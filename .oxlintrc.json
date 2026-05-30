@@ -9,7 +9,8 @@
   "plugins": [
     "typescript",
     "unicorn",
-    "vitest"
+    "vitest",
+    "react"
   ],
   "rules": {
     "typescript/no-explicit-any": "error",
@@ -35,7 +36,22 @@
         "location": "anywhere"
       }
     ],
-    "vitest/no-focused-tests": "error"
+    "vitest/no-focused-tests": "error",
+    "react/jsx-key": "error",
+    "react/jsx-no-target-blank": "error",
+    "react/jsx-no-duplicate-props": "error",
+    "react/no-danger-with-children": "error",
+    "react/no-unknown-property": "error",
+    "react/no-children-prop": "error",
+    "react/jsx-no-undef": "error",
+    "react/jsx-no-comment-textnodes": "error",
+    "unicorn/no-abusive-eslint-disable": "error",
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/prefer-structured-clone": "error",
+    "curly": [
+      "error",
+      "multi-line"
+    ]
   },
   "overrides": [
     {
