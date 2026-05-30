@@ -1,0 +1,9 @@
+---
+description: Enforce architecture boundaries and prevent semantic drift.
+globs: ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx"]
+alwaysApply: true
+---
+
+This file is generated from `policy/agent-guardrails.yaml`. Do not edit it directly.
+
+Use public package entrypoints and preserve architecture direction.

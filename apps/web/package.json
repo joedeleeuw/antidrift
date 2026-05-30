@@ -1,0 +1,27 @@
+{
+  "name": "@agent-guardrails/web",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@agent-guardrails/contracts": "workspace:*",
+    "@agent-guardrails/domain": "workspace:*",
+    "@agent-guardrails/ui": "workspace:*",
+    "react": "catalog:react",
+    "react-dom": "catalog:react"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:react",
+    "@types/react-dom": "catalog:react",
+    "@vitejs/plugin-react": "catalog:react",
+    "typescript": "catalog:core",
+    "vite": "catalog:react",
+    "vitest": "catalog:test"
+  }
+}

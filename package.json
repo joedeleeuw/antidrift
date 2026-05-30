@@ -1,0 +1,56 @@
+{
+  "name": "agent-guardrails-monorepo-template",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "typecheck": "tsc -b --pretty false",
+    "lint": "pnpm lint:oxlint && pnpm lint:eslint",
+    "lint:oxlint": "oxlint . --deny-warnings",
+    "lint:eslint": "eslint . --max-warnings 0",
+    "lint:eslint:json": "mkdir -p reports && eslint . --format json --output-file reports/eslint-antidrift.json || true",
+    "lint:eslint:sarif": "mkdir -p reports && eslint . --format @microsoft/eslint-formatter-sarif --output-file reports/eslint-antidrift.sarif || true",
+    "test": "vitest run --passWithNoTests",
+    "test:integration": "node tooling/antidrift/test/consumer-monorepo.mjs",
+    "check": "pnpm policy:check-generated && pnpm lint && pnpm typecheck && pnpm test",
+    "policy:generate": "antidrift generate",
+    "policy:check-generated": "antidrift check-generated",
+    "policy:check:changed": "antidrift check-changed",
+    "policy:verify-session": "antidrift verify-session",
+    "policy:reports": "pnpm lint:eslint:json && pnpm lint:eslint:sarif",
+    "sonar:prepare": "pnpm lint:eslint:json && antidrift sonar reports/eslint-antidrift.json reports/antidrift-sonar.json",
+    "prepare": "simple-git-hooks"
+  },
+  "devDependencies": {
+    "@joedeleeuw/antidrift": "workspace:*",
+    "@microsoft/eslint-formatter-sarif": "catalog:lint",
+    "@types/node": "catalog:core",
+    "eslint": "catalog:lint",
+    "lint-staged": "catalog:git",
+    "oxlint": "catalog:lint",
+    "prettier": "catalog:lint",
+    "simple-git-hooks": "catalog:git",
+    "tsx": "catalog:core",
+    "typescript": "catalog:core",
+    "vitest": "catalog:test"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,ts,tsx}": [
+      "oxlint --fix",
+      "eslint --fix --max-warnings 0"
+    ],
+    "*.{json,jsonc,md,mdc,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm exec lint-staged",
+    "pre-push": "pnpm policy:verify-session"
+  }
+}

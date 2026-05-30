@@ -1,0 +1,13 @@
+serverBoundaryGlobs:
+  - packages/api/src/routes/**/*.ts # Route handlers must perform auth, schema validation, and ownership checks.
+  - packages/api/src/actions/**/*.ts # Server actions must perform auth, schema validation, and ownership checks.
+
+requiredCalls:
+  authentication:
+    - requireUser # Establishes user identity.
+  authorization:
+    - authorize # Establishes action permission.
+  tenancy:
+    - requireTenant # Establishes tenant scope.
+  validation:
+    - validateInput # Establishes trusted input shape.

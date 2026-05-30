@@ -1,0 +1,36 @@
+id: sonar-ai-strict
+base: Sonar way for AI Code # Use Sonar's AI-oriented gate as the starting point.
+newCode:
+  - metric: new_issues
+    op: equals
+    value: 0
+    comment: AI-assisted changes should not introduce new untriaged Sonar issues.
+  - metric: new_security_hotspots_reviewed
+    op: equals
+    value: 100
+    comment: Security-sensitive generated code requires human review.
+  - metric: new_coverage
+    op: greater_than_or_equal
+    value: 85
+    comment: Coverage is not sufficient, but low coverage is a useful failure signal.
+  - metric: new_duplicated_lines_density
+    op: less_than_or_equal
+    value: 2
+    comment: Agents over-copy local patterns, so duplication budget should be tight.
+  - metric: external_ai_policy_issues
+    op: equals
+    value: 0
+    comment: Custom policy failures imported into Sonar should block the PR gate.
+overallCode:
+  - metric: security_rating
+    op: equals
+    value: A
+    comment: AI code may touch old files, so overall security still matters.
+  - metric: reliability_rating
+    op: equals
+    value: A
+    comment: Reliability debt compounds quickly in agent-edited code.
+  - metric: duplicated_lines_density
+    op: less_than_or_equal
+    value: 5
+    comment: Overall duplication should not trend upward.

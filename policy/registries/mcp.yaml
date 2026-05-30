@@ -1,0 +1,7 @@
+approvedServers: [] # Add MCP servers only after platform-security review.
+
+requiredControls:
+  pinVersion: true # Tool behavior must not change without review.
+  hashToolDescriptions: true # Tool-description drift can alter agent behavior.
+  leastPrivilegeFilesystem: true # Tools should receive the narrowest file scope possible.
+  leastPrivilegeSecrets: true # Tools should receive the narrowest secret scope possible.

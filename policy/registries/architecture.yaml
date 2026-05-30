@@ -1,0 +1,31 @@
+layers:
+  app:
+    roots: ["apps/*/src/**"] # App code may compose UI, domain, and contracts but not server internals.
+    mayImport: ["ui", "domain", "contracts"]
+  ui:
+    roots: ["packages/ui/src/**"] # UI components should remain presentational and token-driven.
+    mayImport: ["domain"]
+  domain:
+    roots: ["packages/domain/src/**"] # Domain code must not depend on infrastructure.
+    mayImport: []
+  contracts:
+    roots: ["packages/contracts/src/**"] # Contracts may reference domain primitives only.
+    mayImport: ["domain"]
+  api:
+    roots: ["packages/api/src/**"] # Server boundaries may compose domain, contracts, and gateways.
+    mayImport: ["domain", "contracts", "gateways"]
+  gateways:
+    roots: ["packages/gateways/src/**"] # Gateways own direct external SDK/client integrations.
+    mayImport: ["domain", "contracts"]
+
+publicEntrypoints:
+  - index.ts # Consumers should import module public APIs, not internal files.
+  - public.ts # Optional explicit public API file for larger modules.
+
+forbiddenImports:
+  - from: "apps/*/src/**" # Browser app code cannot import server internals.
+    to: "packages/api/src/**"
+  - from: "packages/ui/src/**" # UI must not reach infrastructure.
+    to: "packages/gateways/src/**"
+  - from: "packages/domain/src/**" # Domain must not depend on platform details.
+    to: "packages/api/src/**"

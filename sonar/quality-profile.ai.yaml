@@ -1,0 +1,20 @@
+id: sonar-way-plus-ai
+extends: Sonar way # Extending keeps future default Sonar rule updates.
+languages:
+  - JavaScript
+  - TypeScript
+prioritizedRuleFamilies:
+  - id: complexity
+    comment: Agent code often passes tests while becoming hard to understand.
+  - id: duplication
+    comment: Agents copy nearby code and mutate it slightly.
+  - id: control-flow-correctness
+    comment: Plausible generated code often has small branch/callback mistakes.
+  - id: security-injection
+    comment: Generated snippets need strict unsafe API detection.
+  - id: test-integrity
+    comment: Generated tests often lack meaningful assertions.
+  - id: accessibility
+    comment: UI agents omit accessibility unless enforced.
+  - id: external-antidrift
+    comment: Repo-specific agent failures must appear beside native Sonar issues.

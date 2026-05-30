@@ -1,0 +1,9 @@
+runtimeDependencyPolicy:
+  requireApproval: true # Agents must not add runtime dependencies without review.
+  approvalFile: architecture/approved-dependencies.yaml # Reviewable place to record allowed new runtime dependencies.
+  bannedVersionSpecifiers: [latest, "*", "x"] # Floating versions make builds non-reproducible.
+
+allowedDevDependencyFamilies:
+  - lint # Tooling dependencies are allowed through policy changes.
+  - test # Test dependencies are allowed through policy changes.
+  - build # Build dependencies are allowed through policy changes.

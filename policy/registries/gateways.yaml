@@ -1,0 +1,10 @@
+approvedGateways:
+  ai:
+    wrapper: packages/gateways/src/aiGateway.ts # AI client access must centralize timeouts and logging.
+    bannedDirectImports: [openai, "@anthropic-ai/sdk"]
+  payments:
+    wrapper: packages/gateways/src/paymentGateway.ts # Payment SDK access must centralize auth, idempotency, and audit logging.
+    bannedDirectImports: [stripe]
+  cloud:
+    wrapper: packages/gateways/src/cloudGateway.ts # Cloud SDK access must centralize credentials and retry policy.
+    bannedDirectImports: ["@aws-sdk/**", "@google-cloud/**"]

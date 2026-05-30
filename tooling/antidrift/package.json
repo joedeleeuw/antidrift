@@ -1,0 +1,68 @@
+{
+  "name": "@joedeleeuw/antidrift",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Deterministic lint + policy guardrails against code and AI-agent drift: a custom ESLint plugin, shareable ESLint/Oxlint configs, and a policy generator for agent instruction files and hooks.",
+  "keywords": [
+    "eslint",
+    "eslint-plugin",
+    "eslint-config",
+    "oxlint",
+    "lint",
+    "guardrails",
+    "ai",
+    "agents",
+    "codegen",
+    "policy",
+    "typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joedeleeuw/antidrift.git",
+    "directory": "tooling/antidrift"
+  },
+  "homepage": "https://github.com/joedeleeuw/antidrift#readme",
+  "bugs": "https://github.com/joedeleeuw/antidrift/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./src/policy/index.mjs",
+    "./eslint-plugin": "./src/eslint-plugin/index.js",
+    "./eslint-config": "./src/eslint-config/index.mjs",
+    "./oxlint-config": "./src/oxlint-config/index.mjs"
+  },
+  "bin": {
+    "antidrift": "./src/policy/cli.mjs"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.*",
+    "!src/**/fixtures/**"
+  ],
+  "dependencies": {
+    "@eslint/js": "catalog:lint",
+    "eslint-plugin-boundaries": "catalog:lint",
+    "eslint-plugin-jsx-a11y": "catalog:lint",
+    "eslint-plugin-no-only-tests": "catalog:lint",
+    "eslint-plugin-react-hooks": "catalog:lint",
+    "eslint-plugin-sonarjs": "catalog:lint",
+    "globals": "catalog:lint",
+    "yaml": "catalog:core"
+  },
+  "peerDependencies": {
+    "@typescript-eslint/parser": ">=8",
+    "eslint": ">=9",
+    "typescript-eslint": ">=8"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:core",
+    "@typescript-eslint/parser": "catalog:lint",
+    "firebase": "^11.0.0",
+    "typescript": "catalog:core",
+    "typescript-eslint": "catalog:lint",
+    "vitest": "catalog:test",
+    "zod": "catalog:core"
+  }
+}

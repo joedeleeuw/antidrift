@@ -1,0 +1,9 @@
+---
+description: Prevent React state-shape slop from agent-generated UI.
+globs: ["apps/**/*.tsx", "packages/ui/**/*.tsx"]
+alwaysApply: true
+---
+
+This file is generated from `policy/agent-guardrails.yaml`. Do not edit it directly.
+
+Avoid coupled useState waterfalls, status triplets, derived-state effects, and raw fetch calls in components.

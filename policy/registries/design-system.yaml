@@ -1,0 +1,14 @@
+semanticClassPrefixes:
+  - text-fg # Semantic foreground token prefix.
+  - bg-surface # Semantic surface token prefix.
+  - border-border # Semantic border token prefix.
+  - ring-focus # Semantic focus token prefix.
+
+bannedRawTailwindColorPattern: "\\b(text|bg|border|ring)-(red|blue|green|yellow|gray|slate|zinc|neutral)-\\d{2,3}\\b" # Raw palette utilities bypass product tokens.
+bannedHoverTranslatePattern: "hover:-?translate-[xy]" # Moving pointer targets on hover creates cursor-chasing UI.
+
+genericAiCopy:
+  - seamlessly # Common AI filler copy.
+  - unlock your potential # Generic marketing phrase.
+  - take your .* to the next level # Generic AI marketing phrase.
+  - we're sorry for any inconvenience # Generic support phrase.

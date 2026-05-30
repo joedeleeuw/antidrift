@@ -1,0 +1,29 @@
+# Declares canonical generated type sources and their approved consumer wrappers.
+# Each entry declares where the generated types live, what direct imports are banned (agents must
+# not import raw generated output directly), and which file is the approved wrapper that consumers
+# should import from instead.
+#
+# Add entries here whenever codegen (Prisma, GraphQL, OpenAPI, Protobuf) produces TypeScript types
+# that consumers should use via a wrapper rather than importing the raw generated path.
+
+generatedSources: {}
+  # Example — uncomment and adapt when codegen is added:
+  #
+  # prisma:
+  #   generated: node_modules/.prisma/client  # or src/generated/prisma
+  #   wrapper: packages/domain/src/db.ts      # the approved schema wrapper
+  #   bannedDirectImports:
+  #     - "@prisma/client"
+  #   message: "Import domain types from packages/domain/src/db.ts instead of the raw Prisma client."
+  #
+  # graphql:
+  #   generated: src/generated/graphql
+  #   wrapper: packages/contracts/src/graphql.ts
+  #   bannedDirectImports: []                 # empty = no raw import ban; structural drift is caught by gen/no-structural-type-fork
+  #   message: "Import GraphQL types from packages/contracts/src/graphql.ts."
+  #
+  # openapi:
+  #   generated: src/generated/openapi
+  #   wrapper: packages/contracts/src/api.ts
+  #   bannedDirectImports: []
+  #   message: "Import API types from packages/contracts/src/api.ts."

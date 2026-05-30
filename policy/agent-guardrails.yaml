@@ -1,0 +1,345 @@
+version: 1
+
+meta:
+  defaultSeverity: error # Agents treat warnings as optional; policy violations should fail locally and in CI.
+  maxWarnings: 0 # Warning debt becomes normalized agent output, so warning budgets default to zero.
+  generatedFilesAreReadOnly: true # Agents must edit this source file instead of generated policy artifacts.
+  generatedTargets: # These files are regenerated from this source to prevent tool-specific drift.
+    - AGENTS.md # Codex and other agents consume this as repo-local guidance.
+    - CLAUDE.md # Claude consumes this as persistent project context.
+    - .cursor/rules/*.mdc # Cursor consumes scoped IDE-native rules.
+    - .github/copilot-instructions.md # Copilot consumes repository instructions.
+    - .codex/hooks.json # Codex uses this for deterministic lifecycle enforcement.
+    - .claude/settings.json # Claude uses this for deterministic lifecycle enforcement.
+
+clusters:
+  - id: react-state-shape # Agents often create working UI with coupled state lifecycle hidden across many useState calls.
+    owner: frontend-platform # The frontend platform owner decides reducer/query/resource conventions.
+    rules:
+      - id: react/no-use-state-waterfall # Multiple state cells can indicate one implicit state machine.
+        severity: error
+        detector: componentUseStateCountGte:4
+        message: Use a reducer, state object, query resource, or state machine when state values change together.
+      - id: react/no-coupled-state-setters # One handler updating many setters proves the state is coupled.
+        severity: error
+        detector: sameFunctionDistinctStateSettersGte:3
+        message: Model one transition instead of scattering updates across setters.
+      - id: react/no-status-triplet-state # data/loading/error triplets are a common async lifecycle smell.
+        severity: error
+        detector: stateNamesInclude:data/loading/error
+        message: Represent async lifecycle as one resource or reducer value.
+      - id: react/no-derived-state-effect # Setting derived state in effects creates extra renders and stale state.
+        severity: error
+        detector: useEffectSynchronouslyCallsSetterFromDeps
+        message: Compute derived state during render or memoize it.
+      - id: react/no-effect-fetch-waterfall # Fetch-in-effect plus local lifecycle state duplicates app data loading policy.
+        severity: warn
+        detector: useEffectContainsFetchAndLoadingState
+        message: Prefer route loaders, server boundaries, or query resources over ad-hoc component fetches.
+      - id: react/require-effect-deps # A missing deps array runs the effect every render; exhaustive-deps only checks an array that already exists.
+        severity: error
+        detector: effectHookCalledWithoutDependencyArray
+        message: Pass a dependency array to useEffect/useLayoutEffect ([] or the real dependencies); a missing array runs the effect on every render.
+
+  - id: type-contract-shape # Agents appease TypeScript locally unless type ownership is enforced.
+    owner: types-platform # The type platform owner controls when explicit contracts belong at boundaries.
+    rules:
+      - id: ts/no-trivial-selector-wrapper # Blocks getPointFromBag-style wrappers that only restate property access.
+        severity: error
+        detector: singlePropertyReturnWithExplicitReturnType
+        message: Use inference directly or move the contract to the owning boundary.
+      - id: ts/no-mechanical-get-x-from-y # Name shape is a high-signal pattern for AI-created type appeasement helpers.
+        severity: error
+        detector: nameMatches:^(get|select|extract)[A-Z].*From[A-Z]
+        message: Do not create getXFromY helpers unless they contain real domain logic.
+      - id: ts/no-explicit-return-type-private-helper # Private helper return annotations hide weak inference and stale types.
+        severity: error
+        detector: nonExportedFunctionHasReturnType
+        message: Keep explicit return types at public or architectural boundaries.
+      - id: ts/no-inline-structural-type-at-use-site # Use-site structural contracts fork domain ownership.
+        severity: error
+        detector: inlineObjectTypeInParameterOrVariable
+        message: Import or create the owned named type.
+      - id: ts/no-unsafe-cast-chain # as unknown as T is a type-system escape tunnel.
+        severity: error
+        detector: castChainIncludesUnknownThenSpecific
+        message: Validate, narrow, or fix the source type instead of tunneling through unknown.
+
+  - id: abstraction-and-file-shape # Agents over-extract tiny helpers and append to large files.
+    owner: architecture # Architecture owns file/module shape and refactoring thresholds.
+    rules:
+      - id: arch/no-one-use-helper # Tiny helpers referenced once are usually fake abstraction.
+        severity: warn
+        detector: localFunctionReferenceCountLte:1,maxStatements:3
+        message: Inline or name a real domain concept.
+      - id: arch/no-obvious-comment # Agents pad output with comments that restate the next line. Heuristic; trigger words and length are configurable.
+        severity: error
+        detector: commentRestatesAdjacentStatement
+        message: Comment restates the adjacent code. Explain why, not what — or remove it.
+      - id: arch/max-function-lines # Long functions hide generated complexity.
+        severity: error
+        detector: functionLinesGt:50
+        message: Split by responsibility rather than arbitrary wrappers.
+      - id: arch/max-component-lines # Large components mix data, state, render, and effects.
+        severity: error
+        detector: reactComponentLinesGt:180
+        message: Split container, view, and state/resource boundaries.
+      - id: arch/no-high-touch-file-growth # Agents append to central files because they are visible.
+        severity: error
+        detector: fileFanInGte:20,addedLinesGte:25
+        message: Add a focused module instead of growing a hub file.
+
+  - id: semantic-architecture-drift # Code can look modular while semantic ownership scatters.
+    owner: architecture # Architecture owns allowed dependency graph and module entrypoints.
+    registry: policy/registries/architecture.yaml # Layer names and path roots are repo-specific facts.
+    rules:
+      - id: arch/no-cross-layer-import # Prevents bypassing intended layers.
+        severity: error
+        detector: forbiddenImportPairs
+        message: Use the approved layer boundary.
+      - id: arch/no-deep-import # Consumers should import public entrypoints, not internals.
+        severity: error
+        detector: privateImportPath
+        message: Import from the package/module public API.
+      - id: arch/no-new-dependency-cycle # Cycles make future agent edits harder and less local.
+        severity: error
+        detector: dependencyGraphIntroducesCycle
+        message: Break the cycle before merge.
+      - id: arch/no-feature-scatter # One feature spread across many roots is Modular Mirage drift.
+        severity: warn
+        detector: sameChangeTouchesArchitectureRootsGte:5
+        message: Add an architecture note or consolidate ownership.
+
+  - id: side-effects-and-boundaries # Agents call convenient APIs from the wrong layer.
+    owner: platform # Platform owns approved side-effect gateways.
+    registry: policy/registries/gateways.yaml # Approved external SDK wrappers are repo-specific.
+    rules:
+      - id: boundary/no-raw-fetch-in-component # Raw fetch in UI creates local lifecycle soup.
+        severity: error
+        detector: reactComponentContainsGlobalFetch
+        message: Use a route loader, query resource, or API client.
+      - id: boundary/no-sdk-direct-use-outside-gateway # SDK usage must centralize auth, retry, logging, and policy. Enforced via registry-driven rule (gateways.yaml bannedDirectImports).
+        severity: error
+        detector: importSourceMatchesBannedPattern # Registry-driven: options loaded from policy/registries/gateways.yaml at config time.
+        message: Use the approved gateway wrapper.
+      - id: boundary/no-env-access-in-client # Client env access leaks server-only config assumptions.
+        severity: error
+        detector: clientCodeReadsProcessEnv
+        message: Use explicit public config.
+
+  - id: domain-model-drift # Agents invent parallel names and shapes for the same business concept.
+    owner: domain-platform # Domain owners control canonical entities, statuses, and roles.
+    registry: policy/registries/domain.yaml # Domain strings are not guessable without project facts.
+    rules:
+      - id: domain/no-inline-domain-status # Status literals in TSLiteralType nodes outside the owning module duplicate the canonical type. Registry-driven (domain.yaml statuses).
+        severity: error
+        detector: tsLiteralTypeContainsCanonicalStatus # Registry-driven: options from policy/registries/domain.yaml statuses.
+        message: Import the canonical status type instead of re-declaring the literal.
+      - id: domain/no-role-literal-outside-policy # Role literals in TSLiteralType nodes outside the owning module fork authorization semantics. Registry-driven (domain.yaml roles).
+        severity: error
+        detector: tsLiteralTypeContainsCanonicalRole # Registry-driven: options from policy/registries/domain.yaml roles.
+        message: Import the canonical Role type instead of re-declaring the literal.
+      - id: domain/no-canonical-model-fork # Duplicate interfaces create semantic drift.
+        severity: warn
+        detector: newTypeSimilarToCanonicalModel
+        message: Extend or import the canonical model.
+
+  - id: generated-type-drift # Agents hand-write types that already exist as generated output (Prisma, GraphQL codegen, OpenAPI, Protobuf). No published ESLint rule covers this — it is a genuine tooling gap.
+    owner: types-platform # Type platform owns codegen conventions and the generated registry.
+    registry: policy/registries/generated.yaml # Canonical generated sources, their wrappers, and banned direct imports.
+    rules:
+      - id: gen/require-import-from-generated # Bans direct imports of raw generated packages outside the declared wrapper. Registry-driven (generated.yaml bannedDirectImports).
+        severity: error
+        detector: importSourceMatchesBannedGeneratedPattern # Registry-driven: options from policy/registries/generated.yaml; enforced via no-restricted-imports with message and pattern from each entry.
+        message: Import from the approved generated-type wrapper, not the raw generated package.
+      - id: gen/no-structural-type-fork # Detects hand-written object types whose resolved properties are a subset of an installed package's exported type. Fully dynamic — any package imported anywhere in the project becomes canonical; no list to maintain.
+        severity: error
+        detector: localObjectTypeSubsetOfInstalledPackageType # Type-aware (parserServices). Enumerates node_modules object types via the program checker, compares by property name + resolved type string. Unions/intersections excluded; min 4 properties.
+        message: Type matches an installed package's exported type — import it instead of redeclaring.
+
+  - id: authorization-control-drift # Agents add executable boundaries without authz and tenancy.
+    owner: security # Security owns route/action/job authorization templates.
+    registry: policy/registries/boundaries.yaml # Boundary functions vary by stack.
+    rules:
+      - id: auth/no-boundaryless-route # Every server boundary needs auth, schema, and ownership.
+        severity: blocker
+        detector: routeMissingAuthOrValidation
+        message: Add requireUser, authorize, tenant scope, and validateInput.
+      - id: auth/no-client-only-authorization # Client checks are not authorization.
+        severity: blocker
+        detector: clientRoleCheckWithoutServerPolicy
+        message: Enforce authorization on the server boundary.
+      - id: auth/require-authz-check # Reading request params without an ownership/authz call is a classic agent IDOR. Scoped to serverBoundaryGlobs.
+        severity: blocker
+        detector: requestParamsAccessWithoutAuthorize
+        message: Call requireUser/authorize before reading request params (boundaries registry requiredCalls).
+
+  - id: error-handling # Agents keep the happy path moving by hiding failures.
+    owner: reliability # Reliability owns error propagation and observability policy.
+    rules:
+      - id: errors/no-silent-catch # Empty catches hide production failures.
+        severity: error
+        detector: catchBlockHasNoThrowNoReturnNoLog
+        message: Re-throw, return a typed failure, or log with context.
+      - id: errors/preserve-caught-error # Throwing a new error without cause loses stack context.
+        severity: error
+        detector: catchThrowsNewErrorWithoutCause
+        message: Preserve the caught error as cause.
+      - id: errors/no-fallback-to-empty # Returning [] or {} on failure makes bad data look valid.
+        severity: error
+        detector: catchReturnsEmptyCollection
+        message: Return a typed failure unless empty is the explicit contract.
+
+  - id: test-integrity # Agents often write tests that execute code without constraining behavior.
+    owner: quality # Quality owns test evidence policy.
+    rules:
+      - id: test/no-only-or-skip # Focused or skipped tests are agent leftovers.
+        severity: error
+        detector: testOnlyOrSkip
+        message: Do not commit focused or skipped tests.
+      - id: test/no-conditional-expect # Conditional assertions can let tests pass without checking behavior.
+        severity: error
+        detector: expectInsideConditional
+        message: Arrange tests so assertions always run.
+      - id: test/no-test-without-assertion # Smoke-only tests do not prove behavior.
+        severity: error
+        detector: testCaseHasNoAssertion
+        message: Assert observable behavior.
+
+  - id: design-system # Agents use generic CSS/Tailwind instead of local tokens.
+    owner: design-system # Design system owns tokens, class restrictions, and voice rules.
+    registry: policy/registries/design-system.yaml # Tokens and banned raw patterns are project-specific.
+    rules:
+      - id: ui/no-raw-tailwind-color # Raw colors bypass semantic tokens.
+        severity: error
+        detector: classNameRawColorUtility
+        message: Use semantic design tokens.
+      - id: ui/no-hover-translate-card # Moving pointer targets on hover creates cursor-chasing UI.
+        severity: error
+        detector: classNameHoverTranslate
+        message: Use shadow, border, color, or inner transform instead.
+      - id: ui/no-generic-ai-copy # Generic AI copy degrades product voice.
+        severity: warn
+        detector: genericMarketingPhrase
+        message: Replace generic phrasing with product-specific language.
+
+  - id: observability-drift # New async/server behavior must remain debuggable.
+    owner: reliability # Reliability owns required log/trace context.
+    rules:
+      - id: obs/async-boundary-requires-context # Routes/jobs/workers need request/user/tenant context.
+        severity: warn
+        detector: newAsyncBoundaryMissingContext
+        message: Add structured context fields.
+      - id: obs/no-fire-and-forget-without-tracking # Untracked async work hides failures.
+        severity: error
+        detector: floatingPromiseAtBoundary
+        message: Await, return, or intentionally track the async work.
+
+  - id: performance-resource-drift # Agents hide N+1 and unbounded resource usage in plausible code.
+    owner: performance # Performance owns resource budget policy.
+    rules:
+      - id: perf/no-await-in-loop-with-io # Sequential IO in loops is a common generated-code bug.
+        severity: error
+        detector: awaitInLoopCallsKnownIoFunction # Deterministic baseline active via eslint core no-await-in-loop; IO-function narrowing is registry-driven future work.
+        message: Batch, parallelize with a limit, or justify the ordering.
+      - id: perf/no-async-array-method # Agents pass async callbacks to map/filter/forEach, silently dropping the returned promises.
+        severity: error
+        detector: asyncCallbackInArrayMethod
+        message: Wrap .map in Promise.all, or use a for...of loop; array iteration methods do not await callbacks.
+      - id: perf/no-unbounded-promise-all # Unbounded concurrency can exhaust pools and APIs.
+        severity: error
+        detector: promiseAllOverUnboundedArray
+        message: Use a concurrency limiter.
+      - id: perf/require-timeout-for-network-call # Network calls without timeout hang agent-built workflows.
+        severity: error
+        detector: networkCallWithoutTimeoutOrAbortSignal
+        message: Pass timeout or AbortSignal through the gateway.
+
+  - id: injection-and-secret-drift # Agents leak secrets and build injection sinks when generating data-access and config code. Distinct from data-lifecycle-drift (migration/fixture alignment).
+    owner: security # Security owns secret handling, query construction, and deserialization policy.
+    rules:
+      - id: sec/no-hardcoded-secret # Enforced via secretlint pre-commit hook, not ESLint. Variable-name heuristics in lint rules produce too many false positives to be reliable.
+        severity: blocker
+        detector: secretlint # https://github.com/secretlint/secretlint — use as a pre-commit/CI hook, not an ESLint rule.
+        message: Load secrets from the environment or a secret manager. Configure secretlint for repo-specific patterns.
+      - id: sec/no-sql-string-concat # Interpolated/concatenated SQL is an injection sink. Deterministic on SQL structure, not lone keywords.
+        severity: blocker
+        detector: sqlBuiltByInterpolationOrConcat
+        message: Use parameterized queries / bound parameters instead of interpolating values into SQL.
+      - id: sec/no-unsafe-deserialize # JSON.parse over request data without validation trusts untrusted input. Configurable source list.
+        severity: error
+        detector: jsonParseOfUntrustedSourceWithoutValidation
+        message: Validate untrusted request data through a schema (e.g. Zod) before use.
+
+  - id: agent-ops # Hooks prevent agents from bypassing the review system.
+    owner: developer-experience # DX owns deterministic lifecycle checks.
+    rules:
+      - id: agent/block-generated-policy-edits # Generated files must not become the source of truth.
+        severity: blocker
+        hookEvent: PreToolUse
+        message: Edit policy/agent-guardrails.yaml and regenerate.
+      - id: agent/block-destructive-shell # Agents overreach with broad shell fixes.
+        severity: blocker
+        hookEvent: PreToolUse
+        message: Destructive shell command blocked by policy.
+      - id: agent/lint-after-edit # Feedback must happen immediately in the edit loop.
+        severity: error
+        hookEvent: PostToolUse
+        message: Edited files must pass changed-file policy checks.
+      - id: agent/require-checks-before-stop # Agents should not end without deterministic evidence.
+        severity: error
+        hookEvent: Stop
+        message: Run required checks before stopping.
+
+  - id: quality-gate-drift # Agents may weaken checks to make output pass.
+    owner: developer-experience # DX owns toolchain integrity.
+    rules:
+      - id: policy/no-check-weakening-without-policy-task # Lint/type/test/CI/Sonar thresholds are protected files.
+        severity: blocker
+        detector: protectedConfigChangedWithoutPolicyTag
+        message: Add [policy-change] and update source-of-truth policy.
+      - id: policy/no-inline-disable-without-ticket # Disables require traceable intent.
+        severity: error
+        detector: disableCommentWithoutTicketOrReason
+        message: Include a reason or ticket.
+
+  - id: mcp-tooling-drift # MCP/tool config is executable supply chain, not harmless metadata.
+    owner: platform-security # Security owns external tool allowlists and scopes.
+    registry: policy/registries/mcp.yaml # Approved servers and scopes are repo-specific.
+    rules:
+      - id: mcp/no-unapproved-server # Agents must not add tools on demand.
+        severity: blocker
+        detector: addedMcpServerNotAllowlisted
+        message: Add new MCP servers through platform security review.
+      - id: mcp/pin-server-version # Floating tool versions change behavior without review.
+        severity: error
+        detector: mcpServerUsesFloatingVersion
+        message: Pin tool versions.
+
+  - id: sonar-governance # Sonar is the portfolio/PR gate, not the bespoke rule authoring layer.
+    owner: engineering-productivity # Eng productivity owns quality gates and external issue ingestion.
+    rules:
+      - id: sonar/import-custom-eslint-issues # Custom policy failures need PR visibility.
+        severity: error
+        detector: missingExternalIssueReport
+        message: Import policy reports into Sonar.
+      - id: sonar/no-new-critical-issues # New generated code must not add critical reliability/security debt.
+        severity: error
+        detector: sonarQualityGateNewCriticalIssues
+        message: Fix or explicitly triage before merge.
+      - id: sonar/complexity-budget # Agents create plausible but over-complex code.
+        severity: error
+        detector: cognitiveComplexityBudget
+        message: Simplify functions exceeding budget.
+
+  - id: agent-instructions # Natural-language guidance should be generated and linted.
+    owner: developer-experience # DX owns multi-agent instruction consistency.
+    rules:
+      - id: rules/one-source-generates-agent-files # Prevent Claude/Codex/Cursor/Copilot drift.
+        severity: error
+        detector: generatedPolicyFilesOutOfDate
+        message: Regenerate agent instruction files from policy/agent-guardrails.yaml.
+      - id: rules/no-vague-agent-rules # Vague rules are not enforceable by agents or humans.
+        severity: error
+        detector: agentRuleContainsVaguePhrase
+        message: Rules must be specific, testable, and tied to examples or commands.

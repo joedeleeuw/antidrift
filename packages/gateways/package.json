@@ -1,0 +1,22 @@
+{
+  "name": "@agent-guardrails/gateways",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@agent-guardrails/contracts": "workspace:*",
+    "@agent-guardrails/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:core",
+    "vitest": "catalog:test"
+  }
+}
