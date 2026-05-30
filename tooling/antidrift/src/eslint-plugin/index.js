@@ -9,6 +9,7 @@ const ticketPattern = /(?:[A-Z][A-Z0-9]+-\d+|https?:\/\/|because|reason:)/iu;
 const arrayMethodsNeedingPromiseAll = new Set(["map", "flatMap"]);
 const arrayMethodsNeverAsync = new Set(["filter", "forEach", "some", "every", "find", "findIndex", "findLast", "findLastIndex", "sort"]);
 const reactEffectHooks = new Set(["useEffect", "useLayoutEffect"]);
+const zodParseMethods = new Set(["parse", "parseAsync"]);
 const defaultObviousTriggerWords = ["set", "assign", "increase", "increment", "decrease", "decrement", "counter", "return", "create", "update", "delete", "get", "call", "initialize", "define", "loop", "iterate", "check", "store", "save"];
 
 function isExported(node) {
@@ -743,6 +744,64 @@ function ruleNoRoleLiteralInType() {
   };
 }
 
+// True when an identifier's symbol (e.g. the `parse` method being called) is declared inside the
+// installed `zod` / `@zod/*` package — the type-aware way to confirm a `.parse()` is Zod's, with no
+// name-matching (a bare `x.parse()` could be JSON, Date, a custom parser, anything).
+function isZodMethod(checker, tsNameNode) {
+  const sym = tsNameNode && checker.getSymbolAtLocation(tsNameNode);
+  for (const decl of sym?.declarations ?? []) {
+    const file = decl.getSourceFile().fileName.replace(/\\/gu, "/");
+    const idx = file.lastIndexOf("/node_modules/");
+    if (idx === -1) continue;
+    const rest = file.slice(idx + "/node_modules/".length);
+    if (rest === "zod" || rest.startsWith("zod/") || rest.startsWith("@zod/")) return true;
+  }
+  return false;
+}
+
+function ruleNoRedundantZodParse() {
+  return {
+    meta: { type: "problem", docs: { description: "Detect re-parsing a value with the same Zod schema that already produced it. Validate once at the boundary and pass the parsed value inward instead of re-validating in every layer." }, schema: [] },
+    create(context) {
+      const services = context.sourceCode?.parserServices ?? context.parserServices;
+      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const checker = services.program.getTypeChecker();
+      // Symbol of a value already validated → symbol of the schema that validated it.
+      const validatedBy = new Map();
+      const symbolOf = (node) => {
+        const tsNode = services.esTreeNodeToTSNodeMap.get(node);
+        return tsNode ? checker.getSymbolAtLocation(tsNode) : undefined;
+      };
+      return {
+        CallExpression(node) {
+          const callee = node.callee;
+          if (callee.type !== "MemberExpression" || callee.computed) return;
+          if (callee.property.type !== "Identifier" || !zodParseMethods.has(callee.property.name)) return;
+          if (callee.object.type !== "Identifier" || node.arguments.length === 0) return; // schema must be a plain reference
+          const tsCall = services.esTreeNodeToTSNodeMap.get(node);
+          if (!isZodMethod(checker, tsCall?.expression?.name)) return; // confirm it is Zod's parse
+          const schemaSym = symbolOf(callee.object);
+          if (!schemaSym) return;
+
+          // Re-parse: the argument is a value already validated by this exact schema (same binding).
+          const arg = node.arguments[0];
+          if (arg.type === "Identifier" && validatedBy.get(symbolOf(arg)) === schemaSym) {
+            context.report({ node, message: "Redundant Zod parse: this value was already validated by the same schema. Validate once at the boundary and pass the parsed value inward instead of re-parsing." });
+          }
+
+          // Provenance: record `const v = Schema.parse(...)` / `const v = await Schema.parseAsync(...)`.
+          let decl = node.parent;
+          if (decl?.type === "AwaitExpression") decl = decl.parent;
+          if (decl?.type === "VariableDeclarator" && decl.id.type === "Identifier" && decl.parent?.type === "VariableDeclaration" && decl.parent.kind === "const") {
+            const declSym = symbolOf(decl.id);
+            if (declSym) validatedBy.set(declSym, schemaSym);
+          }
+        },
+      };
+    },
+  };
+}
+
 const rules = {
   "no-trivial-selector-wrapper": ruleNoTrivialSelectorWrapper(),
   "no-explicit-return-type-private-helper": ruleNoExplicitReturnTypePrivateHelper(),
@@ -762,6 +821,7 @@ const rules = {
   "no-unsafe-deserialize": ruleNoUnsafeDeserialize(),
   "require-authz-check": ruleRequireAuthzCheck(),
   "no-structural-type-fork": ruleNoStructuralTypeFork(),
+  "no-redundant-zod-parse": ruleNoRedundantZodParse(),
   "no-sdk-direct-use": ruleNoSdkDirectUse(),
   "no-status-literal-in-type": ruleNoStatusLiteralInType(),
   "no-role-literal-in-type": ruleNoRoleLiteralInType(),

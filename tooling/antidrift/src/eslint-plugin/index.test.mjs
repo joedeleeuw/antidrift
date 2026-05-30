@@ -308,3 +308,24 @@ typedRuleTester.run("no-structural-type-fork", rule("no-structural-type-fork"), 
     { ...fixture("programs/drift/redeclares-optional.ts"), errors: 1 },
   ],
 });
+
+// ─── no-redundant-zod-parse fixture suite ─────────────────────────────────────
+// Provenance-based: fires only when a value produced by `S.parse()` is re-parsed by the same S.
+typedRuleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
+  valid: [
+    // Boundary parse of raw/any input — the legitimate first validation
+    fixture("programs/correct/zod-boundary-parse.ts"),
+    // Different schema for the storage shape — a genuine second validation, not redundant
+    fixture("programs/correct/zod-different-schema-reparse.ts"),
+    // Double JSON.parse — not Zod, must stay silent (confirms the zod guard)
+    fixture("programs/correct/zod-non-zod-parse.ts"),
+    // Typed param re-parse — no local provenance, so Rule A correctly abstains (Rule C's case)
+    fixture("programs/drift/zod-reparse-typed-value.ts"),
+  ],
+  invalid: [
+    // Re-parse of a parsed value in the same function
+    { ...fixture("programs/drift/zod-reparse-same-fn.ts"), errors: 1 },
+    // Re-parse across functions in the same file via a module-scoped validated const
+    { ...fixture("programs/drift/zod-reparse-cross-fn-same-file.ts"), errors: 1 },
+  ],
+});

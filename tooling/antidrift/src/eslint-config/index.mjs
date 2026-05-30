@@ -127,6 +127,9 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         // generated-type-drift: structural fork detection against installed package types (type-aware).
         "antidrift/no-structural-type-fork": "error",
 
+        // validation-drift: re-parsing a value with the schema that already produced it (type-aware).
+        "antidrift/no-redundant-zod-parse": "error",
+
         // Data-lifecycle security rules.
         // no-hardcoded-secret: enforced via secretlint pre-commit hook — variable-name heuristics
         // in lint rules produce too many false positives. See policy/registries/dependencies.yaml.

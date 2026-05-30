@@ -254,6 +254,10 @@ clusters:
         severity: error
         detector: networkCallWithoutTimeoutOrAbortSignal
         message: Pass timeout or AbortSignal through the gateway.
+      - id: perf/no-redundant-validation # Re-parsing a value with the same Zod schema that produced it wastes CPU in hot paths; agents add defensive re-validation in every layer. Provenance-based and type-aware, so different-schema and external-boundary parses are not flagged.
+        severity: error
+        detector: zodSchemaReparsesOwnValidatedOutput
+        message: Validate once at the boundary and pass the parsed value inward; do not re-parse with the same schema.
 
   - id: injection-and-secret-drift # Agents leak secrets and build injection sinks when generating data-access and config code. Distinct from data-lifecycle-drift (migration/fixture alignment).
     owner: security # Security owns secret handling, query construction, and deserialization policy.
