@@ -34,13 +34,13 @@ function fail(message) {
 }
 
 try {
-  console.log("1/4  packing @joedeleeuw/antidrift …");
+  console.log("1/4  packing @joedeleeuw/antidrift ...");
   run("pnpm", ["pack", "--pack-destination", work], pkgDir);
   const tgz = readdirSync(work).find((f) => f.endsWith(".tgz"));
   if (!tgz) fail("pack produced no tarball");
   const tarball = join(work, tgz);
 
-  console.log("2/4  scaffolding a consumer pnpm workspace …");
+  console.log("2/4  scaffolding a consumer pnpm workspace ...");
   file("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
   file("package.json", JSON.stringify({
     name: "antidrift-consumer-fixture",
@@ -76,18 +76,30 @@ try {
     "export type AuthUser = {\n" +
     "  uid: string;\n  email: string | null;\n  displayName: string | null;\n" +
     "  photoURL: string | null;\n  providerId: string;\n  phoneNumber: string | null;\n};\n");
+  file("packages/app/src/brand.ts",
+    'import { brand, type Brand, type Unbrand } from "@joedeleeuw/antidrift/brand";\n' +
+    'const UserId = brand("UserId", (value): value is string => typeof value === "string" && value.startsWith("user_"));\n' +
+    'type UserId = Brand<string, "UserId">;\n' +
+    "type RawUserId = Unbrand<UserId>;\n" +
+    "declare const raw: unknown;\n" +
+    "const branded = UserId.make(raw);\n" +
+    'const rawLiteral: RawUserId = "user_123";\n' +
+    "branded satisfies UserId;\n" +
+    "rawLiteral satisfies string;\n");
 
-  console.log("3/4  installing the tarball into the consumer …");
+  console.log("3/4  installing the tarball into the consumer ...");
   run("pnpm", ["install", "--config.confirmModulesPurge=false"], work);
 
-  console.log("4/4  linting consumer files through the shipped config …");
+  console.log("4/4  linting consumer files through the shipped config ...");
   function lint(relFile) {
     try {
       const out = run("pnpm", ["exec", "eslint", relFile, "--format", "json"], work);
       return JSON.parse(out);
     } catch (err) {
       // ESLint exits non-zero when it reports problems; the JSON is still on stdout.
-      if (err.stdout) return JSON.parse(err.stdout);
+      if (err && typeof err === "object" && "stdout" in err && typeof err.stdout === "string") {
+        return JSON.parse(err.stdout);
+      }
       throw err;
     }
   }
@@ -102,9 +114,10 @@ try {
   if (cleanRules.includes(RULE)) {
     fail(`clean.ts (legitimate firebase import) must NOT report ${RULE}, got: ${JSON.stringify(cleanRules)}`);
   }
+  run("pnpm", ["exec", "tsc", "-p", "packages/app/tsconfig.json", "--noEmit", "--pretty", "false"], work);
 
   console.log(`\n✓ tarball installs and enforces in a consumer monorepo`);
-  console.log(`  drift.ts → ${RULE} fired; clean.ts stayed clean.`);
+  console.log(`  drift.ts -> ${RULE} fired; clean.ts stayed clean; brand subpath type-checked.`);
   rmSync(work, { recursive: true, force: true });
 } catch (err) {
   console.error(err.stdout || err.message || err);

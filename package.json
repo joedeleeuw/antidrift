@@ -11,20 +11,24 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "typecheck": "tsc -b --pretty false",
-    "lint": "pnpm lint:oxlint && pnpm lint:eslint",
-    "lint:oxlint": "oxlint . --deny-warnings",
-    "lint:eslint": "eslint . --max-warnings 0",
-    "lint:eslint:json": "mkdir -p reports && eslint . --format json --output-file reports/eslint-antidrift.json || true",
-    "lint:eslint:sarif": "mkdir -p reports && eslint . --format @microsoft/eslint-formatter-sarif --output-file reports/eslint-antidrift.sarif || true",
+    "lint": "eslint . --max-warnings 0",
+    "lint:json": "mkdir -p reports && eslint . --format json --output-file reports/eslint-antidrift.json || true",
+    "lint:sarif": "mkdir -p reports && eslint . --format @microsoft/eslint-formatter-sarif --output-file reports/eslint-antidrift.sarif || true",
     "test": "vitest run --passWithNoTests",
     "test:integration": "node tooling/antidrift/test/consumer-monorepo.mjs",
-    "check": "pnpm policy:check-generated && pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm policy:check-generated && pnpm policy:check-registries && pnpm policy:check-rule-surface && pnpm policy:validate-corpus && pnpm policy:validate-external-corpus && pnpm lint && pnpm typecheck && pnpm test",
     "policy:generate": "antidrift generate",
     "policy:check-generated": "antidrift check-generated",
+    "policy:check-registries": "antidrift check-registries",
+    "policy:check-rule-surface": "antidrift check-rule-surface",
+    "policy:validate-corpus": "antidrift repo-corpus --slice validation-gate",
+    "policy:validate-external-corpus": "antidrift external-corpus --slice external-local",
+    "policy:repo-corpus": "antidrift repo-corpus",
+    "policy:validate-chaski": "antidrift chaski-corpus --slice chaski-local",
     "policy:check:changed": "antidrift check-changed",
     "policy:verify-session": "antidrift verify-session",
-    "policy:reports": "pnpm lint:eslint:json && pnpm lint:eslint:sarif",
-    "sonar:prepare": "pnpm lint:eslint:json && antidrift sonar reports/eslint-antidrift.json reports/antidrift-sonar.json",
+    "policy:reports": "pnpm lint:json && pnpm lint:sarif",
+    "sonar:prepare": "pnpm lint:json && antidrift sonar reports/eslint-antidrift.json reports/antidrift-sonar.json",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
@@ -33,7 +37,6 @@
     "@types/node": "catalog:core",
     "eslint": "catalog:lint",
     "lint-staged": "catalog:git",
-    "oxlint": "catalog:lint",
     "prettier": "catalog:lint",
     "simple-git-hooks": "catalog:git",
     "tsx": "catalog:core",
@@ -42,7 +45,6 @@
   },
   "lint-staged": {
     "*.{js,cjs,mjs,ts,tsx}": [
-      "oxlint --fix",
       "eslint --fix --max-warnings 0"
     ],
     "*.{json,jsonc,md,mdc,yml,yaml}": [

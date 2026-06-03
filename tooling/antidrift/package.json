@@ -3,12 +3,11 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Deterministic lint + policy guardrails against code and AI-agent drift: a custom ESLint plugin, shareable ESLint/Oxlint configs, and a policy generator for agent instruction files and hooks.",
+  "description": "Deterministic lint + policy guardrails against code and AI-agent drift: a custom ESLint plugin, shareable ESLint config, and a policy generator for agent instruction files and hooks.",
   "keywords": [
     "eslint",
     "eslint-plugin",
     "eslint-config",
-    "oxlint",
     "lint",
     "guardrails",
     "ai",
@@ -28,10 +27,15 @@
     "access": "public"
   },
   "exports": {
-    ".": "./src/policy/index.mjs",
+    ".": "./src/index.mjs",
+    "./brand": {
+      "types": "./src/brand/index.d.mts",
+      "import": "./src/brand/index.mjs",
+      "default": "./src/brand/index.mjs"
+    },
     "./eslint-plugin": "./src/eslint-plugin/index.js",
     "./eslint-config": "./src/eslint-config/index.mjs",
-    "./oxlint-config": "./src/oxlint-config/index.mjs"
+    "./policy": "./src/policy/index.mjs"
   },
   "bin": {
     "antidrift": "./src/policy/cli.mjs"
@@ -42,18 +46,22 @@
     "!src/**/fixtures/**"
   ],
   "dependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "catalog:lint",
     "@eslint/js": "catalog:lint",
     "eslint-plugin-boundaries": "catalog:lint",
-    "eslint-plugin-jsx-a11y": "catalog:lint",
+    "eslint-plugin-import-x": "catalog:lint",
     "eslint-plugin-no-only-tests": "catalog:lint",
+    "eslint-plugin-react": "catalog:lint",
     "eslint-plugin-react-hooks": "catalog:lint",
     "eslint-plugin-sonarjs": "catalog:lint",
+    "eslint-plugin-unicorn": "catalog:lint",
     "globals": "catalog:lint",
     "yaml": "catalog:core"
   },
   "peerDependencies": {
     "@typescript-eslint/parser": ">=8",
     "eslint": ">=9",
+    "typescript": ">=5",
     "typescript-eslint": ">=8"
   },
   "devDependencies": {
