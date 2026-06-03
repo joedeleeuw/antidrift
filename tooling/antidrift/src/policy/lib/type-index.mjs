@@ -82,19 +82,16 @@ function candidateFor(checker, sym, pkg) {
   return { label: `${pkg}#${sym.getName()}`, props };
 }
 
-// Enumerate every exported object type (>= MIN_PROPS) from installed packages loaded in the program,
-// with its property fingerprint precomputed. The program contains whatever the project imports, so
-// this is fully dynamic: import a package anywhere in the codebase and its types become canonical.
-export function collectCanonicalTypes(program, checker) {
+function exportedObjectTypes(program, checker, sourceFilter, labelFor) {
   const candidates = [];
   const seen = new Set();
   for (const sf of program.getSourceFiles()) {
-    if (!sf.isDeclarationFile || !isCanonicalSource(sf.fileName)) continue;
+    if (!sourceFilter(sf)) continue;
     const moduleSym = checker.getSymbolAtLocation(sf);
     if (!moduleSym) continue;
-    const pkg = packageOf(sf.fileName);
+    const labelPrefix = labelFor(sf);
     for (const sym of checker.getExportsOfModule(moduleSym)) {
-      const candidate = candidateFor(checker, sym, pkg);
+      const candidate = candidateFor(checker, sym, labelPrefix);
       if (candidate && !seen.has(candidate.label)) {
         seen.add(candidate.label);
         candidates.push(candidate);
@@ -102,4 +99,59 @@ export function collectCanonicalTypes(program, checker) {
     }
   }
   return candidates;
+}
+
+// Enumerate every exported object type (>= MIN_PROPS) from installed packages loaded in the program,
+// with its property fingerprint precomputed. The program contains whatever the project imports, so
+// this is fully dynamic: import a package anywhere in the codebase and its types become canonical.
+export function collectCanonicalTypes(program, checker) {
+  return exportedObjectTypes(
+    program,
+    checker,
+    (sf) => sf.isDeclarationFile && isCanonicalSource(sf.fileName),
+    (sf) => packageOf(sf.fileName),
+  );
+}
+
+function normalizePath(fileName) {
+  return fileName.replace(/\\/gu, "/");
+}
+
+function registryPath(path) {
+  let source = normalizePath(path);
+  while (source.startsWith("./")) source = source.slice(2);
+  while (source.endsWith("/")) source = source.slice(0, -1);
+  return source;
+}
+
+function matchesGeneratedSource(fileName, generated) {
+  const source = registryPath(generated);
+  if (!source) return false;
+  const p = normalizePath(fileName);
+  return p.includes(`/${source}/`) || p.endsWith(`/${source}`);
+}
+
+export function collectGeneratedCanonicalTypes(program, checker, generatedSources = {}) {
+  const entries = Object.entries(generatedSources).filter(([, entry]) => typeof entry?.generated === "string");
+  if (entries.length === 0) return [];
+  return exportedObjectTypes(
+    program,
+    checker,
+    (sf) => entries.some(([, entry]) => matchesGeneratedSource(sf.fileName, entry.generated)),
+    (sf) => {
+      const matched = entries.find(([, entry]) => matchesGeneratedSource(sf.fileName, entry.generated));
+      return matched?.[0] ?? normalizePath(sf.fileName);
+    },
+  );
+}
+
+export function resolvesToGeneratedType(type, generatedSources = {}) {
+  const entries = Object.values(generatedSources).filter((entry) => typeof entry?.generated === "string");
+  if (!type || entries.length === 0) return false;
+  const symbols = [typeof type.getSymbol === "function" ? type.getSymbol() : type.symbol, type.aliasSymbol];
+  return symbols.some((sym) =>
+    (sym?.getDeclarations?.() ?? sym?.declarations ?? []).some((decl) =>
+      entries.some((entry) => matchesGeneratedSource(decl.getSourceFile().fileName, entry.generated))
+    )
+  );
 }

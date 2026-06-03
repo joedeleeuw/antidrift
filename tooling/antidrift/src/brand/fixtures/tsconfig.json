@@ -8,5 +8,5 @@
     "module": "ESNext",
     "target": "ES2022"
   },
-  "include": ["programs/**/*.ts", "programs/**/*.tsx"]
+  "include": ["programs/**/*.ts"]
 }

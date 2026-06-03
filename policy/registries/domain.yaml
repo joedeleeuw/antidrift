@@ -5,11 +5,14 @@ canonicalEntities:
 statuses:
   UserStatus:
     owner: packages/domain/src/user.ts # Status strings must be imported from the canonical type.
+    valuesExport: userStatuses # check-registries compares these values to the owner export.
     values: [active, disabled, invited]
   ProjectStatus:
     owner: packages/domain/src/project.ts # Project status drift breaks authorization and UI logic.
+    valuesExport: projectStatuses
     values: [draft, active, archived]
 
 roles:
   owner: packages/domain/src/auth.ts # Role literals must live in auth/domain policy.
+  valuesExport: roles
   values: [admin, owner, member, viewer]

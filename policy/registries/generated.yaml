@@ -19,7 +19,7 @@ generatedSources: {}
   # graphql:
   #   generated: src/generated/graphql
   #   wrapper: packages/contracts/src/graphql.ts
-  #   bannedDirectImports: []                 # empty = no raw import ban; structural drift is caught by gen/no-structural-type-fork
+  #   bannedDirectImports: []                 # empty = no raw import ban; structural fork detection still uses `generated`
   #   message: "Import GraphQL types from packages/contracts/src/graphql.ts."
   #
   # openapi:

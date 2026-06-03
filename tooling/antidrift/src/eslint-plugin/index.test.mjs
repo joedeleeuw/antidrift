@@ -47,21 +47,22 @@ const rule = (name) => plugin.rules[name];
 
 ruleTester.run("no-async-array-method", rule("no-async-array-method"), {
   valid: [
-    "async function f() { await Promise.all(items.map(async (i) => i + 1)); }",
+    fixture("programs/correct/async-map-promise-all.ts"),
+    fixture("programs/correct/async-map-delayed-promise-all.ts"),
     "items.map((i) => i + 1);",
     "async function f() { for (const i of items) { await work(i); } }",
   ],
   invalid: [
-    { code: "items.map(async (i) => i + 1);", errors: 1 },
-    { code: "items.forEach(async (i) => { await work(i); });", errors: 1 },
-    { code: "items.filter(async (i) => i > 0);", errors: 1 },
+    { ...fixture("programs/drift/async-map-without-promise-all.ts"), errors: 1 },
+    { ...fixture("programs/drift/async-foreach-callback.ts"), errors: 1 },
+    { ...fixture("programs/drift/async-filter-callback.ts"), errors: 1 },
   ],
 });
 
 ruleTester.run("require-effect-deps", rule("require-effect-deps"), {
   valid: [
-    'import { useEffect } from "react"; useEffect(() => {}, []);',
-    'import { useEffect } from "react"; useEffect(() => { f(x); }, [x]);',
+    fixture("programs/correct/effect-empty-deps.ts"),
+    fixture("programs/correct/effect-with-deps.ts"),
     'import { useLayoutEffect } from "react"; useLayoutEffect(() => {}, []);',
     'import { useEffect as ue } from "react"; ue(() => {}, [x]);',
     'import React from "react"; React.useEffect(() => {}, [x]);',
@@ -74,147 +75,180 @@ ruleTester.run("require-effect-deps", rule("require-effect-deps"), {
     'import { useEffect } from "./mine"; useEffect(() => {});',
   ],
   invalid: [
-    { code: 'import { useEffect } from "react"; useEffect(() => { f(x); });', errors: 1 },
+    { ...fixture("programs/drift/effect-missing-deps-direct.ts"), errors: 1 },
     { code: 'import { useLayoutEffect } from "react"; useLayoutEffect(() => {});', errors: 1 },
     { code: 'import { useEffect as ue } from "react"; ue(() => {});', errors: 1 },
     { code: 'import React from "react"; React.useEffect(() => {});', errors: 1 },
     { code: 'import * as React from "react"; React.useEffect(() => {});', errors: 1 },
+    { ...fixture("programs/drift/effect-missing-deps.ts"), errors: 1 },
   ],
 });
 
 ruleTester.run("no-obvious-comment", rule("no-obvious-comment"), {
   valid: [
-    "// Guard against null tenants before lookup\nconst t = ctx.tenant;",
+    fixture("programs/correct/comment-explains-null-guard.ts"),
     "const x = 1;",
     "// eslint-disable-next-line no-console\nconst y = 2;",
+    "/** Use this hook when you need a stable reference without stale closures. */\nexport function useLatestCallbackRef() {}",
+    "// Background colors\nexport const background = {};",
   ],
   invalid: [
-    { code: "// increment count\ncount++;", errors: 1 },
-    { code: "// set count to zero\nlet count = 0;", errors: 1 },
+    { ...fixture("programs/drift/obvious-increment-comment.ts"), errors: 1 },
+    { ...fixture("programs/drift/obvious-assignment-comment.ts"), errors: 1 },
   ],
 });
 
 ruleTester.run("no-trivial-selector-wrapper", rule("no-trivial-selector-wrapper"), {
   valid: [
-    "export function getPointFromBag(bag: { point: number }): number { return bag.point; }",
-    "function compute(bag: { point: number }): number { return bag.point * 2; }",
+    fixture("programs/correct/exported-function-selector-boundary.ts"),
+    fixture("programs/correct/selector-computation.ts"),
+    fixture("programs/correct/inferred-selector-wrapper.ts"),
+    fixture("programs/correct/selector-returns-foreign-object.ts"),
+    fixture("programs/correct/selector-this-member.ts"),
+    fixture("programs/correct/destructured-param-computation.ts"),
+    // Public methods of an exported class are a boundary; type-level/abstract signatures need explicit types
+    fixture("programs/correct/methods-public-boundary.ts"),
+    fixture("programs/correct/methods-interface-and-abstract.ts"),
+    fixture("programs/correct/exported-object-boundary.ts"),
+    fixture("programs/correct/returned-object-boundary.ts"),
+    fixture("programs/correct/private-boolean-predicate-helper.ts"),
   ],
   invalid: [
-    { code: "function getPointFromBag(bag: { point: number }): number { return bag.point; }", errors: 1 },
+    { ...fixture("programs/drift/typed-selector-wrapper.ts"), errors: 1 },
+    { ...fixture("programs/drift/typed-selector-arrow-wrapper.ts"), errors: 1 },
+    { ...fixture("programs/drift/typed-nested-selector-wrapper.ts"), errors: 1 },
+    // Same wrapper as a method on an internal class must be caught too
+    { ...fixture("programs/drift/methods-internal-appeasement.ts"), errors: 3 },
+    { ...fixture("programs/drift/object-literal-appeasement.ts"), errors: 1 },
+    { ...fixture("programs/drift/destructured-param-selector-wrapper.ts"), errors: 2 },
   ],
 });
 
 ruleTester.run("no-unsafe-cast-chain", rule("no-unsafe-cast-chain"), {
-  valid: ["const x = y as Foo;"],
-  invalid: [{ code: "const x = y as unknown as Foo;", errors: 1 }],
+  valid: [fixture("programs/correct/plain-cast.ts")],
+  invalid: [{ ...fixture("programs/drift/unknown-cast-tunnel.ts"), errors: 1 }],
 });
 
-ruleTester.run("no-silent-catch", rule("no-silent-catch"), {
-  valid: ["try { f(); } catch (e) { throw e; }"],
+typedRuleTester.run("no-cast-to-branded", rule("no-cast-to-branded"), {
+  valid: [
+    fixture("programs/correct/brand-validation-boundary.ts"),
+    fixture("programs/correct/plain-cast.ts"),
+  ],
   invalid: [
-    { code: "try { f(); } catch (e) {}", errors: 1 },
-    { code: "try { f(); } catch (e) { console.log(e); }", errors: 1 },
+    { ...fixture("programs/drift/brand-cast-forgery.ts"), errors: 2 },
   ],
 });
 
-ruleTester.run("no-inline-disable-without-ticket", rule("no-inline-disable-without-ticket"), {
-  valid: ["// @ts-ignore because the upstream SDK types are wrong\nconst x = 1;"],
-  invalid: [{ code: "// @ts-ignore\nconst x = 1;", errors: 1 }],
+typedRuleTester.run("no-appeasement-cast", rule("no-appeasement-cast"), {
+  valid: [
+    fixture("programs/correct/narrow-then-assign.ts"),
+    fixture("programs/correct/plain-cast.ts"),
+    fixture("programs/correct/brand-validation-boundary.ts"),
+    fixture("programs/correct/json-parse-result-schema-parse.ts"),
+  ],
+  invalid: [
+    { ...fixture("programs/drift/appeasement-cast.ts"), errors: 2 },
+    { ...fixture("programs/drift/json-parse-result-cast.ts"), errors: 1 },
+  ],
+});
+
+typedRuleTester.run("no-defensive-shape-probing", rule("no-defensive-shape-probing"), {
+  valid: [
+    fixture("programs/correct/owned-type-guard-or-schema.ts"),
+    fixture("programs/correct/narrow-then-assign.ts"),
+  ],
+  invalid: [
+    { ...fixture("programs/drift/object-entries-shape-probing.ts"), errors: 1 },
+  ],
+});
+
+ruleTester.run("no-silent-catch", rule("no-silent-catch"), {
+  valid: [fixture("programs/correct/catch-rethrows-error.ts")],
+  invalid: [
+    { ...fixture("programs/drift/empty-catch-block.ts"), errors: 1 },
+    { ...fixture("programs/drift/console-only-catch.ts"), errors: 1 },
+  ],
 });
 
 ruleTester.run("no-coupled-state-setters", rule("no-coupled-state-setters"), {
   valid: [
-    "function f() { const [a, setA] = useState(0); function h() { setA(1); } }",
-    // Bug regression: ComponentB's handler calls only its OWN setter + a sibling's. Should not fire
-    // because ComponentA's setX is no longer in scope after ComponentA exits.
-    "function A() { const [x, setX] = useState(0); function h() { setX(1); } } function B() { const [y, setY] = useState(0); function h() { setY(1); } }",
+    fixture("programs/correct/single-state-setter-handler.ts"),
+    fixture("programs/correct/sibling-component-setter-scope.ts"),
   ],
   invalid: [
-    {
-      code: "function f() { const [a, setA] = useState(0); const [b, setB] = useState(0); const [c, setC] = useState(0); function h() { setA(1); setB(2); setC(3); } }",
-      errors: 1,
-    },
+    { ...fixture("programs/drift/coupled-state-setters-handler.ts"), errors: 1 },
   ],
 });
 
 ruleTester.run("no-status-triplet-state", rule("no-status-triplet-state"), {
-  valid: ["function f() { const [data, setData] = useState(null); }"],
+  valid: [
+    fixture("programs/correct/resource-state-union.ts"),
+  ],
   invalid: [
+    { ...fixture("programs/drift/status-triplet-default.ts"), errors: 1 },
     {
-      code: "function f() { const [data, setData] = useState(null); const [loading, setLoading] = useState(false); const [error, setError] = useState(null); }",
+      ...fixture("programs/drift/status-triplet-configured.ts"),
+      options: [{ dataNames: ["rows"], loadingNames: ["busy"], errorNames: ["failure"] }],
       errors: 1,
     },
   ],
 });
 
-ruleTester.run("no-explicit-return-type-private-helper", rule("no-explicit-return-type-private-helper"), {
-  valid: [
-    "export function helper(): number { return 1; }",
-    "function useThing(): number { return 1; }",
-  ],
-  invalid: [{ code: "function helper(): number { return 1; }", errors: 1 }],
-});
-
 ruleTester.run("no-inline-structural-type-at-use-site", rule("no-inline-structural-type-at-use-site"), {
-  valid: ["type T = { a: number }; function f(x: T): void {}"],
-  invalid: [{ code: "function f(x: { a: number }): void {}", errors: 1 }],
+  valid: [
+    fixture("programs/correct/named-structural-parameter-type.ts"),
+    "import type { ReactNode } from 'react';\nexport function Shell({ children }: { children: ReactNode }) { return children; }",
+    "type Props = { onConfirm: (date: { year: number; month: number; day: number }) => void }; void ({} as Props);",
+    "const formatDate = (date: { year: number; month: number; day: number }) => String(date.year); void formatDate;",
+  ],
+  invalid: [
+    { ...fixture("programs/drift/inline-structural-parameter-type.ts"), errors: 1 },
+    {
+      code: "export const createApi = () => ({ saveUser: async (req: { id: string; email: string }) => req.email });",
+      errors: 1,
+    },
+  ],
 });
 
 ruleTester.run("no-raw-tailwind-color", rule("no-raw-tailwind-color"), {
-  valid: ['const x = <div className="text-primary" />;'],
-  invalid: [{ code: 'const x = <div className="text-red-500" />;', errors: 1 }],
+  valid: [fixture("programs/correct/semantic-tailwind-token.tsx")],
+  invalid: [{ ...fixture("programs/drift/raw-tailwind-color-class.tsx"), errors: 1 }],
 });
 
 ruleTester.run("no-hover-translate-card", rule("no-hover-translate-card"), {
-  valid: ['const x = <div className="hover:shadow-lg" />;'],
-  invalid: [{ code: 'const x = <div className="hover:-translate-y-1" />;', errors: 1 }],
+  valid: [fixture("programs/correct/hover-shadow-card.tsx")],
+  invalid: [{ ...fixture("programs/drift/hover-translate-card.tsx"), errors: 1 }],
 });
 
 ruleTester.run("no-raw-fetch-in-component", rule("no-raw-fetch-in-component"), {
-  valid: ["function helper() { fetch('/api'); }"],
+  valid: [fixture("programs/correct/raw-fetch-in-helper.ts")],
   invalid: [
-    { code: "function Component() { fetch('/api'); return <div />; }", errors: 1 },
+    { ...fixture("programs/drift/raw-fetch-in-component.tsx"), errors: 1 },
+    { ...fixture("programs/drift/raw-fetch-in-component-module-helper.tsx"), errors: 1 },
   ],
 });
 
 
 ruleTester.run("no-sql-string-concat", rule("no-sql-string-concat"), {
   valid: [
-    "const q = `SELECT * FROM users WHERE id = ?`;",
+    fixture("programs/correct/static-parameterized-sql-template.ts"),
     "const msg = `generated from ${source}`;",
-    "db.query('SELECT * FROM users WHERE id = $1', [id]);",
+    fixture("programs/correct/parameterized-sql-query.ts"),
   ],
   invalid: [
-    { code: "const q = `SELECT * FROM users WHERE id = ${id}`;", errors: 1 },
-    { code: 'const q = "DELETE FROM users WHERE id = " + id;', errors: 1 },
+    { ...fixture("programs/drift/sql-template-interpolation.ts"), errors: 1 },
+    { ...fixture("programs/drift/sql-string-concat.ts"), errors: 1 },
   ],
 });
 
-ruleTester.run("no-unsafe-deserialize", rule("no-unsafe-deserialize"), {
+typedRuleTester.run("no-unsafe-deserialize", rule("no-unsafe-deserialize"), {
   valid: [
-    "const data = JSON.parse(readFileSync(0, 'utf8'));",
-    "const data = schema.parse(req.body);",
+    fixture("programs/correct/json-parse-string.ts"),
+    fixture("programs/correct/schema-parse-unknown.ts"),
   ],
   invalid: [
-    { code: "const data = JSON.parse(req.body);", errors: 1 },
-    { code: "const data = JSON.parse(request.body.payload);", errors: 1 },
-  ],
-});
-
-const gatewayOptions = { gateways: {
-  ai: { wrapper: "packages/gateways/src/aiGateway.ts", bannedDirectImports: ["openai", "@anthropic-ai/sdk"] },
-  cloud: { wrapper: "packages/gateways/src/cloudGateway.ts", bannedDirectImports: ["@aws-sdk/**"] },
-}};
-
-ruleTester.run("no-sdk-direct-use", rule("no-sdk-direct-use"), {
-  valid: [
-    { code: "import x from 'react';", options: [gatewayOptions] },
-    { code: "import { completeText } from './aiGateway.js';", options: [gatewayOptions] },
-    { code: "import OpenAI from 'openai';", filename: "/repo/packages/gateways/src/aiGateway.ts", options: [gatewayOptions] },
-  ],
-  invalid: [
-    { code: "import OpenAI from 'openai';", filename: "/repo/apps/web/src/api.ts", options: [gatewayOptions], errors: 1 },
-    { code: "import { S3 } from '@aws-sdk/client-s3';", filename: "/repo/apps/web/src/api.ts", options: [gatewayOptions], errors: 1 },
+    { ...fixture("programs/drift/json-parse-unknown.ts"), errors: 1 },
+    { ...fixture("programs/drift/json-parse-any.ts"), errors: 1 },
   ],
 });
 
@@ -224,11 +258,12 @@ const statusOptions = { statuses: {
 
 ruleTester.run("no-status-literal-in-type", rule("no-status-literal-in-type"), {
   valid: [
-    { code: "type S = 'active' | 'disabled';", filename: "/repo/packages/domain/src/user.ts", options: [statusOptions] },
+    { ...fixture("programs/correct/packages/domain/src/user.ts"), options: [statusOptions] },
     { code: "const x = user.status === 'active';", filename: "/repo/apps/web/src/App.ts", options: [statusOptions] },
+    { code: "type BadgeProps = { variant: 'active' | 'disabled' };", filename: "/repo/apps/web/src/Badge.ts", options: [statusOptions] },
   ],
   invalid: [
-    { code: "type MyStatus = 'active' | 'disabled';", filename: "/repo/apps/web/src/App.ts", options: [statusOptions], errors: 2 },
+    { ...fixture("programs/drift/status-literal-type-fork.ts"), options: [statusOptions], errors: 2 },
   ],
 });
 
@@ -236,17 +271,18 @@ const roleOptions = { roles: { owner: "packages/domain/src/auth.ts", values: ["a
 
 ruleTester.run("no-role-literal-in-type", rule("no-role-literal-in-type"), {
   valid: [
-    { code: "type R = 'admin' | 'owner';", filename: "/repo/packages/domain/src/auth.ts", options: [roleOptions] },
+    { ...fixture("programs/correct/packages/domain/src/auth.ts"), options: [roleOptions] },
     { code: "if (user.role === 'admin') {}",  filename: "/repo/apps/web/src/App.ts", options: [roleOptions] },
+    { code: "type BadgeProps = { variant: 'admin' | 'owner' };", filename: "/repo/apps/web/src/Badge.ts", options: [roleOptions] },
   ],
   invalid: [
-    { code: "type AppRole = 'admin' | 'owner';", filename: "/repo/apps/web/src/App.ts", options: [roleOptions], errors: 2 },
+    { ...fixture("programs/drift/role-literal-type-fork.ts"), options: [roleOptions], errors: 2 },
   ],
 });
 
 ruleTester.run("require-authz-check", rule("require-authz-check"), {
   valid: [
-    "function handler(req) { authorize(req.user); const id = req.params.id; return id; }",
+    fixture("programs/correct/authz-before-params.ts"),
     "function handler(req) { const body = req.body; return body; }",
     // Bug regression: outer authorize should NOT suppress a violation in an inner callback that
     // accesses params without its own authorize call. Before the fix, sawAuthz was set on ALL
@@ -254,9 +290,9 @@ ruleTester.run("require-authz-check", rule("require-authz-check"), {
     "function outer(req) { authorize(req.user); }",
   ],
   invalid: [
-    { code: "function handler(req) { const id = req.params.id; return id; }", errors: 1 },
+    { ...fixture("programs/drift/params-without-authz.ts"), errors: 1 },
     // Regression case: outer authorize must not suppress inner violation.
-    { code: "function outer(req) { authorize(req.user); function inner(req) { const id = req.params.id; return id; } }", errors: 1 },
+    { ...fixture("programs/drift/nested-params-without-local-authz.ts"), errors: 1 },
   ],
 });
 
@@ -327,5 +363,7 @@ typedRuleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
     { ...fixture("programs/drift/zod-reparse-same-fn.ts"), errors: 1 },
     // Re-parse across functions in the same file via a module-scoped validated const
     { ...fixture("programs/drift/zod-reparse-cross-fn-same-file.ts"), errors: 1 },
+    // Re-parse of a service/helper result already typed as the schema output
+    { ...fixture("programs/drift/zod-reparse-service-result.ts"), errors: 1 },
   ],
 });
