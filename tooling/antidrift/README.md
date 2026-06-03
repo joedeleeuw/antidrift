@@ -89,6 +89,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning
 - `no-cast-to-branded` / `no-appeasement-cast` — casts that paper over missing validation or branding
 - `no-underchecked-type-predicate` — broad-input type predicates that assert object contracts without checking asserted fields
+- `no-canonical-model-fork` — configured first-party model redeclarations that should import or derive from the canonical owner
 - `no-status-triplet-state` — configurable detection for `data` / `loading` / `error` state cells that should be one resource value
 - `no-unsafe-deserialize` — `JSON.parse` of `any` / `unknown` instead of parsing at a schema boundary
 - `no-defensive-shape-probing` — deterministic broad-value extractor cases backed by real corpus evidence, not ordinary boolean predicates

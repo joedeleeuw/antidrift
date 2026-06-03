@@ -2,7 +2,7 @@
 
 ## Engine decision
 
-Use ESLint plus `typescript-eslint` as the canonical host for antidrift custom rules. The original rule scope includes semantic checks that need TypeScript's `Program` and `TypeChecker`: installed package type forks, registry-backed generated-source type forks, alias/import identity, Zod provenance, inferred return types, and assignability.
+Use ESLint plus `typescript-eslint` as the canonical host for antidrift custom rules. The original rule scope includes semantic checks that need TypeScript's `Program` and `TypeChecker`: installed package type forks, registry-backed generated-source and first-party model forks, alias/import identity, Zod provenance, inferred return types, and assignability.
 
 Keep baseline coverage in ESLint and track any missing replacement rule in `docs/lint-rule-parity.md`.
 

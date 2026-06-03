@@ -23,6 +23,17 @@ const structuralTypeForkGeneratedOptions = {
     },
   ],
 };
+const canonicalModelForkOptions = {
+  "antidrift/no-canonical-model-fork": [
+    {
+      canonicalEntities: {
+        ActionItem: "src/frontend/portal/types/reports.ts",
+        Stop: "src/frontend/portal/types/reports.ts",
+        ActionItemsReport: "src/frontend/portal/types/reports.ts",
+      },
+    },
+  ],
+};
 
 export const defaultCases = [
   {
@@ -332,6 +343,53 @@ export const defaultCases = [
     typeAware: true,
     tsconfig: "src/frontend/portal/tsconfig.json",
     paths: ["src/frontend/portal/modules/visualize-impact/tabs/total-savings/hooks/useSnycedMapsViewState.ts"],
+  },
+  {
+    id: "portal-action-items-report-model-forks",
+    ruleId: "antidrift/no-canonical-model-fork",
+    kind: "drift",
+    classification: "ready",
+    subproject: "frontend",
+    typeAware: true,
+    tsconfig: "src/frontend/portal/tsconfig.json",
+    ruleOptions: canonicalModelForkOptions,
+    paths: ["src/frontend/portal/components/reports/action-items/types.ts"],
+    expectedFindings: [
+      {
+        path: "src/frontend/portal/components/reports/action-items/types.ts",
+        line: 10,
+      },
+      {
+        path: "src/frontend/portal/components/reports/action-items/types.ts",
+        line: 24,
+      },
+      {
+        path: "src/frontend/portal/components/reports/action-items/types.ts",
+        line: 42,
+      },
+    ],
+  },
+  {
+    id: "portal-weekly-digest-report-models-clean",
+    ruleId: "antidrift/no-canonical-model-fork",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    typeAware: true,
+    tsconfig: "src/frontend/portal/tsconfig.json",
+    ruleOptions: canonicalModelForkOptions,
+    paths: ["src/frontend/portal/components/reports/weekly-digest/types.ts"],
+  },
+  {
+    id: "portal-report-model-owner-clean",
+    ruleId: "antidrift/no-canonical-model-fork",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    typeAware: true,
+    tsconfig: "src/frontend/portal/tsconfig.json",
+    ruleOptions: canonicalModelForkOptions,
+    paths: ["src/frontend/portal/types/reports.ts"],
   },
   {
     id: "bff-bigquery-zod-boundary-parse-clean",

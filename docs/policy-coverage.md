@@ -18,7 +18,7 @@ Status meanings:
 | `abstraction-and-file-shape` | Partial | `antidrift/no-obvious-comment`; Sonar is expected to cover complexity trends | One-use helper, max function/component lines, and high-touch file growth are not enforced locally. |
 | `semantic-architecture-drift` | Partial | `eslint-plugin-boundaries` enforces layer import direction and private imports; `import-x/no-cycle` enforces maintained import-cycle detection | Feature scatter and high-fan-in growth are not enforced locally. |
 | `side-effects-and-boundaries` | Partial | `antidrift/no-raw-fetch-in-component`; generated `no-restricted-imports` from `policy/registries/gateways.yaml` blocks direct SDK imports outside approved wrappers | Client env access is not enforced. |
-| `domain-model-drift` | Partial | `antidrift/no-status-literal-in-type`, `antidrift/no-role-literal-in-type` | Canonical model fork detection for repo-owned domain models is not implemented beyond status/role literals and generated/package ownership. |
+| `domain-model-drift` | Partial | `antidrift/no-status-literal-in-type`, `antidrift/no-role-literal-in-type`, `antidrift/no-canonical-model-fork` for configured repo-owned model exports | Canonical model fork detection is registry-gated and only covers configured exported object models with enough shape to compare safely. |
 | `generated-type-drift` | Enforced | `antidrift/no-structural-type-fork` catches structural forks of installed package exported types and configured generated-source exported types; generated import restrictions are emitted from `policy/registries/generated.yaml` when configured | No known gap for the currently declared generated-source scope. Generated-source fork detection is inert until `generatedSources` declares the owner path. |
 | `authorization-control-drift` | Partial | `antidrift/require-authz-check` on configured route/action globs for Express-style `req.params`/`ctx.params` reads | tRPC procedure boundaries, boundaryless routes, and client-only authorization are not separately enforced. |
 | `error-handling` | Partial | `antidrift/no-silent-catch` | Preserve-cause and fallback-to-empty rules are not implemented. |
@@ -45,4 +45,5 @@ Completed scoped hardening:
 4. `antidrift/no-unsafe-deserialize` uses TypeScript `any`/`unknown` signals instead of request/source names.
 5. `antidrift/no-nullable-positional-tuple` blocks tuple types with multiple nullable or optional slots.
 6. `antidrift/no-underchecked-type-predicate` blocks broad-input object type predicates that do not check asserted fields or delegate to a validator.
-7. `antidrift/no-defensive-shape-probing`, `antidrift/no-cast-to-branded`, and the brand kit are in the active package surface, with readiness governed by `docs/real-corpus-validation.md`; import cycles are delegated to `import-x/no-cycle`.
+7. `antidrift/no-canonical-model-fork` catches configured first-party canonical model redeclarations.
+8. `antidrift/no-defensive-shape-probing`, `antidrift/no-cast-to-branded`, and the brand kit are in the active package surface, with readiness governed by `docs/real-corpus-validation.md`; import cycles are delegated to `import-x/no-cycle`.

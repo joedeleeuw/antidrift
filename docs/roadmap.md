@@ -32,6 +32,7 @@ These were the next project scope because they are the project, not because a br
 - `no-defensive-shape-probing`: provisional only where real corpus evidence shows deterministic broad-value mini-parsing; do not expand to general boolean predicates.
 - `no-nullable-positional-tuple`: block tuple types with multiple nullable or optional slots, such as `[Date | null, Date | null]`.
 - `no-underchecked-type-predicate`: block broad-input type predicates that claim object contracts without checking asserted fields or delegating to a validator.
+- `no-canonical-model-fork`: registry-backed structural detection for first-party canonical model redeclarations.
 - Brand kit: `Brand<T, Name>` plus `brand() -> { make, safe, is }`.
 - `import-x/no-cycle`: circular-dependency detection through maintained ecosystem import-graph coverage.
 
@@ -56,6 +57,7 @@ Completed in this batch:
 - `no-defensive-shape-probing`: limited to real-corpus-backed broad-value extractor patterns; predicate helpers remain review-first until the rule can prove a validation/type authority bypass.
 - `no-nullable-positional-tuple`: narrow deterministic syntax rule for multi-slot nullable tuples; ordinary non-null tuples and hook-style tuples with one nullable value slot stay clean.
 - `no-underchecked-type-predicate`: TypeChecker-backed v1 for broad-input object predicates; discriminant guards over typed unions and schema delegation stay clean.
+- `no-canonical-model-fork`: TypeChecker-backed v1 for configured first-party model owners; real Chaski report-model forks flag while the owner and a different weekly digest report model stay clean.
 - `no-cycle`: retired custom relative graph traversal in favor of `import-x/no-cycle`.
 - Brand kit and `no-cast-to-branded`: branded values must cross the brand validation boundary.
 

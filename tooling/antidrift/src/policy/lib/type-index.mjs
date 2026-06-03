@@ -155,3 +155,56 @@ export function resolvesToGeneratedType(type, generatedSources = {}) {
     )
   );
 }
+
+function canonicalEntityEntries(canonicalEntities = {}) {
+  return Object.entries(canonicalEntities)
+    .map(([name, entry]) => {
+      if (typeof entry === "string") return { name, exportName: name, owner: entry };
+      if (entry && typeof entry === "object" && typeof entry.owner === "string") {
+        return { name, exportName: typeof entry.exportName === "string" ? entry.exportName : name, owner: entry.owner };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function matchesRegistryFile(fileName, owner) {
+  const source = registryPath(owner);
+  if (!source) return false;
+  return normalizePath(fileName).endsWith(`/${source}`);
+}
+
+export function collectDomainCanonicalTypes(program, checker, canonicalEntities = {}) {
+  const entries = canonicalEntityEntries(canonicalEntities);
+  if (entries.length === 0) return [];
+  const candidates = [];
+  const seen = new Set();
+  for (const sf of program.getSourceFiles()) {
+    const matchingEntries = entries.filter((entry) => matchesRegistryFile(sf.fileName, entry.owner));
+    if (matchingEntries.length === 0) continue;
+    const moduleSym = checker.getSymbolAtLocation(sf);
+    if (!moduleSym) continue;
+    const exports = checker.getExportsOfModule(moduleSym);
+    for (const entry of matchingEntries) {
+      const sym = exports.find((candidate) => candidate.getName() === entry.exportName);
+      const candidate = sym ? candidateFor(checker, sym, entry.owner) : null;
+      if (!candidate || seen.has(entry.name)) continue;
+      seen.add(entry.name);
+      candidates.push({ ...candidate, label: `${entry.owner}#${entry.name}` });
+    }
+  }
+  return candidates;
+}
+
+export function resolvesToDomainCanonicalType(type, canonicalEntities = {}) {
+  const entries = canonicalEntityEntries(canonicalEntities);
+  if (!type || entries.length === 0) return false;
+  const symbols = [typeof type.getSymbol === "function" ? type.getSymbol() : type.symbol, type.aliasSymbol];
+  return symbols.some((sym) =>
+    (sym?.getDeclarations?.() ?? sym?.declarations ?? []).some((decl) => {
+      const sourceFile = decl.getSourceFile();
+      const name = sym.getName?.() ?? sym.name;
+      return entries.some((entry) => entry.exportName === name && matchesRegistryFile(sourceFile.fileName, entry.owner));
+    })
+  );
+}

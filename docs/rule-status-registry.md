@@ -100,6 +100,7 @@ Start investigation before code:
 | `antidrift/no-status-literal-in-type` | `ready` | no | registry plus AST context | `config-replacement` / `own-antidrift` | Seek independent status-fork replication before stable promotion. |
 | `antidrift/no-status-triplet-state` | `ready` | no | configurable name groups plus React state shape | `net-antidrift` / `own-antidrift` | Keep configurable and classify another frontend repo inventory. |
 | `antidrift/no-structural-type-fork` | `ready` | no | TypeChecker structural comparison plus generated registry | `net-antidrift` / `own-antidrift` | Seek independent generated-source or installed-package fork replication before stable promotion. |
+| `antidrift/no-canonical-model-fork` | `ready` | no | TypeChecker plus domain registry | `net-antidrift` / `own-antidrift` | Run another repo inventory with configured domain owners before stable promotion. |
 | `antidrift/no-trivial-selector-wrapper` | `ready` | no | AST structural return shape | `net-antidrift` / `own-antidrift` | Seek independent non-name-gated selector-wrapper replication before stable promotion. |
 | `antidrift/no-underchecked-type-predicate` | `ready` | no | TypeChecker plus AST/control-flow checks | `net-antidrift` / `own-antidrift` | Seek another broad-input underchecked predicate and validator-backed clean control before stable promotion. |
 | `antidrift/no-unsafe-cast-chain` | `ready` | no | AST cast chain | `broader-upstream` / `own-antidrift` | Seek independent cast-tunnel replication before stable promotion. |
@@ -111,7 +112,6 @@ Start investigation before code:
 
 | Candidate | Status | Signal | Entry condition |
 |---|---:|---|---|
-| `antidrift/domain-no-canonical-model-fork` | `research` | TypeChecker plus domain registry | Find real domain model redeclaration evidence and clean DTO controls before implementation. |
 | `ecosystem/discriminated-union-exhaustiveness` | `ecosystem-covered` | TypeChecker | Prefer `@typescript-eslint/switch-exhaustiveness-check` and related type-aware rules before custom work. |
 | `ecosystem/import-cycle` | `ecosystem-covered` | import-graph | Covered by `import-x/no-cycle` in the shared ESLint config; keep custom graph traversal retired. |
 | `ecosystem/disable-comment-description` | `ecosystem-covered` | source-comment | Covered by `@eslint-community/eslint-comments/require-description` and `@typescript-eslint/ban-ts-comment` in the shared ESLint config. |

@@ -1,4 +1,4 @@
-import { typeProps, collectCanonicalTypes, collectGeneratedCanonicalTypes, isObjectType, resolvesToGeneratedType, resolvesToInstalledType, MIN_PROPS } from "../policy/lib/type-index.mjs";
+import { typeProps, collectCanonicalTypes, collectDomainCanonicalTypes, collectGeneratedCanonicalTypes, isObjectType, resolvesToDomainCanonicalType, resolvesToGeneratedType, resolvesToInstalledType, MIN_PROPS } from "../policy/lib/type-index.mjs";
 
 const rawTailwindColorPattern = /\b(?:text|bg|border|ring)-(?:red|blue|green|yellow|gray|slate|zinc|neutral)-\d{2,3}\b/u;
 const hoverTranslatePattern = /hover:-?translate-[xy]/u;
@@ -1241,6 +1241,72 @@ function ruleNoStructuralTypeFork() {
   };
 }
 
+function ruleNoCanonicalModelFork() {
+  return {
+    meta: {
+      type: "problem",
+      docs: { description: "Detect hand-written copies of configured repo-owned canonical domain models." },
+      schema: [
+        {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            canonicalEntities: {
+              type: "object",
+              additionalProperties: {
+                oneOf: [
+                  { type: "string" },
+                  {
+                    type: "object",
+                    additionalProperties: true,
+                    properties: {
+                      owner: { type: "string" },
+                      exportName: { type: "string" },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    },
+    create(context) {
+      const services = context.sourceCode?.parserServices ?? context.parserServices;
+      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const program = services.program;
+      const checker = program.getTypeChecker();
+      const canonicalEntities = context.options[0]?.canonicalEntities ?? {};
+      const candidates = collectDomainCanonicalTypes(program, checker, canonicalEntities);
+      if (!candidates.length) return {};
+
+      function check(node) {
+        if (node.type === "TSTypeAliasDeclaration" && node.typeAnnotation?.type !== "TSTypeLiteral") return;
+        if (isStructuralDerivationAlias(node)) return;
+        const tsNode = services.esTreeNodeToTSNodeMap.get(node);
+        const sym = tsNode?.name && checker.getSymbolAtLocation(tsNode.name);
+        if (!sym) return;
+        const declared = checker.getDeclaredTypeOfSymbol(sym);
+        if (!isObjectType(declared)) return;
+        if (resolvesToDomainCanonicalType(declared, canonicalEntities)) return;
+        const local = typeProps(checker, declared);
+        if (local.size < MIN_PROPS) return;
+        for (const { label, props } of candidates) {
+          if (isStructuralFork(local, props)) {
+            context.report({ node, message: `Type matches ${label} — import or derive from the canonical model owner instead of redeclaring.` });
+            return;
+          }
+        }
+      }
+
+      return {
+        TSTypeAliasDeclaration: check,
+        TSInterfaceDeclaration: check,
+      };
+    },
+  };
+}
+
 function ruleNoCastToBranded() {
   return {
     meta: { type: "problem", docs: { description: "Disallow casting values into antidrift branded types." }, schema: [] },
@@ -1716,6 +1782,7 @@ const rules = {
   "no-unsafe-deserialize": ruleNoUnsafeDeserialize(),
   "require-authz-check": ruleRequireAuthzCheck(),
   "no-structural-type-fork": ruleNoStructuralTypeFork(),
+  "no-canonical-model-fork": ruleNoCanonicalModelFork(),
   "no-redundant-zod-parse": ruleNoRedundantZodParse(),
   "no-status-literal-in-type": ruleNoStatusLiteralInType(),
   "no-role-literal-in-type": ruleNoRoleLiteralInType(),

@@ -417,6 +417,31 @@ rules:
       allows:
         - 'import type { User } from "firebase/auth";'
     nextAction: Seek independent generated-source or installed-package fork replication before stable promotion.
+  antidrift/no-canonical-model-fork:
+    status: ready
+    stable: false
+    signal: TypeChecker plus domain registry
+    solveType: domain-model-drift
+    referenceDoc: docs/rule-investigations/domain-canonical-model-fork.md
+    corpusRepositories: [chaski]
+    concerns:
+      - Requires explicit canonicalEntities registry entries; without a configured owner, the rule is inert.
+      - Only exported canonical object types with at least four properties are candidates, so small helper shapes are intentionally ignored.
+      - Schema-inferred DTO aliases stay clean because the rule only reports handwritten object type/interface declarations.
+      - Boundary DTOs and view models can legitimately overlap, so stable promotion needs broader real-repo inventory.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported rule was found that knows repo-owned canonical model files and compares local redeclarations against those owner exports."
+      whyNotOtherState: "Not covered by no-structural-type-fork because this is about first-party domain ownership, not installed packages or generated sources."
+    examples:
+      flags:
+        - 'type ActionItem = { title: string; status: Status; target: { value: number }; actual: { value: number; status: Status } };'
+      allows:
+        - 'import type { ActionItem } from "@portal/types/reports";'
+    nextAction: Run another repo inventory with configured domain owners before stable promotion.
   antidrift/no-trivial-selector-wrapper:
     status: ready
     stable: false
@@ -559,12 +584,6 @@ retiredRules:
     reason: Real Chaski code showed explicit private helper return types are often legitimate contracts.
 
 researchCandidates:
-  antidrift/domain-no-canonical-model-fork:
-    status: research
-    signal: TypeChecker plus domain registry
-    solveType: domain-model-drift
-    referenceDoc: docs/rule-investigations/domain-canonical-model-fork.md
-    nextAction: Find real domain model redeclaration evidence and clean DTO controls before implementation.
   ecosystem/discriminated-union-exhaustiveness:
     status: ecosystem-covered
     signal: TypeChecker
