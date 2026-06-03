@@ -8,7 +8,6 @@ export const generatedTargets = [
   ".cursor/rules/policy-files.mdc",
   ".claude/settings.json",
   ".codex/hooks.json",
-  ".oxlintrc.json",
 ];
 
 export const protectedPolicyFiles = [

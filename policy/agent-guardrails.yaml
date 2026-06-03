@@ -52,14 +52,18 @@ clusters:
         severity: error
         detector: nameMatches:^(get|select|extract)[A-Z].*From[A-Z]
         message: Do not create getXFromY helpers unless they contain real domain logic.
-      - id: ts/no-explicit-return-type-private-helper # Private helper return annotations hide weak inference and stale types.
-        severity: error
-        detector: nonExportedFunctionHasReturnType
-        message: Keep explicit return types at public or architectural boundaries.
       - id: ts/no-inline-structural-type-at-use-site # Use-site structural contracts fork domain ownership.
         severity: error
         detector: inlineObjectTypeInParameterOrVariable
         message: Import or create the owned named type.
+      - id: ts/no-nullable-positional-tuple # Multiple nullable tuple slots hide field meaning and partial-state combinations.
+        severity: error
+        detector: tupleTypeNullableOrOptionalSlotsGte:2
+        message: Use a named object or explicit state union instead of positional nullable slots.
+      - id: ts/no-underchecked-type-predicate # Broad-input type predicates can launder unknown data into trusted object contracts.
+        severity: error
+        detector: broadInputTypePredicateWithInsufficientFieldChecks
+        message: Check asserted fields or delegate to a schema/validator before returning a type predicate.
       - id: ts/no-unsafe-cast-chain # as unknown as T is a type-system escape tunnel.
         severity: error
         detector: castChainIncludesUnknownThenSpecific
@@ -152,7 +156,7 @@ clusters:
         severity: error
         detector: importSourceMatchesBannedGeneratedPattern # Registry-driven: options from policy/registries/generated.yaml; enforced via no-restricted-imports with message and pattern from each entry.
         message: Import from the approved generated-type wrapper, not the raw generated package.
-      - id: gen/no-structural-type-fork # Detects hand-written object types whose resolved properties are a subset of an installed package's exported type. Fully dynamic — any package imported anywhere in the project becomes canonical; no list to maintain.
+      - id: gen/no-structural-type-fork # Detects hand-written object types whose resolved properties are a subset of an installed package or configured generated-source exported type.
         severity: error
         detector: localObjectTypeSubsetOfInstalledPackageType # Type-aware (parserServices). Enumerates node_modules object types via the program checker, compares by property name + resolved type string. Unions/intersections excluded; min 4 properties.
         message: Type matches an installed package's exported type — import it instead of redeclaring.

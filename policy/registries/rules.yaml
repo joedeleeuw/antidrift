@@ -1,0 +1,591 @@
+schemaVersion: 1
+
+promotionRequirements:
+  investigation:
+    requireReferenceDoc: true
+    requireEcosystemCheck: true
+    requireClaudeAdvisoryKickoff: true
+    notes:
+      - Investigation starts with evidence capture, not code.
+      - The rule table should point to a reference document for candidate scope, ecosystem coverage, potential solves, and remaining gaps.
+      - If an existing ESLint or typescript-eslint rule covers the behavior, mark the candidate ecosystem-covered instead of implementing a custom rule.
+  stable:
+    minIndependentRepositories: 2
+    requireReplicationsNotIntroducedForTest: true
+    maxKnownFalsePositives: 0
+    maxKnownFalseNegatives: 0
+    productionConcerns: none
+    requireClaudeAdvisoryReview: true
+    requireRealCorpusInventory: true
+    notes:
+      - Stable promotion is stricter than local readiness.
+      - Fixture programs and code added only to satisfy a rule do not count as replications.
+      - Claude review is advisory only; repo evidence and validation gates remain authoritative.
+
+claudeAdvisory:
+  model: claude-opus-4-8
+  promptProtocol: docs/claude-rule-review-protocol.md
+  mode: read-only
+  outputDirectory: reports
+
+statuses:
+  ready: Implemented, enabled, and backed by at least one real drift and clean assertion under the current local gate.
+  under-proven: Implemented, but missing enough real drift or clean evidence to trust promotion.
+  false-positive-prone: Implemented, but real corpus evidence or review found an overbroad branch or unstable signal.
+  ecosystem-covered: Existing ecosystem rule or plugin covers the behavior well enough; do not implement a custom antidrift rule unless a real gap remains.
+  retired: Removed from the active rule surface because real code showed the signal was not deterministic enough.
+  research: Not implemented; requires ecosystem review and real corpus evidence before entering scope.
+
+rules:
+  antidrift/no-appeasement-cast:
+    status: ready
+    stable: false
+    signal: TypeChecker
+    solveType: type-escape-hatch
+    corpusRepositories: [chaski]
+    concerns: []
+    external:
+      state: broader-upstream
+      support: high
+      candidates: ["@typescript-eslint/no-unsafe-type-assertion"]
+      decision: own-antidrift
+      whyThisState: "The upstream rule catches some appeasement casts, but it covers a much broader assertion policy than this rule."
+      whyNotOtherState: "Not equivalent because Chaski clean controls include SDK/API conversion casts that the upstream rule also reports."
+    examples:
+      flags:
+        - 'const err = caught as AxiosError;'
+      allows:
+        - 'if (axios.isAxiosError(caught)) return caught.response?.status;'
+    nextAction: Seek an independent second-repo replication before stable promotion.
+  antidrift/no-async-array-method:
+    status: ready
+    stable: false
+    signal: AST
+    solveType: promise-control-flow
+    corpusRepositories: [chaski, sudocode-main]
+    concerns: []
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@typescript-eslint/no-misused-promises", "@typescript-eslint/no-floating-promises"]
+      decision: own-antidrift
+      whyThisState: "The ecosystem pair can catch async callbacks in some array APIs when broad void-return checks are enabled."
+      whyNotOtherState: "Not equivalent because the needed option also reports real Express-style handlers, while the custom rule stays on array-method misuse."
+    examples:
+      flags:
+        - 'items.forEach(async (item) => await save(item));'
+      allows:
+        - 'for (const item of items) await save(item);'
+    nextAction: Seek inventory results without false positives before stable promotion.
+  antidrift/no-cast-to-branded:
+    status: under-proven
+    stable: false
+    signal: TypeChecker
+    solveType: brand-forgery
+    corpusRepositories: []
+    concerns:
+      - No real corpus currently adopts the brand kit.
+    external:
+      state: broader-upstream
+      support: high
+      candidates: ["@typescript-eslint/no-unsafe-type-assertion"]
+      decision: own-antidrift
+      whyThisState: "The upstream assertion rule can report brand-forging casts, but only as part of a broad unsafe-assertion policy."
+      whyNotOtherState: "Not equivalent because the intended contract is brand-specific: branded values must come from the brand constructor or validator."
+    examples:
+      flags:
+        - 'const id = raw as UserId;'
+      allows:
+        - 'const id = UserId.make(raw);'
+    nextAction: Wait for a real branded boundary before promotion work.
+  antidrift/no-coupled-state-setters:
+    status: ready
+    stable: false
+    signal: scope-binding
+    solveType: react-state-shape
+    corpusRepositories: [chaski]
+    concerns:
+      - Broad Chaski inventory has many findings and may need cleanup before wide enforcement.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported React rule was found that models multiple local state setters as one state-machine smell."
+      whyNotOtherState: "Not partial-overlap because generic hooks rules do not reason about coupled setter bindings in one handler."
+    examples:
+      flags:
+        - 'onClick={() => { setData(data); setLoading(false); setError(null); }}'
+      allows:
+        - 'dispatch({ type: "loaded", data });'
+    nextAction: Classify inventory findings before stable promotion.
+  antidrift/no-defensive-shape-probing:
+    status: under-proven
+    stable: false
+    signal: deterministic AST
+    solveType: broad-value-shape-probing
+    referenceDoc: docs/rule-investigations/no-defensive-shape-probing.md
+    corpusRepositories: [chaski]
+    concerns:
+      - Object.entries extractor branch has evidence.
+      - Boolean predicate helper branch was removed and remains separate research.
+      - The narrowed rule bans a syntax pattern, but does not yet prove the source value is broad or unowned.
+      - Stable promotion still needs a second independent repository and broad inventory review.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported rule was found for Object.entries-style normalizers that repeatedly probe broad object shape."
+      whyNotOtherState: "Not equivalent or partial-overlap because ordinary complexity and type-safety rules do not identify this construction pattern."
+    examples:
+      flags:
+        - 'Object.entries(raw).map(([, value]) => "numberValue" in value ? value.numberValue : null)'
+      allows:
+        - 'const parsed = schema.parse(raw);'
+    nextAction: Decide whether the construction pattern itself should be banned; otherwise add TypeChecker or registry evidence before local readiness.
+  antidrift/no-hover-translate-card:
+    status: ready
+    stable: false
+    signal: AST string literal extraction
+    solveType: design-system-interaction
+    corpusRepositories: [chaski, sudocode-main]
+    concerns:
+      - CSS @apply remains outside current JSX scope.
+    external:
+      state: config-replacement
+      support: high
+      candidates: ["ESLint no-restricted-syntax"]
+      decision: own-antidrift
+      whyThisState: "A generated selector could ban hover translate tokens, but the custom extractor handles static class expressions more clearly."
+      whyNotOtherState: "Not ecosystem-covered because the desired policy is design-system interaction guidance, not generic Tailwind validity."
+    examples:
+      flags:
+        - 'className="card hover:-translate-y-0.5"'
+      allows:
+        - 'className="card hover:shadow-md"'
+    nextAction: Stable promotion requires inventory classification across another UI repo.
+  antidrift/no-inline-structural-type-at-use-site:
+    status: ready
+    stable: false
+    signal: AST
+    solveType: type-contract-shape
+    corpusRepositories: [chaski]
+    concerns:
+      - Local UI props and callback payloads require careful exclusions.
+    external:
+      state: config-replacement
+      support: high
+      candidates: ["ESLint no-restricted-syntax"]
+      decision: own-antidrift
+      whyThisState: "Core selectors can find inline type literals, but the custom rule narrows the violation to exported and boundary use sites."
+      whyNotOtherState: "Not equivalent because a raw syntax ban would report legitimate local props, callbacks, and small internal shapes."
+    examples:
+      flags:
+        - 'export function load(input: { userId: string }) {}'
+      allows:
+        - 'export function load(input: LoadInput) {}'
+    nextAction: Seek independent repo replication before stable promotion.
+  antidrift/no-nullable-positional-tuple:
+    status: ready
+    stable: false
+    signal: deterministic AST
+    solveType: type-contract-shape
+    referenceDoc: docs/rule-investigations/no-nullable-positional-tuple.md
+    corpusRepositories: [chaski]
+    concerns:
+      - The rule intentionally requires at least two nullable or optional tuple slots; one nullable slot in a hook-style tuple stays clean.
+      - Type alias and generic-chain nullability are resolved only when TypeScript parser services are available.
+      - Imported owner aliases such as date-picker range types stay outside the rule unless they are redeclared as local tuple syntax.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported rule was found for the narrower smell of positional tuples with multiple nullable or optional slots."
+      whyNotOtherState: "Not equivalent to tuple bans because ordinary coordinate or hook-style tuples should remain clean."
+    examples:
+      flags:
+        - 'type CustomRange = [Date | null, Date | null];'
+      allows:
+        - 'type Point = [number, number];'
+    nextAction: Seek another real nullable positional tuple and clean tuple-control replication before stable promotion.
+  antidrift/no-obvious-comment:
+    status: ready
+    stable: false
+    signal: token-overlap
+    solveType: review-noise
+    corpusRepositories: [chaski]
+    concerns:
+      - Heuristic rule with many inventory findings.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["ESLint no-warning-comments"]
+      decision: own-antidrift
+      whyThisState: "The ecosystem rule covers TODO/FIXME-style comments, which is nearby review-noise policy."
+      whyNotOtherState: "Not equivalent because this rule targets comments that restate adjacent code rather than tagged warning comments."
+    examples:
+      flags:
+        - '// Set count before setCount(count + 1);'
+      allows:
+        - '// Keep latest callback stable across renders.'
+    nextAction: Keep as lower-confidence until another repo inventory shows low false positives.
+  antidrift/no-raw-fetch-in-component:
+    status: ready
+    stable: false
+    signal: import-scope plus AST
+    solveType: side-effect-boundary
+    corpusRepositories: [chaski]
+    concerns: []
+    external:
+      state: config-replacement
+      support: high
+      candidates: ["ESLint no-restricted-syntax"]
+      decision: own-antidrift
+      whyThisState: "A generated selector could ban fetch in broad file globs, but this rule narrows to component context."
+      whyNotOtherState: "Not ecosystem-covered because the replacement would lose the component-boundary ambition and produce cruder reports."
+    examples:
+      flags:
+        - 'function Orders() { fetch("/api/orders"); return null; }'
+      allows:
+        - 'async function loadOrders() { return fetch("/api/orders"); }'
+    nextAction: Seek independent frontend replication before stable promotion.
+  antidrift/no-raw-tailwind-color:
+    status: ready
+    stable: false
+    signal: class-string
+    solveType: design-token-drift
+    corpusRepositories: [chaski]
+    concerns:
+      - Broad Chaski inventory has many findings and may need cleanup before wide enforcement.
+    external:
+      state: config-replacement
+      support: high
+      candidates: ["ESLint no-restricted-syntax"]
+      decision: own-antidrift
+      whyThisState: "Generated selectors could ban raw class tokens, but the custom extractor is clearer for JSX class expressions."
+      whyNotOtherState: "Not equivalent to Tailwind correctness plugins because the policy is semantic token ownership, not valid utility syntax."
+    examples:
+      flags:
+        - 'className="text-red-500"'
+      allows:
+        - 'className="text-danger"'
+    nextAction: Classify inventory findings before stable promotion.
+  antidrift/no-redundant-zod-parse:
+    status: ready
+    stable: false
+    signal: TypeChecker plus schema provenance
+    solveType: validation-boundary-drift
+    corpusRepositories: [chaski]
+    concerns: []
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported Zod rule was found that tracks schema provenance and reports re-parsing a value already produced by the same schema."
+      whyNotOtherState: "Not partial-overlap because generic unsafe-assignment rules do not distinguish raw input from schema-owned output."
+    examples:
+      flags:
+        - 'const row = RowSchema.parse(await getTypedRow());'
+      allows:
+        - 'const row = RowSchema.parse(raw);'
+    nextAction: Seek independent service-to-router reparse replication before stable promotion.
+  antidrift/no-role-literal-in-type:
+    status: under-proven
+    stable: false
+    signal: registry plus AST context
+    solveType: domain-vocabulary-fork
+    corpusRepositories: [chaski]
+    concerns:
+      - No real drift case has been accepted.
+    external:
+      state: config-replacement
+      support: high
+      candidates: ["ESLint no-restricted-syntax"]
+      decision: own-antidrift
+      whyThisState: "Generated selectors could match configured role literals, but the custom rule carries owner-file and type-context exceptions."
+      whyNotOtherState: "Not ecosystem-covered because generic literal restrictions cannot explain the domain registry replacement."
+    examples:
+      flags:
+        - "type Role = 'business-admin' | 'sales-manager';"
+      allows:
+        - 'import type { Roles } from "./api/types";'
+    nextAction: Do not promote until a real role union redeclaration is found.
+  antidrift/no-silent-catch:
+    status: ready
+    stable: false
+    signal: AST
+    solveType: error-handling
+    corpusRepositories: [chaski]
+    concerns: []
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["ESLint no-empty", "sonarjs/no-ignored-exceptions", "ESLint no-console"]
+      decision: own-antidrift
+      whyThisState: "Existing rules catch some empty or ignored catches, so the area has ecosystem coverage."
+      whyNotOtherState: "Not equivalent because comment-only catches and console-only handling do not line up cleanly across the upstream rules."
+    examples:
+      flags:
+        - 'try { work(); } catch {}'
+      allows:
+        - 'try { work(); } catch (error) { throw error; }'
+    nextAction: Seek independent replication before stable promotion.
+  antidrift/no-sql-string-concat:
+    status: ready
+    stable: false
+    signal: AST string construction
+    solveType: injection-boundary
+    corpusRepositories: [chaski]
+    concerns: []
+    external:
+      state: partial-overlap
+      support: medium
+      candidates: ["sonarjs/sql-queries", "sql/no-unsafe-query"]
+      decision: own-antidrift
+      whyThisState: "Security plugins cover SQL construction in nearby ways, but their exact sinks and template conventions differ."
+      whyNotOtherState: "Not equivalent because the real HoGQL interpolation case was not covered by the checked ecosystem path."
+    examples:
+      flags:
+        - 'const sql = `SELECT * FROM users WHERE id = ${id}`;'
+      allows:
+        - 'db.query("SELECT * FROM users WHERE id = ?", [id]);'
+    nextAction: Seek independent replication with parameterized-query clean controls.
+  antidrift/no-status-literal-in-type:
+    status: ready
+    stable: false
+    signal: registry plus AST context
+    solveType: domain-vocabulary-fork
+    corpusRepositories: [chaski]
+    concerns: []
+    external:
+      state: config-replacement
+      support: high
+      candidates: ["ESLint no-restricted-syntax"]
+      decision: own-antidrift
+      whyThisState: "Generated selectors could match configured status literals, but the custom rule carries owner-file and type-context exceptions."
+      whyNotOtherState: "Not ecosystem-covered because generic literal restrictions cannot explain the domain registry replacement."
+    examples:
+      flags:
+        - "type Status = 'active' | 'disabled';"
+      allows:
+        - 'import type { UserStatus } from "./domain";'
+    nextAction: Seek independent status-fork replication before stable promotion.
+  antidrift/no-status-triplet-state:
+    status: ready
+    stable: false
+    signal: configurable name groups plus React state shape
+    solveType: react-state-shape
+    corpusRepositories: [chaski]
+    concerns:
+      - Heuristic by nature; stable promotion needs multiple low-noise inventories.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported React rule was found for configurable data/loading/error state triplets."
+      whyNotOtherState: "Not partial-overlap because ordinary hooks rules do not identify the resource-state modeling smell."
+    examples:
+      flags:
+        - 'const [data] = useState(null); const [loading] = useState(false); const [error] = useState(null);'
+      allows:
+        - 'const [resource] = useState({ state: "loading" });'
+    nextAction: Keep configurable and classify another frontend repo inventory.
+  antidrift/no-structural-type-fork:
+    status: ready
+    stable: false
+    signal: TypeChecker structural comparison plus generated registry
+    solveType: type-fork
+    corpusRepositories: [chaski]
+    concerns:
+      - Installed package fork drift still needs independent real-repo replication.
+      - Generated-source matching is registry-gated and should stay off when no generated source is declared.
+      - Boundary DTOs may intentionally overlap generated types and need real clean controls before broad enablement.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported rule was found that compares handwritten object types against installed package or generated-source exported types."
+      whyNotOtherState: "Not equivalent to naming or import rules because the violation is structural type duplication proven by the TypeChecker."
+    examples:
+      flags:
+        - 'type AuthUser = { uid: string; email: string | null; displayName: string | null; photoURL: string | null; providerId: string; phoneNumber: string | null; };'
+      allows:
+        - 'import type { User } from "firebase/auth";'
+    nextAction: Seek independent generated-source or installed-package fork replication before stable promotion.
+  antidrift/no-trivial-selector-wrapper:
+    status: ready
+    stable: false
+    signal: AST structural return shape
+    solveType: inference-appeasement
+    corpusRepositories: [chaski]
+    concerns: []
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported rule was found for helpers that only return a member of their own parameter to appease inference."
+      whyNotOtherState: "Not covered by explicit-return rules because the actionable fix is to inline the property access, not only remove an annotation."
+    examples:
+      flags:
+        - 'function pickItems(bag: Bag): Item[] { return bag.items; }'
+      allows:
+        - 'function totalItems(bag: Bag): number { return bag.items.length; }'
+    nextAction: Seek independent non-name-gated selector-wrapper replication before stable promotion.
+  antidrift/no-underchecked-type-predicate:
+    status: ready
+    stable: false
+    signal: TypeChecker plus AST/control-flow checks
+    solveType: type-guard-laundering
+    referenceDoc: docs/rule-investigations/no-underchecked-type-predicate.md
+    corpusRepositories: [chaski]
+    concerns:
+      - The rule is intentionally limited to broad-input predicates that assert nontrivial object contracts.
+      - Validator delegation is allowed, so stable promotion should classify schema-backed predicate inventories.
+      - Discriminant guards over already-typed unions stay outside the report path.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported type-aware rule was found that checks whether a predicate body validates enough of the asserted object type."
+      whyNotOtherState: "Not equivalent to discriminated-union exhaustiveness because this rule targets broad-input guard laundering."
+    examples:
+      flags:
+        - 'const isUser = (value: unknown): value is User => value != null && typeof value === "object";'
+      allows:
+        - 'function isDateMessage(value: unknown): value is DateMessage { return !!value && typeof value === "object" && "year" in value && "month" in value && "day" in value; }'
+    nextAction: Seek another broad-input underchecked predicate and validator-backed clean control before stable promotion.
+  antidrift/no-unsafe-cast-chain:
+    status: ready
+    stable: false
+    signal: AST cast chain
+    solveType: type-escape-hatch
+    corpusRepositories: [chaski]
+    concerns: []
+    external:
+      state: broader-upstream
+      support: high
+      candidates: ["@typescript-eslint/no-unsafe-type-assertion"]
+      decision: own-antidrift
+      whyThisState: "The upstream rule catches the cast-chain drift but also owns a broader unsafe-assertion policy."
+      whyNotOtherState: "Not equivalent because adopting the upstream rule directly produced unrelated assertion inventory noise in real code."
+    examples:
+      flags:
+        - 'const user = raw as unknown as User;'
+      allows:
+        - 'const user = schema.parse(raw);'
+    nextAction: Seek independent cast-tunnel replication before stable promotion.
+  antidrift/no-unsafe-deserialize:
+    status: ready
+    stable: false
+    signal: TypeChecker
+    solveType: parse-at-edge
+    corpusRepositories: [chaski, sudocode-main]
+    concerns: []
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@typescript-eslint/no-unsafe-argument"]
+      decision: own-antidrift
+      whyThisState: "The ecosystem rule can catch some any-to-JSON.parse argument flows."
+      whyNotOtherState: "Not equivalent because the desired rule is specifically parse-at-edge guidance for broad JSON input and typed consumption."
+    examples:
+      flags:
+        - 'JSON.parse(row.source as any);'
+      allows:
+        - 'const value = JSON.parse(text);'
+    nextAction: Seek another repo with both any/unknown JSON.parse drift and typed-string clean parses.
+  antidrift/require-authz-check:
+    status: ready
+    stable: false
+    signal: AST control-flow plus registry
+    solveType: authorization-boundary
+    corpusRepositories: [chaski, sudocode-main]
+    concerns:
+      - Current rule is Express-style and does not prove tRPC procedure coverage.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported rule was found for repo-configured authz calls in boundary handlers that read request parameters."
+      whyNotOtherState: "Not equivalent to route or security plugins because the required calls are registry-owned project policy."
+    examples:
+      flags:
+        - 'app.get("/users/:id", (req) => read(req.params.id));'
+      allows:
+        - 'app.get("/users/:id", (req) => { requireUser(req); read(req.params.id); });'
+    nextAction: Keep tRPC authorization as a separate scoped decision.
+  antidrift/require-effect-deps:
+    status: ready
+    stable: false
+    signal: import binding plus AST
+    solveType: react-effect-lifecycle
+    corpusRepositories: [chaski]
+    concerns: []
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["react-hooks/exhaustive-deps", "eslint-plugin-use-effect-no-deps"]
+      decision: own-antidrift
+      whyThisState: "React Hooks exhaustive-deps owns dependency-array correctness once an array exists, and a small plugin covers missing arrays."
+      whyNotOtherState: "Not equivalent because exhaustive-deps intentionally stays silent on the no-array case, and the one-purpose plugin is not a strong maintained replacement."
+    examples:
+      flags:
+        - 'useEffect(() => sync());'
+      allows:
+        - 'useEffect(() => sync(), [sync]);'
+    nextAction: Seek independent missing-dependency-array replication before stable promotion.
+
+retiredRules:
+  antidrift/no-cycle:
+    status: retired
+    reason: Replaced by maintained import graph coverage through import-x/no-cycle.
+    referenceDoc: docs/rule-investigations/no-cycle.md
+  antidrift/no-inline-disable-without-ticket:
+    status: retired
+    reason: Replaced by maintained ESLint directive description coverage through @eslint-community/eslint-comments/require-description plus @typescript-eslint/ban-ts-comment for TypeScript directives.
+  antidrift/no-sdk-direct-use:
+    status: retired
+    reason: Replaced by generated ESLint core no-restricted-imports rules with wrapper-file overrides from policy/registries/gateways.yaml.
+  antidrift/no-explicit-return-type-private-helper:
+    status: retired
+    reason: Real Chaski code showed explicit private helper return types are often legitimate contracts.
+
+researchCandidates:
+  antidrift/domain-no-canonical-model-fork:
+    status: research
+    signal: TypeChecker plus domain registry
+    solveType: domain-model-drift
+    referenceDoc: docs/rule-investigations/domain-canonical-model-fork.md
+    nextAction: Find real domain model redeclaration evidence and clean DTO controls before implementation.
+  ecosystem/discriminated-union-exhaustiveness:
+    status: ecosystem-covered
+    signal: TypeChecker
+    solveType: discriminated-union-control-flow
+    referenceDoc: docs/rule-investigations/discriminated-union-ecosystem.md
+    nextAction: Prefer @typescript-eslint/switch-exhaustiveness-check and related type-aware rules before custom work.
+  ecosystem/import-cycle:
+    status: ecosystem-covered
+    signal: import-graph
+    solveType: architecture-cycle
+    referenceDoc: docs/rule-investigations/no-cycle.md
+    nextAction: Covered by import-x/no-cycle in the shared ESLint config; keep custom graph traversal retired.
+  ecosystem/disable-comment-description:
+    status: ecosystem-covered
+    signal: source-comment
+    solveType: policy-suppression
+    referenceDoc: docs/rule-equivalence-audit.md
+    nextAction: Covered by @eslint-community/eslint-comments/require-description and @typescript-eslint/ban-ts-comment in the shared ESLint config.
+  ecosystem/gateway-restricted-imports:
+    status: ecosystem-covered
+    signal: registry plus core ESLint config
+    solveType: gateway-boundary
+    referenceDoc: docs/rule-equivalence-audit.md
+    nextAction: Covered by generated no-restricted-imports patterns and wrapper-file overrides in the shared ESLint config.

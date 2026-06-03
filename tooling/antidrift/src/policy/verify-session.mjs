@@ -5,6 +5,10 @@ export function verifySession() {
   /** @type {[string, string[]][]} */
   const commands = [
     ["pnpm", ["policy:check-generated"]],
+    ["pnpm", ["policy:check-registries"]],
+    ["pnpm", ["policy:check-rule-surface"]],
+    ["pnpm", ["policy:validate-corpus"]],
+    ["pnpm", ["policy:validate-external-corpus"]],
     ["pnpm", ["lint"]],
     ["pnpm", ["typecheck"]],
     ["pnpm", ["test"]],
