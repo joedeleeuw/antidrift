@@ -7,9 +7,12 @@ This template intentionally excludes the later package-publication surface gap w
 ## What is included
 
 - pnpm workspace catalogs for consistent dependency versions.
-- Oxlint for fast baseline JavaScript/TypeScript feedback.
-- ESLint custom policy rules for project-specific agent failure modes.
+- ESLint for baseline JavaScript/TypeScript feedback and custom policy rules for project-specific agent failure modes.
 - Declarative source of truth in `policy/agent-guardrails.yaml`.
+- Positive build recipes in `docs/build-patterns.md` so agents import or derive concepts instead of duplicating them.
+- Feature planning template in `docs/feature-slice-template.md`.
+- Policy coverage tracking in `docs/policy-coverage.md`.
+- Self-hosting risk controls in `docs/self-hosting-risks.md`.
 - Generated agent instruction targets: `AGENTS.md`, `CLAUDE.md`, Cursor rules, Claude hooks, Codex hooks, and Copilot instructions.
 - Sample packages that exercise the agreed rule families.
 - SonarQube configuration and generic external issue import plumbing.
@@ -23,7 +26,7 @@ packages/contracts               Shared Zod contracts and typed API payloads
 packages/api                     Server route/action boundary examples
 packages/ui                      Design-system components and semantic tokens
 packages/gateways                Approved SDK/client integration boundary examples
-tooling/antidrift            @joedeleeuw/antidrift: plugin, eslint/oxlint configs, policy CLI + hooks (subpath exports)
+tooling/antidrift            @joedeleeuw/antidrift: plugin, eslint config, policy CLI + hooks (subpath exports)
 policy/                          Source-of-truth policy and registries
 docs/                            Handoff, agreed scope, rule authoring, Sonar guidance
 ```
@@ -40,10 +43,15 @@ pnpm check
 ## Daily commands
 
 ```bash
-pnpm lint              # oxlint + ESLint custom policy
+pnpm lint              # ESLint baseline + custom policy
 pnpm typecheck         # TypeScript project references
 pnpm test              # Vitest
 pnpm policy:generate   # regenerate AGENTS/CLAUDE/Cursor/Codex/Copilot policy artifacts
+pnpm policy:check-registries
+pnpm policy:check-rule-surface
+pnpm policy:validate-corpus
+pnpm policy:validate-chaski # optional local real-corpus gate when CHASKI_REPO is available
+pnpm policy:repo-corpus -- --slice current-work --rules import-x/no-cycle
 pnpm policy:verify-session
 pnpm sonar:prepare     # create generic Sonar external issue report from ESLint JSON
 ```

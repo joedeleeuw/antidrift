@@ -7,11 +7,11 @@ This is the non-package-publication scope captured in the template. The later pa
 | Cluster | Primary owner | Package/config home | Notes |
 |---|---|---|---|
 | React state shape | Frontend platform | `tooling/antidrift/src/eslint-plugin`, `apps/web`, `packages/ui` | Detect coupled `useState` waterfalls, status triplets, derived-state effects, and raw fetch-in-component patterns. |
-| Type contract shape | Type platform | `tooling/antidrift/src/eslint-plugin`, `packages/domain`, `packages/contracts` | Detect `getPointFromBag` wrappers, private helper annotations, one-off aliases, inline structural use-site contracts, unsafe cast chains. |
+| Type contract shape | Type platform | `tooling/antidrift/src/eslint-plugin`, `packages/domain`, `packages/contracts` | Detect `getPointFromBag` wrappers, one-off aliases, inline structural use-site contracts, unsafe cast chains, and branded/appeasement casts. |
 | Abstraction and file shape | Architecture | `policy/agent-guardrails.yaml`, Sonar | Control one-use helpers, file/component/function size, high-touch file growth. |
 | Side effects and boundaries | Platform | `packages/gateways`, `packages/api`, ESLint boundaries | Prevent direct SDK, DB, env, and raw network access from the wrong layer. |
 | Error handling | Reliability | ESLint custom rules and Sonar | Block silent catches, console-only handling, fallback-to-empty, lost error cause. |
-| Test integrity | Quality | Oxlint, ESLint, Vitest | Block `.only`, conditional assertions, no-assertion tests, skipped tests without a reason. |
+| Test integrity | Quality | ESLint, Vitest | Block `.only`, conditional assertions, no-assertion tests, skipped tests without a reason. |
 | Design system | Design system | `packages/ui`, registry files, ESLint custom rules | Prefer semantic tokens; block raw Tailwind colors and pointer-target hover transforms. |
 | Agent ops | Developer experience | `.claude/settings.json`, `.codex/hooks.json`, `tooling/antidrift/src/policy` | PreToolUse/PostToolUse/Stop checks for policy tampering and deterministic verification. |
 | Agent instructions | Developer experience | `policy/agent-guardrails.yaml`, generated markdown/rules | One source generates AGENTS, CLAUDE, Cursor, Codex, and Copilot guidance. |

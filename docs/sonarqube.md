@@ -1,6 +1,6 @@
 # SonarQube Setup
 
-SonarQube is the PR and trend governance layer. Local enforcement remains in Oxlint, ESLint, TypeScript, Vitest, and hooks.
+SonarQube is the PR and trend governance layer. Local enforcement remains in ESLint, TypeScript, Vitest, and hooks.
 
 ## Local report generation
 
