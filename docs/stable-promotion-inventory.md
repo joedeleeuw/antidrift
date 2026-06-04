@@ -8,7 +8,7 @@ This table is derived from `policy/registries/rules.yaml`, `tooling/antidrift/sr
 
 | Rank | Rule                                    | Promotion bucket               | Utility lens                       | Drift repos                      | Clean repos                       | Why                                                                                                                                                                          |
 | ---: | --------------------------------------- | ------------------------------ | ---------------------------------- | -------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|    1 | `antidrift/no-appeasement-cast`         | classification-required        | continue                           | Chaski, Codebase Atlas, Sudocode | Chaski, antidrift                 | Type-escape hatches are core scope; broad inventory replicated the signal across three real repos, but findings need production/test classification before stable promotion. |
+|    1 | `antidrift/no-appeasement-cast`         | remediation-required           | continue                           | Chaski, Codebase Atlas, Sudocode | Chaski, antidrift                 | Type-escape hatches are core scope; broad inventory replicated and classified the signal across three real repos, but production cleanup evidence is required before stable promotion. |
 |    2 | `antidrift/no-unsafe-deserialize`       | needs drift replication        | continue                           | Sudocode                         | Chaski, Codebase Atlas, Sudocode  | Parse-at-edge is core scope; type-aware clean breadth exists, but broad-input JSON.parse drift is currently only Sudocode.                                                   |
 |    3 | `antidrift/no-redundant-zod-parse`      | test assertion scope decision  | continue                           | Chaski, Murderbox                | Chaski, Codebase Atlas, Murderbox | Parse-at-edge/reparse discipline is original scope; external production drift exists, but typed schema-contract assertions in tests need a policy decision.                  |
 |    4 | `antidrift/no-raw-fetch-in-component`   | scope decision                 | continue if broadened              | Chaski, Codebase Atlas           | Chaski, Sudocode                  | Component-owned transport drift replicated, but stable depends on whether this remains fetch-specific or becomes a registry-backed raw transport boundary rule.              |
@@ -49,9 +49,9 @@ These remain implemented but not promotable because we still lack real drift evi
 
 ## Next Slice
 
-Work on `antidrift/no-appeasement-cast` first. Broad inventory and grounded advisory review are complete enough to define the next slice: classify the findings before changing rule behavior or stable status.
+Work on `antidrift/no-appeasement-cast` first. Broad inventory and grounded advisory review are complete enough to define the next slice: collect remediation evidence for the classified production drift before changing rule behavior or stable status.
 
-1. Classify every remaining production finding, not only representative examples.
-2. Collect cleanup/remediation evidence for the production drift patterns.
-3. Decide whether BFF, Codebase Atlas, and Sudocode test-file findings should keep reporting or receive a focused test override.
-4. Keep `stable: false` until classification leaves no unresolved concerns.
+1. Remediate at least one production drift pattern in Chaski and one external repo, or document accepted project-local repair patterns.
+2. Keep test files in scope for reporting, but exclude test-only findings from production drift replication.
+3. Rerun the broad inventory and confirm no production false-positive category appears.
+4. Keep `stable: false` until remediation leaves no unresolved productionization concerns.

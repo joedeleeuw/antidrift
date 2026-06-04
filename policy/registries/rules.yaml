@@ -45,8 +45,8 @@ rules:
     referenceDoc: docs/rule-investigations/no-appeasement-cast.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main]
     concerns:
-      - Broad inventory classified Chaski, Codebase Atlas, and Sudocode findings as mostly real boundary/type-escape drift; production cleanup or accepted remediation patterns are required before stable promotion.
-      - Test-file casts remain a policy decision; decide whether impossible-state test construction should report or get a focused config override.
+      - Broad inventory classified all current Chaski, Codebase Atlas, and Sudocode findings as real boundary/type-escape drift or in-scope test setup; production cleanup or accepted remediation patterns are required before stable promotion.
+      - Test-file casts remain in scope and should report, but test-only findings do not count as production drift evidence for stable promotion.
       - The rule has no explicit SDK/API allowlist; typed conversions stay clean only when the source is not any or unknown.
     external:
       state: broader-upstream
@@ -60,7 +60,7 @@ rules:
         - "const err = caught as AxiosError;"
       allows:
         - "if (axios.isAxiosError(caught)) return caught.response?.status;"
-    nextAction: Decide test-file policy and collect cleanup/remediation evidence before stable promotion.
+    nextAction: Collect cleanup/remediation evidence for classified production drift before stable promotion.
   antidrift/no-async-array-method:
     status: ready
     stable: false
