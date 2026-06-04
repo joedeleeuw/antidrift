@@ -23,6 +23,7 @@
     "policy:check-rule-surface": "antidrift check-rule-surface",
     "policy:validate-corpus": "antidrift repo-corpus --slice validation-gate",
     "policy:validate-external-corpus": "antidrift external-corpus --slice external-local",
+    "policy:benchmark-unsafe-type-assertion": "NODE_OPTIONS=--max-old-space-size=8192 antidrift benchmark-unsafe-type-assertion --slice upstream-delta --output reports/unsafe-type-assertion-benchmark.json",
     "policy:repo-corpus": "antidrift repo-corpus",
     "policy:validate-chaski": "antidrift chaski-corpus --slice chaski-local",
     "policy:check:changed": "antidrift check-changed",

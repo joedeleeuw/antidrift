@@ -9,6 +9,7 @@ import { parseArgs as parseChaskiCorpusArgs, chaskiCorpus } from "./chaski-corpu
 import { parseArgs as parseExternalCorpusArgs, externalCorpus } from "./external-corpus.mjs";
 import { verifySession } from "./verify-session.mjs";
 import { eslintJsonToSonar } from "./eslint-json-to-sonar.mjs";
+import { parseArgs as parseUnsafeTypeAssertionBenchmarkArgs, unsafeTypeAssertionBenchmark } from "./unsafe-type-assertion-benchmark.mjs";
 
 const [, , command, ...args] = process.argv;
 
@@ -36,6 +37,7 @@ const commands = {
     const result = await externalCorpus(parseExternalCorpusArgs(args));
     if (result.decision === "fail") process.exitCode = 1;
   },
+  "benchmark-unsafe-type-assertion": () => unsafeTypeAssertionBenchmark(parseUnsafeTypeAssertionBenchmarkArgs(args)),
   "verify-session": verifySession,
   sonar: () => eslintJsonToSonar(args[0], args[1]),
 };

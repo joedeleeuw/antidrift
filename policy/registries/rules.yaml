@@ -48,7 +48,7 @@ rules:
       - Broad inventory classified all current Chaski, Codebase Atlas, and Sudocode findings as real boundary/type-escape drift or in-scope test setup; production cleanup or accepted remediation patterns are required before stable promotion.
       - Test-file casts remain in scope and should report, but test-only findings do not count as production drift evidence for stable promotion.
       - The rule has no explicit SDK/API allowlist; typed conversions stay clean only when the source is not any or unknown.
-      - Claude Opus 4.8 adversarial review found that the broader upstream @typescript-eslint/no-unsafe-type-assertion rule must be benchmarked against the same corpus before custom ownership is treated as settled.
+      - The upstream @typescript-eslint/no-unsafe-type-assertion benchmark checked 2,411 real files and reported every antidrift cast-family location, but also produced 1,331 upstream-only locations; keep upstream as an optional strict benchmark rather than the default replacement.
     external:
       state: broader-upstream
       support: high
@@ -61,7 +61,7 @@ rules:
         - "const err = caught as AxiosError;"
       allows:
         - "if (axios.isAxiosError(caught)) return caught.response?.status;"
-    nextAction: Run an upstream-delta inventory for @typescript-eslint/no-unsafe-type-assertion across Chaski, Codebase Atlas, and Sudocode before remediation or stable-promotion work.
+    nextAction: Collect cleanup/remediation evidence for classified production drift before stable promotion.
   antidrift/no-async-array-method:
     status: ready
     stable: false
@@ -619,3 +619,21 @@ researchCandidates:
     solveType: gateway-boundary
     referenceDoc: docs/rule-equivalence-audit.md
     nextAction: Covered by generated no-restricted-imports patterns and wrapper-file overrides in the shared ESLint config.
+  ecosystem/vitest-test-integrity:
+    status: ecosystem-covered
+    signal: maintained ESLint plugin
+    solveType: test-integrity
+    referenceDoc: docs/rule-equivalence-audit.md
+    nextAction: Covered by @vitest/eslint-plugin in the shared ESLint config for focused tests, disabled tests, conditional expects/tests, standalone expects, and missing assertion checks.
+  ecosystem/react-hooks-compiler:
+    status: ecosystem-covered
+    signal: maintained ESLint plugin
+    solveType: react-state-shape
+    referenceDoc: docs/rule-equivalence-audit.md
+    nextAction: Covered by eslint-plugin-react-hooks recommended-latest plus explicit react-hooks/no-deriving-state-in-effects in the shared ESLint config.
+  ecosystem/sonar-sql-queries:
+    status: ecosystem-covered
+    signal: maintained ESLint plugin
+    solveType: sql-injection-boundary
+    referenceDoc: docs/rule-equivalence-audit.md
+    nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config; keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.

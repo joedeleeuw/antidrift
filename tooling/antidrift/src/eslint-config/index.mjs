@@ -9,6 +9,7 @@ import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import sonarjs from "eslint-plugin-sonarjs";
 import unicorn from "eslint-plugin-unicorn";
+import vitest from "@vitest/eslint-plugin";
 import tseslint from "typescript-eslint";
 import globals from "globals";
 import aiPolicy from "../eslint-plugin/index.js";
@@ -69,6 +70,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
     js.configs.recommended,
     ...tseslint.configs.recommendedTypeChecked,
     sonarjs.configs.recommended,
+    reactHooks.configs.flat["recommended-latest"],
     {
       files: ["**/*.{ts,tsx,js,mjs,cjs}"],
       languageOptions: {
@@ -140,6 +142,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         // React hook lifecycle rules are deterministic feedback for generated UI.
         "react-hooks/rules-of-hooks": "error",
         "react-hooks/exhaustive-deps": "error",
+        "react-hooks/no-deriving-state-in-effects": "error",
         "react/jsx-key": "error",
         "react/jsx-no-target-blank": "error",
         "react/jsx-no-duplicate-props": "error",
@@ -234,7 +237,13 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
     ...gatewayWrapperOverrides(registries, generatedPatterns),
     {
       files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+      plugins: {
+        vitest,
+      },
       rules: {
+        ...vitest.configs.recommended.rules,
+        "vitest/no-disabled-tests": "error",
+        "vitest/no-conditional-in-test": "error",
         "@typescript-eslint/no-non-null-assertion": "off",
         "antidrift/no-inline-structural-type-at-use-site": "off"
       },

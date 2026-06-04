@@ -48,6 +48,7 @@
   "dependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "catalog:lint",
     "@eslint/js": "catalog:lint",
+    "@vitest/eslint-plugin": "catalog:lint",
     "eslint-plugin-boundaries": "catalog:lint",
     "eslint-plugin-import-x": "catalog:lint",
     "eslint-plugin-no-only-tests": "catalog:lint",

@@ -18,6 +18,33 @@ Closest supported rule:
 
 That upstream rule is real and high support. It catches some of the same bad assertions, but it is broader than the antidrift rule. In Chaski, the upstream rule also reports typed SDK/API conversion patterns that this package currently treats as clean controls because their source value is already typed. So the ecosystem rule is not an equivalent replacement for this project scope.
 
+## Upstream Delta Benchmark
+
+Run:
+
+```bash
+pnpm policy:benchmark-unsafe-type-assertion
+```
+
+The benchmark runs `@typescript-eslint/no-unsafe-type-assertion` beside the antidrift cast-family rules over real Chaski, Codebase Atlas, and Sudocode TypeScript programs. The first source-only run checked 2,411 files and produced:
+
+| Rule                                          | Findings |
+| --------------------------------------------- | -------: |
+| `antidrift/no-appeasement-cast`               |       85 |
+| `antidrift/no-unsafe-cast-chain`              |       58 |
+| `antidrift/no-cast-to-branded`                |        0 |
+| `@typescript-eslint/no-unsafe-type-assertion` |    1,474 |
+
+Location comparison:
+
+| Result                                                              | Count |
+| ------------------------------------------------------------------- | ----: |
+| Locations reported by both upstream and antidrift cast-family rules |   142 |
+| Upstream-only locations                                             | 1,331 |
+| Antidrift-only locations                                            |     0 |
+
+Interpretation: upstream is a strict superset on the measured corpus, but too broad to replace the custom rule as the default guardrail. Keep the custom rule for the `any`/`unknown` source-boundary contract and use the upstream benchmark as an optional stricter-policy delta.
+
 ## Real Corpus Evidence
 
 ### Drift
@@ -98,15 +125,15 @@ The broad inventory was run with an ad-hoc ESLint API harness. Some subprojects 
 
 The broad inventory was rerun with `reports/no-appeasement-inventory.mjs` on June 4, 2026. It still reports 85 findings across Chaski, Codebase Atlas, and Sudocode. Every finding now has a classification bucket. No production false-positive category was found; the remaining blocker is cleanup/remediation evidence, not rule narrowing.
 
-| Classification | Count | Examples | Current decision |
-| --- | ---: | --- | --- |
-| Caught-error normalization casts | 21 | Chaski `portal/api/apiService.ts`, Chaski `crow-v2/app/_layout.tsx`, Sudocode executor/worktree/repo-info catches | Drift. Use `instanceof`, `axios.isAxiosError`, typed error guards, or a shared `normalizeError` helper. |
-| Unvalidated serialized data casts | 27 | Chaski `ImpersonationWarning.tsx`; Sudocode config, JSONL, YAML, workflow, sidecar, and `response.json()` readers | Drift. Parse into `unknown`, then validate with a schema, generated decoder, or owned mapper before assigning the contract. |
-| Row/model/object contract casts | 12 | Chaski PowerSync rows and TanStack table rows; Codebase Atlas `mesh.userData`; Sudocode DB rows and Claude tool args | Drift. Fix source generics, add typed row mappers, or guard third-party bags before claiming the model. |
-| String-union / enum value casts | 12 | Chaski toggle/select values; Sudocode editor, entity, relationship, agent, and narration priority values | Drift. Validate against an allowed-value set or make the UI/router source carry the literal type. |
-| Transport/API message contract casts | 5 | Sudocode websocket payloads and generic `ApiResponse<any>` unwrap | Drift. Use discriminated event schemas, generated clients, or response decoders. Generic wrappers are not a built-in exception. |
-| Request-body boundary casts | 5 | Sudocode import/config route bodies | Drift. Validate request bodies at the route boundary before destructuring. |
-| Test setup / impossible-state casts | 3 | Chaski PostHog gateway test, Codebase Atlas persisted-project test, Sudocode hook test | Still reported. Tests are not production promotion evidence, but type-escape hatches in real tests should use typed builders, schema-validated fixture loaders, or focused local suppression with a reason. |
+| Classification                       | Count | Examples                                                                                                             | Current decision                                                                                                                                                                                            |
+| ------------------------------------ | ----: | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Caught-error normalization casts     |    21 | Chaski `portal/api/apiService.ts`, Chaski `crow-v2/app/_layout.tsx`, Sudocode executor/worktree/repo-info catches    | Drift. Use `instanceof`, `axios.isAxiosError`, typed error guards, or a shared `normalizeError` helper.                                                                                                     |
+| Unvalidated serialized data casts    |    27 | Chaski `ImpersonationWarning.tsx`; Sudocode config, JSONL, YAML, workflow, sidecar, and `response.json()` readers    | Drift. Parse into `unknown`, then validate with a schema, generated decoder, or owned mapper before assigning the contract.                                                                                 |
+| Row/model/object contract casts      |    12 | Chaski PowerSync rows and TanStack table rows; Codebase Atlas `mesh.userData`; Sudocode DB rows and Claude tool args | Drift. Fix source generics, add typed row mappers, or guard third-party bags before claiming the model.                                                                                                     |
+| String-union / enum value casts      |    12 | Chaski toggle/select values; Sudocode editor, entity, relationship, agent, and narration priority values             | Drift. Validate against an allowed-value set or make the UI/router source carry the literal type.                                                                                                           |
+| Transport/API message contract casts |     5 | Sudocode websocket payloads and generic `ApiResponse<any>` unwrap                                                    | Drift. Use discriminated event schemas, generated clients, or response decoders. Generic wrappers are not a built-in exception.                                                                             |
+| Request-body boundary casts          |     5 | Sudocode import/config route bodies                                                                                  | Drift. Validate request bodies at the route boundary before destructuring.                                                                                                                                  |
+| Test setup / impossible-state casts  |     3 | Chaski PostHog gateway test, Codebase Atlas persisted-project test, Sudocode hook test                               | Still reported. Tests are not production promotion evidence, but type-escape hatches in real tests should use typed builders, schema-validated fixture loaders, or focused local suppression with a reason. |
 
 No rule narrowing is justified from this inventory. Generic/API wrappers are not an exception to the rule: `response.json() as APIResponse<T>`, `response.data as ApiResponse<any>`, request-body casts, DB/YAML row casts, and websocket payload casts are boundary contract assertions and should be repaired with schema validation, a generated client/decoder, or a typed mapper.
 
