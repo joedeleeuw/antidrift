@@ -250,8 +250,11 @@ rules:
     stable: false
     signal: import-scope plus AST
     solveType: side-effect-boundary
-    corpusRepositories: [chaski]
-    concerns: []
+    referenceDoc: docs/rule-investigations/no-raw-fetch-in-component.md
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main]
+    concerns:
+      - Broad inventory replicated component-owned fetch drift in Chaski, Codebase Atlas, and Murderbox, but the rule is still fetch-specific.
+      - Decide whether this remains a narrow no-raw-fetch-in-component rule or graduates into a registry-backed raw transport boundary rule before stable promotion.
     external:
       state: config-replacement
       support: high
@@ -264,7 +267,8 @@ rules:
         - 'function Orders() { fetch("/api/orders"); return null; }'
       allows:
         - 'async function loadOrders() { return fetch("/api/orders"); }'
-    nextAction: Seek independent frontend replication before stable promotion.
+        - "function Orders() { const { data } = useOrders(); return <div>{data.length}</div>; }"
+    nextAction: Decide narrow fetch-specific scope versus registry-backed raw transport boundary before stable promotion.
   antidrift/no-raw-tailwind-color:
     status: ready
     stable: false

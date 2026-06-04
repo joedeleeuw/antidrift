@@ -37,6 +37,14 @@ const sudocodeCases = [
     paths: ["server/src/routes/projects.ts"],
   },
   {
+    id: "sudocode-executions-page-query-clean",
+    ruleId: "antidrift/no-raw-fetch-in-component",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    paths: ["frontend/src/pages/ExecutionsPage.tsx"],
+  },
+  {
     id: "sudocode-workflows-route-json-parse-any-row",
     ruleId: "antidrift/no-unsafe-deserialize",
     kind: "drift",
@@ -146,6 +154,24 @@ const codebaseAtlasCases = [
     typeAware: true,
     tsconfig: "tsconfig.json",
     paths: ["src/programs/persistenceCuration.ts"],
+  },
+  {
+    id: "atlas-city-route-component-fetch",
+    ruleId: "antidrift/no-raw-fetch-in-component",
+    kind: "drift",
+    classification: "ready",
+    subproject: "app",
+    paths: ["src/routes/atlas.city.tsx"],
+    expectedFindings: [
+      {
+        path: "src/routes/atlas.city.tsx",
+        line: 50,
+      },
+      {
+        path: "src/routes/atlas.city.tsx",
+        line: 76,
+      },
+    ],
   },
   {
     id: "atlas-needle-renderer-userdata-color-appeasement-cast",
