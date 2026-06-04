@@ -89,6 +89,14 @@ const sudocodeCases = [
     paths: ["server/src/routes/config.ts"],
   },
   {
+    id: "sudocode-workflows-placeholder-in-list-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "server",
+    paths: ["server/src/routes/workflows.ts"],
+  },
+  {
     id: "sudocode-issues-route-params-without-authz",
     ruleId: "antidrift/require-authz-check",
     kind: "drift",

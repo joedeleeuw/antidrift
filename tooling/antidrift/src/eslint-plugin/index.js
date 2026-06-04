@@ -922,13 +922,52 @@ function templateText(node) {
   return node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "").join(" ");
 }
 
+function staticStringValue(node) {
+  if (node?.type === "Literal" && typeof node.value === "string") return node.value;
+  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) return templateText(node);
+  return null;
+}
+
+function isQuestionMarkCallback(node) {
+  if (node?.type !== "ArrowFunctionExpression" && node?.type !== "FunctionExpression") return false;
+  return staticStringValue(node.body) === "?";
+}
+
+function isQuestionPlaceholderList(node) {
+  if (node?.type !== "CallExpression") return false;
+  const join = node.callee;
+  if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
+  const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
+  if (separator !== "," && separator !== ", ") return false;
+  const mapCall = join.object;
+  if (mapCall?.type !== "CallExpression") return false;
+  const map = mapCall.callee;
+  return map?.type === "MemberExpression"
+    && !map.computed
+    && map.property?.type === "Identifier"
+    && map.property.name === "map"
+    && isQuestionMarkCallback(mapCall.arguments[0]);
+}
+
 function ruleNoSqlStringConcat() {
   return {
     meta: { type: "problem", docs: { description: "Disallow SQL assembled via string interpolation or concatenation." }, schema: [] },
     create(context) {
+      const sourceCode = context.sourceCode;
+      const safeSqlPlaceholderVariables = new WeakSet();
+      function isSafeSqlPlaceholderExpression(node) {
+        const variable = findVariable(sourceCode, node);
+        return Boolean(variable && safeSqlPlaceholderVariables.has(variable));
+      }
       return {
+        VariableDeclarator(node) {
+          if (!isQuestionPlaceholderList(node.init)) return;
+          const variable = getDeclaredVariable(sourceCode, node);
+          if (variable) safeSqlPlaceholderVariables.add(variable);
+        },
         TemplateLiteral(node) {
           if (node.expressions.length > 0 && sqlPattern.test(templateText(node))) {
+            if (node.expressions.every((expression) => isSafeSqlPlaceholderExpression(expression))) return;
             context.report({ node, message: "Do not interpolate values into SQL strings. Use parameterized queries / bound parameters." });
           }
         },

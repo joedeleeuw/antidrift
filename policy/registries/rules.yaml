@@ -342,11 +342,14 @@ rules:
   antidrift/no-sql-string-concat:
     status: ready
     stable: false
+    referenceDoc: docs/rule-investigations/no-sql-string-concat.md
     signal: AST string construction
     solveType: injection-boundary
-    corpusRepositories: [chaski]
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main]
     concerns:
-      - The benchmark on 178 real files reports 12 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
+      - The benchmark on 178 real files reports 11 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
+      - Dynamic placeholder lists such as `ids.map(() => "?").join(",")` are accepted clean because values remain bound parameters.
+      - Dynamic SET/WHERE clause fragments still need a project convention decision before stable promotion.
     external:
       state: partial-overlap
       support: medium
@@ -359,7 +362,8 @@ rules:
         - "const sql = `SELECT * FROM users WHERE id = ${id}`;"
       allows:
         - 'db.query("SELECT * FROM users WHERE id = ?", [id]);'
-    nextAction: Seek independent replication with parameterized-query clean controls, then rerun `pnpm policy:benchmark-sql-queries`.
+        - 'const placeholders = ids.map(() => "?").join(","); db.prepare(`SELECT id FROM issues WHERE id IN (${placeholders})`).all(...ids);'
+    nextAction: Adjudicate dynamic SQL clause fragments, then rerun `pnpm policy:benchmark-sql-queries`.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
@@ -642,4 +646,4 @@ researchCandidates:
     signal: maintained ESLint plugin
     solveType: sql-injection-boundary
     referenceDoc: docs/rule-equivalence-audit.md
-    nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 12 antidrift SQL findings. Keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.
+    nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 11 antidrift SQL findings. Keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.
