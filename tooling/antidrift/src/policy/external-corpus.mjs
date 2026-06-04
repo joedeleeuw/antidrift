@@ -130,6 +130,14 @@ const sudocodeCases = [
 
 const codebaseAtlasCases = [
   {
+    id: "atlas-debug-bundle-promise-all-map-clean",
+    ruleId: "antidrift/no-async-array-method",
+    kind: "correct",
+    classification: "ready",
+    subproject: "app",
+    paths: ["src/services/debugBundleService.ts"],
+  },
+  {
     id: "atlas-needle-renderer-userdata-color-appeasement-cast",
     ruleId: "antidrift/no-appeasement-cast",
     kind: "drift",

@@ -66,8 +66,11 @@ rules:
     stable: false
     signal: AST
     solveType: promise-control-flow
-    corpusRepositories: [chaski, sudocode-main]
-    concerns: []
+    referenceDoc: docs/rule-investigations/no-async-array-method.md
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main]
+    concerns:
+      - Broad local inventory found no false positives across Chaski and Codebase Atlas, but real drift still replicates only in Sudocode test cleanup code.
+      - Keep stable false until a second independent real drift is found or the project explicitly accepts one-repo drift evidence for this deterministic AST rule.
     external:
       state: partial-overlap
       support: high
@@ -84,7 +87,8 @@ rules:
         - "items.forEach(async (item) => await save(item));"
       allows:
         - "for (const item of items) await save(item);"
-    nextAction: Seek inventory results without false positives before stable promotion.
+        - "await Promise.all(items.map(async (item) => save(item)));"
+    nextAction: Find a second independent real drift instance, or document an explicit one-repo evidence exception before stable promotion.
   antidrift/no-cast-to-branded:
     status: under-proven
     stable: false
