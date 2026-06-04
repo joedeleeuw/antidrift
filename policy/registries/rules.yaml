@@ -342,20 +342,21 @@ rules:
     signal: AST string construction
     solveType: injection-boundary
     corpusRepositories: [chaski]
-    concerns: []
+    concerns:
+      - The benchmark on 178 real files reports 12 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
     external:
       state: partial-overlap
       support: medium
       candidates: ["sonarjs/sql-queries", "sql/no-unsafe-query"]
       decision: own-antidrift
-      whyThisState: "Security plugins cover SQL construction in nearby ways, but their exact sinks and template conventions differ."
+      whyThisState: "Security plugins cover SQL construction in nearby ways, but the measured SonarJS benchmark did not report the real HogQL/template interpolation cases."
       whyNotOtherState: "Not equivalent because the real HoGQL interpolation case was not covered by the checked ecosystem path."
     examples:
       flags:
         - "const sql = `SELECT * FROM users WHERE id = ${id}`;"
       allows:
         - 'db.query("SELECT * FROM users WHERE id = ?", [id]);'
-    nextAction: Seek independent replication with parameterized-query clean controls.
+    nextAction: Seek independent replication with parameterized-query clean controls, then rerun `pnpm policy:benchmark-sql-queries`.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
@@ -637,4 +638,4 @@ researchCandidates:
     signal: maintained ESLint plugin
     solveType: sql-injection-boundary
     referenceDoc: docs/rule-equivalence-audit.md
-    nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config; keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.
+    nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 12 antidrift SQL findings. Keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.

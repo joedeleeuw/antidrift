@@ -10,3 +10,4 @@ export { externalCorpus } from "./external-corpus.mjs";
 export { verifySession } from "./verify-session.mjs";
 export { eslintJsonToSonar } from "./eslint-json-to-sonar.mjs";
 export { unsafeTypeAssertionBenchmark } from "./unsafe-type-assertion-benchmark.mjs";
+export { sqlQueryBenchmark } from "./sql-query-benchmark.mjs";
