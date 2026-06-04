@@ -93,6 +93,22 @@ Focused Chaski and external corpus gates pass for the known drift and clean cont
 
 The broad inventory was run with an ad-hoc ESLint API harness. Some subprojects emitted tsconfig/generated-file parser messages, so only `antidrift/no-appeasement-cast` findings count as rule evidence. These findings are not labeled false positives yet, but none can count toward stable promotion until they are classified.
 
+## Classification Notes
+
+Representative reads show the broad findings cluster into real policy questions rather than random syntax noise:
+
+| Pattern                                                                    | Examples                                                                                                      | Current classification                                                                                       |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Caught errors cast to `Error`, `FirebaseError`, or `NodeJS.ErrnoException` | Chaski `portal/lib/firebase/auth.ts`, Chaski `crow-v2/app/_layout.tsx`, Sudocode executor and service catches | Drift unless narrowed with `instanceof`, an error-normalization helper, or a typed error guard.              |
+| `JSON.parse(...) as Contract` or `response.json() as APIResponse<T>`       | Chaski `ImpersonationWarning.tsx`, Sudocode `workflow/mcp/api-client.ts`, Sudocode config/JSONL readers       | Drift unless followed by schema validation, a generated decoder, or a documented typed boundary.             |
+| Request body casts                                                         | Sudocode `server/src/routes/import.ts` and `server/src/routes/config.ts`                                      | Drift; should validate at the route boundary.                                                                |
+| Websocket/message payload casts                                            | Sudocode `frontend/src/contexts/WebSocketContext.tsx`, `ExecutionsSidebar.tsx`, `ChatWidgetContext.tsx`       | Drift unless narrowed by an event schema or discriminated payload validator.                                 |
+| DB/YAML row casts                                                          | Sudocode `cli/src/operations/issues.ts`, `cli/src/operations/specs.ts`, `merge-resolver.ts`                   | Drift unless the DB/YAML reader owns a typed mapper or schema.                                               |
+| UI select/string-union casts                                               | Chaski `WeeklySchedule.tsx`, Sudocode `routes/editors.ts`                                                     | Needs per-file classification; a guard against the allowed value set is usually the replacement.             |
+| Test impossible-state casts                                                | Chaski BFF test, Codebase Atlas browser-state test, Sudocode frontend hook test                               | Policy decision required: either keep reporting type escape hatches in tests or add a focused test override. |
+
+No rule narrowing is justified yet. The next slice should classify the generic/API-wrapper and test-file cases first; only add an allowlist or config override if real production false positives remain after that review.
+
 ## False-Positive Risks
 
 - Generic API wrappers that return `response.data as T` can be intentional boundary abstractions. The current rule must avoid turning every generic API client into noise unless the source is broad and the target is a named object contract used to silence missing validation.
