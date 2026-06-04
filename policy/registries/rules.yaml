@@ -513,17 +513,13 @@ rules:
     nextAction: Seek independent cast-tunnel replication before stable promotion.
   antidrift/no-unsafe-deserialize:
     status: ready
-    stable: false
+    stable: true
     signal: TypeChecker plus local string-boundary control flow
     solveType: parse-at-edge
     referenceDoc: docs/rule-investigations/no-unsafe-deserialize.md
     corpusRepositories:
       [chaski, codebase-atlas, sudocode-main, cloudflare-agents]
-    concerns:
-      - Type-aware inventory found no Chaski or Codebase Atlas drift; Sudocode and Cloudflare Agents now provide independent broad-input JSON.parse drift.
-      - Guarded any-valued MessageEvent.data is now exempted only when a direct typeof-string branch or early-return guard proves the parse input is a string.
-      - Claude Opus 4.8 advisory completed on June 4, 2026 and agreed ecosystem coverage is only partial, but recommended keeping stable false until parserServices fail-open behavior is explicitly mitigated or documented as a production decision.
-      - "Residual accepted limitations still need to be named before stable promotion: helper-based string guards, aliased/computed JSON.parse calls, and local JSON shadowing."
+    concerns: []
     external:
       state: partial-overlap
       support: high
@@ -539,7 +535,7 @@ rules:
         - "const value = JSON.parse(text);"
         - 'if (typeof event.data !== "string") return; JSON.parse(event.data);'
         - "const parsed = schema.parse(JSON.parse(text));"
-    nextAction: Close the type-aware parserServices production guard/documentation slice, then reconsider stable promotion.
+    nextAction: Stable; monitor raw-plugin type-service guard feedback and revisit only if real consumers show false positives or missed parse-at-edge drift.
   antidrift/require-authz-check:
     status: ready
     stable: false

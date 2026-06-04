@@ -30,6 +30,8 @@ export default createConfig({ tsconfigRootDir: import.meta.dirname });
 
 That gives you the type-aware base (typescript-eslint, sonarjs, architecture boundaries, react-hooks) plus every antidrift rule. If you keep a `policy/` directory with registries, `createConfig` reads them and wires up the domain-specific rules on its own.
 
+If you wire `@joedeleeuw/antidrift/eslint-plugin` by hand instead of using `createConfig`, configure `@typescript-eslint/parser` with parser services (`projectService` or `project`). Fully type-aware antidrift rules report a configuration error when enabled without those services so missing type information cannot silently weaken the rule set.
+
 Generate policy artifacts when `policy/agent-guardrails.yaml` changes:
 
 ```sh

@@ -35,7 +35,7 @@ These require `typescript-eslint` parser services and the TypeScript `Program`/`
 - redundant Zod parses
 - unsafe deserialization from broad values
 
-The shareable `createConfig` path configures `typescript-eslint` project service for these rules. Raw plugin consumers must provide equivalent parser services; otherwise type-aware rules can fail open. Treat that as a productionization concern for stable promotion, not as a corpus-evidence problem.
+The shareable `createConfig` path configures `typescript-eslint` project service for these rules. Raw plugin consumers must provide equivalent parser services. Fully type-aware antidrift rules fail closed with a configuration error when they are enabled without parser services, so missing type information is visible instead of silently weakening the rule.
 
 ### Deterministic AST or scope rules
 

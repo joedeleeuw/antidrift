@@ -43,7 +43,30 @@ const typedRuleTester = new RuleTester({
   },
 });
 
+const typeServiceMessage = /requires TypeScript parser services/u;
 const rule = (name) => plugin.rules[name];
+const typeServiceGuardedRules = [
+  "no-appeasement-cast",
+  "no-cast-to-branded",
+  "no-canonical-model-fork",
+  "no-defensive-shape-probing",
+  "no-redundant-zod-parse",
+  "no-structural-type-fork",
+  "no-underchecked-type-predicate",
+  "no-unsafe-deserialize",
+];
+
+for (const guardedRule of typeServiceGuardedRules) {
+  ruleTester.run(`${guardedRule} type-service guard`, rule(guardedRule), {
+    valid: [],
+    invalid: [
+      {
+        code: "declare const value: any; value;",
+        errors: [{ message: typeServiceMessage }],
+      },
+    ],
+  });
+}
 
 ruleTester.run("no-async-array-method", rule("no-async-array-method"), {
   valid: [

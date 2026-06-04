@@ -14,6 +14,23 @@ const structuralDerivationUtilities = new Set(["Omit", "Partial", "Pick", "Reado
 
 const memberNodeTypes = new Set(["MethodDefinition", "PropertyDefinition", "Property"]);
 
+function missingTypeServicesVisitors(context, ruleName) {
+  return {
+    Program(node) {
+      context.report({
+        node,
+        message: `antidrift/${ruleName} requires TypeScript parser services. Use @joedeleeuw/antidrift createConfig(...) or configure @typescript-eslint/parser with projectService/project.`,
+      });
+    },
+  };
+}
+
+function requireTypeServices(context) {
+  const services = context.sourceCode?.parserServices ?? context.parserServices;
+  if (services?.program && services.esTreeNodeToTSNodeMap) return services;
+  return null;
+}
+
 function getFunctionName(node) {
   if (node.type === "FunctionDeclaration") return node.id?.name ?? "";
   if (node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression") return node.id?.name ?? "";
@@ -1051,8 +1068,8 @@ function ruleNoUnsafeDeserialize() {
   return {
     meta: { type: "problem", docs: { description: "Disallow JSON.parse on any/unknown values without validation." }, schema: [] },
     create(context) {
-      const services = context.sourceCode?.parserServices ?? context.parserServices;
-      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const services = requireTypeServices(context);
+      if (!services) return missingTypeServicesVisitors(context, "no-unsafe-deserialize");
       const checker = services.program.getTypeChecker();
 
       return {
@@ -1344,8 +1361,8 @@ function ruleNoStructuralTypeFork() {
       ],
     },
     create(context) {
-      const services = context.sourceCode?.parserServices ?? context.parserServices;
-      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const services = requireTypeServices(context);
+      if (!services) return missingTypeServicesVisitors(context, "no-structural-type-fork");
       const program = services.program;
       const checker = program.getTypeChecker();
       const generatedSources = context.options[0]?.generatedSources ?? {};
@@ -1420,8 +1437,8 @@ function ruleNoCanonicalModelFork() {
       ],
     },
     create(context) {
-      const services = context.sourceCode?.parserServices ?? context.parserServices;
-      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const services = requireTypeServices(context);
+      if (!services) return missingTypeServicesVisitors(context, "no-canonical-model-fork");
       const program = services.program;
       const checker = program.getTypeChecker();
       const canonicalEntities = context.options[0]?.canonicalEntities ?? {};
@@ -1459,8 +1476,8 @@ function ruleNoCastToBranded() {
   return {
     meta: { type: "problem", docs: { description: "Disallow casting values into antidrift branded types." }, schema: [] },
     create(context) {
-      const services = context.sourceCode?.parserServices ?? context.parserServices;
-      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const services = requireTypeServices(context);
+      if (!services) return missingTypeServicesVisitors(context, "no-cast-to-branded");
       const checker = services.program.getTypeChecker();
 
       return {
@@ -1480,8 +1497,8 @@ function ruleNoAppeasementCast() {
   return {
     meta: { type: "problem", docs: { description: "Disallow casting any/unknown values into named object contracts." }, schema: [] },
     create(context) {
-      const services = context.sourceCode?.parserServices ?? context.parserServices;
-      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const services = requireTypeServices(context);
+      if (!services) return missingTypeServicesVisitors(context, "no-appeasement-cast");
       const checker = services.program.getTypeChecker();
 
       return {
@@ -1691,8 +1708,8 @@ function ruleNoUndercheckedTypePredicate() {
       schema: [],
     },
     create(context) {
-      const services = context.sourceCode?.parserServices ?? context.parserServices;
-      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const services = requireTypeServices(context);
+      if (!services) return missingTypeServicesVisitors(context, "no-underchecked-type-predicate");
       const checker = services.program.getTypeChecker();
 
       function check(fn) {
@@ -1734,8 +1751,8 @@ function ruleNoDefensiveShapeProbing() {
   return {
     meta: { type: "problem", docs: { description: "Disallow Object.entries normalizers that repeatedly probe broad object shape." }, schema: [{ type: "object", properties: { threshold: { type: "number" } }, additionalProperties: false }] },
     create(context) {
-      const services = context.sourceCode?.parserServices ?? context.parserServices;
-      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const services = requireTypeServices(context);
+      if (!services) return missingTypeServicesVisitors(context, "no-defensive-shape-probing");
       const checker = services.program.getTypeChecker();
       const threshold = context.options[0]?.threshold ?? 4;
 
@@ -1903,8 +1920,8 @@ function ruleNoRedundantZodParse() {
   return {
     meta: { type: "problem", docs: { description: "Detect re-parsing a value with the same Zod schema that already produced it. Validate once at the boundary and pass the parsed value inward instead of re-validating in every layer." }, schema: [] },
     create(context) {
-      const services = context.sourceCode?.parserServices ?? context.parserServices;
-      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const services = requireTypeServices(context);
+      if (!services) return missingTypeServicesVisitors(context, "no-redundant-zod-parse");
       const checker = services.program.getTypeChecker();
       // Symbol of a value already validated → symbol of the schema that validated it.
       const validatedBy = new Map();
