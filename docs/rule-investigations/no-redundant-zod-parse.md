@@ -101,6 +101,8 @@ The rule now uses an assertion-context exception, not a test-file override. A Zo
 
 Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md`). It agreed the assertion-context exception is the right shape, but recommended keeping `stable: false` until a real negative gate proves a consumed parse inside a throw assertion still reports, or until that edge is intentionally accepted as unproven.
 
+Follow-up real-corpus search on June 4, 2026 found no consumed assertion-callback reparse case to promote as a drift gate. The scan ran the narrowed rule over 50 Codebase Atlas test files, 30 Murderbox API test files, 132 Sudocode server test files, and 11 Chaski BFF test files; all stayed clean. The consumed-parse edge is accepted as unrepresented in the current corpus rather than blocked on a synthetic fixture. The implementation still keeps the exception narrow by requiring the parse call to be the direct throw-assertion expression.
+
 Known remaining limits:
 
 - Inline service reparses such as `Schema.parse(await getTypedValue())` are not caught unless the awaited result is first assigned to a local identifier.

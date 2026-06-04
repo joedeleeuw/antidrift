@@ -301,7 +301,7 @@ rules:
     corpusRepositories: [chaski, codebase-atlas, murderbox]
     concerns:
       - "Test assertion scope is decided: Zod parses inside throw assertion callbacks are schema-contract checks, not validation-boundary drift."
-      - "Claude Opus 4.8 advisory completed on June 4, 2026 and recommended keeping stable false until a real negative gate proves a consumed parse inside a throw assertion still reports."
+      - "A June 4, 2026 real-test scan found no consumed assertion-callback reparse case across Codebase Atlas, Murderbox, Sudocode, and Chaski; that missing negative gate is accepted as unrepresented in the current corpus."
       - "Known false negatives remain for inline awaited service results and sync helper results."
     external:
       state: net-antidrift
@@ -316,7 +316,7 @@ rules:
       allows:
         - "const row = RowSchema.parse(raw);"
         - "expect(() => RowSchema.parse(typedFixture)).not.toThrow();"
-    nextAction: Seek a real negative corpus gate for consumed assertion-callback reparses, or explicitly accept that edge before stable promotion.
+    nextAction: Decide whether to fix or explicitly accept inline awaited service-result reparses and sync helper-result reparses before stable promotion.
   antidrift/no-role-literal-in-type:
     status: under-proven
     stable: false
