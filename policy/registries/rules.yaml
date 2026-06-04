@@ -458,9 +458,10 @@ rules:
     stable: false
     signal: AST structural return shape
     solveType: inference-appeasement
+    referenceDoc: docs/rule-investigations/no-trivial-selector-wrapper.md
     corpusRepositories: [chaski, codebase-atlas]
     concerns:
-      - Key-extractor or adapter callbacks can also be a single member return; stable promotion needs explicit classification of those shapes.
+      - Adapter callbacks such as key extractors can also be a single member return; the current convention is a local rule-specific disable with a required reason, not a prop-name/use-site heuristic.
     external:
       state: net-antidrift
       support: none
@@ -473,7 +474,7 @@ rules:
         - "function pickItems(bag: Bag): Item[] { return bag.items; }"
       allows:
         - "function totalItems(bag: Bag): number { return bag.items.length; }"
-    nextAction: Run advisory review and classify adapter/key-extractor false-positive risk before stable promotion.
+    nextAction: Keep structural; collect repeated adapter pressure before designing any use-site-aware exemption.
   antidrift/no-underchecked-type-predicate:
     status: ready
     stable: false
@@ -570,23 +571,25 @@ rules:
     stable: false
     signal: import binding plus AST
     solveType: react-effect-lifecycle
+    referenceDoc: docs/rule-investigations/require-effect-deps.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main, murderbox, claude-code-source]
     concerns:
-      - Independent drift includes deliberate every-render effects in Claude Code Source; stable promotion needs a reasoned escape hatch or an explicit policy that those must be locally disabled with prose.
+      - Independent drift includes deliberate every-render effects in Claude Code Source; the current convention is a local `antidrift/require-effect-deps` disable with a required reason.
+      - The exact ecosystem overlap is `eslint-plugin-use-effect-no-deps`, but it is a small single-purpose package and not a strong replacement for the custom rule.
     external:
       state: partial-overlap
       support: high
       candidates:
-        ["react-hooks/exhaustive-deps", "eslint-plugin-use-effect-no-deps"]
+        ["react-hooks/exhaustive-deps", "eslint-plugin-use-effect-no-deps", "@eslint-react/hooks-extra/no-direct-set-state-in-use-effect", "react-hooks-extra/no-direct-set-state-in-use-effect"]
       decision: own-antidrift
-      whyThisState: "React Hooks exhaustive-deps owns dependency-array correctness once an array exists, and a small plugin covers missing arrays."
-      whyNotOtherState: "Not equivalent because exhaustive-deps intentionally stays silent on the no-array case, and the one-purpose plugin is not a strong maintained replacement."
+      whyThisState: "React Hooks exhaustive-deps owns dependency-array correctness once an array exists, the React Compiler/ESLint React ecosystem owns adjacent effect smells, and a small plugin covers missing arrays."
+      whyNotOtherState: "Not equivalent because exhaustive-deps intentionally stays silent on the no-array case, adjacent effect rules target different smells, and the one-purpose no-deps plugin is not a strong maintained replacement."
     examples:
       flags:
         - "useEffect(() => sync());"
       allows:
         - "useEffect(() => sync(), [sync]);"
-    nextAction: Define and validate the intentional-every-render escape convention before stable promotion.
+    nextAction: Collect a real consumer using the rule-specific intentional-every-render disable convention, or explicitly accept the convention as policy-backed by `@eslint-community/eslint-comments/require-description`.
 
 retiredRules:
   antidrift/no-cycle:
