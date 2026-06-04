@@ -7,6 +7,7 @@ const arrayMethodsNeverAsync = new Set(["filter", "forEach", "some", "every", "f
 const arrayTransformMethods = new Set(["map", "flatMap", "reduce"]);
 const reactEffectHooks = new Set(["useEffect", "useLayoutEffect"]);
 const zodParseMethods = new Set(["parse", "parseAsync"]);
+const throwAssertionMatchers = new Set(["toThrow", "toThrowError"]);
 const collectionMetadataMemberNames = new Set(["length", "size"]);
 const defaultObviousTriggerWords = ["set", "assign", "increase", "increment", "decrease", "decrement", "counter", "return", "create", "update", "delete", "get", "call", "initialize", "define", "loop", "iterate", "check", "store", "save"];
 const exportedLocalNamesByProgram = new WeakMap();
@@ -1879,6 +1880,63 @@ function isZodMethod(checker, tsNameNode) {
   return false;
 }
 
+function staticMemberName(node) {
+  if (node?.type !== "MemberExpression" || node.computed) return null;
+  return node.property.type === "Identifier" ? node.property.name : null;
+}
+
+function isExpectCall(node) {
+  if (node?.type !== "CallExpression") return false;
+  if (node.callee.type === "Identifier") return node.callee.name === "expect";
+  return node.callee.type === "MemberExpression"
+    && !node.callee.computed
+    && node.callee.object.type === "Identifier"
+    && node.callee.object.name === "expect";
+}
+
+function hasThrowAssertionMatcher(expectCall) {
+  let current = expectCall.parent;
+  while (current) {
+    if (current.type === "MemberExpression") {
+      if (throwAssertionMatchers.has(staticMemberName(current))) {
+        return current.parent?.type === "CallExpression" && current.parent.callee === current;
+      }
+      current = current.parent;
+      continue;
+    }
+    if (current.type === "CallExpression" || current.type === "ChainExpression") {
+      current = current.parent;
+      continue;
+    }
+    break;
+  }
+  return false;
+}
+
+function nearestFunctionExpression(node) {
+  let current = node.parent;
+  while (current) {
+    if (current.type === "ArrowFunctionExpression" || current.type === "FunctionExpression") return current;
+    if (current.type === "FunctionDeclaration") return null;
+    current = current.parent;
+  }
+  return null;
+}
+
+function isDirectThrowAssertionExpression(node, fn) {
+  if (fn.body === node) return true;
+  return node.parent?.type === "ExpressionStatement"
+    && node.parent.parent?.type === "BlockStatement"
+    && node.parent.parent.parent === fn;
+}
+
+function isThrowAssertionCallbackParse(node) {
+  const fn = nearestFunctionExpression(node);
+  if (!fn || !isDirectThrowAssertionExpression(node, fn)) return false;
+  const expectCall = fn.parent?.type === "CallExpression" && fn.parent.arguments.includes(fn) ? fn.parent : null;
+  return Boolean(isExpectCall(expectCall) && hasThrowAssertionMatcher(expectCall));
+}
+
 function zodParseCallParts(node, services, checker) {
   const callee = node.callee;
   if (callee.type !== "MemberExpression" || callee.computed) return null;
@@ -1941,6 +1999,7 @@ function ruleNoRedundantZodParse() {
           if (!parts) return;
           const { callee, tsCall, arg } = parts;
           const schemaSym = callee.object.type === "Identifier" ? symbolOf(callee.object) : undefined;
+          if (isThrowAssertionCallbackParse(node)) return;
 
           // Re-parse: the argument is a value already validated by this exact schema (same binding).
           if (arg.type === "Identifier" && schemaSym && validatedBy.get(symbolOf(arg)) === schemaSym) {

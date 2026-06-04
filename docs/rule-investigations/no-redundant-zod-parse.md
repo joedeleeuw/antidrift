@@ -55,6 +55,12 @@ const manifest = GeneratedStateManifestSchema.parse({
 
 Why: the function is constructing a schema-owned output object.
 
+```ts
+expect(() => GeneratedStateManifestSchema.parse(manifest)).not.toThrow();
+```
+
+Why: this is a schema-contract assertion. The parse result is not passed back into application code; the test is proving that a generated or assembled typed value still satisfies the runtime schema.
+
 ## Ecosystem Check
 
 No supported ESLint/Zod rule has been found that tracks schema provenance and reports "same schema parses its own output." Generic TypeScript safety rules (`no-unsafe-assignment`, `no-unsafe-return`) and generic Zod style rules do not distinguish raw input from schema-owned output.
@@ -81,18 +87,22 @@ Clean controls:
 
 Broad inventory:
 
-- Codebase Atlas `src`: 61 parse-candidate files, 6 findings, all in `src/test/**`.
+- Codebase Atlas `src`: the prior 6 test-file findings are now clean when they appear inside `expect(() => Schema.parse(value)).not.toThrow()` schema-contract assertions.
 - Taskme `src`: 2 parse-candidate files, 0 findings.
 - Sudocode server/CLI: 46 parse-candidate files, 0 findings.
 - Murderbox API: 32 parse-candidate files, 1 production finding.
 - Murderbox shared, client, and asset pipeline: 18 parse-candidate files, 0 findings.
 
-## Current Concern
+## Scope Decision
 
-The Codebase Atlas findings are in tests that assert a generated product still satisfies a schema. That can be legitimate schema-contract testing even when the value is statically typed. Stable promotion needs one of:
+The Codebase Atlas findings were in tests that assert a generated product still satisfies a schema. That is legitimate schema-contract testing even when the value is statically typed.
 
-- a test-file override,
-- an assertion-context exception, or
-- an explicit decision that typed schema-contract reparses in tests are still drift.
+The rule now uses an assertion-context exception, not a test-file override. A Zod parse is ignored only when it is the direct expression checked by a function passed to `expect(...)` and that expectation uses a throw matcher such as `toThrow` or `not.toThrow`. A redundant parse in a test still reports if the parsed result is assigned, returned, or otherwise consumed as a value.
 
-Until that is decided, the rule remains `stable: false`.
+Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md`). It agreed the assertion-context exception is the right shape, but recommended keeping `stable: false` until a real negative gate proves a consumed parse inside a throw assertion still reports, or until that edge is intentionally accepted as unproven.
+
+Known remaining limits:
+
+- Inline service reparses such as `Schema.parse(await getTypedValue())` are not caught unless the awaited result is first assigned to a local identifier.
+- Synchronous helper results such as `Schema.parse(getTypedValue())` are not caught.
+- The service-result branch trusts TypeScript annotations. If a helper is typed as a schema output but internally casts raw data without validation, a first real boundary parse can look redundant.

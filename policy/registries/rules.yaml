@@ -300,7 +300,9 @@ rules:
     solveType: validation-boundary-drift
     corpusRepositories: [chaski, codebase-atlas, murderbox]
     concerns:
-      - Broad Codebase Atlas inventory reports test assertion reparses that may be legitimate schema-contract tests; stable promotion needs an explicit test-file policy or assertion-context exception.
+      - "Test assertion scope is decided: Zod parses inside throw assertion callbacks are schema-contract checks, not validation-boundary drift."
+      - "Claude Opus 4.8 advisory completed on June 4, 2026 and recommended keeping stable false until a real negative gate proves a consumed parse inside a throw assertion still reports."
+      - "Known false negatives remain for inline awaited service results and sync helper results."
     external:
       state: net-antidrift
       support: none
@@ -313,8 +315,8 @@ rules:
         - "const row = RowSchema.parse(await getTypedRow());"
       allows:
         - "const row = RowSchema.parse(raw);"
-        - "expect(() => RowSchema.parse(rawFixture)).not.toThrow();"
-    nextAction: Decide test assertion scope, then run grounded advisory review before stable promotion.
+        - "expect(() => RowSchema.parse(typedFixture)).not.toThrow();"
+    nextAction: Seek a real negative corpus gate for consumed assertion-callback reparses, or explicitly accept that edge before stable promotion.
   antidrift/no-role-literal-in-type:
     status: under-proven
     stable: false
