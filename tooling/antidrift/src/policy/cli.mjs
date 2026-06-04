@@ -7,6 +7,7 @@ import { checkRuleSurface } from "./check-rule-surface.mjs";
 import { parseArgs as parseRepoCorpusArgs, repoCorpus } from "./repo-corpus.mjs";
 import { parseArgs as parseChaskiCorpusArgs, chaskiCorpus } from "./chaski-corpus.mjs";
 import { parseArgs as parseExternalCorpusArgs, externalCorpus } from "./external-corpus.mjs";
+import { parseArgs as parseNoAppeasementRemediationArgs, noAppeasementRemediationCorpus } from "./no-appeasement-remediation-corpus.mjs";
 import { verifySession } from "./verify-session.mjs";
 import { eslintJsonToSonar } from "./eslint-json-to-sonar.mjs";
 import { parseArgs as parseUnsafeTypeAssertionBenchmarkArgs, unsafeTypeAssertionBenchmark } from "./unsafe-type-assertion-benchmark.mjs";
@@ -35,6 +36,10 @@ const commands = {
   },
   "external-corpus": async () => {
     const result = await externalCorpus(parseExternalCorpusArgs(args));
+    if (result.decision === "fail") process.exitCode = 1;
+  },
+  "no-appeasement-remediation-corpus": async () => {
+    const result = await noAppeasementRemediationCorpus(parseNoAppeasementRemediationArgs(args));
     if (result.decision === "fail") process.exitCode = 1;
   },
   "benchmark-unsafe-type-assertion": () => unsafeTypeAssertionBenchmark(parseUnsafeTypeAssertionBenchmarkArgs(args)),
