@@ -40,7 +40,7 @@ rules:
   antidrift/no-appeasement-cast:
     status: ready
     stable: false
-    signal: TypeChecker plus local string-boundary control flow
+    signal: TypeChecker
     solveType: type-escape-hatch
     referenceDoc: docs/rule-investigations/no-appeasement-cast.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main]
@@ -514,7 +514,7 @@ rules:
   antidrift/no-unsafe-deserialize:
     status: ready
     stable: false
-    signal: TypeChecker
+    signal: TypeChecker plus local string-boundary control flow
     solveType: parse-at-edge
     referenceDoc: docs/rule-investigations/no-unsafe-deserialize.md
     corpusRepositories:
@@ -522,7 +522,8 @@ rules:
     concerns:
       - Type-aware inventory found no Chaski or Codebase Atlas drift; Sudocode and Cloudflare Agents now provide independent broad-input JSON.parse drift.
       - Guarded any-valued MessageEvent.data is now exempted only when a direct typeof-string branch or early-return guard proves the parse input is a string.
-      - Keep stable false until the final promotion review/advisory gate runs.
+      - Claude Opus 4.8 advisory completed on June 4, 2026 and agreed ecosystem coverage is only partial, but recommended keeping stable false until parserServices fail-open behavior is explicitly mitigated or documented as a production decision.
+      - "Residual accepted limitations still need to be named before stable promotion: helper-based string guards, aliased/computed JSON.parse calls, and local JSON shadowing."
     external:
       state: partial-overlap
       support: high
@@ -538,7 +539,7 @@ rules:
         - "const value = JSON.parse(text);"
         - 'if (typeof event.data !== "string") return; JSON.parse(event.data);'
         - "const parsed = schema.parse(JSON.parse(text));"
-    nextAction: Run final promotion review/advisory for the parse-at-edge rule.
+    nextAction: Close the type-aware parserServices production guard/documentation slice, then reconsider stable promotion.
   antidrift/require-authz-check:
     status: ready
     stable: false

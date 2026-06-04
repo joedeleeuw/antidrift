@@ -105,4 +105,14 @@ Cloudflare WebSocket handlers proved the TypeChecker-only version was too blunt:
 
 Status: `ready`, `stable: false`.
 
-The rule is type-aware and now has two independent broad-input drift sources plus multiple clean controls. The guarded-`any` concern is resolved; stable promotion still needs the normal final promotion review/advisory gate.
+The rule is type-aware and now has two independent broad-input drift sources plus multiple clean controls. The guarded-`any` concern is resolved.
+
+Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-review-no-unsafe-deserialize-20260604-145356.md`). It agreed the ecosystem overlap is partial, the strongest signal is TypeChecker plus a narrow local string-boundary exemption, and the real-corpus evidence is strong enough for promotion review. It recommended keeping `stable: false` until the remaining production concern is closed: if parser services are unavailable, this type-aware rule currently fails open. That is acceptable for the generated `createConfig` path, which configures `typescript-eslint` project service, but it must be explicitly documented or guarded for raw plugin consumers before stable promotion.
+
+Accepted limitations to document before promotion:
+
+- Helper-based guards such as `if (!isString(event.data)) return` are not recognized.
+- Aliased or computed parse calls such as `const { parse } = JSON` and `JSON["parse"](value)` are not matched.
+- A local binding named `JSON` could be mistaken for the global JSON object.
+
+Next slice: close the type-aware parserServices production guard/documentation decision, then reconsider `stable: true`.
