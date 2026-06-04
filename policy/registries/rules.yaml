@@ -42,6 +42,7 @@ rules:
     stable: false
     signal: TypeChecker
     solveType: type-escape-hatch
+    referenceDoc: docs/rule-investigations/no-appeasement-cast.md
     corpusRepositories: [chaski, codebase-atlas]
     concerns: []
     external:
@@ -56,7 +57,7 @@ rules:
         - "const err = caught as AxiosError;"
       allows:
         - "if (axios.isAxiosError(caught)) return caught.response?.status;"
-    nextAction: Classify the Codebase Atlas appeasement casts and find clean repair patterns before stable promotion.
+    nextAction: Run grounded Claude advisory review and broad inventory before stable promotion.
   antidrift/no-async-array-method:
     status: ready
     stable: false

@@ -26,6 +26,7 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - `docs/rule-status-registry.md` is the readable index for the rule status registry.
 - `docs/policy-coverage.md` tracks which policy rules are enforced, partial, delegated, or still spec-only.
 - `docs/real-corpus-validation.md` tracks which implemented custom rules have real Chaski-backed or fallback real-corpus evidence, and which rules remain under-proven.
+- `docs/stable-promotion-inventory.md` stack-ranks implemented rules for stable-promotion work and identifies the next advisory/inventory slice.
 - `docs/self-hosting-risks.md` records the self-linting failure modes and which layer owns each control.
 - `docs/roadmap.md` is limited to the hardened rules and chosen next scope: branded casts, appeasement casts, structural selector wrappers, status-triplet handling, unsafe-deserialize type signals, defensive shape probing, brand utilities, and cycle detection.
 

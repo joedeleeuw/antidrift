@@ -88,10 +88,10 @@ pnpm exec antidrift external-corpus --slice <slice-name> --min-repositories 2
 
 For each iteration:
 
-1. Pick one implemented rule from the under-proven list.
-2. Search Chaski frontend/BFF first for one drift file and one clean file.
-3. Add only those real paths to `chaski-corpus`.
+1. If the rule is under-proven, search Chaski frontend/BFF first for one drift file and one clean file.
+2. If the rule is already ready, use `docs/stable-promotion-inventory.md` to pick the next promotion candidate.
+3. Add only real paths to `chaski-corpus` or `external-corpus`.
 4. If Chaski has only clean controls, use `external-corpus` for narrowly named fallback repo cases.
 5. For routine readiness, run `pnpm policy:validate-chaski` and, when fallback evidence is used, `pnpm policy:validate-external-corpus`.
 6. For a promotion or slice-completion claim that depends on external breadth, run `pnpm exec antidrift external-corpus --slice <slice-name> --min-repositories 2`.
-7. Do not call the rule ready from reduced programs or inline fixtures. Keep them only as local regression aids while real source behavior remains the promotion gate.
+7. Do not call the rule ready or stable from reduced programs or inline fixtures. Keep them only as local regression aids while real source behavior remains the promotion gate.
