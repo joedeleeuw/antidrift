@@ -49,6 +49,12 @@ Chaski clean controls:
 
 Broad Chaski BFF inventory reported exactly one finding across 177 files: the accepted `RetoolLineItemData` predicate.
 
+Codebase Atlas clean controls:
+
+- `src/programs/persistenceCuration.ts`: `isTerrainLayoutAnchor` checks `q`, `r`, and `position` through a local alias before claiming the object type. This forced the rule to follow direct aliases when counting checked properties.
+- `src/programs/repoComprehensionSurfaces.ts`: a primitive `value is string` predicate stays clean because this rule is limited to nontrivial object contracts.
+- `src/needle/AtlasNeedleRenderer.ts`: `isMeshStandardMaterial` narrows a third-party material union with `emissive` and `roughness` probes. This is valid interop narrowing, not broad-input contract laundering.
+
 ## Known Risks
 
 - Valid discriminated-union guards may only check one discriminant.
@@ -58,5 +64,5 @@ Broad Chaski BFF inventory reported exactly one finding across 177 files: the ac
 ## Promotion Conditions
 
 - Another real repository contains an under-checked `x is T` or `asserts x is T` drift case.
-- Another real repository contains clean validator-backed and discriminant-only controls.
+- Another real repository contains clean validator-backed and discriminant-only controls. Codebase Atlas now supplies additional clean controls for alias-backed field checks, primitive predicates, and third-party union predicates.
 - Claude Opus 4.8 review has read the rule code, corpus cases, and this investigation doc.

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { chaskiCorpus } from "./chaski-corpus.mjs";
+import { externalCorpus } from "./external-corpus.mjs";
 
 function tempRepo() {
   return mkdtempSync(join(tmpdir(), "antidrift-chaski-corpus-"));
@@ -68,6 +69,30 @@ describe("chaskiCorpus", () => {
     expect(result.cases.find((testCase) => testCase.id === "clean")?.findings).toHaveLength(0);
   });
 
+  it("skips when a rule filter selects no corpus cases", async () => {
+    const root = tempRepo();
+    writeProgram(root, "src/example.ts", "export const ok = true;\n");
+
+    const result = await chaskiCorpus({
+      repo: root,
+      rules: ["antidrift/no-silent-catch"],
+      cases: [
+        {
+          id: "clean",
+          ruleId: "antidrift/no-unsafe-cast-chain",
+          kind: "correct",
+          classification: "ready",
+          subproject: "app",
+          paths: ["src/example.ts"],
+        },
+      ],
+      report: () => {},
+    });
+
+    expect(result.decision).toBe("skip");
+    expect(result.reason).toContain("No corpus cases matched");
+  });
+
   it("can run type-aware Chaski cases against a subproject tsconfig", async () => {
     const root = tempRepo();
     writeProgram(
@@ -131,5 +156,35 @@ export const normalized = Object.fromEntries(
 
     expect(result.decision).toBe("pass");
     expect(result.cases[0]?.findings).toHaveLength(1);
+  });
+});
+
+describe("externalCorpus", () => {
+  it("can require more than one external repository for promotion gates", async () => {
+    const root = tempRepo();
+    writeProgram(root, "src/example.ts", "try { throw new Error('x'); } catch {}\n");
+
+    const result = await externalCorpus({
+      corpus: "sudocode-main",
+      repo: root,
+      minRepositories: 2,
+      cases: [
+        {
+          id: "silent-catch",
+          ruleId: "antidrift/no-silent-catch",
+          kind: "drift",
+          classification: "ready",
+          subproject: "app",
+          paths: ["src/example.ts"],
+          expectedFindings: [{ path: "src/example.ts", line: 1 }],
+        },
+      ],
+      report: () => {},
+    });
+
+    expect(result.decision).toBe("fail");
+    expect(result.reason).toContain("2 required");
+    expect(result.repositories).toHaveLength(1);
+    expect(result.repositories[0]?.decision).toBe("pass");
   });
 });

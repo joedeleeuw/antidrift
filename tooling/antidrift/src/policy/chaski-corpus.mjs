@@ -1204,6 +1204,25 @@ export async function runCorpusCases({
   }
 
   const selectedCases = rules ? cases.filter((testCase) => rules.includes(testCase.ruleId)) : cases;
+  if (selectedCases.length === 0) {
+    const summary = {
+      schemaVersion: 1,
+      corpus,
+      slice,
+      repoRoot,
+      decision: require ? "fail" : "skip",
+      reason: "No corpus cases matched the requested rules.",
+      rules: [],
+      cases: [],
+    };
+    const json = `${JSON.stringify(summary, null, 2)}\n`;
+    if (output) {
+      writeFileSync(resolve(output), json, "utf8");
+    } else {
+      report(json.trimEnd());
+    }
+    return summary;
+  }
   const results = await Promise.all(selectedCases.map((testCase) => lintCase(repoRoot, testCase, corpusLabel)));
 
   const summary = {

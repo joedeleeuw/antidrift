@@ -1451,28 +1451,50 @@ function memberExpressionPropertyName(node) {
   return staticPropertyName(unwrapped.property);
 }
 
-function objectHasOwnPropertyName(node, paramName) {
+function objectHasOwnPropertyName(node, paramNames) {
   if (node?.type !== "CallExpression") return null;
   const callee = node.callee;
   if (callee?.type !== "MemberExpression") return null;
   const method = staticPropertyName(callee.property);
   if (method !== "hasOwn" && method !== "hasOwnProperty") return null;
   if (callee.object?.type === "Identifier" && callee.object.name === "Object") {
-    return hasParamRoot(node.arguments?.[0], new Set([paramName])) ? staticPropertyName(node.arguments?.[1]) : null;
+    return hasParamRoot(node.arguments?.[0], paramNames) ? staticPropertyName(node.arguments?.[1]) : null;
   }
-  return hasParamRoot(callee.object, new Set([paramName])) ? staticPropertyName(node.arguments?.[0]) : null;
+  return hasParamRoot(callee.object, paramNames) ? staticPropertyName(node.arguments?.[0]) : null;
+}
+
+function directAliasName(node, paramNames) {
+  if (node?.type !== "VariableDeclarator" || node.id?.type !== "Identifier") return null;
+  const init = unwrapExpression(node.init);
+  return init?.type === "Identifier" && paramNames.has(init.name) ? node.id.name : null;
+}
+
+function predicateValueNames(node, paramName) {
+  const names = new Set([paramName]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    walkNode(node, (current) => {
+      const alias = directAliasName(current, names);
+      if (alias && !names.has(alias)) {
+        names.add(alias);
+        changed = true;
+      }
+    });
+  }
+  return names;
 }
 
 function checkedTargetProperties(node, paramName, targetProps) {
   const checked = new Set();
-  const paramNames = new Set([paramName]);
+  const paramNames = predicateValueNames(node, paramName);
   walkNode(node, (current) => {
     if (current.type === "BinaryExpression" && current.operator === "in" && hasParamRoot(current.right, paramNames)) {
       const prop = staticPropertyName(current.left);
       if (targetProps.has(prop)) checked.add(prop);
       return;
     }
-    const hasOwnProp = objectHasOwnPropertyName(current, paramName);
+    const hasOwnProp = objectHasOwnPropertyName(current, paramNames);
     if (targetProps.has(hasOwnProp)) {
       checked.add(hasOwnProp);
       return;
@@ -1526,6 +1548,7 @@ function ruleNoUndercheckedTypePredicate() {
         if (!isBroadPredicateInputType(checker, paramType)) return;
 
         const targetType = checker.getTypeFromTypeNode(tsTargetTypeNode);
+        if (!isObjectType(targetType)) return;
         const targetProps = typeProps(checker, targetType);
         if (targetProps.size < 2) return;
         if (hasValidatorDelegation(fn.body, parts.paramName)) return;
