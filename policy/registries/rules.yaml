@@ -517,10 +517,11 @@ rules:
     signal: TypeChecker
     solveType: parse-at-edge
     referenceDoc: docs/rule-investigations/no-unsafe-deserialize.md
-    corpusRepositories: [chaski, codebase-atlas, sudocode-main]
+    corpusRepositories:
+      [chaski, codebase-atlas, sudocode-main, cloudflare-agents]
     concerns:
-      - Type-aware inventory found no Chaski or Codebase Atlas drift; Sudocode remains the only replicated drift source.
-      - Keep stable false until a second independent broad-input JSON.parse drift is found or one-repo drift evidence is explicitly accepted for parse-at-edge rules.
+      - Type-aware inventory found no Chaski or Codebase Atlas drift; Sudocode and Cloudflare Agents now provide independent broad-input JSON.parse drift.
+      - Keep stable false until direct typeof-string guards over any-valued MessageEvent.data are either exempted or documented as intentionally reported.
     external:
       state: partial-overlap
       support: high
@@ -531,10 +532,11 @@ rules:
     examples:
       flags:
         - "JSON.parse(row.source as any);"
+        - "JSON.parse(row.config_json); // when row.config_json is checker-typed as any"
       allows:
         - "const value = JSON.parse(text);"
         - "const parsed = schema.parse(JSON.parse(text));"
-    nextAction: Find a second independent broad-input JSON.parse drift instance, or document an explicit one-repo evidence exception before stable promotion.
+    nextAction: Resolve the guarded-any narrowing concern for typeof-string MessageEvent.data before stable promotion.
   antidrift/require-authz-check:
     status: ready
     stable: false

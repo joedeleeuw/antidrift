@@ -15,6 +15,10 @@ const murderboxRepoCandidates = [
   process.env.MURDERBOX_REPO,
   "/Users/sushi/code/murderbox",
 ].filter(Boolean);
+const cloudflareAgentsRepoCandidates = [
+  process.env.CLOUDFLARE_AGENTS_REPO,
+  "/Users/sushi/code/cloudflare-agents",
+].filter(Boolean);
 const coreRuleIds = new Set(["no-restricted-imports"]);
 
 const sudocodeCases = [
@@ -320,6 +324,35 @@ const murderboxCases = [
   },
 ];
 
+const cloudflareAgentsCases = [
+  {
+    id: "cloudflare-assistant-agent-config-json-any-row",
+    ruleId: "antidrift/no-unsafe-deserialize",
+    kind: "drift",
+    classification: "ready",
+    subproject: "examples/assistant",
+    typeAware: true,
+    tsconfig: "examples/assistant/tsconfig.json",
+    paths: ["examples/assistant/src/server.ts"],
+    expectedFindings: [
+      {
+        path: "examples/assistant/src/server.ts",
+        line: 939,
+      },
+    ],
+  },
+  {
+    id: "cloudflare-voice-text-stream-string-json-clean",
+    ruleId: "antidrift/no-unsafe-deserialize",
+    kind: "correct",
+    classification: "ready",
+    subproject: "packages/voice",
+    typeAware: true,
+    tsconfig: "packages/voice/tsconfig.json",
+    paths: ["packages/voice/src/text-stream.ts"],
+  },
+];
+
 const externalCorpora = [
   {
     name: "sudocode-main",
@@ -338,6 +371,12 @@ const externalCorpora = [
     label: "Murderbox",
     repoCandidates: murderboxRepoCandidates,
     cases: murderboxCases,
+  },
+  {
+    name: "cloudflare-agents",
+    label: "Cloudflare Agents",
+    repoCandidates: cloudflareAgentsRepoCandidates,
+    cases: cloudflareAgentsCases,
   },
 ];
 
@@ -504,4 +543,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (result.decision === "fail") process.exitCode = 1;
 }
 
-export { parseArgs, sudocodeCases, codebaseAtlasCases, murderboxCases };
+export {
+  parseArgs,
+  sudocodeCases,
+  codebaseAtlasCases,
+  murderboxCases,
+  cloudflareAgentsCases,
+};
