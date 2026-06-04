@@ -6,19 +6,19 @@ This table is derived from `policy/registries/rules.yaml`, `tooling/antidrift/sr
 
 ## Stack Rank
 
-| Rank | Rule                                    | Promotion bucket               | Drift repos            | Clean repos      | Why                                                                                                                                                                    |
-| ---: | --------------------------------------- | ------------------------------ | ---------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|    1 | `antidrift/no-appeasement-cast`         | advisory-ready                 | Chaski, Codebase Atlas | Chaski           | Only implemented rule with real drift replication in two independent repos and no registry concerns. Needs broad inventory plus Claude advisory before `stable: true`. |
-|    2 | `antidrift/no-async-array-method`       | needs drift replication        | Sudocode               | Chaski, Sudocode | Clean breadth exists, but drift is currently only Sudocode.                                                                                                            |
-|    3 | `antidrift/no-unsafe-deserialize`       | needs drift replication        | Sudocode               | Chaski, Sudocode | Clean breadth exists, but drift is currently only Sudocode.                                                                                                            |
-|    4 | `antidrift/no-raw-fetch-in-component`   | needs external clean and drift | Chaski                 | Chaski           | Needs a second frontend repo with a real component-side fetch drift and a clean resource/client module.                                                                |
-|    5 | `antidrift/no-redundant-zod-parse`      | needs external clean and drift | Chaski                 | Chaski           | Needs another service-to-router or gateway-to-router reparse case.                                                                                                     |
-|    6 | `antidrift/no-silent-catch`             | needs external clean and drift | Chaski                 | Chaski           | Needs another repo with accepted empty or console-only catch drift and clean rethrow/handled catches.                                                                  |
-|    7 | `antidrift/no-sql-string-concat`        | needs external clean and drift | Chaski                 | Chaski           | Needs another SQL/HogQL interpolation case plus parameterized-query clean controls.                                                                                    |
-|    8 | `antidrift/no-status-literal-in-type`   | needs external clean and drift | Chaski                 | Chaski           | Needs another configured status-owner repo with a real local status union redeclaration.                                                                               |
-|    9 | `antidrift/no-trivial-selector-wrapper` | needs external clean and drift | Chaski                 | Chaski           | Needs another non-name-gated selector wrapper in real source.                                                                                                          |
-|   10 | `antidrift/no-unsafe-cast-chain`        | needs external clean and drift | Chaski                 | Chaski           | Needs another `as unknown as T` tunnel in real source.                                                                                                                 |
-|   11 | `antidrift/require-effect-deps`         | needs external clean and drift | Chaski                 | Chaski           | Needs another missing dependency-array effect case outside Chaski.                                                                                                     |
+| Rank | Rule                                    | Promotion bucket               | Drift repos                      | Clean repos       | Why                                                                                                                                                                               |
+| ---: | --------------------------------------- | ------------------------------ | -------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|    1 | `antidrift/no-appeasement-cast`         | classification-required        | Chaski, Codebase Atlas, Sudocode | Chaski, antidrift | Broad inventory replicated the signal across three real repos, but findings are unclassified. Stable is blocked on generic/API-wrapper, production, and test-file classification. |
+|    2 | `antidrift/no-async-array-method`       | needs drift replication        | Sudocode                         | Chaski, Sudocode  | Clean breadth exists, but drift is currently only Sudocode.                                                                                                                       |
+|    3 | `antidrift/no-unsafe-deserialize`       | needs drift replication        | Sudocode                         | Chaski, Sudocode  | Clean breadth exists, but drift is currently only Sudocode.                                                                                                                       |
+|    4 | `antidrift/no-raw-fetch-in-component`   | needs external clean and drift | Chaski                           | Chaski            | Needs a second frontend repo with a real component-side fetch drift and a clean resource/client module.                                                                           |
+|    5 | `antidrift/no-redundant-zod-parse`      | needs external clean and drift | Chaski                           | Chaski            | Needs another service-to-router or gateway-to-router reparse case.                                                                                                                |
+|    6 | `antidrift/no-silent-catch`             | needs external clean and drift | Chaski                           | Chaski            | Needs another repo with accepted empty or console-only catch drift and clean rethrow/handled catches.                                                                             |
+|    7 | `antidrift/no-sql-string-concat`        | needs external clean and drift | Chaski                           | Chaski            | Needs another SQL/HogQL interpolation case plus parameterized-query clean controls.                                                                                               |
+|    8 | `antidrift/no-status-literal-in-type`   | needs external clean and drift | Chaski                           | Chaski            | Needs another configured status-owner repo with a real local status union redeclaration.                                                                                          |
+|    9 | `antidrift/no-trivial-selector-wrapper` | needs external clean and drift | Chaski                           | Chaski            | Needs another non-name-gated selector wrapper in real source.                                                                                                                     |
+|   10 | `antidrift/no-unsafe-cast-chain`        | needs external clean and drift | Chaski                           | Chaski            | Needs another `as unknown as T` tunnel in real source.                                                                                                                            |
+|   11 | `antidrift/require-effect-deps`         | needs external clean and drift | Chaski                           | Chaski            | Needs another missing dependency-array effect case outside Chaski.                                                                                                                |
 
 ## Blocked From Stable Promotion
 
@@ -50,9 +50,10 @@ These remain implemented but not promotable because we still lack real drift evi
 
 ## Next Slice
 
-Work on `antidrift/no-appeasement-cast` first. It is the only rule currently close enough to stable promotion to justify advisory review and broad inventory:
+Work on `antidrift/no-appeasement-cast` first. Broad inventory and grounded advisory review are complete enough to define the next slice: classify the findings before changing rule behavior or stable status.
 
-1. Classify the Codebase Atlas findings and expected repairs.
-2. Record the false-positive and false-negative risks next to the rule definition.
-3. Run a grounded Claude Opus 4.8 advisory review from `docs/claude-rule-review-protocol.md`.
-4. Keep `stable: false` until the advisory and broad inventory are both clean.
+1. Classify Sudocode generic/API-wrapper casts and decide whether the rule needs a narrow wrapper escape.
+2. Classify Chaski portal, monolithui, and crow-v2 production casts as drift or false positives.
+3. Classify BFF and Codebase Atlas test-file findings and decide whether tests need a config override.
+4. Add a second explicit clean control from Codebase Atlas or Sudocode where a typed source conversion stays quiet.
+5. Keep `stable: false` until classification leaves no unresolved concerns.
