@@ -1,10 +1,4 @@
-type WireValue = {
-  numberValue?: number;
-  stringValue?: string;
-  boolValue?: boolean;
-};
-
-declare const raw: Record<string, WireValue | string | null>;
+declare const raw: Record<string, unknown>;
 
 export const normalized = Object.fromEntries(
   Object.entries(raw).map(([key, value]) => {

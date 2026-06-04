@@ -245,6 +245,28 @@ function collectObjectPatternBindingNames(pattern, names) {
   }
 }
 
+function collectBindingIdentifiers(node, identifiers) {
+  const target = assignmentTarget(node);
+  if (!target) return;
+  if (target.type === "Identifier") {
+    identifiers.push(target);
+    return;
+  }
+  if (target.type === "RestElement") {
+    collectBindingIdentifiers(target.argument, identifiers);
+    return;
+  }
+  if (target.type === "ArrayPattern") {
+    for (const element of target.elements ?? []) collectBindingIdentifiers(element, identifiers);
+    return;
+  }
+  if (target.type === "ObjectPattern") {
+    for (const property of target.properties ?? []) {
+      collectBindingIdentifiers(property.type === "RestElement" ? property.argument : property.value, identifiers);
+    }
+  }
+}
+
 function destructuredParameterBindingNames(fn) {
   const names = new Set();
   for (const param of fn.params ?? []) {
@@ -1158,17 +1180,42 @@ function isObjectEntriesCall(node) {
     && node.callee.property.name === "entries";
 }
 
+function objectEntriesValueBindings(callback, methodName) {
+  const entryParam = methodName === "reduce" ? callback.params?.[1] : callback.params?.[0];
+  const target = assignmentTarget(entryParam);
+  const bindings = [];
+  if (target?.type === "ArrayPattern") {
+    collectBindingIdentifiers(target.elements?.[1], bindings);
+  }
+  return bindings;
+}
+
 function objectEntriesCallbackProbe(node) {
   const callee = node.callee;
   if (callee?.type !== "MemberExpression" || callee.property?.type !== "Identifier") return null;
-  if (!arrayTransformMethods.has(callee.property.name)) return null;
+  const methodName = callee.property.name;
+  if (!arrayTransformMethods.has(methodName)) return null;
   if (!isObjectEntriesCall(callee.object)) return null;
   const cb = node.arguments?.[0];
   if (cb?.type !== "ArrowFunctionExpression" && cb?.type !== "FunctionExpression") return null;
   const names = new Set();
   for (const param of cb.params ?? []) collectBindingNames(param, names);
   if (names.size === 0) return null;
-  return { callback: cb, paramNames: names };
+  return { callback: cb, paramNames: names, valueBindings: objectEntriesValueBindings(cb, methodName) };
+}
+
+function isBroadShapeProbeInputType(checker, type, seen = new Set()) {
+  if (!type || seen.has(type)) return false;
+  seen.add(type);
+  if (isAnyOrUnknownType(type) || typeStringIncludesAnyOrUnknown(checker, type)) return true;
+  return (type.types ?? []).some((part) => isBroadShapeProbeInputType(checker, part, seen));
+}
+
+function hasBroadObjectEntriesValue(probe, services, checker) {
+  return probe.valueBindings.some((binding) => {
+    const tsNode = services.esTreeNodeToTSNodeMap.get(binding);
+    return tsNode ? isBroadShapeProbeInputType(checker, checker.getTypeAtLocation(tsNode)) : false;
+  });
 }
 
 function ruleNoStructuralTypeFork() {
@@ -1575,12 +1622,16 @@ function ruleNoDefensiveShapeProbing() {
   return {
     meta: { type: "problem", docs: { description: "Disallow Object.entries normalizers that repeatedly probe broad object shape." }, schema: [{ type: "object", properties: { threshold: { type: "number" } }, additionalProperties: false }] },
     create(context) {
+      const services = context.sourceCode?.parserServices ?? context.parserServices;
+      if (!services?.program || !services.esTreeNodeToTSNodeMap) return {};
+      const checker = services.program.getTypeChecker();
       const threshold = context.options[0]?.threshold ?? 4;
 
       return {
         CallExpression(node) {
           const probe = objectEntriesCallbackProbe(node);
           if (!probe || isTypePredicateReturn(probe.callback)) return;
+          if (!hasBroadObjectEntriesValue(probe, services, checker)) return;
           if (countShapeProbesIn(probe.callback.body, probe.paramNames) < threshold) return;
           context.report({ node: probe.callback, message: "Do not unpack broad object shapes by probing property names inside Object.entries(...). Move the normalization to an owned schema or converter." });
         },

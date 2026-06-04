@@ -125,17 +125,17 @@ rules:
         - 'dispatch({ type: "loaded", data });'
     nextAction: Classify inventory findings before stable promotion.
   antidrift/no-defensive-shape-probing:
-    status: under-proven
+    status: ready
     stable: false
-    signal: deterministic AST
+    signal: TypeChecker plus AST shape
     solveType: broad-value-shape-probing
     referenceDoc: docs/rule-investigations/no-defensive-shape-probing.md
-    corpusRepositories: [chaski]
+    corpusRepositories: [chaski, sudocode-main, codebase-atlas]
     concerns:
-      - Object.entries extractor branch has evidence.
+      - Object.entries extractor branch has real Chaski drift evidence.
       - Boolean predicate helper branch was removed and remains separate research.
-      - The narrowed rule bans a syntax pattern, but does not yet prove the source value is broad or unowned.
-      - Stable promotion still needs a second independent repository and broad inventory review.
+      - The rule now requires the entries value binding to be any/unknown before shape-probe counting matters.
+      - Stable promotion still needs a second independent drift repository and broad inventory review.
     external:
       state: net-antidrift
       support: none
@@ -145,10 +145,11 @@ rules:
       whyNotOtherState: "Not equivalent or partial-overlap because ordinary complexity and type-safety rules do not identify this construction pattern."
     examples:
       flags:
-        - 'Object.entries(raw).map(([, value]) => "numberValue" in value ? value.numberValue : null)'
+        - 'Object.entries(raw as Record<string, unknown>).map(([, value]) => "numberValue" in value ? value.numberValue : null)'
       allows:
         - "const parsed = schema.parse(raw);"
-    nextAction: Decide whether the construction pattern itself should be banned; otherwise add TypeChecker or registry evidence before local readiness.
+        - "Object.entries(typedMap).map(([id, value]) => value.name)"
+    nextAction: Seek a second real drift repository before stable promotion.
   antidrift/no-hover-translate-card:
     status: ready
     stable: false

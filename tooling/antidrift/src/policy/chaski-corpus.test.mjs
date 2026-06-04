@@ -112,13 +112,7 @@ describe("chaskiCorpus", () => {
     writeProgram(
       root,
       "src/frontend/bff/api/shape.ts",
-      `type WireValue = {
-  numberValue?: number;
-  stringValue?: string;
-  boolValue?: boolean;
-};
-
-declare const raw: Record<string, WireValue | string | null>;
+      `declare const raw: Record<string, unknown>;
 
 export const normalized = Object.fromEntries(
   Object.entries(raw).map(([key, value]) => {
@@ -148,7 +142,7 @@ export const normalized = Object.fromEntries(
           subproject: "bff",
           typeAware: true,
           paths: ["src/frontend/bff/api/shape.ts"],
-          expectedFindings: [{ path: "src/frontend/bff/api/shape.ts", line: 10 }],
+          expectedFindings: [{ path: "src/frontend/bff/api/shape.ts", line: 4 }],
         },
       ],
       report: () => {},

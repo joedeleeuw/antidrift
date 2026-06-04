@@ -2,9 +2,11 @@
 
 ## Current Rule
 
-`antidrift/no-defensive-shape-probing` is implemented and enabled, but remains `under-proven`.
+`antidrift/no-defensive-shape-probing` is implemented and enabled. It is `ready`, but not `stable`.
 
 The real-corpus-backed signal is the `Object.entries(...).map` extractor branch: broad object normalization that repeatedly inspects entry values instead of using an owned schema or converter.
+
+The rule now requires TypeScript parser services. It only reports when the `Object.entries` value binding is typed as `any`, `unknown`, or a type string containing `any`/`unknown`, and the callback body repeatedly probes object shape.
 
 The disputed boolean-helper branch was removed from this rule. Real corpus review showed ordinary route/predicate helpers can look similar without being type laundering.
 
@@ -23,7 +25,7 @@ No existing rule found so far covers the real-corpus-backed `Object.entries(...)
 
 The active rule is narrowed to the real-corpus-backed extractor signal. Predicate/type-guard laundering is owned by `no-underchecked-type-predicate`, which is a separate TypeChecker-backed rule for broad-input object predicates.
 
-This rule is not yet promoted because the remaining implementation is a syntax-pattern ban. That is acceptable only if we decide this construction is itself forbidden:
+This is the shape it flags:
 
 ```ts
 Object.entries(raw).map(([key, value]) => {
@@ -40,24 +42,27 @@ Object.entries(raw).map(([key, value]) => {
 });
 ```
 
-If the intended rule is "do not unpack broad or unowned data," syntax is not enough. The rule then needs TypeChecker or registry evidence that the entries source is broad, generated, external, or otherwise not an owned converter boundary.
+The important detail is the type of `value`: in the Chaski drift case, TypeScript reports it as `any` because the source map comes from generated protobuf `globalParams?: { [key: string]: any }`.
+
+The rule does not report ordinary typed `Object.entries(...).map` transformations, schema-backed parsing, or type-predicate helpers. If TypeScript parser services are unavailable, the rule does not report.
 
 ## Remediation Applied
 
 1. Removed the callable boolean-helper visitor from `no-defensive-shape-probing`.
 2. Kept only `CallExpression` handling for `Object.entries(...).map`/`flatMap`/related transforms.
-3. Updated tests and docs to reflect the narrowed scope.
-4. Reclassified the rule from `false-positive-prone` to `under-proven`; it remains `stable: false`.
+3. Added TypeChecker evidence: the entry value binding must be broad (`any`/`unknown`) before the shape-probe count matters.
+4. Added external clean corpus pressure for typed entries maps in Sudocode and Codebase Atlas.
+5. Reclassified the rule from `under-proven` to `ready`; it remains `stable: false`.
 
 ## Known Risks
 
-- Narrowing may drop some true positives where an internal helper really is laundering broad input.
-- A typed, owned `Object.entries(...).map` normalizer can look similar.
-- Stable promotion still needs a second independent real repository and typed `Object.entries` clean controls.
+- Narrowing drops true positives where a broad value has already been cast to a precise local type before the entries mapper.
+- `checker.typeToString(...)` is a coarse fallback for detecting `any`/`unknown` inside aliases.
+- Stable promotion still needs a second independent real drift repository, not only clean controls.
 
 ## Clear Examples
 
-Allowed as syntax-only violations:
+Allowed as syntax-only violations elsewhere in the rule set:
 
 - `as unknown as T`: the cast tunnel is the escape hatch.
 - `.forEach(async () => ...)`: the async callback is not awaited by the array method.
@@ -67,10 +72,10 @@ Not allowed as syntax-only violations:
 
 - A custom `x is T` predicate that might be sound or unsound depending on its body and target type.
 - A domain model that might be a legitimate DTO unless the registry and TypeChecker prove it is a fork.
-- An `Object.entries` normalizer that might be an owned converter unless the construction pattern itself is what the project forbids.
+- An `Object.entries` normalizer over typed owned data. This rule needs the callback value type to be broad.
 
 ## Entry Conditions For Re-expansion
 
 - A future expansion would need a distinct real repository case that is not already covered by `no-underchecked-type-predicate`.
-- A real repository contains clean discriminant-only and validator-backed predicate controls.
-- The separate predicate rule passes ecosystem and Claude advisory review.
+- Stable promotion needs a second real drift repository plus no false positives in broad inventory.
+- Predicate/type-guard expansions stay in `no-underchecked-type-predicate`, not here.

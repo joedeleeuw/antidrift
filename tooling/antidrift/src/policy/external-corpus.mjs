@@ -110,6 +110,16 @@ const sudocodeCases = [
     subproject: "frontend",
     paths: ["frontend/src/components/ui/button.tsx"],
   },
+  {
+    id: "sudocode-first-party-plugin-entries-clean",
+    ruleId: "antidrift/no-defensive-shape-probing",
+    kind: "correct",
+    classification: "ready",
+    subproject: "cli",
+    typeAware: true,
+    tsconfig: "cli/tsconfig.json",
+    paths: ["cli/src/integrations/plugin-loader.ts"],
+  },
 ];
 
 const codebaseAtlasCases = [
@@ -184,6 +194,26 @@ const codebaseAtlasCases = [
     typeAware: true,
     tsconfig: "tsconfig.json",
     paths: ["src/services/atlasIdService.ts"],
+  },
+  {
+    id: "atlas-layout-overrides-entries-clean",
+    ruleId: "antidrift/no-defensive-shape-probing",
+    kind: "correct",
+    classification: "ready",
+    subproject: "app",
+    typeAware: true,
+    tsconfig: "tsconfig.json",
+    paths: ["tools/write-persistence-curation-hardening-artifacts.ts"],
+  },
+  {
+    id: "atlas-language-counts-entries-clean",
+    ruleId: "antidrift/no-defensive-shape-probing",
+    kind: "correct",
+    classification: "ready",
+    subproject: "app",
+    typeAware: true,
+    tsconfig: "tsconfig.json",
+    paths: ["tools/write-generated-state-debug-simulation-artifacts.ts"],
   },
 ];
 
