@@ -1460,6 +1460,17 @@ function isBroadPredicateInputType(checker, type) {
   return typeName === "Object" && (type.getProperties?.() ?? []).length === 0;
 }
 
+const tsTypeFlagObject = 1 << 19; // ts.TypeFlags.Object
+
+function isPredicateObjectContract(type) {
+  if (!type) return false;
+  if (typeof type.isUnion === "function" && type.isUnion()) return false;
+  if (typeof type.isIntersection === "function" && type.isIntersection()) {
+    return (type.types ?? []).some((part) => isPredicateObjectContract(part));
+  }
+  return (type.flags & tsTypeFlagObject) !== 0;
+}
+
 function staticPropertyName(node) {
   if (node?.type === "Identifier") return node.name;
   if (node?.type === "PrivateIdentifier") return node.name;
@@ -1570,7 +1581,7 @@ function ruleNoUndercheckedTypePredicate() {
         if (!isBroadPredicateInputType(checker, paramType)) return;
 
         const targetType = checker.getTypeFromTypeNode(tsTargetTypeNode);
-        if (!isObjectType(targetType)) return;
+        if (!isPredicateObjectContract(targetType)) return;
         const targetProps = typeProps(checker, targetType);
         if (targetProps.size < 2) return;
         if (hasValidatorDelegation(fn.body, parts.paramName)) return;

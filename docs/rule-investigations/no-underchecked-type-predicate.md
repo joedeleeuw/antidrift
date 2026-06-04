@@ -33,14 +33,15 @@ Use TypeChecker plus AST/control-flow evidence:
 
 1. Find a return type predicate or assertion signature.
 2. Resolve the asserted target type and required properties.
-3. Count decisive checks in the body: schema delegation, discriminant checks, `in` checks, member guards, array checks, and validator calls.
-4. Flag only when broad input is laundered into a nontrivial object contract with no validator and insufficient decisive checks.
+3. Treat object intersections as contracts when their constituents expose object properties; do not broaden the shared structural-type-fork `isObjectType` helper, which intentionally rejects intersections for a different reason.
+4. Count decisive checks in the body: schema delegation, discriminant checks, `in` checks, member guards, array checks, and validator calls.
+5. Flag only when broad input is laundered into a nontrivial object contract with no validator and insufficient decisive checks.
 
 ## Real Corpus Evidence
 
 Chaski drift:
 
-- `src/frontend/bff/api/routers/retool/service-stop-router.ts` line 394: `z.custom<RetoolLineItemData>` uses `(value): value is RetoolLineItemData => value != null && typeof value === "object"`.
+- `src/frontend/bff/api/routers/retool/service-stop-router.ts` line 394: `z.custom<RetoolLineItemData>` uses `(value): value is RetoolLineItemData => value != null && typeof value === "object"`. The asserted type resolves as an intersection (`Partial<LineItemData> & { ... }`), so the rule must handle object intersections without weakening the structural type-fork rule.
 
 Chaski clean controls:
 
