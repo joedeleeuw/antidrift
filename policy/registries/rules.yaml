@@ -253,10 +253,10 @@ rules:
     signal: import-scope plus AST
     solveType: side-effect-boundary
     referenceDoc: docs/rule-investigations/no-raw-fetch-in-component.md
-    corpusRepositories: [chaski, codebase-atlas, sudocode-main]
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main, murderbox]
     concerns:
-      - Broad inventory replicated component-owned fetch drift in Chaski, Codebase Atlas, and Murderbox, but the rule is still fetch-specific.
-      - Decide whether this remains a narrow no-raw-fetch-in-component rule or graduates into a registry-backed raw transport boundary rule before stable promotion.
+      - Scope decision resolved on June 4, 2026; keep this rule fetch-specific and put broader raw transport ownership in a separate registry-backed rule if real non-fetch drift justifies it.
+      - The rule models fetch, globalThis.fetch, window.fetch, and self.fetch. Aliased or destructured fetch is out of scope until real corpus evidence appears.
     external:
       state: config-replacement
       support: high
@@ -267,10 +267,11 @@ rules:
     examples:
       flags:
         - 'function Orders() { fetch("/api/orders"); return null; }'
+        - 'async function loadImage(url) { return globalThis.fetch(url); }'
       allows:
         - 'async function loadOrders() { return fetch("/api/orders"); }'
         - "function Orders() { const { data } = useOrders(); return <div>{data.length}</div>; }"
-    nextAction: Decide narrow fetch-specific scope versus registry-backed raw transport boundary before stable promotion.
+    nextAction: Run final grounded advisory and promotion review; do not broaden this rule without separate non-fetch transport evidence.
   antidrift/no-raw-tailwind-color:
     status: ready
     stable: false

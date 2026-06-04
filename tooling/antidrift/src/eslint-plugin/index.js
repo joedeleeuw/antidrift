@@ -687,6 +687,13 @@ function ruleNoRawFetchInComponent() {
           reportFetch(frame.sawFetch, "Do not call raw fetch inside React components. Use an API client, loader, or query resource.");
         }
       }
+      function isGlobalFetchCall(callee) {
+        if (callee?.type === "Identifier") return callee.name === "fetch";
+        if (callee?.type !== "MemberExpression" || callee.computed) return false;
+        const objectName = callee.object?.type === "Identifier" ? callee.object.name : "";
+        const propertyName = callee.property?.type === "Identifier" ? callee.property.name : "";
+        return propertyName === "fetch" && (objectName === "globalThis" || objectName === "window" || objectName === "self");
+      }
 
       return {
         FunctionDeclaration: enterFunction,
@@ -700,7 +707,7 @@ function ruleNoRawFetchInComponent() {
           if (stack.length > 0) stack[stack.length - 1].sawJsx = true;
         },
         CallExpression(node) {
-          if (node.callee?.type === "Identifier" && node.callee.name === "fetch" && stack.length > 0) {
+          if (isGlobalFetchCall(node.callee) && stack.length > 0) {
             const frame = stack[stack.length - 1];
             frame.sawFetch = node;
             if (!isReactComponentName(frame.name)) moduleFetches.push(node);
