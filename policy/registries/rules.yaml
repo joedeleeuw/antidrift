@@ -293,10 +293,12 @@ rules:
   antidrift/no-redundant-zod-parse:
     status: ready
     stable: false
+    referenceDoc: docs/rule-investigations/no-redundant-zod-parse.md
     signal: TypeChecker plus schema provenance
     solveType: validation-boundary-drift
-    corpusRepositories: [chaski]
-    concerns: []
+    corpusRepositories: [chaski, codebase-atlas, murderbox]
+    concerns:
+      - Broad Codebase Atlas inventory reports test assertion reparses that may be legitimate schema-contract tests; stable promotion needs an explicit test-file policy or assertion-context exception.
     external:
       state: net-antidrift
       support: none
@@ -309,7 +311,8 @@ rules:
         - "const row = RowSchema.parse(await getTypedRow());"
       allows:
         - "const row = RowSchema.parse(raw);"
-    nextAction: Seek independent service-to-router reparse replication before stable promotion.
+        - "expect(() => RowSchema.parse(rawFixture)).not.toThrow();"
+    nextAction: Decide test assertion scope, then run grounded advisory review before stable promotion.
   antidrift/no-role-literal-in-type:
     status: under-proven
     stable: false

@@ -11,6 +11,10 @@ const codebaseAtlasRepoCandidates = [
   process.env.CODEBASE_ATLAS_REPO,
   "/Users/sushi/code/codebase-atlas",
 ].filter(Boolean);
+const murderboxRepoCandidates = [
+  process.env.MURDERBOX_REPO,
+  "/Users/sushi/code/murderbox",
+].filter(Boolean);
 const coreRuleIds = new Set(["no-restricted-imports"]);
 
 const sudocodeCases = [
@@ -174,6 +178,16 @@ const codebaseAtlasCases = [
     ],
   },
   {
+    id: "atlas-generated-state-manifest-zod-boundary-clean",
+    ruleId: "antidrift/no-redundant-zod-parse",
+    kind: "correct",
+    classification: "ready",
+    subproject: "app",
+    typeAware: true,
+    tsconfig: "tsconfig.json",
+    paths: ["src/services/generatedStateIntegrityService.ts"],
+  },
+  {
     id: "atlas-needle-renderer-userdata-color-appeasement-cast",
     ruleId: "antidrift/no-appeasement-cast",
     kind: "drift",
@@ -277,6 +291,35 @@ const codebaseAtlasCases = [
   },
 ];
 
+const murderboxCases = [
+  {
+    id: "murderbox-machine-setup-route-redundant-response-parse",
+    ruleId: "antidrift/no-redundant-zod-parse",
+    kind: "drift",
+    classification: "ready",
+    subproject: "api",
+    typeAware: true,
+    tsconfig: "apps/api/tsconfig.json",
+    paths: ["apps/api/app/api/machines/setup/route.ts"],
+    expectedFindings: [
+      {
+        path: "apps/api/app/api/machines/setup/route.ts",
+        line: 27,
+      },
+    ],
+  },
+  {
+    id: "murderbox-workspace-registry-normalization-clean",
+    ruleId: "antidrift/no-redundant-zod-parse",
+    kind: "correct",
+    classification: "ready",
+    subproject: "api",
+    typeAware: true,
+    tsconfig: "apps/api/tsconfig.json",
+    paths: ["apps/api/lib/server/workspace-projects.ts"],
+  },
+];
+
 const externalCorpora = [
   {
     name: "sudocode-main",
@@ -289,6 +332,12 @@ const externalCorpora = [
     label: "Codebase Atlas",
     repoCandidates: codebaseAtlasRepoCandidates,
     cases: codebaseAtlasCases,
+  },
+  {
+    name: "murderbox",
+    label: "Murderbox",
+    repoCandidates: murderboxRepoCandidates,
+    cases: murderboxCases,
   },
 ];
 
@@ -455,4 +504,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (result.decision === "fail") process.exitCode = 1;
 }
 
-export { parseArgs, sudocodeCases, codebaseAtlasCases };
+export { parseArgs, sudocodeCases, codebaseAtlasCases, murderboxCases };
