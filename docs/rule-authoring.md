@@ -102,6 +102,5 @@ Examples:
 antidrift/no-trivial-selector-wrapper
 antidrift/no-coupled-state-setters
 antidrift/no-status-triplet-state
-antidrift/no-silent-catch
 antidrift/no-raw-tailwind-color
 ```

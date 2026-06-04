@@ -75,7 +75,7 @@ describe("chaskiCorpus", () => {
 
     const result = await chaskiCorpus({
       repo: root,
-      rules: ["antidrift/no-silent-catch"],
+      rules: ["antidrift/no-coupled-state-setters"],
       cases: [
         {
           id: "clean",
@@ -156,7 +156,11 @@ export const normalized = Object.fromEntries(
 describe("externalCorpus", () => {
   it("can require more than one external repository for promotion gates", async () => {
     const root = tempRepo();
-    writeProgram(root, "src/example.ts", "try { throw new Error('x'); } catch {}\n");
+    writeProgram(
+      root,
+      "src/example.ts",
+      "declare const raw: unknown;\nconst value = raw as unknown as { id: string };\nvoid value;\n",
+    );
 
     const result = await externalCorpus({
       corpus: "sudocode-main",
@@ -164,13 +168,13 @@ describe("externalCorpus", () => {
       minRepositories: 2,
       cases: [
         {
-          id: "silent-catch",
-          ruleId: "antidrift/no-silent-catch",
+          id: "unsafe-cast-chain",
+          ruleId: "antidrift/no-unsafe-cast-chain",
           kind: "drift",
           classification: "ready",
           subproject: "app",
           paths: ["src/example.ts"],
-          expectedFindings: [{ path: "src/example.ts", line: 1 }],
+          expectedFindings: [{ path: "src/example.ts", line: 2 }],
         },
       ],
       report: () => {},

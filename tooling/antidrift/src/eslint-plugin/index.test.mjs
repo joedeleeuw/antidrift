@@ -162,14 +162,6 @@ typedRuleTester.run("no-defensive-shape-probing", rule("no-defensive-shape-probi
   ],
 });
 
-ruleTester.run("no-silent-catch", rule("no-silent-catch"), {
-  valid: [fixture("programs/correct/catch-rethrows-error.ts")],
-  invalid: [
-    { ...fixture("programs/drift/empty-catch-block.ts"), errors: 1 },
-    { ...fixture("programs/drift/console-only-catch.ts"), errors: 1 },
-  ],
-});
-
 ruleTester.run("no-coupled-state-setters", rule("no-coupled-state-setters"), {
   valid: [
     fixture("programs/correct/single-state-setter-handler.ts"),

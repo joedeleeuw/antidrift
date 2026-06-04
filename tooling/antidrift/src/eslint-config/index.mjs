@@ -188,7 +188,6 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "antidrift/no-nullable-positional-tuple": "error",
         "antidrift/no-underchecked-type-predicate": "error",
         "antidrift/no-defensive-shape-probing": "error",
-        "antidrift/no-silent-catch": "error",
         "antidrift/no-coupled-state-setters": "error",
         "antidrift/no-status-triplet-state": "error",
         "antidrift/require-effect-deps": "error",

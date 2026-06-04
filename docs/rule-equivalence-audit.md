@@ -30,7 +30,7 @@ These were checked against real program evidence.
 | `antidrift/no-appeasement-cast` | Keep custom | `@typescript-eslint/no-unsafe-type-assertion` | The ecosystem rule catches the intended AxiosError drift but flags real clean controls such as SDK conversion and generic API response casts. |
 | `antidrift/no-cast-to-branded` | Keep custom | `@typescript-eslint/no-unsafe-type-assertion` | No real branded boundary exists yet; keep the brand-specific rule under-proven rather than replacing it with a broader assertion rule. |
 | `antidrift/no-async-array-method` | Keep custom | `@typescript-eslint/no-misused-promises` plus `@typescript-eslint/no-floating-promises` | The ecosystem pair catches the real async `forEach` only with `checksVoidReturn.arguments` enabled, which creates real Express-route noise. Disabling that option removes the noise and misses the drift. |
-| `antidrift/no-silent-catch` | Keep custom | ESLint `no-empty`, `sonarjs/no-ignored-exceptions`, and `no-console` | The ecosystem combination misses comment-only silent catches and `no-console` is too broad for console-only catch parity. |
+| `antidrift/no-silent-catch` | Retired | ESLint `no-empty`, `sonarjs/no-ignored-exceptions`, and `no-console` | Utility review found the remaining custom behavior did not justify ownership. Empty catches and broad console use already have maintained coverage; stronger future work should target preserve-cause and fallback-to-empty instead. |
 | `antidrift/no-inline-disable-without-ticket` | Retired | `@eslint-community/eslint-comments/require-description` plus `@typescript-eslint/ban-ts-comment` | Replaced because the accepted policy is "explicit reason is enough." |
 | `antidrift/no-sql-string-concat` | Keep custom | `sonarjs/sql-queries`, `sql/no-unsafe-query`, or SQL-template plugins | SonarJS does not catch the real HoGQL interpolation case. SQL plugins are oriented around chosen SQL/tagged-template conventions, so keep custom until the repo chooses a query convention. |
 
@@ -79,4 +79,4 @@ No supported equivalent was found for these as currently scoped.
 
 ## Remaining Retirement Candidates
 
-No active custom rule currently has a proven safe drop-in replacement. Reopen retirement only when a real repository shows the ecosystem rule catches the intended drift, keeps the clean controls clean, and does not create unrelated inventory noise.
+After retiring `antidrift/no-silent-catch`, no active custom rule currently has a proven safe drop-in replacement. Reopen retirement only when a real repository shows the ecosystem rule catches the intended drift, keeps the clean controls clean, and does not create unrelated inventory noise.

@@ -486,31 +486,6 @@ function ruleNoUnsafeCastChain() {
   };
 }
 
-function ruleNoSilentCatch() {
-  return {
-    meta: { type: "problem", docs: { description: "Disallow silent catch blocks and console-only handling." }, schema: [] },
-    create(context) {
-      return {
-        CatchClause(node) {
-          const statements = node.body?.body ?? [];
-          if (statements.length === 0) {
-            context.report({ node, message: "Do not silently catch errors. Re-throw, return a typed failure, or log with structured context." });
-            return;
-          }
-          const onlyConsole = statements.length === 1
-            && statements[0].type === "ExpressionStatement"
-            && statements[0].expression?.type === "CallExpression"
-            && statements[0].expression.callee?.type === "MemberExpression"
-            && statements[0].expression.callee.object?.name === "console";
-          if (onlyConsole) {
-            context.report({ node: statements[0], message: "Console logging alone is not error handling. Propagate or return a typed failure." });
-          }
-        },
-      };
-    },
-  };
-}
-
 function ruleNoCoupledStateSetters() {
   return {
     meta: { type: "problem", docs: { description: "Disallow functions that mutate many useState setters." }, schema: [{ type: "object", properties: { threshold: { type: "number" } }, additionalProperties: false }] },
@@ -1843,7 +1818,6 @@ const rules = {
   "no-nullable-positional-tuple": ruleNoNullablePositionalTuple(),
   "no-underchecked-type-predicate": ruleNoUndercheckedTypePredicate(),
   "no-defensive-shape-probing": ruleNoDefensiveShapeProbing(),
-  "no-silent-catch": ruleNoSilentCatch(),
   "no-coupled-state-setters": ruleNoCoupledStateSetters(),
   "no-status-triplet-state": ruleNoStatusTripletState(),
   "require-effect-deps": ruleRequireEffectDeps(),

@@ -93,36 +93,6 @@ export const defaultCases = [
     paths: ["src/frontend/portal/lib/firebase/server.ts"],
   },
   {
-    id: "bff-posthog-gateway-silent-catch",
-    ruleId: "antidrift/no-silent-catch",
-    kind: "drift",
-    classification: "ready",
-    subproject: "bff",
-    paths: ["src/frontend/bff/api/gateways/posthog-gateway.ts"],
-    expectedFindings: [
-      {
-        path: "src/frontend/bff/api/gateways/posthog-gateway.ts",
-        line: 316,
-      },
-    ],
-  },
-  {
-    id: "bff-productset-handler-reports-catch",
-    ruleId: "antidrift/no-silent-catch",
-    kind: "correct",
-    classification: "ready",
-    subproject: "bff",
-    paths: ["src/frontend/bff/api/powersync/productset-handler.ts"],
-  },
-  {
-    id: "bff-middleware-rethrows-catch",
-    ruleId: "antidrift/no-silent-catch",
-    kind: "correct",
-    classification: "ready",
-    subproject: "bff",
-    paths: ["src/frontend/bff/api/server/middleware.ts"],
-  },
-  {
     id: "monolith-firebase-obvious-get-comment",
     ruleId: "antidrift/no-obvious-comment",
     kind: "drift",

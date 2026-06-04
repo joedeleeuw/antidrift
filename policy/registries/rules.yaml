@@ -334,31 +334,6 @@ rules:
       allows:
         - 'import type { Roles } from "./api/types";'
     nextAction: Do not promote until a real role union redeclaration is found.
-  antidrift/no-silent-catch:
-    status: ready
-    stable: false
-    signal: AST
-    solveType: error-handling
-    corpusRepositories: [chaski]
-    concerns: []
-    external:
-      state: partial-overlap
-      support: high
-      candidates:
-        [
-          "ESLint no-empty",
-          "sonarjs/no-ignored-exceptions",
-          "ESLint no-console",
-        ]
-      decision: own-antidrift
-      whyThisState: "Existing rules catch some empty or ignored catches, so the area has ecosystem coverage."
-      whyNotOtherState: "Not equivalent because comment-only catches and console-only handling do not line up cleanly across the upstream rules."
-    examples:
-      flags:
-        - "try { work(); } catch {}"
-      allows:
-        - "try { work(); } catch (error) { throw error; }"
-    nextAction: Seek independent replication before stable promotion.
   antidrift/no-sql-string-concat:
     status: ready
     stable: false
@@ -614,6 +589,9 @@ retiredRules:
   antidrift/no-explicit-return-type-private-helper:
     status: retired
     reason: Real Chaski code showed explicit private helper return types are often legitimate contracts.
+  antidrift/no-silent-catch:
+    status: retired
+    reason: Retired after utility review; ESLint no-empty, no-console, and SonarJS catch rules cover enough of the low-value surface, while the remaining console-only/comment-only custom behavior did not justify ownership.
 
 researchCandidates:
   ecosystem/discriminated-union-exhaustiveness:

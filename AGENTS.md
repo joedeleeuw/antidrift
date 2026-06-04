@@ -22,7 +22,7 @@ Run `pnpm policy:verify-session` before finishing substantial code work.
 - **domain-model-drift** (domain-platform): domain/no-inline-domain-status, domain/no-role-literal-outside-policy, domain/no-canonical-model-fork
 - **generated-type-drift** (types-platform): gen/require-import-from-generated, gen/no-structural-type-fork
 - **authorization-control-drift** (security): auth/no-boundaryless-route, auth/no-client-only-authorization, auth/require-authz-check
-- **error-handling** (reliability): errors/no-silent-catch, errors/preserve-caught-error, errors/no-fallback-to-empty
+- **error-handling** (reliability): errors/preserve-caught-error, errors/no-fallback-to-empty
 - **test-integrity** (quality): test/no-only-or-skip, test/no-conditional-expect, test/no-test-without-assertion
 - **design-system** (design-system): ui/no-raw-tailwind-color, ui/no-hover-translate-card, ui/no-generic-ai-copy
 - **observability-drift** (reliability): obs/async-boundary-requires-context, obs/no-fire-and-forget-without-tracking

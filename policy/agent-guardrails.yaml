@@ -181,10 +181,6 @@ clusters:
   - id: error-handling # Agents keep the happy path moving by hiding failures.
     owner: reliability # Reliability owns error propagation and observability policy.
     rules:
-      - id: errors/no-silent-catch # Empty catches hide production failures.
-        severity: error
-        detector: catchBlockHasNoThrowNoReturnNoLog
-        message: Re-throw, return a typed failure, or log with context.
       - id: errors/preserve-caught-error # Throwing a new error without cause loses stack context.
         severity: error
         detector: catchThrowsNewErrorWithoutCause

@@ -215,7 +215,7 @@ const codebaseAtlasCases = [
     expectedFindings: [
       {
         path: "src/programs/persistenceCuration.ts",
-        line: 652,
+        line: 654,
       },
     ],
   },
