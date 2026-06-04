@@ -351,6 +351,32 @@ const cloudflareAgentsCases = [
     tsconfig: "packages/voice/tsconfig.json",
     paths: ["packages/voice/src/text-stream.ts"],
   },
+  {
+    id: "cloudflare-gadgets-chat-nested-event-json-any",
+    ruleId: "antidrift/no-unsafe-deserialize",
+    kind: "drift",
+    classification: "ready",
+    subproject: "experimental/gadgets-chat",
+    typeAware: true,
+    tsconfig: "experimental/gadgets-chat/tsconfig.json",
+    paths: ["experimental/gadgets-chat/src/client.tsx"],
+    expectedFindings: [
+      {
+        path: "experimental/gadgets-chat/src/client.tsx",
+        line: 177,
+      },
+    ],
+  },
+  {
+    id: "cloudflare-twilio-websocket-string-guard-clean",
+    ruleId: "antidrift/no-unsafe-deserialize",
+    kind: "correct",
+    classification: "ready",
+    subproject: "voice-providers/twilio",
+    typeAware: true,
+    tsconfig: "voice-providers/twilio/tsconfig.json",
+    paths: ["voice-providers/twilio/src/index.ts"],
+  },
 ];
 
 const externalCorpora = [

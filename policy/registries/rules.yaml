@@ -40,7 +40,7 @@ rules:
   antidrift/no-appeasement-cast:
     status: ready
     stable: false
-    signal: TypeChecker
+    signal: TypeChecker plus local string-boundary control flow
     solveType: type-escape-hatch
     referenceDoc: docs/rule-investigations/no-appeasement-cast.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main]
@@ -521,7 +521,8 @@ rules:
       [chaski, codebase-atlas, sudocode-main, cloudflare-agents]
     concerns:
       - Type-aware inventory found no Chaski or Codebase Atlas drift; Sudocode and Cloudflare Agents now provide independent broad-input JSON.parse drift.
-      - Keep stable false until direct typeof-string guards over any-valued MessageEvent.data are either exempted or documented as intentionally reported.
+      - Guarded any-valued MessageEvent.data is now exempted only when a direct typeof-string branch or early-return guard proves the parse input is a string.
+      - Keep stable false until the final promotion review/advisory gate runs.
     external:
       state: partial-overlap
       support: high
@@ -535,8 +536,9 @@ rules:
         - "JSON.parse(row.config_json); // when row.config_json is checker-typed as any"
       allows:
         - "const value = JSON.parse(text);"
+        - 'if (typeof event.data !== "string") return; JSON.parse(event.data);'
         - "const parsed = schema.parse(JSON.parse(text));"
-    nextAction: Resolve the guarded-any narrowing concern for typeof-string MessageEvent.data before stable promotion.
+    nextAction: Run final promotion review/advisory for the parse-at-edge rule.
   antidrift/require-authz-check:
     status: ready
     stable: false
