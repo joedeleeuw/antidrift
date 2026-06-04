@@ -145,6 +145,20 @@ export const defaultCases = [
     paths: ["src/frontend/monolithui/src/lib/crowdiesApi.ts"],
   },
   {
+    id: "portal-impersonation-warning-raw-fetch-effect",
+    ruleId: "antidrift/no-raw-fetch-in-component",
+    kind: "drift",
+    classification: "ready",
+    subproject: "frontend",
+    paths: ["src/frontend/portal/components/ImpersonationWarning.tsx"],
+    expectedFindings: [
+      {
+        path: "src/frontend/portal/components/ImpersonationWarning.tsx",
+        line: 85,
+      },
+    ],
+  },
+  {
     id: "portal-embedded-dashboard-clean-component",
     ruleId: "antidrift/no-raw-fetch-in-component",
     kind: "correct",
@@ -391,6 +405,10 @@ export const defaultCases = [
       {
         path: "src/frontend/bff/api/routers/retool/sequence-count-router.ts",
         line: 21,
+      },
+      {
+        path: "src/frontend/bff/api/routers/retool/sequence-count-router.ts",
+        line: 26,
       },
     ],
   },

@@ -72,6 +72,7 @@ State: `net-antidrift`.
 Chaski drift:
 
 - `/Users/sushi/code/chaski/src/frontend/bff/api/routers/retool/sequence-count-router.ts` line 21 re-parses BigQuery gateway rows already typed as `CountSequenceRow[]`.
+- `/Users/sushi/code/chaski/src/frontend/bff/api/routers/retool/sequence-count-router.ts` line 26 directly parses flattened PostHog gateway rows already typed as `HogQLRow[]`.
 
 Murderbox production drift:
 
@@ -99,12 +100,18 @@ The Codebase Atlas findings were in tests that assert a generated product still 
 
 The rule now uses an assertion-context exception, not a test-file override. A Zod parse is ignored only when it is the direct expression checked by a function passed to `expect(...)` and that expectation uses a throw matcher such as `toThrow` or `not.toThrow`. A redundant parse in a test still reports if the parsed result is assigned, returned, or otherwise consumed as a value.
 
-Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md`). It agreed the assertion-context exception is the right shape, but recommended keeping `stable: false` until a real negative gate proves a consumed parse inside a throw assertion still reports, or until that edge is intentionally accepted as unproven.
+Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md`). It agreed the assertion-context exception is the right shape and asked for either a real negative gate for consumed assertion-callback parses or an explicit acceptance that current corpora do not contain that edge.
 
 Follow-up real-corpus search on June 4, 2026 found no consumed assertion-callback reparse case to promote as a drift gate. The scan ran the narrowed rule over 50 Codebase Atlas test files, 30 Murderbox API test files, 132 Sudocode server test files, and 11 Chaski BFF test files; all stayed clean. The consumed-parse edge is accepted as unrepresented in the current corpus rather than blocked on a synthetic fixture. The implementation still keeps the exception narrow by requiring the parse call to be the direct throw-assertion expression.
 
+The later helper-result slice closed the remaining promotion blocker: direct awaited or synchronous helper calls such as `Schema.parse(await getTypedValue())` and `Schema.parse(getTypedValue())` now report when TypeScript proves the helper result is already equivalent to the schema output, while nested schema pipelines remain clean.
+
 Known remaining limits:
 
-- Inline service reparses such as `Schema.parse(await getTypedValue())` are not caught unless the awaited result is first assigned to a local identifier.
-- Synchronous helper results such as `Schema.parse(getTypedValue())` are not caught.
+- Inline service reparses such as `Schema.parse(await getTypedValue())` and synchronous helper reparses such as `Schema.parse(getTypedValue())` are caught when TypeScript proves the call result is equivalent to the schema output.
+- Nested schema pipelines such as `OutputSchema.parse(CoercionSchema.parse(raw))` stay clean because the inner parse is a first-boundary validation step, not a typed service result.
 - The service-result branch trusts TypeScript annotations. If a helper is typed as a schema output but internally casts raw data without validation, a first real boundary parse can look redundant.
+
+## Promotion State
+
+Status: `ready`, `stable: true`.

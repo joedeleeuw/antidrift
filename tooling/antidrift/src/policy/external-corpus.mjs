@@ -19,6 +19,10 @@ const cloudflareAgentsRepoCandidates = [
   process.env.CLOUDFLARE_AGENTS_REPO,
   "/Users/sushi/code/cloudflare-agents",
 ].filter(Boolean);
+const claudeCodeSourceRepoCandidates = [
+  process.env.CLAUDE_CODE_SOURCE_REPO,
+  "/Users/sushi/code/claude-code-source-code",
+].filter(Boolean);
 const coreRuleIds = new Set(["no-restricted-imports"]);
 
 const sudocodeCases = [
@@ -51,6 +55,14 @@ const sudocodeCases = [
     classification: "ready",
     subproject: "frontend",
     paths: ["frontend/src/pages/ExecutionsPage.tsx"],
+  },
+  {
+    id: "sudocode-issue-detail-effect-deps-clean",
+    ruleId: "antidrift/require-effect-deps",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    paths: ["frontend/src/pages/IssueDetailPage.tsx"],
   },
   {
     id: "sudocode-workflows-route-json-parse-any-row",
@@ -95,6 +107,14 @@ const sudocodeCases = [
     classification: "ready",
     subproject: "server",
     paths: ["server/src/routes/workflows.ts"],
+  },
+  {
+    id: "sudocode-base-workflow-static-set-fragments-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "server",
+    paths: ["server/src/workflow/base-workflow-engine.ts"],
   },
   {
     id: "sudocode-issues-route-params-without-authz",
@@ -186,6 +206,28 @@ const codebaseAtlasCases = [
       {
         path: "src/routes/atlas.city.tsx",
         line: 76,
+      },
+    ],
+  },
+  {
+    id: "atlas-game-state-shell-effect-deps-clean",
+    ruleId: "antidrift/require-effect-deps",
+    kind: "correct",
+    classification: "ready",
+    subproject: "app",
+    paths: ["src/components/AtlasGameStateShell.tsx"],
+  },
+  {
+    id: "atlas-real-program-parser-full-excerpt-selector-wrapper",
+    ruleId: "antidrift/no-trivial-selector-wrapper",
+    kind: "drift",
+    classification: "ready",
+    subproject: "app",
+    paths: ["src/parsing/treeSitterRealProgramParser.ts"],
+    expectedFindings: [
+      {
+        path: "src/parsing/treeSitterRealProgramParser.ts",
+        line: 897,
       },
     ],
   },
@@ -351,6 +393,14 @@ const murderboxCases = [
     paths: ["apps/client/app/api/[...path]+api.ts"],
   },
   {
+    id: "murderbox-theme-effect-deps-clean",
+    ruleId: "antidrift/require-effect-deps",
+    kind: "correct",
+    classification: "ready",
+    subproject: "client",
+    paths: ["apps/client/src/lib/theme.ts"],
+  },
+  {
     id: "murderbox-machine-setup-route-redundant-response-parse",
     ruleId: "antidrift/no-redundant-zod-parse",
     kind: "drift",
@@ -433,6 +483,45 @@ const cloudflareAgentsCases = [
   },
 ];
 
+const claudeCodeSourceCases = [
+  {
+    id: "claude-assistant-history-every-render-effects",
+    ruleId: "antidrift/require-effect-deps",
+    kind: "drift",
+    classification: "ready",
+    subproject: "app",
+    paths: ["src/hooks/useAssistantHistory.ts"],
+    expectedFindings: [
+      {
+        path: "src/hooks/useAssistantHistory.ts",
+        line: 199,
+      },
+      {
+        path: "src/hooks/useAssistantHistory.ts",
+        line: 218,
+      },
+    ],
+  },
+  {
+    id: "claude-virtual-scroll-every-render-layout-effects",
+    ruleId: "antidrift/require-effect-deps",
+    kind: "drift",
+    classification: "ready",
+    subproject: "app",
+    paths: ["src/hooks/useVirtualScroll.ts"],
+    expectedFindings: [
+      {
+        path: "src/hooks/useVirtualScroll.ts",
+        line: 591,
+      },
+      {
+        path: "src/hooks/useVirtualScroll.ts",
+        line: 619,
+      },
+    ],
+  },
+];
+
 const externalCorpora = [
   {
     name: "sudocode-main",
@@ -457,6 +546,12 @@ const externalCorpora = [
     label: "Cloudflare Agents",
     repoCandidates: cloudflareAgentsRepoCandidates,
     cases: cloudflareAgentsCases,
+  },
+  {
+    name: "claude-code-source",
+    label: "Claude Code Source",
+    repoCandidates: claudeCodeSourceRepoCandidates,
+    cases: claudeCodeSourceCases,
   },
 ];
 
@@ -629,4 +724,5 @@ export {
   codebaseAtlasCases,
   murderboxCases,
   cloudflareAgentsCases,
+  claudeCodeSourceCases,
 };

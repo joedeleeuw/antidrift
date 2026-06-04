@@ -97,9 +97,9 @@ Broad inventory on June 4, 2026:
 
 ## Promotion State
 
-Status: `ready`, `stable: false`.
+Status: `ready`, `stable: true`.
 
 Scope decision resolved on June 4, 2026: keep this as a narrow fetch-specific React boundary rule.
 The broader raw transport ownership problem belongs in a separate registry-backed rule if real non-fetch drift justifies it.
 
-Stable promotion is no longer blocked on scope, but it still needs the final grounded advisory/promotion review. Aliased or destructured fetch calls are not modeled until a real corpus program proves that shape matters.
+Grounded advisory review completed with no promotion blockers. Aliased or destructured fetch calls are not modeled until a real corpus program proves that shape matters.

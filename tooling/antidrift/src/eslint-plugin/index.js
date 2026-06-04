@@ -928,17 +928,17 @@ function staticStringValue(node) {
   return null;
 }
 
-function isQuestionMarkCallback(node) {
+function isStaticStringCallback(node) {
   if (node?.type !== "ArrowFunctionExpression" && node?.type !== "FunctionExpression") return false;
-  return staticStringValue(node.body) === "?";
+  return staticStringValue(node.body) !== null;
 }
 
-function isQuestionPlaceholderList(node) {
+function isStaticFragmentMapJoin(node) {
   if (node?.type !== "CallExpression") return false;
   const join = node.callee;
   if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
   const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
-  if (separator !== "," && separator !== ", ") return false;
+  if (!isAllowedSqlFragmentJoinSeparator(separator)) return false;
   const mapCall = join.object;
   if (mapCall?.type !== "CallExpression") return false;
   const map = mapCall.callee;
@@ -946,7 +946,15 @@ function isQuestionPlaceholderList(node) {
     && !map.computed
     && map.property?.type === "Identifier"
     && map.property.name === "map"
-    && isQuestionMarkCallback(mapCall.arguments[0]);
+    && isStaticStringCallback(mapCall.arguments[0]);
+}
+
+function isEmptyArrayExpression(node) {
+  return node?.type === "ArrayExpression" && node.elements.length === 0;
+}
+
+function isAllowedSqlFragmentJoinSeparator(value) {
+  return value === "," || value === ", " || value === " AND " || value === " OR ";
 }
 
 function ruleNoSqlStringConcat() {
@@ -954,20 +962,59 @@ function ruleNoSqlStringConcat() {
     meta: { type: "problem", docs: { description: "Disallow SQL assembled via string interpolation or concatenation." }, schema: [] },
     create(context) {
       const sourceCode = context.sourceCode;
-      const safeSqlPlaceholderVariables = new WeakSet();
-      function isSafeSqlPlaceholderExpression(node) {
+      const safeSqlFragmentArrays = new WeakSet();
+      const safeSqlFragmentStrings = new WeakSet();
+      function isSafeFragmentVariable(node, set) {
         const variable = findVariable(sourceCode, node);
-        return Boolean(variable && safeSqlPlaceholderVariables.has(variable));
+        return Boolean(variable && set.has(variable));
+      }
+      function isSafeSqlFragmentExpression(node) {
+        if (staticStringValue(node) !== null) return true;
+        if (isStaticFragmentMapJoin(node)) return true;
+        if (node?.type === "Identifier") return isSafeFragmentVariable(node, safeSqlFragmentStrings);
+        if (node?.type === "ConditionalExpression") {
+          return isSafeSqlFragmentExpression(node.consequent) && isSafeSqlFragmentExpression(node.alternate);
+        }
+        if (node?.type === "TemplateLiteral") {
+          return node.expressions.every((expression) => isSafeSqlFragmentExpression(expression));
+        }
+        if (node?.type !== "CallExpression") return false;
+        const join = node.callee;
+        if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
+        const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
+        if (!isAllowedSqlFragmentJoinSeparator(separator)) return false;
+        return join.object?.type === "Identifier" && isSafeFragmentVariable(join.object, safeSqlFragmentArrays);
       }
       return {
         VariableDeclarator(node) {
-          if (!isQuestionPlaceholderList(node.init)) return;
           const variable = getDeclaredVariable(sourceCode, node);
-          if (variable) safeSqlPlaceholderVariables.add(variable);
+          if (!variable) return;
+          if (isEmptyArrayExpression(node.init)) {
+            safeSqlFragmentArrays.add(variable);
+          } else if (isSafeSqlFragmentExpression(node.init)) {
+            safeSqlFragmentStrings.add(variable);
+          }
+        },
+        AssignmentExpression(node) {
+          if (node.left?.type !== "Identifier") return;
+          const variable = findVariable(sourceCode, node.left);
+          if (!variable) return;
+          safeSqlFragmentArrays.delete(variable);
+          safeSqlFragmentStrings.delete(variable);
+        },
+        CallExpression(node) {
+          const callee = node.callee;
+          if (callee?.type !== "MemberExpression" || callee.computed || callee.property?.type !== "Identifier" || callee.property.name !== "push") return;
+          if (callee.object?.type !== "Identifier") return;
+          const variable = findVariable(sourceCode, callee.object);
+          if (!variable || !safeSqlFragmentArrays.has(variable)) return;
+          if (!node.arguments.every((arg) => isSafeSqlFragmentExpression(arg))) {
+            safeSqlFragmentArrays.delete(variable);
+          }
         },
         TemplateLiteral(node) {
           if (node.expressions.length > 0 && sqlPattern.test(templateText(node))) {
-            if (node.expressions.every((expression) => isSafeSqlPlaceholderExpression(expression))) return;
+            if (node.expressions.every((expression) => isSafeSqlFragmentExpression(expression))) return;
             context.report({ node, message: "Do not interpolate values into SQL strings. Use parameterized queries / bound parameters." });
           }
         },
@@ -1997,6 +2044,18 @@ function isAwaitedCallInitializer(node) {
   return node?.type === "AwaitExpression" && node.argument?.type === "CallExpression";
 }
 
+function isCallResultExpression(node) {
+  return node?.type === "CallExpression" || isAwaitedCallInitializer(node);
+}
+
+function isZodParseExpression(node, services, checker) {
+  if (node?.type === "CallExpression") return Boolean(zodParseCallParts(node, services, checker));
+  if (node?.type === "AwaitExpression" && node.argument?.type === "CallExpression") {
+    return Boolean(zodParseCallParts(node.argument, services, checker));
+  }
+  return false;
+}
+
 function parsedCallResultMatchesSchemaOutput(checker, services, tsCall, arg) {
   const tsArg = services.esTreeNodeToTSNodeMap.get(arg);
   const argType = tsArg ? checker.getTypeAtLocation(tsArg) : null;
@@ -2056,6 +2115,11 @@ function ruleNoRedundantZodParse() {
           // Service-to-boundary re-parse: a called helper/service already returned the schema's
           // output type, and the caller immediately validates that typed contract again.
           if (arg.type === "Identifier" && callResultSymbols.has(symbolOf(arg)) && parsedCallResultMatchesSchemaOutput(checker, services, tsCall, arg)) {
+            context.report({ node, message: "Redundant Zod parse: this call result is already typed as the schema output. Validate once at the boundary and pass the parsed value inward instead of re-parsing." });
+            return;
+          }
+
+          if (isCallResultExpression(arg) && !isZodParseExpression(arg, services, checker) && parsedCallResultMatchesSchemaOutput(checker, services, tsCall, arg)) {
             context.report({ node, message: "Redundant Zod parse: this call result is already typed as the schema output. Validate once at the boundary and pass the parsed value inward instead of re-parsing." });
             return;
           }

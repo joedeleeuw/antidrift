@@ -249,7 +249,7 @@ rules:
     nextAction: Keep as lower-confidence until another repo inventory shows low false positives.
   antidrift/no-raw-fetch-in-component:
     status: ready
-    stable: false
+    stable: true
     signal: import-scope plus AST
     solveType: side-effect-boundary
     referenceDoc: docs/rule-investigations/no-raw-fetch-in-component.md
@@ -271,7 +271,7 @@ rules:
       allows:
         - 'async function loadOrders() { return fetch("/api/orders"); }'
         - "function Orders() { const { data } = useOrders(); return <div>{data.length}</div>; }"
-    nextAction: Run final grounded advisory and promotion review; do not broaden this rule without separate non-fetch transport evidence.
+    nextAction: Stable; monitor for real aliased/destructured fetch evidence and keep broader raw transport as a separate future rule.
   antidrift/no-raw-tailwind-color:
     status: ready
     stable: false
@@ -295,7 +295,7 @@ rules:
     nextAction: Classify inventory findings before stable promotion.
   antidrift/no-redundant-zod-parse:
     status: ready
-    stable: false
+    stable: true
     referenceDoc: docs/rule-investigations/no-redundant-zod-parse.md
     signal: TypeChecker plus schema provenance
     solveType: validation-boundary-drift
@@ -303,7 +303,7 @@ rules:
     concerns:
       - "Test assertion scope is decided: Zod parses inside throw assertion callbacks are schema-contract checks, not validation-boundary drift."
       - "A June 4, 2026 real-test scan found no consumed assertion-callback reparse case across Codebase Atlas, Murderbox, Sudocode, and Chaski; that missing negative gate is accepted as unrepresented in the current corpus."
-      - "Known false negatives remain for inline awaited service results and sync helper results."
+      - "Direct inline awaited and synchronous helper-result reparses are covered when TypeScript proves the helper result is equivalent to the schema output."
     external:
       state: net-antidrift
       support: none
@@ -317,7 +317,7 @@ rules:
       allows:
         - "const row = RowSchema.parse(raw);"
         - "expect(() => RowSchema.parse(typedFixture)).not.toThrow();"
-    nextAction: Decide whether to fix or explicitly accept inline awaited service-result reparses and sync helper-result reparses before stable promotion.
+    nextAction: Stable; monitor for first-boundary schema pipelines that need additional clean exclusions.
   antidrift/no-role-literal-in-type:
     status: under-proven
     stable: false
@@ -347,9 +347,9 @@ rules:
     solveType: injection-boundary
     corpusRepositories: [chaski, codebase-atlas, sudocode-main]
     concerns:
-      - The benchmark on 178 real files reports 11 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
+      - The benchmark on 178 real files reports 10 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
       - Dynamic placeholder lists such as `ids.map(() => "?").join(",")` are accepted clean because values remain bound parameters.
-      - Dynamic SET/WHERE clause fragments still need a project convention decision before stable promotion.
+      - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
     external:
       state: partial-overlap
       support: medium
@@ -363,7 +363,7 @@ rules:
       allows:
         - 'db.query("SELECT * FROM users WHERE id = ?", [id]);'
         - 'const placeholders = ids.map(() => "?").join(","); db.prepare(`SELECT id FROM issues WHERE id IN (${placeholders})`).all(...ids);'
-    nextAction: Adjudicate dynamic SQL clause fragments, then rerun `pnpm policy:benchmark-sql-queries`.
+    nextAction: Seek independent real drift beyond Chaski before stable promotion.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
@@ -458,8 +458,9 @@ rules:
     stable: false
     signal: AST structural return shape
     solveType: inference-appeasement
-    corpusRepositories: [chaski]
-    concerns: []
+    corpusRepositories: [chaski, codebase-atlas]
+    concerns:
+      - Key-extractor or adapter callbacks can also be a single member return; stable promotion needs explicit classification of those shapes.
     external:
       state: net-antidrift
       support: none
@@ -472,7 +473,7 @@ rules:
         - "function pickItems(bag: Bag): Item[] { return bag.items; }"
       allows:
         - "function totalItems(bag: Bag): number { return bag.items.length; }"
-    nextAction: Seek independent non-name-gated selector-wrapper replication before stable promotion.
+    nextAction: Run advisory review and classify adapter/key-extractor false-positive risk before stable promotion.
   antidrift/no-underchecked-type-predicate:
     status: ready
     stable: false
@@ -569,8 +570,9 @@ rules:
     stable: false
     signal: import binding plus AST
     solveType: react-effect-lifecycle
-    corpusRepositories: [chaski]
-    concerns: []
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main, murderbox, claude-code-source]
+    concerns:
+      - Independent drift includes deliberate every-render effects in Claude Code Source; stable promotion needs a reasoned escape hatch or an explicit policy that those must be locally disabled with prose.
     external:
       state: partial-overlap
       support: high
@@ -584,7 +586,7 @@ rules:
         - "useEffect(() => sync());"
       allows:
         - "useEffect(() => sync(), [sync]);"
-    nextAction: Seek independent missing-dependency-array replication before stable promotion.
+    nextAction: Define and validate the intentional-every-render escape convention before stable promotion.
 
 retiredRules:
   antidrift/no-cycle:
@@ -646,4 +648,4 @@ researchCandidates:
     signal: maintained ESLint plugin
     solveType: sql-injection-boundary
     referenceDoc: docs/rule-equivalence-audit.md
-    nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 11 antidrift SQL findings. Keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.
+    nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 10 antidrift SQL findings. Keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.
