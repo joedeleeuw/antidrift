@@ -48,6 +48,7 @@ rules:
       - Broad inventory classified all current Chaski, Codebase Atlas, and Sudocode findings as real boundary/type-escape drift or in-scope test setup; production cleanup or accepted remediation patterns are required before stable promotion.
       - Test-file casts remain in scope and should report, but test-only findings do not count as production drift evidence for stable promotion.
       - The rule has no explicit SDK/API allowlist; typed conversions stay clean only when the source is not any or unknown.
+      - Claude Opus 4.8 adversarial review found that the broader upstream @typescript-eslint/no-unsafe-type-assertion rule must be benchmarked against the same corpus before custom ownership is treated as settled.
     external:
       state: broader-upstream
       support: high
@@ -60,7 +61,7 @@ rules:
         - "const err = caught as AxiosError;"
       allows:
         - "if (axios.isAxiosError(caught)) return caught.response?.status;"
-    nextAction: Collect cleanup/remediation evidence for classified production drift before stable promotion.
+    nextAction: Run an upstream-delta inventory for @typescript-eslint/no-unsafe-type-assertion across Chaski, Codebase Atlas, and Sudocode before remediation or stable-promotion work.
   antidrift/no-async-array-method:
     status: ready
     stable: false

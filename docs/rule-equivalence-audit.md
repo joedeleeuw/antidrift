@@ -19,6 +19,19 @@ way the ecosystem rule does not express, or registry-backed.
 | Partial ecosystem overlap | Existing rules catch part of the smell, but not the original antidrift behavior. |
 | Net antidrift | No supported equivalent was found; keep custom only if real corpus validation justifies the signal. |
 
+## Advisory Review Deltas
+
+The June 4, 2026 Claude Opus 4.8 adversarial review did not change the default posture, but it exposed two governance gaps that should be handled before stable promotion work:
+
+1. The cast family needs a measured `@typescript-eslint/no-unsafe-type-assertion` delta. The current `broader-upstream` decision is plausible, but it should be proven by running the upstream rule against the same Chaski, Codebase Atlas, and Sudocode corpus and recording overlap, extra reports, and clean-control noise.
+2. Rule maturity does not currently drive configured severity. `under-proven` and heuristic rules can still be enabled as `error`, even though the authoring guidance says heuristics start as warnings. A future control-plane check should fail when config severity outranks registry status or signal confidence.
+
+Follow-up ecosystem checks from the same review:
+
+- `@vitest/eslint-plugin` may cover the remaining test-integrity scope better than custom work.
+- React Hooks v6 compiler rules may cover part of the unimplemented derived-state/effect scope.
+- `sonarjs/sql-queries` should be benchmarked against `antidrift/no-sql-string-concat` before stable promotion claims.
+
 ## Evaluated Direct Replacements
 
 These were checked against real program evidence.
@@ -26,9 +39,9 @@ These were checked against real program evidence.
 | Current custom rule | Classification | Supported replacement | Notes |
 |---|---|---|---|
 | `antidrift/no-cycle` | Retired | `import-x/no-cycle` | Replaced by maintained import-graph coverage in the ESLint config. |
-| `antidrift/no-unsafe-cast-chain` | Keep custom | `@typescript-eslint/no-unsafe-type-assertion` | The ecosystem rule catches the real cast-chain drift, but it also reports many broader assertions. Treat as a future staged/baselined policy, not a blind replacement. |
-| `antidrift/no-appeasement-cast` | Keep custom | `@typescript-eslint/no-unsafe-type-assertion` | The ecosystem rule catches the intended AxiosError drift but flags real clean controls such as SDK conversion and generic API response casts. |
-| `antidrift/no-cast-to-branded` | Keep custom | `@typescript-eslint/no-unsafe-type-assertion` | No real branded boundary exists yet; keep the brand-specific rule under-proven rather than replacing it with a broader assertion rule. |
+| `antidrift/no-unsafe-cast-chain` | Replacement candidate | `@typescript-eslint/no-unsafe-type-assertion` | The ecosystem rule catches the real cast-chain drift, but it also reports broader assertions. Measure the corpus delta before deciding whether this stays custom, becomes a selector, or is retired. |
+| `antidrift/no-appeasement-cast` | Replacement candidate | `@typescript-eslint/no-unsafe-type-assertion` | The ecosystem rule catches the intended AxiosError drift, but may flag clean controls such as SDK conversion and generic API response casts. The keep-custom decision is provisional until the upstream delta is measured. |
+| `antidrift/no-cast-to-branded` | Hold custom | `@typescript-eslint/no-unsafe-type-assertion` | No real branded boundary exists yet; keep the brand-specific rule under-proven and do not promote until a real forged brand cast exists. |
 | `antidrift/no-async-array-method` | Keep custom | `@typescript-eslint/no-misused-promises` plus `@typescript-eslint/no-floating-promises` | The ecosystem pair catches the real async `forEach` only with `checksVoidReturn.arguments` enabled, which creates real Express-route noise. Disabling that option removes the noise and misses the drift. |
 | `antidrift/no-silent-catch` | Retired | ESLint `no-empty`, `sonarjs/no-ignored-exceptions`, and `no-console` | Utility review found the remaining custom behavior did not justify ownership. Empty catches and broad console use already have maintained coverage; stronger future work should target preserve-cause and fallback-to-empty instead. |
 | `antidrift/no-inline-disable-without-ticket` | Retired | `@eslint-community/eslint-comments/require-description` plus `@typescript-eslint/ban-ts-comment` | Replaced because the accepted policy is "explicit reason is enough." |

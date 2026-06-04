@@ -35,6 +35,10 @@ This file is the readable index. Update the YAML registry first, then keep this 
 
 `ready` is not the same as stable. Stable promotion requires multiple independent repository replications that were not created for the rule, zero known false positives, zero known false negatives, no unresolved production concerns, and a grounded Claude Opus 4.8 advisory review.
 
+## Severity Discipline
+
+Rule maturity should constrain configured severity. `under-proven` rules should not become repository-blocking errors until a real drift case and clean control exist. Heuristic rules should start at warning-level unless multiple inventories show low noise. This is not fully enforced yet; add a control-plane check before promoting more heuristic or under-proven rules.
+
 ## External Ownership States
 
 These states answer whether `antidrift` should own code for the rule or defer to a maintained ESLint ecosystem rule/config.
@@ -82,7 +86,7 @@ Start investigation before code:
 
 | Rule                                              |         Status | Stable | Signal                                                    | External                               | Next action                                                                                                                                   |
 | ------------------------------------------------- | -------------: | -----: | --------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `antidrift/no-appeasement-cast`                   |        `ready` |     no | TypeChecker                                               | `broader-upstream` / `own-antidrift`   | Collect cleanup/remediation evidence for classified production drift before stable promotion.                                                  |
+| `antidrift/no-appeasement-cast`                   |        `ready` |     no | TypeChecker                                               | `broader-upstream` / `own-antidrift`   | Run an upstream-delta inventory for `@typescript-eslint/no-unsafe-type-assertion` across Chaski, Codebase Atlas, and Sudocode.                |
 | `antidrift/no-async-array-method`                 |        `ready` |     no | AST                                                       | `partial-overlap` / `own-antidrift`    | Find a second independent real drift instance, or document an explicit one-repo evidence exception before stable promotion.                   |
 | `antidrift/no-cast-to-branded`                    | `under-proven` |     no | TypeChecker                                               | `broader-upstream` / `own-antidrift`   | Wait for a real forged brand cast and decide whether Zod branded targets are in scope.                                                        |
 | `antidrift/no-coupled-state-setters`              |        `ready` |     no | scope-binding                                             | `net-antidrift` / `own-antidrift`      | Classify inventory findings before stable promotion.                                                                                          |
