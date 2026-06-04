@@ -87,7 +87,7 @@ Codebase Atlas adjacent clean pressure:
 
 ## Remediation Evidence (2026-06-04)
 
-Two production repairs have been applied in bracket-prefixed copies so the live repos are not modified:
+Four production repairs have been applied in bracket-prefixed copies so the live repos are not modified:
 
 ```bash
 pnpm policy:validate-appeasement-remediation
@@ -95,8 +95,10 @@ pnpm policy:validate-appeasement-remediation
 
 | Repo | File | Old pattern | Repair | Validation |
 | --- | --- | --- | --- | --- |
-| Chaski copy | `/Users/sushi/code/[antidrift-no-appeasement-remediation]-chaski/src/frontend/portal/api/apiService.ts` | `err as AxiosError` on a caught `unknown` | `isAxiosError(err)` guard before reading `response.status` | `policy:validate-appeasement-remediation` passes; the copied file is a clean case while `ImpersonationWarning.tsx` still proves adjacent drift. |
+| Chaski copy | `/Users/sushi/code/[antidrift-no-appeasement-remediation]-chaski/src/frontend/portal/api/apiService.ts` | `err as AxiosError` on a caught `unknown` | `isAxiosError(err)` guard before reading `response.status` | `policy:validate-appeasement-remediation` passes; the copied file is a clean case. |
+| Chaski copy | `/Users/sushi/code/[antidrift-no-appeasement-remediation]-chaski/src/frontend/portal/components/ImpersonationWarning.tsx` | Three `JSON.parse(...) as ImpersonationData` storage casts | `parseStoredImpersonationData` parses into `unknown` and checks optional string/number fields before returning `ImpersonationData` | `policy:validate-appeasement-remediation` passes; the copied file is a clean case for serialized browser storage. |
 | Codebase Atlas copy | `/Users/sushi/code/[antidrift-no-appeasement-remediation]-codebase-atlas/src/programs/persistenceCuration.ts` | `value as TerrainLayoutAnchor` before checking fields | `TerrainLayoutAnchorSchema.safeParse(value).success` | `policy:validate-appeasement-remediation` passes; the copied file is a clean case while `AtlasNeedleRenderer.ts` still proves adjacent drift. |
+| Codebase Atlas copy | `/Users/sushi/code/[antidrift-no-appeasement-remediation]-codebase-atlas/src/needle/AtlasNeedleRenderer.ts` | `mesh.userData.baseEmissive as ThreeColor` from a third-party user-data bag | `baseEmissive instanceof this.THREE.Color` guard before copying into the material | `policy:validate-appeasement-remediation` passes; the copied file is a clean case for third-party bag narrowing. |
 
 The copied repos use `node_modules` symlinks back to the originals so type-aware rules resolve the same external contracts without changing the original working trees.
 
@@ -104,8 +106,8 @@ Focused inventory deltas after the repairs:
 
 | Scope | Before | After |
 | --- | ---: | ---: |
-| Chaski portal copy | 9 | 8 |
-| Codebase Atlas app/tools copy | 3 | 2 |
+| Chaski targeted remediation files | 4 | 0 |
+| Codebase Atlas targeted remediation files | 2 | 0 |
 
 ## Broad Inventory
 
@@ -128,13 +130,13 @@ The broad inventory was run with an ad-hoc ESLint API harness. Some subprojects 
 
 ## Full Classification (2026-06-04)
 
-The broad inventory was rerun with `reports/no-appeasement-inventory.mjs` on June 4, 2026. It still reports 85 findings across the live Chaski, Codebase Atlas, and Sudocode repos. Every finding has a classification bucket. No production false-positive category was found; the remaining blocker is cleanup/remediation evidence, not rule narrowing. The separate copy-backed remediation corpus demonstrates two accepted repair patterns without changing those live repos.
+The broad inventory was rerun with `reports/no-appeasement-inventory.mjs` on June 4, 2026. It still reports 85 findings across the live Chaski, Codebase Atlas, and Sudocode repos. Every finding has a classification bucket. No production false-positive category was found; the remaining blocker is adoption/cleanup in real consumer repositories, not rule narrowing. The separate copy-backed remediation corpus demonstrates four accepted repair patterns without changing those live repos.
 
 | Classification                       | Count | Examples                                                                                                             | Current decision                                                                                                                                                                                            |
 | ------------------------------------ | ----: | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Caught-error normalization casts     |    21 | Chaski `portal/api/apiService.ts`, Chaski `crow-v2/app/_layout.tsx`, Sudocode executor/worktree/repo-info catches    | Drift. Use `instanceof`, `axios.isAxiosError`, typed error guards, or a shared `normalizeError` helper. The Chaski remediation copy proves the `isAxiosError` repair pattern.                              |
-| Unvalidated serialized data casts    |    27 | Chaski `ImpersonationWarning.tsx`; Sudocode config, JSONL, YAML, workflow, sidecar, and `response.json()` readers    | Drift. Parse into `unknown`, then validate with a schema, generated decoder, or owned mapper before assigning the contract.                                                                                 |
-| Row/model/object contract casts      |    12 | Chaski PowerSync rows and TanStack table rows; Codebase Atlas `mesh.userData`; Sudocode DB rows and Claude tool args | Drift. Fix source generics, add typed row mappers, or guard third-party bags before claiming the model. The Codebase Atlas remediation copy proves the schema-backed repair pattern for `TerrainLayoutAnchor`. |
+| Unvalidated serialized data casts    |    27 | Chaski `ImpersonationWarning.tsx`; Sudocode config, JSONL, YAML, workflow, sidecar, and `response.json()` readers    | Drift. Parse into `unknown`, then validate with a schema, generated decoder, or owned mapper before assigning the contract. The Chaski remediation copy proves the browser storage parser pattern.          |
+| Row/model/object contract casts      |    12 | Chaski PowerSync rows and TanStack table rows; Codebase Atlas `mesh.userData`; Sudocode DB rows and Claude tool args | Drift. Fix source generics, add typed row mappers, or guard third-party bags before claiming the model. The Codebase Atlas remediation copy proves both the schema-backed `TerrainLayoutAnchor` repair and the `THREE.Color` user-data guard pattern. |
 | String-union / enum value casts      |    12 | Chaski toggle/select values; Sudocode editor, entity, relationship, agent, and narration priority values             | Drift. Validate against an allowed-value set or make the UI/router source carry the literal type.                                                                                                           |
 | Transport/API message contract casts |     5 | Sudocode websocket payloads and generic `ApiResponse<any>` unwrap                                                    | Drift. Use discriminated event schemas, generated clients, or response decoders. Generic wrappers are not a built-in exception.                                                                             |
 | Request-body boundary casts          |     5 | Sudocode import/config route bodies                                                                                  | Drift. Validate request bodies at the route boundary before destructuring.                                                                                                                                  |
@@ -157,13 +159,13 @@ No rule narrowing is justified from this inventory. Generic/API wrappers are not
 
 ## Promotion State
 
-This is the strongest current promotion candidate because it has real drift replication in Chaski, Codebase Atlas, and Sudocode, plus initial real remediation evidence in bracket-prefixed Chaski and Codebase Atlas copies.
+This is the strongest current promotion candidate because it has real drift replication in Chaski, Codebase Atlas, and Sudocode, plus remediation-pattern evidence in bracket-prefixed Chaski and Codebase Atlas copies.
 
-It is not stable yet. Current state: locally ready, remediation-required.
+It is not stable yet. Current state: locally ready, remediation patterns proven.
 
 Remaining gates:
 
-1. Continue copy-backed cleanup/remediation evidence beyond the first Chaski and Codebase Atlas repair patterns.
+1. Stop adding more copy-only remediation for this phase.
 2. Keep test files in scope, but do not count test-only findings as production drift replication.
-3. Rerun the broad inventory after cleanup and confirm no new false-positive category appears.
+3. Rerun the broad inventory after any real consumer cleanup and confirm no new false-positive category appears.
 4. Keep `stable: false` until the registry has no unresolved productionization concerns.

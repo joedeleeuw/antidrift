@@ -24,39 +24,27 @@ const chaskiRemediationCases = [
     paths: ["src/frontend/portal/api/apiService.ts"],
   },
   {
-    id: "portal-impersonation-session-json-appeasement-cast",
+    id: "portal-impersonation-session-json-guard-clean",
     ruleId: "antidrift/no-appeasement-cast",
-    kind: "drift",
+    kind: "correct",
     classification: "ready",
     subproject: "frontend",
     typeAware: true,
     tsconfig: "src/frontend/portal/tsconfig.json",
     paths: ["src/frontend/portal/components/ImpersonationWarning.tsx"],
-    expectedFindings: [
-      {
-        path: "src/frontend/portal/components/ImpersonationWarning.tsx",
-        line: 33,
-      },
-    ],
   },
 ];
 
 const codebaseAtlasRemediationCases = [
   {
-    id: "atlas-needle-renderer-userdata-color-appeasement-cast",
+    id: "atlas-needle-renderer-userdata-color-guard-clean",
     ruleId: "antidrift/no-appeasement-cast",
-    kind: "drift",
+    kind: "correct",
     classification: "ready",
     subproject: "app",
     typeAware: true,
     tsconfig: "tsconfig.json",
     paths: ["src/needle/AtlasNeedleRenderer.ts"],
-    expectedFindings: [
-      {
-        path: "src/needle/AtlasNeedleRenderer.ts",
-        line: 200,
-      },
-    ],
   },
   {
     id: "atlas-terrain-layout-anchor-schema-guard-clean",
