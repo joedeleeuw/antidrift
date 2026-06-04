@@ -49,7 +49,7 @@ if (baseEmissive instanceof this.THREE.Color) {
 
 Codebase Atlas:
 
-- `/Users/sushi/code/codebase-atlas/src/programs/persistenceCuration.ts` line 646 casts broad input to `TerrainLayoutAnchor` before checking fields.
+- `/Users/sushi/code/codebase-atlas/src/programs/persistenceCuration.ts` line 652 casts broad input to `TerrainLayoutAnchor` before checking fields.
 
 Expected repair:
 
@@ -73,6 +73,7 @@ Chaski:
 Codebase Atlas adjacent clean pressure:
 
 - `/Users/sushi/code/codebase-atlas/src/programs/persistenceCuration.ts` has `isTerrainLayoutAnchor` as a legitimate predicate shape once it checks `q`, `r`, and `position`. The current implementation is still flagged because it casts before checking; the repair is to check through `Record<string, unknown>` or an equivalent object guard.
+- `/Users/sushi/code/codebase-atlas/src/bridge/AtlasSceneBridge.ts` casts a typed DOM `Event` to `CustomEvent<AtlasSceneEvent>` and stays clean because the source is not `any` or `unknown`.
 
 ## Broad Inventory
 
@@ -109,6 +110,8 @@ Representative reads show the broad findings cluster into real policy questions 
 
 No rule narrowing is justified yet. The next slice should classify the generic/API-wrapper and test-file cases first; only add an allowlist or config override if real production false positives remain after that review.
 
+Current decision after representative reads: generic/API wrappers are not a built-in exception. `response.json() as APIResponse<T>`, `response.data as ApiResponse<any>`, request-body casts, and DB/YAML row casts are boundary contract assertions and should be repaired with schema validation, a generated client/decoder, or a typed mapper. The remaining open policy question is test scope: whether impossible-state construction in tests should keep reporting or receive a focused override.
+
 ## False-Positive Risks
 
 - Generic API wrappers that return `response.data as T` can be intentional boundary abstractions. The current rule must avoid turning every generic API client into noise unless the source is broad and the target is a named object contract used to silence missing validation.
@@ -130,7 +133,7 @@ It is not stable yet. Current state: locally ready, classification-required.
 
 Remaining gates:
 
-1. Classify the broad inventory, especially Sudocode generic/API-wrapper casts and Chaski production casts.
+1. Classify every remaining production finding, not only representative examples.
 2. Decide whether test files need a config override or should continue reporting impossible-state casts.
-3. Add a second explicit clean control from Codebase Atlas or Sudocode where a typed source conversion stays quiet.
+3. Collect cleanup/remediation evidence for the production drift patterns.
 4. Keep `stable: false` until classification is clean and the registry has no unresolved concerns.

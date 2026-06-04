@@ -52,8 +52,7 @@ These remain implemented but not promotable because we still lack real drift evi
 
 Work on `antidrift/no-appeasement-cast` first. Broad inventory and grounded advisory review are complete enough to define the next slice: classify the findings before changing rule behavior or stable status.
 
-1. Classify Sudocode generic/API-wrapper casts and decide whether the rule needs a narrow wrapper escape.
-2. Classify Chaski portal, monolithui, and crow-v2 production casts as drift or false positives.
-3. Classify BFF and Codebase Atlas test-file findings and decide whether tests need a config override.
-4. Add a second explicit clean control from Codebase Atlas or Sudocode where a typed source conversion stays quiet.
-5. Keep `stable: false` until classification leaves no unresolved concerns.
+1. Classify every remaining production finding, not only representative examples.
+2. Collect cleanup/remediation evidence for the production drift patterns.
+3. Decide whether BFF, Codebase Atlas, and Sudocode test-file findings should keep reporting or receive a focused test override.
+4. Keep `stable: false` until classification leaves no unresolved concerns.
