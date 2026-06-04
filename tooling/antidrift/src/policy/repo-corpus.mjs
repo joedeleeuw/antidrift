@@ -1,13 +1,15 @@
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ESLint } from "eslint";
+import YAML from "yaml";
 import plugin from "../eslint-plugin/index.js";
 
 const defaultTargets = ["apps", "packages", "tooling"];
 const defaultRules = Object.keys(plugin.rules).map((name) => `antidrift/${name}`).sort((a, b) => a.localeCompare(b));
 const ignoredPolicy = ["**/fixtures/**", "**/dist/**", "**/*.d.ts", "**/*.d.mts", "**/*.d.cts"];
 const coreRuleIds = new Set(["no-restricted-imports"]);
+const blockingDisallowedStatuses = new Set(["under-proven", "false-positive-prone", "research"]);
 
 function parseCsv(value) {
   return value.split(",").map((item) => item.trim()).filter(Boolean);
@@ -68,6 +70,35 @@ function markFinding(row, message) {
   if (message.severity === 1) row.warnings += 1;
 }
 
+function readRuleRegistry(repoRoot) {
+  try {
+    return YAML.parse(readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8")) ?? {};
+  } catch (err) {
+    if (err.code === "ENOENT") return {};
+    throw err;
+  }
+}
+
+function isHeuristicSignal(signal) {
+  if (typeof signal !== "string") return false;
+  const normalized = signal.toLowerCase();
+  return normalized.includes("heuristic") || normalized.includes("token-overlap") || normalized.includes("configurable name groups");
+}
+
+export function allowedInactiveRulesFromRegistry(ruleRegistry) {
+  const out = new Set();
+  for (const [ruleId, entry] of Object.entries(ruleRegistry?.rules ?? {})) {
+    if (blockingDisallowedStatuses.has(entry?.status) || isHeuristicSignal(entry?.signal)) out.add(normalizeRuleId(ruleId));
+  }
+  return out;
+}
+
+export function repoCorpusDecision({ findings, inactiveRules, allowedInactiveRules }) {
+  const unexpectedInactiveRules = inactiveRules.filter((ruleId) => !allowedInactiveRules.has(ruleId));
+  if (findings.some((finding) => finding.severity === "error")) return "fail";
+  return unexpectedInactiveRules.length > 0 ? "fail" : "pass";
+}
+
 async function configsForResults(eslint, results) {
   return Promise.all(results.map(async (result) => ({
     result,
@@ -121,7 +152,10 @@ export async function repoCorpus({
       }))
   );
   const inactiveRules = ruleReports.filter((rule) => rule.activeFiles === 0).map((rule) => rule.ruleId);
-  const decision = findings.some((finding) => finding.severity === "error") || inactiveRules.length > 0 ? "fail" : "pass";
+  const allowedInactiveRules = allowedInactiveRulesFromRegistry(readRuleRegistry(repoRoot));
+  const allowedInactiveRuleIds = inactiveRules.filter((ruleId) => allowedInactiveRules.has(ruleId));
+  const unexpectedInactiveRules = inactiveRules.filter((ruleId) => !allowedInactiveRules.has(ruleId));
+  const decision = repoCorpusDecision({ findings, inactiveRules, allowedInactiveRules });
   const command = `antidrift repo-corpus --targets ${targets.join(",")} --rules ${rules.join(",")}`;
   const summary = {
     schemaVersion: 1,
@@ -132,6 +166,8 @@ export async function repoCorpus({
     ignoredPolicy,
     rules: ruleReports,
     inactiveRules,
+    allowedInactiveRules: allowedInactiveRuleIds,
+    unexpectedInactiveRules,
     findings,
     decision,
   };

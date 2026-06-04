@@ -37,7 +37,16 @@ This file is the readable index. Update the YAML registry first, then keep this 
 
 ## Severity Discipline
 
-Rule maturity should constrain configured severity. `under-proven` rules should not become repository-blocking errors until a real drift case and clean control exist. Heuristic rules should start at warning-level unless multiple inventories show low noise. This is not fully enforced yet; add a control-plane check before promoting more heuristic or under-proven rules.
+Rule maturity constrains configured severity. `under-proven`, `false-positive-prone`, and `research` rules must not be configured as blocking. Heuristic signals such as `token-overlap` and configurable name groups must also stay non-blocking until multiple real inventories show low noise.
+
+`pnpm policy:check-rule-surface` enforces this against `policy/registries/rules.yaml`. In this repository, both `warn` and `error` count as blocking because the lint gate runs with zero-warning discipline. Implemented rules can remain registered in the shared config as `off` while they collect evidence.
+
+Current default-off custom rules:
+
+- `antidrift/no-cast-to-branded`: under-proven until real branded-value forgery appears in corpus code.
+- `antidrift/no-role-literal-in-type`: under-proven until a real role-union redeclaration is accepted.
+- `antidrift/no-obvious-comment`: token-overlap heuristic; useful for review inventory, not yet safe as a blocker.
+- `antidrift/no-status-triplet-state`: configurable name-group heuristic; needs low-noise frontend inventories before blocking.
 
 ## External Ownership States
 

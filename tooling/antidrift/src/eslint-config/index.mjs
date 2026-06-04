@@ -186,19 +186,19 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "antidrift/no-trivial-selector-wrapper": "error",
         "antidrift/no-inline-structural-type-at-use-site": "error",
         "antidrift/no-unsafe-cast-chain": "error",
-        "antidrift/no-cast-to-branded": "error",
+        "antidrift/no-cast-to-branded": "off",
         "antidrift/no-appeasement-cast": "error",
         "antidrift/no-nullable-positional-tuple": "error",
         "antidrift/no-underchecked-type-predicate": "error",
         "antidrift/no-defensive-shape-probing": "error",
         "antidrift/no-coupled-state-setters": "error",
-        "antidrift/no-status-triplet-state": "error",
+        "antidrift/no-status-triplet-state": "off",
         "antidrift/require-effect-deps": "error",
         "antidrift/no-raw-tailwind-color": "error",
         "antidrift/no-hover-translate-card": "error",
         "antidrift/no-raw-fetch-in-component": "error",
         "antidrift/no-async-array-method": "error",
-        "antidrift/no-obvious-comment": "error",
+        "antidrift/no-obvious-comment": "off",
 
         // generated-type-drift: structural fork detection against installed package types (type-aware).
         "antidrift/no-structural-type-fork": ["error", { generatedSources: registries.generated?.generatedSources ?? {} }],
@@ -215,7 +215,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
 
         // Registry-driven rules: options are loaded from policy registries at config-construction time.
         "antidrift/no-status-literal-in-type": ["error", { statuses: registries.domain?.statuses ?? {} }],
-        "antidrift/no-role-literal-in-type": ["error", { roles: registries.domain?.roles ?? {} }],
+        "antidrift/no-role-literal-in-type": "off",
         ...(restrictedImportPatterns.length > 0 ? { "no-restricted-imports": restrictedImportsRule(restrictedImportPatterns) } : {}),
 
         "no-await-in-loop": "error"
