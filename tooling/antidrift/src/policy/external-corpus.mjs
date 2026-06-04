@@ -138,6 +138,16 @@ const codebaseAtlasCases = [
     paths: ["src/services/debugBundleService.ts"],
   },
   {
+    id: "atlas-persistence-curation-string-json-parse-clean",
+    ruleId: "antidrift/no-unsafe-deserialize",
+    kind: "correct",
+    classification: "ready",
+    subproject: "app",
+    typeAware: true,
+    tsconfig: "tsconfig.json",
+    paths: ["src/programs/persistenceCuration.ts"],
+  },
+  {
     id: "atlas-needle-renderer-userdata-color-appeasement-cast",
     ruleId: "antidrift/no-appeasement-cast",
     kind: "drift",

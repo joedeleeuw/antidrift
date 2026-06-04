@@ -531,8 +531,11 @@ rules:
     stable: false
     signal: TypeChecker
     solveType: parse-at-edge
-    corpusRepositories: [chaski, sudocode-main]
-    concerns: []
+    referenceDoc: docs/rule-investigations/no-unsafe-deserialize.md
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main]
+    concerns:
+      - Type-aware inventory found no Chaski or Codebase Atlas drift; Sudocode remains the only replicated drift source.
+      - Keep stable false until a second independent broad-input JSON.parse drift is found or one-repo drift evidence is explicitly accepted for parse-at-edge rules.
     external:
       state: partial-overlap
       support: high
@@ -545,7 +548,8 @@ rules:
         - "JSON.parse(row.source as any);"
       allows:
         - "const value = JSON.parse(text);"
-    nextAction: Seek another repo with both any/unknown JSON.parse drift and typed-string clean parses.
+        - "const parsed = schema.parse(JSON.parse(text));"
+    nextAction: Find a second independent broad-input JSON.parse drift instance, or document an explicit one-repo evidence exception before stable promotion.
   antidrift/require-authz-check:
     status: ready
     stable: false
