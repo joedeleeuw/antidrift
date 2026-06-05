@@ -4,7 +4,7 @@
 
 Disallow SQL strings assembled with interpolated values or concatenated values.
 
-This is an injection-boundary rule, not a general "SQL keyword" scanner. Static SQL and bound parameters are allowed. A dynamic placeholder list such as `ids.map(() => "?").join(",")` is also allowed because the values are still passed separately to the database driver. Locally built arrays of static SQL fragments may be joined into `SET` / `WHERE` clauses; arbitrary dynamic fragments still report. Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are treated as SQL binding APIs rather than raw string interpolation. Closed SQL identifier fragments are allowed only when the rule can prove the token set from local structure, such as a typed service-boundary union or a static object-literal column map, and only in an identifier/direction position.
+This is an injection-boundary rule, not a general "SQL keyword" scanner. Static SQL and bound parameters are allowed. A dynamic placeholder list such as `ids.map(() => "?").join(",")` is also allowed because the values are still passed separately to the database driver. Locally built arrays of static SQL fragments may be joined into `SET` / `WHERE` clauses; arbitrary dynamic fragments still report. Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are treated as SQL binding APIs rather than raw string interpolation. Closed SQL identifier fragments are allowed only when the rule can prove the token set from local structure, such as a typed service-boundary union or a static object-literal column map, and only in an identifier/direction position. A template literal reports only when the unsafe interpolation itself is in SQL syntax; SQL-looking sample text elsewhere in the same template does not make unrelated interpolations a SQL sink.
 
 ## Should Flag
 
@@ -97,6 +97,18 @@ sql.exec(`UPDATE tasks SET ${sets.join(", ")} WHERE id = ?`, ...params);
 
 Why: the column token is selected from a static object-literal map, while values stay bound.
 
+```ts
+const hugeOutput = "X".repeat(3_000_000);
+await connectAndRun(`
+  ws.send(JSON.stringify({
+    input: { query: "SELECT * FROM everything" },
+    output: "${hugeOutput}"
+  }));
+`);
+```
+
+Why: the SQL-looking text is sample payload data; the interpolation is not part of SQL execution or SQL syntax.
+
 ## Ecosystem
 
 `sonarjs/sql-queries` is active as adjacent maintained coverage, but the benchmark currently reports 0 SonarJS findings against this rule's real Chaski/Sudocode SQL-like findings. Keep this rule until a supported ecosystem rule covers the same HogQL/template interpolation cases.
@@ -106,6 +118,8 @@ Why: the column token is selected from a static object-literal map, while values
 Drift:
 
 - `/Users/sushi/code/chaski/src/frontend/bff/api/gateways/posthog-gateway.ts` has 10 interpolated HogQL/SQL findings, including line 570 where order IDs are escaped into an `IN (...)` string.
+- `/Users/sushi/code/sudocode-main/server/tests/integration/workflow/helpers/workflow-test-setup.ts` line 386 and `/Users/sushi/code/sudocode-main/server/tests/integration/execution/helpers/test-setup.ts` line 179 build `SET` clauses from `Object.keys(updates)`.
+- `/Users/sushi/code/cloudflare-agents/examples/playground/src/demos/core/SqlDemo.tsx` line 133 builds a table query from a plain `string` table name.
 
 Clean:
 
@@ -113,6 +127,7 @@ Clean:
 - `/Users/sushi/code/codebase-atlas/src` and `/Users/sushi/code/codebase-atlas/tools` stay clean across the SQL benchmark targets.
 - `/Users/sushi/code/sudocode-main/server/src/routes/workflows.ts` line 1191 now stays clean for `IN (${placeholders})` where `placeholders` is produced by `issueIds.map(() => "?").join(",")` and values are bound with `.all(...issueIds)`.
 - `/Users/sushi/code/sudocode-main/server/src/workflow/base-workflow-engine.ts` line 482 stays clean for `SET ${setClauses.join(", ")}` where each pushed clause is a static fragment and values are bound with `.run(...values)`.
+- `/Users/sushi/code/cloudflare-agents/packages/ai-chat/e2e/chat.spec.ts` line 1571 stays clean because the template serializes a browser test payload; the interpolation is a tool output string, not SQL assembly.
 
 Current benchmark result after placeholder-list, static-fragment, tag, and closed-identifier narrowing:
 
@@ -127,10 +142,10 @@ Widened local scan:
 - It reported 168 findings and 0 parser errors.
 - Sudocode's typed `ORDER BY ${sortBy} ${order}` service code now stays clean, as does the matching integration helper.
 - Cloudflare Agents parameterized SQL tags and the Codemode static column-map update builder now stay clean.
-- Remaining Sudocode/Cloudflare findings include dynamic `Object.keys(updates)` update helpers, a playground table-name query assembled from a plain `string`, and test/browser-evaluation strings. Many other findings are duplicate Chaski-derived local roots, so they do not provide independent replication.
+- The named Sudocode/Cloudflare findings are now classified: dynamic `Object.keys(updates)` update helpers and the playground table-name query are drift; the browser-evaluation chat payload is clean. Many other findings are duplicate Chaski-derived local roots, so they do not provide independent replication.
 
 ## Promotion State
 
-Status: `ready`, `stable: false`.
+Status: `ready`, `stable: true`.
 
-Do not promote until the remaining widened findings are classified or remediated. The current accepted drift is Chaski HogQL interpolation; Sudocode and Cloudflare now supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, closed identifier/direction fragments, and bound values.
+The rule is stable for the current scope. Drift now replicates across Chaski, Sudocode, and Cloudflare, while Chaski, Codebase Atlas, Sudocode, and Cloudflare supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, closed identifier/direction fragments, serialized payload data, and bound values.

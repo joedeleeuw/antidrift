@@ -341,7 +341,7 @@ rules:
     nextAction: Do not promote until a real role union redeclaration is found.
   antidrift/no-sql-string-concat:
     status: ready
-    stable: false
+    stable: true
     referenceDoc: docs/rule-investigations/no-sql-string-concat.md
     signal: AST string construction
     solveType: injection-boundary
@@ -352,7 +352,8 @@ rules:
       - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
       - Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are accepted clean because the tag owns value binding.
       - Closed SQL identifier fragments from typed service-boundary unions and static object-literal column maps are accepted only in SQL identifier/direction positions.
-      - A widened local scan still has unresolved normal-string API findings around dynamic object-key column lists, non-allowlisted table names, and test/browser-evaluation SQL strings.
+      - Dynamic object-key column lists and non-allowlisted table names are intentional drift findings.
+      - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:
       state: partial-overlap
       support: medium
@@ -364,12 +365,14 @@ rules:
       flags:
         - "const sql = `SELECT * FROM users WHERE id = ${id}`;"
         - 'const setClause = Object.keys(updates).map((field) => `${field} = ?`).join(", "); db.prepare(`UPDATE executions SET ${setClause} WHERE id = ?`);'
+        - "setQuery(`SELECT * FROM ${tableName} LIMIT 10`);"
       allows:
         - 'db.query("SELECT * FROM users WHERE id = ?", [id]);'
         - 'const placeholders = ids.map(() => "?").join(","); db.prepare(`SELECT id FROM issues WHERE id IN (${placeholders})`).all(...ids);'
         - "await this.sqlRun`UPDATE files SET modified_at = ${timestamp} WHERE path = ${path}`;"
         - 'const sortBy = options.sortBy ?? "created_at"; db.prepare(`SELECT * FROM executions ORDER BY ${sortBy}`);'
-    nextAction: Classify or remediate the remaining dynamic object-key column lists, non-allowlisted table names, and test/browser-evaluation SQL strings before promotion.
+        - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
+    nextAction: Stable; monitor widened scans for new SQL construction APIs or repeated false-positive patterns.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false

@@ -918,6 +918,40 @@ function ruleNoObviousComment() {
 
 const sqlPattern = /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
 const parameterizedSqlTagNames = new Set(["sql", "sqlQuery", "sqlRun"]);
+const sqlInterpolationBeforeKeywords = [
+  "FROM",
+  "JOIN",
+  "UPDATE",
+  "INTO",
+  "TABLE",
+  "WHERE",
+  "AND",
+  "OR",
+  "IN",
+  "VALUES",
+  "SET",
+  "ON",
+  "LIKE",
+  "ORDER BY",
+  "GROUP BY",
+  "PARTITION BY",
+];
+const sqlInterpolationAfterKeywords = [
+  "AND",
+  "OR",
+  "WHERE",
+  "FROM",
+  "JOIN",
+  "ORDER BY",
+  "GROUP BY",
+  "PARTITION BY",
+  "LIMIT",
+  "OFFSET",
+  "HAVING",
+  "SET",
+  "VALUES",
+  "IN",
+];
 
 function templateText(node) {
   return node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "").join(" ");
@@ -1007,6 +1041,42 @@ function isSqlDirectionTokenValue(value) {
 
 function isSqlIdentifierContext(before, after) {
   return /(?:ORDER\s+BY|GROUP\s+BY|PARTITION\s+BY|FROM|JOIN|UPDATE|INTO|TABLE)\s*$/iu.test(before) || /^\s*=/.test(after);
+}
+
+function normalizedSqlContext(value) {
+  return value.toUpperCase().replace(/\s+/gu, " ").trim();
+}
+
+function removeTrailingSqlQuote(value) {
+  const trimmed = value.trimEnd();
+  const last = trimmed.at(-1);
+  return last === "'" || last === "\"" || last === "`" ? trimmed.slice(0, -1).trimEnd() : trimmed;
+}
+
+function endsWithSqlInterpolationKeyword(value) {
+  const normalized = normalizedSqlContext(removeTrailingSqlQuote(value));
+  return sqlInterpolationBeforeKeywords.some((keyword) => normalized === keyword || normalized.endsWith(` ${keyword}`) || normalized.endsWith(` ${keyword} (`));
+}
+
+function endsWithSqlInterpolationOperator(value) {
+  const normalized = removeTrailingSqlQuote(value);
+  return ["=", "(", ","].some((operator) => normalized.endsWith(operator));
+}
+
+function startsWithSqlInterpolationKeyword(value) {
+  const trimmed = value.trimStart();
+  const first = trimmed.at(0);
+  const unquoted = first === "'" || first === "\"" || first === "`" ? trimmed.slice(1).trimStart() : trimmed;
+  const normalized = normalizedSqlContext(unquoted);
+  return normalized.startsWith(")") || normalized.startsWith(",") || sqlInterpolationAfterKeywords.some((keyword) => normalized.startsWith(keyword));
+}
+
+function isSqlInterpolationContext(before, after) {
+  const beforeTail = before.slice(-160);
+  const afterHead = after.slice(0, 160);
+  return endsWithSqlInterpolationKeyword(beforeTail)
+    || endsWithSqlInterpolationOperator(beforeTail)
+    || startsWithSqlInterpolationKeyword(afterHead);
 }
 
 function assignedSqlIdentifierNode(node) {
@@ -1099,28 +1169,46 @@ function ruleNoSqlStringConcat() {
       function valuesAreSqlDirections(values) {
         return Boolean(values?.size) && [...values].every(isSqlDirectionTokenValue);
       }
+      function templateInterpolationParts(node, index) {
+        return {
+          before: node.quasis[index]?.value?.cooked ?? node.quasis[index]?.value?.raw ?? "",
+          after: node.quasis[index + 1]?.value?.cooked ?? node.quasis[index + 1]?.value?.raw ?? "",
+        };
+      }
+      function safeSqlInterpolationState(expression, before, after, previousWasIdentifier) {
+        if (isSafeSqlFragmentExpression(expression)) {
+          return { safe: true, previousWasIdentifier: false };
+        }
+        const values = sqlTokenValues(expression);
+        if (valuesAreSqlIdentifiers(values) && isSqlIdentifierContext(before, after)) {
+          return { safe: true, previousWasIdentifier: true };
+        }
+        if (valuesAreSqlDirections(values) && previousWasIdentifier && /^\s*$/u.test(before)) {
+          return { safe: true, previousWasIdentifier: false };
+        }
+        return { safe: false, previousWasIdentifier: false };
+      }
       function isSafeSqlTemplateLiteral(node) {
         let previousWasIdentifier = false;
         for (let i = 0; i < node.expressions.length; i += 1) {
           const expression = node.expressions[i];
-          if (isSafeSqlFragmentExpression(expression)) {
-            previousWasIdentifier = false;
-            continue;
-          }
-          const values = sqlTokenValues(expression);
-          const before = node.quasis[i]?.value?.cooked ?? node.quasis[i]?.value?.raw ?? "";
-          const after = node.quasis[i + 1]?.value?.cooked ?? node.quasis[i + 1]?.value?.raw ?? "";
-          if (valuesAreSqlIdentifiers(values) && isSqlIdentifierContext(before, after)) {
-            previousWasIdentifier = true;
-            continue;
-          }
-          if (valuesAreSqlDirections(values) && previousWasIdentifier && /^\s*$/u.test(before)) {
-            previousWasIdentifier = false;
-            continue;
-          }
-          return false;
+          const { before, after } = templateInterpolationParts(node, i);
+          const state = safeSqlInterpolationState(expression, before, after, previousWasIdentifier);
+          if (!state.safe) return false;
+          previousWasIdentifier = state.previousWasIdentifier;
         }
         return true;
+      }
+      function hasUnsafeSqlInterpolation(node) {
+        let previousWasIdentifier = false;
+        for (let i = 0; i < node.expressions.length; i += 1) {
+          const expression = node.expressions[i];
+          const { before, after } = templateInterpolationParts(node, i);
+          const state = safeSqlInterpolationState(expression, before, after, previousWasIdentifier);
+          if (!state.safe && isSqlInterpolationContext(before, after)) return true;
+          previousWasIdentifier = state.previousWasIdentifier;
+        }
+        return false;
       }
       function isSafeSqlFragmentExpression(node) {
         if (staticStringValue(node) !== null) return true;
@@ -1185,7 +1273,7 @@ function ruleNoSqlStringConcat() {
         TemplateLiteral(node) {
           if (node.parent?.type === "TaggedTemplateExpression" && node.parent.quasi === node && isParameterizedSqlTag(node.parent.tag)) return;
           if (node.expressions.length > 0 && sqlPattern.test(templateText(node))) {
-            if (isSafeSqlTemplateLiteral(node)) return;
+            if (!hasUnsafeSqlInterpolation(node)) return;
             context.report({ node, message: "Do not interpolate values into SQL strings. Use parameterized queries / bound parameters." });
           }
         },

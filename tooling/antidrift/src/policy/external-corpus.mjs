@@ -125,6 +125,34 @@ const sudocodeCases = [
     paths: ["server/src/services/execution-service.ts"],
   },
   {
+    id: "sudocode-workflow-test-dynamic-update-columns",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "drift",
+    classification: "ready",
+    subproject: "server",
+    paths: ["server/tests/integration/workflow/helpers/workflow-test-setup.ts"],
+    expectedFindings: [
+      {
+        path: "server/tests/integration/workflow/helpers/workflow-test-setup.ts",
+        line: 386,
+      },
+    ],
+  },
+  {
+    id: "sudocode-execution-test-dynamic-update-columns",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "drift",
+    classification: "ready",
+    subproject: "server",
+    paths: ["server/tests/integration/execution/helpers/test-setup.ts"],
+    expectedFindings: [
+      {
+        path: "server/tests/integration/execution/helpers/test-setup.ts",
+        line: 179,
+      },
+    ],
+  },
+  {
     id: "sudocode-cli-specs-static-sql-fragments-clean",
     ruleId: "antidrift/no-sql-string-concat",
     kind: "correct",
@@ -492,6 +520,28 @@ const cloudflareAgentsCases = [
     classification: "ready",
     subproject: "examples/codemode",
     paths: ["examples/codemode/src/tools.ts"],
+  },
+  {
+    id: "cloudflare-playground-plain-table-name-query",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "drift",
+    classification: "ready",
+    subproject: "examples/playground",
+    paths: ["examples/playground/src/demos/core/SqlDemo.tsx"],
+    expectedFindings: [
+      {
+        path: "examples/playground/src/demos/core/SqlDemo.tsx",
+        line: 133,
+      },
+    ],
+  },
+  {
+    id: "cloudflare-ai-chat-large-message-payload-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "packages/ai-chat",
+    paths: ["packages/ai-chat/e2e/chat.spec.ts"],
   },
   {
     id: "cloudflare-assistant-agent-config-json-any-row",
