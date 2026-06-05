@@ -39,7 +39,11 @@ Why: only placeholder tokens are interpolated; the actual values remain bound pa
 const setClauses: string[] = [];
 setClauses.push("title = ?");
 setClauses.push("updated_at = ?");
-db.prepare(`UPDATE workflows SET ${setClauses.join(", ")} WHERE id = ?`).run(title, updatedAt, id);
+db.prepare(`UPDATE workflows SET ${setClauses.join(", ")} WHERE id = ?`).run(
+  title,
+  updatedAt,
+  id,
+);
 ```
 
 Why: the interpolated SQL text is assembled only from static fragments, and all values remain bound parameters.
@@ -68,8 +72,16 @@ Current benchmark result after placeholder-list and static-fragment narrowing:
 - 10 `antidrift/no-sql-string-concat` findings.
 - 0 `sonarjs/sql-queries` findings.
 
+Widened local scan:
+
+- An ad hoc scan across `/Users/sushi/code`, excluding the antidrift repo and Chaski roots, checked 6,916 SQL-keyword candidate files with this rule.
+- It reported 452 findings and 1 parser error, but those findings are not accepted as stable-promotion drift yet.
+- Sudocode CLI/server findings include static column lists, static condition lists, typed `ORDER BY` fragments, and bound values. Those are clean-pressure candidates for the static-fragment model, not automatically injection drift.
+- Cloudflare Agents findings are largely tagged SQL template APIs such as `this.sql\`...\${value}...\``. Tagged SQL APIs need tag-aware classification before they can count as unsafe interpolation or clean parameterization.
+- Many remaining findings are duplicate Chaski-derived local roots, so they do not provide independent replication.
+
 ## Promotion State
 
 Status: `ready`, `stable: false`.
 
-Do not promote until a second independent real drift repository is accepted. The current accepted drift is Chaski HogQL interpolation; Sudocode now supplies clean controls for placeholder lists and static SQL fragments.
+Do not promote until the widened non-Chaski findings are classified and at least one independent real drift repository is accepted. The current accepted drift is Chaski HogQL interpolation; Sudocode currently supplies clean-pressure controls for placeholder lists, static SQL fragments, and bound values.

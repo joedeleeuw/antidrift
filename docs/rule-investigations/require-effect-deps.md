@@ -86,6 +86,6 @@ Clean:
 
 ## Promotion State
 
-Status: `ready`, `stable: false`.
+Status: `ready`, `stable: true`.
 
-The rule is deterministic and has independent drift replication, but stable promotion is blocked until the intentional every-render escape convention is proven in a real consumer or explicitly accepted as a policy-level convention backed by the maintained ESLint disable-description rule.
+The rule is deterministic, has independent drift replication, has clean controls across multiple repos, and has grounded advisory review. A broad local search did not find an existing `antidrift/require-effect-deps` disable consumer; that is accepted rather than modeled with a synthetic program. The intentional every-render escape convention is policy-level: use a rule-specific ESLint directive with a required description, enforced by `@eslint-community/eslint-comments/require-description`.

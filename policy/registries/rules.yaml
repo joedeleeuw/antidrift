@@ -267,7 +267,7 @@ rules:
     examples:
       flags:
         - 'function Orders() { fetch("/api/orders"); return null; }'
-        - 'async function loadImage(url) { return globalThis.fetch(url); }'
+        - "async function loadImage(url) { return globalThis.fetch(url); }"
       allows:
         - 'async function loadOrders() { return fetch("/api/orders"); }'
         - "function Orders() { const { data } = useOrders(); return <div>{data.length}</div>; }"
@@ -350,6 +350,7 @@ rules:
       - The benchmark on 178 real files reports 10 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
       - Dynamic placeholder lists such as `ids.map(() => "?").join(",")` are accepted clean because values remain bound parameters.
       - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
+      - A widened local scan found independent non-Chaski findings, but they include tagged SQL APIs and static column/condition fragment arrays that need classification before they can count as accepted drift.
     external:
       state: partial-overlap
       support: medium
@@ -363,7 +364,7 @@ rules:
       allows:
         - 'db.query("SELECT * FROM users WHERE id = ?", [id]);'
         - 'const placeholders = ids.map(() => "?").join(","); db.prepare(`SELECT id FROM issues WHERE id IN (${placeholders})`).all(...ids);'
-    nextAction: Seek independent real drift beyond Chaski before stable promotion.
+    nextAction: Classify the widened non-Chaski SQL scan first; do not promote until tagged SQL APIs and static fragment arrays are either cleanly exempted or accepted as real drift.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
@@ -462,6 +463,7 @@ rules:
     corpusRepositories: [chaski, codebase-atlas]
     concerns:
       - Adapter callbacks such as key extractors can also be a single member return; the current convention is a local rule-specific disable with a required reason, not a prop-name/use-site heuristic.
+      - Current adapter pressure is one strong Murderbox keyExtractor candidate, not repeated enough to justify a use-site-aware exemption.
     external:
       state: net-antidrift
       support: none
@@ -474,7 +476,7 @@ rules:
         - "function pickItems(bag: Bag): Item[] { return bag.items; }"
       allows:
         - "function totalItems(bag: Bag): number { return bag.items.length; }"
-    nextAction: Keep structural; collect repeated adapter pressure before designing any use-site-aware exemption.
+    nextAction: Keep structural; do not add a use-site-aware exemption until repeated adapter pressure appears in real repositories.
   antidrift/no-underchecked-type-predicate:
     status: ready
     stable: false
@@ -568,19 +570,25 @@ rules:
     nextAction: Keep tRPC authorization as a separate scoped decision.
   antidrift/require-effect-deps:
     status: ready
-    stable: false
+    stable: true
     signal: import binding plus AST
     solveType: react-effect-lifecycle
     referenceDoc: docs/rule-investigations/require-effect-deps.md
-    corpusRepositories: [chaski, codebase-atlas, sudocode-main, murderbox, claude-code-source]
+    corpusRepositories:
+      [chaski, codebase-atlas, sudocode-main, murderbox, claude-code-source]
     concerns:
-      - Independent drift includes deliberate every-render effects in Claude Code Source; the current convention is a local `antidrift/require-effect-deps` disable with a required reason.
+      - Intentional every-render effects use a local `antidrift/require-effect-deps` disable with a required reason; this convention is accepted as policy-backed by `@eslint-community/eslint-comments/require-description`.
       - The exact ecosystem overlap is `eslint-plugin-use-effect-no-deps`, but it is a small single-purpose package and not a strong replacement for the custom rule.
     external:
       state: partial-overlap
       support: high
       candidates:
-        ["react-hooks/exhaustive-deps", "eslint-plugin-use-effect-no-deps", "@eslint-react/hooks-extra/no-direct-set-state-in-use-effect", "react-hooks-extra/no-direct-set-state-in-use-effect"]
+        [
+          "react-hooks/exhaustive-deps",
+          "eslint-plugin-use-effect-no-deps",
+          "@eslint-react/hooks-extra/no-direct-set-state-in-use-effect",
+          "react-hooks-extra/no-direct-set-state-in-use-effect",
+        ]
       decision: own-antidrift
       whyThisState: "React Hooks exhaustive-deps owns dependency-array correctness once an array exists, the React Compiler/ESLint React ecosystem owns adjacent effect smells, and a small plugin covers missing arrays."
       whyNotOtherState: "Not equivalent because exhaustive-deps intentionally stays silent on the no-array case, adjacent effect rules target different smells, and the one-purpose no-deps plugin is not a strong maintained replacement."
@@ -589,7 +597,7 @@ rules:
         - "useEffect(() => sync());"
       allows:
         - "useEffect(() => sync(), [sync]);"
-    nextAction: Collect a real consumer using the rule-specific intentional-every-render disable convention, or explicitly accept the convention as policy-backed by `@eslint-community/eslint-comments/require-description`.
+    nextAction: Stable; monitor real consumers of the rule-specific every-render disable convention and revisit only if the directive burden proves noisy.
 
 retiredRules:
   antidrift/no-cycle:

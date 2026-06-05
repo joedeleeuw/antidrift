@@ -93,6 +93,12 @@ Review-risk evidence:
 
 - `/Users/sushi/code/murderbox/apps/client/src/components/chat/message-list.tsx` has `chatItemKey(item: ChatItem): string { return item.id; }`, used as a key extractor. This is not accepted as stable drift or clean evidence yet; it is the false-positive shape to classify before promotion.
 
+Follow-up adapter scan:
+
+- A local scan of Murderbox, Codebase Atlas, Pierre, and Sudocode found one strong typed adapter callback pressure case: the Murderbox `chatItemKey` key extractor above.
+- The same scan found adjacent inline key extractors such as `keyExtractor={(item) => item.kind}`, but those have no explicit return type and are outside this rule's inference-appeasement scope.
+- Because the pressure is not repeated across real repositories, do not add a `keyExtractor` / `getRowId` / prop-name exemption yet.
+
 ## Promotion State
 
 Status: `ready`, `stable: false`.
