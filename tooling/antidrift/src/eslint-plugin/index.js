@@ -917,6 +917,7 @@ function ruleNoObviousComment() {
 
 
 const sqlPattern = /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
+const parameterizedSqlTagNames = new Set(["sql", "sqlQuery", "sqlRun"]);
 
 function templateText(node) {
   return node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "").join(" ");
@@ -953,6 +954,13 @@ function isEmptyArrayExpression(node) {
   return node?.type === "ArrayExpression" && node.elements.length === 0;
 }
 
+function isParameterizedSqlTag(node) {
+  if (node?.type === "Identifier") return parameterizedSqlTagNames.has(node.name);
+  if (node?.type === "ChainExpression") return isParameterizedSqlTag(node.expression);
+  if (node?.type !== "MemberExpression" || node.computed) return false;
+  return node.property?.type === "Identifier" && parameterizedSqlTagNames.has(node.property.name);
+}
+
 function isAllowedSqlFragmentJoinSeparator(value) {
   return value === "," || value === ", " || value === " AND " || value === " OR ";
 }
@@ -985,11 +993,16 @@ function ruleNoSqlStringConcat() {
         if (!isAllowedSqlFragmentJoinSeparator(separator)) return false;
         return join.object?.type === "Identifier" && isSafeFragmentVariable(join.object, safeSqlFragmentArrays);
       }
+      function isSafeSqlFragmentArrayExpression(node) {
+        return isEmptyArrayExpression(node)
+          || (node?.type === "ArrayExpression"
+            && node.elements.every((element) => element && element.type !== "SpreadElement" && isSafeSqlFragmentExpression(element)));
+      }
       return {
         VariableDeclarator(node) {
           const variable = getDeclaredVariable(sourceCode, node);
           if (!variable) return;
-          if (isEmptyArrayExpression(node.init)) {
+          if (isSafeSqlFragmentArrayExpression(node.init)) {
             safeSqlFragmentArrays.add(variable);
           } else if (isSafeSqlFragmentExpression(node.init)) {
             safeSqlFragmentStrings.add(variable);
@@ -1013,6 +1026,7 @@ function ruleNoSqlStringConcat() {
           }
         },
         TemplateLiteral(node) {
+          if (node.parent?.type === "TaggedTemplateExpression" && node.parent.quasi === node && isParameterizedSqlTag(node.parent.tag)) return;
           if (node.expressions.length > 0 && sqlPattern.test(templateText(node))) {
             if (node.expressions.every((expression) => isSafeSqlFragmentExpression(expression))) return;
             context.report({ node, message: "Do not interpolate values into SQL strings. Use parameterized queries / bound parameters." });

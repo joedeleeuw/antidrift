@@ -4,7 +4,7 @@
 
 Disallow SQL strings assembled with interpolated values or concatenated values.
 
-This is an injection-boundary rule, not a general "SQL keyword" scanner. Static SQL and bound parameters are allowed. A dynamic placeholder list such as `ids.map(() => "?").join(",")` is also allowed because the values are still passed separately to the database driver. Locally built arrays of static SQL fragments may be joined into `SET` / `WHERE` clauses; arbitrary dynamic fragments still report.
+This is an injection-boundary rule, not a general "SQL keyword" scanner. Static SQL and bound parameters are allowed. A dynamic placeholder list such as `ids.map(() => "?").join(",")` is also allowed because the values are still passed separately to the database driver. Locally built arrays of static SQL fragments may be joined into `SET` / `WHERE` clauses; arbitrary dynamic fragments still report. Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are treated as SQL binding APIs rather than raw string interpolation.
 
 ## Should Flag
 
@@ -48,6 +48,14 @@ db.prepare(`UPDATE workflows SET ${setClauses.join(", ")} WHERE id = ?`).run(
 
 Why: the interpolated SQL text is assembled only from static fragments, and all values remain bound parameters.
 
+```ts
+await this.sqlRun`
+  UPDATE files SET modified_at = ${timestamp} WHERE path = ${path}
+`;
+```
+
+Why: the template is passed to a parameterized SQL tag; the interpolation is API-level value binding, not raw string construction.
+
 ## Ecosystem
 
 `sonarjs/sql-queries` is active as adjacent maintained coverage, but the benchmark currently reports 0 SonarJS findings against this rule's real Chaski/Sudocode SQL-like findings. Keep this rule until a supported ecosystem rule covers the same HogQL/template interpolation cases.
@@ -67,7 +75,7 @@ Clean:
 
 Current benchmark result after placeholder-list and static-fragment narrowing:
 
-- 178 checked files.
+- 179 checked files.
 - 0 parser errors.
 - 10 `antidrift/no-sql-string-concat` findings.
 - 0 `sonarjs/sql-queries` findings.
@@ -75,13 +83,13 @@ Current benchmark result after placeholder-list and static-fragment narrowing:
 Widened local scan:
 
 - An ad hoc scan across `/Users/sushi/code`, excluding the antidrift repo and Chaski roots, checked 6,916 SQL-keyword candidate files with this rule.
-- It reported 452 findings and 1 parser error, but those findings are not accepted as stable-promotion drift yet.
-- Sudocode CLI/server findings include static column lists, static condition lists, typed `ORDER BY` fragments, and bound values. Those are clean-pressure candidates for the static-fragment model, not automatically injection drift.
-- Cloudflare Agents findings are largely tagged SQL template APIs such as `this.sql\`...\${value}...\``. Tagged SQL APIs need tag-aware classification before they can count as unsafe interpolation or clean parameterization.
+- Before the classification pass, it reported 452 findings and 1 parser error; after accepting static fragment arrays and parameterized SQL tags, it reports 207 findings and 1 parser error.
+- Sudocode CLI static column/condition fragment arrays now stay clean. Sudocode's `execution-service.ts` still reports typed `ORDER BY ${sortBy} ${order}` because the rule does not yet have a safe identifier-fragment model.
+- Cloudflare Agents parameterized SQL tags such as `this.sql`, `sqlQuery`, and `sqlRun` now stay clean. Remaining Cloudflare findings are normal string APIs such as `sql.exec(\`...\`)`, including static dictionary-to-column fragments and selected table-name query assembly.
 - Many remaining findings are duplicate Chaski-derived local roots, so they do not provide independent replication.
 
 ## Promotion State
 
 Status: `ready`, `stable: false`.
 
-Do not promote until the widened non-Chaski findings are classified and at least one independent real drift repository is accepted. The current accepted drift is Chaski HogQL interpolation; Sudocode currently supplies clean-pressure controls for placeholder lists, static SQL fragments, and bound values.
+Do not promote until identifier-valued SQL fragments are modeled or explicitly rejected. The current accepted drift is Chaski HogQL interpolation; Sudocode and Cloudflare now supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, and bound values.

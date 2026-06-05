@@ -345,12 +345,13 @@ rules:
     referenceDoc: docs/rule-investigations/no-sql-string-concat.md
     signal: AST string construction
     solveType: injection-boundary
-    corpusRepositories: [chaski, codebase-atlas, sudocode-main]
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main, cloudflare-agents]
     concerns:
-      - The benchmark on 178 real files reports 10 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
+      - The benchmark on 179 real files reports 10 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
       - Dynamic placeholder lists such as `ids.map(() => "?").join(",")` are accepted clean because values remain bound parameters.
       - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
-      - A widened local scan found independent non-Chaski findings, but they include tagged SQL APIs and static column/condition fragment arrays that need classification before they can count as accepted drift.
+      - Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are accepted clean because the tag owns value binding.
+      - A widened local scan still has unresolved normal-string API findings around identifier-valued SQL fragments such as typed ORDER BY values, static dictionary-to-column maps, and table-name allowlists.
     external:
       state: partial-overlap
       support: medium
@@ -364,7 +365,8 @@ rules:
       allows:
         - 'db.query("SELECT * FROM users WHERE id = ?", [id]);'
         - 'const placeholders = ids.map(() => "?").join(","); db.prepare(`SELECT id FROM issues WHERE id IN (${placeholders})`).all(...ids);'
-    nextAction: Classify the widened non-Chaski SQL scan first; do not promote until tagged SQL APIs and static fragment arrays are either cleanly exempted or accepted as real drift.
+        - "await this.sqlRun`UPDATE files SET modified_at = ${timestamp} WHERE path = ${path}`;"
+    nextAction: Design identifier-fragment handling for typed ORDER BY values, static dictionary-to-column maps, and table-name allowlists before promotion.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false

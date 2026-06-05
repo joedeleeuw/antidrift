@@ -117,6 +117,22 @@ const sudocodeCases = [
     paths: ["server/src/workflow/base-workflow-engine.ts"],
   },
   {
+    id: "sudocode-cli-specs-static-sql-fragments-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "cli",
+    paths: ["cli/src/operations/specs.ts"],
+  },
+  {
+    id: "sudocode-cli-issues-static-sql-fragments-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "cli",
+    paths: ["cli/src/operations/issues.ts"],
+  },
+  {
     id: "sudocode-issues-route-params-without-authz",
     ruleId: "antidrift/require-authz-check",
     kind: "drift",
@@ -429,6 +445,38 @@ const murderboxCases = [
 ];
 
 const cloudflareAgentsCases = [
+  {
+    id: "cloudflare-voice-parameterized-sql-tag-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "packages/voice",
+    paths: ["packages/voice/src/voice.ts"],
+  },
+  {
+    id: "cloudflare-ai-chat-parameterized-sql-tag-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "packages/ai-chat",
+    paths: ["packages/ai-chat/src/index.ts"],
+  },
+  {
+    id: "cloudflare-agents-parameterized-sql-tag-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "packages/agents",
+    paths: ["packages/agents/src/index.ts"],
+  },
+  {
+    id: "cloudflare-shell-sql-run-query-tags-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "packages/shell",
+    paths: ["packages/shell/src/filesystem.ts"],
+  },
   {
     id: "cloudflare-assistant-agent-config-json-any-row",
     ruleId: "antidrift/no-unsafe-deserialize",
