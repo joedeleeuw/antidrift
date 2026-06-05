@@ -965,6 +965,56 @@ function isAllowedSqlFragmentJoinSeparator(value) {
   return value === "," || value === ", " || value === " AND " || value === " OR ";
 }
 
+function sqlStringValuesFromType(typeNode) {
+  if (!typeNode) return null;
+  if (typeNode.type === "TSUnionType") {
+    const values = new Set();
+    for (const part of typeNode.types) {
+      const partValues = sqlStringValuesFromType(part);
+      if (!partValues) return null;
+      for (const value of partValues) values.add(value);
+    }
+    return values;
+  }
+  if (typeNode.type !== "TSLiteralType") return null;
+  const literal = typeNode.literal;
+  return literal?.type === "Literal" && typeof literal.value === "string" ? new Set([literal.value]) : null;
+}
+
+function sqlTypePropertyValues(typeNode, propertyName) {
+  if (typeNode?.type !== "TSTypeLiteral") return null;
+  for (const member of typeNode.members ?? []) {
+    if (member.type !== "TSPropertySignature") continue;
+    const keyName = sqlPropertyKeyName(member.key);
+    if (keyName === propertyName) return sqlStringValuesFromType(member.typeAnnotation?.typeAnnotation);
+  }
+  return null;
+}
+
+function sqlPropertyKeyName(key) {
+  if (key?.type === "Identifier") return key.name;
+  if (key?.type === "Literal") return String(key.value);
+  return "";
+}
+
+function isSqlIdentifierTokenValue(value) {
+  return /^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?$/u.test(value);
+}
+
+function isSqlDirectionTokenValue(value) {
+  return value === "ASC" || value === "DESC" || value === "asc" || value === "desc";
+}
+
+function isSqlIdentifierContext(before, after) {
+  return /(?:ORDER\s+BY|GROUP\s+BY|PARTITION\s+BY|FROM|JOIN|UPDATE|INTO|TABLE)\s*$/iu.test(before) || /^\s*=/.test(after);
+}
+
+function assignedSqlIdentifierNode(node) {
+  if (node.left?.type === "Identifier") return node.left;
+  if (node.left?.type === "MemberExpression" && node.left.object?.type === "Identifier") return node.left.object;
+  return null;
+}
+
 function ruleNoSqlStringConcat() {
   return {
     meta: { type: "problem", docs: { description: "Disallow SQL assembled via string interpolation or concatenation." }, schema: [] },
@@ -972,9 +1022,105 @@ function ruleNoSqlStringConcat() {
       const sourceCode = context.sourceCode;
       const safeSqlFragmentArrays = new WeakSet();
       const safeSqlFragmentStrings = new WeakSet();
+      const safeSqlIdentifierValues = new WeakMap();
+      const safeSqlIdentifierObjectValues = new WeakMap();
       function isSafeFragmentVariable(node, set) {
         const variable = findVariable(sourceCode, node);
         return Boolean(variable && set.has(variable));
+      }
+      function unionStringValues(left, right) {
+        if (!left || !right) return null;
+        return new Set([...left, ...right]);
+      }
+      function variableTypeNode(variable) {
+        const def = variable?.defs?.[0];
+        return def?.name?.typeAnnotation?.typeAnnotation
+          ?? def?.node?.typeAnnotation?.typeAnnotation
+          ?? def?.node?.id?.typeAnnotation?.typeAnnotation
+          ?? null;
+      }
+      function memberTypeStringValues(node) {
+        if (node?.type !== "MemberExpression" || node.computed || node.object?.type !== "Identifier") return null;
+        const propertyName = node.property?.type === "Identifier" ? node.property.name : "";
+        if (!propertyName) return null;
+        return sqlTypePropertyValues(variableTypeNode(findVariable(sourceCode, node.object)), propertyName);
+      }
+      function objectLiteralIdentifierValues(node) {
+        if (node?.type !== "ObjectExpression") return null;
+        const values = new Set();
+        for (const property of node.properties ?? []) {
+          if (property.type !== "Property") return null;
+          const value = staticStringValue(property.value);
+          if (!value || !isSqlIdentifierTokenValue(value)) return null;
+          values.add(value);
+        }
+        return values;
+      }
+      function identifierTokenValues(node) {
+        const variable = findVariable(sourceCode, node);
+        return variable ? safeSqlIdentifierValues.get(variable) ?? null : null;
+      }
+      function memberTokenValues(node) {
+        if (node.computed && node.object?.type === "Identifier") {
+          const variable = findVariable(sourceCode, node.object);
+          return variable ? safeSqlIdentifierObjectValues.get(variable) ?? null : null;
+        }
+        return memberTypeStringValues(node);
+      }
+      function transformedCallTokenValues(node) {
+        if (node.arguments.length > 0) return null;
+        const callee = node.callee;
+        if (callee?.type !== "MemberExpression" || callee.computed || callee.property?.type !== "Identifier") return null;
+        const sourceValues = sqlTokenValues(callee.object);
+        if (!sourceValues) return null;
+        if (callee.property.name === "toUpperCase") return new Set([...sourceValues].map((value) => value.toUpperCase()));
+        if (callee.property.name === "toLowerCase") return new Set([...sourceValues].map((value) => value.toLowerCase()));
+        return null;
+      }
+      function sqlTokenValues(node) {
+        const staticValue = staticStringValue(node);
+        if (staticValue !== null) return new Set([staticValue]);
+        const unwrapped = unwrapExpression(node);
+        if (unwrapped !== node) return sqlTokenValues(unwrapped);
+        if (node?.type === "Identifier") return identifierTokenValues(node);
+        if (node?.type === "MemberExpression") return memberTokenValues(node);
+        if (node?.type === "LogicalExpression" && (node.operator === "??" || node.operator === "||")) {
+          return unionStringValues(sqlTokenValues(node.left), sqlTokenValues(node.right));
+        }
+        if (node?.type === "ConditionalExpression") {
+          return unionStringValues(sqlTokenValues(node.consequent), sqlTokenValues(node.alternate));
+        }
+        if (node?.type === "CallExpression") return transformedCallTokenValues(node);
+        return null;
+      }
+      function valuesAreSqlIdentifiers(values) {
+        return Boolean(values?.size) && [...values].every(isSqlIdentifierTokenValue);
+      }
+      function valuesAreSqlDirections(values) {
+        return Boolean(values?.size) && [...values].every(isSqlDirectionTokenValue);
+      }
+      function isSafeSqlTemplateLiteral(node) {
+        let previousWasIdentifier = false;
+        for (let i = 0; i < node.expressions.length; i += 1) {
+          const expression = node.expressions[i];
+          if (isSafeSqlFragmentExpression(expression)) {
+            previousWasIdentifier = false;
+            continue;
+          }
+          const values = sqlTokenValues(expression);
+          const before = node.quasis[i]?.value?.cooked ?? node.quasis[i]?.value?.raw ?? "";
+          const after = node.quasis[i + 1]?.value?.cooked ?? node.quasis[i + 1]?.value?.raw ?? "";
+          if (valuesAreSqlIdentifiers(values) && isSqlIdentifierContext(before, after)) {
+            previousWasIdentifier = true;
+            continue;
+          }
+          if (valuesAreSqlDirections(values) && previousWasIdentifier && /^\s*$/u.test(before)) {
+            previousWasIdentifier = false;
+            continue;
+          }
+          return false;
+        }
+        return true;
       }
       function isSafeSqlFragmentExpression(node) {
         if (staticStringValue(node) !== null) return true;
@@ -984,7 +1130,7 @@ function ruleNoSqlStringConcat() {
           return isSafeSqlFragmentExpression(node.consequent) && isSafeSqlFragmentExpression(node.alternate);
         }
         if (node?.type === "TemplateLiteral") {
-          return node.expressions.every((expression) => isSafeSqlFragmentExpression(expression));
+          return isSafeSqlTemplateLiteral(node);
         }
         if (node?.type !== "CallExpression") return false;
         const join = node.callee;
@@ -1002,6 +1148,14 @@ function ruleNoSqlStringConcat() {
         VariableDeclarator(node) {
           const variable = getDeclaredVariable(sourceCode, node);
           if (!variable) return;
+          const objectValues = objectLiteralIdentifierValues(node.init);
+          const tokenValues = sqlTokenValues(node.init);
+          if (objectValues && node.parent?.kind === "const") {
+            safeSqlIdentifierObjectValues.set(variable, objectValues);
+          }
+          if (tokenValues && [...tokenValues].every((value) => isSqlIdentifierTokenValue(value) || isSqlDirectionTokenValue(value))) {
+            safeSqlIdentifierValues.set(variable, tokenValues);
+          }
           if (isSafeSqlFragmentArrayExpression(node.init)) {
             safeSqlFragmentArrays.add(variable);
           } else if (isSafeSqlFragmentExpression(node.init)) {
@@ -1009,11 +1163,14 @@ function ruleNoSqlStringConcat() {
           }
         },
         AssignmentExpression(node) {
-          if (node.left?.type !== "Identifier") return;
-          const variable = findVariable(sourceCode, node.left);
+          const assignedIdentifier = assignedSqlIdentifierNode(node);
+          if (!assignedIdentifier) return;
+          const variable = findVariable(sourceCode, assignedIdentifier);
           if (!variable) return;
           safeSqlFragmentArrays.delete(variable);
           safeSqlFragmentStrings.delete(variable);
+          safeSqlIdentifierValues.delete(variable);
+          safeSqlIdentifierObjectValues.delete(variable);
         },
         CallExpression(node) {
           const callee = node.callee;
@@ -1028,7 +1185,7 @@ function ruleNoSqlStringConcat() {
         TemplateLiteral(node) {
           if (node.parent?.type === "TaggedTemplateExpression" && node.parent.quasi === node && isParameterizedSqlTag(node.parent.tag)) return;
           if (node.expressions.length > 0 && sqlPattern.test(templateText(node))) {
-            if (node.expressions.every((expression) => isSafeSqlFragmentExpression(expression))) return;
+            if (isSafeSqlTemplateLiteral(node)) return;
             context.report({ node, message: "Do not interpolate values into SQL strings. Use parameterized queries / bound parameters." });
           }
         },

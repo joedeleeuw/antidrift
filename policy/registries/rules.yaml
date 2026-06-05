@@ -347,11 +347,12 @@ rules:
     solveType: injection-boundary
     corpusRepositories: [chaski, codebase-atlas, sudocode-main, cloudflare-agents]
     concerns:
-      - The benchmark on 179 real files reports 10 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
+      - The benchmark on 190 real files reports 10 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
       - Dynamic placeholder lists such as `ids.map(() => "?").join(",")` are accepted clean because values remain bound parameters.
       - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
       - Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are accepted clean because the tag owns value binding.
-      - A widened local scan still has unresolved normal-string API findings around identifier-valued SQL fragments such as typed ORDER BY values, static dictionary-to-column maps, and table-name allowlists.
+      - Closed SQL identifier fragments from typed service-boundary unions and static object-literal column maps are accepted only in SQL identifier/direction positions.
+      - A widened local scan still has unresolved normal-string API findings around dynamic object-key column lists, non-allowlisted table names, and test/browser-evaluation SQL strings.
     external:
       state: partial-overlap
       support: medium
@@ -362,11 +363,13 @@ rules:
     examples:
       flags:
         - "const sql = `SELECT * FROM users WHERE id = ${id}`;"
+        - 'const setClause = Object.keys(updates).map((field) => `${field} = ?`).join(", "); db.prepare(`UPDATE executions SET ${setClause} WHERE id = ?`);'
       allows:
         - 'db.query("SELECT * FROM users WHERE id = ?", [id]);'
         - 'const placeholders = ids.map(() => "?").join(","); db.prepare(`SELECT id FROM issues WHERE id IN (${placeholders})`).all(...ids);'
         - "await this.sqlRun`UPDATE files SET modified_at = ${timestamp} WHERE path = ${path}`;"
-    nextAction: Design identifier-fragment handling for typed ORDER BY values, static dictionary-to-column maps, and table-name allowlists before promotion.
+        - 'const sortBy = options.sortBy ?? "created_at"; db.prepare(`SELECT * FROM executions ORDER BY ${sortBy}`);'
+    nextAction: Classify or remediate the remaining dynamic object-key column lists, non-allowlisted table names, and test/browser-evaluation SQL strings before promotion.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false

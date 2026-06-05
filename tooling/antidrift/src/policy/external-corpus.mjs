@@ -117,6 +117,14 @@ const sudocodeCases = [
     paths: ["server/src/workflow/base-workflow-engine.ts"],
   },
   {
+    id: "sudocode-execution-service-typed-order-by-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "server",
+    paths: ["server/src/services/execution-service.ts"],
+  },
+  {
     id: "sudocode-cli-specs-static-sql-fragments-clean",
     ruleId: "antidrift/no-sql-string-concat",
     kind: "correct",
@@ -476,6 +484,14 @@ const cloudflareAgentsCases = [
     classification: "ready",
     subproject: "packages/shell",
     paths: ["packages/shell/src/filesystem.ts"],
+  },
+  {
+    id: "cloudflare-codemode-static-column-map-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "examples/codemode",
+    paths: ["examples/codemode/src/tools.ts"],
   },
   {
     id: "cloudflare-assistant-agent-config-json-any-row",
