@@ -464,14 +464,14 @@ rules:
     nextAction: Run another repo inventory with configured domain owners before stable promotion.
   antidrift/no-trivial-selector-wrapper:
     status: ready
-    stable: false
+    stable: true
     signal: AST structural return shape
     solveType: inference-appeasement
     referenceDoc: docs/rule-investigations/no-trivial-selector-wrapper.md
-    corpusRepositories: [chaski, codebase-atlas]
+    corpusRepositories: [chaski, codebase-atlas, murderbox]
     concerns:
-      - Adapter callbacks such as key extractors can also be a single member return; the current convention is a local rule-specific disable with a required reason, not a prop-name/use-site heuristic.
-      - Current adapter pressure is one strong Murderbox keyExtractor candidate, not repeated enough to justify a use-site-aware exemption.
+      - Adapter callbacks such as query selectors and key extractors can stay named and stable; the rule only requires dropping the explicit return annotation when the body already infers it.
+      - Do not add prop-name/use-site heuristics for `select`, `keyExtractor`, or `getRowId` unless future evidence shows an external API genuinely requires an annotated callback signature.
     external:
       state: net-antidrift
       support: none
@@ -482,9 +482,11 @@ rules:
     examples:
       flags:
         - "function pickItems(bag: Bag): Item[] { return bag.items; }"
+        - "function chatItemKey(item: ChatItem): string { return item.id; }"
       allows:
         - "function totalItems(bag: Bag): number { return bag.items.length; }"
-    nextAction: Keep structural; do not add a use-site-aware exemption until repeated adapter pressure appears in real repositories.
+        - "function chatItemKey(item: ChatItem) { return item.id; }"
+    nextAction: Stable; monitor for real APIs that require annotated adapter callback signatures.
   antidrift/no-underchecked-type-predicate:
     status: ready
     stable: false

@@ -453,6 +453,20 @@ const murderboxCases = [
     paths: ["apps/client/src/lib/theme.ts"],
   },
   {
+    id: "murderbox-chat-item-key-selector-wrapper",
+    ruleId: "antidrift/no-trivial-selector-wrapper",
+    kind: "drift",
+    classification: "ready",
+    subproject: "client",
+    paths: ["apps/client/src/components/chat/message-list.tsx"],
+    expectedFindings: [
+      {
+        path: "apps/client/src/components/chat/message-list.tsx",
+        line: 181,
+      },
+    ],
+  },
+  {
     id: "murderbox-machine-setup-route-redundant-response-parse",
     ruleId: "antidrift/no-redundant-zod-parse",
     kind: "drift",

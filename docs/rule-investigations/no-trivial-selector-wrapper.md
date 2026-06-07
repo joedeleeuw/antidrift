@@ -50,7 +50,7 @@ Why: exported functions are public boundaries. Their explicit return type may be
 
 ## Adapter Callback Classification
 
-Single-property adapter callbacks are the real production risk:
+Single-property adapter callbacks are valid functions, but they do not need explicit return annotations when the body already infers the adapter contract:
 
 ```ts
 function chatItemKey(item: ChatItem): string {
@@ -60,14 +60,20 @@ function chatItemKey(item: ChatItem): string {
 <List keyExtractor={chatItemKey} />;
 ```
 
-This can be legitimate because the callback adapts a domain object to an external API that demands a string key. The current rule still reports the helper when it is internal and typed.
-
-Do not add a broad structural exemption yet. The code shape is identical to the drift shape, and detecting adapter intent would require use-site analysis or prop-name matching such as `keyExtractor`, `getRowId`, or `itemKey`. That would move the rule back toward contextual/name heuristics.
-
-For now, intentional adapters should use a local, reasoned directive:
+This callback can stay named and stable for the external API. The drift is the explicit `: string`, not the callback itself:
 
 ```ts
-// eslint-disable-next-line antidrift/no-trivial-selector-wrapper -- adapter callback for List keyExtractor API
+function chatItemKey(item: ChatItem) {
+  return item.id;
+}
+```
+
+Do not add a use-site-aware exemption. Detecting adapter intent would require prop-name matching such as `select`, `keyExtractor`, `getRowId`, or `itemKey`, and the same remediation still applies: keep the callback, let the return type infer.
+
+Use a local directive only when an external API genuinely requires a separately declared annotated callback type:
+
+```ts
+// eslint-disable-next-line antidrift/no-trivial-selector-wrapper -- external adapter type requires annotated callback signature
 function chatItemKey(item: ChatItem): string {
   return item.id;
 }
@@ -82,6 +88,7 @@ Drift:
 - `/Users/sushi/code/chaski/src/frontend/portal/modules/scenarios/agent-configuration/components/table/use-agent-table-data.ts` line 15.
 - `/Users/sushi/code/chaski/src/frontend/portal/modules/scenarios/service-time-influence/components/table/service-time-influence-table.tsx` line 39.
 - `/Users/sushi/code/codebase-atlas/src/parsing/treeSitterRealProgramParser.ts` line 897 defines `fullExcerpt(file: ParsedFile): string { return file.source }`, proving the non-name-gated case.
+- `/Users/sushi/code/murderbox/apps/client/src/components/chat/message-list.tsx` line 181 defines `chatItemKey(item: ChatItem): string { return item.id; }`, proving adapter callbacks can keep their stable helper while dropping the return annotation.
 
 Clean:
 
@@ -89,18 +96,15 @@ Clean:
 - `/Users/sushi/code/chaski/src/frontend/portal/modules/Accounts/formatters.ts`
 - Adjacent Codebase Atlas helpers such as `compactText` transform the returned text and stay outside the bare-member shape.
 
-Review-risk evidence:
-
-- `/Users/sushi/code/murderbox/apps/client/src/components/chat/message-list.tsx` has `chatItemKey(item: ChatItem): string { return item.id; }`, used as a key extractor. This is not accepted as stable drift or clean evidence yet; it is the false-positive shape to classify before promotion.
-
 Follow-up adapter scan:
 
-- A local scan of Murderbox, Codebase Atlas, Pierre, and Sudocode found one strong typed adapter callback pressure case: the Murderbox `chatItemKey` key extractor above.
+- A local scan of Chaski, Codebase Atlas, Murderbox, Sudocode, and Cloudflare Agents found adapter callback pressure in Chaski TanStack Query/table selectors and Murderbox list key extraction.
 - The same scan found adjacent inline key extractors such as `keyExtractor={(item) => item.kind}`, but those have no explicit return type and are outside this rule's inference-appeasement scope.
-- Because the pressure is not repeated across real repositories, do not add a `keyExtractor` / `getRowId` / prop-name exemption yet.
+- Adapter pressure is resolved by dropping the explicit return annotation, not by adding `select` / `keyExtractor` / `getRowId` prop-name exemptions.
+- Cloudflare test helper findings such as `callText(result): string { return ...text }` are real rule hits but test-only and do not count toward stable non-test drift replication.
 
 ## Promotion State
 
-Status: `ready`, `stable: false`.
+Status: `ready`, `stable: true`.
 
-Stable promotion is blocked on adapter callback classification. Until there is repeated real pressure for a use-site-aware exemption, keep the rule structural and require local reasoned disables for intentional adapters.
+The rule is stable for the current scope. Drift replicates across Chaski, Codebase Atlas, and Murderbox; clean controls cover transformed helpers and unannotated selectors. Keep the rule structural and do not add adapter prop-name heuristics unless future evidence shows an annotated callback type is genuinely required.
