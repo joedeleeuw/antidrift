@@ -15,14 +15,21 @@ import globals from "globals";
 import aiPolicy from "../eslint-plugin/index.js";
 
 function generatedImportPatterns(registries) {
-  return Object.values(registries.generated?.generatedSources ?? {}).flatMap(({ bannedDirectImports = [], message = "Import from the approved generated-type wrapper." }) =>
-    bannedDirectImports.map((group) => ({ group: [group], message }))
+  return Object.values(registries.generated?.generatedSources ?? {}).flatMap(
+    ({
+      bannedDirectImports = [],
+      message = "Import from the approved generated-type wrapper.",
+    }) => bannedDirectImports.map((group) => ({ group: [group], message })),
   );
 }
 
 function gatewayImportPatterns(registries) {
-  return Object.values(registries.gateways?.approvedGateways ?? {}).flatMap(({ bannedDirectImports = [], wrapper }) =>
-    bannedDirectImports.map((group) => ({ group: [group], message: `Import through the approved gateway wrapper (${wrapper}).` }))
+  return Object.values(registries.gateways?.approvedGateways ?? {}).flatMap(
+    ({ bannedDirectImports = [], wrapper }) =>
+      bannedDirectImports.map((group) => ({
+        group: [group],
+        message: `Import through the approved gateway wrapper (${wrapper}).`,
+      })),
   );
 }
 
@@ -36,7 +43,10 @@ function gatewayWrapperOverrides(registries, generatedPatterns) {
     .map(({ wrapper }) => ({
       files: [wrapper],
       rules: {
-        "no-restricted-imports": generatedPatterns.length > 0 ? restrictedImportsRule(generatedPatterns) : "off",
+        "no-restricted-imports":
+          generatedPatterns.length > 0
+            ? restrictedImportsRule(generatedPatterns)
+            : "off",
       },
     }));
 }
@@ -48,10 +58,15 @@ function gatewayWrapperOverrides(registries, generatedPatterns) {
  *   policyDir: path to the policy directory, relative to tsconfigRootDir (default: "policy")
  */
 export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
-  const absPolicyDir = tsconfigRootDir ? resolve(tsconfigRootDir, policyDir) : resolve(policyDir);
+  const absPolicyDir = tsconfigRootDir
+    ? resolve(tsconfigRootDir, policyDir)
+    : resolve(policyDir);
   const registries = loadRegistriesSync(absPolicyDir);
   const generatedPatterns = generatedImportPatterns(registries);
-  const restrictedImportPatterns = [...generatedPatterns, ...gatewayImportPatterns(registries)];
+  const restrictedImportPatterns = [
+    ...generatedPatterns,
+    ...gatewayImportPatterns(registries),
+  ];
   return tseslint.config(
     {
       ignores: [
@@ -64,7 +79,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "**/*.d.ts",
         "**/*.d.mts",
         "**/*.d.cts",
-        "**/*.tsbuildinfo"
+        "**/*.tsbuildinfo",
       ],
     },
     js.configs.recommended,
@@ -76,11 +91,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
       languageOptions: {
         parserOptions: {
           projectService: {
-            allowDefaultProject: [
-              "*.mjs",
-              "*.ts",
-              "apps/*/vite.config.ts",
-            ],
+            allowDefaultProject: ["*.mjs", "*.ts", "apps/*/vite.config.ts"],
             defaultProject: "./tsconfig.base.json",
           },
           tsconfigRootDir,
@@ -98,13 +109,33 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         react,
         "react-hooks": reactHooks,
         unicorn,
-        "antidrift": aiPolicy,
+        antidrift: aiPolicy,
       },
       settings: {
         react: { version: "detect" },
-        "import-x/extensions": [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
+        "import-x/extensions": [
+          ".ts",
+          ".tsx",
+          ".mts",
+          ".cts",
+          ".js",
+          ".jsx",
+          ".mjs",
+          ".cjs",
+        ],
         "import-x/resolver": {
-          node: { extensions: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"] },
+          node: {
+            extensions: [
+              ".ts",
+              ".tsx",
+              ".mts",
+              ".cts",
+              ".js",
+              ".jsx",
+              ".mjs",
+              ".cjs",
+            ],
+          },
         },
         "boundaries/elements": [
           { type: "app", pattern: "apps/*/src/**" },
@@ -113,7 +144,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
           { type: "contracts", pattern: "packages/contracts/src/**" },
           { type: "api", pattern: "packages/api/src/**" },
           { type: "gateways", pattern: "packages/gateways/src/**" },
-          { type: "tooling", pattern: "tooling/**" }
+          { type: "tooling", pattern: "tooling/**" },
         ],
       },
       rules: {
@@ -132,12 +163,18 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "@typescript-eslint/no-unsafe-assignment": "error",
         "@typescript-eslint/no-unsafe-member-access": "error",
         "@typescript-eslint/no-unsafe-return": "error",
-        "@typescript-eslint/ban-ts-comment": ["error", { "ts-expect-error": "allow-with-description" }],
-        "@typescript-eslint/no-unused-vars": ["error", {
-          "argsIgnorePattern": "^_",
-          "varsIgnorePattern": "^_",
-          "caughtErrorsIgnorePattern": "^_"
-        }],
+        "@typescript-eslint/ban-ts-comment": [
+          "error",
+          { "ts-expect-error": "allow-with-description" },
+        ],
+        "@typescript-eslint/no-unused-vars": [
+          "error",
+          {
+            argsIgnorePattern: "^_",
+            varsIgnorePattern: "^_",
+            caughtErrorsIgnorePattern: "^_",
+          },
+        ],
 
         // React hook lifecycle rules are deterministic feedback for generated UI.
         "react-hooks/rules-of-hooks": "error",
@@ -156,29 +193,36 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "no-only-tests/no-only-tests": "error",
 
         // Retired baseline coverage now lives in ESLint.
+        "preserve-caught-error": "error",
         "no-console": "error",
         "no-debugger": "error",
         "no-array-constructor": "error",
-        "no-warning-comments": ["error", { terms: ["@nocommit", "FIXME"], location: "anywhere" }],
+        "no-warning-comments": [
+          "error",
+          { terms: ["@nocommit", "FIXME"], location: "anywhere" },
+        ],
         "unicorn/no-abusive-eslint-disable": "error",
         "@eslint-community/eslint-comments/require-description": "error",
         "unicorn/prefer-node-protocol": "error",
         "unicorn/prefer-structured-clone": "error",
-        "curly": ["error", "multi-line"],
+        curly: ["error", "multi-line"],
 
         // Architecture boundaries prevent semantic drift across layers.
-        "boundaries/element-types": ["error", {
-          default: "disallow",
-          rules: [
-            { from: "app", allow: ["ui", "domain", "contracts"] },
-            { from: "ui", allow: ["domain"] },
-            { from: "domain", allow: [] },
-            { from: "contracts", allow: ["domain"] },
-            { from: "api", allow: ["domain", "contracts", "gateways"] },
-            { from: "gateways", allow: ["domain", "contracts"] },
-            { from: "tooling", allow: ["tooling"] }
-          ]
-        }],
+        "boundaries/element-types": [
+          "error",
+          {
+            default: "disallow",
+            rules: [
+              { from: "app", allow: ["ui", "domain", "contracts"] },
+              { from: "ui", allow: ["domain"] },
+              { from: "domain", allow: [] },
+              { from: "contracts", allow: ["domain"] },
+              { from: "api", allow: ["domain", "contracts", "gateways"] },
+              { from: "gateways", allow: ["domain", "contracts"] },
+              { from: "tooling", allow: ["tooling"] },
+            ],
+          },
+        ],
         "boundaries/no-private": "error",
         "import-x/no-cycle": ["error", { ignoreExternal: true }],
 
@@ -201,8 +245,14 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "antidrift/no-obvious-comment": "off",
 
         // generated-type-drift: structural fork detection against installed package types (type-aware).
-        "antidrift/no-structural-type-fork": ["error", { generatedSources: registries.generated?.generatedSources ?? {} }],
-        "antidrift/no-canonical-model-fork": ["error", { canonicalEntities: registries.domain?.canonicalEntities ?? {} }],
+        "antidrift/no-structural-type-fork": [
+          "error",
+          { generatedSources: registries.generated?.generatedSources ?? {} },
+        ],
+        "antidrift/no-canonical-model-fork": [
+          "error",
+          { canonicalEntities: registries.domain?.canonicalEntities ?? {} },
+        ],
 
         // validation-drift: re-parsing a value with the schema that already produced it (type-aware).
         "antidrift/no-redundant-zod-parse": "error",
@@ -214,24 +264,42 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "antidrift/no-unsafe-deserialize": "error",
 
         // Registry-driven rules: options are loaded from policy registries at config-construction time.
-        "antidrift/no-status-literal-in-type": ["error", { statuses: registries.domain?.statuses ?? {} }],
-        "antidrift/no-role-literal-in-type": ["off", { roles: registries.domain?.roles ?? {} }],
-        ...(restrictedImportPatterns.length > 0 ? { "no-restricted-imports": restrictedImportsRule(restrictedImportPatterns) } : {}),
+        "antidrift/no-status-literal-in-type": [
+          "error",
+          { statuses: registries.domain?.statuses ?? {} },
+        ],
+        "antidrift/no-role-literal-in-type": [
+          "off",
+          { roles: registries.domain?.roles ?? {} },
+        ],
+        ...(restrictedImportPatterns.length > 0
+          ? {
+              "no-restricted-imports": restrictedImportsRule(
+                restrictedImportPatterns,
+              ),
+            }
+          : {}),
 
-        "no-await-in-loop": "error"
+        "no-await-in-loop": "error",
       },
     },
     {
       // require-authz-check: scoped to server boundaries declared in the boundaries registry.
-      files: ["packages/*/src/routes/**/*.{ts,tsx}", "packages/*/src/actions/**/*.{ts,tsx}"],
+      files: [
+        "packages/*/src/routes/**/*.{ts,tsx}",
+        "packages/*/src/actions/**/*.{ts,tsx}",
+      ],
       rules: {
-        "antidrift/require-authz-check": ["error", {
-          authzFunctions: [
-            ...(registries.boundaries?.requiredCalls?.authentication ?? []),
-            ...(registries.boundaries?.requiredCalls?.authorization ?? []),
-            ...(registries.boundaries?.requiredCalls?.tenancy ?? []),
-          ],
-        }],
+        "antidrift/require-authz-check": [
+          "error",
+          {
+            authzFunctions: [
+              ...(registries.boundaries?.requiredCalls?.authentication ?? []),
+              ...(registries.boundaries?.requiredCalls?.authorization ?? []),
+              ...(registries.boundaries?.requiredCalls?.tenancy ?? []),
+            ],
+          },
+        ],
       },
     },
     ...gatewayWrapperOverrides(registries, generatedPatterns),
@@ -245,7 +313,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "vitest/no-disabled-tests": "error",
         "vitest/no-conditional-in-test": "error",
         "@typescript-eslint/no-non-null-assertion": "off",
-        "antidrift/no-inline-structural-type-at-use-site": "off"
+        "antidrift/no-inline-structural-type-at-use-site": "off",
       },
     },
     {
@@ -267,7 +335,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "sonarjs/deprecation": "off",
         "@typescript-eslint/no-unsafe-assignment": "off",
       },
-    }
+    },
   );
 }
 

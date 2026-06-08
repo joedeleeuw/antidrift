@@ -31,6 +31,7 @@ Follow-up ecosystem checks from the same review:
 - `@vitest/eslint-plugin` is now wired for Vitest focused/disabled tests, conditional expects/tests, standalone expects, and missing assertion checks.
 - React Hooks `recommended-latest` plus explicit `react-hooks/no-deriving-state-in-effects` is now wired for compiler-era React lifecycle coverage.
 - `sonarjs/sql-queries` is active through `sonarjs.configs.recommended`; `pnpm policy:benchmark-sql-queries` checked 190 real files and reported 10 `antidrift/no-sql-string-concat` findings versus 0 `sonarjs/sql-queries` findings. Keep the custom SQL interpolation guard.
+- ESLint core `preserve-caught-error` is wired for lost caught-error cause. Future custom error work should target fallback-to-empty, not preserve-cause.
 
 ## Evaluated Direct Replacements
 
