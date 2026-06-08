@@ -132,6 +132,7 @@ Start investigation before code:
 | `ecosystem/react-hooks-compiler`               | `ecosystem-covered` | maintained ESLint plugin         | Covered by `eslint-plugin-react-hooks` recommended-latest plus explicit `react-hooks/no-deriving-state-in-effects`.                                |
 | `ecosystem/sonar-sql-queries`                  | `ecosystem-covered` | maintained ESLint plugin         | Covered by `sonarjs/sql-queries`, but the local benchmark currently reports 0 findings against 10 custom SQL findings.                             |
 | `antidrift/no-thin-typed-factory-wrapper`      |          `research` | TypeChecker plus typed single-call constructor/delegation shape | Codebase Atlas has broader typed-constructor-wrapper candidates; classify them before implementation.                                               |
+| `antidrift/no-same-schema-recertification`     |          `research` | TypeChecker plus schema-output assignability and refinement-free override proof | Do not implement; classify Codebase Atlas roundtrip parse anchors first, then drop unless a second repo proves remediated value.                    |
 
 ## Retired Rules
 

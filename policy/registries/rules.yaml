@@ -682,3 +682,9 @@ researchCandidates:
     solveType: unearned-return-contract
     referenceDoc: docs/rule-investigations/no-thin-typed-factory-wrapper.md
     nextAction: Codebase Atlas has broader typed-constructor-wrapper candidates; classify renderSprite and classificationFor* as accepted drift or clean abstractions, then seek a second independent repo before implementation.
+  antidrift/no-same-schema-recertification:
+    status: research
+    signal: TypeChecker plus schema-output assignability and refinement-free override proof
+    solveType: schema-roundtrip-parse
+    referenceDoc: docs/rule-investigations/no-same-schema-recertification.md
+    nextAction: Do not implement; classify Codebase Atlas markExplorationTileUnderstood and moveTo first, then drop unless a second independent repo produces an accepted remediated anchor.
