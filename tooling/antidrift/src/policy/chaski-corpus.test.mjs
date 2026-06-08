@@ -249,4 +249,36 @@ describe("externalCorpus", () => {
     expect(result.repositories).toHaveLength(1);
     expect(result.repositories[0]?.decision).toBe("pass");
   });
+
+  it("can require drift-bearing repositories for promotion gates", async () => {
+    const root = tempRepo();
+    writeProgram(
+      root,
+      "src/example.ts",
+      "declare const raw: unknown;\nconst value = raw as unknown as { id: string };\nvoid value;\n",
+    );
+
+    const result = await externalCorpus({
+      corpus: "sudocode-main",
+      repo: root,
+      minDriftRepositories: 2,
+      cases: [
+        {
+          id: "unsafe-cast-chain",
+          ruleId: "antidrift/no-unsafe-cast-chain",
+          kind: "drift",
+          classification: "ready",
+          subproject: "app",
+          paths: ["src/example.ts"],
+          expectedFindings: [{ path: "src/example.ts", line: 2 }],
+        },
+      ],
+      report: () => {},
+    });
+
+    expect(result.decision).toBe("fail");
+    expect(result.reason).toContain("drift cases");
+    expect(result.driftRepositories).toBe(1);
+    expect(result.repositories[0]?.decision).toBe("pass");
+  });
 });

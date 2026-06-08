@@ -23,6 +23,10 @@ const claudeCodeSourceRepoCandidates = [
   process.env.CLAUDE_CODE_SOURCE_REPO,
   "/Users/sushi/code/claude-code-source-code",
 ].filter(Boolean);
+const opencodeRepoCandidates = [
+  process.env.OPENCODE_REPO,
+  "/Users/sushi/code/opencode",
+].filter(Boolean);
 const coreRuleIds = new Set(["no-restricted-imports"]);
 
 const sudocodeCases = [
@@ -812,6 +816,41 @@ const claudeCodeSourceCases = [
   },
 ];
 
+const opencodeCases = [
+  {
+    id: "opencode-console-benchmark-list-result-json",
+    ruleId: "antidrift/no-unsafe-deserialize",
+    kind: "drift",
+    classification: "ready",
+    subproject: "console-app",
+    typeAware: true,
+    tsconfig: "packages/console/app/tsconfig.json",
+    paths: ["packages/console/app/src/routes/bench/index.tsx"],
+    expectedFindings: [
+      {
+        path: "packages/console/app/src/routes/bench/index.tsx",
+        line: 19,
+      },
+    ],
+  },
+  {
+    id: "opencode-console-benchmark-detail-result-json",
+    ruleId: "antidrift/no-unsafe-deserialize",
+    kind: "drift",
+    classification: "ready",
+    subproject: "console-app",
+    typeAware: true,
+    tsconfig: "packages/console/app/tsconfig.json",
+    paths: ["packages/console/app/src/routes/bench/[id].tsx"],
+    expectedFindings: [
+      {
+        path: "packages/console/app/src/routes/bench/[id].tsx",
+        line: 85,
+      },
+    ],
+  },
+];
+
 const externalCorpora = [
   {
     name: "sudocode-main",
@@ -843,6 +882,12 @@ const externalCorpora = [
     repoCandidates: claudeCodeSourceRepoCandidates,
     cases: claudeCodeSourceCases,
   },
+  {
+    name: "opencode",
+    label: "opencode",
+    repoCandidates: opencodeRepoCandidates,
+    cases: opencodeCases,
+  },
 ];
 
 function parseCsv(value) {
@@ -863,6 +908,40 @@ function parsePositiveInteger(value, fallback) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+const valueArgHandlers = {
+  "--repo": (out, value) => {
+    out.repo = value;
+  },
+  "--corpus": (out, value) => {
+    out.corpus = value;
+  },
+  "--slice": (out, value) => {
+    out.slice = value;
+  },
+  "--output": (out, value) => {
+    out.output = value;
+  },
+  "--rules": (out, value) => {
+    out.rules = parseCsv(value).map(normalizeRuleId);
+  },
+  "--min-repositories": (out, value) => {
+    out.minRepositories = parsePositiveInteger(value, out.minRepositories);
+  },
+  "--min-drift-repositories": (out, value) => {
+    out.minDriftRepositories = parsePositiveInteger(
+      value,
+      out.minDriftRepositories,
+    );
+  },
+};
+
+function applyValueArg(out, arg, value) {
+  const handler = valueArgHandlers[arg];
+  if (!handler || !value) return false;
+  handler(out, value);
+  return true;
+}
+
 function parseArgs(argv) {
   const out = {
     repo: null,
@@ -872,27 +951,12 @@ function parseArgs(argv) {
     require: false,
     rules: null,
     minRepositories: 1,
+    minDriftRepositories: 0,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     const next = argv[i + 1];
-    if (arg === "--repo" && next) {
-      out.repo = next;
-      i += 1;
-    } else if (arg === "--corpus" && next) {
-      out.corpus = next;
-      i += 1;
-    } else if (arg === "--slice" && next) {
-      out.slice = next;
-      i += 1;
-    } else if (arg === "--output" && next) {
-      out.output = next;
-      i += 1;
-    } else if (arg === "--rules" && next) {
-      out.rules = parseCsv(next).map(normalizeRuleId);
-      i += 1;
-    } else if (arg === "--min-repositories" && next) {
-      out.minRepositories = parsePositiveInteger(next, out.minRepositories);
+    if (applyValueArg(out, arg, next)) {
       i += 1;
     } else if (arg === "--require") {
       out.require = true;
@@ -921,22 +985,47 @@ function unknownCorpusSummary(corpus, sharedOptions) {
   };
 }
 
-function externalDecision({ failed, passed, minRepositories, require }) {
+function externalDecision({
+  failed,
+  passed,
+  driftPassed,
+  minRepositories,
+  minDriftRepositories,
+  require,
+}) {
   if (failed) return "fail";
+  if (driftPassed < minDriftRepositories) return passed > 0 ? "fail" : "skip";
   if (passed >= minRepositories) return "pass";
   if (passed > 0) return "fail";
   if (require) return "fail";
   return "skip";
 }
 
-function externalReason({ decision, failed, passed, minRepositories }) {
+function externalReason({
+  decision,
+  failed,
+  passed,
+  driftPassed,
+  minRepositories,
+  minDriftRepositories,
+}) {
   if (decision === "skip") {
     return "No external corpus repositories were found. Pass --repo with --corpus or set a matching environment variable.";
+  }
+  if (!failed && driftPassed < minDriftRepositories) {
+    return `Only ${driftPassed} external corpus repositories had passing drift cases; ${minDriftRepositories} required for this slice.`;
   }
   if (!failed && passed > 0 && passed < minRepositories) {
     return `Only ${passed} external corpus repositories passed; ${minRepositories} required for this slice.`;
   }
   return null;
+}
+
+function repositoryHasPassingDrift(result) {
+  if (result.decision !== "pass") return false;
+  return result.cases.some(
+    (testCase) => testCase.kind === "drift" && testCase.decision === "pass",
+  );
 }
 
 function runExternalCorpus(entry, sharedOptions) {
@@ -966,6 +1055,7 @@ export async function externalCorpus(options = {}) {
     output = null,
     report = console.log,
     minRepositories = 1,
+    minDriftRepositories = 0,
     ...sharedOptions
   } = options;
   const corpora = selectedCorpora(corpus);
@@ -982,20 +1072,32 @@ export async function externalCorpus(options = {}) {
   const passed = repositories.filter(
     (result) => result.decision === "pass",
   ).length;
+  const driftPassed = repositories.filter(repositoryHasPassingDrift).length;
   const failed = repositories.some((result) => result.decision === "fail");
   const decision = externalDecision({
     failed,
     passed,
+    driftPassed,
     minRepositories,
+    minDriftRepositories,
     require: sharedOptions.require,
   });
-  const reason = externalReason({ decision, failed, passed, minRepositories });
+  const reason = externalReason({
+    decision,
+    failed,
+    passed,
+    driftPassed,
+    minRepositories,
+    minDriftRepositories,
+  });
   const summary = {
     schemaVersion: 1,
     corpus: "external",
     slice: externalSlice(sharedOptions),
     decision,
     minRepositories,
+    minDriftRepositories,
+    driftRepositories: driftPassed,
     repositories,
   };
   if (reason) summary.reason = reason;

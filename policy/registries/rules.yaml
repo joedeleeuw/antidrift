@@ -134,7 +134,7 @@ rules:
     signal: TypeChecker
     solveType: type-escape-hatch
     referenceDoc: docs/rule-investigations/no-appeasement-cast.md
-    corpusRepositories: [chaski, codebase-atlas, sudocode-main]
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main, opencode]
     concerns:
       - Broad inventory classified all current Chaski, Codebase Atlas, and Sudocode findings as real boundary/type-escape drift or in-scope test setup.
       - Copy-backed remediation evidence now covers caught-error guards, serialized browser storage validation, schema-backed object-contract checks, and third-party bag guards; do not add more copy-only remediation before the next promotion review.
@@ -660,7 +660,7 @@ rules:
         - "const value = JSON.parse(text);"
         - 'if (typeof event.data !== "string") return; JSON.parse(event.data);'
         - "const parsed = schema.parse(JSON.parse(text));"
-    nextAction: Re-establish a second evaluated drift repository and add an evaluated nested parsed-subfield gate before stable promotion.
+    nextAction: Add an evaluated nested parsed-subfield gate before stable promotion.
   antidrift/require-authz-check:
     status: ready
     stable: false

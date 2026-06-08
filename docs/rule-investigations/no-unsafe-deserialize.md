@@ -72,6 +72,8 @@ Drift:
 
 - `/Users/sushi/code/sudocode-main/server/src/routes/workflows.ts` line 199 parses `row.source` where the checker type is `any`.
 - The same file also reports broad row parses at lines 201, 208, 793, 1010, 1012, 1019, and 1598.
+- `/Users/sushi/code/opencode/packages/console/app/src/routes/bench/index.tsx` line 19 parses `row.result` before asserting a local `BenchmarkResult`.
+- `/Users/sushi/code/opencode/packages/console/app/src/routes/bench/[id].tsx` line 85 parses `rows[0].result` before asserting the same benchmark result shape.
 - Cloudflare Agents previously supplied drift in `examples/assistant/src/server.ts` and `experimental/gadgets-chat/src/client.tsx`, but the current checkout no longer evaluates those as blocking evidence: the assistant file changed substantially, and the Cloudflare tsconfigs extend `agents/tsconfig` without an install-resolvable package path in this external clone.
 - Nested parsed-subfield drift such as `JSON.parse(msg.event)` after `msg` came from an unvalidated broad parse remains desired scope. It needs a fresh evaluated real-program gate before stable promotion.
 - Additional Cloudflare Agents inventory found broad-message parses such as `openai-sdk/streaming-chat/src/client.tsx` line 49 (`item.arguments: any`). This is inventory evidence, not yet a separate gate case.
@@ -94,7 +96,8 @@ Split TypeChecker inventory on June 4, 2026:
 - Chaski crow-v2: 4 JSON.parse files, 0 findings.
 - Codebase Atlas `src`: 6 JSON.parse files, 0 findings.
 - Sudocode server: 57 JSON.parse files, 8 findings, all in `server/src/routes/workflows.ts`.
-- Cloudflare Agents focused corpus: now recorded as known-gap rather than blocking evidence because the external checkout cannot currently resolve `agents/tsconfig` for type-aware linting.
+- opencode console app: 2 JSON.parse findings in benchmark routes.
+- Cloudflare Agents focused corpus: now recorded as known-gap rather than blocking evidence because the external example checkout cannot currently resolve `agents/tsconfig` for type-aware linting.
 - Cloudflare Agents wider scan: at least 15 files reported before the scan stopped after enough dirty and clean candidates were collected.
 
 ## Guarded Any Boundary
@@ -105,7 +108,7 @@ Cloudflare WebSocket handlers proved the TypeChecker-only version was too blunt:
 
 Status: `ready`, `stable: false`.
 
-The rule is type-aware and has strong Sudocode drift plus multiple clean controls. The guarded-`any` concern is resolved, but stable promotion is paused until a second evaluated drift repository is restored and nested parsed-subfield drift has a real-program gate.
+The rule is type-aware and has Sudocode plus opencode drift and multiple clean controls. The guarded-`any` concern is resolved, but stable promotion is paused until nested parsed-subfield drift has a real-program gate.
 
 Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-review-no-unsafe-deserialize-20260604-145356.md`). It agreed the ecosystem overlap is partial, the strongest signal is TypeChecker plus a narrow local string-boundary exemption, and the real-corpus evidence is strong enough for promotion review. It recommended keeping `stable: false` until the remaining production concern was closed: if parser services are unavailable, type-aware rules could fail open. That concern is now closed by a shared rule-level guard: fully type-aware rules report a configuration error when enabled without TypeScript parser services.
 
@@ -115,4 +118,4 @@ Accepted stable limitations:
 - Aliased or computed parse calls such as `const { parse } = JSON` and `JSON["parse"](value)` are not matched.
 - A local binding named `JSON` could be mistaken for the global JSON object.
 
-Next slice: re-establish a second evaluated drift repository and add an evaluated nested parsed-subfield gate.
+Next slice: add an evaluated nested parsed-subfield gate.
