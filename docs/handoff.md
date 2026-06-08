@@ -36,6 +36,7 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - pnpm catalogs live in `pnpm-workspace.yaml` and support named catalogs.
 - ESLint plus `typescript-eslint` is the canonical custom-rule engine because the original scope needs TypeScript `Program` and `TypeChecker` access.
 - Retired-engine baseline coverage is tracked rule-by-rule in `docs/lint-rule-parity.md`; do not remove coverage without recording the replacement or accepted gap.
+- Non-TypeScript language checks belong to native tools in consuming repos, optionally coordinated by a repo-local orchestrator such as Trunk. Do not turn antidrift back into a multi-engine lint runner unless a future `[policy-change]` explicitly widens the package scope.
 - Rule readiness is tracked in `policy/registries/rules.yaml`; do not call a rule stable until it has multiple independent real-repo replications that were not created for the rule, zero known false positives, zero known false negatives, no production concerns, and a grounded Claude Opus 4.8 advisory review.
 - One owner per concept is the primary anti-duplication rule: import or derive from the owner instead of retyping local copies.
 - `policy:check-registries` protects registry-backed rule facts; `policy:check-rule-surface` protects custom rule export/config/test alignment.

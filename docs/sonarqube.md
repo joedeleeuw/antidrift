@@ -25,6 +25,12 @@ The template imports external policy findings with:
 sonar.externalIssuesReportPaths=reports/antidrift-sonar.json
 ```
 
+## Non-TypeScript Tooling
+
+This package does not bundle a Trunk-style multi-language lint runner. Keep antidrift's shipped path focused on TypeScript source semantics: ESLint plus `typescript-eslint` for local findings, Vitest and `tsc` for local correctness, and Sonar for portfolio analysis and gate metrics.
+
+When a consuming monorepo has Go, Python, Proto, Bazel, shell, Docker, Kubernetes, or secret-scanning needs, use that repo's native tooling or an orchestrator such as Trunk at the consumer layer. Do not port those checks into custom antidrift ESLint rules. Generated outputs from those ecosystems should be excluded from Sonar and lint scans; the template already excludes protobuf output (`*.pb.ts`, `*.pb.js`, `*.pb.go`, `*.pb.gw.go`) and generated directories.
+
 ## Suggested quality gate
 
 See `sonar/quality-gate.ai-strict.yaml`.
