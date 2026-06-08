@@ -28,7 +28,7 @@ import { createConfig } from "@joedeleeuw/antidrift/eslint-config";
 export default createConfig({ tsconfigRootDir: import.meta.dirname });
 ```
 
-That gives you the type-aware base (typescript-eslint, sonarjs, architecture boundaries, react-hooks) plus every antidrift rule. It also includes the general monorepo hygiene layer: import grouping and spacing, sorted named imports, top-level `import type` declarations, package dependency checks, type-union/intersection sorting, JSX prop ordering, duplicate-import protection, import-cycle detection, and single-blank-line formatting. If you keep a `policy/` directory with registries, `createConfig` reads them and wires up the domain-specific rules on its own.
+That gives you the type-aware base (typescript-eslint, sonarjs, architecture boundaries, react-hooks) plus every antidrift rule. It also includes the general monorepo hygiene layer: import grouping and spacing, sorted named imports, top-level `import type` declarations, package dependency checks, promise-misuse and unnecessary-condition checks, type-union/intersection sorting, React component/key conventions, JSX prop ordering, duplicate-import protection, import-cycle detection, and single-blank-line formatting. If you keep a `policy/` directory with registries, `createConfig` reads them and wires up the domain-specific rules on its own.
 
 If you wire `@joedeleeuw/antidrift/eslint-plugin` by hand instead of using `createConfig`, configure `@typescript-eslint/parser` with parser services (`projectService` or `project`). Fully type-aware antidrift rules report a configuration error when enabled without those services so missing type information cannot silently weaken the rule set.
 

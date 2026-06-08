@@ -90,6 +90,9 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
     reactHooks.configs.flat["recommended-latest"],
     {
       files: ["**/*.{ts,tsx,js,mjs,cjs}"],
+      linterOptions: {
+        reportUnusedDisableDirectives: "error",
+      },
       languageOptions: {
         parserOptions: {
           projectService: {
@@ -165,6 +168,10 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "@typescript-eslint/no-unsafe-assignment": "error",
         "@typescript-eslint/no-unsafe-member-access": "error",
         "@typescript-eslint/no-unsafe-return": "error",
+        "@typescript-eslint/no-misused-promises": [
+          "error",
+          { checksVoidReturn: { arguments: false, attributes: false } },
+        ],
         "@typescript-eslint/consistent-type-imports": [
           "error",
           { prefer: "type-imports", fixStyle: "separate-type-imports" },
@@ -195,6 +202,20 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "react/no-children-prop": "error",
         "react/jsx-no-undef": "error",
         "react/jsx-no-comment-textnodes": "error",
+        "react/jsx-filename-extension": [
+          "error",
+          { extensions: [".tsx", ".jsx"] },
+        ],
+        "react/function-component-definition": [
+          "error",
+          {
+            namedComponents: ["arrow-function", "function-declaration"],
+            unnamedComponents: ["arrow-function", "function-expression"],
+          },
+        ],
+        "react/jsx-pascal-case": "error",
+        "react/no-array-index-key": "error",
+        "react/no-unescaped-entities": "error",
         "react/jsx-sort-props": [
           "error",
           {
@@ -343,6 +364,16 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
           : {}),
 
         "no-await-in-loop": "error",
+      },
+    },
+    {
+      // TypeScript-only: JS policy scripts often infer option defaults too narrowly.
+      files: ["**/*.{ts,tsx}"],
+      rules: {
+        "@typescript-eslint/no-unnecessary-condition": [
+          "error",
+          { allowConstantLoopConditions: true },
+        ],
       },
     },
     {

@@ -18,7 +18,7 @@ export function requireTenant(context: RequestContext): string {
 }
 
 export function authorize(principal: Principal, action: "project:update"): void {
-  if (action === "project:update" && !canManageProject(principal)) {
+  if (!canManageProject(principal)) {
     throw new Error("Forbidden", { cause: { principalId: principal.id, action } });
   }
 }

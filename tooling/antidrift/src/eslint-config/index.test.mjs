@@ -31,8 +31,15 @@ describe("createConfig", () => {
     expect(severity(rules["vitest/no-conditional-expect"])).toBe("error");
     expect(severity(rules["vitest/expect-expect"])).toBe("error");
 
+    expect(severity(rules["@typescript-eslint/no-misused-promises"])).toBe("error");
+    expect(severity(rules["@typescript-eslint/no-unnecessary-condition"])).toBe("error");
     expect(severity(rules["@typescript-eslint/consistent-type-imports"])).toBe("error");
     expect(severity(rules["@typescript-eslint/sort-type-constituents"])).toBe("error");
+    expect(severity(rules["react/function-component-definition"])).toBe("error");
+    expect(severity(rules["react/jsx-filename-extension"])).toBe("error");
+    expect(severity(rules["react/jsx-pascal-case"])).toBe("error");
+    expect(severity(rules["react/no-array-index-key"])).toBe("error");
+    expect(severity(rules["react/no-unescaped-entities"])).toBe("error");
     expect(severity(rules["react/jsx-sort-props"])).toBe("error");
     expect(severity(rules["no-multiple-empty-lines"])).toBe("error");
     expect(severity(rules["sort-imports"])).toBe("error");
