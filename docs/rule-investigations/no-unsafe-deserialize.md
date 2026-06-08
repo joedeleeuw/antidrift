@@ -72,8 +72,8 @@ Drift:
 
 - `/Users/sushi/code/sudocode-main/server/src/routes/workflows.ts` line 199 parses `row.source` where the checker type is `any`.
 - The same file also reports broad row parses at lines 201, 208, 793, 1010, 1012, 1019, and 1598.
-- `/Users/sushi/code/cloudflare-agents/examples/assistant/src/server.ts` line 939 parses `r.config_json` where the checker type is `any`; the same file reports another broad config parse at line 1145.
-- `/Users/sushi/code/cloudflare-agents/experimental/gadgets-chat/src/client.tsx` line 177 parses `msg.event` where `msg` came from a broad JSON parse; the same file reports the repeated shape at line 273.
+- Cloudflare Agents previously supplied drift in `examples/assistant/src/server.ts` and `experimental/gadgets-chat/src/client.tsx`, but the current checkout no longer evaluates those as blocking evidence: the assistant file changed substantially, and the Cloudflare tsconfigs extend `agents/tsconfig` without an install-resolvable package path in this external clone.
+- Nested parsed-subfield drift such as `JSON.parse(msg.event)` after `msg` came from an unvalidated broad parse remains desired scope. It needs a fresh evaluated real-program gate before stable promotion.
 - Additional Cloudflare Agents inventory found broad-message parses such as `openai-sdk/streaming-chat/src/client.tsx` line 49 (`item.arguments: any`). This is inventory evidence, not yet a separate gate case.
 
 Clean:
@@ -83,8 +83,8 @@ Clean:
 - `/Users/sushi/code/sudocode-main/server/src/workflow/base-workflow-engine.ts` parses typed string row fields.
 - `/Users/sushi/code/sudocode-main/server/src/routes/config.ts` parses file content strings.
 - `/Users/sushi/code/codebase-atlas/src/programs/persistenceCuration.ts` parses file contents into `unknown` and then validates with `parsePersistedProject`.
-- `/Users/sushi/code/cloudflare-agents/packages/voice/src/text-stream.ts` parses a decoded `json: string` line and returns `Record<string, unknown>`.
-- `/Users/sushi/code/cloudflare-agents/voice-providers/twilio/src/index.ts` guards `event.data` with `typeof event.data === "string"` and an early-return `typeof event.data !== "string"` guard before parsing WebSocket messages.
+- `/Users/sushi/code/cloudflare-agents/packages/voice/src/text-stream.ts` parses a decoded `json: string` line and returns `Record<string, unknown>`; this remains a useful clean-control shape, but the current external checkout is config-blocked for type-aware linting.
+- `/Users/sushi/code/cloudflare-agents/voice-providers/twilio/src/index.ts` guards `event.data` with `typeof event.data === "string"` and an early-return `typeof event.data !== "string"` guard before parsing WebSocket messages; this also remains useful but config-blocked in the current external checkout.
 
 Split TypeChecker inventory on June 4, 2026:
 
@@ -94,7 +94,7 @@ Split TypeChecker inventory on June 4, 2026:
 - Chaski crow-v2: 4 JSON.parse files, 0 findings.
 - Codebase Atlas `src`: 6 JSON.parse files, 0 findings.
 - Sudocode server: 57 JSON.parse files, 8 findings, all in `server/src/routes/workflows.ts`.
-- Cloudflare Agents focused corpus: drift in `examples/assistant/src/server.ts` and `experimental/gadgets-chat/src/client.tsx`, clean controls in `packages/voice/src/text-stream.ts` and `voice-providers/twilio/src/index.ts`.
+- Cloudflare Agents focused corpus: now recorded as known-gap rather than blocking evidence because the external checkout cannot currently resolve `agents/tsconfig` for type-aware linting.
 - Cloudflare Agents wider scan: at least 15 files reported before the scan stopped after enough dirty and clean candidates were collected.
 
 ## Guarded Any Boundary
@@ -103,9 +103,9 @@ Cloudflare WebSocket handlers proved the TypeChecker-only version was too blunt:
 
 ## Promotion State
 
-Status: `ready`, `stable: true`.
+Status: `ready`, `stable: false`.
 
-The rule is type-aware and now has two independent broad-input drift sources plus multiple clean controls. The guarded-`any` concern is resolved.
+The rule is type-aware and has strong Sudocode drift plus multiple clean controls. The guarded-`any` concern is resolved, but stable promotion is paused until a second evaluated drift repository is restored and nested parsed-subfield drift has a real-program gate.
 
 Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-review-no-unsafe-deserialize-20260604-145356.md`). It agreed the ecosystem overlap is partial, the strongest signal is TypeChecker plus a narrow local string-boundary exemption, and the real-corpus evidence is strong enough for promotion review. It recommended keeping `stable: false` until the remaining production concern was closed: if parser services are unavailable, type-aware rules could fail open. That concern is now closed by a shared rule-level guard: fully type-aware rules report a configuration error when enabled without TypeScript parser services.
 
@@ -115,4 +115,4 @@ Accepted stable limitations:
 - Aliased or computed parse calls such as `const { parse } = JSON` and `JSON["parse"](value)` are not matched.
 - A local binding named `JSON` could be mistaken for the global JSON object.
 
-Next slice: decide the test assertion scope for `antidrift/no-redundant-zod-parse`.
+Next slice: re-establish a second evaluated drift repository and add an evaluated nested parsed-subfield gate.

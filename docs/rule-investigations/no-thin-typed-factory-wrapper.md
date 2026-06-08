@@ -6,11 +6,11 @@ Working names:
 - `antidrift/no-unearned-return-contract`
 - `antidrift/no-redundant-typed-delegation`
 
-Status: `research`, leaning drop. Do not implement or enable until real-corpus evidence shows this can stay narrow.
+Status: `retired` / dropped. Do not implement or enable without new real non-test exact-forward drift evidence from independent repositories.
 
 Correction from the first investigation pass: Codebase Atlas does contain production candidates for the broader pattern. They are not exact-forward wrappers; they are typed local-constructor wrappers that pass derived string/template arguments to another local factory. That means the exact-forward-only rule would miss the user's motivating shape.
 
-Correction after the June 8, 2026 prospect review: those broader Codebase Atlas candidates are accepted clean abstractions. The broad typed-constructor branch should be dropped. Only the exact-forward symbol-identity slice remains as research, and it currently has no real corpus anchor.
+Correction after the June 8, 2026 prospect review: those broader Codebase Atlas candidates are accepted clean abstractions. The broad typed-constructor branch is dropped. The exact-forward symbol-identity slice also has no real non-test corpus anchor, so this candidate is retired rather than kept as active research.
 
 ## Problem Statement
 
@@ -30,11 +30,11 @@ This is concerning only when `makeRoute` already returns `WebviewRoute` or a Typ
 
 This is not the same as banning functions whose body is one returned call. Real projects use that shape for facades, package boundaries, class adapters, branded constructors, schema validators, method binding, and semantic names.
 
-## Proposed Narrow Signal
+## Retired Narrow Signal
 
-The safest signal is TypeChecker-backed exact-forward delegation. Codebase Atlas showed a broader possible branch, but the grounded review classified those anchors clean, so the broader branch is not part of the candidate rule.
+The safest hypothetical signal was TypeChecker-backed exact-forward delegation. Codebase Atlas showed a broader possible branch, but the grounded review classified those anchors clean, so the broader branch is not part of the retired candidate. The exact-forward slice found no real non-test drift and is no longer an active implementation candidate.
 
-A narrow exact-forward report would require all of these:
+A narrow exact-forward report would have required all of these:
 
 1. The function is internal, not exported and not a public member of an exported class.
 2. The function has an explicit return type annotation.
@@ -54,7 +54,7 @@ The dropped broad branch was typed local-constructor delegation:
 
 Do not implement the broad branch. Its only current anchors are useful domain constructors that derive token IDs, classifications, and rationale strings before delegating to a local factory.
 
-If a future exact-forward wrapper is still useful for semantic naming, the likely fix is to keep the wrapper and remove the explicit return annotation. If the wrapper has no semantic value, inline the delegated call.
+If future work finds new real exact-forward drift, first reopen the investigation with fresh corpus evidence. A likely fix would be to keep a semantically useful wrapper and remove the explicit return annotation, or inline the delegated call when the wrapper has no semantic value.
 
 ## Ecosystem Check
 
@@ -84,29 +84,29 @@ Sources checked:
 
 These are real-program shapes to validate before implementation. Reduced programs are allowed only after the real anchors exist.
 
-| Case | Example shape | Expected | Why |
-| --- | --- | --- | --- |
-| Internal exact-forward factory | `function buildRoute(a, b): WebviewRoute { return makeRoute(a, b); }`, and `makeRoute` returns `WebviewRoute` | Flag | The wrapper repeats a contract already supplied by the callee and earns no new type authority. |
-| Internal exact-forward to structurally equivalent object | `function buildRoute(a): WebviewRoute { return makeRouteObject(a); }`, and the call type is mutually assignable with `WebviewRoute` | Research flag | This is the interesting laundering case, but it may overlap intentional facade/projection patterns. Needs real evidence. |
-| Internal templated constructor wrapper | `function renderSprite(id: string): VisualTokenRegistryEntry { return entry(\`render.sprite.${id}\`, ["render.sprite"], [\`sprite.${id}\`], "..."); }` | Allow | Codebase Atlas has this shape, and the grounded review classified it as a useful domain constructor rather than drift. |
-| Internal typed classification wrapper | `function classificationForFile(file): ClassificationInput { return classification(...derived values...); }` | Allow | Codebase Atlas has this shape, and the wrapper names a domain fact while deriving multiple arguments. |
-| Property extraction into conversion helper | `function terrainNodeIdForGameNode(node): TerrainNodeId { return terrainNodeIdForGameNodeId(node.id); }` | Research/likely allow | The callee validates/converts the ID. This may be a useful adapter rather than unearned contract. |
-| Same wrapper without return annotation | `function buildRoute(a, b) { return makeRoute(a, b); }` | Allow | Inference is doing the work; no explicit contract is being laundered. |
-| Exported package facade | `export function reload(id): Promise<Project> { return readProject(id); }` | Allow | Exported functions are boundaries. A package API may intentionally name or stabilize the callee. |
-| Public method on exported class | `export class Store { read(id): Promise<Project> { return this.inner.read(id); } }` | Allow | Public members are API surface. Thin delegation can be a facade contract. |
-| Private member exact-forward | `private read(id): Promise<Project> { return readProject(id); }` | Research flag | Internal, but private class facades are common. Needs corpus evidence before enabling. |
-| Member-expression callee | `function valid(repo): Promise<boolean> { return this.git.isValidRepo(repo); }` | Probably allow initially | Service facades and method binding produce many false positives. Identifier-only callees may be the safer first scope. |
-| Defaulting or constants | `return makeRoute(path, title, visible ?? true)` | Allow for exact-forward; research for typed-constructor wrappers | The wrapper changes input semantics. Codebase Atlas shows deterministic constructor arguments may still be worth investigating, but not under the exact-forward rule. |
-| Object construction | `return makeRoute({ path, title, visible })` | Allow | Construction changes the call contract even if shallow. |
-| Validation boundary | `return WebviewRouteSchema.parse(raw)` | Allow | Parser/validator earns the contract. |
-| Brand construction | `return WebviewRouteId.make(raw)` or `Schema.parse(\`route-${id}\`)` | Allow | Branding is exactly how a contract is earned. |
-| Transformation after call | `return makeRoute(a).withTitle(title)` | Allow | The wrapper transforms the result. |
-| Error context | `try { return makeRoute(a); } catch (error) { throw new RouteError(error); }` | Allow | Error translation is behavior. |
-| Metrics/cache/logging | `return cache.getOrSet(key, () => makeRoute(a))` | Allow | The wrapper adds behavior and usually does not forward params exactly. |
-| Overload implementation | overload signatures plus body returning a call | Allow initially | Overloads are declaration contracts; reporting them would likely be noisy. |
-| Generic preservation | `function wrap<T>(input: T): Result<T> { return result(input); }` | Research | Generic relationships can be real type modeling, not type laundering. |
-| Async promise wrapper | `async function load(id): Promise<Project> { return readProject(id); }` | Research | `return await` and async context interact with stack traces/error behavior. Do not report until modeled. |
-| Generated client wrapper | `function getUser(id): Promise<User> { return client.getUser(id); }` | Allow by path/config | Generated/client facades are stable boundary code, not drift evidence. |
+| Case                                                     | Example shape                                                                                                                                          | Expected                                                         | Why                                                                                                                                                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Internal exact-forward factory                           | `function buildRoute(a, b): WebviewRoute { return makeRoute(a, b); }`, and `makeRoute` returns `WebviewRoute`                                          | Flag                                                             | The wrapper repeats a contract already supplied by the callee and earns no new type authority.                                                                        |
+| Internal exact-forward to structurally equivalent object | `function buildRoute(a): WebviewRoute { return makeRouteObject(a); }`, and the call type is mutually assignable with `WebviewRoute`                    | Research flag                                                    | This is the interesting laundering case, but it may overlap intentional facade/projection patterns. Needs real evidence.                                              |
+| Internal templated constructor wrapper                   | `function renderSprite(id: string): VisualTokenRegistryEntry { return entry(\`render.sprite.${id}\`, ["render.sprite"], [\`sprite.${id}\`], "..."); }` | Allow                                                            | Codebase Atlas has this shape, and the grounded review classified it as a useful domain constructor rather than drift.                                                |
+| Internal typed classification wrapper                    | `function classificationForFile(file): ClassificationInput { return classification(...derived values...); }`                                           | Allow                                                            | Codebase Atlas has this shape, and the wrapper names a domain fact while deriving multiple arguments.                                                                 |
+| Property extraction into conversion helper               | `function terrainNodeIdForGameNode(node): TerrainNodeId { return terrainNodeIdForGameNodeId(node.id); }`                                               | Research/likely allow                                            | The callee validates/converts the ID. This may be a useful adapter rather than unearned contract.                                                                     |
+| Same wrapper without return annotation                   | `function buildRoute(a, b) { return makeRoute(a, b); }`                                                                                                | Allow                                                            | Inference is doing the work; no explicit contract is being laundered.                                                                                                 |
+| Exported package facade                                  | `export function reload(id): Promise<Project> { return readProject(id); }`                                                                             | Allow                                                            | Exported functions are boundaries. A package API may intentionally name or stabilize the callee.                                                                      |
+| Public method on exported class                          | `export class Store { read(id): Promise<Project> { return this.inner.read(id); } }`                                                                    | Allow                                                            | Public members are API surface. Thin delegation can be a facade contract.                                                                                             |
+| Private member exact-forward                             | `private read(id): Promise<Project> { return readProject(id); }`                                                                                       | Research flag                                                    | Internal, but private class facades are common. Needs corpus evidence before enabling.                                                                                |
+| Member-expression callee                                 | `function valid(repo): Promise<boolean> { return this.git.isValidRepo(repo); }`                                                                        | Probably allow initially                                         | Service facades and method binding produce many false positives. Identifier-only callees may be the safer first scope.                                                |
+| Defaulting or constants                                  | `return makeRoute(path, title, visible ?? true)`                                                                                                       | Allow for exact-forward; research for typed-constructor wrappers | The wrapper changes input semantics. Codebase Atlas shows deterministic constructor arguments may still be worth investigating, but not under the exact-forward rule. |
+| Object construction                                      | `return makeRoute({ path, title, visible })`                                                                                                           | Allow                                                            | Construction changes the call contract even if shallow.                                                                                                               |
+| Validation boundary                                      | `return WebviewRouteSchema.parse(raw)`                                                                                                                 | Allow                                                            | Parser/validator earns the contract.                                                                                                                                  |
+| Brand construction                                       | `return WebviewRouteId.make(raw)` or `Schema.parse(\`route-${id}\`)`                                                                                   | Allow                                                            | Branding is exactly how a contract is earned.                                                                                                                         |
+| Transformation after call                                | `return makeRoute(a).withTitle(title)`                                                                                                                 | Allow                                                            | The wrapper transforms the result.                                                                                                                                    |
+| Error context                                            | `try { return makeRoute(a); } catch (error) { throw new RouteError(error); }`                                                                          | Allow                                                            | Error translation is behavior.                                                                                                                                        |
+| Metrics/cache/logging                                    | `return cache.getOrSet(key, () => makeRoute(a))`                                                                                                       | Allow                                                            | The wrapper adds behavior and usually does not forward params exactly.                                                                                                |
+| Overload implementation                                  | overload signatures plus body returning a call                                                                                                         | Allow initially                                                  | Overloads are declaration contracts; reporting them would likely be noisy.                                                                                            |
+| Generic preservation                                     | `function wrap<T>(input: T): Result<T> { return result(input); }`                                                                                      | Research                                                         | Generic relationships can be real type modeling, not type laundering.                                                                                                 |
+| Async promise wrapper                                    | `async function load(id): Promise<Project> { return readProject(id); }`                                                                                | Research                                                         | `return await` and async context interact with stack traces/error behavior. Do not report until modeled.                                                              |
+| Generated client wrapper                                 | `function getUser(id): Promise<User> { return client.getUser(id); }`                                                                                   | Allow by path/config                                             | Generated/client facades are stable boundary code, not drift evidence.                                                                                                |
 
 ## Real-Corpus Scan Notes
 
@@ -170,14 +170,14 @@ Likely escape shapes:
 
 ## Promotion Gate
 
-Keep this candidate in `research` until all of these are true:
+This retired candidate must not be reopened for implementation unless all of these are true:
 
 1. An exact-forward real drift anchor is found in a production file.
 2. At least two independent repositories contain accepted real non-test drift anchors that were not added to satisfy the rule.
 3. A broad inventory over Chaski, Codebase Atlas, Murderbox, Sudocode, and at least two public corpus candidates shows zero known false positives under the chosen signal.
 4. Clean controls for validators, brand constructors, facades, member-call adapters, async wrappers, contextual-error helpers, and exported boundaries are explicitly recorded.
 5. Claude Opus 4.8 advisory review reads the current repo and this doc, then writes a non-empty report under `reports/`.
-6. The first implementation, if approved, starts default-off or non-blocking until a real remediation proves the rule's action is useful.
+6. The first implementation, if approved after reopening, starts default-off or non-blocking until a real remediation proves the rule's action is useful.
 
 ## Advisory Review
 
@@ -201,7 +201,7 @@ Do not implement the broad "single returned call" version.
 
 Also do not implement the broader typed-constructor-wrapper version. Its only grounded anchors are clean domain constructors and classification helpers.
 
-The only surviving candidate is a TypeChecker symbol-identity exact-forward rule: internal wrapper, explicit named return contract, exactly one returned identifier call, and every argument is the corresponding parameter in order. That slice remains in `research` only as a placeholder. Drop it unless real exact-forward drift appears in two independent repositories and the remediation is more than cosmetic.
+No implementation slice remains active. The only narrow version that survived the broad false-positive review was TypeChecker symbol-identity exact-forward delegation: internal wrapper, explicit named return contract, exactly one returned identifier call, and every argument is the corresponding parameter in order. The read-only audit found no real non-test exact-forward internal drift, while exported facades are excluded boundaries. This candidate is retired/dropped unless real exact-forward drift appears in two independent repositories and the remediation is more than cosmetic.
 
 Before implementing, verify the accepted drift is not already covered by:
 

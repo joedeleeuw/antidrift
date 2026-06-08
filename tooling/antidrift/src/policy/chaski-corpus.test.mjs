@@ -50,7 +50,12 @@ describe("chaskiCorpus", () => {
           classification: "ready",
           subproject: "bff",
           paths: ["src/frontend/bff/api/gateways/posthog-gateway.ts"],
-          expectedFindings: [{ path: "src/frontend/bff/api/gateways/posthog-gateway.ts", line: 3 }],
+          expectedFindings: [
+            {
+              path: "src/frontend/bff/api/gateways/posthog-gateway.ts",
+              line: 3,
+            },
+          ],
         },
         {
           id: "clean",
@@ -65,8 +70,12 @@ describe("chaskiCorpus", () => {
     });
 
     expect(result.decision).toBe("pass");
-    expect(result.cases.find((testCase) => testCase.id === "drift")?.findings).toHaveLength(1);
-    expect(result.cases.find((testCase) => testCase.id === "clean")?.findings).toHaveLength(0);
+    expect(
+      result.cases.find((testCase) => testCase.id === "drift")?.findings,
+    ).toHaveLength(1);
+    expect(
+      result.cases.find((testCase) => testCase.id === "clean")?.findings,
+    ).toHaveLength(0);
   });
 
   it("skips when a rule filter selects no corpus cases", async () => {
@@ -142,7 +151,9 @@ export const normalized = Object.fromEntries(
           subproject: "bff",
           typeAware: true,
           paths: ["src/frontend/bff/api/shape.ts"],
-          expectedFindings: [{ path: "src/frontend/bff/api/shape.ts", line: 4 }],
+          expectedFindings: [
+            { path: "src/frontend/bff/api/shape.ts", line: 4 },
+          ],
         },
       ],
       report: () => {},
@@ -150,6 +161,59 @@ export const normalized = Object.fromEntries(
 
     expect(result.decision).toBe("pass");
     expect(result.cases[0]?.findings).toHaveLength(1);
+  });
+
+  it("records known gaps without blocking corpus validation", async () => {
+    const root = tempRepo();
+    writeProgram(
+      root,
+      "src/example.ts",
+      "type Order = { id: string };\ndeclare const raw: unknown;\nconst order = raw as unknown as Order;\nvoid order;\n",
+    );
+
+    const result = await chaskiCorpus({
+      repo: root,
+      cases: [
+        {
+          id: "known-gap",
+          ruleId: "antidrift/no-unsafe-cast-chain",
+          kind: "known-gap",
+          classification: "ready",
+          subproject: "app",
+          paths: ["src/example.ts"],
+          reason: "Documented but not currently blocking.",
+        },
+      ],
+      report: () => {},
+    });
+
+    expect(result.decision).toBe("pass");
+    expect(result.cases[0]?.decision).toBe("known-gap");
+    expect(result.cases[0]?.findings).toHaveLength(1);
+  });
+
+  it("fails when ESLint cannot parse a corpus source file", async () => {
+    const root = tempRepo();
+    writeProgram(root, "src/broken.ts", "const = ;\n");
+
+    const result = await chaskiCorpus({
+      repo: root,
+      cases: [
+        {
+          id: "broken",
+          ruleId: "antidrift/no-unsafe-cast-chain",
+          kind: "correct",
+          classification: "ready",
+          subproject: "app",
+          paths: ["src/broken.ts"],
+        },
+      ],
+      report: () => {},
+    });
+
+    expect(result.decision).toBe("fail");
+    expect(result.cases[0]?.findings[0]?.ruleId).toBeNull();
+    expect(result.cases[0]?.reason).toContain("ESLint could not evaluate");
   });
 });
 

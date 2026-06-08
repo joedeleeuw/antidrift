@@ -7,7 +7,10 @@ import tsParser from "@typescript-eslint/parser";
 import importX from "eslint-plugin-import-x";
 import plugin from "../eslint-plugin/index.js";
 
-const defaultRepoCandidates = [process.env.CHASKI_REPO, "/Users/sushi/code/chaski"].filter(Boolean);
+const defaultRepoCandidates = [
+  process.env.CHASKI_REPO,
+  "/Users/sushi/code/chaski",
+].filter(Boolean);
 const defaultTypeAwareProjects = {
   bff: "src/frontend/bff/tsconfig.json",
 };
@@ -128,7 +131,9 @@ export const defaultCases = [
     kind: "drift",
     classification: "ready",
     subproject: "frontend",
-    paths: ["src/frontend/monolithui/src/components/QrActionsAdmin/QrActionCard.tsx"],
+    paths: [
+      "src/frontend/monolithui/src/components/QrActionsAdmin/QrActionCard.tsx",
+    ],
     expectedFindings: [
       {
         path: "src/frontend/monolithui/src/components/QrActionsAdmin/QrActionCard.tsx",
@@ -172,7 +177,9 @@ export const defaultCases = [
     kind: "drift",
     classification: "ready",
     subproject: "bff",
-    paths: ["src/frontend/bff/api/features/scenario-planner/core/navigation.ts"],
+    paths: [
+      "src/frontend/bff/api/features/scenario-planner/core/navigation.ts",
+    ],
     ruleOptions: { "import-x/no-cycle": [{ ignoreExternal: true }] },
     expectedFindings: [
       {
@@ -282,7 +289,9 @@ export const defaultCases = [
     subproject: "frontend",
     typeAware: true,
     tsconfig: "src/frontend/portal/tsconfig.json",
-    paths: ["src/frontend/portal/modules/Orchestration/plans/types/orchestration.ts"],
+    paths: [
+      "src/frontend/portal/modules/Orchestration/plans/types/orchestration.ts",
+    ],
   },
   {
     id: "portal-route-assignments-local-range-tuple-clean",
@@ -292,7 +301,9 @@ export const defaultCases = [
     subproject: "frontend",
     typeAware: true,
     tsconfig: "src/frontend/portal/tsconfig.json",
-    paths: ["src/frontend/portal/modules/service-stop/route-assignments/types.ts"],
+    paths: [
+      "src/frontend/portal/modules/service-stop/route-assignments/types.ts",
+    ],
   },
   {
     id: "portal-route-assignments-nullable-custom-range-tuple",
@@ -302,7 +313,9 @@ export const defaultCases = [
     subproject: "frontend",
     typeAware: true,
     tsconfig: "src/frontend/portal/tsconfig.json",
-    paths: ["src/frontend/portal/modules/service-stop/route-assignments/types.ts"],
+    paths: [
+      "src/frontend/portal/modules/service-stop/route-assignments/types.ts",
+    ],
     expectedFindings: [
       {
         path: "src/frontend/portal/modules/service-stop/route-assignments/types.ts",
@@ -326,7 +339,9 @@ export const defaultCases = [
     subproject: "frontend",
     typeAware: true,
     tsconfig: "src/frontend/portal/tsconfig.json",
-    paths: ["src/frontend/portal/modules/visualize-impact/tabs/total-savings/hooks/useSnycedMapsViewState.ts"],
+    paths: [
+      "src/frontend/portal/modules/visualize-impact/tabs/total-savings/hooks/useSnycedMapsViewState.ts",
+    ],
   },
   {
     id: "portal-action-items-report-model-forks",
@@ -458,7 +473,9 @@ export const defaultCases = [
     subproject: "frontend",
     typeAware: true,
     tsconfig: "src/frontend/portal/tsconfig.json",
-    paths: ["src/frontend/portal/modules/service-stop/route-assignments/schemas.ts"],
+    paths: [
+      "src/frontend/portal/modules/service-stop/route-assignments/schemas.ts",
+    ],
   },
   {
     id: "bff-rep-progress-status-inline-union",
@@ -473,7 +490,14 @@ export const defaultCases = [
           statuses: {
             RepProgressStatus: {
               owner: "src/frontend/bff/api/routers/orders-ops-validation.ts",
-              values: ["not_started", "in_progress", "at_stop", "traveling", "completed", "behind"],
+              values: [
+                "not_started",
+                "in_progress",
+                "at_stop",
+                "traveling",
+                "completed",
+                "behind",
+              ],
             },
           },
         },
@@ -499,7 +523,14 @@ export const defaultCases = [
           statuses: {
             RepProgressStatus: {
               owner: "src/frontend/bff/api/routers/orders-ops-validation.ts",
-              values: ["not_started", "in_progress", "at_stop", "traveling", "completed", "behind"],
+              values: [
+                "not_started",
+                "in_progress",
+                "at_stop",
+                "traveling",
+                "completed",
+                "behind",
+              ],
             },
           },
         },
@@ -518,7 +549,8 @@ export const defaultCases = [
         {
           statuses: {
             PlanStatus: {
-              owner: "src/frontend/portal/modules/Orchestration/plans/types/orchestration.ts",
+              owner:
+                "src/frontend/portal/modules/Orchestration/plans/types/orchestration.ts",
               values: [
                 "active",
                 "pending",
@@ -639,7 +671,12 @@ export const defaultCases = [
     ruleOptions: {
       "no-restricted-imports": [
         {
-          patterns: [{ group: ["posthog-js", "posthog-js/**"], message: "Import through the approved gateway wrapper." }],
+          patterns: [
+            {
+              group: ["posthog-js", "posthog-js/**"],
+              message: "Import through the approved gateway wrapper.",
+            },
+          ],
         },
       ],
     },
@@ -660,7 +697,12 @@ export const defaultCases = [
     ruleOptions: {
       "no-restricted-imports": [
         {
-          patterns: [{ group: ["posthog-js", "posthog-js/**"], message: "Import through the approved gateway wrapper." }],
+          patterns: [
+            {
+              group: ["posthog-js", "posthog-js/**"],
+              message: "Import through the approved gateway wrapper.",
+            },
+          ],
         },
       ],
     },
@@ -699,7 +741,9 @@ export const defaultCases = [
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
-    paths: ["src/frontend/monolithui/src/components/Orders/ChangeDeliveryDateDialog.tsx"],
+    paths: [
+      "src/frontend/monolithui/src/components/Orders/ChangeDeliveryDateDialog.tsx",
+    ],
   },
   {
     id: "monolith-crowops-bare-hook-disable",
@@ -759,7 +803,9 @@ export const defaultCases = [
     kind: "drift",
     classification: "ready",
     subproject: "frontend",
-    paths: ["src/frontend/portal/modules/visualize-impact/tabs/total-savings/total-savings.tsx"],
+    paths: [
+      "src/frontend/portal/modules/visualize-impact/tabs/total-savings/total-savings.tsx",
+    ],
     expectedFindings: [
       {
         path: "src/frontend/portal/modules/visualize-impact/tabs/total-savings/total-savings.tsx",
@@ -803,7 +849,9 @@ export const defaultCases = [
     kind: "drift",
     classification: "ready",
     subproject: "frontend",
-    paths: ["src/frontend/portal/modules/InventoryInMarket/InventoryInMarket.tsx"],
+    paths: [
+      "src/frontend/portal/modules/InventoryInMarket/InventoryInMarket.tsx",
+    ],
     expectedFindings: [
       {
         path: "src/frontend/portal/modules/InventoryInMarket/InventoryInMarket.tsx",
@@ -825,7 +873,9 @@ export const defaultCases = [
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
-    paths: ["src/frontend/monolithui/src/components/SolverConfig/CategoryNav.tsx"],
+    paths: [
+      "src/frontend/monolithui/src/components/SolverConfig/CategoryNav.tsx",
+    ],
   },
   {
     id: "monolith-find-my-rep-hover-scale-no-translate-clean",
@@ -841,7 +891,9 @@ export const defaultCases = [
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
-    paths: ["src/frontend/portal/modules/visualize-impact/components/visualize-impact-tabs.tsx"],
+    paths: [
+      "src/frontend/portal/modules/visualize-impact/components/visualize-impact-tabs.tsx",
+    ],
   },
   {
     id: "portal-agent-table-nested-selector-wrapper",
@@ -849,7 +901,9 @@ export const defaultCases = [
     kind: "drift",
     classification: "ready",
     subproject: "frontend",
-    paths: ["src/frontend/portal/modules/scenarios/agent-configuration/components/table/use-agent-table-data.ts"],
+    paths: [
+      "src/frontend/portal/modules/scenarios/agent-configuration/components/table/use-agent-table-data.ts",
+    ],
     expectedFindings: [
       {
         path: "src/frontend/portal/modules/scenarios/agent-configuration/components/table/use-agent-table-data.ts",
@@ -863,7 +917,9 @@ export const defaultCases = [
     kind: "drift",
     classification: "ready",
     subproject: "frontend",
-    paths: ["src/frontend/portal/modules/scenarios/service-time-influence/components/table/service-time-influence-table.tsx"],
+    paths: [
+      "src/frontend/portal/modules/scenarios/service-time-influence/components/table/service-time-influence-table.tsx",
+    ],
     expectedFindings: [
       {
         path: "src/frontend/portal/modules/scenarios/service-time-influence/components/table/service-time-influence-table.tsx",
@@ -1000,7 +1056,9 @@ export const defaultCases = [
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
-    paths: ["src/frontend/portal/modules/scenarios/hooks/use-sticky-column-offsets.ts"],
+    paths: [
+      "src/frontend/portal/modules/scenarios/hooks/use-sticky-column-offsets.ts",
+    ],
   },
   {
     id: "monolith-sequence-ops-effect-deps-clean",
@@ -1013,7 +1071,10 @@ export const defaultCases = [
 ];
 
 function parseCsv(value) {
-  return value.split(",").map((item) => item.trim()).filter(Boolean);
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizeRuleId(rule) {
@@ -1023,7 +1084,13 @@ function normalizeRuleId(rule) {
 }
 
 function parseArgs(argv) {
-  const out = { repo: null, slice: "chaski-corpus", output: null, require: false, rules: null };
+  const out = {
+    repo: null,
+    slice: "chaski-corpus",
+    output: null,
+    require: false,
+    rules: null,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     const next = argv[i + 1];
@@ -1048,7 +1115,11 @@ function parseArgs(argv) {
 
 function findRepoRoot(repo, repoCandidates = defaultRepoCandidates) {
   const candidates = repo ? [repo] : repoCandidates;
-  return candidates.map((candidate) => resolve(candidate)).find((candidate) => existsSync(candidate)) ?? null;
+  return (
+    candidates
+      .map((candidate) => resolve(candidate))
+      .find((candidate) => existsSync(candidate)) ?? null
+  );
 }
 
 function relativeFile(repoRoot, filePath) {
@@ -1062,7 +1133,9 @@ function ruleValueFor(testCase) {
 
 function typeAwareProjectFor(testCase) {
   if (!testCase.typeAware) return null;
-  return testCase.tsconfig ?? defaultTypeAwareProjects[testCase.subproject] ?? null;
+  return (
+    testCase.tsconfig ?? defaultTypeAwareProjects[testCase.subproject] ?? null
+  );
 }
 
 function parserOptionsFor(repoRoot, testCase) {
@@ -1076,25 +1149,64 @@ function parserOptionsFor(repoRoot, testCase) {
 }
 
 function expectedFindingPresent(findings, expected) {
-  return findings.some((finding) => finding.path === expected.path && finding.line === expected.line);
+  return findings.some(
+    (finding) =>
+      finding.path === expected.path && finding.line === expected.line,
+  );
 }
 
-function evaluateCase(testCase, findings, missingFiles, corpusLabel = "corpus") {
+function evaluateCase(
+  testCase,
+  findings,
+  missingFiles,
+  corpusLabel = "corpus",
+) {
   if (missingFiles.length > 0) {
-    return { decision: "fail", reason: `Missing ${corpusLabel} files: ${missingFiles.join(", ")}` };
+    return {
+      decision: "fail",
+      reason: `Missing ${corpusLabel} files: ${missingFiles.join(", ")}`,
+    };
+  }
+
+  if (testCase.kind === "known-gap") {
+    return {
+      decision: "known-gap",
+      reason:
+        testCase.reason ??
+        "Known rule/corpus gap; recorded but not blocking this validation gate.",
+    };
+  }
+
+  const infrastructureFindings = findings.filter(
+    (finding) => finding.ruleId == null,
+  );
+  if (infrastructureFindings.length > 0) {
+    return {
+      decision: "fail",
+      reason: `ESLint could not evaluate ${corpusLabel} source: ${infrastructureFindings[0].message}`,
+    };
   }
 
   if (testCase.kind === "correct" && findings.length > 0) {
-    return { decision: "fail", reason: `Expected clean ${corpusLabel} source, but the rule reported findings.` };
+    return {
+      decision: "fail",
+      reason: `Expected clean ${corpusLabel} source, but the rule reported findings.`,
+    };
   }
 
   if (testCase.kind === "drift") {
     if (findings.length === 0) {
-      return { decision: "fail", reason: `Expected ${corpusLabel} drift finding, but the rule stayed silent.` };
+      return {
+        decision: "fail",
+        reason: `Expected ${corpusLabel} drift finding, but the rule stayed silent.`,
+      };
     }
     for (const expected of testCase.expectedFindings ?? []) {
       if (!expectedFindingPresent(findings, expected)) {
-        return { decision: "fail", reason: `Expected finding at ${expected.path}:${expected.line}.` };
+        return {
+          decision: "fail",
+          reason: `Expected finding at ${expected.path}:${expected.line}.`,
+        };
       }
     }
   }
@@ -1105,8 +1217,12 @@ function evaluateCase(testCase, findings, missingFiles, corpusLabel = "corpus") 
 async function lintCase(repoRoot, testCase, corpusLabel) {
   const absolutePaths = testCase.paths.map((path) => resolve(repoRoot, path));
   const typeAwareProject = typeAwareProjectFor(testCase);
-  const requiredPaths = typeAwareProject ? [...absolutePaths, resolve(repoRoot, typeAwareProject)] : absolutePaths;
-  const missingFiles = requiredPaths.filter((path) => !existsSync(path)).map((path) => relativeFile(repoRoot, path));
+  const requiredPaths = typeAwareProject
+    ? [...absolutePaths, resolve(repoRoot, typeAwareProject)]
+    : absolutePaths;
+  const missingFiles = requiredPaths
+    .filter((path) => !existsSync(path))
+    .map((path) => relativeFile(repoRoot, path));
   if (missingFiles.length > 0) {
     return {
       id: testCase.id,
@@ -1128,18 +1244,47 @@ async function lintCase(repoRoot, testCase, corpusLabel) {
     overrideConfig: [
       {
         files: ["**/*.{ts,tsx,js,jsx}"],
-        ignores: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/gen/**"],
+        ignores: [
+          "**/node_modules/**",
+          "**/dist/**",
+          "**/build/**",
+          "**/gen/**",
+        ],
         languageOptions: {
           parser: tsParser,
           ecmaVersion: 2023,
           sourceType: "module",
           parserOptions: parserOptionsFor(repoRoot, testCase),
         },
-        plugins: { antidrift: plugin, "@eslint-community/eslint-comments": eslintComments, "import-x": importX },
+        plugins: {
+          antidrift: plugin,
+          "@eslint-community/eslint-comments": eslintComments,
+          "import-x": importX,
+        },
         settings: {
-          "import-x/extensions": [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
+          "import-x/extensions": [
+            ".ts",
+            ".tsx",
+            ".mts",
+            ".cts",
+            ".js",
+            ".jsx",
+            ".mjs",
+            ".cjs",
+          ],
           "import-x/resolver": {
-            node: { extensions: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"] },
+            node: {
+              extensions: [
+                ".ts",
+                ".tsx",
+                ".mts",
+                ".cts",
+                ".js",
+                ".jsx",
+                ".mjs",
+                ".cjs",
+              ],
+            },
           },
         },
         rules: { [testCase.ruleId]: ruleValueFor(testCase) },
@@ -1151,16 +1296,24 @@ async function lintCase(repoRoot, testCase, corpusLabel) {
   const results = await eslint.lintFiles(absolutePaths);
   const findings = results.flatMap((result) =>
     result.messages
-      .filter((message) => message.ruleId === testCase.ruleId)
+      .filter(
+        (message) =>
+          message.ruleId === testCase.ruleId || message.ruleId == null,
+      )
       .map((message) => ({
         path: relativeFile(repoRoot, result.filePath),
         ruleId: message.ruleId,
         line: message.line,
         column: message.column,
         message: message.message,
-      }))
+      })),
   );
-  const evaluation = evaluateCase(testCase, findings, missingFiles, corpusLabel);
+  const evaluation = evaluateCase(
+    testCase,
+    findings,
+    missingFiles,
+    corpusLabel,
+  );
 
   return {
     id: testCase.id,
@@ -1201,7 +1354,9 @@ export async function runCorpusCases({
     return summary;
   }
 
-  const selectedCases = rules ? cases.filter((testCase) => rules.includes(testCase.ruleId)) : cases;
+  const selectedCases = rules
+    ? cases.filter((testCase) => rules.includes(testCase.ruleId))
+    : cases;
   if (selectedCases.length === 0) {
     const summary = {
       schemaVersion: 1,
@@ -1221,14 +1376,18 @@ export async function runCorpusCases({
     }
     return summary;
   }
-  const results = await Promise.all(selectedCases.map((testCase) => lintCase(repoRoot, testCase, corpusLabel)));
+  const results = await Promise.all(
+    selectedCases.map((testCase) => lintCase(repoRoot, testCase, corpusLabel)),
+  );
 
   const summary = {
     schemaVersion: 1,
     corpus,
     slice,
     repoRoot,
-    decision: results.some((result) => result.decision !== "pass") ? "fail" : "pass",
+    decision: results.some((result) => result.decision === "fail")
+      ? "fail"
+      : "pass",
     rules: [...new Set(selectedCases.map((testCase) => testCase.ruleId))],
     cases: results,
   };

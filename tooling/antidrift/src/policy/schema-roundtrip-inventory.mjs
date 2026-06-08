@@ -64,15 +64,22 @@ function selectedPlans(repo) {
 
 function readTsconfig(repoRoot, tsconfig) {
   const configPath = resolve(repoRoot, tsconfig);
-  const loaded = ts.readConfigFile(configPath, (fileName) => ts.sys.readFile(fileName));
+  const loaded = ts.readConfigFile(configPath, (fileName) =>
+    ts.sys.readFile(fileName),
+  );
   if (loaded.error) {
-    throw new Error(ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n"));
+    throw new Error(
+      ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n"),
+    );
   }
   return ts.parseJsonConfigFileContent(loaded.config, ts.sys, repoRoot);
 }
 
 function isTypeScriptSource(sourceFile) {
-  return !sourceFile.isDeclarationFile && /\.(?:tsx?|mts|cts)$/u.test(sourceFile.fileName);
+  return (
+    !sourceFile.isDeclarationFile &&
+    /\.(?:tsx?|mts|cts)$/u.test(sourceFile.fileName)
+  );
 }
 
 function normalizePath(path) {
@@ -84,7 +91,9 @@ function targetMatches(relativePath, target) {
   if (normalizedTarget === relativePath) return true;
   if (normalizedTarget.endsWith("/**/*.{ts,tsx}")) {
     const prefix = normalizedTarget.slice(0, -"**/*.{ts,tsx}".length);
-    return relativePath.startsWith(prefix) && /\.(?:ts|tsx)$/u.test(relativePath);
+    return (
+      relativePath.startsWith(prefix) && /\.(?:ts|tsx)$/u.test(relativePath)
+    );
   }
   if (normalizedTarget.endsWith("/**/*.ts")) {
     const prefix = normalizedTarget.slice(0, -"**/*.ts".length);
@@ -116,13 +125,17 @@ function containerInfo(node, sourceFile) {
   if (ts.isFunctionDeclaration(node)) {
     return {
       name: node.name?.text ?? "(anonymous)",
-      exportBoundary: hasModifier(node, ts.SyntaxKind.ExportKeyword) || hasModifier(node, ts.SyntaxKind.DefaultKeyword),
+      exportBoundary:
+        hasModifier(node, ts.SyntaxKind.ExportKeyword) ||
+        hasModifier(node, ts.SyntaxKind.DefaultKeyword),
     };
   }
   if (ts.isMethodDeclaration(node)) {
     const classNode = ts.isClassDeclaration(node.parent) ? node.parent : null;
     const className = classNode?.name?.text;
-    const classExported = Boolean(classNode && hasModifier(classNode, ts.SyntaxKind.ExportKeyword));
+    const classExported = Boolean(
+      classNode && hasModifier(classNode, ts.SyntaxKind.ExportKeyword),
+    );
     const privateMember =
       hasModifier(node, ts.SyntaxKind.PrivateKeyword) ||
       hasModifier(node, ts.SyntaxKind.ProtectedKeyword) ||
@@ -134,11 +147,16 @@ function containerInfo(node, sourceFile) {
     };
   }
   if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
-    if (ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)) {
+    if (
+      ts.isVariableDeclaration(node.parent) &&
+      ts.isIdentifier(node.parent.name)
+    ) {
       const statement = node.parent.parent?.parent;
       return {
         name: node.parent.name.text,
-        exportBoundary: ts.isVariableStatement(statement) && hasModifier(statement, ts.SyntaxKind.ExportKeyword),
+        exportBoundary:
+          ts.isVariableStatement(statement) &&
+          hasModifier(statement, ts.SyntaxKind.ExportKeyword),
       };
     }
   }
@@ -172,17 +190,31 @@ function parseCallInfo(call, sourceFile) {
 }
 
 function rootPath(expression, sourceFile) {
-  if (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) || ts.isTypeAssertionExpression(expression)) {
+  if (
+    ts.isParenthesizedExpression(expression) ||
+    ts.isAsExpression(expression) ||
+    ts.isTypeAssertionExpression(expression)
+  ) {
     return rootPath(expression.expression, sourceFile);
   }
-  if (ts.isIdentifier(expression)) return expression.text;
-  if (expression.kind === ts.SyntaxKind.ThisKeyword) return "this";
+  if (ts.isIdentifier(expression)) {
+    return expression.text;
+  }
+  if (expression.kind === ts.SyntaxKind.ThisKeyword) {
+    return "this";
+  }
   if (ts.isPropertyAccessExpression(expression)) {
     const root = rootPath(expression.expression, sourceFile);
-    return root ? `${root}.${expression.name.text}` : expression.getText(sourceFile);
+    return root
+      ? `${root}.${expression.name.text}`
+      : expression.getText(sourceFile);
   }
-  if (ts.isElementAccessExpression(expression)) return rootPath(expression.expression, sourceFile);
-  if (ts.isCallExpression(expression)) return rootPath(expression.expression, sourceFile);
+  if (ts.isElementAccessExpression(expression)) {
+    return rootPath(expression.expression, sourceFile);
+  }
+  if (ts.isCallExpression(expression)) {
+    return rootPath(expression.expression, sourceFile);
+  }
   return expression.getText(sourceFile);
 }
 
@@ -197,15 +229,23 @@ function isLiteralLike(expression) {
 }
 
 function propertyValue(property) {
-  if (ts.isPropertyAssignment(property)) return property.initializer;
-  if (ts.isShorthandPropertyAssignment(property)) return property.name;
+  if (ts.isPropertyAssignment(property)) {
+    return property.initializer;
+  }
+  if (ts.isShorthandPropertyAssignment(property)) {
+    return property.name;
+  }
   return null;
 }
 
 function valueDerivesFromOwnedSource(value, ownedRoots, sourceFile) {
-  if (isLiteralLike(value)) return true;
+  if (isLiteralLike(value)) {
+    return true;
+  }
   const root = rootPath(value, sourceFile);
-  return [...ownedRoots].some((ownedRoot) => root === ownedRoot || root.startsWith(`${ownedRoot}.`));
+  return [...ownedRoots].some(
+    (ownedRoot) => root === ownedRoot || root.startsWith(`${ownedRoot}.`),
+  );
 }
 
 function sameOutputSpreads(checker, call, objectExpression) {
@@ -232,17 +272,105 @@ function sameOutputSpreads(checker, call, objectExpression) {
 function classifyObjectExpression(objectExpression, ownedRoots, sourceFile) {
   const crossSourceProperties = [];
   for (const property of objectExpression.properties) {
-    if (ts.isSpreadAssignment(property)) continue;
-    if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) continue;
+    if (ts.isSpreadAssignment(property)) {
+      continue;
+    }
+    if (
+      !ts.isPropertyAssignment(property) &&
+      !ts.isShorthandPropertyAssignment(property)
+    ) {
+      continue;
+    }
     const value = propertyValue(property);
-    if (!value) continue;
+    if (!value) {
+      continue;
+    }
     if (!valueDerivesFromOwnedSource(value, ownedRoots, sourceFile)) {
-      crossSourceProperties.push(property.name?.getText(sourceFile) ?? property.getText(sourceFile));
+      crossSourceProperties.push(
+        property.name?.getText(sourceFile) ?? property.getText(sourceFile),
+      );
     }
   }
   return {
-    classification: crossSourceProperties.length > 0 ? "cross-source" : "owned-only",
+    classification:
+      crossSourceProperties.length > 0 ? "cross-source" : "owned-only",
     crossSourceProperties,
+  };
+}
+
+function candidateKind({ classification, exportBoundary, path }) {
+  if (classification === "cross-source") {
+    return "cross-source-invariant-checkpoint";
+  }
+  if (
+    path.includes("/test/") ||
+    path.endsWith(".test.ts") ||
+    path.endsWith(".test.tsx")
+  ) {
+    return "test-roundtrip";
+  }
+  if (exportBoundary) {
+    return "owner-transition-helper-candidate";
+  }
+  return "internal-owned-roundtrip";
+}
+
+function buildFinding({
+  repoRoot,
+  sourceFile,
+  checker,
+  node,
+  info,
+  container,
+}) {
+  const ownedSpreads = sameOutputSpreads(checker, node, info.objectExpression);
+  if (ownedSpreads.length === 0) {
+    return null;
+  }
+
+  const ownedRoots = new Set(ownedSpreads.map((spread) => spread.root));
+  const classification = classifyObjectExpression(
+    info.objectExpression,
+    ownedRoots,
+    sourceFile,
+  );
+  const position = sourceFile.getLineAndCharacterOfPosition(
+    node.getStart(sourceFile),
+  );
+  const path = normalizePath(relative(repoRoot, sourceFile.fileName));
+  const roundtripKind = candidateKind({
+    classification: classification.classification,
+    exportBoundary: container.exportBoundary,
+    path,
+  });
+  const reasons = ["object-spread-same-output"];
+  if (classification.crossSourceProperties.length > 0) {
+    reasons.push("override-from-cross-source");
+  }
+  if (container.exportBoundary) {
+    reasons.push("export-boundary");
+  }
+  if (roundtripKind === "owner-transition-helper-candidate") {
+    reasons.push("owner-transition-helper-candidate");
+  }
+
+  return {
+    path,
+    line: position.line + 1,
+    column: position.character + 1,
+    schemaName: info.schemaName,
+    schemaText: info.schemaText,
+    method: info.method,
+    enclosing: container.name,
+    classification: classification.classification,
+    candidateKind: roundtripKind,
+    exportBoundary: container.exportBoundary,
+    sameOutputSpreads: ownedSpreads.map((spread) => ({
+      root: spread.root,
+      type: spread.type,
+    })),
+    crossSourceProperties: classification.crossSourceProperties,
+    reasons,
   };
 }
 
@@ -261,32 +389,19 @@ function collectFindings(repoRoot, sourceFile, checker) {
     if (ts.isCallExpression(node)) {
       const info = parseCallInfo(node, sourceFile);
       if (info) {
-        const ownedSpreads = sameOutputSpreads(checker, node, info.objectExpression);
-        if (ownedSpreads.length > 0) {
-          const ownedRoots = new Set(ownedSpreads.map((spread) => spread.root));
-          const classification = classifyObjectExpression(info.objectExpression, ownedRoots, sourceFile);
-          const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-          const container = containerStack.at(-1) ?? { name: "(top-level)", exportBoundary: false };
-          const reasons = ["object-spread-same-output"];
-          if (classification.crossSourceProperties.length > 0) reasons.push("override-from-cross-source");
-          if (container.exportBoundary) reasons.push("export-boundary");
-          findings.push({
-            path: normalizePath(relative(repoRoot, sourceFile.fileName)),
-            line: position.line + 1,
-            column: position.character + 1,
-            schemaName: info.schemaName,
-            schemaText: info.schemaText,
-            method: info.method,
-            enclosing: container.name,
-            classification: classification.classification,
-            exportBoundary: container.exportBoundary,
-            sameOutputSpreads: ownedSpreads.map((spread) => ({
-              root: spread.root,
-              type: spread.type,
-            })),
-            crossSourceProperties: classification.crossSourceProperties,
-            reasons,
-          });
+        const finding = buildFinding({
+          repoRoot,
+          sourceFile,
+          checker,
+          node,
+          info,
+          container: containerStack.at(-1) ?? {
+            name: "(top-level)",
+            exportBoundary: false,
+          },
+        });
+        if (finding) {
+          findings.push(finding);
         }
       }
     }
@@ -319,9 +434,13 @@ function runPlan(plan, options) {
   const sourceFiles = program
     .getSourceFiles()
     .filter(isTypeScriptSource)
-    .filter((sourceFile) => normalizePath(sourceFile.fileName).startsWith(normalizePath(repoRoot)))
+    .filter((sourceFile) =>
+      normalizePath(sourceFile.fileName).startsWith(normalizePath(repoRoot)),
+    )
     .filter((sourceFile) => sourceMatches(repoRoot, sourceFile, targets));
-  const findings = sourceFiles.flatMap((sourceFile) => collectFindings(repoRoot, sourceFile, checker));
+  const findings = sourceFiles.flatMap((sourceFile) =>
+    collectFindings(repoRoot, sourceFile, checker),
+  );
 
   return {
     repo: plan.repo,
@@ -337,12 +456,31 @@ function runPlan(plan, options) {
       byClassification: Object.fromEntries(
         ["owned-only", "cross-source"].map((classification) => [
           classification,
-          findings.filter((finding) => finding.classification === classification).length,
+          findings.filter(
+            (finding) => finding.classification === classification,
+          ).length,
         ]),
       ),
-      exportBoundaries: findings.filter((finding) => finding.exportBoundary).length,
+      byCandidateKind: countByCandidateKind(findings),
+      exportBoundaries: findings.filter((finding) => finding.exportBoundary)
+        .length,
     },
   };
+}
+
+function countByCandidateKind(findings) {
+  const kinds = [
+    "owner-transition-helper-candidate",
+    "cross-source-invariant-checkpoint",
+    "internal-owned-roundtrip",
+    "test-roundtrip",
+  ];
+  return Object.fromEntries(
+    kinds.map((kind) => [
+      kind,
+      findings.filter((finding) => finding.candidateKind === kind).length,
+    ]),
+  );
 }
 
 function summarize(results, slice) {
@@ -350,17 +488,26 @@ function summarize(results, slice) {
   return {
     schemaVersion: 1,
     slice,
-    decision: results.some((result) => result.decision === "pass") ? "pass" : "skip",
-    checkedFiles: results.reduce((sum, result) => sum + (result.checkedFiles ?? 0), 0),
+    decision: results.some((result) => result.decision === "pass")
+      ? "pass"
+      : "skip",
+    checkedFiles: results.reduce(
+      (sum, result) => sum + (result.checkedFiles ?? 0),
+      0,
+    ),
     findings: {
       total: findings.length,
       byClassification: Object.fromEntries(
         ["owned-only", "cross-source"].map((classification) => [
           classification,
-          findings.filter((finding) => finding.classification === classification).length,
+          findings.filter(
+            (finding) => finding.classification === classification,
+          ).length,
         ]),
       ),
-      exportBoundaries: findings.filter((finding) => finding.exportBoundary).length,
+      byCandidateKind: countByCandidateKind(findings),
+      exportBoundaries: findings.filter((finding) => finding.exportBoundary)
+        .length,
     },
     results,
   };
@@ -377,8 +524,13 @@ function emit(summary, output, report) {
 
 export function schemaRoundtripInventory(options = {}) {
   const report = options.report ?? console.log;
-  const results = selectedPlans(options.repo).map((plan) => runPlan(plan, options));
-  const summary = summarize(results, options.slice ?? "schema-roundtrip-inventory");
+  const results = selectedPlans(options.repo).map((plan) =>
+    runPlan(plan, options),
+  );
+  const summary = summarize(
+    results,
+    options.slice ?? "schema-roundtrip-inventory",
+  );
   emit(summary, options.output, report);
   return summary;
 }

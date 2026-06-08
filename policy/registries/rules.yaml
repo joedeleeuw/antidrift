@@ -115,7 +115,7 @@ ruleFamilies:
           - "type DateRange = { start: Date | null; end: Date | null };"
           - "type UserDto = z.infer<typeof UserDtoSchema>;"
       typed-delegation-research:
-        intent: Track disputed wrapper shapes without turning broad single-call delegation into a rule.
+        intent: Preserve retired/disputed wrapper evidence without turning broad single-call delegation into a rule.
         rules:
           - antidrift/no-thin-typed-factory-wrapper
           - antidrift/no-explicit-return-type-private-helper
@@ -440,7 +440,7 @@ rules:
     nextAction: Keep default-off; before enablement require a multi-literal role union signal and find a real non-disabled role redeclaration outside the owner.
   antidrift/no-sql-string-concat:
     status: ready
-    stable: true
+    stable: false
     referenceDoc: docs/rule-investigations/no-sql-string-concat.md
     signal: AST string construction
     solveType: injection-boundary
@@ -453,6 +453,7 @@ rules:
       - Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are accepted clean because the tag owns value binding.
       - Closed SQL identifier fragments from typed service-boundary unions and static object-literal column maps are accepted only in SQL identifier/direction positions.
       - Dynamic object-key column lists and non-allowlisted table names are intentional drift findings.
+      - Sanitized dynamic SQL identifiers derived from constructor-validated instance fields are a known gap; Cloudflare Workspace table names are recorded as non-blocking corpus evidence until that proof exists.
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:
       state: partial-overlap
@@ -472,7 +473,7 @@ rules:
         - "await this.sqlRun`UPDATE files SET modified_at = ${timestamp} WHERE path = ${path}`;"
         - 'const sortBy = options.sortBy ?? "created_at"; db.prepare(`SELECT * FROM executions ORDER BY ${sortBy}`);'
         - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
-    nextAction: Stable; monitor widened scans for new SQL construction APIs or repeated false-positive patterns.
+    nextAction: Keep as ready but not stable until sanitized dynamic SQL identifier controls either stay clean through a narrow proof or are explicitly ruled out of scope.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
@@ -636,13 +637,14 @@ rules:
     nextAction: Seek independent cast-tunnel replication before stable promotion.
   antidrift/no-unsafe-deserialize:
     status: ready
-    stable: true
+    stable: false
     signal: TypeChecker plus local string-boundary control flow
     solveType: parse-at-edge
     referenceDoc: docs/rule-investigations/no-unsafe-deserialize.md
-    corpusRepositories:
-      [chaski, codebase-atlas, sudocode-main, cloudflare-agents]
-    concerns: []
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main]
+    concerns:
+      - Cloudflare Agents type-aware corpus cases are currently known-gap because the external checkout's tsconfigs extend agents/tsconfig without an install-resolvable package path.
+      - Nested parsed-subfield drift such as JSON.parse(msg.event) after msg comes from a broad JSON.parse remains desired scope, but needs an evaluated real-program gate before stable promotion.
     external:
       state: partial-overlap
       support: high
@@ -658,7 +660,7 @@ rules:
         - "const value = JSON.parse(text);"
         - 'if (typeof event.data !== "string") return; JSON.parse(event.data);'
         - "const parsed = schema.parse(JSON.parse(text));"
-    nextAction: Stable; monitor raw-plugin type-service guard feedback and revisit only if real consumers show false positives or missed parse-at-edge drift.
+    nextAction: Re-establish a second evaluated drift repository and add an evaluated nested parsed-subfield gate before stable promotion.
   antidrift/require-authz-check:
     status: ready
     stable: false
@@ -728,6 +730,10 @@ retiredRules:
   antidrift/no-silent-catch:
     status: retired
     reason: Retired after utility review; ESLint no-empty, no-console, and SonarJS catch rules cover enough of the low-value surface, while the remaining console-only/comment-only custom behavior did not justify ownership.
+  antidrift/no-thin-typed-factory-wrapper:
+    status: retired
+    reason: Read-only corpus review found no real non-test exact-forward internal drift, while broad typed-constructor wrappers and exported facades are clean controls with high false-positive risk.
+    referenceDoc: docs/rule-investigations/no-thin-typed-factory-wrapper.md
 
 researchCandidates:
   ecosystem/discriminated-union-exhaustiveness:
@@ -772,12 +778,6 @@ researchCandidates:
     solveType: sql-injection-boundary
     referenceDoc: docs/rule-equivalence-audit.md
     nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 10 antidrift SQL findings. Keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.
-  antidrift/no-thin-typed-factory-wrapper:
-    status: research
-    signal: TypeChecker symbol-identity exact-forward delegation
-    solveType: unearned-return-contract
-    referenceDoc: docs/rule-investigations/no-thin-typed-factory-wrapper.md
-    nextAction: Broad typed-constructor anchors are classified clean; keep only exact-forward research and drop unless exact-forward non-test drift appears in two independent repos.
   antidrift/no-same-schema-recertification:
     status: research
     signal: TypeChecker plus schema-output assignability and refinement-free override proof

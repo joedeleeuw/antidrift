@@ -23,7 +23,10 @@ Why: string concatenation makes value binding impossible to audit locally.
 ```ts
 const fields = Object.keys(updates);
 const setClause = fields.map((field) => `${field} = ?`).join(", ");
-db.prepare(`UPDATE executions SET ${setClause} WHERE id = ?`).run(...values, id);
+db.prepare(`UPDATE executions SET ${setClause} WHERE id = ?`).run(
+  ...values,
+  id,
+);
 ```
 
 Why: the SQL identifier list comes from dynamic object keys, not a closed column map.
@@ -142,10 +145,10 @@ Widened local scan:
 - It reported 168 findings and 0 parser errors.
 - Sudocode's typed `ORDER BY ${sortBy} ${order}` service code now stays clean, as does the matching integration helper.
 - Cloudflare Agents parameterized SQL tags and the Codemode static column-map update builder now stay clean.
-- The named Sudocode/Cloudflare findings are now classified: dynamic `Object.keys(updates)` update helpers and the playground table-name query are drift; the browser-evaluation chat payload is clean. Many other findings are duplicate Chaski-derived local roots, so they do not provide independent replication.
+- The named Sudocode/Cloudflare findings are now classified: dynamic `Object.keys(updates)` update helpers and the playground table-name query are drift; the browser-evaluation chat payload is clean. Cloudflare Workspace sanitized namespace table identifiers are a known gap: the code validates a namespace before deriving table/index identifiers, but the rule cannot yet prove that constructor-guarded instance fields are safe SQL identifiers. Many other findings are duplicate Chaski-derived local roots, so they do not provide independent replication.
 
 ## Promotion State
 
 Status: `ready`, `stable: true`.
 
-The rule is stable for the current scope. Drift now replicates across Chaski, Sudocode, and Cloudflare, while Chaski, Codebase Atlas, Sudocode, and Cloudflare supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, closed identifier/direction fragments, serialized payload data, and bound values.
+The rule stays `ready`, but stable promotion is paused until the sanitized dynamic identifier gap is resolved. Drift still replicates across Chaski, Sudocode, and Cloudflare, while Chaski, Codebase Atlas, and Sudocode supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, closed identifier/direction fragments, serialized payload data, and bound values.
