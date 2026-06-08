@@ -12,6 +12,7 @@ import { verifySession } from "./verify-session.mjs";
 import { eslintJsonToSonar } from "./eslint-json-to-sonar.mjs";
 import { parseArgs as parseUnsafeTypeAssertionBenchmarkArgs, unsafeTypeAssertionBenchmark } from "./unsafe-type-assertion-benchmark.mjs";
 import { parseArgs as parseSqlQueryBenchmarkArgs, sqlQueryBenchmark } from "./sql-query-benchmark.mjs";
+import { parseArgs as parseSchemaRoundtripInventoryArgs, schemaRoundtripInventory } from "./schema-roundtrip-inventory.mjs";
 
 const [, , command, ...args] = process.argv;
 
@@ -45,6 +46,7 @@ const commands = {
   },
   "benchmark-unsafe-type-assertion": () => unsafeTypeAssertionBenchmark(parseUnsafeTypeAssertionBenchmarkArgs(args)),
   "benchmark-sql-queries": () => sqlQueryBenchmark(parseSqlQueryBenchmarkArgs(args)),
+  "inventory-schema-roundtrip": () => schemaRoundtripInventory(parseSchemaRoundtripInventoryArgs(args)),
   "verify-session": verifySession,
   sonar: () => eslintJsonToSonar(args[0], args[1]),
 };

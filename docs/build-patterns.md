@@ -47,7 +47,11 @@ Example:
 ```ts
 import { brand, type Brand } from "@joedeleeuw/antidrift/brand";
 
-export const UserId = brand("UserId", (value): value is string => typeof value === "string" && value.startsWith("user_"));
+export const UserId = brand(
+  "UserId",
+  (value): value is string =>
+    typeof value === "string" && value.startsWith("user_"),
+);
 export type UserId = Brand<string, "UserId">;
 ```
 
@@ -79,6 +83,41 @@ export type UserDto = z.infer<typeof userDtoSchema>;
 ```
 
 Do not duplicate domain status literals or re-parse a value with the same schema after it has already crossed the boundary.
+
+## Pattern: Add Schema-Owned State Transitions
+
+Use this when a schema owns a mutable state shape such as `ExplorationState`, `WorkflowState`, or a persisted UI/resource state.
+
+1. Keep the schema and inferred type in the owner module.
+2. Add transition helpers in that same owner module when callers need to update the state.
+3. Have callers invoke the transition helper instead of rebuilding the object locally and parsing it back through the same schema.
+4. Keep `.parse(...)` at raw boundaries, cross-source reconstruction points, or explicit invariant checkpoints.
+
+Example:
+
+```ts
+export const ExplorationStateSchema = z.object({
+  tiles: z.array(ExplorationTileSchema),
+});
+
+export type ExplorationState = z.infer<typeof ExplorationStateSchema>;
+
+export function markTileUnderstood(
+  state: ExplorationState,
+  tileId: TerrainNodeId,
+): ExplorationState {
+  return {
+    ...state,
+    tiles: state.tiles.map((tile) =>
+      tile.terrainNodeId === tileId
+        ? { ...tile, seen: true, understood: true }
+        : tile,
+    ),
+  };
+}
+```
+
+Do not make program-layer callers write `ExplorationStateSchema.parse({ ...state, changed })` just to re-certify a value that already came from `ExplorationStateSchema`. If the parse protects an untyped caller, a cross-source join, or runtime refinements, keep it and treat it as a boundary.
 
 ## Pattern: Model Named Partial State
 

@@ -444,7 +444,8 @@ rules:
     referenceDoc: docs/rule-investigations/no-sql-string-concat.md
     signal: AST string construction
     solveType: injection-boundary
-    corpusRepositories: [chaski, codebase-atlas, sudocode-main, cloudflare-agents]
+    corpusRepositories:
+      [chaski, codebase-atlas, sudocode-main, cloudflare-agents]
     concerns:
       - The benchmark on 190 real files reports 10 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
       - Dynamic placeholder lists such as `ids.map(() => "?").join(",")` are accepted clean because values remain bound parameters.
@@ -782,4 +783,4 @@ researchCandidates:
     signal: TypeChecker plus schema-output assignability and refinement-free override proof
     solveType: schema-roundtrip-parse
     referenceDoc: docs/rule-investigations/no-same-schema-recertification.md
-    nextAction: Do not implement; classify Codebase Atlas markExplorationTileUnderstood and moveTo first, then drop unless a second independent repo produces an accepted remediated anchor.
+    nextAction: Do not implement as a rule; use policy:inventory-schema-roundtrip to classify real roundtrip anchors, then drop unless a second independent repo produces an accepted remediated anchor.

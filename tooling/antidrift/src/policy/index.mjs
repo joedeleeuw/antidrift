@@ -11,3 +11,4 @@ export { verifySession } from "./verify-session.mjs";
 export { eslintJsonToSonar } from "./eslint-json-to-sonar.mjs";
 export { unsafeTypeAssertionBenchmark } from "./unsafe-type-assertion-benchmark.mjs";
 export { sqlQueryBenchmark } from "./sql-query-benchmark.mjs";
+export { schemaRoundtripInventory } from "./schema-roundtrip-inventory.mjs";

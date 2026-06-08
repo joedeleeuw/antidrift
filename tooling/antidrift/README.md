@@ -47,12 +47,14 @@ npx antidrift check-registries
 npx antidrift check-rule-surface
 pnpm policy:validate-corpus
 pnpm policy:validate-chaski
+pnpm policy:inventory-schema-roundtrip
 npx antidrift repo-corpus --slice current-work --rules import-x/no-cycle
 ```
 
 The first validates registry-backed rule facts. The second verifies every custom rule exported by the plugin is configured and covered by `RuleTester`.
 `policy:validate-corpus` lints the maintained project inventory with every custom rule, while `repo-corpus` can narrow the evidence to the rules changed in a slice.
 `policy:validate-chaski` is an optional local corpus gate: it runs explicit assertions against real Chaski frontend/BFF files when `CHASKI_REPO` or `/Users/sushi/code/chaski` is available, and skips otherwise so consumers do not need the private corpus.
+`policy:inventory-schema-roundtrip` is a non-blocking research inventory for same-schema `.parse({ ...typedState })` shapes; it classifies real anchors instead of failing the build.
 
 ## What's in the box
 
@@ -108,7 +110,11 @@ Use the brand kit when a value must be validated before it can enter the domain:
 ```ts
 import { brand, type Brand } from "@joedeleeuw/antidrift/brand";
 
-const UserId = brand("UserId", (value): value is string => typeof value === "string" && value.startsWith("user_"));
+const UserId = brand(
+  "UserId",
+  (value): value is string =>
+    typeof value === "string" && value.startsWith("user_"),
+);
 
 type UserId = Brand<string, "UserId">;
 
