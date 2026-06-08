@@ -24,6 +24,7 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - `docs/feature-slice-template.md` is the lightweight planning shape for new work.
 - `policy/registries/rules.yaml` is the canonical custom-rule status registry: active status, signal choice, corpus repositories, production concerns, and stable-promotion state.
 - `docs/rule-status-registry.md` is the readable index for the rule status registry.
+- `docs/source-ledger.md` records where pulled rules, custom rules, rulesets, tools, and borrowed repo references came from.
 - `docs/policy-coverage.md` tracks which policy rules are enforced, partial, delegated, or still spec-only.
 - `docs/real-corpus-validation.md` tracks which implemented custom rules have real Chaski-backed or fallback real-corpus evidence, and which rules remain under-proven.
 - `docs/gap-inventory.md` is the synthesized current gap surface across active rule maturity, broad policy coverage, real-corpus blockers, and retired/research boundaries.
@@ -36,6 +37,7 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - pnpm catalogs live in `pnpm-workspace.yaml` and support named catalogs.
 - ESLint plus `typescript-eslint` is the canonical custom-rule engine because the original scope needs TypeScript `Program` and `TypeChecker` access.
 - Retired-engine baseline coverage is tracked rule-by-rule in `docs/lint-rule-parity.md`; do not remove coverage without recording the replacement or accepted gap.
+- Source provenance for rules, rulesets, tools, and borrowed references is tracked in `docs/source-ledger.md`; update it when adding or replacing enforcement.
 - Non-TypeScript language checks belong to native tools in consuming repos, optionally coordinated by a repo-local orchestrator such as Trunk. Do not turn antidrift back into a multi-engine lint runner unless a future `[policy-change]` explicitly widens the package scope.
 - Rule readiness is tracked in `policy/registries/rules.yaml`; do not call a rule stable until it has multiple independent real-repo replications that were not created for the rule, zero known false positives, zero known false negatives, no production concerns, and a grounded Claude Opus 4.8 advisory review.
 - One owner per concept is the primary anti-duplication rule: import or derive from the owner instead of retyping local copies.
