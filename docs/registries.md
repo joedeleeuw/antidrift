@@ -12,7 +12,7 @@ policy/registries/design-system.yaml     allowed tokens and banned raw class pat
 policy/registries/boundaries.yaml        route/action/job boundary functions
 policy/registries/dependencies.yaml      approved runtime dependency policy
 policy/registries/mcp.yaml               approved MCP servers and tool scopes
-policy/registries/rules.yaml             custom rule status, signal, promotion, and next action
+policy/registries/rules.yaml             custom rule status, policy rule reviews, signal, promotion, and next action
 ```
 
 ## Rule behavior
@@ -26,4 +26,8 @@ Registry-backed rules should:
 
 Domain status and role entries should include `valuesExport` when the owner module exports a literal array. `pnpm policy:check-registries` compares registry values to that export so the registry cannot drift from the canonical domain module.
 
-Rule status entries should include every active `antidrift/*` rule exported by the plugin. Research candidates need a reference doc under `docs/rule-investigations/`, and candidates with sufficient online/ecosystem coverage should be marked `ecosystem-covered` instead of becoming custom rules. `pnpm policy:check-registries` fails when an active rule is missing from `policy/registries/rules.yaml`, when a retired rule is placed in the active table, when a locked retired/ecosystem-covered decision is removed or reactivated, or when investigation/stable-promotion gates are weakened.
+Rule status entries should include every active `antidrift/*` rule exported by the plugin. Research candidates need a reference doc under `docs/rule-investigations/`, and candidates with sufficient online/ecosystem coverage should be marked `ecosystem-covered` instead of becoming custom rules.
+
+Policy rule reviews should include every rule ID named in `policy/agent-guardrails.yaml`, whether that ID is implemented as an active custom rule, covered by a maintained ecosystem rule, generated as core ESLint config, enforced by hooks or policy scripts, delegated to Sonar, merged into another rule, research-only, or spec-only. This keeps broad policy scope from being mistaken for active implementation scope.
+
+`pnpm policy:check-registries` fails when an active rule is missing from `policy/registries/rules.yaml`, when a retired rule is placed in the active table, when a locked retired/ecosystem-covered decision is removed or reactivated, when a policy-scoped rule lacks a review row, when a review row names a rule outside the policy source, or when investigation/stable-promotion gates are weakened.

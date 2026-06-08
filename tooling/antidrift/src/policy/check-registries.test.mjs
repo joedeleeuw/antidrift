@@ -20,6 +20,29 @@ function touch(root, file) {
   writeFileSync(join(root, file), "");
 }
 
+function writePolicySource(root, ruleIds) {
+  const rules = ruleIds
+    .map(
+      (id) => `      - id: ${id}
+        severity: error
+        detector: testDetector
+        message: Test message.
+`,
+    )
+    .join("");
+
+  writeFileSync(
+    join(root, "policy", "agent-guardrails.yaml"),
+    `version: 1
+clusters:
+  - id: test-cluster
+    owner: test-owner
+    rules:
+${rules}
+`,
+  );
+}
+
 const lockedRetiredRules = [
   "antidrift/no-cycle",
   "antidrift/no-inline-disable-without-ticket",
@@ -522,6 +545,102 @@ ruleFamilies:
     ).toBe(false);
     expect(messages.join("\n")).toContain(
       "ruleFamilies.architecture.subsets.cycles.historical must be true when referencing locked decisions: ecosystem/import-cycle",
+    );
+  });
+
+  it("requires a review row for every policy-scoped rule", () => {
+    const root = workspace();
+    writePolicySource(root, ["test/reviewed", "test/missing"]);
+    writeValidRulesRegistry(root);
+    const existing = join(root, "policy", "registries", "rules.yaml");
+    const text = readFileSync(existing, "utf8");
+    writeFileSync(
+      existing,
+      `${text}
+policyRuleReviews:
+  test/reviewed:
+    status: spec-only
+    coverage: Not implemented in the synthetic policy.
+    reason: Reviewed for test.
+    nextAction: Leave as documented policy.
+`,
+    );
+    const messages = [];
+
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "policyRuleReviews missing policy rule review: test/missing",
+    );
+  });
+
+  it("rejects policy rule reviews that are not in the policy source", () => {
+    const root = workspace();
+    writePolicySource(root, ["test/reviewed"]);
+    writeValidRulesRegistry(root);
+    const existing = join(root, "policy", "registries", "rules.yaml");
+    const text = readFileSync(existing, "utf8");
+    writeFileSync(
+      existing,
+      `${text}
+policyRuleReviews:
+  test/reviewed:
+    status: spec-only
+    coverage: Not implemented in the synthetic policy.
+    reason: Reviewed for test.
+    nextAction: Leave as documented policy.
+  test/extra:
+    status: spec-only
+    coverage: Not implemented in the synthetic policy.
+    reason: Reviewed for test.
+    nextAction: Leave as documented policy.
+`,
+    );
+    const messages = [];
+
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "policyRuleReviews contains non-policy rule review: test/extra",
+    );
+  });
+
+  it("requires active-custom policy reviews to reference active antidrift rules", () => {
+    const root = workspace();
+    writePolicySource(root, ["test/reviewed"]);
+    writeValidRulesRegistry(root);
+    const existing = join(root, "policy", "registries", "rules.yaml");
+    const text = readFileSync(existing, "utf8");
+    writeFileSync(
+      existing,
+      `${text}
+policyRuleReviews:
+  test/reviewed:
+    status: active-custom
+    antidriftRule: antidrift/not-real
+    coverage: Not implemented in the synthetic policy.
+    reason: Reviewed for test.
+    nextAction: Leave as documented policy.
+`,
+    );
+    const messages = [];
+
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "policyRuleReviews.test/reviewed.antidriftRule references unknown active custom rule: antidrift/not-real",
     );
   });
 });

@@ -4,6 +4,8 @@ This document keeps the original guardrail scope honest. `policy/agent-guardrail
 
 This is a ledger, not a backlog. Do not implement a rule from this table unless it also appears in the scoped roadmap or a new issue explicitly widens scope.
 
+Every rule ID named in `policy/agent-guardrails.yaml` is also reviewed in `policy/registries/rules.yaml` under `policyRuleReviews`. That registry row is the source of truth for whether a policy ID is active custom code, ecosystem-covered, generated config, hook-covered, delegated, merged, research, or spec-only.
+
 Status meanings:
 
 - **Enforced**: local checks fail through ESLint, TypeScript, tests, generated hooks, or policy scripts.

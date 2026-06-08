@@ -27,6 +27,24 @@ function readRegistry(policyDir, name, errors) {
   }
 }
 
+function readPolicySource(policyDir, errors) {
+  const file = join(policyDir, "agent-guardrails.yaml");
+  if (!existsSync(file)) return null;
+  try {
+    const parsed = YAML.parse(readFileSync(file, "utf8")) ?? {};
+    if (!isRecord(parsed)) {
+      errors.push("policy/agent-guardrails.yaml must contain a mapping.");
+      return null;
+    }
+    return parsed;
+  } catch (error) {
+    errors.push(
+      `policy/agent-guardrails.yaml could not be parsed: ${error.message}`,
+    );
+    return null;
+  }
+}
+
 function stringArray(value, label, errors, { allowEmpty = false } = {}) {
   if (
     !Array.isArray(value) ||
@@ -517,6 +535,26 @@ const allowedExternalDecisions = new Set([
   "own-antidrift",
   "retired",
 ]);
+const allowedPolicyReviewStatuses = new Set([
+  "active-custom",
+  "ecosystem-covered",
+  "generated-config",
+  "policy-script",
+  "hook-covered",
+  "delegated",
+  "spec-only",
+  "research",
+  "merged",
+  "retired",
+]);
+const policyReviewStatusesRequiringReplacement = new Set([
+  "ecosystem-covered",
+  "generated-config",
+  "policy-script",
+  "hook-covered",
+  "delegated",
+  "retired",
+]);
 const requiredDecisionLocks = new Map([
   ["antidrift/no-cycle", { status: "retired", location: "retiredRules" }],
   [
@@ -663,6 +701,12 @@ function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
   }
 }
 
+function activeAntidriftRules() {
+  return new Set(
+    Object.keys(plugin.rules ?? {}).map((rule) => `antidrift/${rule}`),
+  );
+}
+
 function checkStablePromotionRequirements(stable, errors) {
   if (!isRecord(stable)) {
     errors.push(
@@ -756,9 +800,7 @@ function checkActiveRuleEntries(rules, repoRoot, errors) {
     return;
   }
   const registeredRules = new Set(Object.keys(rules));
-  const activeRules = new Set(
-    Object.keys(plugin.rules ?? {}).map((rule) => `antidrift/${rule}`),
-  );
+  const activeRules = activeAntidriftRules();
 
   for (const rule of [...activeRules].sort((a, b) => a.localeCompare(b))) {
     if (!registeredRules.has(rule)) {
@@ -1010,7 +1052,153 @@ function checkRuleFamilies(ruleFamilies, registry, repoRoot, errors) {
   }
 }
 
-function checkRulesRegistry(registry, repoRoot, errors) {
+function policyClusterRules(cluster, clusterLabel, errors) {
+  if (!isRecord(cluster)) {
+    errors.push(`${clusterLabel} must be a mapping.`);
+    return null;
+  }
+  if (!Array.isArray(cluster.rules)) {
+    errors.push(`${clusterLabel}.rules must be an array.`);
+    return null;
+  }
+  return cluster.rules;
+}
+
+function policyRuleId(rule, ruleLabel, errors) {
+  if (!isRecord(rule)) {
+    errors.push(`${ruleLabel} must be a mapping.`);
+    return null;
+  }
+  if (typeof rule.id !== "string" || rule.id.length === 0) {
+    errors.push(`${ruleLabel}.id must be a non-empty string.`);
+    return null;
+  }
+  return rule.id;
+}
+
+function addUniquePolicyRuleId(ids, seen, id, errors) {
+  if (seen.has(id)) {
+    errors.push(`policy/agent-guardrails.yaml duplicate rule id: ${id}`);
+    return;
+  }
+  seen.add(id);
+  ids.push(id);
+}
+
+function collectPolicyClusterRuleIds(cluster, clusterIndex, ids, seen, errors) {
+  const clusterLabel = `policy/agent-guardrails.yaml clusters[${clusterIndex}]`;
+  const rules = policyClusterRules(cluster, clusterLabel, errors);
+  if (!rules) return;
+
+  for (const [ruleIndex, rule] of rules.entries()) {
+    const ruleLabel = `${clusterLabel}.rules[${ruleIndex}]`;
+    const id = policyRuleId(rule, ruleLabel, errors);
+    if (id) addUniquePolicyRuleId(ids, seen, id, errors);
+  }
+}
+
+function policyClusters(policySource, errors) {
+  if (policySource === null) return null;
+  if (Array.isArray(policySource.clusters)) return policySource.clusters;
+  errors.push("policy/agent-guardrails.yaml clusters must be an array.");
+  return null;
+}
+
+function collectPolicyRuleIds(policySource, errors) {
+  const clusters = policyClusters(policySource, errors);
+  if (!clusters) {
+    return [];
+  }
+  const ids = [];
+  const seen = new Set();
+  for (const [clusterIndex, cluster] of clusters.entries()) {
+    collectPolicyClusterRuleIds(cluster, clusterIndex, ids, seen, errors);
+  }
+  return ids.sort((a, b) => a.localeCompare(b));
+}
+
+function checkPolicyRuleReviewEntry(entry, label, activeRules, errors) {
+  if (!isRecord(entry)) {
+    errors.push(`${label} must be a mapping.`);
+    return;
+  }
+  if (!allowedPolicyReviewStatuses.has(entry.status)) {
+    errors.push(
+      `${label}.status must be one of: ${[...allowedPolicyReviewStatuses].join(", ")}.`,
+    );
+  }
+  requireString(entry.coverage, `${label}.coverage`, errors);
+  requireString(entry.reason, `${label}.reason`, errors);
+  requireString(entry.nextAction, `${label}.nextAction`, errors);
+
+  if (entry.antidriftRule !== undefined) {
+    requireString(entry.antidriftRule, `${label}.antidriftRule`, errors);
+    if (!activeRules.has(entry.antidriftRule)) {
+      errors.push(
+        `${label}.antidriftRule references unknown active custom rule: ${entry.antidriftRule}`,
+      );
+    }
+  }
+  if (entry.mergedInto !== undefined) {
+    requireString(entry.mergedInto, `${label}.mergedInto`, errors);
+  }
+  if (entry.replacement !== undefined) {
+    requireString(entry.replacement, `${label}.replacement`, errors);
+  }
+
+  if (entry.status === "active-custom" && entry.antidriftRule === undefined) {
+    errors.push(`${label}.antidriftRule is required for active-custom.`);
+  }
+  if (entry.status === "merged" && entry.mergedInto === undefined) {
+    errors.push(`${label}.mergedInto is required for merged.`);
+  }
+  if (
+    policyReviewStatusesRequiringReplacement.has(entry.status) &&
+    entry.replacement === undefined
+  ) {
+    errors.push(`${label}.replacement is required for ${entry.status}.`);
+  }
+}
+
+function checkPolicyRuleReviews(registry, policySource, errors) {
+  const policyRuleIds = collectPolicyRuleIds(policySource, errors);
+  if (policyRuleIds.length === 0) return;
+  if (!isRecord(registry.policyRuleReviews)) {
+    errors.push(
+      "policy/registries/rules.yaml policyRuleReviews must be a mapping.",
+    );
+    return;
+  }
+
+  const reviews = registry.policyRuleReviews;
+  const policyRuleSet = new Set(policyRuleIds);
+  const activeRules = activeAntidriftRules();
+
+  for (const id of policyRuleIds) {
+    if (reviews[id] === undefined) {
+      errors.push(
+        `policy/registries/rules.yaml policyRuleReviews missing policy rule review: ${id}`,
+      );
+      continue;
+    }
+    checkPolicyRuleReviewEntry(
+      reviews[id],
+      `policy/registries/rules.yaml policyRuleReviews.${id}`,
+      activeRules,
+      errors,
+    );
+  }
+
+  for (const id of Object.keys(reviews).sort((a, b) => a.localeCompare(b))) {
+    if (!policyRuleSet.has(id)) {
+      errors.push(
+        `policy/registries/rules.yaml policyRuleReviews contains non-policy rule review: ${id}`,
+      );
+    }
+  }
+}
+
+function checkRulesRegistry(registry, repoRoot, policySource, errors) {
   if (Object.keys(registry).length === 0) {
     errors.push(
       "policy/registries/rules.yaml must exist and contain the rule status registry.",
@@ -1035,6 +1223,7 @@ function checkRulesRegistry(registry, repoRoot, errors) {
   checkResearchCandidates(registry.researchCandidates, repoRoot, errors);
   checkDecisionLocks(registry, errors);
   checkRuleFamilies(registry.ruleFamilies, registry, repoRoot, errors);
+  checkPolicyRuleReviews(registry, policySource, errors);
 }
 
 export function checkRegistries({
@@ -1043,6 +1232,7 @@ export function checkRegistries({
   report = console.error,
 } = {}) {
   const errors = [];
+  const policySource = readPolicySource(policyDir, errors);
   const registries = {
     architecture: readRegistry(policyDir, "architecture", errors),
     boundaries: readRegistry(policyDir, "boundaries", errors),
@@ -1061,7 +1251,7 @@ export function checkRegistries({
   checkDomain(registries.domain, repoRoot, errors);
   checkGateways(registries.gateways, repoRoot, errors);
   checkGenerated(registries.generated, repoRoot, errors);
-  checkRulesRegistry(registries.rules, repoRoot, errors);
+  checkRulesRegistry(registries.rules, repoRoot, policySource, errors);
 
   for (const error of errors) report(error);
   return errors.length === 0;

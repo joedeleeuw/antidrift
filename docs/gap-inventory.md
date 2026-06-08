@@ -14,6 +14,7 @@ This is the synthesized gap surface for the current antidrift repository. It doe
 ## Current Counts
 
 Active custom rules in the registry: 24.
+Policy-scoped rule IDs reviewed in `policyRuleReviews`: 63.
 
 | State                      | Count | Meaning                                                                                |
 | -------------------------- | ----: | -------------------------------------------------------------------------------------- |
@@ -21,6 +22,20 @@ Active custom rules in the registry: 24.
 | Ready but not stable       |    18 | Implemented and enabled, but evidence, inventory, or advisory gates remain.            |
 | Under-proven               |     2 | Implemented but default-off because real drift or clean evidence is not strong enough. |
 | Retired Oxlint parity gaps |     0 | The former Oxlint baseline has ESLint replacements or explicit retirements.            |
+
+Policy rule review dispositions:
+
+| Disposition         | Count | Meaning                                                           |
+| ------------------- | ----: | ----------------------------------------------------------------- |
+| `active-custom`     |    21 | Implemented by active `antidrift/*` rules.                        |
+| `ecosystem-covered` |    10 | Covered by maintained ESLint ecosystem rules.                     |
+| `generated-config`  |     2 | Covered by registry-generated core ESLint config.                 |
+| `hook-covered`      |     4 | Covered by generated Claude/Codex hooks.                          |
+| `policy-script`     |     3 | Covered by antidrift policy scripts or report generation.         |
+| `delegated`         |     2 | Delegated to SonarQube or equivalent external gates.              |
+| `merged`            |     1 | Historical policy wording merged into another reviewed rule.      |
+| `research`          |    10 | Potential rule, not implemented without real evidence.            |
+| `spec-only`         |    10 | Documented policy, intentionally not enforced in the current cut. |
 
 Stable custom rules today:
 

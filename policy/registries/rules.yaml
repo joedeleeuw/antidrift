@@ -128,6 +128,366 @@ ruleFamilies:
           - "function mapErrorCode(error: Error): TRPCError['code'] { return error instanceof AuthError ? 'UNAUTHORIZED' : 'INTERNAL_SERVER_ERROR'; }"
           - "export function reloadProject(id: ProjectId): Promise<Project> { return readProject(id); }"
 
+policyRuleReviews:
+  react/no-use-state-waterfall:
+    status: research
+    coverage: Not implemented as a custom or ecosystem rule.
+    reason: The smell is plausible, but raw useState count alone is too coarse without real inventory and reducer/resource replacement examples.
+    nextAction: Keep out of blocking config until a real program matrix proves a deterministic signal beyond ordinary component complexity.
+  react/no-coupled-state-setters:
+    status: active-custom
+    antidriftRule: antidrift/no-coupled-state-setters
+    coverage: Implemented as a scope-binding custom rule for multiple state setters called in one function.
+    reason: Existing React ecosystem rules do not model coupled setter bindings as one implicit state-machine smell.
+    nextAction: Classify broad Chaski inventory before stable promotion.
+  react/no-status-triplet-state:
+    status: active-custom
+    antidriftRule: antidrift/no-status-triplet-state
+    coverage: Implemented but default-off as a configurable data/loading/error name-group heuristic.
+    reason: Structure alone cannot prove loading/error intent, so this remains reviewed but under promotion discipline.
+    nextAction: Keep configurable and require multiple low-noise frontend inventories before enabling.
+  react/no-derived-state-effect:
+    status: ecosystem-covered
+    replacement: react-hooks/no-deriving-state-in-effects
+    coverage: Covered by eslint-plugin-react-hooks recommended-latest plus an explicit rule enablement.
+    reason: React owns this effect anti-pattern directly; custom code would duplicate maintained compiler-era linting.
+    nextAction: Keep the maintained React Hooks rule enabled.
+  react/no-effect-fetch-waterfall:
+    status: research
+    coverage: Partially pressured by antidrift/no-raw-fetch-in-component, but no separate waterfall rule exists.
+    reason: Fetch-in-effect plus loading state overlaps component data-loading architecture and can become framework-specific quickly.
+    nextAction: Do not implement until real code proves a gap left after no-raw-fetch-in-component and React hooks rules.
+  react/require-effect-deps:
+    status: active-custom
+    antidriftRule: antidrift/require-effect-deps
+    coverage: Implemented as an import-binding custom rule for effect hooks called without a dependency array.
+    reason: react-hooks/exhaustive-deps validates an existing dependency array but intentionally does not report the missing-array case.
+    nextAction: Stable; monitor intentional every-render disables with required descriptions.
+  ts/no-trivial-selector-wrapper:
+    status: active-custom
+    antidriftRule: antidrift/no-trivial-selector-wrapper
+    coverage: Implemented structurally for explicit-return helpers that only return a member of their own parameter.
+    reason: This is a net antidrift rule; no maintained rule targets inference appeasement selector wrappers.
+    nextAction: Stable; do not reintroduce getXFromY name fingerprints.
+  ts/no-mechanical-get-x-from-y:
+    status: merged
+    mergedInto: ts/no-trivial-selector-wrapper
+    coverage: Former name-shaped concern is subsumed by the structural selector-wrapper rule.
+    reason: User-chosen names are too gameable when the AST return shape can carry the signal.
+    nextAction: Keep as historical policy wording only; do not implement a name-regex rule.
+  ts/no-inline-structural-type-at-use-site:
+    status: active-custom
+    antidriftRule: antidrift/no-inline-structural-type-at-use-site
+    coverage: Implemented as a structural AST rule for exported and boundary use-site object contracts.
+    reason: Generic syntax bans are too broad; the custom rule narrows to public/boundary contract drift.
+    nextAction: Seek independent boundary-function replication and clean local-props pressure before stable promotion.
+  ts/no-nullable-positional-tuple:
+    status: active-custom
+    antidriftRule: antidrift/no-nullable-positional-tuple
+    coverage: Implemented as deterministic AST/type-service detection of tuple types with multiple nullable or optional slots.
+    reason: The rule captures ambiguous positional partial state such as CustomRange = [Date | null, Date | null] without banning ordinary tuples.
+    nextAction: Seek another real nullable positional tuple and clean tuple-control replication.
+  ts/no-underchecked-type-predicate:
+    status: active-custom
+    antidriftRule: antidrift/no-underchecked-type-predicate
+    coverage: Implemented as a TypeChecker-backed broad-input object predicate check.
+    reason: Ecosystem exhaustiveness rules do not check whether a predicate has earned the object contract it asserts.
+    nextAction: Seek another broad-input underchecked predicate drift case and validator-delegation pressure.
+  ts/no-unsafe-cast-chain:
+    status: active-custom
+    antidriftRule: antidrift/no-unsafe-cast-chain
+    coverage: Implemented as the narrow double-cast tunnel rule.
+    reason: It remains a useful explicit escape-hatch detector even though no-appeasement-cast owns broader cast authority drift.
+    nextAction: Seek independent cast-tunnel replication before stable promotion.
+  arch/no-one-use-helper:
+    status: research
+    coverage: Not implemented.
+    reason: One-use helpers can be fake abstraction, but reference counts and helper size alone produce many legitimate local extraction cases.
+    nextAction: Keep out of blocking scope until real programs prove a deterministic rule with clean domain-helper controls.
+  arch/no-obvious-comment:
+    status: active-custom
+    antidriftRule: antidrift/no-obvious-comment
+    coverage: Implemented but default-off as a token-overlap heuristic.
+    reason: Comment restatement can be detected locally, but the signal is intentionally lower confidence than structural/type rules.
+    nextAction: Keep lower-confidence until another repo inventory shows low false positives.
+  arch/max-function-lines:
+    status: spec-only
+    coverage: Not enforced locally as a line-count rule.
+    reason: Function length is a blunt proxy for complexity and can duplicate Sonar trend governance without a clear construction pattern.
+    nextAction: Use Sonar complexity trends unless real corpus evidence justifies a narrower custom threshold.
+  arch/max-component-lines:
+    status: spec-only
+    coverage: Not enforced locally as a component line-count rule.
+    reason: Component size needs container/view/resource context; raw line count would encourage arbitrary extraction.
+    nextAction: Revisit only after React state/resource rules expose a repeatable component split pattern.
+  arch/no-high-touch-file-growth:
+    status: spec-only
+    coverage: Not enforced locally.
+    reason: High-touch file growth depends on change history rather than a single source file AST and needs repository analytics.
+    nextAction: Keep as architecture review guidance unless a policy script with real git-history evidence is scoped.
+  arch/no-cross-layer-import:
+    status: ecosystem-covered
+    replacement: boundaries/element-types
+    coverage: Covered by eslint-plugin-boundaries with configured layer import directions.
+    reason: The maintained boundaries plugin already owns this import-graph check.
+    nextAction: Keep layer facts in architecture registry/config.
+  arch/no-deep-import:
+    status: ecosystem-covered
+    replacement: boundaries/no-private
+    coverage: Covered by eslint-plugin-boundaries private import checks.
+    reason: Maintained boundary rules are a better fit than custom path parsing.
+    nextAction: Keep public/private entrypoint facts aligned with architecture policy.
+  arch/no-new-dependency-cycle:
+    status: ecosystem-covered
+    replacement: import-x/no-cycle
+    coverage: Covered by import-x/no-cycle in the shared ESLint config.
+    reason: Custom cycle traversal was retired; maintained import graph coverage is the correct owner.
+    nextAction: Keep the locked retired custom no-cycle decision in place.
+  arch/no-feature-scatter:
+    status: spec-only
+    coverage: Not enforced locally.
+    reason: Feature scatter is a change-set and architecture-intent signal, not a reliable single-file AST rule.
+    nextAction: Treat as review guidance until a repository analytics gate is explicitly scoped.
+  boundary/no-raw-fetch-in-component:
+    status: active-custom
+    antidriftRule: antidrift/no-raw-fetch-in-component
+    coverage: Implemented as a component-boundary fetch rule.
+    reason: A generated selector could ban fetch broadly, but the custom rule narrows to component context.
+    nextAction: Stable; only widen to raw transport if real non-fetch evidence appears.
+  boundary/no-sdk-direct-use-outside-gateway:
+    status: generated-config
+    replacement: no-restricted-imports from policy/registries/gateways.yaml
+    coverage: Covered by generated core ESLint restrictions with wrapper-file overrides.
+    reason: Registry-backed import restriction is simpler and more idiomatic than a custom SDK rule.
+    nextAction: Keep gateway imports in the gateways registry.
+  boundary/no-env-access-in-client:
+    status: research
+    coverage: Not implemented.
+    reason: The signal is likely deterministic, but client/server file boundaries and public env conventions need repo-specific evidence.
+    nextAction: Evaluate maintained config options and real client env reads before writing a custom rule.
+  domain/no-inline-domain-status:
+    status: active-custom
+    antidriftRule: antidrift/no-status-literal-in-type
+    coverage: Implemented through registry-backed status literal detection in type contexts.
+    reason: Domain statuses are repo facts, so the rule needs the domain registry rather than hardcoded strings.
+    nextAction: Seek independent status-fork replication before stable promotion.
+  domain/no-role-literal-outside-policy:
+    status: active-custom
+    antidriftRule: antidrift/no-role-literal-in-type
+    coverage: Implemented but default-off through registry-backed role literal detection.
+    reason: Role words such as owner/admin/member/viewer are generic enough to need stronger real evidence before blocking.
+    nextAction: Require a real non-disabled multi-literal role redeclaration before enablement.
+  domain/no-canonical-model-fork:
+    status: active-custom
+    antidriftRule: antidrift/no-canonical-model-fork
+    coverage: Implemented as TypeChecker plus domain canonicalEntities registry comparison.
+    reason: First-party canonical model forks need repo-owned type facts, not installed-package scanning.
+    nextAction: Run another configured repo inventory before stable promotion.
+  gen/require-import-from-generated:
+    status: generated-config
+    replacement: no-restricted-imports from policy/registries/generated.yaml
+    coverage: Covered when generatedSources declare bannedDirectImports and wrappers.
+    reason: Import routing is a registry-to-core-ESLint concern, not a custom AST rule.
+    nextAction: Keep generated.yaml current when codegen is added.
+  gen/no-structural-type-fork:
+    status: active-custom
+    antidriftRule: antidrift/no-structural-type-fork
+    coverage: Implemented as TypeChecker structural comparison against installed package and configured generated-source exports.
+    reason: No maintained rule compares handwritten object shapes against package/generated exported types.
+    nextAction: Seek independent installed-package or generated-source fork replication.
+  auth/no-boundaryless-route:
+    status: research
+    coverage: Not implemented as a separate rule.
+    reason: Boundaryless routes require framework-specific route/action discovery and should not be inferred from generic function shape.
+    nextAction: Decide route framework scope after require-authz-check middleware and tRPC decisions.
+  auth/no-client-only-authorization:
+    status: research
+    coverage: Not implemented.
+    reason: Client-only authorization needs paired client/server reasoning and a concrete server policy convention.
+    nextAction: Keep out of custom scope until real code shows the gap and expected server-side replacement.
+  auth/require-authz-check:
+    status: active-custom
+    antidriftRule: antidrift/require-authz-check
+    coverage: Implemented for registry-scoped server boundary globs with handler-local request param reads.
+    reason: Project authz calls are registry facts and no maintained rule knows the local boundary contract.
+    nextAction: Decide middleware dominance and tRPC procedure scope separately before widening.
+  errors/preserve-caught-error:
+    status: ecosystem-covered
+    replacement: preserve-caught-error
+    coverage: Covered by the maintained ESLint rule enabled in the shared config.
+    reason: Preserving caught error cause is ecosystem-covered; custom silent-catch work was retired.
+    nextAction: Keep the maintained rule enabled.
+  errors/no-fallback-to-empty:
+    status: research
+    coverage: Not implemented.
+    reason: Returning [] or {} from catch remains a clear drift candidate with higher value than generic silent-catch detection.
+    nextAction: Create a real-program matrix before implementation.
+  test/no-only-or-skip:
+    status: ecosystem-covered
+    replacement: no-only-tests/no-only-tests plus @vitest/eslint-plugin no-disabled-tests
+    coverage: Covered by framework-agnostic focused-test linting plus Vitest disabled-test rules.
+    reason: Maintained test plugins own this surface.
+    nextAction: Keep Vitest plugin enabled; add Jest parity only if a repo adopts Jest.
+  test/no-conditional-expect:
+    status: ecosystem-covered
+    replacement: vitest/no-conditional-in-test
+    coverage: Covered for the declared Vitest scope.
+    reason: Vitest plugin already reports conditional test assertions and control flow.
+    nextAction: Keep Vitest plugin enabled.
+  test/no-test-without-assertion:
+    status: ecosystem-covered
+    replacement: vitest/expect-expect from @vitest/eslint-plugin recommended config
+    coverage: Covered for the declared Vitest scope through the recommended plugin rules.
+    reason: Maintained test plugins are preferable to custom assertion counting.
+    nextAction: Keep Vitest recommended rules enabled.
+  ui/no-raw-tailwind-color:
+    status: active-custom
+    antidriftRule: antidrift/no-raw-tailwind-color
+    coverage: Implemented for JSX class string extraction.
+    reason: The policy is semantic token ownership, not Tailwind validity.
+    nextAction: Classify broad design-system inventory before stable promotion.
+  ui/no-hover-translate-card:
+    status: active-custom
+    antidriftRule: antidrift/no-hover-translate-card
+    coverage: Implemented for JSX class string extraction.
+    reason: The interaction policy is local design-system guidance, not a generic CSS validity rule.
+    nextAction: Run another UI repo inventory and decide CSS @apply scope.
+  ui/no-generic-ai-copy:
+    status: spec-only
+    coverage: Not enforced locally.
+    reason: Generic copy detection is heuristic by nature and currently lower value than type, validation, and boundary drift.
+    nextAction: Keep as design review guidance unless a deterministic phrase registry with low-noise corpus evidence is scoped.
+  obs/async-boundary-requires-context:
+    status: spec-only
+    coverage: Not enforced locally.
+    reason: The repo lacks a concrete logging/tracing context API that a rule could require deterministically.
+    nextAction: Define the positive observability construction pattern before any rule work.
+  obs/no-fire-and-forget-without-tracking:
+    status: research
+    coverage: Not implemented.
+    reason: Floating async work is valuable, but boundary tracking depends on approved background-task APIs and overlap with no-floating-promises.
+    nextAction: Evaluate maintained promise rules and local tracking conventions before custom scope.
+  perf/no-await-in-loop-with-io:
+    status: ecosystem-covered
+    replacement: ESLint no-await-in-loop
+    coverage: Covered by the broad core ESLint no-await-in-loop baseline.
+    reason: IO-specific narrowing is not implemented; the active guard is the maintained broad rule.
+    nextAction: Only add IO-function narrowing if broad-rule findings prove too noisy in real code.
+  perf/no-async-array-method:
+    status: active-custom
+    antidriftRule: antidrift/no-async-array-method
+    coverage: Implemented for async callbacks passed to array methods with known promise behavior.
+    reason: Ecosystem promise rules overlap but can overreport real handlers when configured broadly.
+    nextAction: Find a second independent real drift instance or document a one-repo evidence exception.
+  perf/no-unbounded-promise-all:
+    status: research
+    coverage: Not implemented.
+    reason: Useful if tied to obvious unbounded collections, but Promise.all over small or prebounded arrays is common and clean.
+    nextAction: Build real drift and clean bounded-control programs before coding.
+  perf/require-timeout-for-network-call:
+    status: research
+    coverage: Not implemented.
+    reason: The construction pattern should likely be gateway-scoped timeout or AbortSignal propagation, not any fetch-like call.
+    nextAction: Define gateway/network call inventory and maintained-rule overlap before implementation.
+  perf/no-redundant-validation:
+    status: active-custom
+    antidriftRule: antidrift/no-redundant-zod-parse
+    coverage: Implemented as schema-provenance detection for reparsing values already produced by the same Zod schema.
+    reason: No maintained Zod rule tracks same-schema output provenance.
+    nextAction: Stable for current scope; keep same-schema-recertification research separate.
+  sec/no-hardcoded-secret:
+    status: spec-only
+    coverage: Not wired in this repository.
+    reason: Secret detection should be delegated to a maintained scanner; custom AST variable-name heuristics are not acceptable.
+    nextAction: Wire a maintained secret scanner before claiming enforcement.
+  sec/no-sql-string-concat:
+    status: active-custom
+    antidriftRule: antidrift/no-sql-string-concat
+    coverage: Implemented for SQL structure built through interpolation or concatenation, layered with sonarjs/sql-queries.
+    reason: The local SonarJS benchmark missed real HogQL/template interpolation cases that antidrift reports.
+    nextAction: Seek a second sanitized dynamic SQL identifier clean control before stable promotion.
+  sec/no-unsafe-deserialize:
+    status: active-custom
+    antidriftRule: antidrift/no-unsafe-deserialize
+    coverage: Implemented with TypeChecker any/unknown and local string-boundary control-flow signals.
+    reason: The request-name fingerprint was removed; the rule now uses type signals for parse-at-edge drift.
+    nextAction: Add an evaluated nested parsed-subfield gate before stable promotion.
+  agent/block-generated-policy-edits:
+    status: hook-covered
+    replacement: block-generated-policy-edits hook
+    coverage: Covered by generated Claude/Codex PreToolUse hooks.
+    reason: Tool lifecycle checks belong in hooks because they block edits before source semantics exist.
+    nextAction: Keep generated hook artifacts in sync from policy/agent-guardrails.yaml.
+  agent/block-destructive-shell:
+    status: hook-covered
+    replacement: block-dangerous-shell hook
+    coverage: Covered by generated Claude/Codex PreToolUse hooks.
+    reason: Shell-command safety depends on tool-call context, not source AST.
+    nextAction: Keep hook script coverage in policy:verify-session.
+  agent/lint-after-edit:
+    status: hook-covered
+    replacement: pnpm policy:check:changed PostToolUse hook
+    coverage: Covered by generated Claude/Codex PostToolUse hooks.
+    reason: Changed-file validation is an edit-loop control-plane check.
+    nextAction: Keep check-changed and generated hook artifacts aligned.
+  agent/require-checks-before-stop:
+    status: hook-covered
+    replacement: pnpm policy:verify-session Stop hook
+    coverage: Covered by generated Claude/Codex Stop hooks.
+    reason: Session completion evidence is lifecycle policy, not lint semantics.
+    nextAction: Keep verify-session as the stop condition.
+  policy/no-check-weakening-without-policy-task:
+    status: policy-script
+    replacement: pnpm policy:check:changed
+    coverage: Covered for protected generated/config paths through the changed-file policy check.
+    reason: Toolchain weakening is a repository control-plane concern rather than an AST rule.
+    nextAction: Extend protected-file coverage only when new control-plane files are added.
+  policy/no-inline-disable-without-ticket:
+    status: ecosystem-covered
+    replacement: "@eslint-community/eslint-comments/require-description plus @typescript-eslint/ban-ts-comment"
+    coverage: Covered by maintained directive-description and TypeScript suppression rules.
+    reason: Ticket-string matching was retired; descriptions are the maintainable ecosystem path.
+    nextAction: Keep the locked retired custom decision in place.
+  mcp/no-unapproved-server:
+    status: spec-only
+    coverage: Not enforced locally.
+    reason: MCP allowlist enforcement belongs in policy scripts/config checks, but no implementation is scoped yet.
+    nextAction: Implement only if MCP registry changes become part of the active package surface.
+  mcp/pin-server-version:
+    status: spec-only
+    coverage: Not enforced locally.
+    reason: Version pinning is registry/config validation, not ESLint, and no active MCP consumer path is scoped.
+    nextAction: Keep in mcp.yaml as policy guidance until MCP enforcement work is explicit.
+  sonar/import-custom-eslint-issues:
+    status: policy-script
+    replacement: pnpm sonar:prepare
+    coverage: Covered by antidrift sonar conversion and sonar.externalIssuesReportPaths configuration.
+    reason: Sonar issue import is report generation and scanner configuration, not a lint rule.
+    nextAction: Keep reports/antidrift-sonar.json generation documented in sonar guidance.
+  sonar/no-new-critical-issues:
+    status: delegated
+    replacement: SonarQube quality gate
+    coverage: Delegated to server-side Sonar quality gate configuration.
+    reason: Critical issue gating is owned by Sonar once external issues and scanner properties are present.
+    nextAction: Configure the Sonar server gate for consuming projects.
+  sonar/complexity-budget:
+    status: delegated
+    replacement: SonarQube complexity metrics
+    coverage: Delegated to Sonar complexity and trend metrics.
+    reason: Complexity budgeting is portfolio/PR governance rather than custom local AST rule work.
+    nextAction: Keep Sonar guidance current and avoid duplicating it with blunt line-count custom rules.
+  rules/one-source-generates-agent-files:
+    status: policy-script
+    replacement: pnpm policy:check-generated
+    coverage: Covered by generated artifact verification against policy/agent-guardrails.yaml.
+    reason: Instruction consistency is a source-of-truth generation check.
+    nextAction: Keep generated targets synchronized through policy:generate.
+  rules/no-vague-agent-rules:
+    status: spec-only
+    coverage: Not enforced locally.
+    reason: Vague-rule detection is heuristic and currently lower priority than deterministic source and registry checks.
+    nextAction: Do not implement without a phrase taxonomy, examples, and real false-positive review.
+
 rules:
   antidrift/no-appeasement-cast:
     status: ready
