@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -239,5 +239,29 @@ ${rules}
     expect(checkRegistries({ repoRoot: root, report: (message) => messages.push(message) })).toBe(false);
     expect(messages.join("\n")).toContain(".external.whyThisState must be a non-empty string");
     expect(messages.join("\n")).toContain(".external.whyNotOtherState must be a non-empty string");
+  });
+
+  it("rejects rule-family subsets that reference unknown rules", () => {
+    const root = workspace();
+    writeValidRulesRegistry(root);
+    const existing = join(root, "policy", "registries", "rules.yaml");
+    const text = readFileSync(existing, "utf8");
+    writeFileSync(existing, `${text}
+ruleFamilies:
+  type-contract-authority:
+    description: Owns type authority laundering patterns.
+    subsets:
+      casts:
+        intent: Reject type escape hatches.
+        rules: [antidrift/not-a-rule]
+        flags:
+          - raw as Order
+        allows:
+          - OrderSchema.parse(raw)
+`);
+    const messages = [];
+
+    expect(checkRegistries({ repoRoot: root, report: (message) => messages.push(message) })).toBe(false);
+    expect(messages.join("\n")).toContain("ruleFamilies.type-contract-authority.subsets.casts.rules references unknown rule: antidrift/not-a-rule");
   });
 });

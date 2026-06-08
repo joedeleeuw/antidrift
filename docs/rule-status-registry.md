@@ -20,6 +20,8 @@ The two `why*` fields are deliberately required. They are the escape hatch again
 
 `docs/rule-equivalence-audit.md` is the companion ownership audit. It tracks whether a custom rule should be retired in favor of a maintained ESLint, `typescript-eslint`, plugin, or generated core-config replacement.
 
+`policy/registries/rules.yaml` also registers rule families. The current type-contract family is documented in `docs/rule-family-type-contract-authority.md`; it groups the cast, parse, predicate, selector, duplication, and typed-delegation subsets so future work can draw scope boundaries before adding rules.
+
 This file is the readable index. Update the YAML registry first, then keep this table aligned.
 
 ## Status Meanings

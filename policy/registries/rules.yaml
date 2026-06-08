@@ -36,6 +36,85 @@ statuses:
   retired: Removed from the active rule surface because real code showed the signal was not deterministic enough.
   research: Not implemented; requires ecosystem review and real corpus evidence before entering scope.
 
+ruleFamilies:
+  type-contract-authority:
+    description: Rules that decide whether local code has earned the type contract it claims, or should import, infer, validate, narrow, or derive from the owner instead.
+    referenceDoc: docs/rule-family-type-contract-authority.md
+    subsets:
+      selector-inference-appeasement:
+        intent: Prevent internal helpers from adding explicit return contracts to bare property access that TypeScript can infer directly.
+        rules:
+          - antidrift/no-trivial-selector-wrapper
+        flags:
+          - "function fullExcerpt(file: ParsedFile): string { return file.source; }"
+        allows:
+          - "function compactText(file: ParsedFile) { return file.source.trim(); }"
+          - "export function selectSource(file: ParsedFile): string { return file.source; }"
+      type-escape-casts:
+        intent: Prevent casts from manufacturing named, narrowed, or branded contracts without a guard, parser, or brand constructor.
+        rules:
+          - antidrift/no-appeasement-cast
+          - antidrift/no-unsafe-cast-chain
+          - antidrift/no-cast-to-branded
+        flags:
+          - "const order = raw as Order;"
+          - "const order = raw as unknown as Order;"
+          - "const id = raw as UserId;"
+        allows:
+          - "const order = OrderSchema.parse(raw);"
+          - "if (isOrder(raw)) return raw;"
+          - "const id = UserId.make(raw);"
+      validation-boundary-provenance:
+        intent: Keep raw data parsing at the boundary, and avoid re-certifying values already produced by the same schema.
+        rules:
+          - antidrift/no-unsafe-deserialize
+          - antidrift/no-redundant-zod-parse
+          - antidrift/no-same-schema-recertification
+        flags:
+          - "const input = JSON.parse(rawUnknown);"
+          - "const row = RowSchema.parse(await getTypedRow());"
+          - "return StateSchema.parse({ ...state, changed });"
+        allows:
+          - "const input = InputSchema.parse(JSON.parse(rawString));"
+          - "const row = RowSchema.parse(rawRow);"
+          - "return moveTo(StateSchema.parse(nextState));"
+      broad-shape-probing:
+        intent: Prevent broad-input predicates and normalizers from checking a token shape while claiming a larger object contract.
+        rules:
+          - antidrift/no-underchecked-type-predicate
+          - antidrift/no-defensive-shape-probing
+        flags:
+          - "z.custom<LineItem>((value) => typeof value === 'object' && value !== null)"
+          - "Object.entries(raw as Record<string, unknown>).map(([, value]) => 'numberValue' in value ? value.numberValue : null)"
+        allows:
+          - "z.custom<DateMessage>((value) => hasNumber(value, 'year') && hasNumber(value, 'month') && hasNumber(value, 'day'))"
+          - "Object.entries(typedMap).map(([, value]) => value.name)"
+      contract-shape-duplication:
+        intent: Prevent local structural copies or ambiguous positional shapes when a package, generated source, domain owner, or named object contract owns the shape.
+        rules:
+          - antidrift/no-structural-type-fork
+          - antidrift/no-canonical-model-fork
+          - antidrift/no-inline-structural-type-at-use-site
+          - antidrift/no-nullable-positional-tuple
+        flags:
+          - "type UserFork = { id: string; email: string; status: UserStatus };"
+          - "export function load(input: { userId: string }) {}"
+          - "type CustomRange = [Date | null, Date | null];"
+        allows:
+          - "import type { User } from '@agent-guardrails/domain';"
+          - "export function load(input: LoadInput) {}"
+          - "type DateRange = { start: Date | null; end: Date | null };"
+      typed-delegation-research:
+        intent: Track disputed wrapper shapes without turning broad single-call delegation into a rule.
+        rules:
+          - antidrift/no-thin-typed-factory-wrapper
+          - antidrift/no-explicit-return-type-private-helper
+        flags:
+          - "function buildRoute(path: string, title: string): WebviewRoute { return makeRoute(path, title); }"
+        allows:
+          - "function renderSprite(id: string): VisualTokenRegistryEntry { return entry(`render.sprite.${id}`, ['render.sprite'], [`sprite.${id}`], 'sprite token'); }"
+          - "function mapErrorCode(error: Error): TRPCError['code'] { return error instanceof AuthError ? 'UNAUTHORIZED' : 'INTERNAL_SERVER_ERROR'; }"
+
 rules:
   antidrift/no-appeasement-cast:
     status: ready

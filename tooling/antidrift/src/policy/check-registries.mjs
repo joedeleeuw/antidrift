@@ -426,6 +426,60 @@ function checkResearchCandidates(researchCandidates, repoRoot, errors) {
   }
 }
 
+function knownRuleIds(registry) {
+  return new Set([
+    ...Object.keys(registry.rules ?? {}),
+    ...Object.keys(registry.retiredRules ?? {}),
+    ...Object.keys(registry.researchCandidates ?? {}),
+  ]);
+}
+
+function checkKnownRuleReferences(rules, knownRules, label, errors) {
+  for (const rule of rules) {
+    if (!knownRules.has(rule)) errors.push(`${label}.rules references unknown rule: ${rule}`);
+  }
+}
+
+function checkRuleFamilySubset(subsetEntry, subsetLabel, knownRules, errors) {
+  if (!isRecord(subsetEntry)) {
+    errors.push(`${subsetLabel} must be a mapping.`);
+    return;
+  }
+  requireString(subsetEntry.intent, `${subsetLabel}.intent`, errors);
+  const rules = stringArray(subsetEntry.rules, `${subsetLabel}.rules`, errors);
+  checkKnownRuleReferences(rules, knownRules, subsetLabel, errors);
+  stringArray(subsetEntry.flags, `${subsetLabel}.flags`, errors);
+  stringArray(subsetEntry.allows, `${subsetLabel}.allows`, errors);
+}
+
+function checkRuleFamilyEntry(entry, label, repoRoot, knownRules, errors) {
+  if (!isRecord(entry)) {
+    errors.push(`${label} must be a mapping.`);
+    return;
+  }
+  requireString(entry.description, `${label}.description`, errors);
+  if (entry.referenceDoc !== undefined) requireExistingPath(repoRoot, entry.referenceDoc, `${label}.referenceDoc`, errors);
+  if (!isRecord(entry.subsets)) {
+    errors.push(`${label}.subsets must be a mapping.`);
+    return;
+  }
+  for (const [subset, subsetEntry] of Object.entries(entry.subsets)) {
+    checkRuleFamilySubset(subsetEntry, `${label}.subsets.${subset}`, knownRules, errors);
+  }
+}
+
+function checkRuleFamilies(ruleFamilies, registry, repoRoot, errors) {
+  if (ruleFamilies === undefined) return;
+  if (!isRecord(ruleFamilies)) {
+    errors.push("policy/registries/rules.yaml ruleFamilies must be a mapping.");
+    return;
+  }
+  const knownRules = knownRuleIds(registry);
+  for (const [family, entry] of Object.entries(ruleFamilies)) {
+    checkRuleFamilyEntry(entry, `policy/registries/rules.yaml ruleFamilies.${family}`, repoRoot, knownRules, errors);
+  }
+}
+
 function checkRulesRegistry(registry, repoRoot, errors) {
   if (Object.keys(registry).length === 0) {
     errors.push("policy/registries/rules.yaml must exist and contain the rule status registry.");
@@ -439,6 +493,7 @@ function checkRulesRegistry(registry, repoRoot, errors) {
   checkActiveRuleEntries(registry.rules, repoRoot, errors);
   checkRetiredRules(registry.retiredRules, repoRoot, errors);
   checkResearchCandidates(registry.researchCandidates, repoRoot, errors);
+  checkRuleFamilies(registry.ruleFamilies, registry, repoRoot, errors);
 }
 
 export function checkRegistries({ repoRoot = process.cwd(), policyDir = join(repoRoot, "policy"), report = console.error } = {}) {

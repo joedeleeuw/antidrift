@@ -10,6 +10,7 @@ For policy coverage status, see `docs/policy-coverage.md`. For retired-engine pa
 - Oxlint is retired; active references should not return.
 - Custom rule surface: the implemented `antidrift/*` rules exported by `tooling/antidrift/src/eslint-plugin/index.js`; `policy:check-rule-surface` keeps exports, config, and RuleTester or real-corpus coverage aligned.
 - Third-party support rules: the explicit rules configured in `tooling/antidrift/src/eslint-config/index.mjs`.
+- Type-contract authority is the registered rule family for the type-system work. See `docs/rule-family-type-contract-authority.md` for subsets, examples, non-goals, and research boundaries.
 
 ## Built And Hardened Scope
 
