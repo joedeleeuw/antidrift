@@ -4,7 +4,7 @@ newCode:
   - metric: new_issues
     op: equals
     value: 0
-    comment: AI-assisted changes should not introduce new untriaged Sonar issues.
+    comment: AI-assisted changes should not introduce new untriaged Sonar issues, including imported antidrift external issues.
   - metric: new_security_hotspots_reviewed
     op: equals
     value: 100
@@ -17,15 +17,15 @@ newCode:
     op: less_than_or_equal
     value: 2
     comment: Agents over-copy local patterns, so duplication budget should be tight.
-  - metric: external_ai_policy_issues
-    op: equals
-    value: 0
-    comment: Custom policy failures imported into Sonar should block the PR gate.
 overallCode:
   - metric: security_rating
     op: equals
     value: A
     comment: AI code may touch old files, so overall security still matters.
+  - metric: security_hotspots_reviewed
+    op: equals
+    value: 100
+    comment: AI code may touch old files, so security hotspots should not remain unreviewed.
   - metric: reliability_rating
     op: equals
     value: A
