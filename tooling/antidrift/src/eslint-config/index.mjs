@@ -1,7 +1,8 @@
 import { resolve } from "node:path";
-import { loadRegistriesSync } from "../policy/lib/registries.mjs";
-import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
+
 import js from "@eslint/js";
+import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
+import vitest from "@vitest/eslint-plugin";
 import boundaries from "eslint-plugin-boundaries";
 import importX from "eslint-plugin-import-x";
 import noOnlyTests from "eslint-plugin-no-only-tests";
@@ -9,10 +10,11 @@ import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import sonarjs from "eslint-plugin-sonarjs";
 import unicorn from "eslint-plugin-unicorn";
-import vitest from "@vitest/eslint-plugin";
-import tseslint from "typescript-eslint";
 import globals from "globals";
+import tseslint from "typescript-eslint";
+
 import aiPolicy from "../eslint-plugin/index.js";
+import { loadRegistriesSync } from "../policy/lib/registries.mjs";
 
 function generatedImportPatterns(registries) {
   return Object.values(registries.generated?.generatedSources ?? {}).flatMap(
@@ -163,6 +165,11 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "@typescript-eslint/no-unsafe-assignment": "error",
         "@typescript-eslint/no-unsafe-member-access": "error",
         "@typescript-eslint/no-unsafe-return": "error",
+        "@typescript-eslint/consistent-type-imports": [
+          "error",
+          { prefer: "type-imports", fixStyle: "separate-type-imports" },
+        ],
+        "@typescript-eslint/sort-type-constituents": "error",
         "@typescript-eslint/ban-ts-comment": [
           "error",
           { "ts-expect-error": "allow-with-description" },
@@ -188,6 +195,14 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "react/no-children-prop": "error",
         "react/jsx-no-undef": "error",
         "react/jsx-no-comment-textnodes": "error",
+        "react/jsx-sort-props": [
+          "error",
+          {
+            callbacksLast: true,
+            reservedFirst: true,
+            shorthandFirst: true,
+          },
+        ],
 
         // Focused tests are failed output.
         "no-only-tests/no-only-tests": "error",
@@ -197,6 +212,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "no-console": "error",
         "no-debugger": "error",
         "no-array-constructor": "error",
+        "no-multiple-empty-lines": ["error", { max: 1, maxEOF: 0 }],
         "no-warning-comments": [
           "error",
           { terms: ["@nocommit", "FIXME"], location: "anywhere" },
@@ -225,6 +241,52 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         ],
         "boundaries/no-private": "error",
         "import-x/no-cycle": ["error", { ignoreExternal: true }],
+        "import-x/consistent-type-specifier-style": [
+          "error",
+          "prefer-top-level",
+        ],
+        "import-x/first": "error",
+        "import-x/newline-after-import": ["error", { count: 1 }],
+        "import-x/no-duplicates": "error",
+        "import-x/no-extraneous-dependencies": [
+          "error",
+          {
+            devDependencies: [
+              "**/*.test.*",
+              "**/*.spec.*",
+              "**/test/**",
+              "**/tests/**",
+              "**/tooling/**",
+              "**/*.config.*",
+            ],
+          },
+        ],
+        "import-x/no-useless-path-segments": [
+          "error",
+          { noUselessIndex: false },
+        ],
+        "import-x/order": [
+          "error",
+          {
+            groups: [
+              "builtin",
+              "external",
+              "internal",
+              ["parent", "sibling", "index"],
+              "type",
+            ],
+            "newlines-between": "always",
+            alphabetize: { order: "asc", caseInsensitive: true },
+          },
+        ],
+        "sort-imports": [
+          "error",
+          {
+            allowSeparatedGroups: true,
+            ignoreDeclarationSort: true,
+            ignoreMemberSort: false,
+          },
+        ],
 
         // AI-specific custom rules from the local plugin.
         "antidrift/no-trivial-selector-wrapper": "error",

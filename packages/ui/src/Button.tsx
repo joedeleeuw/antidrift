@@ -1,6 +1,7 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { buttonClassNames } from "./tokens";
 
-import { buttonClassNames, type ButtonVariant } from "./tokens";
+import type { ButtonVariant } from "./tokens";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+
 import { protectedPolicyFiles } from "../lib/generated-targets.mjs";
 
 const input = readFileSync(0, "utf8");

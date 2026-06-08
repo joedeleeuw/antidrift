@@ -1,4 +1,4 @@
-import { typeProps, collectCanonicalTypes, collectDomainCanonicalTypes, collectGeneratedCanonicalTypes, isObjectType, resolvesToDomainCanonicalType, resolvesToGeneratedType, resolvesToInstalledType, MIN_PROPS } from "../policy/lib/type-index.mjs";
+import { MIN_PROPS, collectCanonicalTypes, collectDomainCanonicalTypes, collectGeneratedCanonicalTypes, isObjectType, resolvesToDomainCanonicalType, resolvesToGeneratedType, resolvesToInstalledType, typeProps } from "../policy/lib/type-index.mjs";
 
 const rawTailwindColorPattern = /\b(?:text|bg|border|ring)-(?:red|blue|green|yellow|gray|slate|zinc|neutral)-\d{2,3}\b/u;
 const hoverTranslatePattern = /hover:-?translate-[xy]/u;
@@ -914,7 +914,6 @@ function ruleNoObviousComment() {
     },
   };
 }
-
 
 const sqlPattern = /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
 const parameterizedSqlTagNames = new Set(["sql", "sqlQuery", "sqlRun"]);

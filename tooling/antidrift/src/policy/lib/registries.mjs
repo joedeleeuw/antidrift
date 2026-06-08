@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import YAML from "yaml";
 
 // Registries are optional. A registry that is not present means "no rules of that kind configured"

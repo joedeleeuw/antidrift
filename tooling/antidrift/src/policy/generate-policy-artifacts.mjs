@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import YAML from "yaml";
 
 const hookScript = (name) => `node node_modules/@joedeleeuw/antidrift/src/policy/hooks/${name}.mjs`;

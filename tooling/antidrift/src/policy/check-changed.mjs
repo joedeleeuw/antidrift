@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { changedFiles } from "./lib/git.mjs";
+
 import { protectedPolicyFiles } from "./lib/generated-targets.mjs";
+import { changedFiles } from "./lib/git.mjs";
 
 export function checkChanged() {
   const changed = changedFiles();

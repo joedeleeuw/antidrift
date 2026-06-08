@@ -1,6 +1,7 @@
-import type { Principal } from "@agent-guardrails/domain";
 import { canManageProject } from "@agent-guardrails/domain";
-import { z } from "zod";
+
+import type { Principal } from "@agent-guardrails/domain";
+import type { z } from "zod";
 
 export type RequestContext = {
   requestId: string;

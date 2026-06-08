@@ -1,8 +1,7 @@
 import type { UserDto } from "@agent-guardrails/contracts";
 
 export type LoadUserResult =
-  | { state: "loaded"; user: UserDto }
-  | { state: "failed"; message: string };
+  { state: "failed"; message: string } | { state: "loaded"; user: UserDto };
 
 export function loadUser(_signal: AbortSignal): Promise<LoadUserResult> {
   // Template placeholder: apps call an API client, not raw fetch in components.

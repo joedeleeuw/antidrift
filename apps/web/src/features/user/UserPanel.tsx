@@ -1,13 +1,12 @@
+import { Button } from "@agent-guardrails/ui";
 import { useEffect, useReducer } from "react";
 
-import { Button } from "@agent-guardrails/ui";
+import { loadUser } from "../../apiClient";
 
-import { loadUser, type LoadUserResult } from "../../apiClient";
+import type { LoadUserResult } from "../../apiClient";
 
 type UserPanelState =
-  | { state: "idle" }
-  | { state: "loading" }
-  | LoadUserResult;
+  LoadUserResult | { state: "idle" } | { state: "loading" };
 
 type UserPanelAction =
   | { type: "load" }

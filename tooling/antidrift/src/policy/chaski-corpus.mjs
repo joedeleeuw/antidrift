@@ -1,10 +1,12 @@
 import { existsSync, writeFileSync } from "node:fs";
-import { resolve, relative } from "node:path";
+import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ESLint } from "eslint";
+
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import tsParser from "@typescript-eslint/parser";
+import { ESLint } from "eslint";
 import importX from "eslint-plugin-import-x";
+
 import plugin from "../eslint-plugin/index.js";
 
 const defaultRepoCandidates = [

@@ -1,9 +1,11 @@
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
-import plugin from "../eslint-plugin/index.js";
+
 import { checkRegistries } from "./check-registries.mjs";
+import plugin from "../eslint-plugin/index.js";
 
 function workspace() {
   const root = mkdtempSync(join(tmpdir(), "antidrift-registries-"));

@@ -1,6 +1,5 @@
-import { z } from "zod";
-
 import { userStatuses } from "@agent-guardrails/domain";
+import { z } from "zod";
 
 export const userDtoSchema = z.object({
   id: z.string(),

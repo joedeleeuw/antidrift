@@ -1,9 +1,11 @@
 import { existsSync, writeFileSync } from "node:fs";
-import { resolve, relative } from "node:path";
+import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ESLint } from "eslint";
+
 import tsParser from "@typescript-eslint/parser";
+import { ESLint } from "eslint";
 import sonarjs from "eslint-plugin-sonarjs";
+
 import antidrift from "../eslint-plugin/index.js";
 
 const chaskiRepoCandidates = [

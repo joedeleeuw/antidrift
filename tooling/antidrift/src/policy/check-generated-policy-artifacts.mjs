@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { loadPolicy, renderPolicyArtifacts } from "./generate-policy-artifacts.mjs";
 
 async function readOrNull(target) {

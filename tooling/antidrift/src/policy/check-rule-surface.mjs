@@ -1,10 +1,12 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import YAML from "yaml";
+
+import { defaultCases as chaskiCorpusCases } from "./chaski-corpus.mjs";
 import { createConfig } from "../eslint-config/index.mjs";
 import plugin from "../eslint-plugin/index.js";
-import { defaultCases as chaskiCorpusCases } from "./chaski-corpus.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = resolve(__dirname, "../../../..");

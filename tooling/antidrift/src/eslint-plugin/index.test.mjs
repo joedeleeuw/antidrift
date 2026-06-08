@@ -1,9 +1,11 @@
-import { RuleTester } from "eslint";
-import tsParser from "@typescript-eslint/parser";
 import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import tsParser from "@typescript-eslint/parser";
+import { RuleTester } from "eslint";
 import { afterAll, describe, it } from "vitest";
+
 import plugin from "./index.js";
 
 RuleTester.afterAll = afterAll;
@@ -242,7 +244,6 @@ ruleTester.run("no-raw-fetch-in-component", rule("no-raw-fetch-in-component"), {
     { ...fixture("programs/drift/raw-fetch-in-component-module-helper.tsx"), errors: 1 },
   ],
 });
-
 
 ruleTester.run("no-sql-string-concat", rule("no-sql-string-concat"), {
   valid: [

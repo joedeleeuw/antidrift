@@ -1,6 +1,7 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import ts from "typescript";
 
 const codebaseAtlasRepoCandidates = [

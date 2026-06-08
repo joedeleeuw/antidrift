@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { createConfig } from "./index.mjs";
 
 function collectRules(configs) {
@@ -29,5 +30,18 @@ describe("createConfig", () => {
     expect(severity(rules["vitest/no-disabled-tests"])).toBe("error");
     expect(severity(rules["vitest/no-conditional-expect"])).toBe("error");
     expect(severity(rules["vitest/expect-expect"])).toBe("error");
+
+    expect(severity(rules["@typescript-eslint/consistent-type-imports"])).toBe("error");
+    expect(severity(rules["@typescript-eslint/sort-type-constituents"])).toBe("error");
+    expect(severity(rules["react/jsx-sort-props"])).toBe("error");
+    expect(severity(rules["no-multiple-empty-lines"])).toBe("error");
+    expect(severity(rules["sort-imports"])).toBe("error");
+    expect(severity(rules["import-x/consistent-type-specifier-style"])).toBe("error");
+    expect(severity(rules["import-x/first"])).toBe("error");
+    expect(severity(rules["import-x/newline-after-import"])).toBe("error");
+    expect(severity(rules["import-x/no-duplicates"])).toBe("error");
+    expect(severity(rules["import-x/no-extraneous-dependencies"])).toBe("error");
+    expect(severity(rules["import-x/no-useless-path-segments"])).toBe("error");
+    expect(severity(rules["import-x/order"])).toBe("error");
   });
 });

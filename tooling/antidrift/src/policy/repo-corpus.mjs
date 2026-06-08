@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve, relative } from "node:path";
+import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { ESLint } from "eslint";
 import YAML from "yaml";
+
 import plugin from "../eslint-plugin/index.js";
 
 const defaultTargets = ["apps", "packages", "tooling"];

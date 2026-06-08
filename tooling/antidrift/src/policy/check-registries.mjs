@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve, join, sep } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import ts from "typescript";
 import YAML from "yaml";
+
 import plugin from "../eslint-plugin/index.js";
 
 function isRecord(value) {
