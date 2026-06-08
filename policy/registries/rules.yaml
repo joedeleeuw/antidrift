@@ -676,3 +676,9 @@ researchCandidates:
     solveType: sql-injection-boundary
     referenceDoc: docs/rule-equivalence-audit.md
     nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 10 antidrift SQL findings. Keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.
+  antidrift/no-thin-typed-factory-wrapper:
+    status: research
+    signal: TypeChecker plus typed single-call constructor/delegation shape
+    solveType: unearned-return-contract
+    referenceDoc: docs/rule-investigations/no-thin-typed-factory-wrapper.md
+    nextAction: Codebase Atlas has broader typed-constructor-wrapper candidates; classify renderSprite and classificationFor* as accepted drift or clean abstractions, then seek a second independent repo before implementation.

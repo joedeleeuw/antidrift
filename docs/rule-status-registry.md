@@ -131,6 +131,7 @@ Start investigation before code:
 | `ecosystem/vitest-test-integrity`              | `ecosystem-covered` | maintained ESLint plugin         | Covered by `@vitest/eslint-plugin` for focused tests, disabled tests, conditional expects/tests, standalone expects, and missing assertion checks. |
 | `ecosystem/react-hooks-compiler`               | `ecosystem-covered` | maintained ESLint plugin         | Covered by `eslint-plugin-react-hooks` recommended-latest plus explicit `react-hooks/no-deriving-state-in-effects`.                                |
 | `ecosystem/sonar-sql-queries`                  | `ecosystem-covered` | maintained ESLint plugin         | Covered by `sonarjs/sql-queries`, but the local benchmark currently reports 0 findings against 10 custom SQL findings.                             |
+| `antidrift/no-thin-typed-factory-wrapper`      |          `research` | TypeChecker plus typed single-call constructor/delegation shape | Codebase Atlas has broader typed-constructor-wrapper candidates; classify them before implementation.                                               |
 
 ## Retired Rules
 
