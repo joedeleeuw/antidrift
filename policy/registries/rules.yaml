@@ -50,6 +50,7 @@ ruleFamilies:
         allows:
           - "function compactText(file: ParsedFile) { return file.source.trim(); }"
           - "export function selectSource(file: ParsedFile): string { return file.source; }"
+          - "/* eslint-disable-next-line antidrift/no-trivial-selector-wrapper -- external adapter type requires annotated callback */ const keyForExternalList = (item: ChatItem): string => item.id;"
       type-escape-casts:
         intent: Prevent casts from manufacturing named, narrowed, or branded contracts without a guard, parser, or brand constructor.
         rules:
@@ -64,6 +65,7 @@ ruleFamilies:
           - "const order = OrderSchema.parse(raw);"
           - "if (isOrder(raw)) return raw;"
           - "const id = UserId.make(raw);"
+          - "const user = currentUser.toJSON() as FirebaseUserJson; // source is a typed SDK value, not any or unknown"
       validation-boundary-provenance:
         intent: Keep raw data parsing at the boundary, and avoid re-certifying values already produced by the same schema.
         rules:
@@ -78,6 +80,7 @@ ruleFamilies:
           - "const input = InputSchema.parse(JSON.parse(rawString));"
           - "const row = RowSchema.parse(rawRow);"
           - "return moveTo(StateSchema.parse(nextState));"
+          - "expect(() => RowSchema.parse(typedFixture)).not.toThrow();"
       broad-shape-probing:
         intent: Prevent broad-input predicates and normalizers from checking a token shape while claiming a larger object contract.
         rules:
@@ -89,6 +92,7 @@ ruleFamilies:
         allows:
           - "z.custom<DateMessage>((value) => hasNumber(value, 'year') && hasNumber(value, 'month') && hasNumber(value, 'day'))"
           - "Object.entries(typedMap).map(([, value]) => value.name)"
+          - "function isString(value: unknown): value is string { return typeof value === 'string'; }"
       contract-shape-duplication:
         intent: Prevent local structural copies or ambiguous positional shapes when a package, generated source, domain owner, or named object contract owns the shape.
         rules:
@@ -104,6 +108,7 @@ ruleFamilies:
           - "import type { User } from '@agent-guardrails/domain';"
           - "export function load(input: LoadInput) {}"
           - "type DateRange = { start: Date | null; end: Date | null };"
+          - "type UserDto = z.infer<typeof UserDtoSchema>;"
       typed-delegation-research:
         intent: Track disputed wrapper shapes without turning broad single-call delegation into a rule.
         rules:
@@ -114,6 +119,7 @@ ruleFamilies:
         allows:
           - "function renderSprite(id: string): VisualTokenRegistryEntry { return entry(`render.sprite.${id}`, ['render.sprite'], [`sprite.${id}`], 'sprite token'); }"
           - "function mapErrorCode(error: Error): TRPCError['code'] { return error instanceof AuthError ? 'UNAUTHORIZED' : 'INTERNAL_SERVER_ERROR'; }"
+          - "export function reloadProject(id: ProjectId): Promise<Project> { return readProject(id); }"
 
 rules:
   antidrift/no-appeasement-cast:

@@ -17,6 +17,30 @@ This is a family registry, not an implementation queue. A subset can be stable, 
 | Contract shape duplication | `antidrift/no-structural-type-fork`, `antidrift/no-canonical-model-fork`, `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-nullable-positional-tuple` | Ready | TypeChecker, registry facts, and deterministic AST | Local structural copies of owner types, exported inline object contracts, and ambiguous nullable positional tuples. | Imported owner types, named DTO/input contracts, schema-inferred types, and named object ranges. |
 | Typed delegation research | research `antidrift/no-thin-typed-factory-wrapper`, retired `antidrift/no-explicit-return-type-private-helper` | Research or retired | Exact-forward TypeChecker symbol identity, if ever revived | Only a future exact-forward wrapper that repeats the callee's return contract without adding behavior. | Domain constructors, classification helpers, validators, brand constructors, contextual error helpers, facades, and legitimate private return contracts. |
 
+## Good Counterexample Matrix
+
+These are examples that can look superficially similar to a violation. They should stay clean unless new real-corpus evidence proves otherwise.
+
+| Subset | Good usage | Why it is clean |
+| --- | --- | --- |
+| Selector inference appeasement | `export function selectSource(file: ParsedFile): string { return file.source; }` | Exported functions are API boundaries; their return type can be part of the public contract. |
+| Selector inference appeasement | `const rowKey = (item: ChatItem): string => item.id;` when an external list API requires an annotated callback | The helper may be an adapter for an external API signature. Keep the helper only with a narrow rule-specific disable reason when the external annotation is truly required. |
+| Type escape casts | `const user = currentUser.toJSON() as FirebaseUserJson;` | The source is a typed SDK value, not `any` or `unknown`; this is an interop conversion, not a broad-input type escape. |
+| Type escape casts | `if (isOrder(raw)) return raw;` | The predicate earns the type by narrowing before use. Predicate quality is owned by the predicate subset, not by cast rules. |
+| Type escape casts | `const id = UserId.make(raw);` | The brand constructor is the authority for creating the branded value. |
+| Validation-boundary provenance | `const input = InputSchema.parse(JSON.parse(rawString));` | Raw string input is parsed and immediately validated at the boundary. |
+| Validation-boundary provenance | `expect(() => RowSchema.parse(typedFixture)).not.toThrow();` | Schema-contract tests may intentionally assert that a typed fixture still satisfies the schema. |
+| Validation-boundary provenance | `return moveTo(StateSchema.parse(nextState));` | Invariant checkpoints can be valid when real code proves the parse establishes a state transition boundary. |
+| Broad shape probing | `function isString(value: unknown): value is string { return typeof value === "string"; }` | Primitive predicates do not claim an object contract with unchecked fields. |
+| Broad shape probing | `value.table === "orders" && value.data.type === "line-item"` over a typed union | Discriminant checks over already-typed unions are normal control flow, not broad-input laundering. |
+| Broad shape probing | `Object.entries(typedMap).map(([, value]) => value.name)` | The map value already has an owned type, so property access is not defensive mini-parsing. |
+| Contract shape duplication | `type UserDto = z.infer<typeof UserDtoSchema>;` | The schema owns the wire contract; the type is derived from it instead of retyped manually. |
+| Contract shape duplication | `type DateRange = { start: Date | null; end: Date | null };` | Named fields carry meaning that a nullable positional tuple hides. |
+| Contract shape duplication | `type ProjectWithTenant = Project & { tenantId: string };` | Supersets that add real fields are not structural forks of the owner type. |
+| Typed delegation research | `function renderSprite(id): VisualTokenRegistryEntry { return entry(...derivedTokenParts); }` | The wrapper derives domain facts and names a useful constructor. Broad single-call delegation would false-positive here. |
+| Typed delegation research | `function requiredString(node): string { return required(node, "expected string"); }` | The wrapper adds contextual error meaning even if it delegates. |
+| Typed delegation research | `export function reloadProject(id): Promise<Project> { return readProject(id); }` | Exported facades can intentionally stabilize public package/API shape. |
+
 ## Examples
 
 ### Selector Inference Appeasement
@@ -39,6 +63,9 @@ function compactText(file: ParsedFile): string {
 export function selectSource(file: ParsedFile): string {
   return file.source;
 }
+
+// eslint-disable-next-line antidrift/no-trivial-selector-wrapper -- external adapter type requires annotated callback
+const rowKey = (item: ChatItem): string => item.id;
 ```
 
 ### Type Escape Casts
@@ -61,6 +88,8 @@ if (isOrder(raw)) {
 }
 
 const id = UserId.make(raw);
+
+const user = currentUser.toJSON() as FirebaseUserJson;
 ```
 
 ### Validation-Boundary Provenance
@@ -79,6 +108,8 @@ Allows:
 const input = InputSchema.parse(JSON.parse(rawString));
 const row = RowSchema.parse(rawRow);
 return moveTo(StateSchema.parse(nextState));
+
+expect(() => RowSchema.parse(typedFixture)).not.toThrow();
 ```
 
 The same-schema state recertification example is research only. It is not an active rule until a real second-repo remediation proves the signal.
@@ -105,6 +136,10 @@ const DateMessageSchema = z.custom<DateMessage>(
 );
 
 Object.entries(typedMap).map(([, value]) => value.name);
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
 ```
 
 ### Contract Shape Duplication
@@ -134,6 +169,8 @@ type DateRange = {
   start: Date | null;
   end: Date | null;
 };
+
+type UserDto = z.infer<typeof UserDtoSchema>;
 ```
 
 ### Typed Delegation Research
@@ -155,6 +192,10 @@ function renderSprite(id: string): VisualTokenRegistryEntry {
 
 function mapErrorCode(error: Error): TRPCError["code"] {
   return error instanceof AuthError ? "UNAUTHORIZED" : "INTERNAL_SERVER_ERROR";
+}
+
+export function reloadProject(id: ProjectId): Promise<Project> {
+  return readProject(id);
 }
 ```
 
