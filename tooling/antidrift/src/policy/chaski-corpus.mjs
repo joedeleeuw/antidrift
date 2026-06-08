@@ -963,6 +963,16 @@ export const defaultCases = [
     paths: ["src/frontend/bff/api/schemas/powersync.ts"],
   },
   {
+    id: "monolith-account-details-destructured-date-predicate-clean",
+    ruleId: "antidrift/no-underchecked-type-predicate",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    typeAware: true,
+    tsconfig: "src/frontend/monolithui/tsconfig.json",
+    paths: ["src/frontend/monolithui/src/components/AccountDetails.tsx"],
+  },
+  {
     id: "portal-latest-callback-ref-missing-layout-effect-deps",
     ruleId: "antidrift/require-effect-deps",
     kind: "drift",

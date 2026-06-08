@@ -63,7 +63,8 @@ if (axios.isAxiosError(err)) {
 
 Codebase Atlas:
 
-- `/Users/sushi/code/codebase-atlas/src/needle/AtlasNeedleRenderer.ts` line 200 casts `mesh.userData.baseEmissive` to `ThreeColor`.
+- `/Users/sushi/code/codebase-atlas/src/needle/AtlasNeedleRenderer.ts` line 205 casts `mesh.userData.baseEmissive` to `ThreeColor`.
+- `/Users/sushi/code/codebase-atlas/src/programs/persistenceCuration.ts` line 1269 casts broad input to `TerrainLayoutAnchor` before checking fields.
 
 Expected repair:
 

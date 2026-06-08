@@ -2014,9 +2014,34 @@ function predicateValueNames(node, paramName) {
   return names;
 }
 
+function destructuredTargetPropertyAliases(node, paramNames, targetProps) {
+  const aliases = new Map();
+  walkNode(node, (current) => {
+    if (current.type !== "VariableDeclarator" || current.id?.type !== "ObjectPattern") return;
+    if (!hasParamRoot(current.init, paramNames)) return;
+    for (const prop of current.id.properties ?? []) {
+      if (prop?.type !== "Property") continue;
+      const propName = staticPropertyName(prop.key);
+      if (!targetProps.has(propName)) continue;
+      const value = prop.value?.type === "AssignmentPattern" ? prop.value.left : prop.value;
+      if (value?.type === "Identifier") aliases.set(value.name, propName);
+    }
+  });
+  return aliases;
+}
+
+function isBindingIdentifier(node) {
+  const parent = node.parent;
+  if (parent?.type === "VariableDeclarator" && parent.id === node) return true;
+  if (parent?.type === "Property" && parent.value === node && parent.parent?.type === "ObjectPattern") return true;
+  if (parent?.type === "AssignmentPattern" && parent.left === node && parent.parent?.type === "Property") return true;
+  return false;
+}
+
 function checkedTargetProperties(node, paramName, targetProps) {
   const checked = new Set();
   const paramNames = predicateValueNames(node, paramName);
+  const propertyAliases = destructuredTargetPropertyAliases(node, paramNames, targetProps);
   walkNode(node, (current) => {
     if (current.type === "BinaryExpression" && current.operator === "in" && hasParamRoot(current.right, paramNames)) {
       const prop = staticPropertyName(current.left);
@@ -2030,6 +2055,11 @@ function checkedTargetProperties(node, paramName, targetProps) {
     }
     if (current.type === "MemberExpression" && hasParamRoot(current, paramNames)) {
       const prop = memberExpressionPropertyName(current);
+      if (targetProps.has(prop)) checked.add(prop);
+      return;
+    }
+    if (current.type === "Identifier" && !isBindingIdentifier(current)) {
+      const prop = propertyAliases.get(current.name);
       if (targetProps.has(prop)) checked.add(prop);
     }
   });

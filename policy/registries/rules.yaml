@@ -96,10 +96,13 @@ rules:
     stable: false
     signal: TypeChecker
     solveType: brand-forgery
+    referenceDoc: docs/rule-investigations/no-cast-to-branded.md
     corpusRepositories: [codebase-atlas]
     concerns:
       - No real corpus currently adopts the antidrift brand kit.
-      - Codebase Atlas has Zod-branded IDs and clean parse boundaries, but no real forged brand cast.
+      - Current implementation detects only the antidrift brand marker; Codebase Atlas Zod-branded IDs are not detected yet.
+      - Codebase Atlas has Zod-branded IDs and clean parse boundaries, but no real non-test forged brand cast.
+      - Angle-bracket type assertions are not visited today.
     external:
       state: broader-upstream
       support: high
@@ -112,7 +115,8 @@ rules:
         - "const id = raw as UserId;"
       allows:
         - "const id = UserId.make(raw);"
-    nextAction: Wait for a real forged brand cast and decide whether Zod branded targets are in scope.
+        - "const id = UserIdSchema.parse(raw);"
+    nextAction: Explore Zod brand target detection and TSTypeAssertion coverage, then seek a real non-test forged brand cast before enabling.
   antidrift/no-coupled-state-setters:
     status: ready
     stable: false
@@ -497,8 +501,10 @@ rules:
     concerns:
       - The rule is intentionally limited to broad-input predicates that assert nontrivial object contracts.
       - Codebase Atlas supplies clean controls for primitive predicates, alias-based field checks, and third-party union predicates.
+      - Chaski supplies a destructured-field clean control for object predicates.
       - Validator delegation is allowed, so stable promotion should classify schema-backed predicate inventories.
       - Discriminant guards over already-typed unions stay outside the report path.
+      - The verdict layer is heuristic; validator-looking helper names and incidental member reads can cause false negatives.
     external:
       state: net-antidrift
       support: none

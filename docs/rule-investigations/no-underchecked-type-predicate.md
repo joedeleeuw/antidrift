@@ -47,6 +47,7 @@ Chaski clean controls:
 
 - `src/frontend/bff/shared/date.ts`: `isDateMessage` checks `year`, `month`, and `day`.
 - `src/frontend/bff/api/schemas/powersync.ts`: discriminant predicates narrow already-typed unions by table/data shape.
+- `src/frontend/monolithui/src/components/AccountDetails.tsx`: `isDateStruct` destructures `year`, `month`, and `day` from `Record<string, unknown>` before checking each primitive. This is a clean guard that protects the destructured-field-check edge.
 
 Broad Chaski BFF inventory reported exactly one finding across 177 files: the accepted `RetoolLineItemData` predicate.
 
@@ -61,6 +62,21 @@ Codebase Atlas clean controls:
 - Valid discriminated-union guards may only check one discriminant.
 - Guards may delegate to a validator helper that needs provenance tracking.
 - Required-property counting can overstate what a runtime guard must check.
+- The validator delegation escape is name-shaped (`safeParse`, `validate`, `assert`, `check`, `isX`, `hasX`), so a trivial helper with a validator-looking name can hide a false negative.
+- Incidental member reads can count as checked fields if they are not part of a real guard expression.
+
+## Claude Advisory Review
+
+Claude Opus 4.8 advisory review completed on June 8, 2026 (`reports/claude-rule-reviews/20260608-105341-type-predicate.md`). It read repo code through `Read`, `Grep`, and `Glob`; stderr was empty.
+
+The review agreed:
+
+- No supported ecosystem rule checks predicate-body sufficiency.
+- The TypeChecker entry gates are real: broad input, asserted object target, intersection handling, and property count all need type services.
+- The verdict layer is necessarily heuristic because runtime validation sufficiency cannot be proved generally.
+- Keep the rule `ready`, not stable.
+- Do not promote until another real repository supplies an underchecked broad-input predicate drift case.
+- Add or seek clean controls for destructuring, assertion signatures, and validator delegation names outside the current regex.
 
 ## Promotion Conditions
 

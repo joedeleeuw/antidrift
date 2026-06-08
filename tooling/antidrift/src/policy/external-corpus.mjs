@@ -279,7 +279,7 @@ const codebaseAtlasCases = [
     expectedFindings: [
       {
         path: "src/parsing/treeSitterRealProgramParser.ts",
-        line: 897,
+        line: 916,
       },
     ],
   },
@@ -325,7 +325,7 @@ const codebaseAtlasCases = [
     expectedFindings: [
       {
         path: "src/needle/AtlasNeedleRenderer.ts",
-        line: 200,
+        line: 205,
       },
     ],
   },
@@ -341,7 +341,7 @@ const codebaseAtlasCases = [
     expectedFindings: [
       {
         path: "src/programs/persistenceCuration.ts",
-        line: 654,
+        line: 1269,
       },
     ],
   },

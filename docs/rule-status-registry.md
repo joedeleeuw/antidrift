@@ -43,7 +43,7 @@ Rule maturity constrains configured severity. `under-proven`, `false-positive-pr
 
 Current default-off custom rules:
 
-- `antidrift/no-cast-to-branded`: under-proven until real branded-value forgery appears in corpus code.
+- `antidrift/no-cast-to-branded`: under-proven until real branded-value forgery appears in corpus code; Zod brand target detection is the likely route to real evidence.
 - `antidrift/no-role-literal-in-type`: under-proven until a real role-union redeclaration is accepted.
 - `antidrift/no-obvious-comment`: token-overlap heuristic; useful for review inventory, not yet safe as a blocker.
 - `antidrift/no-status-triplet-state`: configurable name-group heuristic; needs low-noise frontend inventories before blocking.
@@ -97,7 +97,7 @@ Start investigation before code:
 | ------------------------------------------------- | -------------: | -----: | --------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `antidrift/no-appeasement-cast`                   |        `ready` |     no | TypeChecker                                               | `broader-upstream` / `own-antidrift`   | Copy-backed repair patterns are proven; pause copy-only remediation and rerun broad inventory after real consumer cleanup.                 |
 | `antidrift/no-async-array-method`                 |        `ready` |     no | AST                                                       | `partial-overlap` / `own-antidrift`    | Find a second independent real drift instance, or document an explicit one-repo evidence exception before stable promotion.                |
-| `antidrift/no-cast-to-branded`                    | `under-proven` |     no | TypeChecker                                               | `broader-upstream` / `own-antidrift`   | Wait for a real forged brand cast and decide whether Zod branded targets are in scope.                                                     |
+| `antidrift/no-cast-to-branded`                    | `under-proven` |     no | TypeChecker                                               | `broader-upstream` / `own-antidrift`   | Explore Zod brand target detection and `TSTypeAssertion` coverage, then seek a real non-test forged brand cast before enabling.            |
 | `antidrift/no-coupled-state-setters`              |        `ready` |     no | scope-binding                                             | `net-antidrift` / `own-antidrift`      | Classify inventory findings before stable promotion.                                                                                       |
 | `antidrift/no-defensive-shape-probing`            |        `ready` |     no | TypeChecker plus AST shape                                | `net-antidrift` / `own-antidrift`      | Seek a second real drift repository before stable promotion.                                                                               |
 | `antidrift/no-hover-translate-card`               |        `ready` |     no | AST string literal extraction                             | `config-replacement` / `own-antidrift` | Stable promotion requires inventory classification across another UI repo.                                                                 |
