@@ -37,6 +37,19 @@ This file is the readable index. Update the YAML registry first, then keep this 
 
 `ready` is not the same as stable. Stable promotion requires multiple independent repository replications that were not created for the rule, zero known false positives, zero known false negatives, no unresolved production concerns, and a grounded Claude Opus 4.8 advisory review.
 
+## Decision Locks
+
+Some decisions are intentionally harder to reopen than ordinary registry rows. `policy/registries/rules.yaml` has a `decisionLocks` section for custom rules that were retired and candidates that were judged ecosystem-covered. `pnpm policy:check-registries` validates those locks against a hardcoded list in `tooling/antidrift/src/policy/check-registries.mjs`.
+
+That means a shot-down rule cannot quietly return by moving it from `retiredRules` or `researchCandidates` into the active `rules` table. Reopening one requires changing the checker and tests, which should happen only as explicit policy work backed by new real-code evidence.
+
+Rule-family subsets may reference a locked decision only as historical evidence, and must declare `historical: true`. That keeps the old lesson searchable without making the subset look like active implementation scope.
+
+Current locked decisions include:
+
+- retired custom rules: `antidrift/no-cycle`, `antidrift/no-inline-disable-without-ticket`, `antidrift/no-sdk-direct-use`, `antidrift/no-explicit-return-type-private-helper`, `antidrift/no-silent-catch`, and `antidrift/no-thin-typed-factory-wrapper`
+- ecosystem-covered candidates: discriminated-union exhaustiveness, import cycles, disable-comment descriptions, gateway restricted imports, Vitest test integrity, React Hooks compiler coverage, and SonarJS SQL query coverage
+
 ## Severity Discipline
 
 Rule maturity constrains configured severity. `under-proven`, `false-positive-prone`, and `research` rules must not be configured as blocking. Heuristic signals such as `token-overlap` and configurable name groups must also stay non-blocking until multiple real inventories show low noise.

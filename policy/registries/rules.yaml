@@ -115,6 +115,7 @@ ruleFamilies:
           - "type DateRange = { start: Date | null; end: Date | null };"
           - "type UserDto = z.infer<typeof UserDtoSchema>;"
       typed-delegation-research:
+        historical: true
         intent: Preserve retired/disputed wrapper evidence without turning broad single-call delegation into a rule.
         rules:
           - antidrift/no-thin-typed-factory-wrapper
@@ -786,3 +787,70 @@ researchCandidates:
     solveType: schema-roundtrip-parse
     referenceDoc: docs/rule-investigations/no-same-schema-recertification.md
     nextAction: Do not implement as a rule; use policy:inventory-schema-roundtrip to classify real roundtrip anchors, then drop unless a second independent repo produces an accepted remediated anchor.
+
+decisionLocks:
+  antidrift/no-cycle:
+    status: retired
+    location: retiredRules
+    replacement: import-x/no-cycle
+    reason: Maintained import-graph coverage owns cycle detection; do not rebuild custom graph traversal without changing the checker lock.
+  antidrift/no-inline-disable-without-ticket:
+    status: retired
+    location: retiredRules
+    replacement: "@eslint-community/eslint-comments/require-description plus @typescript-eslint/ban-ts-comment"
+    reason: Maintained directive-description rules own local disable justification; do not revive ticket-string matching.
+  antidrift/no-sdk-direct-use:
+    status: retired
+    location: retiredRules
+    replacement: generated no-restricted-imports from policy/registries/gateways.yaml
+    reason: Core ESLint restrictions plus gateway registry facts own direct SDK import blocking.
+  antidrift/no-explicit-return-type-private-helper:
+    status: retired
+    location: retiredRules
+    replacement: none
+    reason: Real corpus review showed private helper return annotations are often legitimate contracts, not deterministic appeasement.
+  antidrift/no-silent-catch:
+    status: retired
+    location: retiredRules
+    replacement: "ESLint no-empty, no-console, sonarjs/no-ignored-exceptions, preserve-caught-error"
+    reason: Maintained rules cover enough low-value catch handling; future custom error work should target fallback-to-empty.
+  antidrift/no-thin-typed-factory-wrapper:
+    status: retired
+    location: retiredRules
+    replacement: none
+    reason: No real non-test exact-forward internal drift was found, while broad factory-wrapper variants false-positive on clean constructors and facades.
+  ecosystem/discriminated-union-exhaustiveness:
+    status: ecosystem-covered
+    location: researchCandidates
+    replacement: "@typescript-eslint/switch-exhaustiveness-check and related type-aware rules"
+    reason: Discriminated-union handling is ecosystem-covered until real code proves a gap those rules cannot express.
+  ecosystem/import-cycle:
+    status: ecosystem-covered
+    location: researchCandidates
+    replacement: import-x/no-cycle
+    reason: Keep custom cycle traversal retired unless maintained import-graph coverage becomes unusable.
+  ecosystem/disable-comment-description:
+    status: ecosystem-covered
+    location: researchCandidates
+    replacement: "@eslint-community/eslint-comments/require-description plus @typescript-eslint/ban-ts-comment"
+    reason: Disable-comment descriptions are maintained ecosystem scope.
+  ecosystem/gateway-restricted-imports:
+    status: ecosystem-covered
+    location: researchCandidates
+    replacement: generated no-restricted-imports
+    reason: Gateway import boundaries are expressible through generated core ESLint config.
+  ecosystem/vitest-test-integrity:
+    status: ecosystem-covered
+    location: researchCandidates
+    replacement: "@vitest/eslint-plugin"
+    reason: Vitest-focused test integrity is maintained plugin scope.
+  ecosystem/react-hooks-compiler:
+    status: ecosystem-covered
+    location: researchCandidates
+    replacement: eslint-plugin-react-hooks recommended-latest
+    reason: React compiler-era hook rules are maintained React plugin scope.
+  ecosystem/sonar-sql-queries:
+    status: ecosystem-covered
+    location: researchCandidates
+    replacement: sonarjs/sql-queries
+    reason: SonarJS SQL coverage stays tracked as ecosystem coverage even though antidrift keeps its narrower HogQL/template interpolation rule.
