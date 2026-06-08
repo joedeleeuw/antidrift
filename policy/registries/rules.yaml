@@ -453,7 +453,7 @@ rules:
       - Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are accepted clean because the tag owns value binding.
       - Closed SQL identifier fragments from typed service-boundary unions and static object-literal column maps are accepted only in SQL identifier/direction positions.
       - Dynamic object-key column lists and non-allowlisted table names are intentional drift findings.
-      - Sanitized dynamic SQL identifiers derived from constructor-validated instance fields are a known gap; Cloudflare Workspace table names are recorded as non-blocking corpus evidence until that proof exists.
+      - Constructor-validated dynamic SQL identifiers are accepted only when an anchored identifier regex guard definitely exits on failure, the derived identifier template remains identifier-shaped, and interpolation is in an SQL identifier position.
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:
       state: partial-overlap
@@ -472,8 +472,9 @@ rules:
         - 'const placeholders = ids.map(() => "?").join(","); db.prepare(`SELECT id FROM issues WHERE id IN (${placeholders})`).all(...ids);'
         - "await this.sqlRun`UPDATE files SET modified_at = ${timestamp} WHERE path = ${path}`;"
         - 'const sortBy = options.sortBy ?? "created_at"; db.prepare(`SELECT * FROM executions ORDER BY ${sortBy}`);'
+        - 'if (!VALID_NAMESPACE.test(ns)) throw new Error("bad namespace"); this.tableName = `cf_workspace_${ns}`; this.sql.run(`SELECT * FROM ${this.tableName}`);'
         - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
-    nextAction: Keep as ready but not stable until sanitized dynamic SQL identifier controls either stay clean through a narrow proof or are explicitly ruled out of scope.
+    nextAction: Sanitized dynamic SQL identifier proof is covered by Cloudflare Workspace; run the formal advisory review before stable promotion.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false

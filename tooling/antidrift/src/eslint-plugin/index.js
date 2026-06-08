@@ -1039,6 +1039,34 @@ function isSqlDirectionTokenValue(value) {
   return value === "ASC" || value === "DESC" || value === "asc" || value === "desc";
 }
 
+function charClassAllowsOnlySqlIdentifierChars(value, { allowDigit }) {
+  let i = 0;
+  while (i < value.length) {
+    const char = value[i];
+    const next = value[i + 1];
+    const end = value[i + 2];
+    if (next === "-" && end) {
+      const range = `${char}-${end}`;
+      if (range !== "a-z" && range !== "A-Z" && (!allowDigit || range !== "0-9")) return false;
+      i += 3;
+    } else {
+      const isLetter = /[A-Za-z]/u.test(char);
+      const isDigit = /\d/u.test(char);
+      if (!isLetter && char !== "_" && (!allowDigit || !isDigit)) return false;
+      i += 1;
+    }
+  }
+  return true;
+}
+
+function isSqlIdentifierRegexLiteral(node) {
+  const pattern = node?.type === "Literal" && node.regex ? node.regex.pattern : "";
+  const match = /^\^\[([^\]]+)\]\[([^\]]+)\]\*\$$/u.exec(pattern);
+  if (!match) return false;
+  return charClassAllowsOnlySqlIdentifierChars(match[1], { allowDigit: false })
+    && charClassAllowsOnlySqlIdentifierChars(match[2], { allowDigit: true });
+}
+
 function isSqlIdentifierContext(before, after) {
   return /(?:ORDER\s+BY|GROUP\s+BY|PARTITION\s+BY|FROM|JOIN|UPDATE|INTO|TABLE)\s*$/iu.test(before) || /^\s*=/.test(after);
 }
@@ -1085,6 +1113,29 @@ function assignedSqlIdentifierNode(node) {
   return null;
 }
 
+function classMemberKey(node) {
+  if (node?.type !== "MemberExpression" || node.computed) return null;
+  if (node.object?.type !== "ThisExpression" || node.property?.type !== "Identifier") return null;
+  return node.property.name;
+}
+
+function enclosingClass(node) {
+  let cur = node?.parent ?? null;
+  while (cur) {
+    if (cur.type === "ClassDeclaration" || cur.type === "ClassExpression") return cur;
+    cur = cur.parent;
+  }
+  return null;
+}
+
+function statementExits(node) {
+  if (!node) return false;
+  if (node.type === "ThrowStatement" || node.type === "ReturnStatement") return true;
+  if (node.type === "BlockStatement") return statementExits(node.body.at(-1));
+  if (node.type === "IfStatement") return statementExits(node.consequent) && statementExits(node.alternate);
+  return false;
+}
+
 function ruleNoSqlStringConcat() {
   return {
     meta: { type: "problem", docs: { description: "Disallow SQL assembled via string interpolation or concatenation." }, schema: [] },
@@ -1094,9 +1145,40 @@ function ruleNoSqlStringConcat() {
       const safeSqlFragmentStrings = new WeakSet();
       const safeSqlIdentifierValues = new WeakMap();
       const safeSqlIdentifierObjectValues = new WeakMap();
+      const safeDynamicSqlIdentifierVariables = new WeakSet();
+      const safeDynamicSqlIdentifierMembers = new WeakMap();
+      const sqlIdentifierRegexVariables = new WeakSet();
       function isSafeFragmentVariable(node, set) {
         const variable = findVariable(sourceCode, node);
         return Boolean(variable && set.has(variable));
+      }
+      function markDynamicSqlIdentifierVariable(node) {
+        const variable = findVariable(sourceCode, node);
+        if (variable) safeDynamicSqlIdentifierVariables.add(variable);
+      }
+      function unmarkSqlIdentifierVariable(variable) {
+        safeSqlIdentifierValues.delete(variable);
+        safeSqlIdentifierObjectValues.delete(variable);
+        safeDynamicSqlIdentifierVariables.delete(variable);
+      }
+      function classSafeMembers(classNode) {
+        let members = safeDynamicSqlIdentifierMembers.get(classNode);
+        if (!members) {
+          members = new Set();
+          safeDynamicSqlIdentifierMembers.set(classNode, members);
+        }
+        return members;
+      }
+      function markDynamicSqlIdentifierMember(node) {
+        const key = classMemberKey(node);
+        const classNode = key && enclosingClass(node);
+        if (key && classNode) classSafeMembers(classNode).add(key);
+      }
+      function unmarkDynamicSqlIdentifierMember(node) {
+        const key = classMemberKey(node);
+        const classNode = key && enclosingClass(node);
+        const members = classNode ? safeDynamicSqlIdentifierMembers.get(classNode) : null;
+        if (key && members) members.delete(key);
       }
       function unionStringValues(left, right) {
         if (!left || !right) return null;
@@ -1129,6 +1211,16 @@ function ruleNoSqlStringConcat() {
       function identifierTokenValues(node) {
         const variable = findVariable(sourceCode, node);
         return variable ? safeSqlIdentifierValues.get(variable) ?? null : null;
+      }
+      function isSafeDynamicSqlIdentifierVariable(node) {
+        const variable = node?.type === "Identifier" ? findVariable(sourceCode, node) : null;
+        return Boolean(variable && safeDynamicSqlIdentifierVariables.has(variable));
+      }
+      function isSafeDynamicSqlIdentifierMember(node) {
+        const key = classMemberKey(node);
+        const classNode = key && enclosingClass(node);
+        const members = classNode ? safeDynamicSqlIdentifierMembers.get(classNode) : null;
+        return Boolean(key && members?.has(key));
       }
       function memberTokenValues(node) {
         if (node.computed && node.object?.type === "Identifier") {
@@ -1163,6 +1255,23 @@ function ruleNoSqlStringConcat() {
         if (node?.type === "CallExpression") return transformedCallTokenValues(node);
         return null;
       }
+      function templateStaticPartsAreSqlIdentifierSafe(node) {
+        const text = node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "").join("A");
+        return isSqlIdentifierTokenValue(text);
+      }
+      function isSafeDynamicSqlIdentifierTemplate(node) {
+        return node?.type === "TemplateLiteral"
+          && node.expressions.length > 0
+          && templateStaticPartsAreSqlIdentifierSafe(node)
+          && node.expressions.every(isSafeSqlIdentifierExpression);
+      }
+      function isSafeSqlIdentifierExpression(node) {
+        const values = sqlTokenValues(node);
+        if (valuesAreSqlIdentifiers(values)) return true;
+        if (isSafeDynamicSqlIdentifierVariable(node)) return true;
+        if (node?.type === "MemberExpression" && isSafeDynamicSqlIdentifierMember(node)) return true;
+        return isSafeDynamicSqlIdentifierTemplate(node);
+      }
       function valuesAreSqlIdentifiers(values) {
         return Boolean(values?.size) && [...values].every(isSqlIdentifierTokenValue);
       }
@@ -1179,10 +1288,10 @@ function ruleNoSqlStringConcat() {
         if (isSafeSqlFragmentExpression(expression)) {
           return { safe: true, previousWasIdentifier: false };
         }
-        const values = sqlTokenValues(expression);
-        if (valuesAreSqlIdentifiers(values) && isSqlIdentifierContext(before, after)) {
+        if (isSafeSqlIdentifierExpression(expression) && isSqlIdentifierContext(before, after)) {
           return { safe: true, previousWasIdentifier: true };
         }
+        const values = sqlTokenValues(expression);
         if (valuesAreSqlDirections(values) && previousWasIdentifier && /^\s*$/u.test(before)) {
           return { safe: true, previousWasIdentifier: false };
         }
@@ -1232,10 +1341,26 @@ function ruleNoSqlStringConcat() {
           || (node?.type === "ArrayExpression"
             && node.elements.every((element) => element && element.type !== "SpreadElement" && isSafeSqlFragmentExpression(element)));
       }
+      function guardedSqlIdentifierVariable(node) {
+        if (!statementExits(node.consequent)) return null;
+        const test = node.test;
+        const call = test?.type === "UnaryExpression" && test.operator === "!" ? test.argument : null;
+        if (call?.type !== "CallExpression") return null;
+        const callee = call.callee;
+        if (callee?.type !== "MemberExpression" || callee.computed || callee.property?.type !== "Identifier" || callee.property.name !== "test") return null;
+        if (callee.object?.type !== "Identifier") return null;
+        const regexVariable = findVariable(sourceCode, callee.object);
+        if (!regexVariable || !sqlIdentifierRegexVariables.has(regexVariable)) return null;
+        const arg = call.arguments[0];
+        return arg?.type === "Identifier" ? arg : null;
+      }
       return {
         VariableDeclarator(node) {
           const variable = getDeclaredVariable(sourceCode, node);
           if (!variable) return;
+          if (isSqlIdentifierRegexLiteral(node.init)) {
+            sqlIdentifierRegexVariables.add(variable);
+          }
           const objectValues = objectLiteralIdentifierValues(node.init);
           const tokenValues = sqlTokenValues(node.init);
           if (objectValues && node.parent?.kind === "const") {
@@ -1243,6 +1368,9 @@ function ruleNoSqlStringConcat() {
           }
           if (tokenValues && [...tokenValues].every((value) => isSqlIdentifierTokenValue(value) || isSqlDirectionTokenValue(value))) {
             safeSqlIdentifierValues.set(variable, tokenValues);
+          }
+          if (isSafeSqlIdentifierExpression(node.init)) {
+            safeDynamicSqlIdentifierVariables.add(variable);
           }
           if (isSafeSqlFragmentArrayExpression(node.init)) {
             safeSqlFragmentArrays.add(variable);
@@ -1257,8 +1385,19 @@ function ruleNoSqlStringConcat() {
           if (!variable) return;
           safeSqlFragmentArrays.delete(variable);
           safeSqlFragmentStrings.delete(variable);
-          safeSqlIdentifierValues.delete(variable);
-          safeSqlIdentifierObjectValues.delete(variable);
+          unmarkSqlIdentifierVariable(variable);
+        },
+        IfStatement(node) {
+          const identifier = guardedSqlIdentifierVariable(node);
+          if (identifier) markDynamicSqlIdentifierVariable(identifier);
+        },
+        "AssignmentExpression:exit"(node) {
+          if (node.left?.type !== "MemberExpression") return;
+          if (isSafeSqlIdentifierExpression(node.right)) {
+            markDynamicSqlIdentifierMember(node.left);
+          } else {
+            unmarkDynamicSqlIdentifierMember(node.left);
+          }
         },
         CallExpression(node) {
           const callee = node.callee;

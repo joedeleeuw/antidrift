@@ -690,12 +690,10 @@ const cloudflareAgentsCases = [
   {
     id: "cloudflare-shell-sanitized-namespace-table-identifiers",
     ruleId: "antidrift/no-sql-string-concat",
-    kind: "known-gap",
+    kind: "correct",
     classification: "ready",
     subproject: "packages/shell",
     paths: ["packages/shell/src/filesystem.ts"],
-    reason:
-      "Cloudflare validates workspace namespaces with VALID_NAMESPACE before deriving table/index identifiers, but antidrift/no-sql-string-concat cannot yet prove constructor-guarded SQL identifier safety across instance fields.",
   },
   {
     id: "cloudflare-codemode-static-column-map-clean",

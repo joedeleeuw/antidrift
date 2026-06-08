@@ -4,7 +4,7 @@
 
 Disallow SQL strings assembled with interpolated values or concatenated values.
 
-This is an injection-boundary rule, not a general "SQL keyword" scanner. Static SQL and bound parameters are allowed. A dynamic placeholder list such as `ids.map(() => "?").join(",")` is also allowed because the values are still passed separately to the database driver. Locally built arrays of static SQL fragments may be joined into `SET` / `WHERE` clauses; arbitrary dynamic fragments still report. Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are treated as SQL binding APIs rather than raw string interpolation. Closed SQL identifier fragments are allowed only when the rule can prove the token set from local structure, such as a typed service-boundary union or a static object-literal column map, and only in an identifier/direction position. A template literal reports only when the unsafe interpolation itself is in SQL syntax; SQL-looking sample text elsewhere in the same template does not make unrelated interpolations a SQL sink.
+This is an injection-boundary rule, not a general "SQL keyword" scanner. Static SQL and bound parameters are allowed. A dynamic placeholder list such as `ids.map(() => "?").join(",")` is also allowed because the values are still passed separately to the database driver. Locally built arrays of static SQL fragments may be joined into `SET` / `WHERE` clauses; arbitrary dynamic fragments still report. Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are treated as SQL binding APIs rather than raw string interpolation. Closed SQL identifier fragments are allowed only when the rule can prove the token set from local structure, such as a typed service-boundary union, a static object-literal column map, or an anchored identifier regex guard that definitely exits on failure before deriving an identifier-shaped template. These proofs are accepted only in an identifier/direction position. A template literal reports only when the unsafe interpolation itself is in SQL syntax; SQL-looking sample text elsewhere in the same template does not make unrelated interpolations a SQL sink.
 
 ## Should Flag
 
@@ -101,6 +101,25 @@ sql.exec(`UPDATE tasks SET ${sets.join(", ")} WHERE id = ?`, ...params);
 Why: the column token is selected from a static object-literal map, while values stay bound.
 
 ```ts
+const VALID_NAMESPACE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+
+class Workspace {
+  private readonly tableName: string;
+
+  constructor(ns: string) {
+    if (!VALID_NAMESPACE.test(ns)) throw new Error("invalid namespace");
+    this.tableName = `cf_workspace_${ns}`;
+  }
+
+  init() {
+    return this.sql.run(`SELECT * FROM ${this.tableName}`);
+  }
+}
+```
+
+Why: the namespace is proven to be an SQL identifier token by an anchored regex guard that exits on failure, and the derived table name is interpolated only where SQL expects an identifier.
+
+```ts
 const hugeOutput = "X".repeat(3_000_000);
 await connectAndRun(`
   ws.send(JSON.stringify({
@@ -131,10 +150,11 @@ Clean:
 - `/Users/sushi/code/sudocode-main/server/src/routes/workflows.ts` line 1191 now stays clean for `IN (${placeholders})` where `placeholders` is produced by `issueIds.map(() => "?").join(",")` and values are bound with `.all(...issueIds)`.
 - `/Users/sushi/code/sudocode-main/server/src/workflow/base-workflow-engine.ts` line 482 stays clean for `SET ${setClauses.join(", ")}` where each pushed clause is a static fragment and values are bound with `.run(...values)`.
 - `/Users/sushi/code/cloudflare-agents/packages/ai-chat/e2e/chat.spec.ts` line 1571 stays clean because the template serializes a browser test payload; the interpolation is a tool output string, not SQL assembly.
+- `/Users/sushi/code/cloudflare-agents/packages/shell/src/filesystem.ts` stays clean because `VALID_NAMESPACE.test(ns)` exits on failure before deriving `this.tableName` and `this.indexName`, and those fields are interpolated only in SQL identifier positions.
 
-Current benchmark result after placeholder-list, static-fragment, tag, and closed-identifier narrowing:
+Current benchmark result after placeholder-list, static-fragment, tag, closed-identifier, and constructor-validated identifier narrowing:
 
-- 190 checked files.
+- 236 checked files.
 - 0 parser errors.
 - 10 `antidrift/no-sql-string-concat` findings.
 - 0 `sonarjs/sql-queries` findings.
@@ -144,11 +164,11 @@ Widened local scan:
 - A fresh ad hoc SQL-pattern scan across `/Users/sushi/code`, excluding the antidrift repo and Chaski roots, checked 1,024 candidate files with this rule.
 - It reported 168 findings and 0 parser errors.
 - Sudocode's typed `ORDER BY ${sortBy} ${order}` service code now stays clean, as does the matching integration helper.
-- Cloudflare Agents parameterized SQL tags and the Codemode static column-map update builder now stay clean.
-- The named Sudocode/Cloudflare findings are now classified: dynamic `Object.keys(updates)` update helpers and the playground table-name query are drift; the browser-evaluation chat payload is clean. Cloudflare Workspace sanitized namespace table identifiers are a known gap: the code validates a namespace before deriving table/index identifiers, but the rule cannot yet prove that constructor-guarded instance fields are safe SQL identifiers. Many other findings are duplicate Chaski-derived local roots, so they do not provide independent replication.
+- Cloudflare Agents parameterized SQL tags, the Codemode static column-map update builder, and the Workspace sanitized namespace table identifiers now stay clean.
+- The named Sudocode/Cloudflare findings are now classified: dynamic `Object.keys(updates)` update helpers and the playground table-name query are drift; browser/test payload SQL-looking strings and constructor-validated namespace table identifiers are clean. Many other findings are duplicate Chaski-derived local roots, so they do not provide independent replication.
 
 ## Promotion State
 
-Status: `ready`, `stable: true`.
+Status: `ready`, `stable: false`.
 
-The rule stays `ready`, but stable promotion is paused until the sanitized dynamic identifier gap is resolved. Drift still replicates across Chaski, Sudocode, and Cloudflare, while Chaski, Codebase Atlas, and Sudocode supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, closed identifier/direction fragments, serialized payload data, and bound values.
+The sanitized dynamic identifier gap is resolved in the local rule and validated against Cloudflare Workspace. Drift still replicates across Chaski, Sudocode, and Cloudflare, while Chaski, Codebase Atlas, Sudocode, and Cloudflare supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, and bound values. Stable promotion now waits on the formal advisory review required by `docs/rule-status-registry.md`, not on a known code blocker.
