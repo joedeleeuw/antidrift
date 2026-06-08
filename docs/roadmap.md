@@ -2,7 +2,7 @@
 
 This roadmap is limited to the lint stack, the custom rules already hardened, and the specific next rules/utilities that motivated this project. Do not use this file to add unrelated policy families.
 
-For policy coverage status, see `docs/policy-coverage.md`. For retired-engine parity, see `docs/lint-rule-parity.md`.
+For policy coverage status, see `docs/policy-coverage.md`. For the synthesized current gap surface, see `docs/gap-inventory.md`. For retired-engine parity, see `docs/lint-rule-parity.md`.
 
 ## Current Scope
 
