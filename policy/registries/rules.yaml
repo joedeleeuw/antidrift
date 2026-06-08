@@ -681,7 +681,7 @@ rules:
         - 'app.get("/users/:id", (req) => read(req.params.id));'
       allows:
         - 'app.get("/users/:id", (req) => { requireUser(req); read(req.params.id); });'
-    nextAction: Keep tRPC authorization as a separate scoped decision.
+    nextAction: Broadened Sudocode route coverage now proves the handler-local Express shape; decide middleware-aware Express dominance and tRPC procedure authorization as separate scoped rules before stable promotion.
   antidrift/require-effect-deps:
     status: ready
     stable: true

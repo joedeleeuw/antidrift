@@ -180,6 +180,180 @@ const sudocodeCases = [
         path: "server/src/routes/issues.ts",
         line: 78,
       },
+      {
+        path: "server/src/routes/issues.ts",
+        line: 179,
+      },
+      {
+        path: "server/src/routes/issues.ts",
+        line: 292,
+      },
+      {
+        path: "server/src/routes/issues.ts",
+        line: 378,
+      },
+    ],
+  },
+  {
+    id: "sudocode-specs-route-params-without-authz",
+    ruleId: "antidrift/require-authz-check",
+    kind: "drift",
+    classification: "ready",
+    subproject: "server",
+    paths: ["server/src/routes/specs.ts"],
+    expectedFindings: [
+      {
+        path: "server/src/routes/specs.ts",
+        line: 76,
+      },
+      {
+        path: "server/src/routes/specs.ts",
+        line: 183,
+      },
+      {
+        path: "server/src/routes/specs.ts",
+        line: 294,
+      },
+      {
+        path: "server/src/routes/specs.ts",
+        line: 392,
+      },
+    ],
+  },
+  {
+    id: "sudocode-relationships-route-params-without-authz",
+    ruleId: "antidrift/require-authz-check",
+    kind: "drift",
+    classification: "ready",
+    subproject: "server",
+    paths: ["server/src/routes/relationships.ts"],
+    expectedFindings: [
+      {
+        path: "server/src/routes/relationships.ts",
+        line: 27,
+      },
+      {
+        path: "server/src/routes/relationships.ts",
+        line: 67,
+      },
+      {
+        path: "server/src/routes/relationships.ts",
+        line: 110,
+      },
+    ],
+  },
+  {
+    id: "sudocode-executions-route-params-without-authz",
+    ruleId: "antidrift/require-authz-check",
+    kind: "drift",
+    classification: "ready",
+    subproject: "server",
+    paths: ["server/src/routes/executions.ts"],
+    expectedFindings: [
+      {
+        path: "server/src/routes/executions.ts",
+        line: 320,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 420,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 461,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 536,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 603,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 641,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 698,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 725,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 785,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 849,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 888,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 952,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 991,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1060,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1145,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1198,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1252,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1286,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1352,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1420,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1478,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1528,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1760,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1793,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1849,
+      },
+      {
+        path: "server/src/routes/executions.ts",
+        line: 1893,
+      },
     ],
   },
   {
