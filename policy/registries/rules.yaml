@@ -442,18 +442,19 @@ rules:
     status: ready
     stable: false
     referenceDoc: docs/rule-investigations/no-sql-string-concat.md
-    signal: AST string construction
+    signal: AST string construction plus scope-binding guard control-flow
     solveType: injection-boundary
     corpusRepositories:
       [chaski, codebase-atlas, sudocode-main, cloudflare-agents]
     concerns:
-      - The benchmark on 190 real files reports 10 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
+      - The benchmark on 236 real files reports 10 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
       - Dynamic placeholder lists such as `ids.map(() => "?").join(",")` are accepted clean because values remain bound parameters.
       - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
       - Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are accepted clean because the tag owns value binding.
       - Closed SQL identifier fragments from typed service-boundary unions and static object-literal column maps are accepted only in SQL identifier/direction positions.
       - Dynamic object-key column lists and non-allowlisted table names are intentional drift findings.
       - Constructor-validated dynamic SQL identifiers are accepted only when an anchored identifier regex guard definitely exits on failure, the derived identifier template remains identifier-shaped, and interpolation is in an SQL identifier position.
+      - "The June 8, 2026 advisory review found the sanitized-identifier branch locally ready but not stable: the clean constructor-validated identifier shape exists in only one independent repo, equivalent guard shapes are uncharacterized, and the guard branch's lower edge needs real-program pressure."
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:
       state: partial-overlap
@@ -474,7 +475,7 @@ rules:
         - 'const sortBy = options.sortBy ?? "created_at"; db.prepare(`SELECT * FROM executions ORDER BY ${sortBy}`);'
         - 'if (!VALID_NAMESPACE.test(ns)) throw new Error("bad namespace"); this.tableName = `cf_workspace_${ns}`; this.sql.run(`SELECT * FROM ${this.tableName}`);'
         - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
-    nextAction: Sanitized dynamic SQL identifier proof is covered by Cloudflare Workspace; run the formal advisory review before stable promotion.
+    nextAction: Seek a second independent sanitized dynamic SQL identifier clean control and a real invalid/near-miss guard control before stable promotion.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false

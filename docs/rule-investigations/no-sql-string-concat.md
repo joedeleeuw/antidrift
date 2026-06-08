@@ -171,4 +171,12 @@ Widened local scan:
 
 Status: `ready`, `stable: false`.
 
-The sanitized dynamic identifier gap is resolved in the local rule and validated against Cloudflare Workspace. Drift still replicates across Chaski, Sudocode, and Cloudflare, while Chaski, Codebase Atlas, Sudocode, and Cloudflare supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, and bound values. Stable promotion now waits on the formal advisory review required by `docs/rule-status-registry.md`, not on a known code blocker.
+The sanitized dynamic identifier gap is resolved in the local rule and validated against Cloudflare Workspace. Drift still replicates across Chaski, Sudocode, and Cloudflare, while Chaski, Codebase Atlas, Sudocode, and Cloudflare supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, and bound values.
+
+The June 8, 2026 advisory review was grounded in repo reads and kept the rule at `ready`, not stable. The review agreed this is not ecosystem-covered and that the Cloudflare branch is deterministic enough to keep, but it found three stable-promotion blockers:
+
+- The constructor-validated dynamic identifier clean shape currently exists in only one independent repo.
+- Equivalent guard shapes such as positive guards, quantifier forms, or allowlist checks are uncharacterized against real code.
+- The guard branch's lower edge still needs real-program pressure: a value that looks guarded but is not, and must still report.
+
+Stable promotion waits on that evidence, not on a known code blocker.
