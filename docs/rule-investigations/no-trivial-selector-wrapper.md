@@ -88,7 +88,7 @@ Drift:
 - `/Users/sushi/code/chaski/src/frontend/portal/modules/scenarios/agent-configuration/components/table/use-agent-table-data.ts` line 15.
 - `/Users/sushi/code/chaski/src/frontend/portal/modules/scenarios/service-time-influence/components/table/service-time-influence-table.tsx` line 39.
 - `/Users/sushi/code/codebase-atlas/src/parsing/treeSitterRealProgramParser.ts` line 916 defines `fullExcerpt(file: ParsedFile): string { return file.source }`, proving the non-name-gated case.
-- `/Users/sushi/code/murderbox/apps/client/src/components/chat/message-list.tsx` line 181 defines `chatItemKey(item: ChatItem): string { return item.id; }`, proving adapter callbacks can keep their stable helper while dropping the return annotation.
+- `/Users/sushi/code/murderbox/apps/client/src/components/chat/message-list.tsx` line 189 defines `chatItemKey(item: ChatItem): string { return item.id; }`, proving adapter callbacks can keep their stable helper while dropping the return annotation.
 
 Clean:
 

@@ -419,22 +419,12 @@ const codebaseAtlasCases = [
 
 const murderboxCases = [
   {
-    id: "murderbox-chat-module-global-fetch",
+    id: "murderbox-chat-module-app-fetch-clean",
     ruleId: "antidrift/no-raw-fetch-in-component",
-    kind: "drift",
+    kind: "correct",
     classification: "ready",
     subproject: "client",
     paths: ["apps/client/app/(chat)/index.tsx"],
-    expectedFindings: [
-      {
-        path: "apps/client/app/(chat)/index.tsx",
-        line: 459,
-      },
-      {
-        path: "apps/client/app/(chat)/index.tsx",
-        line: 704,
-      },
-    ],
   },
   {
     id: "murderbox-client-api-proxy-fetch-clean",
@@ -462,7 +452,7 @@ const murderboxCases = [
     expectedFindings: [
       {
         path: "apps/client/src/components/chat/message-list.tsx",
-        line: 181,
+        line: 189,
       },
     ],
   },

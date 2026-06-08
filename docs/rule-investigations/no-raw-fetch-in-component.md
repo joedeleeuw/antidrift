@@ -77,8 +77,6 @@ Drift:
 - `/Users/sushi/code/chaski/src/frontend/monolithui/src/components/QrActionsAdmin/QrActionCard.tsx` line 41 fetches a QR image inside a component module helper.
 - `/Users/sushi/code/chaski/src/frontend/portal/components/ImpersonationWarning.tsx` line 85 exchanges an impersonation code with raw fetch inside a component effect.
 - `/Users/sushi/code/codebase-atlas/src/routes/atlas.city.tsx` lines 50 and 76 fetch generated scene/audio JSON inside route component effects.
-- `/Users/sushi/code/murderbox/apps/client/app/(chat)/index.tsx` line 459 calls `globalThis.fetch` inside a component module helper, and line 704 calls bare `fetch` from the same module.
-- Broad inventory also found Murderbox component-module fetches in `apps/client/app/(models)/admin.tsx`, `apps/client/app/_debug.tsx`, and `apps/client/src/components/chat/message-list.tsx`.
 
 Clean:
 
@@ -86,6 +84,7 @@ Clean:
 - `/Users/sushi/code/chaski/src/frontend/portal/components/EmbeddedDashboard.tsx` renders without raw transport.
 - `/Users/sushi/code/sudocode-main/frontend/src/pages/ExecutionsPage.tsx` uses query/refetch state rather than raw component fetch.
 - `/Users/sushi/code/murderbox/apps/client/app/api/[...path]+api.ts` owns proxy transport in an API module and stays clean.
+- `/Users/sushi/code/murderbox/apps/client/app/(chat)/index.tsx` now uses `appFetch` / `appStreamFetch`, not raw `fetch`, and stays clean under this rule.
 
 Broad inventory on June 4, 2026:
 
