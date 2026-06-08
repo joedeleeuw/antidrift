@@ -22,6 +22,7 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - `.claude/settings.json` and `.codex/hooks.json` enforce policy during agent tool use.
 - `docs/build-patterns.md` is the positive construction guide. Use it before inventing a new domain, contract, API, UI resource, or gateway shape.
 - `docs/feature-slice-template.md` is the lightweight planning shape for new work.
+- `docs/dependency-lanes.md` records dependency ownership, expected lifetime, and tie-back to the source/rule/tool that justifies each direct dependency family.
 - `policy/registries/rules.yaml` is the canonical custom-rule status registry: active status, signal choice, corpus repositories, production concerns, and stable-promotion state.
 - `docs/rule-status-registry.md` is the readable index for the rule status registry.
 - `docs/source-ledger.md` records where pulled rules, custom rules, rulesets, tools, and borrowed repo references came from.
@@ -35,6 +36,7 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 ## Evidence anchors
 
 - pnpm catalogs live in `pnpm-workspace.yaml` and support named catalogs.
+- Dependency lanes live in `docs/dependency-lanes.md`; direct dependency additions should name a lane, expected lifetime, and tie-back before they are accepted.
 - ESLint plus `typescript-eslint` is the canonical custom-rule engine because the original scope needs TypeScript `Program` and `TypeChecker` access.
 - Retired-engine baseline coverage is tracked rule-by-rule in `docs/lint-rule-parity.md`; do not remove coverage without recording the replacement or accepted gap.
 - Source provenance for rules, rulesets, tools, and borrowed references is tracked in `docs/source-ledger.md`; update it when adding or replacing enforcement.
