@@ -41,6 +41,28 @@ These are examples that can look superficially similar to a violation. They shou
 | Typed delegation research | `function requiredString(node): string { return required(node, "expected string"); }` | The wrapper adds contextual error meaning even if it delegates. |
 | Typed delegation research | `export function reloadProject(id): Promise<Project> { return readProject(id); }` | Exported facades can intentionally stabilize public package/API shape. |
 
+## Bad Usage Matrix
+
+These examples show the behavior this family exists to reject. Bad examples in research subsets are evidence targets, not active lint behavior.
+
+| Subset | Bad usage | Why it is bad | Owning rule or state |
+| --- | --- | --- | --- |
+| Selector inference appeasement | `function fullExcerpt(file: ParsedFile): string { return file.source; }` | The helper only repeats a property access while adding a return contract TypeScript can infer. Inline the member access or let the helper infer. | `antidrift/no-trivial-selector-wrapper` |
+| Selector inference appeasement | `const itemId = (item: Item): string => item.id;` | The annotation turns a bare selector into a local type assertion unless it is a documented external adapter boundary. | `antidrift/no-trivial-selector-wrapper` |
+| Type escape casts | `const err = caught as AxiosError;` | A caught value is broad input; use `axios.isAxiosError(caught)` or a local guard before reading Axios-specific fields. | `antidrift/no-appeasement-cast` |
+| Type escape casts | `const order = raw as unknown as Order;` | The double cast tunnels through `unknown` to silence assignability instead of validating or narrowing. | `antidrift/no-unsafe-cast-chain` |
+| Type escape casts | `const id = raw as UserId;` | A branded value must come from the brand constructor or schema parser; a cast forges the brand. | `antidrift/no-cast-to-branded`, under-proven/default-off |
+| Validation-boundary provenance | `const input = JSON.parse(rawUnknown);` | `JSON.parse` gives broad data. The boundary must guard the input string and validate the parsed payload before claiming a contract. | `antidrift/no-unsafe-deserialize` |
+| Validation-boundary provenance | `const row = RowSchema.parse(await getTypedRow());` | Re-parsing a value already typed as the same schema output is usually certification theater; keep the parse at the raw boundary. | `antidrift/no-redundant-zod-parse` |
+| Validation-boundary provenance | `return StateSchema.parse({ ...state, changed });` | A same-schema parse after local mutation may hide a missing typed state transition API. This stays research until real programs prove the boundary. | research `antidrift/no-same-schema-recertification` |
+| Broad shape probing | `z.custom<LineItem>((value) => typeof value === "object" && value !== null)` | The predicate claims `LineItem` while checking only object-ness. It should validate required fields or delegate to a schema. | `antidrift/no-underchecked-type-predicate` |
+| Broad shape probing | `Object.entries(raw as Record<string, unknown>).map(([, value]) => "numberValue" in value ? value.numberValue : null)` | This is a mini-parser over broad values; parse to an owned type once, then iterate typed data. | `antidrift/no-defensive-shape-probing` |
+| Contract shape duplication | `type UserFork = { id: string; email: string; status: UserStatus };` | A local structural copy can drift from the owner. Import the owner type or derive from the owner schema. | `antidrift/no-structural-type-fork`, `antidrift/no-canonical-model-fork` |
+| Contract shape duplication | `export function load(input: { userId: string }) {}` | Exported inline object contracts create unnamed boundary shapes that callers can duplicate. Name the input contract. | `antidrift/no-inline-structural-type-at-use-site` |
+| Contract shape duplication | `type CustomRange = [Date | null, Date | null];` | Nullable positional tuples hide which slot means start/end and invite order bugs. Use a named object range. | `antidrift/no-nullable-positional-tuple` |
+| Typed delegation research | `function buildRoute(path: string, title: string): WebviewRoute { return makeRoute(path, title); }` | This is only suspicious if it is internal, exact-forwarding, adds no defaults/context/errors, and the callee already returns the same contract. | research `antidrift/no-thin-typed-factory-wrapper` |
+| Typed delegation research | `function routeForUser(userId: UserId): WebviewRoute { return makeUserRoute(userId); }` | A wrapper that only repeats another factory's contract can become a type appeasement layer. This is not broad enough for an active rule yet. | research `antidrift/no-thin-typed-factory-wrapper` |
+
 ## Examples
 
 ### Selector Inference Appeasement
