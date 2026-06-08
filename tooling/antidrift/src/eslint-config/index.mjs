@@ -215,7 +215,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
 
         // Registry-driven rules: options are loaded from policy registries at config-construction time.
         "antidrift/no-status-literal-in-type": ["error", { statuses: registries.domain?.statuses ?? {} }],
-        "antidrift/no-role-literal-in-type": "off",
+        "antidrift/no-role-literal-in-type": ["off", { roles: registries.domain?.roles ?? {} }],
         ...(restrictedImportPatterns.length > 0 ? { "no-restricted-imports": restrictedImportsRule(restrictedImportPatterns) } : {}),
 
         "no-await-in-loop": "error"

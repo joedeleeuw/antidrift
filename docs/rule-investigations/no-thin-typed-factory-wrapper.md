@@ -6,9 +6,11 @@ Working names:
 - `antidrift/no-unearned-return-contract`
 - `antidrift/no-redundant-typed-delegation`
 
-Status: `research`. Do not implement or enable until real-corpus evidence shows this can stay narrow.
+Status: `research`, leaning drop. Do not implement or enable until real-corpus evidence shows this can stay narrow.
 
 Correction from the first investigation pass: Codebase Atlas does contain production candidates for the broader pattern. They are not exact-forward wrappers; they are typed local-constructor wrappers that pass derived string/template arguments to another local factory. That means the exact-forward-only rule would miss the user's motivating shape.
+
+Correction after the June 8, 2026 prospect review: those broader Codebase Atlas candidates are accepted clean abstractions. The broad typed-constructor branch should be dropped. Only the exact-forward symbol-identity slice remains as research, and it currently has no real corpus anchor.
 
 ## Problem Statement
 
@@ -30,7 +32,7 @@ This is not the same as banning functions whose body is one returned call. Real 
 
 ## Proposed Narrow Signal
 
-The safest signal is TypeChecker-backed exact-forward delegation, but Codebase Atlas shows that the motivating pattern is broader than exact-forward.
+The safest signal is TypeChecker-backed exact-forward delegation. Codebase Atlas showed a broader possible branch, but the grounded review classified those anchors clean, so the broader branch is not part of the candidate rule.
 
 A narrow exact-forward report would require all of these:
 
@@ -42,7 +44,7 @@ A narrow exact-forward report would require all of these:
 6. TypeScript proves the call's return type is the same as, or mutually assignable with, the annotated return contract after unwrapping async/Promise where appropriate.
 7. The call is not a validator, parser, brand constructor, assertion function, or other configured contract-earning boundary.
 
-The broader research branch is typed local-constructor delegation:
+The dropped broad branch was typed local-constructor delegation:
 
 1. The function is internal and has an explicit named return contract.
 2. The body is exactly one returned call expression.
@@ -50,7 +52,9 @@ The broader research branch is typed local-constructor delegation:
 4. Arguments are only parameters, property reads from parameters, literals, arrays/objects of those, and deterministic string/template derivations.
 5. The wrapper adds no validation, narrowing, error context, branching, side effects, caching, instrumentation, or boundary context.
 
-If the wrapper is still useful for semantic naming, the likely fix is to keep the wrapper and remove the explicit return annotation. If the wrapper has no semantic value, inline the delegated call.
+Do not implement the broad branch. Its only current anchors are useful domain constructors that derive token IDs, classifications, and rationale strings before delegating to a local factory.
+
+If a future exact-forward wrapper is still useful for semantic naming, the likely fix is to keep the wrapper and remove the explicit return annotation. If the wrapper has no semantic value, inline the delegated call.
 
 ## Ecosystem Check
 
@@ -84,8 +88,8 @@ These are real-program shapes to validate before implementation. Reduced program
 | --- | --- | --- | --- |
 | Internal exact-forward factory | `function buildRoute(a, b): WebviewRoute { return makeRoute(a, b); }`, and `makeRoute` returns `WebviewRoute` | Flag | The wrapper repeats a contract already supplied by the callee and earns no new type authority. |
 | Internal exact-forward to structurally equivalent object | `function buildRoute(a): WebviewRoute { return makeRouteObject(a); }`, and the call type is mutually assignable with `WebviewRoute` | Research flag | This is the interesting laundering case, but it may overlap intentional facade/projection patterns. Needs real evidence. |
-| Internal templated constructor wrapper | `function renderSprite(id: string): VisualTokenRegistryEntry { return entry(\`render.sprite.${id}\`, ["render.sprite"], [\`sprite.${id}\`], "..."); }` | Research flag | Codebase Atlas has this shape. It may be real drift or a useful abstraction; classify before implementation. |
-| Internal typed classification wrapper | `function classificationForFile(file): ClassificationInput { return classification(...derived values...); }` | Research flag | Codebase Atlas has this shape. The callee already returns the annotated contract, but the wrapper names a domain fact. |
+| Internal templated constructor wrapper | `function renderSprite(id: string): VisualTokenRegistryEntry { return entry(\`render.sprite.${id}\`, ["render.sprite"], [\`sprite.${id}\`], "..."); }` | Allow | Codebase Atlas has this shape, and the grounded review classified it as a useful domain constructor rather than drift. |
+| Internal typed classification wrapper | `function classificationForFile(file): ClassificationInput { return classification(...derived values...); }` | Allow | Codebase Atlas has this shape, and the wrapper names a domain fact while deriving multiple arguments. |
 | Property extraction into conversion helper | `function terrainNodeIdForGameNode(node): TerrainNodeId { return terrainNodeIdForGameNodeId(node.id); }` | Research/likely allow | The callee validates/converts the ID. This may be a useful adapter rather than unearned contract. |
 | Same wrapper without return annotation | `function buildRoute(a, b) { return makeRoute(a, b); }` | Allow | Inference is doing the work; no explicit contract is being laundered. |
 | Exported package facade | `export function reload(id): Promise<Project> { return readProject(id); }` | Allow | Exported functions are boundaries. A package API may intentionally name or stabilize the callee. |
@@ -108,13 +112,13 @@ These are real-program shapes to validate before implementation. Reduced program
 
 A syntax-only inventory of typed single-return-call functions across Codebase Atlas, Murderbox, Sudocode, and Cloudflare Agents produced many legitimate wrappers. A TypeScript-program scan of Codebase Atlas then found production candidates for the broader local-constructor-wrapper shape.
 
-Codebase Atlas candidate anchors:
+Codebase Atlas broad-branch anchors now classified clean:
 
 - `/Users/sushi/code/codebase-atlas/src/visualTokens/visualTokenRegistry.ts` lines 142-148: `renderSprite(spriteId: string): VisualTokenRegistryEntry` returns `entry(...)`, and TypeScript proves `entry(...)` already returns `VisualTokenRegistryEntry`. The wrapper derives deterministic token strings and rationale text.
 - `/Users/sushi/code/codebase-atlas/src/programs/repoIngestion.ts` lines 1736-1749: `classificationForFile(file: ParsedRepoSourceFile): ClassificationInput` returns `classification(...)`, and the callee already returns `ClassificationInput`.
 - `/Users/sushi/code/codebase-atlas/src/programs/repoIngestion.ts` lines 1843-1852: `classificationForConfigFile(file: ParsedRepoSourceFile): ClassificationInput` returns `classification(...)`, and the callee already returns `ClassificationInput`.
 
-Codebase Atlas disputed/likely clean controls:
+Codebase Atlas clean controls:
 
 - `/Users/sushi/code/codebase-atlas/src/services/sceneStateAdapter.ts` lines 322-327: `terrainNodeIdForGameNode` and `terrainNodeIdForSceneInstance` return a conversion helper call over a property. The underlying helper validates the `game-` prefix and parses the branded terrain ID, so this may earn the contract indirectly.
 - `/Users/sushi/code/codebase-atlas/src/parsing/treeSitterRealProgramParser.ts` lines 797-860: the `required*` helpers return `required(...)` with contextual error messages. The wrapper adds error context and should stay clean.
@@ -127,7 +131,7 @@ Codebase Atlas disputed/likely clean controls:
 
 Potential future drift anchors still needed:
 
-- Classification of the Codebase Atlas candidates above as accepted drift or accepted clean abstractions.
+- An exact-forward, identifier-callee wrapper whose annotation repeats the callee's return contract and forwards only the parameters verbatim.
 - A second independent repository with the same accepted drift shape.
 - A real remediation where removing the annotation or wrapper improves the code without losing API meaning.
 
@@ -168,7 +172,7 @@ Likely escape shapes:
 
 Keep this candidate in `research` until all of these are true:
 
-1. Codebase Atlas candidates are classified as accepted drift or accepted clean abstractions.
+1. An exact-forward real drift anchor is found in a production file.
 2. At least two independent repositories contain accepted real non-test drift anchors that were not added to satisfy the rule.
 3. A broad inventory over Chaski, Codebase Atlas, Murderbox, Sudocode, and at least two public corpus candidates shows zero known false positives under the chosen signal.
 4. Clean controls for validators, brand constructors, facades, member-call adapters, async wrappers, contextual-error helpers, and exported boundaries are explicitly recorded.
@@ -184,11 +188,20 @@ Claude Opus 4.8 advisory completed on 2026-06-08:
 
 The debug log shows `Read` and `Grep` tool use against the repository. The advisory agreed with the pre-correction status: keep the candidate in `research`, do not implement on zero accepted drift anchors, and avoid the broad "single returned call" rule. It also recommends that a first implementation, if evidence later justifies one, start with symbol-identity or very narrow assignability rather than broad structural equivalence. Rerun advisory review before promotion because the Codebase Atlas candidate anchors were added after this report.
 
+A second read-only Claude Opus 4.8 prospect review completed on 2026-06-08:
+
+- `reports/claude-prospect-reviews/20260608-132852-thin-typed-factory.md`
+- `reports/claude-prospect-reviews/20260608-132852-thin-typed-factory.debug.log`
+
+That review read the live Codebase Atlas anchors and classified `renderSprite` and `classificationFor*` as clean abstractions. Its key finding is the current decision point: the safe exact-forward signal catches no known corpus code, while the corpus-matching broad constructor signal flags good code.
+
 ## Current Verdict
 
 Do not implement the broad "single returned call" version.
 
-The exact-forward-only rule is too narrow for the motivating Codebase Atlas examples. The plausible custom rule is now a TypeChecker-backed internal typed-constructor-wrapper rule with strict clean controls for validators, brands, exported facades, contextual error helpers, and conversion helpers. It still stays in `research` until the Codebase Atlas candidates are classified and a second independent repository replicates the accepted drift shape.
+Also do not implement the broader typed-constructor-wrapper version. Its only grounded anchors are clean domain constructors and classification helpers.
+
+The only surviving candidate is a TypeChecker symbol-identity exact-forward rule: internal wrapper, explicit named return contract, exactly one returned identifier call, and every argument is the corresponding parameter in order. That slice remains in `research` only as a placeholder. Drop it unless real exact-forward drift appears in two independent repositories and the remediation is more than cosmetic.
 
 Before implementing, verify the accepted drift is not already covered by:
 

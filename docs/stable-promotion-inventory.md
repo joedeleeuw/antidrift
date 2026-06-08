@@ -44,8 +44,8 @@ These remain implemented but not promotable because we still lack real drift evi
 
 | Rule                                | Current state                                                                               |
 | ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| `antidrift/no-cast-to-branded`      | Codebase Atlas has clean Zod-brand parse boundaries, but the rule does not detect Zod brands yet and no real non-test forged branded cast is known. |
-| `antidrift/no-role-literal-in-type` | Chaski has clean role ownership/runtime controls, but no accepted role union redeclaration. |
+| `antidrift/no-cast-to-branded`      | Codebase Atlas has clean Zod-brand parse boundaries, but the rule does not detect Zod brands yet and no real non-test forged branded cast is known. Keep default-off and retire to ecosystem-covered if that evidence still does not appear by the next promotion cycle. |
+| `antidrift/no-role-literal-in-type` | Chaski has clean role ownership/runtime controls and the config now wires role registry options while off, but no accepted multi-literal role union redeclaration exists. |
 
 ## Next Slice
 

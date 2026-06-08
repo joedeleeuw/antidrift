@@ -103,6 +103,7 @@ rules:
       - Current implementation detects only the antidrift brand marker; Codebase Atlas Zod-branded IDs are not detected yet.
       - Codebase Atlas has Zod-branded IDs and clean parse boundaries, but no real non-test forged brand cast.
       - Angle-bracket type assertions are not visited today.
+      - The June 8, 2026 Claude prospect review found 0 custom findings across the current corpus and recommends a sunset to ecosystem-covered if no real non-test forged brand cast appears by the next promotion cycle.
     external:
       state: broader-upstream
       support: high
@@ -116,7 +117,7 @@ rules:
       allows:
         - "const id = UserId.make(raw);"
         - "const id = UserIdSchema.parse(raw);"
-    nextAction: Explore Zod brand target detection and TSTypeAssertion coverage, then seek a real non-test forged brand cast before enabling.
+    nextAction: Keep default-off; optionally harden Zod brand target detection, TSTypeAssertion coverage, and double-cast ownership, but retire to ecosystem-covered if no real non-test forged brand cast appears in a second independent repo by the next promotion cycle.
   antidrift/no-coupled-state-setters:
     status: ready
     stable: false
@@ -325,11 +326,14 @@ rules:
   antidrift/no-role-literal-in-type:
     status: under-proven
     stable: false
+    referenceDoc: docs/rule-investigations/no-role-literal-in-type.md
     signal: registry plus AST context
     solveType: domain-vocabulary-fork
     corpusRepositories: [chaski]
     concerns:
       - No real drift case has been accepted.
+      - The rule remains default-off, but the shared config now wires registry options so opt-in consumers exercise the real role registry instead of an empty rule.
+      - The current role-name context gate is weak for generic values such as owner, admin, member, and viewer; any enablement needs a multi-literal floor or stronger context.
     external:
       state: config-replacement
       support: high
@@ -342,7 +346,7 @@ rules:
         - "type Role = 'business-admin' | 'sales-manager';"
       allows:
         - 'import type { Roles } from "./api/types";'
-    nextAction: Do not promote until a real role union redeclaration is found.
+    nextAction: Keep default-off; before enablement require a multi-literal role union signal and find a real non-disabled role redeclaration outside the owner.
   antidrift/no-sql-string-concat:
     status: ready
     stable: true
@@ -678,10 +682,10 @@ researchCandidates:
     nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 10 antidrift SQL findings. Keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.
   antidrift/no-thin-typed-factory-wrapper:
     status: research
-    signal: TypeChecker plus typed single-call constructor/delegation shape
+    signal: TypeChecker symbol-identity exact-forward delegation
     solveType: unearned-return-contract
     referenceDoc: docs/rule-investigations/no-thin-typed-factory-wrapper.md
-    nextAction: Codebase Atlas has broader typed-constructor-wrapper candidates; classify renderSprite and classificationFor* as accepted drift or clean abstractions, then seek a second independent repo before implementation.
+    nextAction: Broad typed-constructor anchors are classified clean; keep only exact-forward research and drop unless exact-forward non-test drift appears in two independent repos.
   antidrift/no-same-schema-recertification:
     status: research
     signal: TypeChecker plus schema-output assignability and refinement-free override proof

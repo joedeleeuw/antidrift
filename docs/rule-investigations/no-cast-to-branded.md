@@ -56,17 +56,32 @@ The review agreed:
 - Fix the current syntactic gap where `TSTypeAssertion` / angle-bracket assertions are not visited.
 - Avoid stable promotion until real forged branded casts and clean parse-boundary controls replicate in independent repositories.
 
+A second prospect review completed on June 8, 2026 (`reports/claude-prospect-reviews/20260608-132852-cast-to-branded.md`) after the wider rule-status cleanup. It sharpened the decision:
+
+- Treat `@typescript-eslint/no-unsafe-type-assertion` as the standing benchmark, not a default replacement yet.
+- Keep the rule default-off unless a real non-test forged brand cast appears.
+- Add only correctness hardening before evidence: `TSTypeAssertion` coverage, symbol-based Zod brand detection, explicit double-cast ownership, and source gating for guarded casts.
+- Add a sunset: if no real forged branded cast appears in a second independent repository by the next promotion cycle, retire the custom rule to `ecosystem-covered`.
+
 ## Known Risks
 
 - Antidrift-marker-only detection makes real promotion nearly impossible until consumers adopt the brand kit.
 - Zod brand detection must be symbol/type based, not name-string matching.
 - `raw as unknown as Brand` can be reported by both `no-unsafe-cast-chain` and `no-cast-to-branded`; ownership of the double-cast case should be explicit before enabling both.
 - Type-aware parser services are required; enabling the rule in a non-type-aware config intentionally reports configuration errors.
+- The current clean controls are parse-boundary files with no cast node. They prove the preferred construction pattern, but they do not prove a cast-bearing false-positive boundary.
 
 ## Promotion Conditions
 
 - Implement Zod brand target detection, or explicitly decide Zod brands are out of scope and keep the rule under-proven/off.
 - Add `TSTypeAssertion` coverage if TypeScript source files can use angle-bracket casts.
 - Find a real non-test forged brand cast in a repository that already uses branded validation boundaries.
+- Find at least one real cast-bearing clean control, such as a guarded brand cast that should not report, before enabling.
 - Keep real clean controls for schema/brand constructors.
 - Require at least two independent repositories before stable promotion.
+
+## Current Verdict
+
+Keep implemented but default-off and under-proven.
+
+The rule has a sound intended contract, but the current corpus gives it no work: Codebase Atlas uses Zod brands through parse boundaries, and the real non-test forged-cast count is still zero. The next useful action is not another broad hunt; it is a small correctness hardening pass only if the rule is going to stay in the package. Without a real forged-brand replication before the next promotion cycle, this should move to `ecosystem-covered` and let `@typescript-eslint/no-unsafe-type-assertion` own the general assertion surface.
