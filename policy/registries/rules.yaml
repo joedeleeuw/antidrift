@@ -556,6 +556,7 @@ rules:
       - Benchmarking shows the current any-typed Chaski drift is also reported by @typescript-eslint unsafe member-access rules on the individual property reads, while antidrift reports one callback-level architectural finding.
       - The 2026-06-09 syntax sweep found additional clean controls, but no second drift repository.
       - Stable promotion still needs a second independent drift repository and broad inventory review.
+      - Claude Opus 4.8 advisory review recommends demoting to inventory/off or retiring if no second drift appears beyond upstream unsafe-member coverage.
     external:
       state: partial-overlap
       support: medium
@@ -572,7 +573,7 @@ rules:
       allows:
         - "const parsed = schema.parse(raw);"
         - "Object.entries(typedMap).map(([id, value]) => value.name)"
-    nextAction: Seek a second real drift repository, preferably with unknown-typed broad values, and rerun the upstream-overlap benchmark before stable promotion; do not repeat the 2026-06-09 syntax sweep unless new repos are added.
+    nextAction: Decide demotion to inventory/off unless a second real drift repository appears, preferably with unknown-typed broad values not already explained by upstream unsafe-member rules.
   antidrift/no-hover-translate-card:
     status: ready
     stable: false
@@ -814,19 +815,22 @@ rules:
     corpusRepositories: [chaski]
     concerns:
       - Current detector is heuristic by nature; stable promotion needs a derivability/cohesion signal and multiple low-noise inventories.
+      - Claude Opus 4.8 advisory review says the sharper derivability signal likely belongs in no-coupled-state-setters plus a redundant-constant-cell branch.
     external:
-      state: net-antidrift
-      support: none
-      candidates: []
+      state: partial-overlap
+      support: high
+      candidates:
+        - "react-hooks/no-deriving-state-in-effects"
+        - "eslint-plugin-react-hooks recommended-latest"
       decision: own-antidrift
-      whyThisState: "No supported React rule was found for separately mutable resource lifecycle state where derived facts are split into local cells."
-      whyNotOtherState: "Not partial-overlap because ordinary hooks rules do not identify the resource-state derivability/cohesion smell."
+      whyThisState: "React Hooks rules cover derived-state-in-effect and adjacent compiler-era state issues, but not local resource lifecycle cells acting as one implicit state machine."
+      whyNotOtherState: "Not equivalent because the current concern is static local resource-state cohesion; not net-antidrift because React Hooks rules cover adjacent derivability slices."
     examples:
       flags:
         - "const [data] = useState(null); const [loading] = useState(false); const [error] = useState(null);"
       allows:
         - 'const [resource] = useState({ state: "loading" });'
-    nextAction: Keep configurable and classify another frontend repo inventory.
+    nextAction: Decide whether to fold the sharper derivability signal into no-coupled-state-setters as a redundant-constant-cell branch, or retire the standalone rule.
   antidrift/no-structural-type-fork:
     status: ready
     stable: false
