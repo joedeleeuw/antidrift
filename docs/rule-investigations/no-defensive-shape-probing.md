@@ -14,12 +14,13 @@ The disputed boolean-helper branch was removed from this rule. Real corpus revie
 
 Adjacent ecosystem rules:
 
+- `@typescript-eslint/no-unsafe-member-access`, `@typescript-eslint/no-unsafe-return`, and `@typescript-eslint/no-unsafe-assignment` catch many `any` leakage symptoms. A benchmark over Chaski BFF, Codebase Atlas, and Sudocode CLI checked 577 files and found 1 antidrift finding, 373 unsafe-member-access findings, 30 unsafe-return findings, and 209 unsafe-assignment findings. The Chaski drift is partially overlapped: antidrift reports the `Object.entries` callback at line 706, while upstream reports the individual `.numberValue`, `.stringValue`, and `.boolValue` member reads at lines 710-712.
 - `@typescript-eslint/no-unsafe-type-assertion` catches unsafe narrowing assertions, but does not catch broad-object probing or normalizer callbacks.
 - `@typescript-eslint/no-unnecessary-condition` catches impossible or redundant conditions once type information proves them unnecessary.
 - `@typescript-eslint/switch-exhaustiveness-check` covers discriminated-union exhaustiveness, not broad-object normalization.
 - ESLint core `guard-for-in` addresses inherited keys in `for...in`, not `Object.entries` shape probing.
 
-No existing rule found so far covers the real-corpus-backed `Object.entries(...).map` mini-parser shape.
+No existing rule found so far covers the real-corpus-backed `Object.entries(...).map` mini-parser shape as one architectural finding with an owned converter/schema replacement. The current status is partial overlap, not net-new coverage.
 
 ## Applied Direction
 
@@ -58,6 +59,7 @@ The rule does not report ordinary typed `Object.entries(...).map` transformation
 
 - Narrowing drops true positives where a broad value has already been cast to a precise local type before the entries mapper.
 - `checker.typeToString(...)` is a coarse fallback for detecting `any`/`unknown` inside aliases.
+- Current real drift is `any`-typed and partially covered by upstream unsafe rules. A real `unknown`-typed broad-value mini-parser would better prove unique rule value.
 - Stable promotion still needs a second independent real drift repository, not only clean controls.
 
 ## Clear Examples
@@ -77,5 +79,5 @@ Not allowed as syntax-only violations:
 ## Entry Conditions For Re-expansion
 
 - A future expansion would need a distinct real repository case that is not already covered by `no-underchecked-type-predicate`.
-- Stable promotion needs a second real drift repository plus no false positives in broad inventory.
+- Stable promotion needs a second real drift repository plus no false positives in broad inventory. Prefer a real `unknown`-typed broad-value mini-parser or benchmark evidence showing findings that upstream unsafe rules do not already explain.
 - Predicate/type-guard expansions stay in `no-underchecked-type-predicate`, not here.
