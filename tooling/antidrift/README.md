@@ -39,6 +39,18 @@ npx antidrift generate
 ```
 
 That writes the agent instruction files and hook configs (more on those below).
+If you use the generated hooks/instructions, add the scripts they call to your root package:
+
+```json
+{
+  "scripts": {
+    "policy:generate": "antidrift generate",
+    "policy:check-generated": "antidrift check-generated",
+    "policy:check:changed": "antidrift check-changed",
+    "policy:verify-session": "antidrift verify-session"
+  }
+}
+```
 
 For self-hosted rule packages, two additional checks keep the control plane honest:
 
@@ -52,6 +64,7 @@ npx antidrift repo-corpus --slice current-work --rules import-x/no-cycle
 ```
 
 The first validates registry-backed rule facts. The second verifies every custom rule exported by the plugin is configured and covered by `RuleTester`.
+`check-rule-surface` is only meaningful in this source repository layout; installed consumers can use `verify-session`, `check-generated`, and normal ESLint runs without carrying antidrift's own rule tests.
 `policy:validate-corpus` lints the maintained project inventory with every custom rule, while `repo-corpus` can narrow the evidence to the rules changed in a slice.
 `policy:validate-chaski` is an optional local corpus gate: it runs explicit assertions against real Chaski frontend/BFF files when `CHASKI_REPO` or `/Users/sushi/code/chaski` is available, and skips otherwise so consumers do not need the private corpus.
 `policy:inventory-schema-roundtrip` is a non-blocking research inventory for same-schema `.parse({ ...typedState })` shapes; it classifies real anchors instead of failing the build.
@@ -60,7 +73,7 @@ The first validates registry-backed rule facts. The second verifies every custom
 
 Public entry points, one package:
 
-- `@joedeleeuw/antidrift` — stable primitives: `createConfig`, `eslintPlugin`, policy rendering, and registry loading
+- `@joedeleeuw/antidrift` — package primitives: `createConfig`, `eslintPlugin`, policy rendering, and registry loading
 - `@joedeleeuw/antidrift/brand` — `Brand<T, Name>`, `Unbrand<T>`, and `brand(name, check)`
 - `@joedeleeuw/antidrift/eslint-config` — the `createConfig` factory above
 - `@joedeleeuw/antidrift/eslint-plugin` — the raw plugin, if you'd rather wire rules by hand

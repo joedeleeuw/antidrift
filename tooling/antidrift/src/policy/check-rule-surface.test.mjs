@@ -95,4 +95,16 @@ describe("checkRuleSurface", () => {
     expect(ok).toBe(true);
     expect(messages).toEqual([]);
   });
+
+  it("skips cleanly when run outside the self-hosted source layout", () => {
+    const messages = [];
+    const ok = checkRuleSurface({
+      repoRoot: "not-the-antidrift-source-repo",
+      configs: [],
+      report: (message) => messages.push(message),
+    });
+
+    expect(ok).toBe(true);
+    expect(messages.join("\n")).toContain("check-rule-surface skipped");
+  });
 });

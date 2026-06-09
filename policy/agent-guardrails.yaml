@@ -262,10 +262,10 @@ clusters:
   - id: injection-and-secret-drift # Agents leak secrets and build injection sinks when generating data-access and config code. Distinct from data-lifecycle-drift (migration/fixture alignment).
     owner: security # Security owns secret handling, query construction, and deserialization policy.
     rules:
-      - id: sec/no-hardcoded-secret # Enforced via secretlint pre-commit hook, not ESLint. Variable-name heuristics in lint rules produce too many false positives to be reliable.
+      - id: sec/no-hardcoded-secret # Delegate to a maintained secret scanner. Variable-name heuristics in lint rules produce too many false positives to be reliable.
         severity: blocker
-        detector: secretlint # https://github.com/secretlint/secretlint — use as a pre-commit/CI hook, not an ESLint rule.
-        message: Load secrets from the environment or a secret manager. Configure secretlint for repo-specific patterns.
+        detector: delegatedSecretScanner
+        message: Load secrets from the environment or a secret manager. Configure a maintained scanner for repo-specific patterns.
       - id: sec/no-sql-string-concat # Interpolated/concatenated SQL is an injection sink. Deterministic on SQL structure, not lone keywords.
         severity: blocker
         detector: sqlBuiltByInterpolationOrConcat

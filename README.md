@@ -2,7 +2,7 @@
 
 A pnpm TypeScript monorepo template for making agent-authored code fail fast at the IDE, hook, CI, and SonarQube layers.
 
-This template intentionally excludes the later package-publication surface gap work: no `arethetypeswrong`, `publint`, `validate-package-exports`, package tarball checks, or consumer-matrix tooling are included.
+This template intentionally excludes the later package-publication surface gap work for consuming monorepos: no `arethetypeswrong`, `publint`, `validate-package-exports`, or package export matrix is part of the baseline. The `@joedeleeuw/antidrift` package itself has a focused tarball consumer test under `pnpm test:integration`.
 
 ## What is included
 

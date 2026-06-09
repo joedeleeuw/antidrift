@@ -21,10 +21,10 @@ way the ecosystem rule does not express, or registry-backed.
 
 ## Advisory Review Deltas
 
-The June 4, 2026 Claude Opus 4.8 adversarial review did not change the default posture, but it exposed two governance gaps that should be handled before stable promotion work:
+The June 4, 2026 Claude Opus 4.8 adversarial review did not change the default posture, but it exposed two governance checks that are now part of the control plane:
 
 1. The cast family now has a measured `@typescript-eslint/no-unsafe-type-assertion` delta. `pnpm policy:benchmark-unsafe-type-assertion` checked 2,411 real files across Chaski, Codebase Atlas, and Sudocode: `@typescript-eslint/no-unsafe-type-assertion` reported 1,474 findings, the antidrift cast family reported 143 findings, every antidrift cast location overlapped upstream, and upstream produced 1,331 upstream-only locations. That confirms `broader-upstream`, not equivalent replacement.
-2. Rule maturity does not currently drive configured severity. `under-proven` and heuristic rules can still be enabled as `error`, even though the authoring guidance says heuristics start as warnings. A future control-plane check should fail when config severity outranks registry status or signal confidence.
+2. Rule maturity drives configured severity. `pnpm policy:check-rule-surface` fails when `under-proven`, `false-positive-prone`, `research`, or heuristic-signal rules are configured as blocking.
 
 Follow-up ecosystem checks from the same review:
 
@@ -89,7 +89,7 @@ No supported equivalent was found for these as currently scoped.
 | `antidrift/no-underchecked-type-predicate` | TypeChecker plus AST/control-flow checks                  | Detects broad-input type predicates that assert a nontrivial object contract without checking asserted fields or delegating to a validator. Existing type-aware rules do not validate predicate-body sufficiency. |
 | `antidrift/no-unsafe-deserialize`          | TypeChecker plus local string-boundary guard              | Detects `JSON.parse` on `any`/`unknown` input while allowing direct `typeof` string guards. Security plugins cover broader smells, but not this type-signal parse-at-edge rule directly.                          |
 | `antidrift/require-authz-check`            | AST control-flow plus registry                            | Requires configured authz/ownership calls in handler-local Express-style boundaries that read request params. Middleware dominance and tRPC procedure chains are separate scopes.                                 |
-| `antidrift/no-defensive-shape-probing`     | Deterministic AST, under-proven                           | No equivalent was found for Object.entries normalizers that repeatedly probe broad object shape. Keep under-proven until real evidence justifies it.                                                              |
+| `antidrift/no-defensive-shape-probing`     | TypeChecker plus AST shape                                | No equivalent was found for Object.entries normalizers that repeatedly probe broad object shape. The rule is ready but not stable; seek a second real drift repository before promotion.                         |
 
 ## Remaining Retirement Candidates
 

@@ -4,7 +4,9 @@ packages:
   - tooling/*
 
 # pnpm catalogs centralize tool and library versions for the whole workspace.
-# Use `catalog:<name>` in package.json files so agents do not invent per-package versions.
+# Use `catalog:<name>` in private package.json files so agents do not invent per-package
+# versions. Published packages must use concrete ranges because npm does not understand
+# pnpm catalog specifiers.
 catalogs:
   core:
     "@types/node": ^22.10.2

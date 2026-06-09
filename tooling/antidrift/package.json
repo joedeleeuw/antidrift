@@ -26,6 +26,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "exports": {
     ".": "./src/index.mjs",
     "./brand": {
@@ -38,7 +41,7 @@
     "./policy": "./src/policy/index.mjs"
   },
   "bin": {
-    "antidrift": "./src/policy/cli.mjs"
+    "antidrift": "src/policy/cli.mjs"
   },
   "files": [
     "src",
@@ -46,18 +49,18 @@
     "!src/**/fixtures/**"
   ],
   "dependencies": {
-    "@eslint-community/eslint-plugin-eslint-comments": "catalog:lint",
-    "@eslint/js": "catalog:lint",
-    "@vitest/eslint-plugin": "catalog:lint",
-    "eslint-plugin-boundaries": "catalog:lint",
-    "eslint-plugin-import-x": "catalog:lint",
-    "eslint-plugin-no-only-tests": "catalog:lint",
-    "eslint-plugin-react": "catalog:lint",
-    "eslint-plugin-react-hooks": "catalog:lint",
-    "eslint-plugin-sonarjs": "catalog:lint",
-    "eslint-plugin-unicorn": "catalog:lint",
-    "globals": "catalog:lint",
-    "yaml": "catalog:core"
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
+    "@eslint/js": "^9.17.0",
+    "@vitest/eslint-plugin": "^1.6.19",
+    "eslint-plugin-boundaries": "^5.0.1",
+    "eslint-plugin-import-x": "^4.16.2",
+    "eslint-plugin-no-only-tests": "^3.3.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-sonarjs": "^4.0.3",
+    "eslint-plugin-unicorn": "^64.0.0",
+    "globals": "^15.14.0",
+    "yaml": "^2.6.1"
   },
   "peerDependencies": {
     "@typescript-eslint/parser": ">=8",
@@ -66,12 +69,12 @@
     "typescript-eslint": ">=8"
   },
   "devDependencies": {
-    "@types/node": "catalog:core",
-    "@typescript-eslint/parser": "catalog:lint",
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/parser": "^8.60.1",
     "firebase": "^11.0.0",
-    "typescript": "catalog:core",
-    "typescript-eslint": "catalog:lint",
-    "vitest": "catalog:test",
-    "zod": "catalog:core"
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.60.1",
+    "vitest": "^2.1.8",
+    "zod": "^3.24.1"
   }
 }

@@ -340,9 +340,8 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         // validation-drift: re-parsing a value with the schema that already produced it (type-aware).
         "antidrift/no-redundant-zod-parse": "error",
 
-        // Data-lifecycle security rules.
-        // no-hardcoded-secret: enforced via secretlint pre-commit hook — variable-name heuristics
-        // in lint rules produce too many false positives. See policy/registries/dependencies.yaml.
+        // Data-lifecycle security rules. Secret scanning is delegated to a maintained
+        // scanner in consumer CI; variable-name heuristics in lint rules overreport.
         "antidrift/no-sql-string-concat": "error",
         "antidrift/no-unsafe-deserialize": "error",
 

@@ -37,10 +37,15 @@ function collectConfiguredRuleSettings(configs) {
 
 function readPluginTestSource(repoRoot) {
   const pluginDir = resolve(repoRoot, "tooling/antidrift/src/eslint-plugin");
-  return readdirSync(pluginDir)
-    .filter((file) => file.endsWith(".test.mjs"))
-    .map((file) => readFileSync(resolve(pluginDir, file), "utf8"))
-    .join("\n");
+  try {
+    return readdirSync(pluginDir)
+      .filter((file) => file.endsWith(".test.mjs"))
+      .map((file) => readFileSync(resolve(pluginDir, file), "utf8"))
+      .join("\n");
+  } catch (err) {
+    if (err.code === "ENOENT") return null;
+    throw err;
+  }
 }
 
 function collectTestedRules(testSource) {
@@ -108,15 +113,21 @@ export function checkRuleSurface({
   repoRoot = defaultRepoRoot,
   pluginRules = plugin.rules,
   configs = createConfig({ tsconfigRootDir: repoRoot }),
-  testSource = readPluginTestSource(repoRoot),
+  testSource,
   corpusCases = chaskiCorpusCases,
   ruleRegistry = readRuleRegistry(repoRoot),
   report = console.error,
 } = {}) {
+  const resolvedTestSource = testSource ?? readPluginTestSource(repoRoot);
+  if (resolvedTestSource === null) {
+    report("check-rule-surface skipped: antidrift source layout was not found. This command is intended for the self-hosted antidrift repository.");
+    return true;
+  }
+
   const exported = new Set(Object.keys(pluginRules ?? {}));
   const configuredSettings = collectConfiguredRuleSettings(Array.isArray(configs) ? configs : [configs]);
   const configured = new Set(configuredSettings.keys());
-  const tested = new Set([...collectTestedRules(testSource), ...collectCorpusCoveredRules(corpusCases)]);
+  const tested = new Set([...collectTestedRules(resolvedTestSource), ...collectCorpusCoveredRules(corpusCases)]);
 
   const configuredButNotExported = new Set([...configured].filter((rule) => !exported.has(rule)));
   const exportedButNotConfigured = new Set([...exported].filter((rule) => !configured.has(rule)));
