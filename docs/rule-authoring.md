@@ -8,8 +8,6 @@ Keep baseline coverage in ESLint and track any missing replacement rule in `docs
 
 Record source provenance in `docs/source-ledger.md` whenever you add, remove, or replace a rule, ruleset, tool, or borrowed repo reference. The ledger should say whether the source is local custom code, a maintained ecosystem rule, generated ESLint config, a delegated tool such as Sonar, or consumer-only tooling such as Trunk.
 
-When a rule or ruleset adds a direct dependency, record its lane in `docs/dependency-lanes.md`. The lane should explain whether the dependency is a peer contract, lint engine, policy CLI helper, test-corpus package, repo control-plane tool, delegated scanner, or investigation-only package.
-
 New rules should start from `docs/build-patterns.md`: first define the simple construction pattern, then add a rule only when the violation can be detected without relying on reviewer interpretation.
 
 Use `docs/self-hosting-risks.md` when changing the rule package itself. The short version: code semantics live in ESLint rules, repository control-plane checks live in policy scripts, and agent lifecycle safety lives in hooks.
@@ -89,7 +87,6 @@ These should start as warnings:
 - Do not use reduced fixture programs as a completion gate. Real project files are the assertion surface for rule promotion.
 - Add or update the rule row in `policy/registries/rules.yaml` whenever a rule is added, retired, narrowed, reclassified, or considered for stable promotion.
 - Add or update the corresponding provenance row in `docs/source-ledger.md` whenever a rule, ruleset, tool, or borrowed reference changes.
-- Add or update `docs/dependency-lanes.md` whenever the change adds, removes, or reclassifies a direct dependency.
 - Do not mark `stable: true` in the rule registry until multiple independent real repositories replicate the behavior, with zero known false positives, zero known false negatives, no productionization concerns, and a grounded Claude Opus 4.8 advisory review.
 - Track any deleted or replaced lint rule in `docs/lint-rule-parity.md` with an explicit replacement or accepted gap.
 - Update `docs/policy-coverage.md` whenever a policy rule moves between spec-only, delegated, partial, and enforced.

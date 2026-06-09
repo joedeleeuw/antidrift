@@ -4,7 +4,6 @@ This ledger records where rules, rulesets, and tools come from. Update it whenev
 
 The goal is provenance, not duplicate rule documentation. Detailed status still lives in:
 
-- `docs/dependency-lanes.md` for dependency ownership, expected lifetime, and rule/tool tie-back.
 - `policy/registries/rules.yaml` for custom rule maturity, examples, external overlap, and promotion state.
 - `docs/rule-status-registry.md` for the readable custom-rule index.
 - `docs/lint-rule-parity.md` for retired Oxlint parity.
@@ -55,9 +54,8 @@ The goal is provenance, not duplicate rule documentation. Detailed status still 
 Before adding a rule, ruleset, or tool:
 
 1. Pick one source type from this file.
-2. If it adds or keeps a direct dependency, assign a lane in `docs/dependency-lanes.md`.
-3. Record the package/tool/rule IDs and local config path.
-4. If it is custom, update `policy/registries/rules.yaml` and the relevant investigation/audit docs.
-5. If it replaces custom code or a retired engine rule, update `docs/lint-rule-parity.md` or `docs/rule-equivalence-audit.md`.
-6. If it came from reviewing another repo such as Chaski, record that path as a `borrowed-reference` and name the final owner.
-7. If it is consumer-only tooling, document why it is not bundled into antidrift.
+2. Record the package/tool/rule IDs and local config path.
+3. If it is custom, update `policy/registries/rules.yaml` and the relevant investigation/audit docs.
+4. If it replaces custom code or a retired engine rule, update `docs/lint-rule-parity.md` or `docs/rule-equivalence-audit.md`.
+5. If it came from reviewing another repo such as Chaski, record that path as a `borrowed-reference` and name the final owner.
+6. If it is consumer-only tooling, document why it is not bundled into antidrift.

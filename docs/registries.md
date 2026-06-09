@@ -15,8 +15,6 @@ policy/registries/mcp.yaml               approved MCP servers and tool scopes
 policy/registries/rules.yaml             custom rule status, policy rule reviews, signal, promotion, and next action
 ```
 
-Dependency policy is intentionally split: `policy/registries/dependencies.yaml` owns hard policy such as runtime approval and banned version specifiers, while `docs/dependency-lanes.md` owns the human review model for dependency lane, expected lifetime, and tie-back.
-
 ## Rule behavior
 
 Registry-backed rules should:
