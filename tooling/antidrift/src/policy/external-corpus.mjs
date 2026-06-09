@@ -817,6 +817,19 @@ const claudeCodeSourceCases = [
 
 const opencodeCases = [
   {
+    id: "opencode-drizzle-sql-template-identifiers-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "effect-drizzle-sqlite",
+    paths: [
+      "packages/effect-drizzle-sqlite/src/up-migrations/effect-sqlite.ts",
+      "packages/effect-drizzle-sqlite/src/up-migrations/sqlite.ts",
+      "packages/effect-drizzle-sqlite/src/sqlite-core/effect/session.ts",
+      "packages/core/src/database/migration.ts",
+    ],
+  },
+  {
     id: "opencode-console-benchmark-list-result-json",
     ruleId: "antidrift/no-unsafe-deserialize",
     kind: "drift",

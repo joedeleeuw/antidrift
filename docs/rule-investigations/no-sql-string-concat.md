@@ -133,15 +133,17 @@ Why: the SQL-looking text is sample payload data; the interpolation is not part 
 
 ## Ecosystem
 
-`sonarjs/sql-queries` is active as adjacent maintained coverage, but the benchmark currently reports 0 SonarJS findings against this rule's real Chaski/Sudocode SQL-like findings. Keep this rule until a supported ecosystem rule covers the same HogQL/template interpolation cases.
+`sonarjs/sql-queries` is active as adjacent maintained coverage, but Sonar documents that rule as a security-sensitive formatted-query hotspot, not SQL injection detection. The local benchmark currently reports 0 SonarJS findings against this rule's 11 real-corpus findings, so it is not a replacement for the HogQL/template interpolation signal.
+
+SQL tag ecosystems are relevant clean controls, not drift. Prisma documents `$queryRaw` and `$executeRaw` as tagged templates that parameterize values, while warning that identifiers such as table names and column names cannot be passed through placeholders. Drizzle documents its `sql` template as parameterized and identifier-aware through table/column objects and helpers such as `sql.identifier(...)`. That matches this rule's shape: treat known SQL tags as owned binding APIs, and keep raw string interpolation suspicious unless the identifier token set is locally closed.
 
 ## Real-Corpus Evidence
 
 Drift:
 
-- `/Users/sushi/code/chaski/src/frontend/bff/api/gateways/posthog-gateway.ts` has 10 interpolated HogQL/SQL findings, including line 570 where order IDs are escaped into an `IN (...)` string.
-- `/Users/sushi/code/sudocode-main/server/tests/integration/workflow/helpers/workflow-test-setup.ts` line 386 and `/Users/sushi/code/sudocode-main/server/tests/integration/execution/helpers/test-setup.ts` line 179 build `SET` clauses from `Object.keys(updates)`.
-- `/Users/sushi/code/cloudflare-agents/examples/playground/src/demos/core/SqlDemo.tsx` line 133 builds a table query from a plain `string` table name.
+- Production: `/Users/sushi/code/chaski/src/frontend/bff/api/gateways/posthog-gateway.ts` has 10 interpolated HogQL/SQL findings, including line 570 where order IDs are escaped into an `IN (...)` string.
+- Lower-strength pressure: `/Users/sushi/code/sudocode-main/server/tests/integration/workflow/helpers/workflow-test-setup.ts` line 386 and `/Users/sushi/code/sudocode-main/server/tests/integration/execution/helpers/test-setup.ts` line 179 build `SET` clauses from `Object.keys(updates)`.
+- Lower-strength pressure: `/Users/sushi/code/cloudflare-agents/examples/playground/src/demos/core/SqlDemo.tsx` line 133 builds a table query from a plain `string` table name.
 
 Clean:
 
@@ -151,12 +153,13 @@ Clean:
 - `/Users/sushi/code/sudocode-main/server/src/workflow/base-workflow-engine.ts` line 482 stays clean for `SET ${setClauses.join(", ")}` where each pushed clause is a static fragment and values are bound with `.run(...values)`.
 - `/Users/sushi/code/cloudflare-agents/packages/ai-chat/e2e/chat.spec.ts` line 1571 stays clean because the template serializes a browser test payload; the interpolation is a tool output string, not SQL assembly.
 - `/Users/sushi/code/cloudflare-agents/packages/shell/src/filesystem.ts` stays clean because `VALID_NAMESPACE.test(ns)` exits on failure before deriving `this.tableName` and `this.indexName`, and those fields are interpolated only in SQL identifier positions.
+- `/Users/sushi/code/opencode/packages/effect-drizzle-sqlite/src` and `/Users/sushi/code/opencode/packages/core/src/database/migration.ts` stay clean for Drizzle-style `sql` tags and `sql.identifier(...)` composition.
 
 Current benchmark result after placeholder-list, static-fragment, tag, closed-identifier, and constructor-validated identifier narrowing:
 
-- 236 checked files.
+- 260 checked files.
 - 0 parser errors.
-- 10 `antidrift/no-sql-string-concat` findings.
+- 11 `antidrift/no-sql-string-concat` findings.
 - 0 `sonarjs/sql-queries` findings.
 
 Widened local scan:
@@ -171,7 +174,7 @@ Widened local scan:
 
 Status: `ready`, `stable: false`.
 
-The sanitized dynamic identifier gap is resolved in the local rule and validated against Cloudflare Workspace. Drift still replicates across Chaski, Sudocode, and Cloudflare, while Chaski, Codebase Atlas, Sudocode, and Cloudflare supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, and bound values.
+The sanitized dynamic identifier gap is resolved in the local rule and validated against Cloudflare Workspace. Production drift is currently Chaski; Sudocode and Cloudflare provide useful but lower-strength drift pressure from test-helper and demo/playground programs. Chaski, Codebase Atlas, Sudocode, Cloudflare, and Opencode supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, ORM-owned SQL composition, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, and bound values.
 
 The June 8, 2026 advisory review was grounded in repo reads and kept the rule at `ready`, not stable. The review agreed this is not ecosystem-covered and that the Cloudflare branch is deterministic enough to keep, but it found three stable-promotion blockers:
 

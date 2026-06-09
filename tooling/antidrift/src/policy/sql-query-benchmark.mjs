@@ -20,6 +20,14 @@ const sudocodeRepoCandidates = [
   process.env.SUDOCODE_REPO,
   "/Users/sushi/code/sudocode-main",
 ].filter(Boolean);
+const cloudflareAgentsRepoCandidates = [
+  process.env.CLOUDFLARE_AGENTS_REPO,
+  "/Users/sushi/code/cloudflare-agents",
+].filter(Boolean);
+const opencodeRepoCandidates = [
+  process.env.OPENCODE_REPO,
+  "/Users/sushi/code/opencode",
+].filter(Boolean);
 
 const benchmarkRuleIds = [
   "antidrift/no-sql-string-concat",
@@ -52,6 +60,42 @@ const corpusPlans = [
       "server/src/routes/workflows.ts",
       "server/src/workflow/base-workflow-engine.ts",
       "server/src/routes/config.ts",
+    ],
+  },
+  {
+    repo: "sudocode-main-cli",
+    label: "cli-sql-corpus",
+    repoCandidates: sudocodeRepoCandidates,
+    targets: [
+      "cli/src/operations/issues.ts",
+      "cli/src/operations/specs.ts",
+      "cli/src/operations/tags.ts",
+      "cli/src/operations/relationships.ts",
+    ],
+  },
+  {
+    repo: "cloudflare-agents",
+    label: "sql-corpus",
+    repoCandidates: cloudflareAgentsRepoCandidates,
+    targets: [
+      "packages/shell/src/filesystem.ts",
+      "examples/codemode/src/tools.ts",
+      "examples/playground/src/demos/core/SqlDemo.tsx",
+      "packages/ai-chat/e2e/chat.spec.ts",
+      "packages/voice/src/voice.ts",
+      "packages/ai-chat/src/index.ts",
+      "packages/agents/src/index.ts",
+    ],
+  },
+  {
+    repo: "opencode",
+    label: "drizzle-sql-corpus",
+    repoCandidates: opencodeRepoCandidates,
+    targets: [
+      "packages/effect-drizzle-sqlite/src/up-migrations/effect-sqlite.ts",
+      "packages/effect-drizzle-sqlite/src/up-migrations/sqlite.ts",
+      "packages/effect-drizzle-sqlite/src/sqlite-core/effect/session.ts",
+      "packages/core/src/database/migration.ts",
     ],
   },
 ];
