@@ -144,6 +144,7 @@ Better split:
 - First-party domain model forks need registry-backed owner facts.
 - Inline use-site object contracts are only bad at public/boundary surfaces.
 - Status literals are bad only when the registry proves an owner exists and the local context is not the owner.
+- The true one-owner structural-fork family is `no-structural-type-fork` plus `no-canonical-model-fork`; inline use-site object contracts are boundary-shape hygiene, and status literals are vocabulary drift.
 
 Recommended default:
 
@@ -154,6 +155,14 @@ First human grill question:
 Should a boundary DTO or view model be allowed to structurally overlap a domain model if it represents a real translation boundary?
 
 Recommended answer: yes. The rule should block unowned forks, not legitimate boundary contracts.
+
+Current advisory:
+
+Claude Opus 4.8 reviewed this branch in `reports/claude-contracts-sql-grill-stream-20260609.md`. It challenged the family grouping: installed/generated and domain structural forks are one family with different owner sources, but inline use-site contracts and status literals are separate jobs. It also called out the installed-package sweep as weaker than generated/domain registry-backed ownership because not every exported package object type is a contract the app was meant to import.
+
+Next human grill question:
+
+Because structural fork matching fires on subsets, does a hand-written boundary DTO that projects four or more identical owner fields count as a fork, or only a full-shape redeclaration? For installed packages specifically, should the unconfigured all-`node_modules` sweep stay blocking, or should blocking require generated/domain/registry owner facts?
 
 ### SQL String Construction
 
@@ -175,6 +184,7 @@ Better split:
 - Value interpolation should use parameters.
 - Identifier interpolation needs an explicit allowlist or trusted escaper.
 - Parameterized SQL tag/template systems should stay clean.
+- Value interpolation and identifier interpolation have different proof burdens. Value interpolation is blockable by SQL syntax context alone; identifier interpolation needs allowlist, escaper, typed union, static map, or configured safe-member proof.
 
 Recommended default:
 
@@ -186,35 +196,68 @@ Should type-aware safe identifier proofs be required for clean interpolation, ev
 
 Recommended answer: yes for stable policy. Do not replace type proof with name exemptions.
 
-### Deterministic Narrow Syntax
+Current advisory:
+
+Claude Opus 4.8 reviewed this branch in `reports/claude-contracts-sql-grill-stream-20260609.md`. It agreed the rule should stay custom, but split the stable blocker by interpolation kind: value interpolation can block everywhere, while identifier interpolation may need different behavior when parser services are absent.
+
+Next human grill question:
+
+Should SQL severity split by interpolation kind: value interpolation blocks everywhere, while dynamic identifier interpolation downgrades to inventory when parser services are absent? Or do we accept conservative identifier reports as the cost of one severity?
+
+### Nullable Positional Tuple
 
 Rules:
 
 - `antidrift/no-nullable-positional-tuple`
+
+Human problem:
+
+Nullable or optional multi-slot tuples create ambiguous positional partial state, such as `[Date | null, Date | null]`, where readers must remember which slot means what and which combinations are valid.
+
+Bad framing:
+
+- "Ban all tuples."
+- "This is low impact, so it cannot be stable."
+
+Recommended default:
+
+Keep the rule narrow. The blockable signal is two or more nullable/optional tuple slots, not tuple syntax in general. Low impact affects priority, not whether the detector is true.
+
+First human grill question:
+
+Is nullability the actual policy boundary, or is it a proxy for any two-or-more-slot positional tuple that hides field meaning?
+
+Recommended answer: nullability is the boundary because it creates ambiguous partial-state combinations; non-null positional tuples can still be legitimate compact data.
+
+### Async Array Callback Control Flow
+
+Rule:
+
 - `antidrift/no-async-array-method`
 
 Human problem:
 
-The source shape itself is the bug-prone construction.
+Async callbacks in array methods can silently drop promises or create promise lists that are not joined.
 
 Bad framing:
 
-- "This must be stable only after endless repo mining."
+- "Ban all async callbacks in array methods."
+- "Use the broad ecosystem rule even if it creates route-handler noise."
 
 Better split:
 
-- Nullable multi-slot tuples are ambiguous positional partial state.
-- Async callbacks in array methods are control-flow hazards, with `.map`/`.flatMap` needing a clear `Promise.all` or loop story.
+- Never-await methods such as `forEach`, `filter`, and `some` discard callback return values.
+- `map` and `flatMap` can be valid when the resulting promise list is returned, awaited, or passed to `Promise.all`.
 
 Recommended default:
 
-Treat these as narrow deterministic rules. A second real program is useful, but if the detector is precise and ecosystem overlap is only partial, a documented one-repo evidence exception may be acceptable.
+Keep custom because the configured ecosystem baseline deliberately disables the noisy `checksVoidReturn.arguments` path. Consider splitting the rule's maturity: never-await methods are deterministic; `map`/`flatMap` collection is a separate dataflow branch.
 
 First human grill question:
 
-For deterministic syntax rules, is low impact enough reason to keep them not-stable, or should stability be allowed once false-positive risk is demonstrably low?
+Should `no-async-array-method` split promotion by branch: never-await methods can promote on deterministic evidence, while `map`/`flatMap` not-collected remains a separate evidence gate?
 
-Recommended answer: low impact should affect priority, not truth. Stability should depend on correctness and evidence, not perceived glamour.
+Recommended answer: yes. They share syntax, but the job failures and proof burdens differ.
 
 ### Authz Framework Scope
 
@@ -224,7 +267,7 @@ Rule:
 
 Human problem:
 
-Server handlers read request identity, route params, or tenant-scoped inputs without an ownership/authorization decision in the same boundary.
+Express-style handlers read route params without a co-located ownership/authorization decision.
 
 Bad framing:
 
@@ -237,6 +280,7 @@ Better split:
 - Middleware dominance is a control-flow/framework question.
 - tRPC procedures are a separate framework shape.
 - Client-only authorization is a separate boundary violation.
+- A stronger future shape may be construction-pattern based: every route/action is registered through a typed policy-bearing wrapper.
 
 Recommended default:
 
@@ -248,13 +292,55 @@ Should middleware-level authorization satisfy this rule, or do we want every mut
 
 Recommended answer: framework middleware can satisfy authentication, but ownership checks tied to specific resources usually need local proof or a typed policy wrapper.
 
+Current advisory:
+
+Claude Opus 4.8 reviewed this branch in `reports/claude-deterministic-authz-ui-grill-stream-20260609.md`. It warned that absence-of-call detection is inherently fragile because authorization can live in middleware, wrappers, or higher-order handlers. The stronger direction is a positive construction pattern: route/action handlers register through an approved policy-bearing wrapper.
+
+Next human grill question:
+
+Should authz move from absence detection to a construction-pattern rule, where handlers must be registered through a typed policy wrapper?
+
+### Design-System Class Strings
+
+Rules:
+
+- `antidrift/no-raw-tailwind-color`
+- `antidrift/no-hover-translate-card`
+
+Human problem:
+
+App code bypasses design-system primitives by spelling visual policy directly in class strings.
+
+Bad framing:
+
+- "Infer design intent from component names."
+- "Pretend a small regex is full design-system enforcement."
+
+Better split:
+
+- Raw color utilities are a token-governance problem.
+- Hover translate on card-like surfaces is an interaction-policy problem.
+- The string itself is the policy surface, so these do not need semantic inference, but the implementation must honestly state its extraction coverage.
+
+Recommended default:
+
+Keep as class-string policy only if lint is the chosen layer. Prefer making disallowed utilities unconstructable through Tailwind/theme/design-system entrypoints when possible.
+
+First human grill question:
+
+Is source-scanning lint the right layer for raw Tailwind colors and hover translate, or should the design-system/theme make those utilities unconstructable?
+
+Recommended answer: use lint as a backstop, not the primary design-system control. If lint stays, the raw-color regex needs to be treated as a sampler unless it covers the project's actual token surface.
+
 ## Live Grill Order
 
 Ask these one at a time, and update this file as decisions crystallize:
 
 1. React split resource state: should the sharper status-triplet intent fold into coupled-setters plus a redundant-constant-cell branch?
 2. Broad-input type authority: should only zero-field authority claims block, or can heuristic sufficiency thresholds block?
-3. One-owner contracts: where do boundary DTOs/view models stop being forks?
-4. SQL: should type-aware safe identifier proof be required for clean dynamic identifiers?
-5. Deterministic syntax: can precise low-risk rules become stable with less replication?
-6. Authz: which framework scopes are in, and what counts as local proof?
+3. One-owner contracts: do projected boundary DTOs count as forks, and should installed-package ownership require registry/generated facts before blocking?
+4. SQL: should value interpolation and identifier interpolation have different severity when parser services are absent?
+5. Nullable tuples: is nullability the policy boundary, or any ambiguous positional tuple?
+6. Async arrays: should never-await methods and `map`/`flatMap` not-collected have separate promotion bars?
+7. Authz: should route authz move from absence detection to typed policy-wrapper registration?
+8. Design-system class strings: should lint stay as the control, or should the theme/design system make bad utilities unconstructable?

@@ -503,6 +503,7 @@ rules:
     concerns:
       - Broad local inventory found no false positives across Chaski and Codebase Atlas, but real drift still replicates only in Sudocode test cleanup code.
       - Keep stable false until a second independent real drift is found or the project explicitly accepts one-repo drift evidence for this deterministic AST rule.
+      - The never-await method branch and map/flatMap not-collected branch have different proof burdens and may need separate promotion gates.
     external:
       state: partial-overlap
       support: high
@@ -520,7 +521,7 @@ rules:
       allows:
         - "for (const item of items) await save(item);"
         - "await Promise.all(items.map(async (item) => save(item)));"
-    nextAction: Find a second independent real drift instance, or document an explicit one-repo evidence exception before stable promotion.
+    nextAction: "Decide branch-specific promotion: never-await methods may be stable on deterministic evidence while map/flatMap not-collected keeps a separate dataflow evidence gate."
   antidrift/no-coupled-state-setters:
     status: ready
     stable: false
@@ -529,6 +530,7 @@ rules:
     corpusRepositories: [chaski]
     concerns:
       - Broad Chaski inventory has many findings and may need cleanup before wide enforcement.
+      - The status-triplet derivability branch may belong here as a redundant-constant-cell proof instead of remaining a standalone name-group rule.
     external:
       state: net-antidrift
       support: none
@@ -541,7 +543,7 @@ rules:
         - "onClick={() => { setData(data); setLoading(false); setError(null); }}"
       allows:
         - 'dispatch({ type: "loaded", data });'
-    nextAction: Classify inventory findings before stable promotion.
+    nextAction: Classify inventory findings and decide whether the redundant-constant-cell branch absorbs the standalone status-triplet intent.
   antidrift/no-defensive-shape-probing:
     status: ready
     stable: false
@@ -673,6 +675,8 @@ rules:
     corpusRepositories: [chaski]
     concerns:
       - Broad Chaski inventory has many findings and may need cleanup before wide enforcement.
+      - Current raw-color regex is a source-scanning sampler unless it is tied to the project's actual token surface.
+      - Theme/design-system constraints may be a stronger primary control than lint for making raw utilities unconstructable.
     external:
       state: config-replacement
       support: high
@@ -685,7 +689,7 @@ rules:
         - 'className="text-red-500"'
       allows:
         - 'className="text-danger"'
-    nextAction: Classify inventory findings before stable promotion.
+    nextAction: Decide lint-vs-theme control layer; if lint stays, classify inventory findings and make token coverage explicit.
   antidrift/no-redundant-zod-parse:
     status: ready
     stable: true
@@ -841,6 +845,8 @@ rules:
       - Installed package fork drift still needs independent real-repo replication.
       - Generated-source matching is registry-gated and should stay off when no generated source is declared.
       - Boundary DTOs may intentionally overlap generated types and need real clean controls before broad enablement.
+      - Installed-package exported object types are not always contracts the consuming app was expected to import, so that mode has a weaker owner-authority claim than generated/domain registry modes.
+      - "Subset matching raises a boundary DTO question: projected DTOs with four or more owner fields may be legitimate translation contracts."
     external:
       state: net-antidrift
       support: none
@@ -853,7 +859,7 @@ rules:
         - "type AuthUser = { uid: string; email: string | null; displayName: string | null; photoURL: string | null; providerId: string; phoneNumber: string | null; };"
       allows:
         - 'import type { User } from "firebase/auth";'
-    nextAction: Seek independent generated-source or installed-package fork replication before stable promotion.
+    nextAction: Decide installed-package owner authority and projected DTO boundaries; generated/registry owner modes remain the stronger blocking path.
   antidrift/no-canonical-model-fork:
     status: ready
     stable: false
@@ -967,6 +973,8 @@ rules:
     corpusRepositories: [chaski, sudocode-main]
     concerns:
       - Current rule is Express-style and does not prove tRPC procedure coverage.
+      - Absence-of-call detection is fragile when authentication or authorization is provided by middleware, higher-order handlers, or framework wrappers.
+      - A typed policy-wrapper registration pattern may be a stronger construction rule than scanning handlers for nearby authz calls.
     external:
       state: net-antidrift
       support: none
@@ -979,7 +987,7 @@ rules:
         - 'app.get("/users/:id", (req) => read(req.params.id));'
       allows:
         - 'app.get("/users/:id", (req) => { requireUser(req); read(req.params.id); });'
-    nextAction: Broadened Sudocode route coverage now proves the handler-local Express shape; decide middleware-aware Express dominance and tRPC procedure authorization as separate scoped rules before stable promotion.
+    nextAction: Decide whether typed policy-wrapper route registration should replace absence-of-call detection before widening framework scope.
   antidrift/require-effect-deps:
     status: ready
     stable: true
