@@ -727,6 +727,18 @@ const cloudflareAgentsCases = [
     paths: ["packages/ai-chat/e2e/chat.spec.ts"],
   },
   {
+    id: "cloudflare-ai-chat-websocket-json-contract-casts",
+    ruleId: "antidrift/no-appeasement-cast",
+    kind: "known-gap",
+    classification: "ready",
+    subproject: "packages/ai-chat",
+    typeAware: true,
+    tsconfig: "packages/ai-chat/tsconfig.json",
+    paths: ["packages/ai-chat/src/ws-chat-transport.ts"],
+    reason:
+      "Production WebSocket handlers parse event.data and assert OutgoingMessage/UIMessageChunk contracts before validation, but this external checkout's tsconfig extends agents/tsconfig without an install-resolvable package path.",
+  },
+  {
     id: "cloudflare-assistant-agent-config-json-any-row",
     ruleId: "antidrift/no-unsafe-deserialize",
     kind: "known-gap",
@@ -760,7 +772,7 @@ const cloudflareAgentsCases = [
     tsconfig: "experimental/gadgets-chat/tsconfig.json",
     paths: ["experimental/gadgets-chat/src/client.tsx"],
     reason:
-      "Nested parsed-subfield drift remains desired scope, but this external checkout's tsconfig extends agents/tsconfig without an install-resolvable package path.",
+      "Non-blocking broad nested parse-input inventory; this external checkout's tsconfig extends agents/tsconfig without an install-resolvable package path.",
   },
   {
     id: "cloudflare-twilio-websocket-string-guard-clean",

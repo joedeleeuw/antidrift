@@ -411,7 +411,7 @@ policyRuleReviews:
     antidriftRule: antidrift/no-unsafe-deserialize
     coverage: Implemented with TypeChecker any/unknown and local string-boundary control-flow signals.
     reason: The request-name fingerprint was removed; the rule now uses type signals for parse-at-edge drift.
-    nextAction: Add an evaluated nested parsed-subfield gate before stable promotion.
+    nextAction: Stable for parse-input safety; parse-output contract assertions are owned by the cast-family rules.
   agent/block-generated-policy-edits:
     status: hook-covered
     replacement: block-generated-policy-edits hook
@@ -502,6 +502,7 @@ rules:
       - Test-file casts remain in scope and should report, but test-only findings do not count as production drift evidence for stable promotion.
       - The rule has no explicit SDK/API allowlist; typed conversions stay clean only when the source is not any or unknown.
       - The upstream @typescript-eslint/no-unsafe-type-assertion benchmark checked 2,411 real files and reported every antidrift cast-family location, but also produced 1,331 upstream-only locations; keep upstream as an optional strict benchmark rather than the default replacement.
+      - Cloudflare Agents has production WebSocket JSON parse-output contract assertions in packages/ai-chat/src/ws-chat-transport.ts, but that external checkout cannot currently resolve agents/tsconfig for type-aware evaluation.
     external:
       state: broader-upstream
       support: high
@@ -1006,14 +1007,14 @@ rules:
     nextAction: Seek independent cast-tunnel replication before stable promotion.
   antidrift/no-unsafe-deserialize:
     status: ready
-    stable: false
+    stable: true
     signal: TypeChecker plus local string-boundary control flow
     solveType: parse-at-edge
     referenceDoc: docs/rule-investigations/no-unsafe-deserialize.md
-    corpusRepositories: [chaski, codebase-atlas, sudocode-main]
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main, opencode]
     concerns:
-      - Cloudflare Agents type-aware corpus cases are currently known-gap because the external checkout's tsconfigs extend agents/tsconfig without an install-resolvable package path.
-      - Nested parsed-subfield drift such as JSON.parse(msg.event) after msg comes from a broad JSON.parse remains desired scope, but needs an evaluated real-program gate before stable promotion.
+      - Cloudflare Agents type-aware deserialize cases remain external-corpus inventory only because the checkout's tsconfigs extend agents/tsconfig without an install-resolvable package path.
+      - Parse-output contract assertions such as JSON.parse(event.data as string) as OutgoingMessage are owned by antidrift/no-appeasement-cast, not this parse-input rule.
     external:
       state: partial-overlap
       support: high
@@ -1029,7 +1030,7 @@ rules:
         - "const value = JSON.parse(text);"
         - 'if (typeof event.data !== "string") return; JSON.parse(event.data);'
         - "const parsed = schema.parse(JSON.parse(text));"
-    nextAction: Add an evaluated nested parsed-subfield gate before stable promotion.
+    nextAction: Stable; monitor for real aliased JSON.parse calls or helper-based string guards before widening.
   antidrift/require-authz-check:
     status: ready
     stable: false

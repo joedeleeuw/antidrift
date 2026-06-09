@@ -145,6 +145,13 @@ The broad inventory was rerun with `reports/no-appeasement-inventory.mjs` on Jun
 
 No rule narrowing is justified from this inventory. Generic/API wrappers are not an exception to the rule: `response.json() as APIResponse<T>`, `response.data as ApiResponse<any>`, request-body casts, DB/YAML row casts, and websocket payload casts are boundary contract assertions and should be repaired with schema validation, a generated client/decoder, or a typed mapper.
 
+Cloudflare Agents now has an external-corpus `known-gap` for the same family:
+`packages/ai-chat/src/ws-chat-transport.ts` parses WebSocket `event.data` and asserts
+`OutgoingMessage` / `UIMessageChunk` contracts before validation. This is not a
+`no-unsafe-deserialize` gap because the parse input is a string; it is parse-output
+contract authority owned by this rule once the checkout's unresolved `agents/tsconfig`
+can be type-checked.
+
 ## False-Positive Risks
 
 - Generic API wrappers that return `response.data as T` can be intentional boundary abstractions. The current rule must avoid turning every generic API client into noise unless the source is broad and the target is a named object contract used to silence missing validation.
