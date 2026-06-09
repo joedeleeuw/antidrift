@@ -961,6 +961,18 @@ export const defaultCases = [
     ],
   },
   {
+    id: "portal-agent-config-typed-patches-shape-probing-clean",
+    ruleId: "antidrift/no-defensive-shape-probing",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    typeAware: true,
+    tsconfig: "src/frontend/portal/tsconfig.json",
+    paths: [
+      "src/frontend/portal/modules/scenarios/agent-configuration/lib/agent-config.ts",
+    ],
+  },
+  {
     id: "bff-date-message-type-predicate-clean",
     ruleId: "antidrift/no-defensive-shape-probing",
     kind: "correct",

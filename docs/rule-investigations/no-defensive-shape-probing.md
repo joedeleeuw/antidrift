@@ -47,6 +47,16 @@ The important detail is the type of `value`: in the Chaski drift case, TypeScrip
 
 The rule does not report ordinary typed `Object.entries(...).map` transformations, schema-backed parsing, or type-predicate helpers. If TypeScript parser services are unavailable, the rule does not report.
 
+## Corpus Sweep 2026-06-09
+
+A syntax-first sweep over Chaski, Codebase Atlas, Sudocode, Opencode, Cloudflare Agents, and Murderbox found no second drift repository for this exact extractor signal. The sweep did find useful clean controls:
+
+- Chaski `src/frontend/portal/modules/scenarios/agent-configuration/lib/agent-config.ts` has many `patch.* !== undefined` checks inside `Object.entries(patches).map(...)`, but `patch` is a typed `MutableAgentFields`, not broad inbound data.
+- Opencode `packages/console/app/src/routes/zen/util/handler.ts` recursively rewrites a provider payload template and checks arrays/objects/strings, but the value is not decoded into a domain contract and the rule stays quiet.
+- Murderbox API candidates with object/array guards stayed quiet under the rule.
+
+This keeps the rule at `ready`, not `stable`: clean pressure improved, but the missing proof is still a second real broad-value mini-parser drift, preferably `unknown`-typed and not merely explainable by `@typescript-eslint/no-unsafe-member-access`.
+
 ## Remediation Applied
 
 1. Removed the callable boolean-helper visitor from `no-defensive-shape-probing`.
@@ -54,6 +64,7 @@ The rule does not report ordinary typed `Object.entries(...).map` transformation
 3. Added TypeChecker evidence: the entry value binding must be broad (`any`/`unknown`) before the shape-probe count matters.
 4. Added external clean corpus pressure for typed entries maps in Sudocode and Codebase Atlas.
 5. Reclassified the rule from `under-proven` to `ready`; it remains `stable: false`.
+6. Added clean real-program controls for Chaski typed patch application and Opencode provider payload rewriting after a broad syntax sweep found no second drift repo.
 
 ## Known Risks
 

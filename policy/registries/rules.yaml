@@ -598,12 +598,13 @@ rules:
     signal: TypeChecker plus AST shape
     solveType: broad-value-shape-probing
     referenceDoc: docs/rule-investigations/no-defensive-shape-probing.md
-    corpusRepositories: [chaski, sudocode-main, codebase-atlas]
+    corpusRepositories: [chaski, sudocode-main, codebase-atlas, opencode]
     concerns:
       - Object.entries extractor branch has real Chaski drift evidence.
       - Boolean predicate helper branch was removed and remains separate research.
       - The rule now requires the entries value binding to be any/unknown before shape-probe counting matters.
       - Benchmarking shows the current any-typed Chaski drift is also reported by @typescript-eslint unsafe member-access rules on the individual property reads, while antidrift reports one callback-level architectural finding.
+      - The 2026-06-09 syntax sweep found additional clean controls, but no second drift repository.
       - Stable promotion still needs a second independent drift repository and broad inventory review.
     external:
       state: partial-overlap
@@ -621,7 +622,7 @@ rules:
       allows:
         - "const parsed = schema.parse(raw);"
         - "Object.entries(typedMap).map(([id, value]) => value.name)"
-    nextAction: Seek a second real drift repository, preferably with unknown-typed broad values, and rerun the upstream-overlap benchmark before stable promotion.
+    nextAction: Seek a second real drift repository, preferably with unknown-typed broad values, and rerun the upstream-overlap benchmark before stable promotion; do not repeat the 2026-06-09 syntax sweep unless new repos are added.
   antidrift/no-hover-translate-card:
     status: ready
     stable: false

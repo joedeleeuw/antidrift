@@ -873,6 +873,16 @@ const opencodeCases = [
       },
     ],
   },
+  {
+    id: "opencode-zen-provider-payload-replacer-clean",
+    ruleId: "antidrift/no-defensive-shape-probing",
+    kind: "correct",
+    classification: "ready",
+    subproject: "console-app",
+    typeAware: true,
+    tsconfig: "packages/console/app/tsconfig.json",
+    paths: ["packages/console/app/src/routes/zen/util/handler.ts"],
+  },
 ];
 
 const externalCorpora = [
