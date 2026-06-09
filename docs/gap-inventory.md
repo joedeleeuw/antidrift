@@ -19,8 +19,8 @@ Policy-scoped rule IDs reviewed in `policyRuleReviews`: 60.
 | State                      | Count | Meaning                                                                                |
 | -------------------------- | ----: | -------------------------------------------------------------------------------------- |
 | Stable                     |     5 | Ready, independently replicated enough for stable treatment.                           |
-| Ready but not stable       |    14 | Implemented and enabled, but evidence, inventory, or advisory gates remain.            |
-| Under-proven               |     1 | Implemented but default-off because real drift or clean evidence is not strong enough. |
+| Ready but not stable       |    13 | Implemented and enabled, but evidence, inventory, or advisory gates remain.            |
+| Under-proven               |     2 | Implemented but default-off because real drift or clean evidence is not strong enough. |
 | Retired Oxlint parity gaps |     0 | The former Oxlint baseline has ESLint replacements or explicit retirements.            |
 
 Policy rule review dispositions:
@@ -52,7 +52,7 @@ Default-off custom rules today:
 
 ## Remaining Custom Rule Queues
 
-These are the 15 active custom rules that are ready but not stable. Retired and research rows are out of scope unless new real-code evidence reopens them.
+These are the 15 active custom rules that are not stable. Retired and research rows are out of scope unless new real-code evidence reopens them.
 
 | Queue | Rules | Clarification needed |
 | --- | --- | --- |
@@ -119,7 +119,7 @@ These are implemented-rule gaps. They are not all implementation tasks; many are
 | `antidrift/no-raw-tailwind-color`                 | Ready, not stable         | Broad Chaski inventory has many findings that need classification before broad claims. Current regex is a policy sampler unless it is tied to the project's actual token surface or replaced by theme/design-system constraints.                                                                                                                                                                                   |
 | `antidrift/no-sql-string-concat`                  | Ready, not stable         | Has second-repo sanitized identifier replication through Opencode plus lower-edge, imported escaper proof, configured `SourceTable.escapedIdentifier` proof, and numbered-placeholder proof through PowerSync. The 24-repo source-fleet inventory has zero known type-aware false positives after this slice; stable is blocked by deciding how parser-services-only conservative broad findings count. |
 | `antidrift/no-status-literal-in-type`             | Ready, not stable         | Needs independent status-fork replication with configured domain facts.                                                                                                                                                                                                                                                                                                                                            |
-| `antidrift/no-status-triplet-state`               | Ready, default-off        | Current detector is React `useState` resource-lifecycle inventory. Blocking requires folding the proven derivability/cohesion subset into `no-coupled-state-setters` or retiring the standalone rule.                                                                                                                                                                                        |
+| `antidrift/no-status-triplet-state`               | Under-proven, default-off | Current detector is React `useState` resource-lifecycle inventory. Blocking requires folding the proven derivability/cohesion subset into `no-coupled-state-setters` or retiring the standalone rule.                                                                                                                                                                                        |
 | `antidrift/no-structural-type-fork`               | Ready, not stable         | Generated/registry owner modes are stronger than the unconfigured installed-package sweep. Needs independent replication plus a decision on whether projected boundary DTOs and arbitrary package-exported object shapes count as forks.                                                                                                                                                                            |
 | `antidrift/no-canonical-model-fork`               | Ready, not stable         | Needs another configured repository inventory. Boundary DTOs and view models can legitimately overlap, so promotion needs broader clean pressure.                                                                                                                                                                                                                                                                  |
 | `antidrift/no-underchecked-type-predicate`        | Ready, not stable         | Needs another broad-input underchecked predicate drift case. Sudocode now supplies clean pressure for field-complete and union-discriminant predicates; Opencode UI has a plausible drift candidate blocked by missing tsconfig deps.                                                                                                                                                                              |

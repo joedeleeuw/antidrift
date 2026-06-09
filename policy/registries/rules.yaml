@@ -811,7 +811,7 @@ rules:
         - 'import type { UserStatus } from "./domain";'
     nextAction: Seek independent status-fork replication before stable promotion.
   antidrift/no-status-triplet-state:
-    status: ready
+    status: under-proven
     stable: false
     signal: configurable name groups plus React state shape
     solveType: react-state-shape
