@@ -138,8 +138,8 @@ policyRuleReviews:
   react/no-status-triplet-state:
     status: active-custom
     antidriftRule: antidrift/no-status-triplet-state
-    coverage: Implemented but default-off as a configurable data/loading/error name-group heuristic.
-    reason: Structure alone cannot prove loading/error intent, so this remains reviewed but under promotion discipline.
+    coverage: Implemented but default-off as a React useState data/loading/error name-group inventory signal.
+    reason: The real target is separately mutable React resource lifecycle facts when one or more can be derived or inferred; names alone cannot prove that.
     nextAction: Keep configurable and require multiple low-noise frontend inventories before enabling.
   react/no-derived-state-effect:
     status: ecosystem-covered
@@ -813,14 +813,14 @@ rules:
     referenceDoc: docs/rule-investigations/no-status-triplet-state.md
     corpusRepositories: [chaski]
     concerns:
-      - Heuristic by nature; stable promotion needs multiple low-noise inventories.
+      - Current detector is heuristic by nature; stable promotion needs a derivability/cohesion signal and multiple low-noise inventories.
     external:
       state: net-antidrift
       support: none
       candidates: []
       decision: own-antidrift
-      whyThisState: "No supported React rule was found for configurable data/loading/error state triplets."
-      whyNotOtherState: "Not partial-overlap because ordinary hooks rules do not identify the resource-state modeling smell."
+      whyThisState: "No supported React rule was found for separately mutable resource lifecycle state where derived facts are split into local cells."
+      whyNotOtherState: "Not partial-overlap because ordinary hooks rules do not identify the resource-state derivability/cohesion smell."
     examples:
       flags:
         - "const [data] = useState(null); const [loading] = useState(false); const [error] = useState(null);"
