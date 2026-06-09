@@ -162,6 +162,7 @@ Drift:
 
 - Production: `/Users/sushi/code/chaski/src/frontend/bff/api/gateways/posthog-gateway.ts` has 10 interpolated HogQL/SQL findings, including line 570 where order IDs are escaped into an `IN (...)` string.
 - Production: `/Users/sushi/code/chaski/src/frontend/crow-v2/backend/powersync.ts` line 20 builds an `INSERT INTO ${op.table} (${Object.keys(op.data).join(",")})` statement from operation payload structure.
+- Production: `/Users/sushi/code/powersync-service/modules/module-mysql/src/api/MySQLRouteAPIAdapter.ts` line 235 interpolates `sourceTable.table` directly, even though neighboring code exposes escaped table-name APIs. This is the current lower-edge pressure case: raw table-name access still reports when a safer shape exists nearby.
 - Lower-strength pressure: `/Users/sushi/code/sudocode-main/server/tests/integration/workflow/helpers/workflow-test-setup.ts` line 386 and `/Users/sushi/code/sudocode-main/server/tests/integration/execution/helpers/test-setup.ts` line 179 build `SET` clauses from `Object.keys(updates)`.
 - Lower-strength pressure: `/Users/sushi/code/cloudflare-agents/examples/playground/src/demos/core/SqlDemo.tsx` line 133 builds a table query from a plain `string` table name.
 
@@ -177,6 +178,10 @@ Clean:
 - `/Users/sushi/code/cloudflare-agents/packages/shell/src/filesystem.ts` stays clean because `VALID_NAMESPACE.test(ns)` exits on failure before deriving `this.tableName` and `this.indexName`, and those fields are interpolated only in SQL identifier positions.
 - `/Users/sushi/code/opencode/packages/effect-drizzle-sqlite/src` and `/Users/sushi/code/opencode/packages/core/src/database/migration.ts` stay clean for Drizzle-style `sql` tags and `sql.identifier(...)` composition.
 - `/Users/sushi/code/opencode/packages/stats/core/src/domain/inference.ts` stays clean for local `sqlIdentifier` / `sqlString` quote-doubling helpers, finite static `dimensionSql` fragments, and local SQL-fragment builders that only receive identifier-safe literal arguments.
+
+Known gap:
+
+- `/Users/sushi/code/powersync-service/modules/module-mysql/src/replication/BinLogStream.ts` line 311 currently reports even though the call goes through imported `escapeMysqlTableName(table)`, whose implementation quote-doubles backticks in schema and table names. The rule proves local escapers only; imported escaper proof is unresolved.
 
 Current benchmark result after placeholder-list, static-fragment, tag, closed-identifier, and constructor-validated identifier narrowing:
 
@@ -197,11 +202,11 @@ Widened local scan:
 
 Status: `ready`, `stable: false`.
 
-The second independent sanitized identifier clean-control gap is resolved: Cloudflare Workspace covers anchored-regex/early-exit identifier derivation, and Opencode stats covers quote-doubling identifier and string escapers plus bounded local SQL-fragment builders. Production drift is still Chaski; Sudocode and Cloudflare provide useful but lower-strength drift pressure from test-helper and demo/playground programs. Chaski, Codebase Atlas, Sudocode, Cloudflare, and Opencode supply clean controls for placeholder lists, static SQL fragments, parameterized SQL tags, ORM-owned SQL composition, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, local quote escapers, finite static object fragments, and bound values.
+The second independent sanitized identifier clean-control gap is resolved: Cloudflare Workspace covers anchored-regex/early-exit identifier derivation, and Opencode stats covers quote-doubling identifier and string escapers plus bounded local SQL-fragment builders. PowerSync service now supplies the lower-edge pressure case: raw `sourceTable.table` interpolation reports next to escaped table-name APIs. Production drift is Chaski plus PowerSync service; Sudocode and Cloudflare provide useful but lower-strength drift pressure from test-helper and demo/playground programs. Chaski, Codebase Atlas, Sudocode, Cloudflare, Opencode, and PowerSync service supply clean and pressure controls for placeholder lists, static SQL fragments, parameterized SQL tags, ORM-owned SQL composition, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, local quote escapers, finite static object fragments, bound values, and imported-escaper false-positive pressure.
 
-The June 8, 2026 advisory review was grounded in repo reads and kept the rule at `ready`, not stable. The review agreed this is not ecosystem-covered and that the Cloudflare branch is deterministic enough to keep, but it found three stable-promotion blockers:
+The June 8, 2026 advisory review was grounded in repo reads and kept the rule at `ready`, not stable. The review agreed this is not ecosystem-covered and that the Cloudflare branch is deterministic enough to keep. PowerSync resolves the lower-edge blocker but replaces it with a sharper production concern:
 
 - Equivalent guard shapes such as positive guards, quantifier forms, or allowlist checks remain uncharacterized against real code.
-- The guard/escaper lower edge still needs real-program pressure: a value that looks guarded or escaped but is not, and must still report.
+- Imported SQL escapers are not proven across files; `escapeMysqlTableName(table)` is a real false-positive pressure case.
 
-Stable promotion waits on that evidence, not on a known code blocker.
+Stable promotion waits on either imported-escaper proof or an explicit decision that cross-file SQL escaper validation is outside this rule's stable scope.

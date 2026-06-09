@@ -28,6 +28,10 @@ const opencodeRepoCandidates = [
   process.env.OPENCODE_REPO,
   "/Users/sushi/code/opencode",
 ].filter(Boolean);
+const powersyncServiceRepoCandidates = [
+  process.env.POWERSYNC_SERVICE_REPO,
+  "/Users/sushi/code/powersync-service",
+].filter(Boolean);
 const coreRuleIds = new Set(["no-restricted-imports"]);
 
 const sudocodeCases = [
@@ -955,6 +959,33 @@ const opencodeCases = [
   },
 ];
 
+const powersyncServiceCases = [
+  {
+    id: "powersync-mysql-raw-source-table-name",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "drift",
+    classification: "ready",
+    subproject: "module-mysql",
+    paths: ["modules/module-mysql/src/api/MySQLRouteAPIAdapter.ts"],
+    expectedFindings: [
+      {
+        path: "modules/module-mysql/src/api/MySQLRouteAPIAdapter.ts",
+        line: 235,
+      },
+    ],
+  },
+  {
+    id: "powersync-mysql-imported-escaped-table-helper-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "known-gap",
+    classification: "ready",
+    subproject: "module-mysql",
+    paths: ["modules/module-mysql/src/replication/BinLogStream.ts"],
+    reason:
+      "Real clean control uses imported escapeMysqlTableName(table), whose implementation quote-doubles backticks in schema and table names. The current syntax/scope rule proves local escapers only, so this remains an imported-helper false-positive pressure case.",
+  },
+];
+
 const externalCorpora = [
   {
     name: "sudocode-main",
@@ -991,6 +1022,12 @@ const externalCorpora = [
     label: "opencode",
     repoCandidates: opencodeRepoCandidates,
     cases: opencodeCases,
+  },
+  {
+    name: "powersync-service",
+    label: "PowerSync service",
+    repoCandidates: powersyncServiceRepoCandidates,
+    cases: powersyncServiceCases,
   },
 ];
 
