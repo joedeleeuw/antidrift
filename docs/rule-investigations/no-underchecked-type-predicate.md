@@ -57,6 +57,18 @@ Codebase Atlas clean controls:
 - `src/programs/repoComprehensionSurfaces.ts`: a primitive `value is string` predicate stays clean because this rule is limited to nontrivial object contracts.
 - `src/needle/AtlasNeedleRenderer.ts`: `isMeshStandardMaterial` narrows a third-party material union with `emissive` and `roughness` probes. This is valid interop narrowing, not broad-input contract laundering.
 
+Sudocode clean controls:
+
+- `cli/src/integrations/plugin-loader.ts`: `isValidPlugin` narrows `unknown` to `IntegrationPlugin` after checking the plugin API surface fields.
+- `frontend/src/components/workflows/CreateWorkflowDialog.tsx`: `isValidPersistedSettings` narrows `unknown` localStorage data after checking several persisted settings fields.
+- `server/src/execution/output/coalesced-types.ts`: `isCoalescedUpdate` narrows a broad event to a union by discriminant. The union target stays out of the report path.
+
+Opencode known drift candidate:
+
+- `packages/ui/src/components/basic-tool.tsx`: `isTriggerTitle` checks only `"title" in val` before claiming `TriggerTitle`, whose optional fields still carry typed contracts if present. This may be a useful second drift case, but the local checkout cannot run the UI package type-aware because `packages/ui/tsconfig.json` extends missing `@tsconfig/node22/tsconfig.json`.
+
+The 2026-06-09 sweep over Chaski, Codebase Atlas, Sudocode, Opencode, Cloudflare Agents, and Murderbox did not find a second evaluable drift repository. It did add clean pressure for field-complete guards, localStorage guards, and discriminant-union guards.
+
 ## Known Risks
 
 - Valid discriminated-union guards may only check one discriminant.

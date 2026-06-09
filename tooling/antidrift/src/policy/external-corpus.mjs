@@ -401,6 +401,36 @@ const sudocodeCases = [
     tsconfig: "cli/tsconfig.json",
     paths: ["cli/src/integrations/plugin-loader.ts"],
   },
+  {
+    id: "sudocode-plugin-shape-predicate-field-checked-clean",
+    ruleId: "antidrift/no-underchecked-type-predicate",
+    kind: "correct",
+    classification: "ready",
+    subproject: "cli",
+    typeAware: true,
+    tsconfig: "cli/tsconfig.json",
+    paths: ["cli/src/integrations/plugin-loader.ts"],
+  },
+  {
+    id: "sudocode-workflow-settings-predicate-field-checked-clean",
+    ruleId: "antidrift/no-underchecked-type-predicate",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    typeAware: true,
+    tsconfig: "frontend/tsconfig.json",
+    paths: ["frontend/src/components/workflows/CreateWorkflowDialog.tsx"],
+  },
+  {
+    id: "sudocode-coalesced-update-union-predicate-clean",
+    ruleId: "antidrift/no-underchecked-type-predicate",
+    kind: "correct",
+    classification: "ready",
+    subproject: "server",
+    typeAware: true,
+    tsconfig: "server/tsconfig.json",
+    paths: ["server/src/execution/output/coalesced-types.ts"],
+  },
 ];
 
 const codebaseAtlasCases = [
@@ -882,6 +912,18 @@ const opencodeCases = [
     typeAware: true,
     tsconfig: "packages/console/app/tsconfig.json",
     paths: ["packages/console/app/src/routes/zen/util/handler.ts"],
+  },
+  {
+    id: "opencode-ui-trigger-title-underchecked-predicate",
+    ruleId: "antidrift/no-underchecked-type-predicate",
+    kind: "known-gap",
+    classification: "ready",
+    subproject: "ui",
+    typeAware: true,
+    tsconfig: "packages/ui/tsconfig.json",
+    paths: ["packages/ui/src/components/basic-tool.tsx"],
+    reason:
+      "Real UI predicate candidate checks only `title` before claiming the broader TriggerTitle contract, but this external checkout's UI tsconfig extends @tsconfig/node22/tsconfig.json without an install-resolvable package path.",
   },
 ];
 

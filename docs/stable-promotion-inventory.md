@@ -35,7 +35,7 @@ These rules are implemented and may be `ready`, but they have unresolved concern
 | `antidrift/no-raw-tailwind-color`                 | Broad Chaski inventory has many findings; needs cleanup/classification before broad claims.                                                   |
 | `antidrift/no-status-triplet-state`               | Heuristic by nature; stable needs multiple low-noise inventories.                                                                             |
 | `antidrift/no-structural-type-fork`               | Installed-package and generated-source variants need independent replication and boundary DTO clean pressure.                                 |
-| `antidrift/no-underchecked-type-predicate`        | Needs a second real underchecked broad-input predicate drift case.                                                                            |
+| `antidrift/no-underchecked-type-predicate`        | Needs a second real underchecked broad-input predicate drift case. Sudocode now adds clean controls, and Opencode has a plausible UI predicate drift candidate that is not evaluable until its missing tsconfig dependency is available. |
 | `antidrift/require-authz-check`                   | Current implementation is handler-local Express-style; it does not model mount middleware dominance or tRPC procedure authorization coverage. |
 
 ## Under-Proven Rules

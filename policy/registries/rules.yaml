@@ -965,11 +965,13 @@ rules:
     signal: TypeChecker plus AST/control-flow checks
     solveType: type-guard-laundering
     referenceDoc: docs/rule-investigations/no-underchecked-type-predicate.md
-    corpusRepositories: [chaski, codebase-atlas]
+    corpusRepositories: [chaski, codebase-atlas, sudocode-main, opencode]
     concerns:
       - The rule is intentionally limited to broad-input predicates that assert nontrivial object contracts.
       - Codebase Atlas supplies clean controls for primitive predicates, alias-based field checks, and third-party union predicates.
       - Chaski supplies a destructured-field clean control for object predicates.
+      - Sudocode supplies clean controls for field-complete broad-input predicates and discriminant-only union predicates.
+      - Opencode has a real underchecked UI predicate candidate, but this checkout cannot type-check that package because @tsconfig/node22 is missing.
       - Validator delegation is allowed, so stable promotion should classify schema-backed predicate inventories.
       - Discriminant guards over already-typed unions stay outside the report path.
       - The verdict layer is heuristic; validator-looking helper names and incidental member reads can cause false negatives.
@@ -985,7 +987,7 @@ rules:
         - 'const isUser = (value: unknown): value is User => value != null && typeof value === "object";'
       allows:
         - 'function isDateMessage(value: unknown): value is DateMessage { return !!value && typeof value === "object" && "year" in value && "month" in value && "day" in value; }'
-    nextAction: Seek another broad-input underchecked predicate drift case before stable promotion.
+    nextAction: Seek another evaluable broad-input underchecked predicate drift case before stable promotion; recheck the Opencode UI candidate if that checkout has install-resolvable tsconfig dependencies.
   antidrift/no-unsafe-cast-chain:
     status: ready
     stable: false
