@@ -26,7 +26,7 @@ The two `why*` fields are deliberately required. They are the escape hatch again
 
 The `policyRuleReviews` section closes the broader policy surface. Every rule ID named in `policy/agent-guardrails.yaml` must have a row there, even when it is not a custom ESLint rule. `pnpm policy:check-registries` fails when a policy ID is missing, when the registry invents an extra policy review, or when an `active-custom` review points at a non-active `antidrift/*` rule.
 
-Each rule is judged on its own merits through a senior JavaScript/TypeScript tooling lens. If an ecosystem rule covers the same behavior, the custom rule becomes an elimination candidate. If a signal is too broad or symptomatic, the next action is to reformulate the failure mode until the rule has a narrow construction pattern. If the rule's value cannot be stated clearly, do not implement it; collect at least three close ecosystem/readme references or practitioner writeups and keep the candidate in `research` until the "why" is defensible.
+Each rule is judged on its own merits through a senior JavaScript/TypeScript tooling lens. If an ecosystem rule covers the same behavior, the custom rule becomes an elimination candidate. If a signal is too broad or symptomatic, the next action is to reformulate the failure mode until the rule has a narrow construction pattern. If a rule's value is unclear, first recover the original local complaint from the current session, handoff docs, reports, or available Codex memory; then test that complaint against real code and ecosystem rules. If the value still cannot be stated clearly, do not implement it; collect at least three close ecosystem/readme references or practitioner writeups and keep the candidate in `research` until the "why" is defensible.
 
 This file is the readable index. Update the YAML registry first, then keep this table aligned.
 
@@ -122,12 +122,13 @@ Syntax should be a violation only when the construction pattern is the policy. I
 Start investigation before code:
 
 1. Create or update a reference doc under `docs/rule-investigations/`.
-2. Check existing ESLint, `typescript-eslint`, and relevant plugin coverage.
-3. Update `docs/rule-equivalence-audit.md` when the rule is active, replaceable, or net-new.
-4. Kick off a read-only Claude Opus 4.8 advisory review using `docs/claude-rule-review-protocol.md`.
-5. Mark the candidate `ecosystem-covered` when an existing rule is sufficient.
-6. If the "why" is still unclear, find three close ecosystem rules, plugin readmes, or practitioner references and summarize why each is equivalent, broader, narrower, or only adjacent.
-7. Keep the candidate `research` until a real drift file and clean control prove a custom rule is needed.
+2. Recover the original complaint from the current session, local handoff/report docs, or available Codex memory. Summarize it as a concrete failure mode, not as a quote dump.
+3. Check existing ESLint, `typescript-eslint`, and relevant plugin coverage.
+4. Update `docs/rule-equivalence-audit.md` when the rule is active, replaceable, or net-new.
+5. Kick off a read-only Claude Opus 4.8 advisory review using `docs/claude-rule-review-protocol.md`.
+6. Mark the candidate `ecosystem-covered` when an existing rule is sufficient.
+7. If the "why" is still unclear, find three close ecosystem rules, plugin readmes, or practitioner references and summarize why each is equivalent, broader, narrower, or only adjacent.
+8. Keep the candidate `research` until a real drift file and clean control prove a custom rule is needed.
 
 ## Active Rule Table
 

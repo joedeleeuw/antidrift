@@ -12,7 +12,7 @@ New rules should start from `docs/build-patterns.md`: first define the simple co
 
 Use `docs/self-hosting-risks.md` when changing the rule package itself. The short version: code semantics live in ESLint rules, repository control-plane checks live in policy scripts, and agent lifecycle safety lives in hooks.
 
-Each candidate rule is judged on its own merits. Before implementing or keeping custom code, compare the scoped behavior against maintained ESLint, `typescript-eslint`, React, import, SonarJS, Vitest, and Oxlint ecosystem coverage. A supported equivalent is an elimination candidate: prefer pulling in the external rule or generated core config. If the custom rule is broader, narrower, or only adjacent, document that delta with real drift and clean programs. If the "why" is unclear, do not write code; collect at least three close ecosystem/readme/practitioner references and keep the item in research.
+Each candidate rule is judged on its own merits. Before implementing or keeping custom code, recover the original local complaint from the current session, handoff docs, reports, or available Codex memory and translate it into a concrete failure mode. Then compare the scoped behavior against maintained ESLint, `typescript-eslint`, React, import, SonarJS, Vitest, and Oxlint ecosystem coverage. A supported equivalent is an elimination candidate: prefer pulling in the external rule or generated core config. If the custom rule is broader, narrower, or only adjacent, document that delta with real drift and clean programs. If the "why" is still unclear, do not write code; collect at least three close ecosystem/readme/practitioner references and keep the item in research.
 
 ## Signal Ladder
 
