@@ -77,13 +77,13 @@ Current locked decisions include:
 
 ## Severity Discipline
 
-Rule maturity constrains configured severity. `under-proven`, `false-positive-prone`, and `research` rules must not be configured as blocking. Heuristic signals such as `token-overlap` and configurable name groups must also stay non-blocking until multiple real inventories show low noise.
+Rule maturity constrains configured severity. `under-proven`, `false-positive-prone`, and `research` rules must not be configured as blocking. Default-off inventory signals, such as the current React resource-state triplet detector, must also stay non-blocking until they have a stronger behavioral signal and multiple real inventories show low noise.
 
 `pnpm policy:check-rule-surface` enforces this against `policy/registries/rules.yaml`. In this repository, both `warn` and `error` count as blocking because the lint gate runs with zero-warning discipline. Implemented rules can remain registered in the shared config as `off` while they collect evidence.
 
 Current default-off custom rules:
 
-- `antidrift/no-status-triplet-state`: configurable name-group heuristic; needs low-noise frontend inventories before blocking.
+- `antidrift/no-status-triplet-state`: React `useState` resource-lifecycle inventory signal; needs a derivability/cohesion detector and low-noise frontend inventories before blocking.
 
 ## External Ownership States
 
@@ -146,7 +146,7 @@ Start investigation before code:
 | `antidrift/no-redundant-zod-parse`                |        `ready` |    yes | TypeChecker plus schema provenance                                                                    | `net-antidrift` / `own-antidrift`      | Stable; monitor for first-boundary schema pipelines that need additional clean exclusions.                                                                                         |
 | `antidrift/no-sql-string-concat`                  |        `ready` |     no | SQL keyword/context AST plus scope-binding guard control-flow plus TypeChecker imported-escaper and configured safe-identifier-member proof | `partial-overlap` / `own-antidrift`    | Decide parser-services-only broad inventory policy; safe identifier controls require parser services and must not be replaced with name-only exemptions. |
 | `antidrift/no-status-literal-in-type`             |        `ready` |     no | registry plus AST context                                                                             | `config-replacement` / `own-antidrift` | Seek independent status-fork replication before stable promotion.                                                                                                                  |
-| `antidrift/no-status-triplet-state`               |        `ready` |     no | configurable name groups plus React state shape                                                       | `net-antidrift` / `own-antidrift`      | Keep configurable and classify another frontend repo inventory.                                                                                                                    |
+| `antidrift/no-status-triplet-state`               |        `ready` |     no | React `useState` name groups for resource-lifecycle inventory                                         | `net-antidrift` / `own-antidrift`      | Do not block until the rule proves derivability/cohesion behavior and another frontend inventory is low-noise.                                                                     |
 | `antidrift/no-structural-type-fork`               |        `ready` |     no | TypeChecker structural comparison plus generated registry                                             | `net-antidrift` / `own-antidrift`      | Seek independent generated-source or installed-package fork replication before stable promotion.                                                                                   |
 | `antidrift/no-canonical-model-fork`               |        `ready` |     no | TypeChecker plus domain registry                                                                      | `net-antidrift` / `own-antidrift`      | Run another repo inventory with configured domain owners before stable promotion.                                                                                                  |
 | `antidrift/no-trivial-selector-wrapper`           |        `ready` |    yes | AST structural return shape                                                                           | `net-antidrift` / `own-antidrift`      | Stable; adapter callbacks can stay named and stable, but bare member-return helpers should rely on inferred return types instead of explicit annotations.                          |
