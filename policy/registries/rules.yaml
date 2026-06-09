@@ -810,6 +810,7 @@ rules:
     stable: false
     signal: configurable name groups plus React state shape
     solveType: react-state-shape
+    referenceDoc: docs/rule-investigations/no-status-triplet-state.md
     corpusRepositories: [chaski]
     concerns:
       - Heuristic by nature; stable promotion needs multiple low-noise inventories.
