@@ -1151,7 +1151,7 @@ function isIndexArithmeticExpression(node, indexName) {
   const unwrapped = unwrapExpression(node);
   if (unwrapped?.type === "Identifier") return unwrapped.name === indexName;
   if (unwrapped?.type === "Literal") return typeof unwrapped.value === "number";
-  if (unwrapped?.type !== "BinaryExpression" || !["+", "-", "*"].includes(unwrapped.operator)) return false;
+  if (unwrapped?.type !== "BinaryExpression" || !["+", "*"].includes(unwrapped.operator)) return false;
   return isIndexArithmeticExpression(unwrapped.left, indexName)
     && isIndexArithmeticExpression(unwrapped.right, indexName);
 }
@@ -1716,14 +1716,12 @@ function ruleNoSqlStringConcat() {
         return false;
       }
       function isDirectSafeSqlFragmentExpression(node) {
-        return [
-          staticStringValue(node) !== null,
-          sqlEscaperCallKind(node) === "string",
-          isSafeSqlFragmentCall(node),
-          isSqlEscaperMapJoin(node, "string", new Set([",", ", "])),
-          isStaticFragmentMapJoin(node),
-          isPlaceholderSqlFragmentMapJoin(node),
-        ].some(Boolean);
+        return staticStringValue(node) !== null
+          || sqlEscaperCallKind(node) === "string"
+          || isSafeSqlFragmentCall(node)
+          || isSqlEscaperMapJoin(node, "string", new Set([",", ", "]))
+          || isStaticFragmentMapJoin(node)
+          || isPlaceholderSqlFragmentMapJoin(node);
       }
       function isSafeSqlFragmentExpression(node) {
         if (isDirectSafeSqlFragmentExpression(node)) return true;

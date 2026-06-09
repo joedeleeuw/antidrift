@@ -4,6 +4,8 @@
 
 Each active rule entry also declares `examples.flags` and `examples.allows` beside its registration. `pnpm policy:check-registries` fails when an active rule is missing either side, so rule definitions always carry a short positive and negative example.
 
+Active rows can also split evidence into `proven`, `unproven`, and `openReviewConcerns`. Use `proven` for accepted real-program drift or clean controls, `unproven` for remaining blockers before stable promotion, and `openReviewConcerns` for adversarial-review notes that need follow-up. `pnpm policy:check-registries` validates these as string lists when present.
+
 Each active rule also declares an `external` ownership block:
 
 ```yaml

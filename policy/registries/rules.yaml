@@ -820,9 +820,25 @@ rules:
         opencode,
         powersync-service,
       ]
+    proven:
+      - "Production drift evidence exists in Chaski HogQL/template interpolation and PowerSync service raw `sourceTable.table` interpolation."
+      - "Bound-value SQL stays clean for positional placeholder lists, parameterized `sql`/`sqlQuery`/`sqlRun` tags, ORM-owned SQL composition, and numbered Postgres placeholder fragments that interpolate only index plus/multiply arithmetic after `$` while values remain in bound params."
+      - "Static SQL fragments stay clean for literal fragment arrays, finite static object fragment maps, and static condition fragments joined into SET/WHERE shapes."
+      - "Closed SQL identifiers stay clean when proven by typed service-boundary unions, static object-literal column maps, anchored regex guards that definitely exit on failure, local quote-doubling escapers, imported quote-doubling escapers, or configured safe identifier members with parser services."
+      - "Dynamic object-key column lists and non-allowlisted table names are intentional drift findings."
+      - "The targeted broad inventory across PowerSync Service, Opencode, Cloudflare Agents, and Sudocode checked 707 SQL-candidate files with 31 custom findings, 0 SonarJS findings, and no known type-aware false positives after the numbered-placeholder fix."
+      - "The June 9 adversarial cleanup restored short-circuit safety checks and keeps numbered-placeholder proof limited to the real observed plus/multiply arithmetic shape; subtraction and arbitrary arithmetic are not accepted."
+    unproven:
+      - "The wider `/Users/sushi/code` SQL inventory beyond the targeted four repositories is not yet classified."
+      - "Stable promotion still needs an explicit decision on whether lower-strength demo/test drift counts, or whether another production drift repository is required."
+      - "Non-type-aware broad inventory cannot prove imported escapers or configured safe identifier members; those controls are intentionally parser-services-only."
+      - "Parameterized SQL tag ecosystems beyond the currently observed `sql`, `sqlQuery`, and `sqlRun` names remain unclassified, including Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags."
+      - "Equivalent positive guard, allowlist, quantifier, and regex-variant SQL identifier sanitizers remain uncharacterized against real code."
+      - "Unsafe SQL-builder `+=`, `.concat()`, or array-join dynamic SQL examples have not been found; do not widen builder linting without a real unsafe program."
+      - "Numbered placeholder fragments using subtraction, non-index variables, function calls, or arbitrary arithmetic remain unsupported unless real clean code proves the shape."
     concerns:
       - The benchmark on 268 real files reports 16 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
-      - Dynamic placeholder lists such as `ids.map(() => "?").join(",")`, and numbered Postgres placeholder fragments that interpolate only index arithmetic after `$`, are accepted clean because values remain bound parameters.
+      - Dynamic placeholder lists such as `ids.map(() => "?").join(",")`, and numbered Postgres placeholder fragments that interpolate only index plus/multiply arithmetic after `$`, are accepted clean because values remain bound parameters.
       - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
       - Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are accepted clean because the tag owns value binding.
       - Opencode Drizzle-style `sql` tags and `sql.identifier(...)` usage are accepted clean as ORM-owned SQL composition.

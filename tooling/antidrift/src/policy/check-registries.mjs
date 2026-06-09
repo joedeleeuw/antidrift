@@ -687,6 +687,18 @@ function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
     stringArray(entry.concerns ?? [], `${label}.concerns`, errors, {
       allowEmpty: true,
     });
+    stringArray(entry.proven ?? [], `${label}.proven`, errors, {
+      allowEmpty: true,
+    });
+    stringArray(entry.unproven ?? [], `${label}.unproven`, errors, {
+      allowEmpty: true,
+    });
+    stringArray(
+      entry.openReviewConcerns ?? [],
+      `${label}.openReviewConcerns`,
+      errors,
+      { allowEmpty: true },
+    );
     checkRuleExternal(entry.external, label, errors);
     checkRuleExamples(entry.examples, label, errors);
   }

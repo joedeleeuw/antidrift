@@ -4,7 +4,7 @@
 
 Disallow SQL strings assembled with interpolated values or concatenated values.
 
-This is an injection-boundary rule, not a general "SQL keyword" scanner. Static SQL and bound parameters are allowed. Dynamic placeholder lists such as `ids.map(() => "?").join(",")`, and numbered Postgres placeholder fragments that interpolate only index arithmetic after `$`, are allowed because values remain separately bound to the database driver. Locally built arrays of static SQL fragments may be joined into `SET` / `WHERE` clauses; arbitrary dynamic fragments still report. Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are treated as SQL binding APIs rather than raw string interpolation. Closed SQL identifier fragments are allowed only when the rule can prove the token set from local structure, such as a typed service-boundary union, a static object-literal column map, an anchored identifier regex guard that definitely exits on failure before deriving an identifier-shaped template, or a local quote-doubling SQL identifier escaper. Local SQL-fragment builder helpers are accepted only when their body is a single safe template, parameter interpolations are unquoted identifier positions, call-site arguments are identifier-safe, and dynamic value fragments pass through a proven string escaper. A template literal reports only when the unsafe interpolation itself is in SQL syntax; SQL-looking sample text elsewhere in the same template does not make unrelated interpolations a SQL sink.
+This is an injection-boundary rule, not a general "SQL keyword" scanner. Static SQL and bound parameters are allowed. Dynamic placeholder lists such as `ids.map(() => "?").join(",")`, and numbered Postgres placeholder fragments that interpolate only index plus/multiply arithmetic after `$`, are allowed because values remain separately bound to the database driver. Locally built arrays of static SQL fragments may be joined into `SET` / `WHERE` clauses; arbitrary dynamic fragments still report. Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are treated as SQL binding APIs rather than raw string interpolation. Closed SQL identifier fragments are allowed only when the rule can prove the token set from local structure, such as a typed service-boundary union, a static object-literal column map, an anchored identifier regex guard that definitely exits on failure before deriving an identifier-shaped template, or a local quote-doubling SQL identifier escaper. Local SQL-fragment builder helpers are accepted only when their body is a single safe template, parameter interpolations are unquoted identifier positions, call-site arguments are identifier-safe, and dynamic value fragments pass through a proven string escaper. A template literal reports only when the unsafe interpolation itself is in SQL syntax; SQL-looking sample text elsewhere in the same template does not make unrelated interpolations a SQL sink.
 
 ## Should Flag
 
@@ -221,6 +221,24 @@ Current targeted broad finding classification:
 Status: `ready`, `stable: false`.
 
 The second independent sanitized identifier clean-control gap is resolved: Cloudflare Workspace covers anchored-regex/early-exit identifier derivation, and Opencode stats covers quote-doubling identifier and string escapers plus bounded local SQL-fragment builders. PowerSync service now supplies the lower-edge pressure case: raw `sourceTable.table` interpolation reports next to escaped table-name APIs, imported `escapeMysqlTableName(table)` stays clean through a TypeScript symbol-to-declaration proof, Postgres `SourceTable.escapedIdentifier` stays clean only through an explicit type/member contract that requires parser services to prove the receiver type, and Postgres storage numbered placeholder fragments stay clean through local structure. Production drift is Chaski plus PowerSync service; Sudocode, Cloudflare, and PowerSync tests provide useful but lower-strength drift pressure from test-helper/demo/integration-test code. Chaski, Codebase Atlas, Sudocode, Cloudflare, Opencode, and PowerSync service supply clean and pressure controls for placeholder lists, static SQL fragments, parameterized SQL tags, ORM-owned SQL composition, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, local and imported quote escapers, finite static object fragments, numbered placeholder fragments, and bound values.
+
+Proven:
+
+- Production drift exists in Chaski HogQL/template interpolation and PowerSync raw `sourceTable.table` interpolation.
+- Bound-value composition stays clean for positional placeholder lists, parameterized SQL tags, ORM-owned SQL composition, and numbered Postgres placeholder fragments whose interpolation only creates `$<number>` placeholders.
+- Closed identifier composition stays clean when proven by typed unions, static maps, anchored regex guards with failure exit, quote-doubling escapers, imported escapers, or configured safe identifier members with parser services.
+- The targeted broad run over PowerSync Service, Opencode, Cloudflare Agents, and Sudocode is classified: 707 SQL-candidate files, 31 custom findings, 0 SonarJS findings, and no known type-aware false positives after the numbered-placeholder fix.
+- The June 9 adversarial cleanup keeps the placeholder proof limited to `+` and `*` index arithmetic and restores short-circuit safety checks.
+
+Unproven before stable:
+
+- The wider `/Users/sushi/code` SQL inventory is not classified.
+- Test/demo drift weighting is unresolved; another production drift repository may still be needed for stable promotion.
+- Non-type-aware inventory cannot prove imported escapers or configured safe identifier members, by design.
+- SQL tag ecosystems beyond the observed `sql`, `sqlQuery`, and `sqlRun` names remain unclassified.
+- Positive guard, allowlist, quantifier, and regex-variant SQL identifier sanitizers remain uncharacterized against real code.
+- Unsafe dynamic SQL-builder `+=`, `.concat()`, and array-join examples have not been found.
+- Placeholder arithmetic beyond index `+`/`*` numeric expressions is unsupported until real clean code proves it.
 
 The June 8, 2026 advisory review was grounded in repo reads and kept the rule at `ready`, not stable. The review agreed this is not ecosystem-covered and that the Cloudflare branch is deterministic enough to keep. PowerSync resolved the lower-edge and imported-escaper evidence blockers.
 
