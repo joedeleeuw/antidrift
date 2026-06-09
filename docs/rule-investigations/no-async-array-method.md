@@ -50,6 +50,13 @@ Why: the rule tracks the local promise list and sees it awaited later.
 
 `@typescript-eslint/no-misused-promises` and `@typescript-eslint/no-floating-promises` partially overlap. `no-misused-promises` can cover async predicate callbacks and can catch `forEach(async ...)` when broad `checksVoidReturn.arguments` is enabled, but that broader option also reports legitimate Express-style async handlers in common projects. The remaining custom value is the array-method-only scope plus `.map` / `.flatMap` promise-list joining: unjoined async maps are not covered by the local ecosystem pair.
 
+Closest online references checked:
+
+- `@typescript-eslint/no-misused-promises` documents `checksVoidReturn.arguments` and shows `forEach(async ...)` as an incorrect void-callback example, with `Promise.all([].map(async ...))` as the accepted shape.
+- `@typescript-eslint/strict-void-return` documents the broader "returned value in void context" family and points async-only misuse back to `no-misused-promises`.
+- `eslint-plugin-no-async-array-methods` exists and directly bans async callbacks for array methods, but it is a small standalone plugin with weaker maintenance/support than the TypeScript ESLint stack.
+- ESLint core `no-await-in-loop` is adjacent but points the other direction: it encourages starting promises and joining them with `Promise.all`, not banning async array callbacks.
+
 ## Real-Corpus Evidence
 
 Drift:
