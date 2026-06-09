@@ -832,8 +832,8 @@ rules:
       - Opencode stats local `sqlIdentifier` / `sqlString` quote-doubling helpers are accepted only when the helper body proves matching quote escaping; local SQL-fragment builders are accepted only for single-template bodies with unquoted identifier parameters and identifier-safe call-site arguments.
       - Finite static object fragments such as Opencode `dimensionSql.select` / `dimensionSql.groupBy` are accepted only when all returned object branches expose safe SQL fragment properties.
       - Current production drift evidence is Chaski plus PowerSync service. Sudocode and Cloudflare add useful but lower-strength drift pressure because the accepted findings are in test helpers and demo/playground code.
-      - "PowerSync service supplies the guard/escaper lower edge: `sourceTable.table` still reports when a neighboring escaped table-name helper exists. It also exposes a known false positive for imported `escapeMysqlTableName(table)`, whose implementation quote-doubles backticks but is outside the rule's current local proof."
-      - "The June 8, 2026 advisory review found the sanitized-identifier branch locally ready but not stable. Opencode now supplies second-repo sanitized identifier replication, and PowerSync supplies lower-edge pressure, but imported escaper proof remains unresolved."
+      - "PowerSync service supplies the guard/escaper lower edge: `sourceTable.table` still reports when a neighboring escaped table-name helper exists. The imported `escapeMysqlTableName(table)` call now stays clean through a TypeScript symbol-to-declaration proof of quote-doubled identifier escaping."
+      - "The June 8, 2026 advisory review found the sanitized-identifier branch locally ready but not stable. Opencode now supplies second-repo sanitized identifier replication, and PowerSync supplies lower-edge plus imported-escaper clean pressure, so stable promotion needs a fresh review rather than more edge searching."
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:
       state: partial-overlap
@@ -855,7 +855,7 @@ rules:
         - 'if (!VALID_NAMESPACE.test(ns)) throw new Error("bad namespace"); this.tableName = `cf_workspace_${ns}`; this.sql.run(`SELECT * FROM ${this.tableName}`);'
         - 'const table = [catalog, database, name].map(sqlIdentifier).join("."); db.prepare(`SELECT * FROM ${table}`);'
         - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
-    nextAction: Decide whether to implement imported escaper proof or explicitly keep cross-file SQL escaper validation out of stable promotion scope.
+    nextAction: Run a fresh stable-promotion review now that lower-edge and imported-escaper proof are covered by real corpus gates.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false

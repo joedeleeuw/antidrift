@@ -977,12 +977,12 @@ const powersyncServiceCases = [
   {
     id: "powersync-mysql-imported-escaped-table-helper-clean",
     ruleId: "antidrift/no-sql-string-concat",
-    kind: "known-gap",
+    kind: "correct",
     classification: "ready",
     subproject: "module-mysql",
+    typeAware: true,
+    tsconfig: "modules/module-mysql/tsconfig.json",
     paths: ["modules/module-mysql/src/replication/BinLogStream.ts"],
-    reason:
-      "Real clean control uses imported escapeMysqlTableName(table), whose implementation quote-doubles backticks in schema and table names. The current syntax/scope rule proves local escapers only, so this remains an imported-helper false-positive pressure case.",
   },
 ];
 

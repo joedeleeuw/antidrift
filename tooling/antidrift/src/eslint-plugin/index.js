@@ -1,3 +1,5 @@
+import ts from "typescript";
+
 import { MIN_PROPS, collectCanonicalTypes, collectDomainCanonicalTypes, collectGeneratedCanonicalTypes, isObjectType, resolvesToDomainCanonicalType, resolvesToGeneratedType, resolvesToInstalledType, typeProps } from "../policy/lib/type-index.mjs";
 
 const rawTailwindColorPattern = /\b(?:text|bg|border|ring)-(?:red|blue|green|yellow|gray|slate|zinc|neutral)-\d{2,3}\b/u;
@@ -1000,6 +1002,90 @@ function sqlEscaperFunctionKind(node) {
   return sqlEscaperKindFromReturnExpression(singleReturnExpression(node), param.name);
 }
 
+function tsStaticStringValue(node) {
+  if (!node) return null;
+  if (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  return null;
+}
+
+function tsSingleReturnExpression(node) {
+  if (!node?.body) return null;
+  if (!ts.isBlock(node.body)) return node.body;
+  if (node.body.statements.length !== 1) return null;
+  const statement = node.body.statements[0];
+  return ts.isReturnStatement(statement) ? statement.expression ?? null : null;
+}
+
+function tsTemplateParts(node) {
+  if (!node || !ts.isTemplateExpression(node)) return null;
+  return {
+    expressions: node.templateSpans.map((span) => span.expression),
+    parts: [
+      node.head.text,
+      ...node.templateSpans.map((span) => span.literal.text),
+    ],
+  };
+}
+
+function tsRegexMatchesGlobalQuote(node, quote) {
+  if (!ts.isRegularExpressionLiteral(node)) return false;
+  const text = node.getText();
+  if (!text.endsWith("g")) return false;
+  return text === `/${quote}/g`;
+}
+
+function tsEscapedReplaceCall(node, paramName, quote) {
+  if (!ts.isCallExpression(node)) return false;
+  if (!ts.isPropertyAccessExpression(node.expression)) return false;
+  const method = node.expression.name.text;
+  if (method !== "replace" && method !== "replaceAll") return false;
+  const receiver = node.expression.expression;
+  let receiverRoot = null;
+  if (ts.isIdentifier(receiver)) {
+    receiverRoot = receiver;
+  } else if (ts.isPropertyAccessExpression(receiver) && ts.isIdentifier(receiver.expression)) {
+    receiverRoot = receiver.expression;
+  }
+  if (receiverRoot?.text !== paramName) return false;
+  const [pattern, replacement] = node.arguments;
+  const patternMatches = method === "replaceAll"
+    ? tsStaticStringValue(pattern) === quote
+    : tsRegexMatchesGlobalQuote(pattern, quote);
+  return patternMatches && tsStaticStringValue(replacement) === `${quote}${quote}`;
+}
+
+function tsTemplateSqlEscaperKind(node, paramName) {
+  const template = tsTemplateParts(node);
+  if (!template || template.expressions.length === 0) return null;
+  const skeleton = template.parts.join("A");
+  const isIdentifierSkeleton = /^(?:"A"|`A`)(?:\.(?:"A"|`A`))*$/u.test(skeleton);
+  const isStringSkeleton = skeleton === "'A'";
+  if (!isIdentifierSkeleton && !isStringSkeleton) return null;
+  const expectedQuotes = template.expressions.map((_, index) => {
+    const before = template.parts[index];
+    const after = template.parts[index + 1];
+    const quote = before.at(-1);
+    return quote && quote === after?.[0] ? quote : null;
+  });
+  if (expectedQuotes.some((quote) => quote !== "\"" && quote !== "'" && quote !== "`")) return null;
+  if (!template.expressions.every((expression, index) => tsEscapedReplaceCall(expression, paramName, expectedQuotes[index]))) return null;
+  return isStringSkeleton ? "string" : "identifier";
+}
+
+function tsSqlEscaperDeclarationKind(node) {
+  if (!node) return null;
+  let fn = null;
+  if (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node)) {
+    fn = node;
+  } else if (ts.isVariableDeclaration(node) && node.initializer && (ts.isFunctionExpression(node.initializer) || ts.isArrowFunction(node.initializer))) {
+    fn = node.initializer;
+  }
+  if (!fn || fn.parameters.length !== 1) return null;
+  const param = fn.parameters[0];
+  if (!ts.isIdentifier(param.name)) return null;
+  return tsTemplateSqlEscaperKind(tsSingleReturnExpression(fn), param.name.text);
+}
+
 function hasOpenSqlQuote(value, quote) {
   let open = false;
   for (let i = 0; i < value.length; i += 1) {
@@ -1262,6 +1348,8 @@ function ruleNoSqlStringConcat() {
     meta: { type: "problem", docs: { description: "Disallow SQL assembled via string interpolation or concatenation." }, schema: [] },
     create(context) {
       const sourceCode = context.sourceCode;
+      const services = requireTypeServices(context);
+      const checker = services?.program?.getTypeChecker() ?? null;
       const safeSqlFragmentArrays = new WeakSet();
       const safeSqlFragmentStrings = new WeakSet();
       const safeSqlFragmentObjectValues = new WeakMap();
@@ -1271,6 +1359,7 @@ function ruleNoSqlStringConcat() {
       const safeDynamicSqlIdentifierMembers = new WeakMap();
       const sqlIdentifierRegexVariables = new WeakSet();
       const sqlEscaperFunctions = new WeakMap();
+      const importedSqlEscaperDeclarations = new WeakMap();
       const safeSqlFragmentFunctions = new WeakMap();
       function isSafeFragmentVariable(node, set) {
         const variable = findVariable(sourceCode, node);
@@ -1300,15 +1389,28 @@ function ruleNoSqlStringConcat() {
       function sqlEscaperCallbackKind(node) {
         if (node?.type === "Identifier") {
           const variable = findVariable(sourceCode, node);
-          return variable ? sqlEscaperFunctions.get(variable) ?? null : null;
+          return variable ? sqlEscaperFunctions.get(variable) ?? importedSqlEscaperKind(node) : importedSqlEscaperKind(node);
         }
         return sqlEscaperFunctionKind(node);
+      }
+      function importedSqlEscaperKind(node) {
+        if (!checker || !services?.esTreeNodeToTSNodeMap || node?.type !== "Identifier") return null;
+        const tsNode = services.esTreeNodeToTSNodeMap.get(node);
+        const symbol = tsNode && checker.getSymbolAtLocation(tsNode);
+        const resolved = symbol && (symbol.flags & ts.SymbolFlags.Alias) ? checker.getAliasedSymbol(symbol) : symbol;
+        for (const declaration of resolved?.declarations ?? []) {
+          if (importedSqlEscaperDeclarations.has(declaration)) return importedSqlEscaperDeclarations.get(declaration);
+          const kind = tsSqlEscaperDeclarationKind(declaration);
+          importedSqlEscaperDeclarations.set(declaration, kind);
+          if (kind) return kind;
+        }
+        return null;
       }
       function sqlEscaperCallKind(node) {
         if (node?.type !== "CallExpression" || node.arguments.length !== 1) return null;
         if (node.callee?.type !== "Identifier") return null;
         const variable = findVariable(sourceCode, node.callee);
-        return variable ? sqlEscaperFunctions.get(variable) ?? null : null;
+        return variable ? sqlEscaperFunctions.get(variable) ?? importedSqlEscaperKind(node.callee) : importedSqlEscaperKind(node.callee);
       }
       function safeSqlFragmentFunctionSummary(node) {
         const fn = getFunctionNode(node);
