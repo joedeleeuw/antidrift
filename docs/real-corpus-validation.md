@@ -70,9 +70,11 @@ Run:
 pnpm policy:benchmark-sql-queries
 ```
 
-This is an inventory gate, not a pass/fail lint gate. It runs `sonarjs/sql-queries` beside `antidrift/no-sql-string-concat` over real SQL-related Chaski, Codebase Atlas, Sudocode, Cloudflare Agents, and Opencode programs, then writes `reports/sql-query-benchmark.json`.
+This is an inventory gate, not a pass/fail lint gate. It runs `sonarjs/sql-queries` beside `antidrift/no-sql-string-concat` over real SQL-related Chaski, Codebase Atlas, Sudocode, Cloudflare Agents, Opencode, and PowerSync Service programs, then writes `reports/sql-query-benchmark.json`.
 
 Current benchmark result: 262 files checked, 0 parser errors, 12 `antidrift/no-sql-string-concat` findings, and 0 `sonarjs/sql-queries` findings. The custom findings are the 10 Chaski HogQL/template interpolation findings, one Cloudflare playground table-name interpolation, and one PowerSync service raw table-name interpolation. Opencode stats stays clean for local `sqlIdentifier` / `sqlString` quote-doubling helpers, finite static object fragments, and bounded SQL-fragment builders. PowerSync service now runs as a type-aware benchmark plan and keeps the imported `escapeMysqlTableName(table)` clean control quiet. Treat SonarJS as maintained adjacent coverage, not a replacement for this custom rule.
+
+The report also includes `coverageInventory`, which records promotion blockers without turning them into lint failures. The current inventory sees 177 SQL tagged-template uses and all are already in the allowed `sql`/`sqlQuery`/`sqlRun` shape, one SQL-context negative regex/exit guard (`!VALID_NAMESPACE.test(ns)`), 37 static SQL-builder `+=` appends, 8 dynamic SQL-builder `+=` candidates, 11 SQL sentence templates outside the main report pattern, and no `.concat()` or array-join SQL candidates. The PowerSync non-type-aware probe measures the parser-services degradation directly: without type services, `modules/module-mysql/src/replication/BinLogStream.ts:311` becomes one extra conservative report.
 
 ## Schema Roundtrip Inventory
 

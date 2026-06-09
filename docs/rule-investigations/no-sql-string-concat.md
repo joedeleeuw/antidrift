@@ -216,10 +216,10 @@ The June 8, 2026 advisory review was grounded in repo reads and kept the rule at
 
 The June 9, 2026 advisory review (`reports/claude-rule-review-no-sql-string-concat-20260609-0803-rerun.md`) read the current repo and the external corpus directories. It found the PowerSync imported-escaper proof sound and the rule still locally ready, but not stable. Stable promotion remains blocked by:
 
-- Equivalent guard shapes such as positive guards, quantifier forms, or allowlist checks remain uncharacterized against real code.
+- Equivalent guard shapes such as positive guards, quantifier forms, or allowlist checks remain uncharacterized against real code. The benchmark now inventories guard shapes and currently finds only the already-supported negative regex/exit shape in SQL context: `!VALID_NAMESPACE.test(ns)`.
 - The widened 168-finding SQL scan is not fully classified, so the project cannot claim zero known false positives.
-- Imported escaper proof is type-aware-only. Without parser services, imported escaper calls conservatively report rather than proving the helper declaration.
-- Common parameterized SQL tag ecosystems beyond `sql`, `sqlQuery`, and `sqlRun` remain unclassified. Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags are likely clean when used as true tagged templates, but they need real-code inventory before widening the allowlist.
-- Concatenation false negatives remain open: `+=`, `.concat()`, array joins, and queries whose SQL verb is split into an interpolation are not covered by the current rule.
+- Imported escaper proof is type-aware-only. The benchmark now runs a non-type-aware probe for PowerSync and measures the degradation directly: without parser services, `modules/module-mysql/src/replication/BinLogStream.ts:311` becomes one extra conservative report.
+- Common parameterized SQL tag ecosystems beyond `sql`, `sqlQuery`, and `sqlRun` remain unclassified. The current benchmark inventories 177 SQL tagged-template uses and all are already in the allowed-name shape; Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags still need real-code inventory before widening the allowlist.
+- Concatenation false negatives remain open but are now measured: the benchmark sees 37 static SQL-builder `+=` appends, 8 dynamic SQL-builder `+=` candidates, 11 SQL sentence templates outside the main report pattern, and no `.concat()` or array-join SQL candidates. The dynamic append candidates include safe placeholder and allowlisted-sort patterns, so a future lint change must reuse the existing safe-fragment/identifier proof rather than flag every builder append.
 
-Stable promotion waits on broad finding classification plus an explicit decision on the non-type-aware imported-escaper degradation.
+Stable promotion waits on broad finding classification, classification of the 8 dynamic SQL-builder candidates, and an explicit decision on the non-type-aware imported-escaper degradation.
