@@ -1344,11 +1344,40 @@ function templateInterpolationParts(node, index) {
   };
 }
 
+function safeIdentifierMemberSpecs(options) {
+  return (options.safeIdentifierMembers ?? [])
+    .filter(({ type, member }) => typeof type === "string" && typeof member === "string")
+    .map(({ type, member }) => ({ type, member }));
+}
+
 function ruleNoSqlStringConcat() {
   return {
-    meta: { type: "problem", docs: { description: "Disallow SQL assembled via string interpolation or concatenation." }, schema: [] },
+    meta: {
+      type: "problem",
+      docs: { description: "Disallow SQL assembled via string interpolation or concatenation." },
+      schema: [{
+        type: "object",
+        properties: {
+          safeIdentifierMembers: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                type: { type: "string" },
+                member: { type: "string" },
+                evidence: { type: "string" },
+              },
+              required: ["type", "member"],
+              additionalProperties: false,
+            },
+          },
+        },
+        additionalProperties: false,
+      }],
+    },
     create(context) {
       const sourceCode = context.sourceCode;
+      const safeIdentifierMembers = safeIdentifierMemberSpecs(context.options[0] ?? {});
       const services = requireTypeServices(context);
       const checker = services?.program?.getTypeChecker() ?? null;
       const safeSqlFragmentArrays = new WeakSet();
@@ -1548,6 +1577,23 @@ function ruleNoSqlStringConcat() {
         const members = classNode ? safeDynamicSqlIdentifierMembers.get(classNode) : null;
         return Boolean(key && members?.has(key));
       }
+      function typeNames(type) {
+        return new Set([
+          checker.typeToString(type),
+          type.getSymbol()?.getName(),
+          type.aliasSymbol?.getName(),
+        ].filter(Boolean));
+      }
+      function isConfiguredSafeSqlIdentifierMember(node) {
+        if (!checker || safeIdentifierMembers.length === 0) return false;
+        if (node?.type !== "MemberExpression" || node.computed || node.property?.type !== "Identifier") return false;
+        const candidates = safeIdentifierMembers.filter(({ member }) => member === node.property.name);
+        if (candidates.length === 0) return false;
+        const tsObject = services?.esTreeNodeToTSNodeMap?.get(node.object);
+        if (!tsObject) return false;
+        const names = typeNames(checker.getTypeAtLocation(tsObject));
+        return candidates.some(({ type }) => names.has(type));
+      }
       function memberTokenValues(node) {
         if (node.computed && node.object?.type === "Identifier") {
           const variable = findVariable(sourceCode, node.object);
@@ -1593,6 +1639,7 @@ function ruleNoSqlStringConcat() {
         const values = sqlTokenValues(node);
         if (valuesAreSqlIdentifiers(values)) return true;
         if (isSafeDynamicSqlIdentifierVariable(node)) return true;
+        if (isConfiguredSafeSqlIdentifierMember(node)) return true;
         if (node?.type === "MemberExpression" && isSafeDynamicSqlIdentifierMember(node)) return true;
         return isSafeDynamicSqlIdentifierTemplate(node);
       }

@@ -39,6 +39,16 @@ const benchmarkRuleIds = [
 ];
 const customRuleId = "antidrift/no-sql-string-concat";
 const upstreamRuleId = "sonarjs/sql-queries";
+const powersyncSafeIdentifierOptions = {
+  safeIdentifierMembers: [
+    {
+      type: "SourceTable",
+      member: "escapedIdentifier",
+      evidence:
+        "PowerSync SourceTable.escapedIdentifier is the owned table identifier escape API; TypeScript proves the receiver type before this exemption applies.",
+    },
+  ],
+};
 const allowedSqlTagNames = new Set(["sql", "sqlQuery", "sqlRun"]);
 const sqlPattern = /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
 const sqlKeywordPattern = /\b(?:SELECT|FROM|INSERT|INTO|UPDATE|DELETE|DROP|TABLE|WHERE|JOIN|ORDER|GROUP|VALUES|SET)\b/iu;
@@ -116,9 +126,21 @@ const corpusPlans = [
     label: "module-mysql-sql-corpus",
     repoCandidates: powersyncServiceRepoCandidates,
     tsconfig: "modules/module-mysql/tsconfig.json",
+    ruleOptions: { [customRuleId]: powersyncSafeIdentifierOptions },
     targets: [
       "modules/module-mysql/src/api/MySQLRouteAPIAdapter.ts",
       "modules/module-mysql/src/replication/BinLogStream.ts",
+    ],
+  },
+  {
+    repo: "powersync-service",
+    label: "module-postgres-sql-corpus",
+    repoCandidates: powersyncServiceRepoCandidates,
+    tsconfig: "modules/module-postgres/tsconfig.json",
+    ruleOptions: { [customRuleId]: powersyncSafeIdentifierOptions },
+    targets: [
+      "modules/module-postgres/src/replication/WalStream.ts",
+      "modules/module-postgres/src/replication/replication-utils.ts",
     ],
   },
 ];
@@ -197,7 +219,12 @@ function eslintConfig(plan, repoRoot) {
         sonarjs,
       },
       rules: Object.fromEntries(
-        benchmarkRuleIds.map((ruleId) => [ruleId, "error"]),
+        benchmarkRuleIds.map((ruleId) => [
+          ruleId,
+          plan.ruleOptions?.[ruleId]
+            ? ["error", plan.ruleOptions[ruleId]]
+            : "error",
+        ]),
       ),
     },
   ];

@@ -33,6 +33,20 @@ const powersyncServiceRepoCandidates = [
   "/Users/sushi/code/powersync-service",
 ].filter(Boolean);
 const coreRuleIds = new Set(["no-restricted-imports"]);
+const powersyncSqlRuleOptions = {
+  "antidrift/no-sql-string-concat": [
+    {
+      safeIdentifierMembers: [
+        {
+          type: "SourceTable",
+          member: "escapedIdentifier",
+          evidence:
+            "PowerSync SourceTable.escapedIdentifier is the owned table identifier escape API; TypeScript proves the receiver type before this exemption applies.",
+        },
+      ],
+    },
+  ],
+};
 
 const sudocodeCases = [
   {
@@ -982,7 +996,22 @@ const powersyncServiceCases = [
     subproject: "module-mysql",
     typeAware: true,
     tsconfig: "modules/module-mysql/tsconfig.json",
+    ruleOptions: powersyncSqlRuleOptions,
     paths: ["modules/module-mysql/src/replication/BinLogStream.ts"],
+  },
+  {
+    id: "powersync-postgres-escaped-identifier-member-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "module-postgres",
+    typeAware: true,
+    tsconfig: "modules/module-postgres/tsconfig.json",
+    ruleOptions: powersyncSqlRuleOptions,
+    paths: [
+      "modules/module-postgres/src/replication/WalStream.ts",
+      "modules/module-postgres/src/replication/replication-utils.ts",
+    ],
   },
 ];
 
