@@ -205,6 +205,7 @@ Widened local scan:
 - Sudocode's typed `ORDER BY ${sortBy} ${order}` service code now stays clean, as does the matching integration helper.
 - Cloudflare Agents parameterized SQL tags, the Codemode static column-map update builder, and the Workspace sanitized namespace table identifiers now stay clean.
 - The named Sudocode/Cloudflare findings are now classified: dynamic `Object.keys(updates)` update helpers and the playground table-name query are drift; browser/test payload SQL-looking strings and constructor-validated namespace table identifiers are clean. Many other findings are duplicate Chaski-derived local roots, so they do not provide independent replication.
+- The scan is now reproducible through `pnpm policy:inventory-sql-broad`. A targeted broad run over PowerSync Service, Opencode, Cloudflare Agents, and Sudocode checked 707 SQL-candidate files, reported 32 custom findings, and reported 0 SonarJS findings. That run confirmed the non-type-aware false-positive class: escaped identifier controls such as `table.escapedIdentifier` and `escapeMysqlTableName(table)` report unless the inventory has TypeScript parser services to resolve the getter/helper proof.
 
 ## Promotion State
 
@@ -217,9 +218,9 @@ The June 8, 2026 advisory review was grounded in repo reads and kept the rule at
 The June 9, 2026 advisory review (`reports/claude-rule-review-no-sql-string-concat-20260609-0803-rerun.md`) read the current repo and the external corpus directories. It found the PowerSync imported-escaper proof sound and the rule still locally ready, but not stable. Stable promotion remains blocked by:
 
 - Equivalent guard shapes such as positive guards, quantifier forms, or allowlist checks remain uncharacterized against real code. The benchmark now inventories guard shapes and currently finds only the already-supported negative regex/exit shape in SQL context: `!VALID_NAMESPACE.test(ns)`.
-- The widened 168-finding SQL scan is not fully classified, so the project cannot claim zero known false positives.
+- The widened SQL scan is now reproducible, but still not fully classified. The targeted broad inventory already proves known non-type-aware false positives on escaped identifier controls, so stable promotion requires type-aware broad plans or an explicit conservative-mode limitation.
 - Imported escaper proof is type-aware-only. The benchmark now runs a non-type-aware probe for PowerSync and measures the degradation directly: without parser services, `modules/module-mysql/src/replication/BinLogStream.ts:311` becomes one extra conservative report.
 - Common parameterized SQL tag ecosystems beyond `sql`, `sqlQuery`, and `sqlRun` remain unclassified. The current benchmark inventories 177 SQL tagged-template uses and all are already in the allowed-name shape; Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags still need real-code inventory before widening the allowlist.
 - Concatenation false negatives are now measured: the benchmark sees 37 static SQL-builder `+=` appends, 8 dynamic SQL-builder `+=` candidates, 11 SQL sentence templates outside the old 200-character `SELECT ... FROM` pattern, and no `.concat()` or array-join SQL candidates. The 8 dynamic appends are classified clean: placeholder lists, joins of static condition fragments, or allowlisted sort/direction fragments. The widened sentence-pattern trigger now reports the four unsafe long Chaski templates at lines 626, 650, 1111, and 1367 while the Cloudflare/Opencode controls stay clean. Do not add SQL-builder append linting unless a real unsafe dynamic append appears.
 
-Stable promotion waits on broad finding classification and an explicit decision on the non-type-aware imported-escaper degradation.
+Stable promotion waits on broad finding classification and an explicit decision on the non-type-aware imported-escaper / escaped-identifier degradation.

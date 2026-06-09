@@ -26,6 +26,7 @@
     "policy:validate-appeasement-remediation": "antidrift no-appeasement-remediation-corpus --slice no-appeasement-remediation-copy",
     "policy:benchmark-unsafe-type-assertion": "NODE_OPTIONS=--max-old-space-size=8192 antidrift benchmark-unsafe-type-assertion --slice upstream-delta --output reports/unsafe-type-assertion-benchmark.json",
     "policy:benchmark-sql-queries": "antidrift benchmark-sql-queries --slice upstream-delta --output reports/sql-query-benchmark.json",
+    "policy:inventory-sql-broad": "NODE_OPTIONS=--max-old-space-size=8192 antidrift inventory-sql-broad --slice broad-sql-promotion --output reports/sql-broad-inventory.json",
     "policy:inventory-schema-roundtrip": "antidrift inventory-schema-roundtrip --slice same-schema-recertification-research --output reports/schema-roundtrip-inventory.json",
     "policy:repo-corpus": "antidrift repo-corpus",
     "policy:validate-chaski": "antidrift chaski-corpus --slice chaski-local",

@@ -840,6 +840,7 @@ rules:
       - The current concatenation branch does not cover SQL-builder `+=`; the benchmark sees 37 static builder appends and 8 dynamic builder append candidates. The dynamic candidates are currently classified clean, so do not widen builder-append linting until a real unsafe dynamic append appears.
       - The widened sentence-pattern trigger catches long unsafe Chaski templates at lines 626, 650, 1111, and 1367 that the old 200-character `SELECT ... FROM` window missed, while Cloudflare and Opencode SQL controls stay clean.
       - "The benchmark directly measures non-type-aware degradation: without parser services, PowerSync `modules/module-mysql/src/replication/BinLogStream.ts:311` becomes one extra conservative report."
+      - "The reproducible broad SQL inventory command checked 707 SQL-candidate files across PowerSync Service, Opencode, Cloudflare Agents, and Sudocode with 32 custom findings and 0 SonarJS findings; it confirmed non-type-aware false positives on escaped identifier controls such as `table.escapedIdentifier`."
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:
       state: partial-overlap
@@ -861,7 +862,7 @@ rules:
         - 'if (!VALID_NAMESPACE.test(ns)) throw new Error("bad namespace"); this.tableName = `cf_workspace_${ns}`; this.sql.run(`SELECT * FROM ${this.tableName}`);'
         - 'const table = [catalog, database, name].map(sqlIdentifier).join("."); db.prepare(`SELECT * FROM ${table}`);'
         - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
-    nextAction: Classify the broad SQL inventory and resolve or explicitly document the non-type-aware imported-escaper degradation before stable promotion.
+    nextAction: Add type-aware broad SQL plans for PowerSync Postgres/MySQL modules, then classify the broad SQL inventory and resolve or explicitly document the non-type-aware imported-escaper / escaped-identifier degradation before stable promotion.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
