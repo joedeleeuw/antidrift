@@ -11,9 +11,9 @@ function loadOne(policyDir, name) {
   let text;
   try {
     text = readFileSync(join(policyDir, "registries", `${name}.yaml`), "utf8");
-  } catch (err) {
-    if (err.code === "ENOENT") return {};
-    throw err;
+  } catch (error) {
+    if (error.code === "ENOENT") return {};
+    throw error;
   }
   return YAML.parse(text) ?? {};
 }

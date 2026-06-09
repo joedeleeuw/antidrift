@@ -42,9 +42,9 @@ function readPluginTestSource(repoRoot) {
       .filter((file) => file.endsWith(".test.mjs"))
       .map((file) => readFileSync(resolve(pluginDir, file), "utf8"))
       .join("\n");
-  } catch (err) {
-    if (err.code === "ENOENT") return null;
-    throw err;
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
   }
 }
 
@@ -67,9 +67,9 @@ function collectCorpusCoveredRules(cases) {
 function readRuleRegistry(repoRoot) {
   try {
     return YAML.parse(readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8")) ?? {};
-  } catch (err) {
-    if (err.code === "ENOENT") return {};
-    throw err;
+  } catch (error) {
+    if (error.code === "ENOENT") return {};
+    throw error;
   }
 }
 

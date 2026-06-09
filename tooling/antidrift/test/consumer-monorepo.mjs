@@ -95,12 +95,12 @@ try {
     try {
       const out = run("pnpm", ["exec", "eslint", relFile, "--format", "json"], work);
       return JSON.parse(out);
-    } catch (err) {
+    } catch (error) {
       // ESLint exits non-zero when it reports problems; the JSON is still on stdout.
-      if (err && typeof err === "object" && "stdout" in err && typeof err.stdout === "string") {
-        return JSON.parse(err.stdout);
+      if (error && typeof error === "object" && "stdout" in error && typeof error.stdout === "string") {
+        return JSON.parse(error.stdout);
       }
-      throw err;
+      throw error;
     }
   }
 
@@ -119,7 +119,7 @@ try {
   console.log(`\n✓ tarball installs and enforces in a consumer monorepo`);
   console.log(`  drift.ts -> ${RULE} fired; clean.ts stayed clean; brand subpath type-checked.`);
   rmSync(work, { recursive: true, force: true });
-} catch (err) {
-  console.error(err.stdout || err.message || err);
+} catch (error) {
+  console.error(error.stdout || error.message || error);
   fail("integration run threw");
 }

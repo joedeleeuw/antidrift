@@ -75,9 +75,9 @@ function markFinding(row, message) {
 function readRuleRegistry(repoRoot) {
   try {
     return YAML.parse(readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8")) ?? {};
-  } catch (err) {
-    if (err.code === "ENOENT") return {};
-    throw err;
+  } catch (error) {
+    if (error.code === "ENOENT") return {};
+    throw error;
   }
 }
 

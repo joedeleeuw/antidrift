@@ -46,6 +46,8 @@ describe("createConfig", () => {
     expect(severity(rules["react/no-array-index-key"])).toBe("error");
     expect(severity(rules["react/no-unescaped-entities"])).toBe("error");
     expect(severity(rules["react/jsx-sort-props"])).toBe("error");
+    expect(severity(rules["unicorn/catch-error-name"])).toBe("error");
+    expect(severity(rules["unicorn/consistent-function-scoping"])).toBe("error");
     expect(severity(rules["unicorn/no-instanceof-builtins"])).toBe("error");
     expect(severity(rules["unicorn/no-new-buffer"])).toBe("error");
     expect(severity(rules["unicorn/prefer-regexp-test"])).toBe("error");

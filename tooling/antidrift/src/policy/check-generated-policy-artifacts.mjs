@@ -7,8 +7,8 @@ import { loadPolicy, renderPolicyArtifacts } from "./generate-policy-artifacts.m
 async function readOrNull(target) {
   try {
     return await readFile(target, "utf8");
-  } catch (err) {
-    if (err?.code !== "ENOENT") throw err;
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
     return null;
   }
 }

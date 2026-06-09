@@ -449,23 +449,23 @@ const callableVisitors = (check) => ({
   Property: check,
 });
 
-function ruleNoTrivialSelectorWrapper() {
-  function check(node, context) {
-    if (isBoundary(node)) return;
-    const fn = getFunctionNode(node);
-    if (!fn || !hasExplicitReturnType(fn)) return;
-    if (isTrivialSelectorWrapper(fn)) {
-      context.report({
-        node,
-        message: "Do not create a typed selector wrapper that only returns a property of its own parameter. Use inference directly or move the contract to the owned boundary.",
-      });
-    }
+function checkTrivialSelectorWrapper(node, context) {
+  if (isBoundary(node)) return;
+  const fn = getFunctionNode(node);
+  if (!fn || !hasExplicitReturnType(fn)) return;
+  if (isTrivialSelectorWrapper(fn)) {
+    context.report({
+      node,
+      message: "Do not create a typed selector wrapper that only returns a property of its own parameter. Use inference directly or move the contract to the owned boundary.",
+    });
   }
+}
 
+function ruleNoTrivialSelectorWrapper() {
   return {
     meta: { type: "problem", docs: { description: "Disallow typed selector wrappers that only restate property access." }, schema: [] },
     create(context) {
-      return callableVisitors((node) => check(node, context));
+      return callableVisitors((node) => checkTrivialSelectorWrapper(node, context));
     },
   };
 }
@@ -485,11 +485,11 @@ function ruleNoInlineStructuralTypeAtUseSite() {
   };
 }
 
-function ruleNoUnsafeCastChain() {
-  function isUnknownCast(node) {
-    return node?.type === "TSAsExpression" && node.typeAnnotation?.type === "TSUnknownKeyword";
-  }
+function isUnknownCast(node) {
+  return node?.type === "TSAsExpression" && node.typeAnnotation?.type === "TSUnknownKeyword";
+}
 
+function ruleNoUnsafeCastChain() {
   return {
     meta: { type: "problem", docs: { description: "Disallow as unknown as T cast tunnels." }, schema: [] },
     create(context) {
@@ -555,6 +555,8 @@ function ruleNoCoupledStateSetters() {
   };
 }
 
+const lowerSet = (values) => new Set(values.map((value) => value.toLowerCase()));
+
 function ruleNoStatusTripletState() {
   return {
     meta: {
@@ -572,7 +574,6 @@ function ruleNoStatusTripletState() {
     },
     create(context) {
       const opts = context.options[0] ?? {};
-      const lowerSet = (values) => new Set(values.map((value) => value.toLowerCase()));
       const dataNames = lowerSet(opts.dataNames ?? ["data", "result", "user", "items"]);
       const loadingNames = lowerSet(opts.loadingNames ?? ["loading", "isLoading", "pending", "isPending"]);
       const errorNames = lowerSet(opts.errorNames ?? ["error", "loadError", "failure"]);
@@ -608,6 +609,14 @@ function ruleNoStatusTripletState() {
       };
     },
   };
+}
+
+function isGlobalFetchCall(callee) {
+  if (callee?.type === "Identifier") return callee.name === "fetch";
+  if (callee?.type !== "MemberExpression" || callee.computed) return false;
+  const objectName = callee.object?.type === "Identifier" ? callee.object.name : "";
+  const propertyName = callee.property?.type === "Identifier" ? callee.property.name : "";
+  return propertyName === "fetch" && (objectName === "globalThis" || objectName === "window" || objectName === "self");
 }
 
 function ruleRequireEffectDeps() {
@@ -686,13 +695,6 @@ function ruleNoRawFetchInComponent() {
         if (frame?.sawFetch && (frame.sawJsx || isReactComponentName(frame.name))) {
           reportFetch(frame.sawFetch, "Do not call raw fetch inside React components. Use an API client, loader, or query resource.");
         }
-      }
-      function isGlobalFetchCall(callee) {
-        if (callee?.type === "Identifier") return callee.name === "fetch";
-        if (callee?.type !== "MemberExpression" || callee.computed) return false;
-        const objectName = callee.object?.type === "Identifier" ? callee.object.name : "";
-        const propertyName = callee.property?.type === "Identifier" ? callee.property.name : "";
-        return propertyName === "fetch" && (objectName === "globalThis" || objectName === "window" || objectName === "self");
       }
 
       return {
@@ -1135,6 +1137,51 @@ function statementExits(node) {
   return false;
 }
 
+function unionStringValues(left, right) {
+  if (!left || !right) return null;
+  return new Set([...left, ...right]);
+}
+
+function variableTypeNode(variable) {
+  const def = variable?.defs?.[0];
+  return def?.name?.typeAnnotation?.typeAnnotation
+    ?? def?.node?.typeAnnotation?.typeAnnotation
+    ?? def?.node?.id?.typeAnnotation?.typeAnnotation
+    ?? null;
+}
+
+function objectLiteralIdentifierValues(node) {
+  if (node?.type !== "ObjectExpression") return null;
+  const values = new Set();
+  for (const property of node.properties ?? []) {
+    if (property.type !== "Property") return null;
+    const value = staticStringValue(property.value);
+    if (!value || !isSqlIdentifierTokenValue(value)) return null;
+    values.add(value);
+  }
+  return values;
+}
+
+function templateStaticPartsAreSqlIdentifierSafe(node) {
+  const text = node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "").join("A");
+  return isSqlIdentifierTokenValue(text);
+}
+
+function valuesAreSqlIdentifiers(values) {
+  return Boolean(values?.size) && [...values].every(isSqlIdentifierTokenValue);
+}
+
+function valuesAreSqlDirections(values) {
+  return Boolean(values?.size) && [...values].every(isSqlDirectionTokenValue);
+}
+
+function templateInterpolationParts(node, index) {
+  return {
+    before: node.quasis[index]?.value?.cooked ?? node.quasis[index]?.value?.raw ?? "",
+    after: node.quasis[index + 1]?.value?.cooked ?? node.quasis[index + 1]?.value?.raw ?? "",
+  };
+}
+
 function ruleNoSqlStringConcat() {
   return {
     meta: { type: "problem", docs: { description: "Disallow SQL assembled via string interpolation or concatenation." }, schema: [] },
@@ -1179,33 +1226,11 @@ function ruleNoSqlStringConcat() {
         const members = classNode ? safeDynamicSqlIdentifierMembers.get(classNode) : null;
         if (key && members) members.delete(key);
       }
-      function unionStringValues(left, right) {
-        if (!left || !right) return null;
-        return new Set([...left, ...right]);
-      }
-      function variableTypeNode(variable) {
-        const def = variable?.defs?.[0];
-        return def?.name?.typeAnnotation?.typeAnnotation
-          ?? def?.node?.typeAnnotation?.typeAnnotation
-          ?? def?.node?.id?.typeAnnotation?.typeAnnotation
-          ?? null;
-      }
       function memberTypeStringValues(node) {
         if (node?.type !== "MemberExpression" || node.computed || node.object?.type !== "Identifier") return null;
         const propertyName = node.property?.type === "Identifier" ? node.property.name : "";
         if (!propertyName) return null;
         return sqlTypePropertyValues(variableTypeNode(findVariable(sourceCode, node.object)), propertyName);
-      }
-      function objectLiteralIdentifierValues(node) {
-        if (node?.type !== "ObjectExpression") return null;
-        const values = new Set();
-        for (const property of node.properties ?? []) {
-          if (property.type !== "Property") return null;
-          const value = staticStringValue(property.value);
-          if (!value || !isSqlIdentifierTokenValue(value)) return null;
-          values.add(value);
-        }
-        return values;
       }
       function identifierTokenValues(node) {
         const variable = findVariable(sourceCode, node);
@@ -1254,10 +1279,6 @@ function ruleNoSqlStringConcat() {
         if (node?.type === "CallExpression") return transformedCallTokenValues(node);
         return null;
       }
-      function templateStaticPartsAreSqlIdentifierSafe(node) {
-        const text = node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "").join("A");
-        return isSqlIdentifierTokenValue(text);
-      }
       function isSafeDynamicSqlIdentifierTemplate(node) {
         return node?.type === "TemplateLiteral"
           && node.expressions.length > 0
@@ -1270,18 +1291,6 @@ function ruleNoSqlStringConcat() {
         if (isSafeDynamicSqlIdentifierVariable(node)) return true;
         if (node?.type === "MemberExpression" && isSafeDynamicSqlIdentifierMember(node)) return true;
         return isSafeDynamicSqlIdentifierTemplate(node);
-      }
-      function valuesAreSqlIdentifiers(values) {
-        return Boolean(values?.size) && [...values].every(isSqlIdentifierTokenValue);
-      }
-      function valuesAreSqlDirections(values) {
-        return Boolean(values?.size) && [...values].every(isSqlDirectionTokenValue);
-      }
-      function templateInterpolationParts(node, index) {
-        return {
-          before: node.quasis[index]?.value?.cooked ?? node.quasis[index]?.value?.raw ?? "",
-          after: node.quasis[index + 1]?.value?.cooked ?? node.quasis[index + 1]?.value?.raw ?? "",
-        };
       }
       function safeSqlInterpolationState(expression, before, after, previousWasIdentifier) {
         if (isSafeSqlFragmentExpression(expression)) {
