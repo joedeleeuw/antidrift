@@ -633,16 +633,6 @@ const codebaseAtlasCases = [
     paths: ["src/needle/AtlasNeedleRenderer.ts"],
   },
   {
-    id: "atlas-zod-branded-id-parse-boundary-clean",
-    ruleId: "antidrift/no-cast-to-branded",
-    kind: "correct",
-    classification: "under-proven",
-    subproject: "app",
-    typeAware: true,
-    tsconfig: "tsconfig.json",
-    paths: ["src/services/atlasIdService.ts"],
-  },
-  {
     id: "atlas-layout-overrides-entries-clean",
     ruleId: "antidrift/no-defensive-shape-probing",
     kind: "correct",

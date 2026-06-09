@@ -12,6 +12,8 @@ New rules should start from `docs/build-patterns.md`: first define the simple co
 
 Use `docs/self-hosting-risks.md` when changing the rule package itself. The short version: code semantics live in ESLint rules, repository control-plane checks live in policy scripts, and agent lifecycle safety lives in hooks.
 
+Each candidate rule is judged on its own merits. Before implementing or keeping custom code, compare the scoped behavior against maintained ESLint, `typescript-eslint`, React, import, SonarJS, Vitest, and Oxlint ecosystem coverage. A supported equivalent is an elimination candidate: prefer pulling in the external rule or generated core config. If the custom rule is broader, narrower, or only adjacent, document that delta with real drift and clean programs. If the "why" is unclear, do not write code; collect at least three close ecosystem/readme/practitioner references and keep the item in research.
+
 ## Signal Ladder
 
 Use the strongest available signal. Do not start with AST shape unless the syntax itself is the violation.
@@ -30,12 +32,12 @@ This means a boolean predicate such as `isWebviewRoute` is not a type escape hat
 
 These require `typescript-eslint` parser services and the TypeScript `Program`/`TypeChecker`:
 
-- unsafe cast chains
 - appeasement casts from `any`/`unknown` into named contracts
-- casts into branded types
 - structural type forks
 - redundant Zod parses
 - unsafe deserialization from broad values
+
+Double-cast tunnels and broad unsafe assertions are covered by `@typescript-eslint/no-unsafe-type-assertion`. The former custom brand-cast rule is retired until real non-test brand forgery and adopted brand-boundary evidence justify reopening it.
 
 The shareable `createConfig` path configures `typescript-eslint` project service for these rules. Raw plugin consumers must provide equivalent parser services. Fully type-aware antidrift rules fail closed with a configuration error when they are enabled without parser services, so missing type information is visible instead of silently weakening the rule.
 
@@ -46,19 +48,18 @@ These are valid only when the syntax or local binding is itself the violation:
 - trivial selector wrappers that only return a member access rooted in their own parameter
 - async callbacks in array methods that do not await callbacks
 - missing effect dependency arrays
-- silent catches
 - coupled state setters
 - configurable `data/loading/error` status triplets
 - `.only` and skipped tests
 - inline disables without a reason
 
-Import cycles are intentionally not custom rule scope; use maintained import-graph coverage such as `import-x/no-cycle`.
+Silent catches, import cycles, and local disable justification are intentionally not custom rule scope in the current package; use maintained coverage such as `no-empty`, `no-console`, SonarJS catch rules, `import-x/no-cycle`, `@eslint-community/eslint-comments/require-description`, and `@typescript-eslint/ban-ts-comment`.
 
 ### Registry-backed rules
 
 These need repo facts:
 
-- domain statuses and roles
+- domain statuses and configured canonical models
 - canonical model names
 - approved gateway imports
 - architecture layer paths

@@ -64,10 +64,6 @@ clusters:
         severity: error
         detector: broadInputTypePredicateWithInsufficientFieldChecks
         message: Check asserted fields or delegate to a schema/validator before returning a type predicate.
-      - id: ts/no-unsafe-cast-chain # as unknown as T is a type-system escape tunnel.
-        severity: error
-        detector: castChainIncludesUnknownThenSpecific
-        message: Validate, narrow, or fix the source type instead of tunneling through unknown.
 
   - id: abstraction-and-file-shape # Agents over-extract tiny helpers and append to large files.
     owner: architecture # Architecture owns file/module shape and refactoring thresholds.
@@ -76,10 +72,6 @@ clusters:
         severity: warn
         detector: localFunctionReferenceCountLte:1,maxStatements:3
         message: Inline or name a real domain concept.
-      - id: arch/no-obvious-comment # Agents pad output with comments that restate the next line. Heuristic; trigger words and length are configurable.
-        severity: error
-        detector: commentRestatesAdjacentStatement
-        message: Comment restates the adjacent code. Explain why, not what — or remove it.
       - id: arch/max-function-lines # Long functions hide generated complexity.
         severity: error
         detector: functionLinesGt:50
@@ -139,10 +131,6 @@ clusters:
         severity: error
         detector: tsLiteralTypeContainsCanonicalStatus # Registry-driven: options from policy/registries/domain.yaml statuses.
         message: Import the canonical status type instead of re-declaring the literal.
-      - id: domain/no-role-literal-outside-policy # Role literals in TSLiteralType nodes outside the owning module fork authorization semantics. Registry-driven (domain.yaml roles).
-        severity: error
-        detector: tsLiteralTypeContainsCanonicalRole # Registry-driven: options from policy/registries/domain.yaml roles.
-        message: Import the canonical Role type instead of re-declaring the literal.
       - id: domain/no-canonical-model-fork # Duplicate interfaces create semantic drift.
         severity: warn
         detector: newTypeSimilarToCanonicalModel

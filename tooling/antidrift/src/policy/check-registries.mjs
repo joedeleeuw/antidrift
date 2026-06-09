@@ -580,6 +580,22 @@ const requiredDecisionLocks = new Map([
     { status: "retired", location: "retiredRules" },
   ],
   [
+    "antidrift/no-obvious-comment",
+    { status: "retired", location: "retiredRules" },
+  ],
+  [
+    "antidrift/no-role-literal-in-type",
+    { status: "retired", location: "retiredRules" },
+  ],
+  [
+    "antidrift/no-cast-to-branded",
+    { status: "retired", location: "retiredRules" },
+  ],
+  [
+    "antidrift/no-unsafe-cast-chain",
+    { status: "retired", location: "retiredRules" },
+  ],
+  [
     "ecosystem/discriminated-union-exhaustiveness",
     { status: "ecosystem-covered", location: "researchCandidates" },
   ],

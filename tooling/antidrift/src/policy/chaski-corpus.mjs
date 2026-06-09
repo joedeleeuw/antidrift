@@ -42,36 +42,6 @@ const canonicalModelForkOptions = {
 
 export const defaultCases = [
   {
-    id: "bff-posthog-gateway-unsafe-cast-chain",
-    ruleId: "antidrift/no-unsafe-cast-chain",
-    kind: "drift",
-    classification: "ready",
-    subproject: "bff",
-    paths: ["src/frontend/bff/api/gateways/posthog-gateway.ts"],
-    expectedFindings: [
-      {
-        path: "src/frontend/bff/api/gateways/posthog-gateway.ts",
-        line: 733,
-      },
-    ],
-  },
-  {
-    id: "bff-orders-service-clean-cast-chain",
-    ruleId: "antidrift/no-unsafe-cast-chain",
-    kind: "correct",
-    classification: "ready",
-    subproject: "bff",
-    paths: ["src/frontend/bff/api/services/orders-service.ts"],
-  },
-  {
-    id: "portal-accounts-clean-cast-chain",
-    ruleId: "antidrift/no-unsafe-cast-chain",
-    kind: "correct",
-    classification: "ready",
-    subproject: "frontend",
-    paths: ["src/frontend/portal/modules/Accounts/Accounts.tsx"],
-  },
-  {
     id: "portal-api-service-axios-error-appeasement-cast",
     ruleId: "antidrift/no-appeasement-cast",
     kind: "drift",
@@ -96,36 +66,6 @@ export const defaultCases = [
     typeAware: true,
     tsconfig: "src/frontend/portal/tsconfig.json",
     paths: ["src/frontend/portal/lib/firebase/server.ts"],
-  },
-  {
-    id: "monolith-firebase-obvious-get-comment",
-    ruleId: "antidrift/no-obvious-comment",
-    kind: "drift",
-    classification: "ready",
-    subproject: "frontend",
-    paths: ["src/frontend/monolithui/src/lib/firebase.ts"],
-    expectedFindings: [
-      {
-        path: "src/frontend/monolithui/src/lib/firebase.ts",
-        line: 14,
-      },
-    ],
-  },
-  {
-    id: "portal-latest-callback-ref-explanatory-doc-clean",
-    ruleId: "antidrift/no-obvious-comment",
-    kind: "correct",
-    classification: "ready",
-    subproject: "frontend",
-    paths: ["src/frontend/portal/lib/hooks/useLatestCallbackRef.ts"],
-  },
-  {
-    id: "crow-v2-theme-color-section-comments-clean",
-    ruleId: "antidrift/no-obvious-comment",
-    kind: "correct",
-    classification: "ready",
-    subproject: "frontend",
-    paths: ["src/frontend/crow-v2/app/theme/colors.ts"],
   },
   {
     id: "monolith-qr-action-card-raw-fetch-helper",
@@ -568,96 +508,6 @@ export const defaultCases = [
                 "unknown",
               ],
             },
-          },
-        },
-      ],
-    },
-  },
-  {
-    id: "portal-roles-enum-owner-clean",
-    ruleId: "antidrift/no-role-literal-in-type",
-    kind: "correct",
-    classification: "under-proven",
-    subproject: "frontend",
-    paths: ["src/frontend/portal/api/types.ts"],
-    ruleOptions: {
-      "antidrift/no-role-literal-in-type": [
-        {
-          roles: {
-            owner: "src/frontend/portal/api/types.ts",
-            values: ["business-admin", "sales-manager", "sales-representative"],
-          },
-        },
-      ],
-    },
-  },
-  {
-    id: "portal-user-form-role-enum-usage-clean",
-    ruleId: "antidrift/no-role-literal-in-type",
-    kind: "correct",
-    classification: "under-proven",
-    subproject: "frontend",
-    paths: ["src/frontend/portal/modules/UserForm/constants.ts"],
-    ruleOptions: {
-      "antidrift/no-role-literal-in-type": [
-        {
-          roles: {
-            owner: "src/frontend/portal/api/types.ts",
-            values: ["business-admin", "sales-manager", "sales-representative"],
-          },
-        },
-      ],
-    },
-  },
-  {
-    id: "portal-user-form-role-type-import-clean",
-    ruleId: "antidrift/no-role-literal-in-type",
-    kind: "correct",
-    classification: "under-proven",
-    subproject: "frontend",
-    paths: ["src/frontend/portal/modules/UserForm/types.ts"],
-    ruleOptions: {
-      "antidrift/no-role-literal-in-type": [
-        {
-          roles: {
-            owner: "src/frontend/portal/api/types.ts",
-            values: ["business-admin", "sales-manager", "sales-representative"],
-          },
-        },
-      ],
-    },
-  },
-  {
-    id: "bff-jwt-role-claim-keys-clean",
-    ruleId: "antidrift/no-role-literal-in-type",
-    kind: "correct",
-    classification: "under-proven",
-    subproject: "bff",
-    paths: ["src/frontend/bff/api/helpers/jwt.ts"],
-    ruleOptions: {
-      "antidrift/no-role-literal-in-type": [
-        {
-          roles: {
-            owner: "src/frontend/portal/api/types.ts",
-            values: ["business-admin", "sales-manager", "sales-representative"],
-          },
-        },
-      ],
-    },
-  },
-  {
-    id: "monolith-user-onboarding-runtime-role-strings-clean",
-    ruleId: "antidrift/no-role-literal-in-type",
-    kind: "correct",
-    classification: "under-proven",
-    subproject: "frontend",
-    paths: ["src/frontend/monolithui/src/components/UserOnboarding.tsx"],
-    ruleOptions: {
-      "antidrift/no-role-literal-in-type": [
-        {
-          roles: {
-            owner: "src/frontend/portal/api/types.ts",
-            values: ["business-admin", "sales-manager", "sales-representative"],
           },
         },
       ],

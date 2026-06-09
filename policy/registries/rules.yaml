@@ -56,17 +56,12 @@ ruleFamilies:
         intent: Prevent casts from manufacturing named, narrowed, or branded contracts without a guard, parser, or brand constructor.
         rules:
           - antidrift/no-appeasement-cast
-          - antidrift/no-unsafe-cast-chain
-          - antidrift/no-cast-to-branded
         flags:
           - "const order = raw as Order;"
-          - "const order = raw as unknown as Order;"
-          - "const id = raw as UserId;"
           - "const err = caught as AxiosError;"
         allows:
           - "const order = OrderSchema.parse(raw);"
           - "if (isOrder(raw)) return raw;"
-          - "const id = UserId.make(raw);"
           - "const user = currentUser.toJSON() as FirebaseUserJson; // source is a typed SDK value, not any or unknown"
       validation-boundary-provenance:
         intent: Keep raw data parsing at the boundary, and avoid re-certifying values already produced by the same schema.
@@ -193,23 +188,11 @@ policyRuleReviews:
     coverage: Implemented as a TypeChecker-backed broad-input object predicate check.
     reason: Ecosystem exhaustiveness rules do not check whether a predicate has earned the object contract it asserts.
     nextAction: Seek another broad-input underchecked predicate drift case and validator-delegation pressure.
-  ts/no-unsafe-cast-chain:
-    status: active-custom
-    antidriftRule: antidrift/no-unsafe-cast-chain
-    coverage: Implemented as the narrow double-cast tunnel rule.
-    reason: It remains a useful explicit escape-hatch detector even though no-appeasement-cast owns broader cast authority drift.
-    nextAction: Seek independent cast-tunnel replication before stable promotion.
   arch/no-one-use-helper:
     status: research
     coverage: Not implemented.
     reason: One-use helpers can be fake abstraction, but reference counts and helper size alone produce many legitimate local extraction cases.
     nextAction: Keep out of blocking scope until real programs prove a deterministic rule with clean domain-helper controls.
-  arch/no-obvious-comment:
-    status: active-custom
-    antidriftRule: antidrift/no-obvious-comment
-    coverage: Implemented but default-off as a token-overlap heuristic.
-    reason: Comment restatement can be detected locally, but the signal is intentionally lower confidence than structural/type rules.
-    nextAction: Keep lower-confidence until another repo inventory shows low false positives.
   arch/max-function-lines:
     status: spec-only
     coverage: Not enforced locally as a line-count rule.
@@ -271,12 +254,6 @@ policyRuleReviews:
     coverage: Implemented through registry-backed status literal detection in type contexts.
     reason: Domain statuses are repo facts, so the rule needs the domain registry rather than hardcoded strings.
     nextAction: Seek independent status-fork replication before stable promotion.
-  domain/no-role-literal-outside-policy:
-    status: active-custom
-    antidriftRule: antidrift/no-role-literal-in-type
-    coverage: Implemented but default-off through registry-backed role literal detection.
-    reason: Role words such as owner/admin/member/viewer are generic enough to need stronger real evidence before blocking.
-    nextAction: Require a real non-disabled multi-literal role redeclaration before enablement.
   domain/no-canonical-model-fork:
     status: active-custom
     antidriftRule: antidrift/no-canonical-model-fork
@@ -544,33 +521,6 @@ rules:
         - "for (const item of items) await save(item);"
         - "await Promise.all(items.map(async (item) => save(item)));"
     nextAction: Find a second independent real drift instance, or document an explicit one-repo evidence exception before stable promotion.
-  antidrift/no-cast-to-branded:
-    status: under-proven
-    stable: false
-    signal: TypeChecker
-    solveType: brand-forgery
-    referenceDoc: docs/rule-investigations/no-cast-to-branded.md
-    corpusRepositories: [codebase-atlas]
-    concerns:
-      - No real corpus currently adopts the antidrift brand kit.
-      - Current implementation detects only the antidrift brand marker; Codebase Atlas Zod-branded IDs are not detected yet.
-      - Codebase Atlas has Zod-branded IDs and clean parse boundaries, but no real non-test forged brand cast.
-      - Angle-bracket type assertions are not visited today.
-      - The June 8, 2026 Claude prospect review found 0 custom findings across the current corpus and recommends a sunset to ecosystem-covered if no real non-test forged brand cast appears by the next promotion cycle.
-    external:
-      state: broader-upstream
-      support: high
-      candidates: ["@typescript-eslint/no-unsafe-type-assertion"]
-      decision: own-antidrift
-      whyThisState: "The upstream assertion rule can report brand-forging casts, but only as part of a broad unsafe-assertion policy."
-      whyNotOtherState: "Not equivalent because the intended contract is brand-specific: branded values must come from the brand constructor or validator."
-    examples:
-      flags:
-        - "const id = raw as UserId;"
-      allows:
-        - "const id = UserId.make(raw);"
-        - "const id = UserIdSchema.parse(raw);"
-    nextAction: Keep default-off; optionally harden Zod brand target detection, TSTypeAssertion coverage, and double-cast ownership, but retire to ecosystem-covered if no real non-test forged brand cast appears in a second independent repo by the next promotion cycle.
   antidrift/no-coupled-state-setters:
     status: ready
     stable: false
@@ -689,27 +639,6 @@ rules:
       allows:
         - "type Point = [number, number];"
     nextAction: Seek another real nullable positional tuple and clean tuple-control replication before stable promotion.
-  antidrift/no-obvious-comment:
-    status: ready
-    stable: false
-    signal: token-overlap
-    solveType: review-noise
-    corpusRepositories: [chaski]
-    concerns:
-      - Heuristic rule with many inventory findings.
-    external:
-      state: partial-overlap
-      support: high
-      candidates: ["ESLint no-warning-comments"]
-      decision: own-antidrift
-      whyThisState: "The ecosystem rule covers TODO/FIXME-style comments, which is nearby review-noise policy."
-      whyNotOtherState: "Not equivalent because this rule targets comments that restate adjacent code rather than tagged warning comments."
-    examples:
-      flags:
-        - "// Set count before setCount(count + 1);"
-      allows:
-        - "// Keep latest callback stable across renders."
-    nextAction: Keep as lower-confidence until another repo inventory shows low false positives.
   antidrift/no-raw-fetch-in-component:
     status: ready
     stable: true
@@ -781,30 +710,6 @@ rules:
         - "const row = RowSchema.parse(raw);"
         - "expect(() => RowSchema.parse(typedFixture)).not.toThrow();"
     nextAction: Stable; monitor for first-boundary schema pipelines that need additional clean exclusions.
-  antidrift/no-role-literal-in-type:
-    status: under-proven
-    stable: false
-    referenceDoc: docs/rule-investigations/no-role-literal-in-type.md
-    signal: registry plus AST context
-    solveType: domain-vocabulary-fork
-    corpusRepositories: [chaski]
-    concerns:
-      - No real drift case has been accepted.
-      - The rule remains default-off, but the shared config now wires registry options so opt-in consumers exercise the real role registry instead of an empty rule.
-      - The current role-name context gate is weak for generic values such as owner, admin, member, and viewer; any enablement needs a multi-literal floor or stronger context.
-    external:
-      state: config-replacement
-      support: high
-      candidates: ["ESLint no-restricted-syntax"]
-      decision: own-antidrift
-      whyThisState: "Generated selectors could match configured role literals, but the custom rule carries owner-file and type-context exceptions."
-      whyNotOtherState: "Not ecosystem-covered because generic literal restrictions cannot explain the domain registry replacement."
-    examples:
-      flags:
-        - "type Role = 'business-admin' | 'sales-manager';"
-      allows:
-        - 'import type { Roles } from "./api/types";'
-    nextAction: Keep default-off; before enablement require a multi-literal role union signal and find a real non-disabled role redeclaration outside the owner.
   antidrift/no-sql-string-concat:
     status: ready
     stable: false
@@ -1023,26 +928,6 @@ rules:
       allows:
         - 'function isDateMessage(value: unknown): value is DateMessage { return !!value && typeof value === "object" && "year" in value && "month" in value && "day" in value; }'
     nextAction: Seek another evaluable broad-input underchecked predicate drift case before stable promotion; recheck the Opencode UI candidate if that checkout has install-resolvable tsconfig dependencies.
-  antidrift/no-unsafe-cast-chain:
-    status: ready
-    stable: false
-    signal: AST cast chain
-    solveType: type-escape-hatch
-    corpusRepositories: [chaski]
-    concerns: []
-    external:
-      state: broader-upstream
-      support: high
-      candidates: ["@typescript-eslint/no-unsafe-type-assertion"]
-      decision: own-antidrift
-      whyThisState: "The upstream rule catches the cast-chain drift but also owns a broader unsafe-assertion policy."
-      whyNotOtherState: "Not equivalent because adopting the upstream rule directly produced unrelated assertion inventory noise in real code."
-    examples:
-      flags:
-        - "const user = raw as unknown as User;"
-      allows:
-        - "const user = schema.parse(raw);"
-    nextAction: Seek independent cast-tunnel replication before stable promotion.
   antidrift/no-unsafe-deserialize:
     status: ready
     stable: true
@@ -1142,6 +1027,20 @@ retiredRules:
     status: retired
     reason: Read-only corpus review found no real non-test exact-forward internal drift, while broad typed-constructor wrappers and exported facades are clean controls with high false-positive risk.
     referenceDoc: docs/rule-investigations/no-thin-typed-factory-wrapper.md
+  antidrift/no-obvious-comment:
+    status: retired
+    reason: Token-overlap comment restatement produced review-style noise and did not justify custom lint ownership.
+  antidrift/no-role-literal-in-type:
+    status: retired
+    reason: Role words are too generic without canonical model context, and no accepted real role-union redeclaration was found.
+    referenceDoc: docs/rule-investigations/no-role-literal-in-type.md
+  antidrift/no-cast-to-branded:
+    status: retired
+    reason: No real non-test branded cast forgery was found, and the current rule only detected the package's own under-adopted brand marker.
+    referenceDoc: docs/rule-investigations/no-cast-to-branded.md
+  antidrift/no-unsafe-cast-chain:
+    status: retired
+    reason: Replaced by maintained @typescript-eslint/no-unsafe-type-assertion coverage for double-cast tunnels; no-appeasement-cast owns the narrower source-boundary authority policy.
 
 researchCandidates:
   ecosystem/discriminated-union-exhaustiveness:
@@ -1224,6 +1123,26 @@ decisionLocks:
     location: retiredRules
     replacement: none
     reason: No real non-test exact-forward internal drift was found, while broad factory-wrapper variants false-positive on clean constructors and facades.
+  antidrift/no-obvious-comment:
+    status: retired
+    location: retiredRules
+    replacement: "ESLint no-warning-comments for tagged warning comments"
+    reason: Comment-restatement detection is heuristic review guidance, not a deterministic custom lint rule.
+  antidrift/no-role-literal-in-type:
+    status: retired
+    location: retiredRules
+    replacement: domain/no-canonical-model-fork
+    reason: Role literals are too generic without a stronger model-fork context.
+  antidrift/no-cast-to-branded:
+    status: retired
+    location: retiredRules
+    replacement: "@typescript-eslint/no-unsafe-type-assertion"
+    reason: The package-specific brand marker had no real adoption or forgery evidence.
+  antidrift/no-unsafe-cast-chain:
+    status: retired
+    location: retiredRules
+    replacement: "@typescript-eslint/no-unsafe-type-assertion"
+    reason: Maintained unsafe assertion coverage owns double-cast tunnels.
   ecosystem/discriminated-union-exhaustiveness:
     status: ecosystem-covered
     location: researchCandidates

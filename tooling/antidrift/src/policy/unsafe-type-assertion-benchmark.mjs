@@ -23,8 +23,6 @@ const sudocodeRepoCandidates = [
 
 const benchmarkRuleIds = [
   "antidrift/no-appeasement-cast",
-  "antidrift/no-unsafe-cast-chain",
-  "antidrift/no-cast-to-branded",
   "@typescript-eslint/no-unsafe-type-assertion",
 ];
 const antidriftRuleIds = benchmarkRuleIds.filter((ruleId) =>

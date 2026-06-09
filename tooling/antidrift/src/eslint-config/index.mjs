@@ -422,8 +422,6 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         // AI-specific custom rules from the local plugin.
         "antidrift/no-trivial-selector-wrapper": "error",
         "antidrift/no-inline-structural-type-at-use-site": "error",
-        "antidrift/no-unsafe-cast-chain": "error",
-        "antidrift/no-cast-to-branded": "off",
         "antidrift/no-appeasement-cast": "error",
         "antidrift/no-nullable-positional-tuple": "error",
         "antidrift/no-underchecked-type-predicate": "error",
@@ -435,7 +433,6 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "antidrift/no-hover-translate-card": "error",
         "antidrift/no-raw-fetch-in-component": "error",
         "antidrift/no-async-array-method": "error",
-        "antidrift/no-obvious-comment": "off",
 
         // generated-type-drift: structural fork detection against installed package types (type-aware).
         "antidrift/no-structural-type-fork": [
@@ -459,10 +456,6 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "antidrift/no-status-literal-in-type": [
           "error",
           { statuses: registries.domain?.statuses ?? {} },
-        ],
-        "antidrift/no-role-literal-in-type": [
-          "off",
-          { roles: registries.domain?.roles ?? {} },
         ],
         ...(restrictedImportPatterns.length > 0
           ? {

@@ -33,13 +33,13 @@ describe("chaskiCorpus", () => {
     const root = tempRepo();
     writeProgram(
       root,
-      "src/frontend/bff/api/gateways/posthog-gateway.ts",
-      "type Order = { id: string };\ndeclare const raw: unknown;\nconst order = raw as unknown as Order;\nvoid order;\n",
+      "src/frontend/bff/api/tests/project-cleanup.ts",
+      "async function close(id: string) { return id; }\nconst openedProjectIds = ['a'];\nopenedProjectIds.forEach(async (id) => close(id));\n",
     );
     writeProgram(
       root,
-      "src/frontend/bff/api/services/orders-service.ts",
-      "type Order = { id: string };\ndeclare const order: Order;\nvoid order;\n",
+      "src/frontend/bff/api/services/project-cleanup.ts",
+      "async function close(id: string) { return id; }\nconst openedProjectIds = ['a'];\nawait Promise.all(openedProjectIds.map(async (id) => close(id)));\n",
     );
 
     const result = await chaskiCorpus({
@@ -47,25 +47,25 @@ describe("chaskiCorpus", () => {
       cases: [
         {
           id: "drift",
-          ruleId: "antidrift/no-unsafe-cast-chain",
+          ruleId: "antidrift/no-async-array-method",
           kind: "drift",
           classification: "ready",
           subproject: "bff",
-          paths: ["src/frontend/bff/api/gateways/posthog-gateway.ts"],
+          paths: ["src/frontend/bff/api/tests/project-cleanup.ts"],
           expectedFindings: [
             {
-              path: "src/frontend/bff/api/gateways/posthog-gateway.ts",
+              path: "src/frontend/bff/api/tests/project-cleanup.ts",
               line: 3,
             },
           ],
         },
         {
           id: "clean",
-          ruleId: "antidrift/no-unsafe-cast-chain",
+          ruleId: "antidrift/no-async-array-method",
           kind: "correct",
           classification: "ready",
           subproject: "bff",
-          paths: ["src/frontend/bff/api/services/orders-service.ts"],
+          paths: ["src/frontend/bff/api/services/project-cleanup.ts"],
         },
       ],
       report: () => {},
@@ -90,7 +90,7 @@ describe("chaskiCorpus", () => {
       cases: [
         {
           id: "clean",
-          ruleId: "antidrift/no-unsafe-cast-chain",
+          ruleId: "antidrift/no-async-array-method",
           kind: "correct",
           classification: "ready",
           subproject: "app",
@@ -170,7 +170,7 @@ export const normalized = Object.fromEntries(
     writeProgram(
       root,
       "src/example.ts",
-      "type Order = { id: string };\ndeclare const raw: unknown;\nconst order = raw as unknown as Order;\nvoid order;\n",
+      "type Order = { id: string };\ndeclare const raw: unknown;\nconst order = raw as Order;\nvoid order;\n",
     );
 
     const result = await chaskiCorpus({
@@ -178,7 +178,7 @@ export const normalized = Object.fromEntries(
       cases: [
         {
           id: "known-gap",
-          ruleId: "antidrift/no-unsafe-cast-chain",
+          ruleId: "antidrift/no-appeasement-cast",
           kind: "known-gap",
           classification: "ready",
           subproject: "app",
@@ -203,7 +203,7 @@ export const normalized = Object.fromEntries(
       cases: [
         {
           id: "broken",
-          ruleId: "antidrift/no-unsafe-cast-chain",
+          ruleId: "antidrift/no-appeasement-cast",
           kind: "correct",
           classification: "ready",
           subproject: "app",
@@ -225,7 +225,7 @@ describe("externalCorpus", () => {
     writeProgram(
       root,
       "src/example.ts",
-      "declare const raw: unknown;\nconst value = raw as unknown as { id: string };\nvoid value;\n",
+      "async function close(id: string) { return id; }\nconst ids = ['a'];\nids.forEach(async (id) => close(id));\n",
     );
 
     const result = await externalCorpus({
@@ -234,13 +234,13 @@ describe("externalCorpus", () => {
       minRepositories: 2,
       cases: [
         {
-          id: "unsafe-cast-chain",
-          ruleId: "antidrift/no-unsafe-cast-chain",
+          id: "async-array-method",
+          ruleId: "antidrift/no-async-array-method",
           kind: "drift",
           classification: "ready",
           subproject: "app",
           paths: ["src/example.ts"],
-          expectedFindings: [{ path: "src/example.ts", line: 2 }],
+          expectedFindings: [{ path: "src/example.ts", line: 3 }],
         },
       ],
       report: () => {},
@@ -257,7 +257,7 @@ describe("externalCorpus", () => {
     writeProgram(
       root,
       "src/example.ts",
-      "declare const raw: unknown;\nconst value = raw as unknown as { id: string };\nvoid value;\n",
+      "async function close(id: string) { return id; }\nconst ids = ['a'];\nids.forEach(async (id) => close(id));\n",
     );
 
     const result = await externalCorpus({
@@ -266,13 +266,13 @@ describe("externalCorpus", () => {
       minDriftRepositories: 2,
       cases: [
         {
-          id: "unsafe-cast-chain",
-          ruleId: "antidrift/no-unsafe-cast-chain",
+          id: "async-array-method",
+          ruleId: "antidrift/no-async-array-method",
           kind: "drift",
           classification: "ready",
           subproject: "app",
           paths: ["src/example.ts"],
-          expectedFindings: [{ path: "src/example.ts", line: 2 }],
+          expectedFindings: [{ path: "src/example.ts", line: 3 }],
         },
       ],
       report: () => {},

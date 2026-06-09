@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented as `antidrift/no-role-literal-in-type`, but default-off and under-proven.
+Retired. It was implemented as `antidrift/no-role-literal-in-type`, but removed from the active custom rule surface after review.
 
 This is the role-vocabulary sibling of `antidrift/no-status-literal-in-type`: repo role strings should live in the domain owner and be imported or derived from that owner, not redeclared as local unions.
 
@@ -26,13 +26,7 @@ The rule is not intended to ban runtime role strings, JWT claim strings, test pa
 
 The rule uses registry values from `policy/registries/domain.yaml`, skips the configured owner file, and reports configured role literals in role-like type contexts.
 
-The shared config keeps the rule off by default:
-
-```js
-"antidrift/no-role-literal-in-type": ["off", { roles: registries.domain?.roles ?? {} }]
-```
-
-That matters even while default-off: an opt-in consumer now exercises the real registry instead of an empty rule.
+The shared config no longer wires this rule. Role ownership should be reopened only through a stronger canonical-model rule or generated config if real code proves a separate role surface.
 
 ## Ecosystem Check
 
@@ -82,6 +76,6 @@ The review recommended keeping the rule under-proven and default-off, wiring the
 
 ## Current Verdict
 
-Keep implemented, registry-wired, and default-off.
+Retired.
 
-Do not promote until a real role-union redeclaration appears outside the owner. Before enablement, harden the signal so one generic role word is not enough to report. The first practical slice is a multi-literal role-union floor plus a real-corpus inventory, not TypeChecker symbol work.
+Do not reopen until a real role-union redeclaration appears outside the owner and cannot be handled by `domain/no-canonical-model-fork` or generated config. Before any future enablement, the signal would need a multi-literal role-union floor and broad clean controls for owner modules, runtime role strings, JWT claim strings, UI variants, and non-auth role-like domain types.

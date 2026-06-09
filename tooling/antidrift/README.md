@@ -104,7 +104,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `require-effect-deps` — a `useEffect` with no dependency array runs on every render, and `exhaustive-deps` won't say a word about it
 - `no-trivial-selector-wrapper` — local selector helpers that paper over inference instead of using the existing value
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning
-- `no-cast-to-branded` / `no-appeasement-cast` — casts that paper over missing validation or branding
+- `no-appeasement-cast` — `any` / `unknown` casts that paper over missing validation
 - `no-underchecked-type-predicate` — broad-input type predicates that assert object contracts without checking asserted fields
 - `no-canonical-model-fork` — configured first-party model redeclarations that should import or derive from the canonical owner
 - `no-status-triplet-state` — configurable detection for `data` / `loading` / `error` state cells that should be one resource value
@@ -134,7 +134,7 @@ type UserId = Brand<string, "UserId">;
 const id = UserId.make(raw);
 ```
 
-Consumer code should obtain branded values from `make`, `safe`, `is`, or a schema boundary. `antidrift/no-cast-to-branded` rejects `raw as UserId`.
+Consumer code should obtain branded values from `make`, `safe`, `is`, or a schema boundary. The package keeps the brand utility, but the former custom brand-cast lint rule is retired until real consumer adoption and non-test forgery evidence justify reopening it.
 
 ## The part that isn't lint
 

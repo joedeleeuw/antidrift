@@ -6,9 +6,9 @@
 
 The rule is type-aware. It reports a plain `as T` assertion when the source expression is `any` or `unknown` and the target is a named object contract with at least one resolved property.
 
-The rule deliberately excludes branded targets, which are owned by `antidrift/no-cast-to-branded`, and `as unknown as T` tunnels, which are owned by `antidrift/no-unsafe-cast-chain`. There is no explicit SDK/API allowlist: typed SDK conversions stay clean because the source is not `any` or `unknown`.
+The rule deliberately excludes branded targets because the package-specific brand-cast rule is retired until real non-test forgery evidence exists. It also skips `as unknown as T` tunnels because maintained `@typescript-eslint/no-unsafe-type-assertion` owns the broad/double assertion surface. There is no explicit SDK/API allowlist: typed SDK conversions stay clean because the source is not `any` or `unknown`.
 
-This is different from `no-unsafe-cast-chain`, which only catches explicit cast tunnels such as `value as unknown as User`.
+This is different from the retired `no-unsafe-cast-chain`, which only caught explicit cast tunnels such as `value as unknown as User`.
 
 ## Ecosystem Check
 
@@ -26,24 +26,22 @@ Run:
 pnpm policy:benchmark-unsafe-type-assertion
 ```
 
-The benchmark runs `@typescript-eslint/no-unsafe-type-assertion` beside the antidrift cast-family rules over real Chaski, Codebase Atlas, and Sudocode TypeScript programs. The current live-corpus source-only run checked 2,411 files and produced:
+The benchmark runs `@typescript-eslint/no-unsafe-type-assertion` beside `antidrift/no-appeasement-cast` over real Chaski, Codebase Atlas, and Sudocode TypeScript programs. The current live-corpus source-only run checked 2,411 files and produced:
 
 | Rule                                          | Findings |
 | --------------------------------------------- | -------: |
 | `antidrift/no-appeasement-cast`               |       85 |
-| `antidrift/no-unsafe-cast-chain`              |       58 |
-| `antidrift/no-cast-to-branded`                |        0 |
 | `@typescript-eslint/no-unsafe-type-assertion` |    1,474 |
 
 Location comparison:
 
 | Result                                                              | Count |
 | ------------------------------------------------------------------- | ----: |
-| Locations reported by both upstream and antidrift cast-family rules |   142 |
-| Upstream-only locations                                             | 1,331 |
+| Locations reported by both upstream and `no-appeasement-cast`       |    85 |
+| Upstream-only locations                                             | 1,389 |
 | Antidrift-only locations                                            |     0 |
 
-Interpretation: upstream is a strict superset on the measured corpus, but too broad to replace the custom rule as the default guardrail. Keep the custom rule for the `any`/`unknown` source-boundary contract and use the upstream benchmark as an optional stricter-policy delta.
+Interpretation: upstream is a strict superset on the measured corpus, but too broad to replace the custom rule as the default guardrail. Keep the custom rule for the `any`/`unknown` source-boundary contract and use the upstream benchmark as the stricter maintained assertion surface.
 
 ## Real Corpus Evidence
 

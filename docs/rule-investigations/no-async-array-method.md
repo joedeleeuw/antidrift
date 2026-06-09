@@ -48,7 +48,7 @@ Why: the rule tracks the local promise list and sees it awaited later.
 
 ## Ecosystem
 
-`@typescript-eslint/no-misused-promises` and `@typescript-eslint/no-floating-promises` partially overlap. They can catch some async callbacks in void-return positions, but the broad option that catches the real `forEach(async ...)` drift also reports legitimate Express-style async handlers in common projects. Antidrift keeps this rule narrower: array-method promise control flow only.
+`@typescript-eslint/no-misused-promises` and `@typescript-eslint/no-floating-promises` partially overlap. `no-misused-promises` can cover async predicate callbacks and can catch `forEach(async ...)` when broad `checksVoidReturn.arguments` is enabled, but that broader option also reports legitimate Express-style async handlers in common projects. The remaining custom value is the array-method-only scope plus `.map` / `.flatMap` promise-list joining: unjoined async maps are not covered by the local ecosystem pair.
 
 ## Real-Corpus Evidence
 

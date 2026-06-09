@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented as `antidrift/no-cast-to-branded`, but default-off and under-proven.
+Retired. It was implemented as `antidrift/no-cast-to-branded`, but removed from the active custom rule surface after review.
 
 ## Scope
 
@@ -21,11 +21,11 @@ The drift pattern is:
 const id = raw as UserId;
 ```
 
-This is not the same as general unsafe assertions. `@typescript-eslint/no-unsafe-type-assertion` can report many branded casts, but it reports a much broader assertion policy and does not give brand-boundary guidance.
+This is not the same as general unsafe assertions. `@typescript-eslint/no-unsafe-type-assertion` can report many branded casts, but it reports a much broader assertion policy and does not give brand-boundary guidance. In practice, the custom rule had no real non-test forged brand casts and only understood the under-adopted antidrift brand marker, so the separate lint rule was retired.
 
-## Current Solve
+## Former Solve
 
-The current rule is TypeChecker-backed and detects only the antidrift brand marker exported by `@joedeleeuw/antidrift/brand`.
+The former rule was TypeChecker-backed and detected only the antidrift brand marker exported by `@joedeleeuw/antidrift/brand`.
 
 That makes the rule precise for adopters of the antidrift brand utility, but weak as corpus evidence today: no real scanned repository currently uses the antidrift brand marker.
 
@@ -67,7 +67,7 @@ A second prospect review completed on June 8, 2026 (`reports/claude-prospect-rev
 
 - Antidrift-marker-only detection makes real promotion nearly impossible until consumers adopt the brand kit.
 - Zod brand detection must be symbol/type based, not name-string matching.
-- `raw as unknown as Brand` can be reported by both `no-unsafe-cast-chain` and `no-cast-to-branded`; ownership of the double-cast case should be explicit before enabling both.
+- `raw as unknown as Brand` is now delegated to `@typescript-eslint/no-unsafe-type-assertion`; no separate custom double-cast or brand-cast rule is active.
 - Type-aware parser services are required; enabling the rule in a non-type-aware config intentionally reports configuration errors.
 - The current clean controls are parse-boundary files with no cast node. They prove the preferred construction pattern, but they do not prove a cast-bearing false-positive boundary.
 
@@ -82,6 +82,6 @@ A second prospect review completed on June 8, 2026 (`reports/claude-prospect-rev
 
 ## Current Verdict
 
-Keep implemented but default-off and under-proven.
+Retired.
 
-The rule has a sound intended contract, but the current corpus gives it no work: Codebase Atlas uses Zod brands through parse boundaries, and the real non-test forged-cast count is still zero. The next useful action is not another broad hunt; it is a small correctness hardening pass only if the rule is going to stay in the package. Without a real forged-brand replication before the next promotion cycle, this should move to `ecosystem-covered` and let `@typescript-eslint/no-unsafe-type-assertion` own the general assertion surface.
+The intended contract is understandable, but the current corpus gives it no work: Codebase Atlas uses Zod brands through parse boundaries, and the real non-test forged-cast count is still zero. Reopen only if a real repository has adopted branded validation boundaries and a non-test forged branded cast appears. Until then, keep the brand utility and let `@typescript-eslint/no-unsafe-type-assertion` own the broad assertion surface.

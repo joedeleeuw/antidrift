@@ -52,6 +52,10 @@ const lockedRetiredRules = [
   "antidrift/no-explicit-return-type-private-helper",
   "antidrift/no-silent-catch",
   "antidrift/no-thin-typed-factory-wrapper",
+  "antidrift/no-obvious-comment",
+  "antidrift/no-role-literal-in-type",
+  "antidrift/no-cast-to-branded",
+  "antidrift/no-unsafe-cast-chain",
 ];
 
 const lockedEcosystemCandidates = [

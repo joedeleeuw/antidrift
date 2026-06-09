@@ -102,9 +102,8 @@ Owned files:
 Acceptance:
 
 - Consumers import `brand`, `Brand`, and `Unbrand` from `@joedeleeuw/antidrift/brand`.
-- `no-cast-to-branded` rejects branded casts.
 - `no-appeasement-cast` rejects `any`/`unknown as NamedObject`.
-- A real consumer or fallback corpus supplies brand-construction and forbidden-cast evidence before `no-cast-to-branded` is promoted as ready.
+- The brand utility packs and type-checks, but the former custom brand-cast rule stays retired unless real consumer adoption and non-test forgery evidence justify reopening it.
 - The packed-tarball consumer integration type-checks the brand subpath.
 
 ### S5: Replace Name Heuristics With Type Or Config Signals

@@ -49,7 +49,6 @@ const typeServiceMessage = /requires TypeScript parser services/u;
 const rule = (name) => plugin.rules[name];
 const typeServiceGuardedRules = [
   "no-appeasement-cast",
-  "no-cast-to-branded",
   "no-canonical-model-fork",
   "no-defensive-shape-probing",
   "no-redundant-zod-parse",
@@ -109,20 +108,6 @@ ruleTester.run("require-effect-deps", rule("require-effect-deps"), {
   ],
 });
 
-ruleTester.run("no-obvious-comment", rule("no-obvious-comment"), {
-  valid: [
-    fixture("programs/correct/comment-explains-null-guard.ts"),
-    "const x = 1;",
-    "// eslint-disable-next-line no-console\nconst y = 2;",
-    "/** Use this hook when you need a stable reference without stale closures. */\nexport function useLatestCallbackRef() {}",
-    "// Background colors\nexport const background = {};",
-  ],
-  invalid: [
-    { ...fixture("programs/drift/obvious-increment-comment.ts"), errors: 1 },
-    { ...fixture("programs/drift/obvious-assignment-comment.ts"), errors: 1 },
-  ],
-});
-
 ruleTester.run("no-trivial-selector-wrapper", rule("no-trivial-selector-wrapper"), {
   valid: [
     fixture("programs/correct/exported-function-selector-boundary.ts"),
@@ -146,21 +131,6 @@ ruleTester.run("no-trivial-selector-wrapper", rule("no-trivial-selector-wrapper"
     { ...fixture("programs/drift/methods-internal-appeasement.ts"), errors: 3 },
     { ...fixture("programs/drift/object-literal-appeasement.ts"), errors: 1 },
     { ...fixture("programs/drift/destructured-param-selector-wrapper.ts"), errors: 2 },
-  ],
-});
-
-ruleTester.run("no-unsafe-cast-chain", rule("no-unsafe-cast-chain"), {
-  valid: [fixture("programs/correct/plain-cast.ts")],
-  invalid: [{ ...fixture("programs/drift/unknown-cast-tunnel.ts"), errors: 1 }],
-});
-
-typedRuleTester.run("no-cast-to-branded", rule("no-cast-to-branded"), {
-  valid: [
-    fixture("programs/correct/brand-validation-boundary.ts"),
-    fixture("programs/correct/plain-cast.ts"),
-  ],
-  invalid: [
-    { ...fixture("programs/drift/brand-cast-forgery.ts"), errors: 2 },
   ],
 });
 
@@ -280,19 +250,6 @@ ruleTester.run("no-status-literal-in-type", rule("no-status-literal-in-type"), {
   ],
   invalid: [
     { ...fixture("programs/drift/status-literal-type-fork.ts"), options: [statusOptions], errors: 2 },
-  ],
-});
-
-const roleOptions = { roles: { owner: "packages/domain/src/auth.ts", values: ["admin", "owner", "member"] }};
-
-ruleTester.run("no-role-literal-in-type", rule("no-role-literal-in-type"), {
-  valid: [
-    { ...fixture("programs/correct/packages/domain/src/auth.ts"), options: [roleOptions] },
-    { code: "if (user.role === 'admin') {}",  filename: "/repo/apps/web/src/App.ts", options: [roleOptions] },
-    { code: "type BadgeProps = { variant: 'admin' | 'owner' };", filename: "/repo/apps/web/src/Badge.ts", options: [roleOptions] },
-  ],
-  invalid: [
-    { ...fixture("programs/drift/role-literal-type-fork.ts"), options: [roleOptions], errors: 2 },
   ],
 });
 

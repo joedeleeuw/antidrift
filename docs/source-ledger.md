@@ -56,6 +56,7 @@ Before adding a rule, ruleset, or tool:
 1. Pick one source type from this file.
 2. Record the package/tool/rule IDs and local config path.
 3. If it is custom, update `policy/registries/rules.yaml` and the relevant investigation/audit docs.
-4. If it replaces custom code or a retired engine rule, update `docs/lint-rule-parity.md` or `docs/rule-equivalence-audit.md`.
-5. If it came from reviewing another repo such as Chaski, record that path as a `borrowed-reference` and name the final owner.
-6. If it is consumer-only tooling, document why it is not bundled into antidrift.
+4. If it is custom, record why maintained ESLint, `typescript-eslint`, Oxlint, SonarJS, React, Vitest, or import-graph rules are not equivalent; when the why is unclear, collect at least three close ecosystem/readme/practitioner references before writing code.
+5. If it replaces custom code or a retired engine rule, update `docs/lint-rule-parity.md` or `docs/rule-equivalence-audit.md`.
+6. If it came from reviewing another repo such as Chaski, record that path as a `borrowed-reference` and name the final owner.
+7. If it is consumer-only tooling, document why it is not bundled into antidrift.

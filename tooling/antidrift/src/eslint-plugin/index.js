@@ -11,7 +11,6 @@ const reactEffectHooks = new Set(["useEffect", "useLayoutEffect"]);
 const zodParseMethods = new Set(["parse", "parseAsync"]);
 const throwAssertionMatchers = new Set(["toThrow", "toThrowError"]);
 const collectionMetadataMemberNames = new Set(["length", "size"]);
-const defaultObviousTriggerWords = ["set", "assign", "increase", "increment", "decrease", "decrement", "counter", "return", "create", "update", "delete", "get", "call", "initialize", "define", "loop", "iterate", "check", "store", "save"];
 const exportedLocalNamesByProgram = new WeakMap();
 const structuralDerivationUtilities = new Set(["Omit", "Partial", "Pick", "Readonly", "Required"]);
 
@@ -487,25 +486,6 @@ function ruleNoInlineStructuralTypeAtUseSite() {
   };
 }
 
-function isUnknownCast(node) {
-  return node?.type === "TSAsExpression" && node.typeAnnotation?.type === "TSUnknownKeyword";
-}
-
-function ruleNoUnsafeCastChain() {
-  return {
-    meta: { type: "problem", docs: { description: "Disallow as unknown as T cast tunnels." }, schema: [] },
-    create(context) {
-      return {
-        TSAsExpression(node) {
-          if (isUnknownCast(node.expression)) {
-            context.report({ node, message: "Do not tunnel through unknown with `as unknown as T`. Validate, narrow, or fix the source type." });
-          }
-        },
-      };
-    },
-  };
-}
-
 function ruleNoCoupledStateSetters() {
   return {
     meta: { type: "problem", docs: { description: "Disallow functions that mutate many useState setters." }, schema: [{ type: "object", properties: { threshold: { type: "number" } }, additionalProperties: false }] },
@@ -828,90 +808,6 @@ function ruleNoAsyncArrayMethod() {
             if (isDirectlyWrappedInPromiseCombinator(node)) return;
             if (queuePendingAsyncMap(sourceCode, node, cb, method, pendingAsyncMaps)) return;
             context.report({ node: cb, message: asyncMapMessage(method) });
-          }
-        },
-      };
-    },
-  };
-}
-
-function extractCommentWords(text) {
-  return text.toLowerCase().replace(/[^a-z0-9]+/gu, " ").split(/\s+/u).filter(Boolean);
-}
-
-function collectNodeTokens(node, out) {
-  if (!node || typeof node.type !== "string") return;
-  // Identifier-only: string literals (e.g. rule-name keys in config) cause false positives on explanatory comments.
-  if (node.type === "Identifier" && typeof node.name === "string") out.add(node.name.toLowerCase());
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "parent" || key === "loc" || key === "range") continue;
-    if (Array.isArray(value)) {
-      for (const child of value) collectNodeTokens(child, out);
-    } else if (value && typeof value.type === "string") {
-      collectNodeTokens(value, out);
-    }
-  }
-}
-
-function findEnclosingStatement(node) {
-  let cur = node;
-  while (cur?.parent) {
-    // Stop at Property/PropertyDefinition too: a comment before an object member is adjacent to that
-    // member, not the whole enclosing statement — otherwise large config objects over-collect tokens.
-    if (cur.type.endsWith("Statement") || cur.type === "VariableDeclaration" || cur.type === "Property" || cur.type === "PropertyDefinition") return cur;
-    cur = cur.parent;
-  }
-  return node;
-}
-
-const obviousCommentSkipPattern = /^\s*(eslint|ts-|@ts-|prettier|global|c8|istanbul|biome|v8)/u;
-
-function statementAfterComment(sourceCode, comment) {
-  const nextToken = sourceCode.getTokenAfter(comment, { includeComments: false });
-  if (!nextToken || nextToken.loc.start.line - comment.loc.end.line > 1) return null;
-  const node = sourceCode.getNodeByRangeIndex(nextToken.range[0]);
-  return node ? findEnclosingStatement(node) : null;
-}
-
-function countOverlap(commentWords, statement) {
-  const tokens = new Set();
-  collectNodeTokens(statement, tokens);
-  let overlap = 0;
-  for (const word of commentWords) if (tokens.has(word)) overlap += 1;
-  return overlap;
-}
-
-function ruleNoObviousComment() {
-  return {
-    meta: {
-      type: "suggestion",
-      docs: { description: "Disallow comments that restate what the adjacent statement already expresses." },
-      schema: [{ type: "object", properties: { triggerWords: { type: "array", items: { type: "string" } } }, additionalProperties: false }],
-    },
-    create(context) {
-      const sourceCode = context.sourceCode ?? context.getSourceCode();
-      const opts = context.options[0] ?? {};
-      const triggerWords = new Set((opts.triggerWords ?? defaultObviousTriggerWords).map((word) => word.toLowerCase()));
-
-      function isObvious(comment) {
-        if (comment.type !== "Line") return false;
-        if (obviousCommentSkipPattern.test(comment.value)) return false;
-        const statement = statementAfterComment(sourceCode, comment);
-        if (!statement) return false;
-        const commentWords = new Set(extractCommentWords(comment.value));
-        if (commentWords.size === 0) return false;
-        const overlap = countOverlap(commentWords, statement);
-        if (overlap === 0) return false;
-        const hasTrigger = [...commentWords].some((word) => triggerWords.has(word));
-        return hasTrigger;
-      }
-
-      return {
-        "Program:exit"() {
-          for (const comment of sourceCode.getAllComments()) {
-            if (isObvious(comment)) {
-              context.report({ loc: comment.loc, message: "Comment restates the adjacent code. Explain why, not what — or remove it." });
-            }
           }
         },
       };
@@ -2417,27 +2313,6 @@ function ruleNoCanonicalModelFork() {
   };
 }
 
-function ruleNoCastToBranded() {
-  return {
-    meta: { type: "problem", docs: { description: "Disallow casting values into antidrift branded types." }, schema: [] },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) return missingTypeServicesVisitors(context, "no-cast-to-branded");
-      const checker = services.program.getTypeChecker();
-
-      return {
-        TSAsExpression(node) {
-          const tsTypeNode = services.esTreeNodeToTSNodeMap.get(node.typeAnnotation);
-          if (!tsTypeNode) return;
-          const targetType = checker.getTypeFromTypeNode(tsTypeNode);
-          if (!isAntidriftBrandedType(targetType)) return;
-          context.report({ node, message: "Do not cast to a branded type. Create branded values through the brand validation boundary." });
-        },
-      };
-    },
-  };
-}
-
 function ruleNoAppeasementCast() {
   return {
     meta: { type: "problem", docs: { description: "Disallow casting any/unknown values into named object contracts." }, schema: [] },
@@ -2801,44 +2676,6 @@ function isStatusLiteralContext(node, statusName) {
   return false;
 }
 
-function ruleNoRoleLiteralInType() {
-  return {
-    meta: { type: "problem", docs: { description: "Disallow re-declaring canonical role values as type literals outside the owning module (domain registry)." }, schema: [{ type: "object", properties: { roles: { type: "object" } }, additionalProperties: false }] },
-    create(context) {
-      const roles = context.options[0]?.roles ?? {};
-      const values = roles.values ?? [];
-      if (values.length === 0) return {};
-      const filename = context.filename ?? context.getFilename();
-      return {
-        TSLiteralType(node) {
-          const value = node.literal?.value;
-          if (typeof value !== "string" || !values.includes(value)) return;
-          if (fileMatchesPath(filename, roles.owner)) return;
-          if (!isRoleLiteralContext(node)) return;
-          context.report({ node, message: `String literal '${value}' duplicates a canonical role from ${roles.owner}. Import the Role type instead.` });
-        },
-      };
-    },
-  };
-}
-
-function isRoleContextName(contextName) {
-  return normalizedContextName(contextName).includes("role");
-}
-
-function isRoleLiteralContext(node) {
-  let cur = node.parent;
-  while (cur) {
-    if (cur.type === "TSTypeAliasDeclaration") return isRoleContextName(cur.id?.name);
-    if (cur.type === "TSInterfaceDeclaration") return isRoleContextName(cur.id?.name);
-    if (cur.type === "TSPropertySignature") return isRoleContextName(nodeKeyName(cur.key));
-    if (cur.type === "Identifier") return isRoleContextName(cur.name);
-    if (cur.type === "VariableDeclarator" && cur.id?.type === "Identifier") return isRoleContextName(cur.id.name);
-    cur = cur.parent;
-  }
-  return false;
-}
-
 // True when an identifier's symbol (e.g. the `parse` method being called) is declared inside the
 // installed `zod` / `@zod/*` package — the type-aware way to confirm a `.parse()` is Zod's, with no
 // name-matching (a bare `x.parse()` could be JSON, Date, a custom parser, anything).
@@ -3016,8 +2853,6 @@ function ruleNoRedundantZodParse() {
 const rules = {
   "no-trivial-selector-wrapper": ruleNoTrivialSelectorWrapper(),
   "no-inline-structural-type-at-use-site": ruleNoInlineStructuralTypeAtUseSite(),
-  "no-unsafe-cast-chain": ruleNoUnsafeCastChain(),
-  "no-cast-to-branded": ruleNoCastToBranded(),
   "no-appeasement-cast": ruleNoAppeasementCast(),
   "no-nullable-positional-tuple": ruleNoNullablePositionalTuple(),
   "no-underchecked-type-predicate": ruleNoUndercheckedTypePredicate(),
@@ -3029,7 +2864,6 @@ const rules = {
   "no-hover-translate-card": ruleClassNamePattern("no-hover-translate-card", hoverTranslatePattern, "Do not move pointer targets on hover. Use shadow, border, color, or inner transforms."),
   "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
   "no-async-array-method": ruleNoAsyncArrayMethod(),
-  "no-obvious-comment": ruleNoObviousComment(),
   "no-sql-string-concat": ruleNoSqlStringConcat(),
   "no-unsafe-deserialize": ruleNoUnsafeDeserialize(),
   "require-authz-check": ruleRequireAuthzCheck(),
@@ -3037,7 +2871,6 @@ const rules = {
   "no-canonical-model-fork": ruleNoCanonicalModelFork(),
   "no-redundant-zod-parse": ruleNoRedundantZodParse(),
   "no-status-literal-in-type": ruleNoStatusLiteralInType(),
-  "no-role-literal-in-type": ruleNoRoleLiteralInType(),
 };
 
 export default {
