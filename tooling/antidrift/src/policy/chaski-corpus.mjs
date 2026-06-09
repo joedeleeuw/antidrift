@@ -792,6 +792,20 @@ export const defaultCases = [
     ],
   },
   {
+    id: "crow-powersync-dynamic-crud-sql-identifiers",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "drift",
+    classification: "ready",
+    subproject: "frontend",
+    paths: ["src/frontend/crow-v2/backend/powersync.ts"],
+    expectedFindings: [
+      {
+        path: "src/frontend/crow-v2/backend/powersync.ts",
+        line: 20,
+      },
+    ],
+  },
+  {
     id: "bff-bigquery-parameterized-query-clean",
     ruleId: "antidrift/no-sql-string-concat",
     kind: "correct",

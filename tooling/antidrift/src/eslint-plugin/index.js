@@ -964,6 +964,81 @@ function staticStringValue(node) {
   return null;
 }
 
+function singleReturnExpression(node) {
+  if (!node) return null;
+  if (node.type === "ArrowFunctionExpression" && node.body?.type !== "BlockStatement") return node.body;
+  if (node.body?.type !== "BlockStatement" || node.body.body.length !== 1) return null;
+  const statement = node.body.body[0];
+  return statement?.type === "ReturnStatement" ? statement.argument : null;
+}
+
+function isEscapedReplaceCall(node, paramName, quote) {
+  if (node?.type !== "CallExpression") return false;
+  const callee = node.callee;
+  if (callee?.type !== "MemberExpression" || callee.computed) return false;
+  if (callee.object?.type !== "Identifier" || callee.object.name !== paramName) return false;
+  if (callee.property?.type !== "Identifier" || callee.property.name !== "replace") return false;
+  const [pattern, replacement] = node.arguments;
+  const patternMatches = pattern?.type === "Literal"
+    && ((pattern.regex && pattern.regex.pattern === quote && pattern.regex.flags.includes("g")) || pattern.value === quote);
+  return patternMatches && staticStringValue(replacement) === `${quote}${quote}`;
+}
+
+function sqlEscaperKindFromReturnExpression(node, paramName) {
+  if (node?.type !== "TemplateLiteral" || node.expressions.length !== 1) return null;
+  const before = node.quasis[0]?.value.cooked ?? node.quasis[0]?.value.raw ?? "";
+  const after = node.quasis[1]?.value.cooked ?? node.quasis[1]?.value.raw ?? "";
+  if (before === "\"" && after === "\"" && isEscapedReplaceCall(node.expressions[0], paramName, "\"")) return "identifier";
+  if (before === "'" && after === "'" && isEscapedReplaceCall(node.expressions[0], paramName, "'")) return "string";
+  return null;
+}
+
+function sqlEscaperFunctionKind(node) {
+  if (node?.type !== "FunctionDeclaration" && node?.type !== "FunctionExpression" && node?.type !== "ArrowFunctionExpression") return null;
+  const param = node.params?.[0];
+  if (node.params.length !== 1 || param?.type !== "Identifier") return null;
+  return sqlEscaperKindFromReturnExpression(singleReturnExpression(node), param.name);
+}
+
+function hasOpenSqlQuote(value, quote) {
+  let open = false;
+  for (let i = 0; i < value.length; i += 1) {
+    if (value[i] !== quote) continue;
+    if (value[i + 1] === quote) {
+      i += 1;
+      continue;
+    }
+    open = !open;
+  }
+  return open;
+}
+
+function isUnquotedSqlInterpolation(before, after) {
+  if (hasOpenSqlQuote(before, "'") || hasOpenSqlQuote(before, "\"") || hasOpenSqlQuote(before, "`")) return false;
+  return !/^\s*['"`]/u.test(after);
+}
+
+function intersectPropertySets(left, right) {
+  if (!left) return new Set(right);
+  return new Set([...left].filter((key) => right.has(key)));
+}
+
+function collectReturnArguments(node, out) {
+  if (!node) return;
+  if (node.type === "ReturnStatement") {
+    out.push(node.argument);
+    return;
+  }
+  if (node.type === "BlockStatement") {
+    for (const statement of node.body ?? []) collectReturnArguments(statement, out);
+    return;
+  }
+  if (node.type === "IfStatement") {
+    collectReturnArguments(node.consequent, out);
+    collectReturnArguments(node.alternate, out);
+  }
+}
+
 function isStaticStringCallback(node) {
   if (node?.type !== "ArrowFunctionExpression" && node?.type !== "FunctionExpression") return false;
   return staticStringValue(node.body) !== null;
@@ -1189,14 +1264,137 @@ function ruleNoSqlStringConcat() {
       const sourceCode = context.sourceCode;
       const safeSqlFragmentArrays = new WeakSet();
       const safeSqlFragmentStrings = new WeakSet();
+      const safeSqlFragmentObjectValues = new WeakMap();
       const safeSqlIdentifierValues = new WeakMap();
       const safeSqlIdentifierObjectValues = new WeakMap();
       const safeDynamicSqlIdentifierVariables = new WeakSet();
       const safeDynamicSqlIdentifierMembers = new WeakMap();
       const sqlIdentifierRegexVariables = new WeakSet();
+      const sqlEscaperFunctions = new WeakMap();
+      const safeSqlFragmentFunctions = new WeakMap();
       function isSafeFragmentVariable(node, set) {
         const variable = findVariable(sourceCode, node);
         return Boolean(variable && set.has(variable));
+      }
+      function isSafeFragmentMember(node) {
+        if (node?.type !== "MemberExpression" || node.computed || node.object?.type !== "Identifier" || node.property?.type !== "Identifier") return false;
+        const variable = findVariable(sourceCode, node.object);
+        const properties = variable ? safeSqlFragmentObjectValues.get(variable) : null;
+        return Boolean(properties?.has(node.property.name));
+      }
+      function markSqlEscaperFunction(node) {
+        const kind = sqlEscaperFunctionKind(getFunctionNode(node));
+        if (!kind) return;
+        const variable = getDeclaredVariable(sourceCode, node);
+        if (variable) sqlEscaperFunctions.set(variable, kind);
+      }
+      function scanSqlEscaperDeclaration(node) {
+        const declaration = node?.type === "ExportNamedDeclaration" || node?.type === "ExportDefaultDeclaration" ? node.declaration : node;
+        if (declaration?.type === "FunctionDeclaration") {
+          markSqlEscaperFunction(declaration);
+          return;
+        }
+        if (declaration?.type !== "VariableDeclaration") return;
+        for (const declarator of declaration.declarations ?? []) markSqlEscaperFunction(declarator);
+      }
+      function sqlEscaperCallbackKind(node) {
+        if (node?.type === "Identifier") {
+          const variable = findVariable(sourceCode, node);
+          return variable ? sqlEscaperFunctions.get(variable) ?? null : null;
+        }
+        return sqlEscaperFunctionKind(node);
+      }
+      function sqlEscaperCallKind(node) {
+        if (node?.type !== "CallExpression" || node.arguments.length !== 1) return null;
+        if (node.callee?.type !== "Identifier") return null;
+        const variable = findVariable(sourceCode, node.callee);
+        return variable ? sqlEscaperFunctions.get(variable) ?? null : null;
+      }
+      function safeSqlFragmentFunctionSummary(node) {
+        const fn = getFunctionNode(node);
+        if (fn?.type !== "FunctionDeclaration" && fn?.type !== "FunctionExpression" && fn?.type !== "ArrowFunctionExpression") return null;
+        const params = fn.params ?? [];
+        if (params.some((param) => param.type !== "Identifier")) return null;
+        const paramNames = new Set(params.map((param) => param.name));
+        const identifierParams = new Set();
+        if (!isSafeSqlFragmentExpressionForSummary(singleReturnExpression(fn), paramNames, identifierParams)) return null;
+        return { arity: params.length, identifierParams: params.map((param, index) => identifierParams.has(param.name) ? index : null).filter((index) => index !== null) };
+      }
+      function markSafeSqlFragmentFunction(node) {
+        const summary = safeSqlFragmentFunctionSummary(node);
+        if (!summary) return;
+        const variable = getDeclaredVariable(sourceCode, node);
+        if (variable) safeSqlFragmentFunctions.set(variable, summary);
+      }
+      function scanSafeSqlFragmentDeclaration(node) {
+        const declaration = node?.type === "ExportNamedDeclaration" || node?.type === "ExportDefaultDeclaration" ? node.declaration : node;
+        if (declaration?.type === "FunctionDeclaration") {
+          markSafeSqlFragmentFunction(declaration);
+          return;
+        }
+        if (declaration?.type !== "VariableDeclaration") return;
+        for (const declarator of declaration.declarations ?? []) markSafeSqlFragmentFunction(declarator);
+      }
+      function safeSqlFragmentCallSummary(node) {
+        if (node?.type !== "CallExpression" || node.callee?.type !== "Identifier") return null;
+        const variable = findVariable(sourceCode, node.callee);
+        return variable ? safeSqlFragmentFunctions.get(variable) ?? null : null;
+      }
+      function isSafeSqlFragmentCall(node) {
+        const summary = safeSqlFragmentCallSummary(node);
+        if (!summary || node.arguments.length !== summary.arity) return false;
+        return summary.identifierParams.every((index) => isSafeSqlIdentifierExpression(node.arguments[index]));
+      }
+      function isSqlEscaperMapJoin(node, kind, separators) {
+        if (node?.type !== "CallExpression") return false;
+        const join = node.callee;
+        if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
+        const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
+        if (!separators.has(separator)) return false;
+        const mapCall = join.object;
+        if (mapCall?.type !== "CallExpression") return false;
+        const map = mapCall.callee;
+        return map?.type === "MemberExpression"
+          && !map.computed
+          && map.property?.type === "Identifier"
+          && map.property.name === "map"
+          && sqlEscaperCallbackKind(mapCall.arguments[0]) === kind;
+      }
+      function isSafeSqlFragmentMapJoinForSummary(node, paramNames, identifierParams) {
+        if (node?.type !== "CallExpression") return false;
+        const join = node.callee;
+        if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
+        const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
+        if (!isAllowedSqlFragmentJoinSeparator(separator) && separator !== "\n") return false;
+        const mapCall = join.object;
+        if (mapCall?.type !== "CallExpression") return false;
+        const map = mapCall.callee;
+        if (map?.type !== "MemberExpression" || map.computed || map.property?.type !== "Identifier" || map.property.name !== "map") return false;
+        const callback = mapCall.arguments[0];
+        if (callback?.type !== "ArrowFunctionExpression" && callback?.type !== "FunctionExpression") return false;
+        return isSafeSqlFragmentExpressionForSummary(singleReturnExpression(callback), paramNames, identifierParams);
+      }
+      function isSafeSqlFragmentTemplateForSummary(node, paramNames, identifierParams) {
+        if (node?.type !== "TemplateLiteral") return false;
+        for (let i = 0; i < node.expressions.length; i += 1) {
+          const expression = node.expressions[i];
+          const { before, after } = templateInterpolationParts(node, i);
+          if (expression.type === "Identifier" && paramNames.has(expression.name)) {
+            if (!isUnquotedSqlInterpolation(before, after)) return false;
+            identifierParams.add(expression.name);
+            continue;
+          }
+          if (!isSafeSqlFragmentExpressionForSummary(expression, paramNames, identifierParams)) return false;
+        }
+        return true;
+      }
+      function isSafeSqlFragmentExpressionForSummary(node, paramNames, identifierParams) {
+        if (staticStringValue(node) !== null) return true;
+        if (sqlEscaperCallKind(node) === "string") return true;
+        if (isSqlEscaperMapJoin(node, "string", new Set([",", ", "]))) return true;
+        if (node?.type === "TemplateLiteral") return isSafeSqlFragmentTemplateForSummary(node, paramNames, identifierParams);
+        if (node?.type === "CallExpression") return isSafeSqlFragmentMapJoinForSummary(node, paramNames, identifierParams);
+        return false;
       }
       function markDynamicSqlIdentifierVariable(node) {
         const variable = findVariable(sourceCode, node);
@@ -1205,6 +1403,7 @@ function ruleNoSqlStringConcat() {
       function unmarkSqlIdentifierVariable(variable) {
         safeSqlIdentifierValues.delete(variable);
         safeSqlIdentifierObjectValues.delete(variable);
+        safeSqlFragmentObjectValues.delete(variable);
         safeDynamicSqlIdentifierVariables.delete(variable);
       }
       function classSafeMembers(classNode) {
@@ -1286,6 +1485,8 @@ function ruleNoSqlStringConcat() {
           && node.expressions.every(isSafeSqlIdentifierExpression);
       }
       function isSafeSqlIdentifierExpression(node) {
+        if (sqlEscaperCallKind(node) === "identifier") return true;
+        if (isSqlEscaperMapJoin(node, "identifier", new Set(["."]))) return true;
         const values = sqlTokenValues(node);
         if (valuesAreSqlIdentifiers(values)) return true;
         if (isSafeDynamicSqlIdentifierVariable(node)) return true;
@@ -1329,8 +1530,12 @@ function ruleNoSqlStringConcat() {
       }
       function isSafeSqlFragmentExpression(node) {
         if (staticStringValue(node) !== null) return true;
+        if (sqlEscaperCallKind(node) === "string") return true;
+        if (isSafeSqlFragmentCall(node)) return true;
+        if (isSqlEscaperMapJoin(node, "string", new Set([",", ", "]))) return true;
         if (isStaticFragmentMapJoin(node)) return true;
         if (node?.type === "Identifier") return isSafeFragmentVariable(node, safeSqlFragmentStrings);
+        if (isSafeFragmentMember(node)) return true;
         if (node?.type === "ConditionalExpression") {
           return isSafeSqlFragmentExpression(node.consequent) && isSafeSqlFragmentExpression(node.alternate);
         }
@@ -1349,6 +1554,39 @@ function ruleNoSqlStringConcat() {
           || (node?.type === "ArrayExpression"
             && node.elements.every((element) => element && element.type !== "SpreadElement" && isSafeSqlFragmentExpression(element)));
       }
+      function objectSqlFragmentProperties(node) {
+        if (node?.type !== "ObjectExpression") return null;
+        const properties = new Set();
+        for (const property of node.properties ?? []) {
+          if (property.type !== "Property" || property.computed) return null;
+          const key = sqlPropertyKeyName(property.key);
+          if (!key || !isSafeSqlFragmentExpression(property.value)) return null;
+          properties.add(key);
+        }
+        return properties;
+      }
+      function returnedObjectSqlFragmentProperties(node) {
+        const returns = [];
+        collectReturnArguments(node, returns);
+        if (returns.length === 0) return null;
+        let properties = null;
+        for (const argument of returns) {
+          const returned = objectSqlFragmentProperties(argument);
+          if (!returned) return null;
+          properties = intersectPropertySets(properties, returned);
+        }
+        return properties;
+      }
+      function iifeObjectSqlFragmentProperties(node) {
+        if (node?.type !== "CallExpression" || node.arguments.length !== 0) return null;
+        const callee = node.callee;
+        if (callee?.type !== "ArrowFunctionExpression" && callee?.type !== "FunctionExpression") return null;
+        if (callee.body?.type === "ObjectExpression") return objectSqlFragmentProperties(callee.body);
+        return returnedObjectSqlFragmentProperties(callee.body);
+      }
+      function objectSqlFragmentPropertiesFromExpression(node) {
+        return objectSqlFragmentProperties(node) ?? iifeObjectSqlFragmentProperties(node);
+      }
       function guardedSqlIdentifierVariable(node) {
         if (!statementExits(node.consequent)) return null;
         const test = node.test;
@@ -1363,7 +1601,13 @@ function ruleNoSqlStringConcat() {
         return arg?.type === "Identifier" ? arg : null;
       }
       return {
+        Program(node) {
+          for (const statement of node.body ?? []) scanSqlEscaperDeclaration(statement);
+          for (const statement of node.body ?? []) scanSafeSqlFragmentDeclaration(statement);
+        },
         VariableDeclarator(node) {
+          markSqlEscaperFunction(node);
+          markSafeSqlFragmentFunction(node);
           const variable = getDeclaredVariable(sourceCode, node);
           if (!variable) return;
           if (isSqlIdentifierRegexLiteral(node.init)) {
@@ -1384,6 +1628,9 @@ function ruleNoSqlStringConcat() {
             safeSqlFragmentArrays.add(variable);
           } else if (isSafeSqlFragmentExpression(node.init)) {
             safeSqlFragmentStrings.add(variable);
+          } else {
+            const sqlFragmentObjectProperties = objectSqlFragmentPropertiesFromExpression(node.init);
+            if (sqlFragmentObjectProperties && node.parent?.kind === "const") safeSqlFragmentObjectValues.set(variable, sqlFragmentObjectProperties);
           }
         },
         AssignmentExpression(node) {

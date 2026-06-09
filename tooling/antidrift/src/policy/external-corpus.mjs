@@ -114,6 +114,14 @@ const sudocodeCases = [
     paths: ["server/src/routes/workflows.ts"],
   },
   {
+    id: "sudocode-workflows-sort-allowlist-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "server",
+    paths: ["server/src/routes/workflows.ts"],
+  },
+  {
     id: "sudocode-base-workflow-static-set-fragments-clean",
     ruleId: "antidrift/no-sql-string-concat",
     kind: "correct",
@@ -172,6 +180,18 @@ const sudocodeCases = [
     classification: "ready",
     subproject: "cli",
     paths: ["cli/src/operations/issues.ts"],
+  },
+  {
+    id: "sudocode-cli-entity-table-union-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "cli",
+    paths: [
+      "cli/src/operations/tags.ts",
+      "cli/src/operations/relationships.ts",
+      "cli/src/id-generator.ts",
+    ],
   },
   {
     id: "sudocode-issues-route-params-without-authz",
@@ -870,6 +890,14 @@ const opencodeCases = [
       "packages/effect-drizzle-sqlite/src/sqlite-core/effect/session.ts",
       "packages/core/src/database/migration.ts",
     ],
+  },
+  {
+    id: "opencode-stats-local-sql-escaper-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "stats-core",
+    paths: ["packages/stats/core/src/domain/inference.ts"],
   },
   {
     id: "opencode-console-benchmark-list-result-json",

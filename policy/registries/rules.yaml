@@ -405,7 +405,7 @@ policyRuleReviews:
     antidriftRule: antidrift/no-sql-string-concat
     coverage: Implemented for SQL structure built through interpolation or concatenation, layered with sonarjs/sql-queries.
     reason: The local SonarJS benchmark missed real HogQL/template interpolation cases that antidrift reports.
-    nextAction: Seek a second sanitized dynamic SQL identifier clean control before stable promotion.
+    nextAction: Seek a real invalid/near-miss guard or escaper control before stable promotion.
   sec/no-unsafe-deserialize:
     status: active-custom
     antidriftRule: antidrift/no-unsafe-deserialize
@@ -822,8 +822,10 @@ rules:
       - Closed SQL identifier fragments from typed service-boundary unions and static object-literal column maps are accepted only in SQL identifier/direction positions.
       - Dynamic object-key column lists and non-allowlisted table names are intentional drift findings.
       - Constructor-validated dynamic SQL identifiers are accepted only when an anchored identifier regex guard definitely exits on failure, the derived identifier template remains identifier-shaped, and interpolation is in an SQL identifier position.
+      - Opencode stats local `sqlIdentifier` / `sqlString` quote-doubling helpers are accepted only when the helper body proves matching quote escaping; local SQL-fragment builders are accepted only for single-template bodies with unquoted identifier parameters and identifier-safe call-site arguments.
+      - Finite static object fragments such as Opencode `dimensionSql.select` / `dimensionSql.groupBy` are accepted only when all returned object branches expose safe SQL fragment properties.
       - Current production drift evidence is Chaski. Sudocode and Cloudflare add useful but lower-strength drift pressure because the accepted findings are in test helpers and demo/playground code.
-      - "The June 8, 2026 advisory review found the sanitized-identifier branch locally ready but not stable: the clean constructor-validated identifier shape exists in only one independent repo, equivalent guard shapes are uncharacterized, and the guard branch's lower edge needs real-program pressure."
+      - "The June 8, 2026 advisory review found the sanitized-identifier branch locally ready but not stable. Opencode now supplies second-repo sanitized identifier replication, but equivalent guard shapes remain uncharacterized and the guard/escaper branch's lower edge still needs real-program pressure."
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:
       state: partial-overlap
@@ -843,8 +845,9 @@ rules:
         - "await this.sqlRun`UPDATE files SET modified_at = ${timestamp} WHERE path = ${path}`;"
         - 'const sortBy = options.sortBy ?? "created_at"; db.prepare(`SELECT * FROM executions ORDER BY ${sortBy}`);'
         - 'if (!VALID_NAMESPACE.test(ns)) throw new Error("bad namespace"); this.tableName = `cf_workspace_${ns}`; this.sql.run(`SELECT * FROM ${this.tableName}`);'
+        - 'const table = [catalog, database, name].map(sqlIdentifier).join("."); db.prepare(`SELECT * FROM ${table}`);'
         - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
-    nextAction: Seek a second independent sanitized dynamic SQL identifier clean control and a real invalid/near-miss guard control before stable promotion.
+    nextAction: Seek a real invalid/near-miss guard or escaper control before stable promotion.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
