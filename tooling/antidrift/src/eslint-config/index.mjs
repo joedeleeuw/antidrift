@@ -425,7 +425,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "antidrift/no-appeasement-cast": "error",
         "antidrift/no-nullable-positional-tuple": "error",
         "antidrift/no-underchecked-type-predicate": "error",
-        "antidrift/no-defensive-shape-probing": "error",
+        "antidrift/no-defensive-shape-probing": "off",
         "antidrift/no-coupled-state-setters": "error",
         "antidrift/no-status-triplet-state": "off",
         "antidrift/require-effect-deps": "error",

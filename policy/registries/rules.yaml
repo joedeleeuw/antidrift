@@ -545,7 +545,7 @@ rules:
         - 'dispatch({ type: "loaded", data });'
     nextAction: Classify inventory findings and decide whether the redundant-constant-cell branch absorbs the standalone status-triplet intent.
   antidrift/no-defensive-shape-probing:
-    status: ready
+    status: under-proven
     stable: false
     signal: TypeChecker plus AST shape
     solveType: broad-value-shape-probing

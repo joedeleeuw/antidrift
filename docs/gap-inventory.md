@@ -19,8 +19,8 @@ Policy-scoped rule IDs reviewed in `policyRuleReviews`: 60.
 | State                      | Count | Meaning                                                                                |
 | -------------------------- | ----: | -------------------------------------------------------------------------------------- |
 | Stable                     |     5 | Ready, independently replicated enough for stable treatment.                           |
-| Ready but not stable       |    15 | Implemented and enabled, but evidence, inventory, or advisory gates remain.            |
-| Under-proven               |     0 | Implemented but default-off because real drift or clean evidence is not strong enough. |
+| Ready but not stable       |    14 | Implemented and enabled, but evidence, inventory, or advisory gates remain.            |
+| Under-proven               |     1 | Implemented but default-off because real drift or clean evidence is not strong enough. |
 | Retired Oxlint parity gaps |     0 | The former Oxlint baseline has ESLint replacements or explicit retirements.            |
 
 Policy rule review dispositions:
@@ -48,6 +48,7 @@ Stable custom rules today:
 Default-off custom rules today:
 
 - `antidrift/no-status-triplet-state`
+- `antidrift/no-defensive-shape-probing`
 
 ## Remaining Custom Rule Queues
 
@@ -111,7 +112,7 @@ These are implemented-rule gaps. They are not all implementation tasks; many are
 | `antidrift/no-appeasement-cast`                   | Ready, not stable         | Copy-backed repair patterns are proven, but stable promotion should wait for broad inventory after real consumer cleanup.                                                                                                                                                                                                                                                                                          |
 | `antidrift/no-async-array-method`                 | Ready, not stable         | Needs a branch decision: never-await methods are deterministic discarded-return hazards, while `map`/`flatMap` not-collected depends on local promise-list dataflow and may need separate evidence.                                                                                                                                                                                                              |
 | `antidrift/no-coupled-state-setters`              | Ready, not stable         | Broad Chaski inventory has many findings that need classification before broad claims.                                                                                                                                                                                                                                                                                                                             |
-| `antidrift/no-defensive-shape-probing`            | Ready, disputed           | Has clean breadth but only one drift repository. Current `any` drift is same-file partial overlap with upstream unsafe member-access reports; a 2026-06-09 syntax sweep across the active real-repo set found no second drift. Next decision is demote to inventory/off, or prove a second drift not already owned by upstream unsafe rules.                                      |
+| `antidrift/no-defensive-shape-probing`            | Under-proven, default-off | Has clean breadth but only one drift repository. Current `any` drift is same-file partial overlap with upstream unsafe member-access reports; a 2026-06-09 syntax sweep across the active real-repo set found no second drift. It remains inventory/off until a second drift appears that is not already owned by upstream unsafe rules.                                      |
 | `antidrift/no-hover-translate-card`               | Ready, not stable         | Needs another UI repo inventory. CSS `@apply hover:-translate-*` remains outside the JSX class extractor.                                                                                                                                                                                                                                                                                                          |
 | `antidrift/no-inline-structural-type-at-use-site` | Ready, not stable         | Needs independent repo replication and more pressure on local UI-prop/callback-payload exclusions.                                                                                                                                                                                                                                                                                                                 |
 | `antidrift/no-nullable-positional-tuple`          | Ready, not stable         | Needs another real nullable positional tuple and clean tuple-control replication. Alias/generic-chain nullability depends on parser services; imported owner range aliases are intentionally out of scope.                                                                                                                                                                                                         |
