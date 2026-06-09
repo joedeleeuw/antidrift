@@ -143,6 +143,15 @@ const corpusPlans = [
       "modules/module-postgres/src/replication/replication-utils.ts",
     ],
   },
+  {
+    repo: "powersync-service",
+    label: "module-postgres-storage-sql-corpus",
+    repoCandidates: powersyncServiceRepoCandidates,
+    tsconfig: "modules/module-postgres-storage/tsconfig.json",
+    targets: [
+      "modules/module-postgres-storage/src/storage/PostgresSyncRulesStorage.ts",
+    ],
+  },
 ];
 
 function parseCsv(value) {

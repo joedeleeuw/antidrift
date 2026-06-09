@@ -821,8 +821,8 @@ rules:
         powersync-service,
       ]
     concerns:
-      - The benchmark on 264 real files reports 16 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
-      - Dynamic placeholder lists such as `ids.map(() => "?").join(",")` are accepted clean because values remain bound parameters.
+      - The benchmark on 268 real files reports 16 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
+      - Dynamic placeholder lists such as `ids.map(() => "?").join(",")`, and numbered Postgres placeholder fragments that interpolate only index arithmetic after `$`, are accepted clean because values remain bound parameters.
       - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
       - Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are accepted clean because the tag owns value binding.
       - Opencode Drizzle-style `sql` tags and `sql.identifier(...)` usage are accepted clean as ORM-owned SQL composition.
@@ -832,15 +832,15 @@ rules:
       - Opencode stats local `sqlIdentifier` / `sqlString` quote-doubling helpers are accepted only when the helper body proves matching quote escaping; local SQL-fragment builders are accepted only for single-template bodies with unquoted identifier parameters and identifier-safe call-site arguments.
       - Finite static object fragments such as Opencode `dimensionSql.select` / `dimensionSql.groupBy` are accepted only when all returned object branches expose safe SQL fragment properties.
       - Current production drift evidence is Chaski plus PowerSync service. Sudocode and Cloudflare add useful but lower-strength drift pressure because the accepted findings are in test helpers and demo/playground code.
-      - "PowerSync service supplies the guard/escaper lower edge: `sourceTable.table` still reports when a neighboring escaped table-name helper exists. The imported `escapeMysqlTableName(table)` call stays clean through a TypeScript symbol-to-declaration proof of quote-doubled identifier escaping, and Postgres `SourceTable.escapedIdentifier` stays clean only through an explicit type/member contract that requires parser services to prove the receiver type."
-      - "The June 9, 2026 advisory review found the PowerSync imported-escaper proof sound and the rule locally ready, but not stable. Stable is blocked by broad SQL finding classification; safe identifier controls remain parser-services-only by design."
-      - The widened ad hoc SQL scan still has 168 mostly unclassified findings; curated corpus gates are not enough to claim zero false positives.
-      - "The SQL benchmark now inventories promotion blockers: 177 SQL tagged-template uses are all in the currently allowed `sql`/`sqlQuery`/`sqlRun` shape, while Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags still need real-code inventory before widening the allowlist."
+      - "PowerSync service supplies the guard/escaper lower edge: `sourceTable.table` still reports when a neighboring escaped table-name helper exists. The imported `escapeMysqlTableName(table)` call stays clean through a TypeScript symbol-to-declaration proof of quote-doubled identifier escaping, Postgres `SourceTable.escapedIdentifier` stays clean only through an explicit type/member contract that requires parser services to prove the receiver type, and numbered Postgres placeholder fragments stay clean through local structure."
+      - "The June 9, 2026 advisory review found the PowerSync imported-escaper proof sound and the rule locally ready, but not stable. Stable is blocked by broader SQL inventory classification and by deciding how much test/demo drift counts toward stable; safe identifier controls remain parser-services-only by design."
+      - The targeted broad SQL inventory across PowerSync Service, Opencode, Cloudflare Agents, and Sudocode is now classified with zero known false positives after the numbered-placeholder fix, but the wider `/Users/sushi/code` inventory remains unclassified.
+      - "The SQL benchmark now inventories promotion blockers: 199 SQL tagged-template uses are all in the currently allowed `sql`/`sqlQuery`/`sqlRun` shape, while Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags still need real-code inventory before widening the allowlist."
       - Equivalent positive guard, allowlist, and regex-variant identifier sanitizers remain uncharacterized against real code; the current benchmark only finds the already-supported negative regex/exit shape in SQL context.
       - The current concatenation branch does not cover SQL-builder `+=`; the benchmark sees 37 static builder appends and 8 dynamic builder append candidates. The dynamic candidates are currently classified clean, so do not widen builder-append linting until a real unsafe dynamic append appears.
       - The widened sentence-pattern trigger catches long unsafe Chaski templates at lines 626, 650, 1111, and 1367 that the old 200-character `SELECT ... FROM` window missed, while Cloudflare and Opencode SQL controls stay clean.
       - "The benchmark directly measures the non-type-aware boundary: without parser services, PowerSync `modules/module-mysql/src/replication/BinLogStream.ts:311`, `modules/module-postgres/src/replication/replication-utils.ts:290`, and `modules/module-postgres/src/replication/WalStream.ts:437` become conservative reports."
-      - "The reproducible broad SQL inventory command checked 707 SQL-candidate files across PowerSync Service, Opencode, Cloudflare Agents, and Sudocode with 32 custom findings and 0 SonarJS findings; it confirmed the parser-services boundary for escaped identifier controls such as `table.escapedIdentifier`."
+      - "The reproducible broad SQL inventory command checked 707 SQL-candidate files across PowerSync Service, Opencode, Cloudflare Agents, and Sudocode with 31 custom findings and 0 SonarJS findings; the run is classified as 1 production drift, 3 parser-services-only conservative reports, 27 lower-strength demo/test drift findings, and 0 known false positives."
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:
       state: partial-overlap
@@ -862,7 +862,7 @@ rules:
         - 'if (!VALID_NAMESPACE.test(ns)) throw new Error("bad namespace"); this.tableName = `cf_workspace_${ns}`; this.sql.run(`SELECT * FROM ${this.tableName}`);'
         - 'const table = [catalog, database, name].map(sqlIdentifier).join("."); db.prepare(`SELECT * FROM ${table}`);'
         - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
-    nextAction: Classify broad SQL findings while preserving the parser-services-only proof boundary for imported escapers and configured safe identifier members.
+    nextAction: Run and classify the broader `/Users/sushi/code` SQL inventory beyond the targeted four repositories, then decide how much test/demo drift can count toward stable.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false

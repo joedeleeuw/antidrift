@@ -1013,6 +1013,16 @@ const powersyncServiceCases = [
       "modules/module-postgres/src/replication/replication-utils.ts",
     ],
   },
+  {
+    id: "powersync-postgres-storage-numbered-placeholder-fragment-clean",
+    ruleId: "antidrift/no-sql-string-concat",
+    kind: "correct",
+    classification: "ready",
+    subproject: "module-postgres-storage",
+    typeAware: true,
+    tsconfig: "modules/module-postgres-storage/tsconfig.json",
+    paths: ["modules/module-postgres-storage/src/storage/PostgresSyncRulesStorage.ts"],
+  },
 ];
 
 const externalCorpora = [

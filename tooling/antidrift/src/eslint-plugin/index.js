@@ -1147,6 +1147,43 @@ function isStaticFragmentMapJoin(node) {
     && isStaticStringCallback(mapCall.arguments[0]);
 }
 
+function isIndexArithmeticExpression(node, indexName) {
+  const unwrapped = unwrapExpression(node);
+  if (unwrapped?.type === "Identifier") return unwrapped.name === indexName;
+  if (unwrapped?.type === "Literal") return typeof unwrapped.value === "number";
+  if (unwrapped?.type !== "BinaryExpression" || !["+", "-", "*"].includes(unwrapped.operator)) return false;
+  return isIndexArithmeticExpression(unwrapped.left, indexName)
+    && isIndexArithmeticExpression(unwrapped.right, indexName);
+}
+
+function isPostgresPlaceholderTemplate(node, indexName) {
+  if (node?.type !== "TemplateLiteral" || node.expressions.length === 0) return false;
+  for (let index = 0; index < node.expressions.length; index += 1) {
+    const before = node.quasis[index]?.value?.cooked ?? node.quasis[index]?.value?.raw ?? "";
+    const after = node.quasis[index + 1]?.value?.cooked ?? node.quasis[index + 1]?.value?.raw ?? "";
+    if (!before.endsWith("$") || /^\d/u.test(after)) return false;
+    if (!isIndexArithmeticExpression(node.expressions[index], indexName)) return false;
+  }
+  return true;
+}
+
+function isPlaceholderSqlFragmentMapJoin(node) {
+  if (node?.type !== "CallExpression") return false;
+  const join = node.callee;
+  if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
+  const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
+  if (separator !== " OR " && separator !== " AND ") return false;
+  const mapCall = join.object;
+  if (mapCall?.type !== "CallExpression") return false;
+  const map = mapCall.callee;
+  if (map?.type !== "MemberExpression" || map.computed || map.property?.type !== "Identifier" || map.property.name !== "map") return false;
+  const callback = mapCall.arguments[0];
+  if (callback?.type !== "ArrowFunctionExpression" && callback?.type !== "FunctionExpression") return false;
+  const indexParam = callback.params?.[1];
+  if (indexParam?.type !== "Identifier") return false;
+  return isPostgresPlaceholderTemplate(singleReturnExpression(callback), indexParam.name);
+}
+
 function isEmptyArrayExpression(node) {
   return node?.type === "ArrayExpression" && node.elements.length === 0;
 }
@@ -1678,12 +1715,18 @@ function ruleNoSqlStringConcat() {
         }
         return false;
       }
+      function isDirectSafeSqlFragmentExpression(node) {
+        return [
+          staticStringValue(node) !== null,
+          sqlEscaperCallKind(node) === "string",
+          isSafeSqlFragmentCall(node),
+          isSqlEscaperMapJoin(node, "string", new Set([",", ", "])),
+          isStaticFragmentMapJoin(node),
+          isPlaceholderSqlFragmentMapJoin(node),
+        ].some(Boolean);
+      }
       function isSafeSqlFragmentExpression(node) {
-        if (staticStringValue(node) !== null) return true;
-        if (sqlEscaperCallKind(node) === "string") return true;
-        if (isSafeSqlFragmentCall(node)) return true;
-        if (isSqlEscaperMapJoin(node, "string", new Set([",", ", "]))) return true;
-        if (isStaticFragmentMapJoin(node)) return true;
+        if (isDirectSafeSqlFragmentExpression(node)) return true;
         if (node?.type === "Identifier") return isSafeFragmentVariable(node, safeSqlFragmentStrings);
         if (isSafeFragmentMember(node)) return true;
         if (node?.type === "ConditionalExpression") {
