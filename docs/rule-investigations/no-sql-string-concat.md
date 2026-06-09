@@ -219,5 +219,7 @@ The June 9, 2026 advisory review (`reports/claude-rule-review-no-sql-string-conc
 - Equivalent guard shapes such as positive guards, quantifier forms, or allowlist checks remain uncharacterized against real code.
 - The widened 168-finding SQL scan is not fully classified, so the project cannot claim zero known false positives.
 - Imported escaper proof is type-aware-only. Without parser services, imported escaper calls conservatively report rather than proving the helper declaration.
+- Common parameterized SQL tag ecosystems beyond `sql`, `sqlQuery`, and `sqlRun` remain unclassified. Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags are likely clean when used as true tagged templates, but they need real-code inventory before widening the allowlist.
+- Concatenation false negatives remain open: `+=`, `.concat()`, array joins, and queries whose SQL verb is split into an interpolation are not covered by the current rule.
 
 Stable promotion waits on broad finding classification plus an explicit decision on the non-type-aware imported-escaper degradation.

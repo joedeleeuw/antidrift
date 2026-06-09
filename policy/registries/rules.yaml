@@ -835,6 +835,9 @@ rules:
       - "PowerSync service supplies the guard/escaper lower edge: `sourceTable.table` still reports when a neighboring escaped table-name helper exists. The imported `escapeMysqlTableName(table)` call now stays clean through a TypeScript symbol-to-declaration proof of quote-doubled identifier escaping."
       - "The June 9, 2026 advisory review found the PowerSync imported-escaper proof sound and the rule locally ready, but not stable. Stable is blocked by broad SQL finding classification and by the type-aware-only imported-escaper branch silently degrading to conservative reports without parser services."
       - The widened ad hoc SQL scan still has 168 mostly unclassified findings; curated corpus gates are not enough to claim zero false positives.
+      - Common parameterized SQL tag ecosystems such as Prisma `$queryRaw`, Kysely, Slonik, or aliased Drizzle tags are not broadly inventoried against the current name-based tag allowlist.
+      - Equivalent positive guard, allowlist, and regex-variant identifier sanitizers remain uncharacterized against real code.
+      - The current concatenation branch does not cover `+=`, `.concat()`, array joins, or SQL verbs split into interpolated fragments; those are false-negative risks to classify before stable promotion.
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:
       state: partial-overlap
