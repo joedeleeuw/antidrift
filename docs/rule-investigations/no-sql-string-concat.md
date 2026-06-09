@@ -167,7 +167,7 @@ External references checked during the June 9, 2026 review:
 
 Drift:
 
-- Production: `/Users/sushi/code/chaski/src/frontend/bff/api/gateways/posthog-gateway.ts` has 10 interpolated HogQL/SQL findings, including line 570 where order IDs are escaped into an `IN (...)` string.
+- Production: `/Users/sushi/code/chaski/src/frontend/bff/api/gateways/posthog-gateway.ts` has 14 interpolated HogQL/SQL findings, including line 570 where order IDs are escaped into an `IN (...)` string and the long-template findings at lines 626, 650, 1111, and 1367.
 - Production: `/Users/sushi/code/chaski/src/frontend/crow-v2/backend/powersync.ts` line 20 builds an `INSERT INTO ${op.table} (${Object.keys(op.data).join(",")})` statement from operation payload structure.
 - Production: `/Users/sushi/code/powersync-service/modules/module-mysql/src/api/MySQLRouteAPIAdapter.ts` line 235 interpolates `sourceTable.table` directly, even though neighboring code exposes escaped table-name APIs. This is the current lower-edge pressure case: raw table-name access still reports when a safer shape exists nearby.
 - Lower-strength pressure: `/Users/sushi/code/sudocode-main/server/tests/integration/workflow/helpers/workflow-test-setup.ts` line 386 and `/Users/sushi/code/sudocode-main/server/tests/integration/execution/helpers/test-setup.ts` line 179 build `SET` clauses from `Object.keys(updates)`.
@@ -194,7 +194,7 @@ Current benchmark result after placeholder-list, static-fragment, tag, closed-id
 
 - 262 checked files.
 - 0 parser errors.
-- 12 `antidrift/no-sql-string-concat` findings.
+- 16 `antidrift/no-sql-string-concat` findings.
 - 0 `sonarjs/sql-queries` findings.
 - PowerSync service contributes one raw-table finding and zero findings for the imported `escapeMysqlTableName(table)` clean control under `modules/module-mysql/tsconfig.json`.
 
@@ -220,6 +220,6 @@ The June 9, 2026 advisory review (`reports/claude-rule-review-no-sql-string-conc
 - The widened 168-finding SQL scan is not fully classified, so the project cannot claim zero known false positives.
 - Imported escaper proof is type-aware-only. The benchmark now runs a non-type-aware probe for PowerSync and measures the degradation directly: without parser services, `modules/module-mysql/src/replication/BinLogStream.ts:311` becomes one extra conservative report.
 - Common parameterized SQL tag ecosystems beyond `sql`, `sqlQuery`, and `sqlRun` remain unclassified. The current benchmark inventories 177 SQL tagged-template uses and all are already in the allowed-name shape; Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags still need real-code inventory before widening the allowlist.
-- Concatenation false negatives remain open but are now measured: the benchmark sees 37 static SQL-builder `+=` appends, 8 dynamic SQL-builder `+=` candidates, 11 SQL sentence templates outside the main report pattern, and no `.concat()` or array-join SQL candidates. The dynamic append candidates include safe placeholder and allowlisted-sort patterns, so a future lint change must reuse the existing safe-fragment/identifier proof rather than flag every builder append.
+- Concatenation false negatives are now measured: the benchmark sees 37 static SQL-builder `+=` appends, 8 dynamic SQL-builder `+=` candidates, 11 SQL sentence templates outside the old 200-character `SELECT ... FROM` pattern, and no `.concat()` or array-join SQL candidates. The 8 dynamic appends are classified clean: placeholder lists, joins of static condition fragments, or allowlisted sort/direction fragments. The widened sentence-pattern trigger now reports the four unsafe long Chaski templates at lines 626, 650, 1111, and 1367 while the Cloudflare/Opencode controls stay clean. Do not add SQL-builder append linting unless a real unsafe dynamic append appears.
 
-Stable promotion waits on broad finding classification, classification of the 8 dynamic SQL-builder candidates, and an explicit decision on the non-type-aware imported-escaper degradation.
+Stable promotion waits on broad finding classification and an explicit decision on the non-type-aware imported-escaper degradation.

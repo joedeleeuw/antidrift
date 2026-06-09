@@ -411,15 +411,16 @@ function recordSqlGuard({ repo, repoRoot, filePath, inventory, node, source, sql
   }
 }
 
-function recordSqlBuilderAppend({ repo, repoRoot, filePath, inventory, node, sqlBuilderVariables }) {
+function recordSqlBuilderAppend({ repo, repoRoot, filePath, inventory, node, sqlBuilderVariables, source }) {
   if (node.type !== "AssignmentExpression" || node.operator !== "+=" || !isSqlBuilderVariable(node.left, sqlBuilderVariables)) return;
   const rightText = staticSqlText(node.right);
+  const detail = sourceText(source, node.right).replace(/\s+/gu, " ").trim();
   if (rightText !== null && sqlFragmentKeywordPattern.test(rightText)) {
     inventory.concatRiskShapes.plusEqualsStaticSqlBuilder += 1;
-    pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "plus-equals-static-sql-builder"));
+    pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "plus-equals-static-sql-builder", detail), 80);
   } else if (rightText === null) {
     inventory.concatRiskShapes.plusEqualsDynamicSqlBuilder += 1;
-    pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "plus-equals-dynamic-sql-builder"));
+    pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "plus-equals-dynamic-sql-builder", detail), 80);
   }
 }
 
@@ -427,7 +428,7 @@ function recordConcatCall({ repo, repoRoot, filePath, inventory, node }) {
   if (node.type !== "CallExpression" || callMemberName(node) !== "concat") return;
   if (![node.callee.object, ...node.arguments].some(containsSqlKeyword)) return;
   inventory.concatRiskShapes.concatCallSql += 1;
-  pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "concat-call-sql"));
+  pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "concat-call-sql"), 80);
 }
 
 function recordArrayJoin({ repo, repoRoot, filePath, inventory, node }) {
@@ -435,7 +436,7 @@ function recordArrayJoin({ repo, repoRoot, filePath, inventory, node }) {
   const joined = arrayJoinedText(node);
   if (!joined || !sqlSentencePattern.test(joined)) return;
   inventory.concatRiskShapes.arrayJoinSql += 1;
-  pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "array-join-sql"));
+  pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "array-join-sql"), 80);
 }
 
 function recordTemplateOutsideMainPattern({ repo, repoRoot, filePath, inventory, node }) {
@@ -443,7 +444,7 @@ function recordTemplateOutsideMainPattern({ repo, repoRoot, filePath, inventory,
   const text = templateLiteralText(node);
   if (sqlPattern.test(text) || !sqlSentencePattern.test(text)) return;
   inventory.concatRiskShapes.keywordTemplateOutsideMainPattern += 1;
-  pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "keyword-template-outside-main-pattern"));
+  pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "keyword-template-outside-main-pattern"), 80);
 }
 
 function classifySqlInventoryForFile({ repo, repoRoot, filePath }) {
@@ -457,7 +458,7 @@ function classifySqlInventoryForFile({ repo, repoRoot, filePath }) {
     const base = { repo, repoRoot, filePath, inventory, node };
     recordSqlTag(base);
     recordSqlGuard({ ...base, source, sqlContext });
-    recordSqlBuilderAppend({ ...base, sqlBuilderVariables });
+    recordSqlBuilderAppend({ ...base, sqlBuilderVariables, source });
     recordConcatCall(base);
     recordArrayJoin(base);
     recordTemplateOutsideMainPattern(base);
@@ -504,7 +505,7 @@ function mergeInventory(left, right) {
   out.concatRiskShapes.keywordTemplateOutsideMainPattern += right.concatRiskShapes.keywordTemplateOutsideMainPattern;
   for (const example of right.sqlTags.examples) pushExample(out.sqlTags.examples, example);
   for (const example of right.guardShapes.examples) pushExample(out.guardShapes.examples, example);
-  for (const example of right.concatRiskShapes.examples) pushExample(out.concatRiskShapes.examples, example);
+  for (const example of right.concatRiskShapes.examples) pushExample(out.concatRiskShapes.examples, example, 80);
   for (const error of right.parseErrors) pushExample(out.parseErrors, error);
   return out;
 }

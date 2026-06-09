@@ -920,6 +920,7 @@ function ruleNoObviousComment() {
 }
 
 const sqlPattern = /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
+const sqlSentencePattern = /\b(?:SELECT\b[\s\S]*?\bFROM\b|INSERT\s+INTO\b|UPDATE\b[\s\S]*?\bSET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
 const parameterizedSqlTagNames = new Set(["sql", "sqlQuery", "sqlRun"]);
 const sqlInterpolationBeforeKeywords = [
   "FROM",
@@ -1768,7 +1769,7 @@ function ruleNoSqlStringConcat() {
         },
         TemplateLiteral(node) {
           if (node.parent?.type === "TaggedTemplateExpression" && node.parent.quasi === node && isParameterizedSqlTag(node.parent.tag)) return;
-          if (node.expressions.length > 0 && sqlPattern.test(templateText(node))) {
+          if (node.expressions.length > 0 && (sqlPattern.test(templateText(node)) || sqlSentencePattern.test(templateText(node)))) {
             if (!hasUnsafeSqlInterpolation(node)) return;
             context.report({ node, message: "Do not interpolate values into SQL strings. Use parameterized queries / bound parameters." });
           }

@@ -837,7 +837,8 @@ rules:
       - The widened ad hoc SQL scan still has 168 mostly unclassified findings; curated corpus gates are not enough to claim zero false positives.
       - "The SQL benchmark now inventories promotion blockers: 177 SQL tagged-template uses are all in the currently allowed `sql`/`sqlQuery`/`sqlRun` shape, while Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags still need real-code inventory before widening the allowlist."
       - Equivalent positive guard, allowlist, and regex-variant identifier sanitizers remain uncharacterized against real code; the current benchmark only finds the already-supported negative regex/exit shape in SQL context.
-      - The current concatenation branch does not cover SQL-builder `+=`; the benchmark sees 37 static builder appends and 8 dynamic builder append candidates. Classify those dynamic candidates before widening the lint rule.
+      - The current concatenation branch does not cover SQL-builder `+=`; the benchmark sees 37 static builder appends and 8 dynamic builder append candidates. The dynamic candidates are currently classified clean, so do not widen builder-append linting until a real unsafe dynamic append appears.
+      - The widened sentence-pattern trigger catches long unsafe Chaski templates at lines 626, 650, 1111, and 1367 that the old 200-character `SELECT ... FROM` window missed, while Cloudflare and Opencode SQL controls stay clean.
       - "The benchmark directly measures non-type-aware degradation: without parser services, PowerSync `modules/module-mysql/src/replication/BinLogStream.ts:311` becomes one extra conservative report."
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:

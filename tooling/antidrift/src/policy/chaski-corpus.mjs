@@ -789,6 +789,22 @@ export const defaultCases = [
         path: "src/frontend/bff/api/gateways/posthog-gateway.ts",
         line: 570,
       },
+      {
+        path: "src/frontend/bff/api/gateways/posthog-gateway.ts",
+        line: 626,
+      },
+      {
+        path: "src/frontend/bff/api/gateways/posthog-gateway.ts",
+        line: 650,
+      },
+      {
+        path: "src/frontend/bff/api/gateways/posthog-gateway.ts",
+        line: 1111,
+      },
+      {
+        path: "src/frontend/bff/api/gateways/posthog-gateway.ts",
+        line: 1367,
+      },
     ],
   },
   {
