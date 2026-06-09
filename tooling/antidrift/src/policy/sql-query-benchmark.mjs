@@ -28,6 +28,10 @@ const opencodeRepoCandidates = [
   process.env.OPENCODE_REPO,
   "/Users/sushi/code/opencode",
 ].filter(Boolean);
+const powersyncServiceRepoCandidates = [
+  process.env.POWERSYNC_SERVICE_REPO,
+  "/Users/sushi/code/powersync-service",
+].filter(Boolean);
 
 const benchmarkRuleIds = [
   "antidrift/no-sql-string-concat",
@@ -98,6 +102,16 @@ const corpusPlans = [
       "packages/core/src/database/migration.ts",
     ],
   },
+  {
+    repo: "powersync-service",
+    label: "module-mysql-sql-corpus",
+    repoCandidates: powersyncServiceRepoCandidates,
+    tsconfig: "modules/module-mysql/tsconfig.json",
+    targets: [
+      "modules/module-mysql/src/api/MySQLRouteAPIAdapter.ts",
+      "modules/module-mysql/src/replication/BinLogStream.ts",
+    ],
+  },
 ];
 
 function parseCsv(value) {
@@ -140,7 +154,16 @@ function selectedPlans(repo) {
   return corpusPlans.filter((plan) => requested.has(plan.repo));
 }
 
-function eslintConfig() {
+function eslintConfig(plan, repoRoot) {
+  const parserOptions = {
+    ecmaFeatures: { jsx: true },
+    ecmaVersion: 2023,
+    sourceType: "module",
+  };
+  if (plan.tsconfig) {
+    parserOptions.project = [plan.tsconfig];
+    parserOptions.tsconfigRootDir = repoRoot;
+  }
   return [
     {
       ignores: [
@@ -158,11 +181,7 @@ function eslintConfig() {
       files: ["**/*.{ts,tsx}"],
       languageOptions: {
         parser: tsParser,
-        parserOptions: {
-          ecmaVersion: 2023,
-          sourceType: "module",
-          ecmaFeatures: { jsx: true },
-        },
+        parserOptions,
       },
       plugins: {
         antidrift,
@@ -224,7 +243,7 @@ async function runPlan(plan) {
   const eslint = new ESLint({
     cwd: repoRoot,
     overrideConfigFile: true,
-    overrideConfig: eslintConfig(),
+    overrideConfig: eslintConfig(plan, repoRoot),
   });
   const results = await eslint.lintFiles(plan.targets);
   const parserErrors = results.flatMap((result) =>
@@ -244,6 +263,8 @@ async function runPlan(plan) {
     decision: "pass",
     repoRoot,
     targets: plan.targets,
+    typeAware: Boolean(plan.tsconfig),
+    tsconfig: plan.tsconfig ?? null,
     checkedFiles: results.length,
     parserErrors: parserErrors.length,
     parserErrorFindings: parserErrors.slice(0, 10),

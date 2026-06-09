@@ -72,7 +72,7 @@ pnpm policy:benchmark-sql-queries
 
 This is an inventory gate, not a pass/fail lint gate. It runs `sonarjs/sql-queries` beside `antidrift/no-sql-string-concat` over real SQL-related Chaski, Codebase Atlas, Sudocode, Cloudflare Agents, and Opencode programs, then writes `reports/sql-query-benchmark.json`.
 
-Current benchmark result: 260 files checked, 0 parser errors, 11 `antidrift/no-sql-string-concat` findings, and 0 `sonarjs/sql-queries` findings. The custom findings are the 10 Chaski HogQL/template interpolation findings plus one Cloudflare playground table-name interpolation. Opencode stats now stays clean for local `sqlIdentifier` / `sqlString` quote-doubling helpers, finite static object fragments, and bounded SQL-fragment builders. Treat SonarJS as maintained adjacent coverage, not a replacement for this custom rule.
+Current benchmark result: 262 files checked, 0 parser errors, 12 `antidrift/no-sql-string-concat` findings, and 0 `sonarjs/sql-queries` findings. The custom findings are the 10 Chaski HogQL/template interpolation findings, one Cloudflare playground table-name interpolation, and one PowerSync service raw table-name interpolation. Opencode stats stays clean for local `sqlIdentifier` / `sqlString` quote-doubling helpers, finite static object fragments, and bounded SQL-fragment builders. PowerSync service now runs as a type-aware benchmark plan and keeps the imported `escapeMysqlTableName(table)` clean control quiet. Treat SonarJS as maintained adjacent coverage, not a replacement for this custom rule.
 
 ## Schema Roundtrip Inventory
 

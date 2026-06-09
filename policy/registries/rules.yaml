@@ -809,7 +809,7 @@ rules:
     status: ready
     stable: false
     referenceDoc: docs/rule-investigations/no-sql-string-concat.md
-    signal: SQL keyword/context AST plus scope-binding guard control-flow
+    signal: SQL keyword/context AST plus scope-binding guard control-flow plus TypeChecker imported-escaper proof
     solveType: injection-boundary
     corpusRepositories:
       [
@@ -821,7 +821,7 @@ rules:
         powersync-service,
       ]
     concerns:
-      - The benchmark on 260 real files reports 11 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
+      - The benchmark on 262 real files reports 12 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
       - Dynamic placeholder lists such as `ids.map(() => "?").join(",")` are accepted clean because values remain bound parameters.
       - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
       - Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are accepted clean because the tag owns value binding.
@@ -833,7 +833,8 @@ rules:
       - Finite static object fragments such as Opencode `dimensionSql.select` / `dimensionSql.groupBy` are accepted only when all returned object branches expose safe SQL fragment properties.
       - Current production drift evidence is Chaski plus PowerSync service. Sudocode and Cloudflare add useful but lower-strength drift pressure because the accepted findings are in test helpers and demo/playground code.
       - "PowerSync service supplies the guard/escaper lower edge: `sourceTable.table` still reports when a neighboring escaped table-name helper exists. The imported `escapeMysqlTableName(table)` call now stays clean through a TypeScript symbol-to-declaration proof of quote-doubled identifier escaping."
-      - "The June 8, 2026 advisory review found the sanitized-identifier branch locally ready but not stable. Opencode now supplies second-repo sanitized identifier replication, and PowerSync supplies lower-edge plus imported-escaper clean pressure, so stable promotion needs a fresh review rather than more edge searching."
+      - "The June 9, 2026 advisory review found the PowerSync imported-escaper proof sound and the rule locally ready, but not stable. Stable is blocked by broad SQL finding classification and by the type-aware-only imported-escaper branch silently degrading to conservative reports without parser services."
+      - The widened ad hoc SQL scan still has 168 mostly unclassified findings; curated corpus gates are not enough to claim zero false positives.
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
     external:
       state: partial-overlap
@@ -855,7 +856,7 @@ rules:
         - 'if (!VALID_NAMESPACE.test(ns)) throw new Error("bad namespace"); this.tableName = `cf_workspace_${ns}`; this.sql.run(`SELECT * FROM ${this.tableName}`);'
         - 'const table = [catalog, database, name].map(sqlIdentifier).join("."); db.prepare(`SELECT * FROM ${table}`);'
         - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
-    nextAction: Run a fresh stable-promotion review now that lower-edge and imported-escaper proof are covered by real corpus gates.
+    nextAction: Classify the broad SQL inventory and resolve or explicitly document the non-type-aware imported-escaper degradation before stable promotion.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
@@ -1161,7 +1162,7 @@ researchCandidates:
     signal: maintained ESLint plugin
     solveType: sql-injection-boundary
     referenceDoc: docs/rule-equivalence-audit.md
-    nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 11 antidrift SQL findings. Keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.
+    nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 12 antidrift SQL findings. Keep antidrift/no-sql-string-concat until the HogQL/template interpolation delta is proven redundant.
   antidrift/no-same-schema-recertification:
     status: research
     signal: TypeChecker plus schema-output assignability and refinement-free override proof
