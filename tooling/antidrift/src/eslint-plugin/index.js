@@ -1286,9 +1286,16 @@ function endsWithSqlInterpolationKeyword(value) {
   return sqlInterpolationBeforeKeywords.some((keyword) => normalized === keyword || normalized.endsWith(` ${keyword}`) || normalized.endsWith(` ${keyword} (`));
 }
 
+function containsSqlStatementContext(value) {
+  return /\b(?:SELECT|FROM|JOIN|WHERE|VALUES|UPDATE|INSERT|DELETE|ORDER BY|GROUP BY|HAVING)\b/u.test(
+    normalizedSqlContext(value),
+  );
+}
+
 function endsWithSqlInterpolationOperator(value) {
   const normalized = removeTrailingSqlQuote(value);
-  return ["=", "(", ","].some((operator) => normalized.endsWith(operator));
+  return containsSqlStatementContext(normalized)
+    && ["=", "(", ","].some((operator) => normalized.endsWith(operator));
 }
 
 function startsWithSqlInterpolationKeyword(value) {

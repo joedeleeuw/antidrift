@@ -27,6 +27,7 @@
     "policy:benchmark-unsafe-type-assertion": "NODE_OPTIONS=--max-old-space-size=8192 antidrift benchmark-unsafe-type-assertion --slice upstream-delta --output reports/unsafe-type-assertion-benchmark.json",
     "policy:benchmark-sql-queries": "antidrift benchmark-sql-queries --slice upstream-delta --output reports/sql-query-benchmark.json",
     "policy:inventory-sql-broad": "NODE_OPTIONS=--max-old-space-size=8192 antidrift inventory-sql-broad --slice broad-sql-promotion --output reports/sql-broad-inventory.json",
+    "policy:inventory-sql-source-fleet": "NODE_OPTIONS=--max-old-space-size=8192 antidrift inventory-sql-broad --slice broad-sql-source-fleet --repo LibreChat,agent-browser,athena-crisis,bridglet,charging-monitor,cloudflare-agents,codebase-atlas,codex,codiff,excalidraw-mcp-app,figma-console-mcp,frontend-coding-challenge,hunk,linear-lite,murderbox,opencode,pierre,powersync-service,rubber,sandcastle,site-greater-co,sudocode-main,taskme,usurper --output reports/sql-broad-inventory-source-fleet.json",
     "policy:inventory-schema-roundtrip": "antidrift inventory-schema-roundtrip --slice same-schema-recertification-research --output reports/schema-roundtrip-inventory.json",
     "policy:repo-corpus": "antidrift repo-corpus",
     "policy:validate-chaski": "antidrift chaski-corpus --slice chaski-local",

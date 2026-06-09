@@ -21,6 +21,8 @@ const ignoredDirectoryNames = new Set([
   ".git",
   ".next",
   ".nuxt",
+  ".open-next",
+  ".sst",
   ".turbo",
   "build",
   "coverage",
