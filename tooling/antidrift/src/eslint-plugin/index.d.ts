@@ -1,5 +1,5 @@
-import type { Linter } from "eslint";
+import type { ESLint } from "eslint";
 
-declare const plugin: Linter.Plugin;
+declare const plugin: ESLint.Plugin;
 
 export default plugin;

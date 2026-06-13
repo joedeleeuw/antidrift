@@ -1,5 +1,5 @@
 export { loadRegistriesSync } from "./lib/registries.mjs";
-export { generate } from "./generate-policy-artifacts.mjs";
+export { generate, loadPolicy, renderPolicyArtifacts } from "./generate-policy-artifacts.mjs";
 export { checkGenerated } from "./check-generated-policy-artifacts.mjs";
 export { checkChanged } from "./check-changed.mjs";
 export { checkRegistries } from "./check-registries.mjs";

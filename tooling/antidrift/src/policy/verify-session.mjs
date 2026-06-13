@@ -9,6 +9,7 @@ export function verifySession() {
     ["pnpm", ["policy:check-rule-surface"]],
     ["pnpm", ["policy:validate-corpus"]],
     ["pnpm", ["policy:validate-external-corpus"]],
+    ["pnpm", ["package:verify"]],
     ["pnpm", ["lint"]],
     ["pnpm", ["typecheck"]],
     ["pnpm", ["test"]],

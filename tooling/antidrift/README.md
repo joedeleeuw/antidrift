@@ -52,18 +52,20 @@ If you use the generated hooks/instructions, add the scripts they call to your r
 }
 ```
 
-For self-hosted rule packages, two additional checks keep the control plane honest:
+For self-hosted rule packages, these additional checks keep the control plane honest:
 
 ```sh
 npx antidrift check-registries
 npx antidrift check-rule-surface
+pnpm package:verify
 pnpm policy:validate-corpus
 pnpm policy:validate-chaski
 pnpm policy:inventory-schema-roundtrip
 npx antidrift repo-corpus --slice current-work --rules import-x/no-cycle
 ```
 
-The first validates registry-backed rule facts. The second verifies every custom rule exported by the plugin is configured and covered by `RuleTester`.
+The first two validate registry-backed rule facts and verify every custom rule exported by the plugin is configured and covered by `RuleTester`.
+`package:verify` packs the npm tarball, installs it in a throwaway consumer workspace, type-checks every public export under Bundler and NodeNext resolution, imports every runtime export, and runs ESLint through the shipped config.
 `check-rule-surface` is only meaningful in this source repository layout; installed consumers can use `verify-session`, `check-generated`, and normal ESLint runs without carrying antidrift's own rule tests.
 `policy:validate-corpus` lints the maintained project inventory with every custom rule, while `repo-corpus` can narrow the evidence to the rules changed in a slice.
 `policy:validate-chaski` is an optional local corpus gate: it runs explicit assertions against real Chaski frontend/BFF files when `CHASKI_REPO` or `/Users/sushi/code/chaski` is available, and skips otherwise so consumers do not need the private corpus.
