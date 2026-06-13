@@ -26,19 +26,31 @@
   "publishConfig": {
     "access": "public"
   },
+  "types": "./src/index.d.mts",
   "engines": {
     "node": ">=22"
   },
   "exports": {
-    ".": "./src/index.mjs",
+    ".": {
+      "types": "./src/index.d.mts",
+      "import": "./src/index.mjs"
+    },
     "./brand": {
       "types": "./src/brand/index.d.mts",
-      "import": "./src/brand/index.mjs",
-      "default": "./src/brand/index.mjs"
+      "import": "./src/brand/index.mjs"
     },
-    "./eslint-plugin": "./src/eslint-plugin/index.js",
-    "./eslint-config": "./src/eslint-config/index.mjs",
-    "./policy": "./src/policy/index.mjs"
+    "./eslint-plugin": {
+      "types": "./src/eslint-plugin/index.d.ts",
+      "import": "./src/eslint-plugin/index.js"
+    },
+    "./eslint-config": {
+      "types": "./src/eslint-config/index.d.mts",
+      "import": "./src/eslint-config/index.mjs"
+    },
+    "./policy": {
+      "types": "./src/policy/index.d.mts",
+      "import": "./src/policy/index.mjs"
+    }
   },
   "bin": {
     "antidrift": "src/policy/cli.mjs"
