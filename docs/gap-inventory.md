@@ -10,6 +10,7 @@ This is the synthesized gap surface for the current antidrift repository. It doe
 - `docs/stable-promotion-inventory.md` owns stable-promotion blockers.
 - `docs/real-corpus-validation.md` owns real-program evidence.
 - `docs/lint-rule-parity.md` owns retired Oxlint parity.
+- `docs/rule-roadmap.md` owns the per-rule classification and keep/delegate/retire decisions.
 
 ## Current Counts
 

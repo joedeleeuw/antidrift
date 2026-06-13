@@ -1,6 +1,6 @@
 # Rule Intent Grill
 
-Last updated: 2026-06-09.
+Last updated: 2026-06-10.
 
 This document is for deciding whether a rule deserves custom code. It is intentionally human-first: before implementing or promoting a rule, state the job failure in plain language, then decide whether the right answer is an ecosystem rule, a sharper detector, inventory-only/off, or retirement.
 
@@ -72,6 +72,8 @@ Claude Opus 4.8 reviewed this branch in `reports/claude-react-grill-stream-auth-
 Next human grill question:
 
 If the only deterministic proof of derivability is a setter writing one cell to a constant whenever another cell is set, should `no-status-triplet-state` retire and fold into `no-coupled-state-setters`?
+
+Human answer (2026-06-10): yes. Any-co-mutation as a blocking signal is false-positive-prone by definition because multiple setters in one handler is often correct React. The redundant-constant-cell branch is the blocking core, the broad co-mutation signal stays classification inventory, and the standalone name-group rule retires after the fold.
 
 ### Broad-Input Type Authority
 
@@ -347,7 +349,7 @@ Recommended answer: use lint as a backstop, not the primary design-system contro
 
 Ask these one at a time, and update this file as decisions crystallize:
 
-1. React split resource state: should the sharper status-triplet intent fold into coupled-setters plus a redundant-constant-cell branch?
+1. React split resource state: should the sharper status-triplet intent fold into coupled-setters plus a redundant-constant-cell branch? (Answered 2026-06-10: yes; see the React section.)
 2. Broad-input type authority: should only zero-field authority claims block, or can heuristic sufficiency thresholds block?
 3. One-owner contracts: do projected boundary DTOs count as forks, and should installed-package ownership require registry/generated facts before blocking?
 4. SQL: should value interpolation and identifier interpolation have different severity when parser services are absent?
