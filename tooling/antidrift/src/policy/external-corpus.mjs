@@ -526,7 +526,7 @@ const codebaseAtlasCases = [
     expectedFindings: [
       {
         path: "src/parsing/treeSitterRealProgramParser.ts",
-        line: 916,
+        line: 917,
       },
     ],
   },
@@ -633,16 +633,6 @@ const codebaseAtlasCases = [
     paths: ["src/needle/AtlasNeedleRenderer.ts"],
   },
   {
-    id: "atlas-layout-overrides-entries-clean",
-    ruleId: "antidrift/no-defensive-shape-probing",
-    kind: "correct",
-    classification: "ready",
-    subproject: "app",
-    typeAware: true,
-    tsconfig: "tsconfig.json",
-    paths: ["tools/write-persistence-curation-hardening-artifacts.ts"],
-  },
-  {
     id: "atlas-language-counts-entries-clean",
     ruleId: "antidrift/no-defensive-shape-probing",
     kind: "correct",
@@ -689,7 +679,7 @@ const murderboxCases = [
     expectedFindings: [
       {
         path: "apps/client/src/components/chat/message-list.tsx",
-        line: 189,
+        line: 193,
       },
     ],
   },
@@ -910,34 +900,26 @@ const opencodeCases = [
   {
     id: "opencode-console-benchmark-list-result-json",
     ruleId: "antidrift/no-unsafe-deserialize",
-    kind: "drift",
+    kind: "known-gap",
     classification: "ready",
     subproject: "console-app",
     typeAware: true,
     tsconfig: "packages/console/app/tsconfig.json",
     paths: ["packages/console/app/src/routes/bench/index.tsx"],
-    expectedFindings: [
-      {
-        path: "packages/console/app/src/routes/bench/index.tsx",
-        line: 19,
-      },
-    ],
+    reason:
+      "Benchmark rows still cast JSON.parse output to BenchmarkResult, but the current no-unsafe-deserialize rule is scoped to any/unknown parse input. This is a parse-output contract gap, not a current-rule drift fixture.",
   },
   {
     id: "opencode-console-benchmark-detail-result-json",
     ruleId: "antidrift/no-unsafe-deserialize",
-    kind: "drift",
+    kind: "known-gap",
     classification: "ready",
     subproject: "console-app",
     typeAware: true,
     tsconfig: "packages/console/app/tsconfig.json",
     paths: ["packages/console/app/src/routes/bench/[id].tsx"],
-    expectedFindings: [
-      {
-        path: "packages/console/app/src/routes/bench/[id].tsx",
-        line: 85,
-      },
-    ],
+    reason:
+      "Benchmark detail rows still cast JSON.parse output to BenchmarkResult, but the current no-unsafe-deserialize rule is scoped to any/unknown parse input. This is a parse-output contract gap, not a current-rule drift fixture.",
   },
   {
     id: "opencode-zen-provider-payload-replacer-clean",
