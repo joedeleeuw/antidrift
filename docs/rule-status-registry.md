@@ -125,7 +125,7 @@ Syntax should be a violation only when the construction pattern is the policy. I
 Start investigation before code:
 
 1. Create or update a reference doc under `docs/rule-investigations/`.
-2. Recover the original complaint from the current session, local handoff/report docs, or available Codex memory. Summarize it as a concrete failure mode, not as a quote dump.
+2. Recover the original complaint from the current session, local handoff/report docs, or available Codex memory. Summarize it as a concrete failure mode, not as a quote dump, then classify its truth artifact through `docs/rule-mining-protocol.md` before choosing lint, semantic lint, hook, workflow, or advisory form.
 3. Check existing ESLint, `typescript-eslint`, and relevant plugin coverage.
 4. Update `docs/rule-equivalence-audit.md` when the rule is active, replaceable, or net-new.
 5. Kick off a read-only Claude Opus 4.8 advisory review using `docs/claude-rule-review-protocol.md`.
