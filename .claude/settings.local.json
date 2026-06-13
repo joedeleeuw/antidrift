@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm policy:verify-session)",
+      "Bash(claude *)",
+      "Bash(find /Users/sushi -name \"shard-003*\" 2>/dev/null)",
+      "Bash(find /Users/sushi -name \"shard-*.jsonl\" 2>/dev/null | head -10)",
+      "Bash(find /Users/sushi -name \"shard-012.jsonl\" 2>/dev/null | head -5)",
+      "Bash(find /Users/sushi/code -name \"*.jsonl\" -type f 2>/dev/null | head -20)",
+      "Bash(cd /Users/sushi/code/preflab && ls data/fullshards/labeled-*.jsonl 2>/dev/null | wc -l | xargs echo \"labeled shards so far:\"; ls data/fullshards/xcheck-*.jsonl 2>/dev/null | wc -l | xargs echo \"xcheck shards so far:\")",
+      "Bash(find /Users/sushi -name \"shard-000.jsonl\" 2>/dev/null)",
+      "Bash(ls -la /Users/sushi/code/ | grep -i shard)",
+      "Bash(find /Users/sushi -name \"shard-018.jsonl\" 2>/dev/null)",
+      "Bash(find /Users/sushi -name \"shard-024.jsonl\" 2>/dev/null | head -5)",
+      "Bash(find /Users/sushi -path \"*/.git\" -prune -o -type f -name \"*.md\" -print 2>/dev/null | xargs grep -l \"shard-006\\\\|fullshards\" 2>/dev/null | head -5)",
+      "Bash(find /Users/sushi -name \"shard-019.jsonl\" 2>/dev/null)",
+      "Bash(find /Users/sushi -name \"shard-023.jsonl\" 2>/dev/null)",
+      "Bash(find /Users/sushi -name \"*shard*\" -type f 2>/dev/null | head -10)",
+      "Bash(find /Users/sushi -name \"*shard*020*\" -o -name \"shard-020.jsonl\" 2>/dev/null | head -10)",
+      "Bash(find /Users/sushi/code -type d -name \"fullshards\" -o -type d -name \"shards\" 2>/dev/null)",
+      "Bash(find /Users/sushi -name \"*shard*022*\" -type f 2>/dev/null | head -10)",
+      "Bash(find /Users/sushi -name \"shard-025.jsonl\" 2>/dev/null)",
+      "Bash(find /Users/sushi -name \"shard-016*\" -type f 2>/dev/null)"
+    ]
+  }
+}
