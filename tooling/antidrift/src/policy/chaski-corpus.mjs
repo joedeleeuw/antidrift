@@ -6,6 +6,7 @@ import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import tsParser from "@typescript-eslint/parser";
 import { ESLint } from "eslint";
 import importX from "eslint-plugin-import-x";
+import ts from "typescript";
 
 import plugin from "../eslint-plugin/index.js";
 
@@ -681,49 +682,21 @@ export const defaultCases = [
   },
   {
     id: "portal-total-savings-coupled-timeframe-state",
-    ruleId: "antidrift/no-coupled-state-setters",
-    kind: "drift",
-    classification: "ready",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "correct",
+    classification: "inventory-only",
     subproject: "frontend",
     paths: [
       "src/frontend/portal/modules/visualize-impact/tabs/total-savings/total-savings.tsx",
     ],
-    expectedFindings: [
-      {
-        path: "src/frontend/portal/modules/visualize-impact/tabs/total-savings/total-savings.tsx",
-        line: 103,
-      },
-    ],
   },
   {
     id: "monolith-sequence-ops-coupled-state-clean",
-    ruleId: "antidrift/no-coupled-state-setters",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
     paths: ["src/frontend/monolithui/src/components/SequenceOps.tsx"],
-  },
-  {
-    id: "crow-v2-team-members-status-triplet",
-    ruleId: "antidrift/no-status-triplet-state",
-    kind: "drift",
-    classification: "ready",
-    subproject: "frontend",
-    paths: ["src/frontend/crow-v2/hooks/useTeamMembers.ts"],
-    expectedFindings: [
-      {
-        path: "src/frontend/crow-v2/hooks/useTeamMembers.ts",
-        line: 33,
-      },
-    ],
-  },
-  {
-    id: "monolith-products-query-state-clean",
-    ruleId: "antidrift/no-status-triplet-state",
-    kind: "correct",
-    classification: "ready",
-    subproject: "frontend",
-    paths: ["src/frontend/monolithui/src/components/Products.tsx"],
   },
   {
     id: "portal-inventory-raw-tailwind-color",
@@ -880,19 +853,15 @@ export const defaultCases = [
     paths: ["src/frontend/bff/api/schemas/optimizer-config.ts"],
   },
   {
-    id: "bff-service-stop-retool-line-item-underchecked-predicate",
+    id: "bff-service-stop-retool-line-item-optional-predicate-clean",
     ruleId: "antidrift/no-underchecked-type-predicate",
-    kind: "drift",
+    kind: "correct",
     classification: "ready",
     subproject: "bff",
     typeAware: true,
     paths: ["src/frontend/bff/api/routers/retool/service-stop-router.ts"],
-    expectedFindings: [
-      {
-        path: "src/frontend/bff/api/routers/retool/service-stop-router.ts",
-        line: 394,
-      },
-    ],
+    reason:
+      "RetoolLineItemData is optional-heavy under the current TypeChecker proof floor; optional-field sufficiency is inventory, not a blocking required-field drift case.",
   },
   {
     id: "bff-date-message-field-checked-predicate-clean",
@@ -1032,7 +1001,36 @@ function typeAwareProjectFor(testCase) {
   );
 }
 
+function programFilesFor(repoRoot, testCase) {
+  return (testCase.programFiles ?? []).map((path) => resolve(repoRoot, path));
+}
+
+function programFor(repoRoot, testCase) {
+  const rootNames = programFilesFor(repoRoot, testCase);
+  if (rootNames.length === 0) return null;
+  return ts.createProgram({
+    rootNames,
+    options: {
+      strict: true,
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      jsx: ts.JsxEmit.ReactJSX,
+      noEmit: true,
+      skipLibCheck: true,
+    },
+  });
+}
+
 function parserOptionsFor(repoRoot, testCase) {
+  const program = programFor(repoRoot, testCase);
+  if (program) {
+    return {
+      ecmaFeatures: { jsx: true },
+      programs: [program],
+      tsconfigRootDir: repoRoot,
+    };
+  }
   const project = typeAwareProjectFor(testCase);
   if (!project) return { ecmaFeatures: { jsx: true } };
   return {
@@ -1047,6 +1045,43 @@ function expectedFindingPresent(findings, expected) {
     (finding) =>
       finding.path === expected.path && finding.line === expected.line,
   );
+}
+
+function unexpectedFindingPresent(findings, unexpected) {
+  return findings.some(
+    (finding) =>
+      finding.path === unexpected.path && finding.line === unexpected.line,
+  );
+}
+
+function evaluateDriftFindings(testCase, findings, corpusLabel) {
+  if (findings.length === 0) {
+    return {
+      decision: "fail",
+      reason: `Expected ${corpusLabel} drift finding, but the rule stayed silent.`,
+    };
+  }
+  for (const expected of testCase.expectedFindings ?? []) {
+    if (!expectedFindingPresent(findings, expected)) {
+      return {
+        decision: "fail",
+        reason: `Expected finding at ${expected.path}:${expected.line}.`,
+      };
+    }
+  }
+  return null;
+}
+
+function evaluateUnexpectedFindings(testCase, findings) {
+  for (const unexpected of testCase.unexpectedFindings ?? []) {
+    if (unexpectedFindingPresent(findings, unexpected)) {
+      return {
+        decision: "fail",
+        reason: `Unexpected finding at ${unexpected.path}:${unexpected.line}.`,
+      };
+    }
+  }
+  return null;
 }
 
 function evaluateCase(
@@ -1089,31 +1124,25 @@ function evaluateCase(
   }
 
   if (testCase.kind === "drift") {
-    if (findings.length === 0) {
-      return {
-        decision: "fail",
-        reason: `Expected ${corpusLabel} drift finding, but the rule stayed silent.`,
-      };
-    }
-    for (const expected of testCase.expectedFindings ?? []) {
-      if (!expectedFindingPresent(findings, expected)) {
-        return {
-          decision: "fail",
-          reason: `Expected finding at ${expected.path}:${expected.line}.`,
-        };
-      }
-    }
+    const failure = evaluateDriftFindings(testCase, findings, corpusLabel);
+    if (failure) return failure;
   }
 
-  return { decision: "pass", reason: null };
+  return (
+    evaluateUnexpectedFindings(testCase, findings) ?? {
+      decision: "pass",
+      reason: null,
+    }
+  );
 }
 
 async function lintCase(repoRoot, testCase, corpusLabel) {
   const absolutePaths = testCase.paths.map((path) => resolve(repoRoot, path));
   const typeAwareProject = typeAwareProjectFor(testCase);
+  const programFiles = programFilesFor(repoRoot, testCase);
   const requiredPaths = typeAwareProject
-    ? [...absolutePaths, resolve(repoRoot, typeAwareProject)]
-    : absolutePaths;
+    ? [...absolutePaths, resolve(repoRoot, typeAwareProject), ...programFiles]
+    : [...absolutePaths, ...programFiles];
   const missingFiles = requiredPaths
     .filter((path) => !existsSync(path))
     .map((path) => relativeFile(repoRoot, path));

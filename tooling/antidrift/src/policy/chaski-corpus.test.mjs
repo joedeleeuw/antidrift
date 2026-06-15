@@ -86,7 +86,7 @@ describe("chaskiCorpus", () => {
 
     const result = await chaskiCorpus({
       repo: root,
-      rules: ["antidrift/no-coupled-state-setters"],
+      rules: ["antidrift/no-handrolled-resource-lifecycle-cells"],
       cases: [
         {
           id: "clean",
@@ -163,6 +163,94 @@ export const normalized = Object.fromEntries(
 
     expect(result.decision).toBe("pass");
     expect(result.cases[0]?.findings).toHaveLength(1);
+  });
+
+  it("can run type-aware corpus cases against explicit program files", async () => {
+    const root = tempRepo();
+    const ruleOptions = {
+      "antidrift/no-canonical-model-fork": [
+        {
+          canonicalEntities: {
+            ProjectInfo: "server/src/types/project.ts",
+          },
+        },
+      ],
+    };
+    const programFiles = [
+      "server/src/types/project.ts",
+      "frontend/src/types/project.ts",
+    ];
+    writeProgram(
+      root,
+      "server/src/types/project.ts",
+      `export interface ProjectInfo {
+  id: string;
+  name: string;
+  path: string;
+  sudocodeDir: string;
+  registeredAt: string;
+  favorite: boolean;
+}
+`,
+    );
+    writeProgram(
+      root,
+      "frontend/src/types/project.ts",
+      `export interface ProjectInfo {
+  id: string;
+  name: string;
+  path: string;
+  sudocodeDir: string;
+  registeredAt: string;
+  favorite: boolean;
+}
+
+export interface OpenProjectInfo extends ProjectInfo {
+  openedAt: string;
+}
+`,
+    );
+
+    const result = await chaskiCorpus({
+      repo: root,
+      cases: [
+        {
+          id: "fork",
+          ruleId: "antidrift/no-canonical-model-fork",
+          kind: "drift",
+          classification: "ready",
+          subproject: "frontend",
+          programFiles,
+          ruleOptions,
+          paths: ["frontend/src/types/project.ts"],
+          expectedFindings: [
+            { path: "frontend/src/types/project.ts", line: 1 },
+          ],
+          unexpectedFindings: [
+            { path: "frontend/src/types/project.ts", line: 10 },
+          ],
+        },
+        {
+          id: "owner",
+          ruleId: "antidrift/no-canonical-model-fork",
+          kind: "correct",
+          classification: "ready",
+          subproject: "server",
+          programFiles,
+          ruleOptions,
+          paths: ["server/src/types/project.ts"],
+        },
+      ],
+      report: () => {},
+    });
+
+    expect(result.decision).toBe("pass");
+    expect(
+      result.cases.find((testCase) => testCase.id === "fork")?.findings,
+    ).toHaveLength(1);
+    expect(
+      result.cases.find((testCase) => testCase.id === "owner")?.findings,
+    ).toHaveLength(0);
   });
 
   it("records known gaps without blocking corpus validation", async () => {

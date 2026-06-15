@@ -47,6 +47,16 @@ const powersyncSqlRuleOptions = {
     },
   ],
 };
+const sudocodeCanonicalModelForkOptions = {
+  "antidrift/no-canonical-model-fork": [
+    {
+      canonicalEntities: {
+        ProjectInfo: "server/src/types/project.ts",
+        ProjectsConfig: "server/src/types/project.ts",
+      },
+    },
+  ],
+};
 
 const sudocodeCases = [
   {
@@ -468,6 +478,44 @@ const sudocodeCases = [
     typeAware: true,
     tsconfig: "server/tsconfig.json",
     paths: ["server/src/execution/output/coalesced-types.ts"],
+  },
+  {
+    id: "sudocode-project-info-frontend-model-fork",
+    ruleId: "antidrift/no-canonical-model-fork",
+    kind: "drift",
+    classification: "ready",
+    subproject: "frontend",
+    programFiles: [
+      "server/src/types/project.ts",
+      "frontend/src/types/project.ts",
+    ],
+    ruleOptions: sudocodeCanonicalModelForkOptions,
+    paths: ["frontend/src/types/project.ts"],
+    expectedFindings: [
+      {
+        path: "frontend/src/types/project.ts",
+        line: 5,
+      },
+    ],
+    unexpectedFindings: [
+      {
+        path: "frontend/src/types/project.ts",
+        line: 22,
+      },
+    ],
+  },
+  {
+    id: "sudocode-project-info-owner-clean",
+    ruleId: "antidrift/no-canonical-model-fork",
+    kind: "correct",
+    classification: "ready",
+    subproject: "server",
+    programFiles: [
+      "server/src/types/project.ts",
+      "frontend/src/types/project.ts",
+    ],
+    ruleOptions: sudocodeCanonicalModelForkOptions,
+    paths: ["server/src/types/project.ts"],
   },
 ];
 
@@ -932,16 +980,16 @@ const opencodeCases = [
     paths: ["packages/console/app/src/routes/zen/util/handler.ts"],
   },
   {
-    id: "opencode-ui-trigger-title-underchecked-predicate",
+    id: "opencode-ui-trigger-title-required-field-clean",
     ruleId: "antidrift/no-underchecked-type-predicate",
-    kind: "known-gap",
+    kind: "correct",
     classification: "ready",
     subproject: "ui",
     typeAware: true,
     tsconfig: "packages/ui/tsconfig.json",
     paths: ["packages/ui/src/components/basic-tool.tsx"],
     reason:
-      "Real UI predicate candidate checks only `title` before claiming the broader TriggerTitle contract, but this external checkout's UI tsconfig extends @tsconfig/node22/tsconfig.json without an install-resolvable package path.",
+      "TriggerTitle has one required field; optional field sufficiency remains inventory rather than blocking proof.",
   },
 ];
 
@@ -993,7 +1041,9 @@ const powersyncServiceCases = [
     subproject: "module-postgres-storage",
     typeAware: true,
     tsconfig: "modules/module-postgres-storage/tsconfig.json",
-    paths: ["modules/module-postgres-storage/src/storage/PostgresSyncRulesStorage.ts"],
+    paths: [
+      "modules/module-postgres-storage/src/storage/PostgresSyncRulesStorage.ts",
+    ],
   },
 ];
 
@@ -1041,6 +1091,7 @@ const externalCorpora = [
     cases: powersyncServiceCases,
   },
 ];
+const defaultCases = externalCorpora.flatMap((entry) => entry.cases);
 
 function parseCsv(value) {
   return value
@@ -1263,6 +1314,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export {
+  defaultCases,
   parseArgs,
   sudocodeCases,
   codebaseAtlasCases,

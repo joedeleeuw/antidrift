@@ -1,6 +1,6 @@
 {
   "name": "@joedeleeuw/antidrift",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "license": "MIT",
   "description": "Deterministic lint + policy guardrails against code and AI-agent drift: a custom ESLint plugin, shareable ESLint config, and a policy generator for agent instruction files and hooks.",
@@ -50,6 +50,46 @@
     "./policy": {
       "types": "./src/policy/index.d.mts",
       "import": "./src/policy/index.mjs"
+    },
+    "./semantic-adapters": {
+      "types": "./src/semantic-adapters/index.d.mts",
+      "import": "./src/semantic-adapters/index.mjs"
+    },
+    "./semantic-adapters/async-control-flow": {
+      "types": "./src/semantic-adapters/async-control-flow.d.mts",
+      "import": "./src/semantic-adapters/async-control-flow.mjs"
+    },
+    "./semantic-adapters/auth-boundary": {
+      "types": "./src/semantic-adapters/auth-boundary.d.mts",
+      "import": "./src/semantic-adapters/auth-boundary.mjs"
+    },
+    "./semantic-adapters/broad-input": {
+      "types": "./src/semantic-adapters/broad-input.d.mts",
+      "import": "./src/semantic-adapters/broad-input.mjs"
+    },
+    "./semantic-adapters/parse-input": {
+      "types": "./src/semantic-adapters/parse-input.d.mts",
+      "import": "./src/semantic-adapters/parse-input.mjs"
+    },
+    "./semantic-adapters/react-state": {
+      "types": "./src/semantic-adapters/react-state.d.mts",
+      "import": "./src/semantic-adapters/react-state.mjs"
+    },
+    "./semantic-adapters/schema-provenance": {
+      "types": "./src/semantic-adapters/schema-provenance.d.mts",
+      "import": "./src/semantic-adapters/schema-provenance.mjs"
+    },
+    "./semantic-adapters/sql": {
+      "types": "./src/semantic-adapters/sql.d.mts",
+      "import": "./src/semantic-adapters/sql.mjs"
+    },
+    "./semantic-adapters/tuple-shape": {
+      "types": "./src/semantic-adapters/tuple-shape.d.mts",
+      "import": "./src/semantic-adapters/tuple-shape.mjs"
+    },
+    "./semantic-adapters/type-owner": {
+      "types": "./src/semantic-adapters/type-owner.d.mts",
+      "import": "./src/semantic-adapters/type-owner.mjs"
     }
   },
   "bin": {
@@ -63,6 +103,7 @@
   "dependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
     "@eslint/js": "^9.17.0",
+    "@typescript-eslint/utils": "^8.60.1",
     "@vitest/eslint-plugin": "^1.6.19",
     "eslint-plugin-boundaries": "^5.0.1",
     "eslint-plugin-import-x": "^4.16.2",
@@ -83,6 +124,7 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@typescript-eslint/parser": "^8.60.1",
+    "@typescript-eslint/rule-tester": "^8.60.1",
     "firebase": "^11.0.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.60.1",

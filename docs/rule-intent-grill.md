@@ -21,12 +21,12 @@ Recommended default: if the answer to question 1 is unclear, do not implement. I
 
 This map is the working answer to the goal: unclear rules must move toward ecosystem coverage, a sharper detector, inventory-only/off, or retirement. `ready but not stable` is not a product decision by itself; it only means code exists and the current gates pass.
 
-| Outcome | Rules | Current decision |
-| --- | --- | --- |
-| Ecosystem-covered or retired | `no-cycle`, `no-inline-disable-without-ticket`, `no-sdk-direct-use`, `no-silent-catch`, `no-explicit-return-type-private-helper`, `no-thin-typed-factory-wrapper`, `no-obvious-comment`, `no-role-literal-in-type`, `no-cast-to-branded`, `no-unsafe-cast-chain` | Locked in `docs/rule-status-registry.md`; do not reopen without new real-code evidence and checker changes. |
-| Rewrite with sharper detector | `no-appeasement-cast`, `no-sql-string-concat`, `no-underchecked-type-predicate`, `no-coupled-state-setters`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-structural-type-fork`, `no-canonical-model-fork`, `require-authz-check` | Keep custom only where the sharper signal is explicit: broad-input authority casts, type-aware SQL identifier proof, degenerate authority claims, redundant constant state cells, branch-specific async array control flow, nullable/optional tuple slots, owner-backed structural contracts, and typed policy wrappers. |
-| Inventory-only/off unless proven | `no-status-triplet-state`, `no-defensive-shape-probing` | `no-status-triplet-state` stays off unless folded into `no-coupled-state-setters`; `no-defensive-shape-probing` is default-off unless a second drift proves value beyond upstream unsafe-member rules. |
-| Config/theme replacement candidate | `no-raw-tailwind-color`, `no-hover-translate-card`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type` | Prefer generated config or construction constraints when readable; keep custom code only when extraction context and exceptions are materially clearer than config. |
+| Outcome                            | Rules                                                                                                                                                                                                                                                                                       | Current decision                                                                                                                                                                                                                                                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ecosystem-covered or retired       | `no-cycle`, `no-inline-disable-without-ticket`, `no-sdk-direct-use`, `no-silent-catch`, `no-explicit-return-type-private-helper`, `no-thin-typed-factory-wrapper`, `no-obvious-comment`, `no-role-literal-in-type`, `no-cast-to-branded`, `no-unsafe-cast-chain`, `no-status-triplet-state` | Locked in `docs/rule-status-registry.md`; do not reopen without new real-code evidence and checker changes.                                                                                                                                                                                                              |
+| Rewrite with sharper detector      | `no-appeasement-cast`, `no-sql-string-concat`, `no-underchecked-type-predicate`, `no-handrolled-resource-lifecycle-cells`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-structural-type-fork`, `no-canonical-model-fork`, `require-authz-check`                                           | Keep custom only where the sharper signal is explicit: broad-input authority casts, type-aware SQL identifier proof, degenerate authority claims, redundant constant state cells, branch-specific async array control flow, nullable/optional tuple slots, owner-backed structural contracts, and typed policy wrappers. |
+| Inventory-only/off unless proven   | `no-defensive-shape-probing`                                                                                                                                                                                                                                                                | `no-defensive-shape-probing` is default-off unless a second drift proves value beyond upstream unsafe-member rules.                                                                                                                                                                                                      |
+| Config/theme replacement candidate | `no-raw-tailwind-color`, `no-hover-translate-card`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type`                                                                                                                                                                    | Prefer generated config or construction constraints when readable; keep custom code only when extraction context and exceptions are materially clearer than config.                                                                                                                                                      |
 
 ## Current Grill Targets
 
@@ -35,7 +35,7 @@ This map is the working answer to the goal: unclear rules must move toward ecosy
 Rules:
 
 - `antidrift/no-status-triplet-state`
-- `antidrift/no-coupled-state-setters`
+- `antidrift/no-handrolled-resource-lifecycle-cells`
 - research: `react/no-use-state-waterfall`, `react/no-effect-fetch-waterfall`
 
 Human problem:
@@ -50,14 +50,14 @@ Bad framing:
 
 Better split:
 
-- `no-status-triplet-state` is really about derivable resource lifecycle facts.
-- `no-coupled-state-setters` is about local state cells behaving like one implicit state machine.
-- A behavior-based `no-status-triplet-state` likely collapses into `no-coupled-state-setters` plus a redundant-constant-cell proof: one setter writes a constant such as `false` or `null` whenever another setter receives the resource value.
+- The retired `no-status-triplet-state` rule was really about derivable resource lifecycle facts.
+- `no-handrolled-resource-lifecycle-cells` is about local state cells behaving like one implicit resource lifecycle machine.
+- The behavior-based subset collapsed into `no-handrolled-resource-lifecycle-cells` plus a redundant-constant-cell proof: one setter writes a constant such as `false` or `null` whenever another setter receives the resource value.
 - Fetch/effect waterfall is a separate data-loading architecture problem, mostly pressured by `no-raw-fetch-in-component` and React Hooks rules.
 
 Recommended default:
 
-Keep `no-status-triplet-state` off. Rebuild only if the detector proves React resource-lifecycle cohesion: async boundary, related setters, and evidence that at least one cell is derivable from the lifecycle state. Names can be hints, not proof. The likely implementation path is to fold the proven subset into `no-coupled-state-setters`, not to maintain a separate name-triplet rule.
+Keep `no-status-triplet-state` retired. Names can be hints, not proof; resource-lifecycle enforcement now belongs to `no-handrolled-resource-lifecycle-cells` through async boundary, related setters, and derivable lifecycle-cell evidence.
 
 First human grill question:
 
@@ -67,11 +67,11 @@ Recommended answer: no. The problem is local mutable lifecycle modeling, not the
 
 Current advisory:
 
-Claude Opus 4.8 reviewed this branch in `reports/claude-react-grill-stream-auth-20260609.md`. It agreed the direction is right, but challenged the standalone rule boundary: derivability is the proof that a coupled cell is redundant, so the sharper rule may be `no-coupled-state-setters` with a redundant-constant-cell branch.
+Claude Opus 4.8 reviewed this branch in `reports/claude-react-grill-stream-auth-20260609.md`. It agreed the direction is right, but challenged the standalone rule boundary: derivability is the proof that a coupled cell is redundant, so the sharper rule became `no-handrolled-resource-lifecycle-cells` with a redundant-constant-cell branch.
 
 Next human grill question:
 
-If the only deterministic proof of derivability is a setter writing one cell to a constant whenever another cell is set, should `no-status-triplet-state` retire and fold into `no-coupled-state-setters`?
+If the only deterministic proof of derivability is a setter writing one cell to a constant whenever another cell is set, should `no-status-triplet-state` retire and fold into `no-handrolled-resource-lifecycle-cells`?
 
 Human answer (2026-06-10): yes. Any-co-mutation as a blocking signal is false-positive-prone by definition because multiple setters in one handler is often correct React. The redundant-constant-cell branch is the blocking core, the broad co-mutation signal stays classification inventory, and the standalone name-group rule retires after the fold.
 
@@ -349,9 +349,9 @@ Recommended answer: use lint as a backstop, not the primary design-system contro
 
 Ask these one at a time, and update this file as decisions crystallize:
 
-1. React split resource state: should the sharper status-triplet intent fold into coupled-setters plus a redundant-constant-cell branch? (Answered 2026-06-10: yes; see the React section.)
+1. React split resource state: should the sharper status-triplet intent fold into coupled-setters plus a redundant-constant-cell branch? (Answered and executed: yes; the standalone rule is retired.)
 2. Broad-input type authority: should only zero-field authority claims block, or can heuristic sufficiency thresholds block?
-3. One-owner contracts: do projected boundary DTOs count as forks, and should installed-package ownership require registry/generated facts before blocking?
+3. One-owner contracts: installed-package ownership now requires accepted `ownership.yaml` package-owner facts before blocking; projected boundary DTOs still need clean-pressure classification.
 4. SQL: should value interpolation and identifier interpolation have different severity when parser services are absent?
 5. Nullable tuples: is nullability the policy boundary, or any ambiguous positional tuple?
 6. Async arrays: should never-await methods and `map`/`flatMap` not-collected have separate promotion bars?

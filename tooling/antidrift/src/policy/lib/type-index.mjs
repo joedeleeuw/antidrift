@@ -9,7 +9,12 @@ const TS_TYPE_FLAG_OBJECT = 1 << 19; // ts.TypeFlags.Object
 // apparent members, which would spuriously match any other string-literal union.
 export function isObjectType(type) {
   if (!type) return false;
-  if (typeof type.isUnion === "function" && (type.isUnion() || type.isIntersection())) return false;
+  if (
+    typeof type.isUnion === "function" &&
+    (type.isUnion() || type.isIntersection())
+  ) {
+    return false;
+  }
   return (type.flags & TS_TYPE_FLAG_OBJECT) !== 0;
 }
 
@@ -25,7 +30,9 @@ export function typeProps(checker, type) {
     // Optional properties surface as `T | undefined` at the top level. Strip that suffix so a
     // loosened (all-optional) redeclaration still matches the canonical required shape. Nested
     // unions like `(string | undefined)[]` end in `[]`, not the suffix, so they're unaffected.
-    if (str.endsWith(OPTIONAL_SUFFIX)) str = str.slice(0, -OPTIONAL_SUFFIX.length);
+    if (str.endsWith(OPTIONAL_SUFFIX)) {
+      str = str.slice(0, -OPTIONAL_SUFFIX.length);
+    }
     props.set(sym.name, str);
   }
   return props;
@@ -45,7 +52,9 @@ function isCanonicalSource(fileName) {
   const p = fileName.replace(/\\/gu, "/");
   // Only types shipped by installed packages count as canonical — never the user's own code.
   // The TypeScript standard libs (typescript/lib) are excluded to avoid DOM/global noise.
-  return p.includes("/node_modules/") && !p.includes("/node_modules/typescript/lib/");
+  return (
+    p.includes("/node_modules/") && !p.includes("/node_modules/typescript/lib/")
+  );
 }
 
 // A symbol is a named installed type when it has a real name (TypeScript prefixes synthetic
@@ -65,11 +74,14 @@ function isNamedInstalledSymbol(sym) {
 // zod's mapped-type machinery, so the schema's hand-restated shape is still caught as drift.
 export function resolvesToInstalledType(type) {
   if (!type) return false;
-  const symbol = typeof type.getSymbol === "function" ? type.getSymbol() : type.symbol;
-  return isNamedInstalledSymbol(symbol) || isNamedInstalledSymbol(type.aliasSymbol);
+  const symbol =
+    typeof type.getSymbol === "function" ? type.getSymbol() : type.symbol;
+  return (
+    isNamedInstalledSymbol(symbol) || isNamedInstalledSymbol(type.aliasSymbol)
+  );
 }
 
-function candidateFor(checker, sym, pkg) {
+function candidateFor(checker, sym, pkg, metadata = {}) {
   let declared;
   try {
     declared = checker.getDeclaredTypeOfSymbol(sym);
@@ -79,10 +91,16 @@ function candidateFor(checker, sym, pkg) {
   if (!isObjectType(declared)) return null;
   const props = typeProps(checker, declared);
   if (props.size < MIN_PROPS) return null;
-  return { label: `${pkg}#${sym.getName()}`, props };
+  return { label: `${pkg}#${sym.getName()}`, props, ...metadata };
 }
 
-function exportedObjectTypes(program, checker, sourceFilter, labelFor) {
+function exportedObjectTypes(
+  program,
+  checker,
+  sourceFilter,
+  labelFor,
+  metadataFor,
+) {
   const candidates = [];
   const seen = new Set();
   for (const sf of program.getSourceFiles()) {
@@ -91,7 +109,12 @@ function exportedObjectTypes(program, checker, sourceFilter, labelFor) {
     if (!moduleSym) continue;
     const labelPrefix = labelFor(sf);
     for (const sym of checker.getExportsOfModule(moduleSym)) {
-      const candidate = candidateFor(checker, sym, labelPrefix);
+      const candidate = candidateFor(
+        checker,
+        sym,
+        labelPrefix,
+        metadataFor(sf),
+      );
       if (candidate && !seen.has(candidate.label)) {
         seen.add(candidate.label);
         candidates.push(candidate);
@@ -110,7 +133,80 @@ export function collectCanonicalTypes(program, checker) {
     checker,
     (sf) => sf.isDeclarationFile && isCanonicalSource(sf.fileName),
     (sf) => packageOf(sf.fileName),
+    () => ({ authority: "installed-package", authorityState: "proposal" }),
   );
+}
+
+function packageTypeOwnerEntries(packageTypeOwners = {}) {
+  return Object.entries(packageTypeOwners)
+    .map(([name, entry]) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+      if (
+        typeof entry.package !== "string" ||
+        typeof entry.exportName !== "string"
+      ) {
+        return null;
+      }
+      return { name, package: entry.package, exportName: entry.exportName };
+    })
+    .filter(Boolean);
+}
+
+function acceptedPackageCandidate(checker, exports, entry) {
+  const sym = exports.find(
+    (candidate) => candidate.getName() === entry.exportName,
+  );
+  const candidate = sym
+    ? candidateFor(checker, sym, entry.package, {
+        authority: "installed-package",
+        authorityState: "accepted",
+        ownerKey: entry.name,
+      })
+    : null;
+  if (!candidate) return null;
+  return { ...candidate, label: `${entry.package}#${entry.exportName}` };
+}
+
+function collectAcceptedPackageCandidates(checker, exports, entries, seen) {
+  const candidates = [];
+  for (const entry of entries) {
+    const candidate = acceptedPackageCandidate(checker, exports, entry);
+    if (!candidate || seen.has(candidate.label)) continue;
+    seen.add(candidate.label);
+    candidates.push(candidate);
+  }
+  return candidates;
+}
+
+export function collectAcceptedPackageCanonicalTypes(
+  program,
+  checker,
+  packageTypeOwners = {},
+) {
+  const entries = packageTypeOwnerEntries(packageTypeOwners);
+  if (entries.length === 0) return [];
+  const candidates = [];
+  const seen = new Set();
+  for (const sf of program.getSourceFiles()) {
+    if (!sf.isDeclarationFile || !isCanonicalSource(sf.fileName)) continue;
+    const matchingEntries = entries.filter(
+      (entry) => entry.package === packageOf(sf.fileName),
+    );
+    if (matchingEntries.length === 0) continue;
+    const moduleSym = checker.getSymbolAtLocation(sf);
+    if (!moduleSym) continue;
+    candidates.push(
+      ...collectAcceptedPackageCandidates(
+        checker,
+        checker.getExportsOfModule(moduleSym),
+        matchingEntries,
+        seen,
+      ),
+    );
+  }
+  return candidates;
 }
 
 function normalizePath(fileName) {
@@ -131,37 +227,67 @@ function matchesGeneratedSource(fileName, generated) {
   return p.includes(`/${source}/`) || p.endsWith(`/${source}`);
 }
 
-export function collectGeneratedCanonicalTypes(program, checker, generatedSources = {}) {
-  const entries = Object.entries(generatedSources).filter(([, entry]) => typeof entry?.generated === "string");
+export function collectGeneratedCanonicalTypes(
+  program,
+  checker,
+  generatedSources = {},
+) {
+  const entries = Object.entries(generatedSources).filter(
+    ([, entry]) => typeof entry?.generated === "string",
+  );
   if (entries.length === 0) return [];
   return exportedObjectTypes(
     program,
     checker,
-    (sf) => entries.some(([, entry]) => matchesGeneratedSource(sf.fileName, entry.generated)),
+    (sf) =>
+      entries.some(([, entry]) =>
+        matchesGeneratedSource(sf.fileName, entry.generated),
+      ),
     (sf) => {
-      const matched = entries.find(([, entry]) => matchesGeneratedSource(sf.fileName, entry.generated));
+      const matched = entries.find(([, entry]) =>
+        matchesGeneratedSource(sf.fileName, entry.generated),
+      );
       return matched?.[0] ?? normalizePath(sf.fileName);
     },
+    () => ({ authority: "generated-source", authorityState: "accepted" }),
   );
 }
 
 export function resolvesToGeneratedType(type, generatedSources = {}) {
-  const entries = Object.values(generatedSources).filter((entry) => typeof entry?.generated === "string");
+  const entries = Object.values(generatedSources).filter(
+    (entry) => typeof entry?.generated === "string",
+  );
   if (!type || entries.length === 0) return false;
-  const symbols = [typeof type.getSymbol === "function" ? type.getSymbol() : type.symbol, type.aliasSymbol];
+  const symbols = [
+    typeof type.getSymbol === "function" ? type.getSymbol() : type.symbol,
+    type.aliasSymbol,
+  ];
   return symbols.some((sym) =>
     (sym?.getDeclarations?.() ?? sym?.declarations ?? []).some((decl) =>
-      entries.some((entry) => matchesGeneratedSource(decl.getSourceFile().fileName, entry.generated))
-    )
+      entries.some((entry) =>
+        matchesGeneratedSource(decl.getSourceFile().fileName, entry.generated),
+      ),
+    ),
   );
 }
 
 function canonicalEntityEntries(canonicalEntities = {}) {
   return Object.entries(canonicalEntities)
     .map(([name, entry]) => {
-      if (typeof entry === "string") return { name, exportName: name, owner: entry };
-      if (entry && typeof entry === "object" && typeof entry.owner === "string") {
-        return { name, exportName: typeof entry.exportName === "string" ? entry.exportName : name, owner: entry.owner };
+      if (typeof entry === "string") {
+        return { name, exportName: name, owner: entry };
+      }
+      if (
+        entry &&
+        typeof entry === "object" &&
+        typeof entry.owner === "string"
+      ) {
+        return {
+          name,
+          exportName:
+            typeof entry.exportName === "string" ? entry.exportName : name,
+          owner: entry.owner,
+        };
       }
       return null;
     })
@@ -174,20 +300,33 @@ function matchesRegistryFile(fileName, owner) {
   return normalizePath(fileName).endsWith(`/${source}`);
 }
 
-export function collectDomainCanonicalTypes(program, checker, canonicalEntities = {}) {
+export function collectDomainCanonicalTypes(
+  program,
+  checker,
+  canonicalEntities = {},
+) {
   const entries = canonicalEntityEntries(canonicalEntities);
   if (entries.length === 0) return [];
   const candidates = [];
   const seen = new Set();
   for (const sf of program.getSourceFiles()) {
-    const matchingEntries = entries.filter((entry) => matchesRegistryFile(sf.fileName, entry.owner));
+    const matchingEntries = entries.filter((entry) =>
+      matchesRegistryFile(sf.fileName, entry.owner),
+    );
     if (matchingEntries.length === 0) continue;
     const moduleSym = checker.getSymbolAtLocation(sf);
     if (!moduleSym) continue;
     const exports = checker.getExportsOfModule(moduleSym);
     for (const entry of matchingEntries) {
-      const sym = exports.find((candidate) => candidate.getName() === entry.exportName);
-      const candidate = sym ? candidateFor(checker, sym, entry.owner) : null;
+      const sym = exports.find(
+        (candidate) => candidate.getName() === entry.exportName,
+      );
+      const candidate = sym
+        ? candidateFor(checker, sym, entry.owner, {
+            authority: "domain",
+            authorityState: "accepted",
+          })
+        : null;
       if (!candidate || seen.has(entry.name)) continue;
       seen.add(entry.name);
       candidates.push({ ...candidate, label: `${entry.owner}#${entry.name}` });
@@ -199,12 +338,19 @@ export function collectDomainCanonicalTypes(program, checker, canonicalEntities 
 export function resolvesToDomainCanonicalType(type, canonicalEntities = {}) {
   const entries = canonicalEntityEntries(canonicalEntities);
   if (!type || entries.length === 0) return false;
-  const symbols = [typeof type.getSymbol === "function" ? type.getSymbol() : type.symbol, type.aliasSymbol];
+  const symbols = [
+    typeof type.getSymbol === "function" ? type.getSymbol() : type.symbol,
+    type.aliasSymbol,
+  ];
   return symbols.some((sym) =>
     (sym?.getDeclarations?.() ?? sym?.declarations ?? []).some((decl) => {
       const sourceFile = decl.getSourceFile();
       const name = sym.getName?.() ?? sym.name;
-      return entries.some((entry) => entry.exportName === name && matchesRegistryFile(sourceFile.fileName, entry.owner));
-    })
+      return entries.some(
+        (entry) =>
+          entry.exportName === name &&
+          matchesRegistryFile(sourceFile.fileName, entry.owner),
+      );
+    }),
   );
 }

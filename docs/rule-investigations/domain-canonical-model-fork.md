@@ -21,7 +21,7 @@ Implemented as `antidrift/no-canonical-model-fork`. The rule is inert unless `ca
 
 ## Real Corpus Evidence
 
-Chaski report types provide the current real-program gate:
+Chaski report types provide the primary real-program gate:
 
 - Drift: `src/frontend/portal/components/reports/action-items/types.ts` redeclares `ActionItem`, `Stop`, and `ActionItemsReport` from `src/frontend/portal/types/reports.ts`.
 - Clean owner: `src/frontend/portal/types/reports.ts`.
@@ -29,15 +29,22 @@ Chaski report types provide the current real-program gate:
 
 The local `Account` and `TDay` declarations in the drift file are not asserted: `Account` is not exported by the canonical owner, and `TDay` has fewer than four comparable properties.
 
+Sudocode provides second-repo configured-owner evidence:
+
+- Drift: `frontend/src/types/project.ts` redeclares `ProjectInfo` from `server/src/types/project.ts`.
+- Clean owner: `server/src/types/project.ts`.
+- Clean derivation: `OpenProjectInfo extends ProjectInfo` in the frontend file is not reported.
+- Harness note: the corpus case supplies an explicit cross-project TypeScript Program because the owner and target span server/frontend tsconfigs.
+
 ## Known Risks
 
 - Domain models, DTOs, view models, and wire contracts can legitimately overlap.
 - Small models produce high false-positive risk, so the current rule uses the shared four-property threshold.
-- Stable promotion still needs another configured repository inventory.
+- Stable promotion still needs fresh adversarial review and broader boundary DTO/view-model clean pressure.
 
 ## Entry Conditions
 
 - A second real repository contains a configured domain model fork.
-- A second real repository contains clean DTO/view-model controls.
+- A second real repository contains clean owner and derivation controls.
 - Any needed sanctioned-boundary allowlist shape is proven by real code before broad enablement.
 - Claude Opus 4.8 review has read the registry, implementation, and corpus evidence.

@@ -1,5 +1,5 @@
-// Full structural redeclaration of firebase/auth UserInfo — no import from firebase.
-// Expected: 1 error on UserInfo (matches firebase/auth#UserInfo shape)
+// Full structural redeclaration of firebase/auth UserInfo.
+// Unaccepted installed-package authority emits inventory facts only.
 
 export type UserInfo = {
   uid: string;

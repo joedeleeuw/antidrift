@@ -4,6 +4,8 @@
 
 Use ESLint plus `typescript-eslint` as the canonical host for antidrift custom rules. The original rule scope includes semantic checks that need TypeScript's `Program` and `TypeChecker`: installed package type forks, registry-backed generated-source and first-party model forks, alias/import identity, Zod provenance, inferred return types, and assignability.
 
+Use `docs/semantic-drift-goal.md` as the north-star requirement for new or migrated rules. A rule should recover a semantic association, authority fact, deterministic source construction, or repo/session proof surface; if it cannot, keep it in inventory, research, delegation, or retirement. Use `docs/semantic-validation-matrix.md` to decide the rule's carrier, blocking threshold, and validation evidence before implementation or promotion.
+
 Keep baseline coverage in ESLint and track any missing replacement rule in `docs/lint-rule-parity.md`.
 
 Record source provenance in `docs/source-ledger.md` whenever you add, remove, or replace a rule, ruleset, tool, or borrowed repo reference. The ledger should say whether the source is local custom code, a maintained ecosystem rule, generated ESLint config, a delegated tool such as Sonar, or consumer-only tooling such as Trunk.
@@ -39,7 +41,7 @@ These require `typescript-eslint` parser services and the TypeScript `Program`/`
 
 Double-cast tunnels and broad unsafe assertions are covered by `@typescript-eslint/no-unsafe-type-assertion`. The former custom brand-cast rule is retired until real non-test brand forgery and adopted brand-boundary evidence justify reopening it.
 
-The shareable `createConfig` path configures `typescript-eslint` project service for these rules. Raw plugin consumers must provide equivalent parser services. Fully type-aware antidrift rules fail closed with a configuration error when they are enabled without parser services, so missing type information is visible instead of silently weakening the rule.
+The shareable `createConfig` path configures `typescript-eslint` project service for these rules. Raw plugin consumers must provide equivalent parser services. Fully type-aware antidrift rules fail closed with a configuration error when they are enabled without parser services, so missing type information is visible instead of silently weakening the rule. Hybrid rules may keep a non-type-aware branch only when the weaker proof is documented, tested, and emitted in a report; `antidrift/no-sql-string-concat` uses `parserServiceDeltas` for that split.
 
 ### Deterministic AST or scope rules
 
@@ -49,7 +51,7 @@ These are valid only when the syntax or local binding is itself the violation:
 - async callbacks in array methods that do not await callbacks
 - missing effect dependency arrays
 - coupled state setters
-- configurable `data/loading/error` status triplets
+- hand-rolled resource lifecycle transitions through `no-handrolled-resource-lifecycle-cells`
 - `.only` and skipped tests
 - inline disables without a reason
 
@@ -106,7 +108,6 @@ Examples:
 
 ```txt
 antidrift/no-trivial-selector-wrapper
-antidrift/no-coupled-state-setters
-antidrift/no-status-triplet-state
+antidrift/no-handrolled-resource-lifecycle-cells
 antidrift/no-raw-tailwind-color
 ```

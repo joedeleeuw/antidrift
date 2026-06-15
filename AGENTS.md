@@ -14,7 +14,7 @@ Run `pnpm policy:verify-session` before finishing substantial code work.
 
 ## Rule clusters
 
-- **react-state-shape** (frontend-platform): react/no-use-state-waterfall, react/no-coupled-state-setters, react/no-status-triplet-state, react/no-derived-state-effect, react/no-effect-fetch-waterfall, react/require-effect-deps
+- **react-state-shape** (frontend-platform): react/no-use-state-waterfall, react/no-handrolled-resource-lifecycle-cells, react/no-status-triplet-state, react/no-derived-state-effect, react/no-effect-fetch-waterfall, react/require-effect-deps
 - **type-contract-shape** (types-platform): ts/no-trivial-selector-wrapper, ts/no-mechanical-get-x-from-y, ts/no-inline-structural-type-at-use-site, ts/no-nullable-positional-tuple, ts/no-underchecked-type-predicate
 - **abstraction-and-file-shape** (architecture): arch/no-one-use-helper, arch/max-function-lines, arch/max-component-lines, arch/no-high-touch-file-growth
 - **semantic-architecture-drift** (architecture): arch/no-cross-layer-import, arch/no-deep-import, arch/no-new-dependency-cycle, arch/no-feature-scatter

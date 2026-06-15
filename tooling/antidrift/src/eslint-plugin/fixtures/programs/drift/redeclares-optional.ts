@@ -1,7 +1,6 @@
 // Loosened redeclaration of firebase/auth UserInfo — same shape, every field made optional.
-// Agents commonly relax types this way; the `?` only appends `| undefined`, so this is still a
-// structural fork of the canonical required shape.
-// Expected: 1 error on UserAttrs
+// Agents commonly relax types this way; the `?` only appends `| undefined`.
+// Unaccepted installed-package authority emits inventory facts only.
 
 export type UserAttrs = {
   uid?: string;

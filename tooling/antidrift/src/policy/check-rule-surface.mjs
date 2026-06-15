@@ -5,12 +5,14 @@ import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 
 import { defaultCases as chaskiCorpusCases } from "./chaski-corpus.mjs";
+import { defaultCases as externalCorpusCases } from "./external-corpus.mjs";
 import { createConfig } from "../eslint-config/index.mjs";
 import plugin from "../eslint-plugin/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = resolve(__dirname, "../../../..");
 const blockingDisallowedStatuses = new Set(["under-proven", "false-positive-prone", "research"]);
+const defaultCorpusCases = [...chaskiCorpusCases, ...externalCorpusCases];
 
 function severityOf(ruleValue) {
   const severity = Array.isArray(ruleValue) ? ruleValue[0] : ruleValue;
@@ -114,7 +116,7 @@ export function checkRuleSurface({
   pluginRules = plugin.rules,
   configs = createConfig({ tsconfigRootDir: repoRoot }),
   testSource,
-  corpusCases = chaskiCorpusCases,
+  corpusCases = defaultCorpusCases,
   ruleRegistry = readRuleRegistry(repoRoot),
   report = console.error,
 } = {}) {
@@ -127,19 +129,26 @@ export function checkRuleSurface({
   const exported = new Set(Object.keys(pluginRules ?? {}));
   const configuredSettings = collectConfiguredRuleSettings(Array.isArray(configs) ? configs : [configs]);
   const configured = new Set(configuredSettings.keys());
-  const tested = new Set([...collectTestedRules(resolvedTestSource), ...collectCorpusCoveredRules(corpusCases)]);
+  const ruleTesterCovered = collectTestedRules(resolvedTestSource);
+  const corpusCovered = collectCorpusCoveredRules(corpusCases);
 
   const configuredButNotExported = new Set([...configured].filter((rule) => !exported.has(rule)));
   const exportedButNotConfigured = new Set([...exported].filter((rule) => !configured.has(rule)));
-  const exportedButNotTested = new Set([...exported].filter((rule) => !tested.has(rule)));
+  const exportedButNotRuleTesterCovered = new Set([...exported].filter((rule) => !ruleTesterCovered.has(rule)));
+  const exportedButNotCorpusCovered = new Set([...exported].filter((rule) => !corpusCovered.has(rule)));
   const blockingMaturityViolations = collectBlockingMaturityViolations(configuredSettings, ruleRegistry);
 
   reportSorted(configuredButNotExported, "Custom rule configured but not exported", report);
   reportSorted(exportedButNotConfigured, "Custom rule exported but not configured", report);
-  reportSorted(exportedButNotTested, "Custom rule exported but not covered by RuleTester or corpus", report);
+  reportSorted(exportedButNotRuleTesterCovered, "Custom rule exported but not covered by RuleTester", report);
+  reportSorted(exportedButNotCorpusCovered, "Custom rule exported but not covered by corpus evidence", report);
   reportSortedViolations(blockingMaturityViolations, report);
 
-  return configuredButNotExported.size + exportedButNotConfigured.size + exportedButNotTested.size + blockingMaturityViolations.length === 0;
+  return configuredButNotExported.size +
+    exportedButNotConfigured.size +
+    exportedButNotRuleTesterCovered.size +
+    exportedButNotCorpusCovered.size +
+    blockingMaturityViolations.length === 0;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url) && !checkRuleSurface()) {

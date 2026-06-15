@@ -600,16 +600,96 @@ function nonTypeAwareComparison(typeAwareFindings, nonTypeAwareFindings) {
   };
 }
 
+function classifySqlParserServiceDelta(probe) {
+  if (!probe) return "not-applicable";
+  if ((probe.parserErrors ?? 0) > 0) return "parser-error";
+  const comparison = probe.comparisonWithTypeAware ?? {};
+  const extraWithoutTypeServices =
+    comparison.extraWithoutTypeServices ?? [];
+  const missingWithoutTypeServices =
+    comparison.missingWithoutTypeServices ?? [];
+  if (
+    extraWithoutTypeServices.length === 0 &&
+    missingWithoutTypeServices.length === 0
+  ) {
+    return "equivalent-without-parser-services";
+  }
+  if (
+    extraWithoutTypeServices.length > 0 &&
+    missingWithoutTypeServices.length > 0
+  ) {
+    return "mixed-parser-service-delta";
+  }
+  if (missingWithoutTypeServices.length > 0) {
+    return "blocking-false-negative-without-parser-services";
+  }
+  return "conservative-inventory-without-parser-services";
+}
+
+function countByValue(values) {
+  const counts = {};
+  for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
+  return counts;
+}
+
+function parserServiceLocations(probes, key) {
+  return probes
+    .flatMap((probe) =>
+      (probe.comparisonWithTypeAware?.[key] ?? []).map((location) => ({
+        repo: probe.repo,
+        label: probe.label,
+        location,
+      })),
+    )
+    .sort((a, b) =>
+      `${a.repo}:${a.label}:${a.location}`.localeCompare(
+        `${b.repo}:${b.label}:${b.location}`,
+      ),
+    );
+}
+
+function summarizeParserServiceDeltas(results) {
+  const typeAwarePlans = results.filter((result) => result.typeAware).length;
+  const probes = results
+    .map((result) => result.nonTypeAwareProbe)
+    .filter(Boolean);
+  return {
+    typeAwarePlans,
+    probedPlans: probes.length,
+    classificationCounts: countByValue(
+      probes.map((probe) => probe.parserServiceDelta),
+    ),
+    extraWithoutTypeServices: parserServiceLocations(
+      probes,
+      "extraWithoutTypeServices",
+    ),
+    missingWithoutTypeServices: parserServiceLocations(
+      probes,
+      "missingWithoutTypeServices",
+    ),
+  };
+}
+
 async function nonTypeAwareProbe(plan, repoRoot, typeAwareFindings) {
   if (!plan.tsconfig) return null;
   const probePlan = { ...plan, tsconfig: null };
   const { parserErrors, findings } = await lintPlan(probePlan, repoRoot);
-  return {
+  const comparisonWithTypeAware = nonTypeAwareComparison(
+    typeAwareFindings,
+    findings,
+  );
+  const probe = {
+    repo: plan.repo,
+    label: plan.label,
     typeAware: false,
     checkedTargets: plan.targets,
     parserErrors: parserErrors.length,
     findingsByRule: countByRule(findings),
-    comparisonWithTypeAware: nonTypeAwareComparison(typeAwareFindings, findings),
+    comparisonWithTypeAware,
+  };
+  return {
+    ...probe,
+    parserServiceDelta: classifySqlParserServiceDelta(probe),
   };
 }
 
@@ -672,6 +752,7 @@ function summarize(results, slice) {
     findingsByRule: countByRule(findings),
     comparison: compare(findings),
     coverageInventory,
+    parserServiceDeltas: summarizeParserServiceDeltas(results),
     results,
   };
 }
@@ -709,3 +790,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export { parseArgs };
+export { classifySqlParserServiceDelta };

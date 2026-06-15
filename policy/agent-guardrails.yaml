@@ -20,7 +20,7 @@ clusters:
         severity: error
         detector: componentUseStateCountGte:4
         message: Use a reducer, state object, query resource, or state machine when state values change together.
-      - id: react/no-coupled-state-setters # One handler updating many setters proves the state is coupled.
+      - id: react/no-handrolled-resource-lifecycle-cells # An async transition hand-rolls a resource lifecycle: a constant lifecycle cell is toggled while a sibling receives the awaited resource and the caught error.
         severity: error
         detector: sameFunctionDistinctStateSettersGte:3
         message: Model one transition instead of scattering updates across setters.

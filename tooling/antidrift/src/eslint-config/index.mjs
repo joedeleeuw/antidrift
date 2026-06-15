@@ -55,11 +55,15 @@ function gatewayWrapperOverrides(registries, generatedPatterns) {
 
 /**
  * Shareable flat config for the AI guardrails policy.
- * @param {{ tsconfigRootDir?: string, policyDir?: string }} [options]
+ * @param {{ tsconfigRootDir?: string, policyDir?: string, semanticFacts?: unknown }} [options]
  *   tsconfigRootDir: consumer repo root (import.meta.dirname of its eslint.config.mjs)
  *   policyDir: path to the policy directory, relative to tsconfigRootDir (default: "policy")
  */
-export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
+export function createConfig({
+  tsconfigRootDir,
+  policyDir = "policy",
+  semanticFacts,
+} = {}) {
   const absPolicyDir = tsconfigRootDir
     ? resolve(tsconfigRootDir, policyDir)
     : resolve(policyDir);
@@ -118,6 +122,7 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
       },
       settings: {
         react: { version: "detect" },
+        ...(semanticFacts ? { antidrift: { semanticFacts } } : {}),
         "import-x/extensions": [
           ".ts",
           ".tsx",
@@ -424,10 +429,9 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         "antidrift/no-inline-structural-type-at-use-site": "error",
         "antidrift/no-appeasement-cast": "error",
         "antidrift/no-nullable-positional-tuple": "error",
-        "antidrift/no-underchecked-type-predicate": "error",
+        "antidrift/no-underchecked-type-predicate": "off",
         "antidrift/no-defensive-shape-probing": "off",
-        "antidrift/no-coupled-state-setters": "error",
-        "antidrift/no-status-triplet-state": "off",
+        "antidrift/no-handrolled-resource-lifecycle-cells": "error",
         "antidrift/require-effect-deps": "error",
         "antidrift/no-raw-tailwind-color": "error",
         "antidrift/no-hover-translate-card": "error",
@@ -437,7 +441,10 @@ export function createConfig({ tsconfigRootDir, policyDir = "policy" } = {}) {
         // generated-type-drift: structural fork detection against installed package types (type-aware).
         "antidrift/no-structural-type-fork": [
           "error",
-          { generatedSources: registries.generated?.generatedSources ?? {} },
+          {
+            generatedSources: registries.generated?.generatedSources ?? {},
+            packageTypeOwners: registries.ownership?.packageTypeOwners ?? {},
+          },
         ],
         "antidrift/no-canonical-model-fork": [
           "error",

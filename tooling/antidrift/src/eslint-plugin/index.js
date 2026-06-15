@@ -1,20 +1,98 @@
+import { ESLintUtils } from "@typescript-eslint/utils";
 import ts from "typescript";
 
-import { MIN_PROPS, collectCanonicalTypes, collectDomainCanonicalTypes, collectGeneratedCanonicalTypes, isObjectType, resolvesToDomainCanonicalType, resolvesToGeneratedType, resolvesToInstalledType, typeProps } from "../policy/lib/type-index.mjs";
+import {
+  createReactStateTracker,
+  frameStatePayload,
+  lifecycleProof,
+} from "./react-state-graph.js";
+import {
+  emitSemanticFact,
+  semanticFactSink,
+} from "../policy/lib/semantic-facts.mjs";
+import {
+  asyncArrayCallbackClassification,
+  findVariable,
+  getDeclaredVariable,
+  isDirectlyWrappedInPromiseCombinator,
+  markAwaitedPendingMaps,
+  queuePendingAsyncMap,
+} from "../semantic-adapters/async-control-flow.mjs";
+import {
+  DEFAULT_AUTHZ_FUNCTIONS,
+  createAuthBoundaryTracker,
+} from "../semantic-adapters/auth-boundary.mjs";
+import {
+  checkedTargetProperties,
+  countShapeProbesIn,
+  functionParameterByName,
+  hasBroadObjectEntriesValue,
+  hasValidatorDelegation,
+  isAppeasementContractCast,
+  isBroadPredicateInputType,
+  isPredicateObjectContract,
+  objectEntriesCallbackProbe,
+  requiredTypeProps,
+  typePredicateParts,
+} from "../semantic-adapters/broad-input.mjs";
+import { isUnsafeJsonParseInput } from "../semantic-adapters/parse-input.mjs";
+import {
+  isAwaitedCallInitializer,
+  isCallResultExpression,
+  isThrowAssertionCallbackParse,
+  isZodParseExpression,
+  parsedCallResultMatchesSchemaOutput,
+  recordParsedConst,
+  zodParseCallParts,
+} from "../semantic-adapters/schema-provenance.mjs";
+import {
+  isSqlDirectionTokenValue,
+  isSqlIdentifierContext,
+  isSqlIdentifierTokenValue,
+  isSqlInterpolationContext,
+  safeIdentifierMemberSpecs,
+  templateStaticPartsAreSqlIdentifierSafe,
+  valuesAreSqlDirections,
+  valuesAreSqlIdentifiers,
+} from "../semantic-adapters/sql.mjs";
+import { hasNullablePositionalTuple } from "../semantic-adapters/tuple-shape.mjs";
+import {
+  MIN_PROPS,
+  canonicalStatusLiteralOwner,
+  collectAcceptedPackageCanonicalTypes,
+  collectCanonicalTypes,
+  collectDomainCanonicalTypes,
+  collectGeneratedCanonicalTypes,
+  isObjectType,
+  resolvesToDomainCanonicalType,
+  resolvesToGeneratedType,
+  resolvesToInstalledType,
+  typeProps,
+} from "../semantic-adapters/type-owner.mjs";
 
-const rawTailwindColorPattern = /\b(?:text|bg|border|ring)-(?:red|blue|green|yellow|gray|slate|zinc|neutral)-\d{2,3}\b/u;
+const rawTailwindColorPattern =
+  /\b(?:text|bg|border|ring)-(?:red|blue|green|yellow|gray|slate|zinc|neutral)-\d{2,3}\b/u;
 const hoverTranslatePattern = /hover:-?translate-[xy]/u;
-const arrayMethodsNeedingPromiseAll = new Set(["map", "flatMap"]);
-const arrayMethodsNeverAsync = new Set(["filter", "forEach", "some", "every", "find", "findIndex", "findLast", "findLastIndex", "sort"]);
-const arrayTransformMethods = new Set(["map", "flatMap", "reduce"]);
+const createRule = ESLintUtils.RuleCreator(
+  (name) =>
+    `https://github.com/joedeleeuw/antidrift/tree/main/tooling/antidrift#${name}`,
+);
 const reactEffectHooks = new Set(["useEffect", "useLayoutEffect"]);
-const zodParseMethods = new Set(["parse", "parseAsync"]);
-const throwAssertionMatchers = new Set(["toThrow", "toThrowError"]);
 const collectionMetadataMemberNames = new Set(["length", "size"]);
 const exportedLocalNamesByProgram = new WeakMap();
-const structuralDerivationUtilities = new Set(["Omit", "Partial", "Pick", "Readonly", "Required"]);
+const structuralDerivationUtilities = new Set([
+  "Omit",
+  "Partial",
+  "Pick",
+  "Readonly",
+  "Required",
+]);
 
-const memberNodeTypes = new Set(["MethodDefinition", "PropertyDefinition", "Property"]);
+const memberNodeTypes = new Set([
+  "MethodDefinition",
+  "PropertyDefinition",
+  "Property",
+]);
 
 function missingTypeServicesVisitors(context, ruleName) {
   return {
@@ -35,19 +113,37 @@ function requireTypeServices(context) {
 
 function getFunctionName(node) {
   if (node.type === "FunctionDeclaration") return node.id?.name ?? "";
-  if (node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression") return node.id?.name ?? "";
-  if (node.type === "VariableDeclarator" && node.id?.type === "Identifier") return node.id.name;
+  if (
+    node.type === "FunctionExpression" ||
+    node.type === "ArrowFunctionExpression"
+  ) {
+    return node.id?.name ?? "";
+  }
+  if (node.type === "VariableDeclarator" && node.id?.type === "Identifier") {
+    return node.id.name;
+  }
   if (memberNodeTypes.has(node.type)) {
     const key = node.key;
-    if (key?.type === "Identifier" || key?.type === "PrivateIdentifier") return key.name;
-    if (key?.type === "Literal" && typeof key.value === "string") return key.value;
+    if (key?.type === "Identifier" || key?.type === "PrivateIdentifier") {
+      return key.name;
+    }
+    if (key?.type === "Literal" && typeof key.value === "string") {
+      return key.value;
+    }
   }
   return "";
 }
 
 function declarationName(node) {
-  if (node.type === "VariableDeclarator" && node.id?.type === "Identifier") return node.id.name;
-  if ((node.type === "FunctionDeclaration" || node.type === "ClassDeclaration") && node.id?.type === "Identifier") return node.id.name;
+  if (node.type === "VariableDeclarator" && node.id?.type === "Identifier") {
+    return node.id.name;
+  }
+  if (
+    (node.type === "FunctionDeclaration" || node.type === "ClassDeclaration") &&
+    node.id?.type === "Identifier"
+  ) {
+    return node.id.name;
+  }
   return getFunctionName(node);
 }
 
@@ -65,7 +161,9 @@ function exportedLocalNames(program) {
   for (const statement of program?.body ?? []) {
     if (statement.type !== "ExportNamedDeclaration") continue;
     for (const specifier of statement.specifiers ?? []) {
-      if (specifier.local?.type === "Identifier") names.add(specifier.local.name);
+      if (specifier.local?.type === "Identifier") {
+        names.add(specifier.local.name);
+      }
     }
   }
   exportedLocalNamesByProgram.set(program, names);
@@ -73,50 +171,91 @@ function exportedLocalNames(program) {
 }
 
 function isExported(node) {
-  if (node.parent?.type === "ExportNamedDeclaration" || node.parent?.type === "ExportDefaultDeclaration") return true;
+  if (
+    node.parent?.type === "ExportNamedDeclaration" ||
+    node.parent?.type === "ExportDefaultDeclaration"
+  ) {
+    return true;
+  }
   const name = declarationName(node);
   return Boolean(name && exportedLocalNames(programNode(node)).has(name));
 }
 
 function getFunctionNode(node) {
-  if (node.type === "FunctionDeclaration" || node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression") return node;
+  if (
+    node.type === "FunctionDeclaration" ||
+    node.type === "FunctionExpression" ||
+    node.type === "ArrowFunctionExpression"
+  ) {
+    return node;
+  }
   if (node.type === "VariableDeclarator") return node.init;
   // Class methods/fields and object members hold the function in `value`; ignore non-function fields.
   if (memberNodeTypes.has(node.type)) {
     const value = node.value;
-    return value?.type === "FunctionExpression" || value?.type === "ArrowFunctionExpression" ? value : null;
+    return value?.type === "FunctionExpression" ||
+      value?.type === "ArrowFunctionExpression"
+      ? value
+      : null;
   }
   return null;
 }
 
 function enclosingClassExported(memberNode) {
   const classNode = memberNode.parent?.parent; // member → ClassBody → Class
-  if (classNode?.type !== "ClassDeclaration" && classNode?.type !== "ClassExpression") return false;
-  if (classNode.parent?.type === "ExportNamedDeclaration" || classNode.parent?.type === "ExportDefaultDeclaration") return true;
+  if (
+    classNode?.type !== "ClassDeclaration" &&
+    classNode?.type !== "ClassExpression"
+  ) {
+    return false;
+  }
+  if (
+    classNode.parent?.type === "ExportNamedDeclaration" ||
+    classNode.parent?.type === "ExportDefaultDeclaration"
+  ) {
+    return true;
+  }
   // export const X = class { ... }
-  return classNode.parent?.type === "VariableDeclarator" && classNode.parent.parent?.parent?.type === "ExportNamedDeclaration";
+  return (
+    classNode.parent?.type === "VariableDeclarator" &&
+    classNode.parent.parent?.parent?.type === "ExportNamedDeclaration"
+  );
 }
 
 function enclosingObjectExported(memberNode) {
   const objectNode = memberNode.parent;
   if (objectNode?.type !== "ObjectExpression") return false;
   if (objectNode.parent?.type === "ExportDefaultDeclaration") return true;
-  return objectNode.parent?.type === "VariableDeclarator" && objectNode.parent.parent?.parent?.type === "ExportNamedDeclaration";
+  return (
+    objectNode.parent?.type === "VariableDeclarator" &&
+    objectNode.parent.parent?.parent?.type === "ExportNamedDeclaration"
+  );
 }
 
 function enclosingReturnedObjectFromBoundary(memberNode) {
   const objectNode = memberNode.parent;
   if (objectNode?.type !== "ObjectExpression") return false;
-  if (objectNode.parent?.type === "ArrowFunctionExpression" && objectNode.parent.body === objectNode) {
+  if (
+    objectNode.parent?.type === "ArrowFunctionExpression" &&
+    objectNode.parent.body === objectNode
+  ) {
     const arrowParent = objectNode.parent.parent;
-    if (arrowParent?.type === "VariableDeclarator") return isBoundary(arrowParent);
+    if (arrowParent?.type === "VariableDeclarator") {
+      return isBoundary(arrowParent);
+    }
     return isBoundary(objectNode.parent);
   }
   if (objectNode.parent?.type !== "ReturnStatement") return false;
   let cur = objectNode.parent.parent;
   while (cur) {
     if (cur.type === "FunctionDeclaration") return isBoundary(cur);
-    if ((cur.type === "FunctionExpression" || cur.type === "ArrowFunctionExpression") && cur.parent?.type === "VariableDeclarator") return isBoundary(cur.parent);
+    if (
+      (cur.type === "FunctionExpression" ||
+        cur.type === "ArrowFunctionExpression") &&
+      cur.parent?.type === "VariableDeclarator"
+    ) {
+      return isBoundary(cur.parent);
+    }
     if (memberNodeTypes.has(cur.type)) return isBoundary(cur);
     cur = cur.parent;
   }
@@ -125,7 +264,13 @@ function enclosingReturnedObjectFromBoundary(memberNode) {
 
 function functionBoundaryNode(fn) {
   if (fn?.type === "FunctionDeclaration") return fn;
-  if ((fn?.type === "FunctionExpression" || fn?.type === "ArrowFunctionExpression") && fn.parent?.type === "VariableDeclarator") return fn.parent;
+  if (
+    (fn?.type === "FunctionExpression" ||
+      fn?.type === "ArrowFunctionExpression") &&
+    fn.parent?.type === "VariableDeclarator"
+  ) {
+    return fn.parent;
+  }
   if (fn && memberNodeTypes.has(fn.parent?.type)) return fn.parent;
   return fn;
 }
@@ -133,25 +278,50 @@ function functionBoundaryNode(fn) {
 function enclosingFunction(node) {
   let cur = node.parent;
   while (cur) {
-    if (cur.type === "FunctionDeclaration" || cur.type === "FunctionExpression" || cur.type === "ArrowFunctionExpression") return cur;
+    if (
+      cur.type === "FunctionDeclaration" ||
+      cur.type === "FunctionExpression" ||
+      cur.type === "ArrowFunctionExpression"
+    ) {
+      return cur;
+    }
     cur = cur.parent;
   }
   return null;
 }
 
 function objectExpressionExposesIdentifier(objectNode, name) {
-  return objectNode?.type === "ObjectExpression" && objectNode.properties.some((property) => {
-    if (property.type !== "Property") return false;
-    if (property.value?.type === "Identifier" && property.value.name === name) return true;
-    return property.shorthand && property.key?.type === "Identifier" && property.key.name === name;
-  });
+  return (
+    objectNode?.type === "ObjectExpression" &&
+    objectNode.properties.some((property) => {
+      if (property.type !== "Property") return false;
+      if (
+        property.value?.type === "Identifier" &&
+        property.value.name === name
+      ) {
+        return true;
+      }
+      return (
+        property.shorthand &&
+        property.key?.type === "Identifier" &&
+        property.key.name === name
+      );
+    })
+  );
 }
 
 function returnedObjectExposesIdentifier(fn, name) {
-  if (fn?.body?.type === "ObjectExpression") return objectExpressionExposesIdentifier(fn.body, name);
+  if (fn?.body?.type === "ObjectExpression") {
+    return objectExpressionExposesIdentifier(fn.body, name);
+  }
   if (fn?.body?.type !== "BlockStatement") return false;
-  return fn.body.body.some((statement) =>
-    statement.type === "ReturnStatement" && objectExpressionExposesIdentifier(unwrapExpression(statement.argument), name)
+  return fn.body.body.some(
+    (statement) =>
+      statement.type === "ReturnStatement" &&
+      objectExpressionExposesIdentifier(
+        unwrapExpression(statement.argument),
+        name,
+      ),
   );
 }
 
@@ -172,12 +342,37 @@ function callableReturnedFromBoundaryFactory(node) {
 function isBoundary(node) {
   if (!memberNodeTypes.has(node.type)) {
     if (isExported(node)) return true;
-    if ((node.type === "VariableDeclarator" || node.type === "FunctionDeclaration") && callableReturnedFromBoundaryFactory(node)) return true;
-    return node.type === "VariableDeclarator" && node.parent?.parent?.type === "ExportNamedDeclaration";
+    if (
+      (node.type === "VariableDeclarator" ||
+        node.type === "FunctionDeclaration") &&
+      callableReturnedFromBoundaryFactory(node)
+    ) {
+      return true;
+    }
+    return (
+      node.type === "VariableDeclarator" &&
+      node.parent?.parent?.type === "ExportNamedDeclaration"
+    );
   }
-  if (node.kind === "get" || node.kind === "set" || node.kind === "constructor") return true;
-  if (node.type === "Property") return enclosingObjectExported(node) || enclosingReturnedObjectFromBoundary(node);
-  if (node.key?.type === "PrivateIdentifier" || node.accessibility === "private" || node.accessibility === "protected") return false;
+  if (
+    node.kind === "get" ||
+    node.kind === "set" ||
+    node.kind === "constructor"
+  ) {
+    return true;
+  }
+  if (node.type === "Property") {
+    return (
+      enclosingObjectExported(node) || enclosingReturnedObjectFromBoundary(node)
+    );
+  }
+  if (
+    node.key?.type === "PrivateIdentifier" ||
+    node.accessibility === "private" ||
+    node.accessibility === "protected"
+  ) {
+    return false;
+  }
   return enclosingClassExported(node);
 }
 
@@ -187,9 +382,15 @@ function hasExplicitReturnType(fn) {
 
 function unwrapExpression(expression) {
   if (expression?.type === "ChainExpression") return expression.expression;
-  if (expression?.type === "TSAsExpression") return unwrapExpression(expression.expression);
-  if (expression?.type === "TSNonNullExpression") return unwrapExpression(expression.expression);
-  if (expression?.type === "TSSatisfiesExpression") return unwrapExpression(expression.expression);
+  if (expression?.type === "TSAsExpression") {
+    return unwrapExpression(expression.expression);
+  }
+  if (expression?.type === "TSNonNullExpression") {
+    return unwrapExpression(expression.expression);
+  }
+  if (expression?.type === "TSSatisfiesExpression") {
+    return unwrapExpression(expression.expression);
+  }
   return expression;
 }
 
@@ -203,46 +404,39 @@ function isSingleReturnMemberExpression(fn) {
   if (isMemberExpression(fn.body)) return true;
   if (fn.body.type !== "BlockStatement") return false;
   const statements = fn.body.body;
-  return statements.length === 1 && statements[0]?.type === "ReturnStatement" && isMemberExpression(statements[0].argument);
+  return (
+    statements.length === 1 &&
+    statements[0]?.type === "ReturnStatement" &&
+    isMemberExpression(statements[0].argument)
+  );
 }
 
 function returnedExpression(fn) {
   if (!fn?.body) return null;
   if (fn.body.type !== "BlockStatement") return unwrapExpression(fn.body);
   const statements = fn.body.body;
-  if (statements.length !== 1 || statements[0]?.type !== "ReturnStatement") return null;
+  if (statements.length !== 1 || statements[0]?.type !== "ReturnStatement") {
+    return null;
+  }
   return unwrapExpression(statements[0].argument);
 }
 
 function parameterName(param) {
   if (param?.type === "Identifier") return param.name;
-  if (param?.type === "AssignmentPattern" && param.left?.type === "Identifier") return param.left.name;
-  if (param?.type === "RestElement" && param.argument?.type === "Identifier") return param.argument.name;
+  if (
+    param?.type === "AssignmentPattern" &&
+    param.left?.type === "Identifier"
+  ) {
+    return param.left.name;
+  }
+  if (param?.type === "RestElement" && param.argument?.type === "Identifier") {
+    return param.argument.name;
+  }
   return null;
 }
 
 function assignmentTarget(node) {
   return node?.type === "AssignmentPattern" ? node.left : node;
-}
-
-function collectBindingNames(node, names) {
-  const target = assignmentTarget(node);
-  if (!target) return;
-  if (target.type === "Identifier") {
-    names.add(target.name);
-    return;
-  }
-  if (target.type === "RestElement") {
-    collectBindingNames(target.argument, names);
-    return;
-  }
-  if (target.type === "ArrayPattern") {
-    for (const element of target.elements ?? []) collectBindingNames(element, names);
-    return;
-  }
-  if (target.type === "ObjectPattern") {
-    collectObjectPatternBindingNames(target, names);
-  }
 }
 
 function bindingIdentifierName(node) {
@@ -257,32 +451,14 @@ function nestedObjectPattern(node) {
 
 function collectObjectPatternBindingNames(pattern, names) {
   for (const property of pattern.properties ?? []) {
-    const name = property.type === "RestElement" ? bindingIdentifierName(property.argument) : bindingIdentifierName(property.value);
+    const name =
+      property.type === "RestElement"
+        ? bindingIdentifierName(property.argument)
+        : bindingIdentifierName(property.value);
     if (name) names.add(name);
-    const nested = property.type === "Property" ? nestedObjectPattern(property.value) : null;
+    const nested =
+      property.type === "Property" ? nestedObjectPattern(property.value) : null;
     if (nested) collectObjectPatternBindingNames(nested, names);
-  }
-}
-
-function collectBindingIdentifiers(node, identifiers) {
-  const target = assignmentTarget(node);
-  if (!target) return;
-  if (target.type === "Identifier") {
-    identifiers.push(target);
-    return;
-  }
-  if (target.type === "RestElement") {
-    collectBindingIdentifiers(target.argument, identifiers);
-    return;
-  }
-  if (target.type === "ArrayPattern") {
-    for (const element of target.elements ?? []) collectBindingIdentifiers(element, identifiers);
-    return;
-  }
-  if (target.type === "ObjectPattern") {
-    for (const property of target.properties ?? []) {
-      collectBindingIdentifiers(property.type === "RestElement" ? property.argument : property.value, identifiers);
-    }
   }
 }
 
@@ -308,7 +484,13 @@ function memberExpressionRootName(expression) {
 
 function terminalMemberName(expression) {
   const unwrapped = unwrapExpression(expression);
-  if (unwrapped?.type !== "MemberExpression" || unwrapped.computed || unwrapped.property?.type !== "Identifier") return null;
+  if (
+    unwrapped?.type !== "MemberExpression" ||
+    unwrapped.computed ||
+    unwrapped.property?.type !== "Identifier"
+  ) {
+    return null;
+  }
   return unwrapped.property.name;
 }
 
@@ -317,7 +499,9 @@ function returnsMemberOfOwnParameter(fn) {
   const expression = returnedExpression(fn);
   if (expression?.type !== "MemberExpression") return false;
   const terminalName = terminalMemberName(expression);
-  if (terminalName && collectionMetadataMemberNames.has(terminalName)) return false;
+  if (terminalName && collectionMetadataMemberNames.has(terminalName)) {
+    return false;
+  }
   const rootName = memberExpressionRootName(expression);
   return Boolean(rootName && params.has(rootName));
 }
@@ -328,8 +512,10 @@ function returnsDestructuredOwnParameterBinding(fn) {
 }
 
 function isTrivialSelectorWrapper(fn) {
-  return (isSingleReturnMemberExpression(fn) && returnsMemberOfOwnParameter(fn))
-    || returnsDestructuredOwnParameterBinding(fn);
+  return (
+    (isSingleReturnMemberExpression(fn) && returnsMemberOfOwnParameter(fn)) ||
+    returnsDestructuredOwnParameterBinding(fn)
+  );
 }
 
 function isReactComponentName(name) {
@@ -337,44 +523,70 @@ function isReactComponentName(name) {
 }
 
 function isFunctionLike(node) {
-  return node?.type === "FunctionDeclaration"
-    || node?.type === "FunctionExpression"
-    || node?.type === "ArrowFunctionExpression";
+  return (
+    node?.type === "FunctionDeclaration" ||
+    node?.type === "FunctionExpression" ||
+    node?.type === "ArrowFunctionExpression"
+  );
 }
 
 function functionNodeName(fn) {
   if (fn?.type === "FunctionDeclaration") return fn.id?.name ?? "";
-  if ((fn?.type === "FunctionExpression" || fn?.type === "ArrowFunctionExpression") && fn.parent?.type === "VariableDeclarator" && fn.parent.id?.type === "Identifier") return fn.parent.id.name;
-  if ((fn?.type === "FunctionExpression" || fn?.type === "ArrowFunctionExpression") && fn.parent?.type === "Property") {
+  if (
+    (fn?.type === "FunctionExpression" ||
+      fn?.type === "ArrowFunctionExpression") &&
+    fn.parent?.type === "VariableDeclarator" &&
+    fn.parent.id?.type === "Identifier"
+  ) {
+    return fn.parent.id.name;
+  }
+  if (
+    (fn?.type === "FunctionExpression" ||
+      fn?.type === "ArrowFunctionExpression") &&
+    fn.parent?.type === "Property"
+  ) {
     const key = fn.parent.key;
-    if (key?.type === "Identifier" || key?.type === "PrivateIdentifier") return key.name;
-    if (key?.type === "Literal" && typeof key.value === "string") return key.value;
+    if (key?.type === "Identifier" || key?.type === "PrivateIdentifier") {
+      return key.name;
+    }
+    if (key?.type === "Literal" && typeof key.value === "string") {
+      return key.value;
+    }
   }
   return "";
 }
 
 function functionForImplementationParameter(param) {
   const maybeFunction = param?.parent;
-  return isFunctionLike(maybeFunction) && maybeFunction.body ? maybeFunction : null;
+  return isFunctionLike(maybeFunction) && maybeFunction.body
+    ? maybeFunction
+    : null;
 }
 
 function isBoundaryObjectMethod(fn) {
   const property = fn?.parent;
-  return property?.type === "Property"
-    && property.value === fn
-    && (enclosingObjectExported(property) || enclosingReturnedObjectFromBoundary(property));
+  return (
+    property?.type === "Property" &&
+    property.value === fn &&
+    (enclosingObjectExported(property) ||
+      enclosingReturnedObjectFromBoundary(property))
+  );
 }
 
 function isExportedLowercaseFunction(fn) {
   const owner = fn?.type === "FunctionDeclaration" ? fn : fn?.parent;
   const name = functionNodeName(fn);
-  return Boolean(name && !isReactComponentName(name) && owner && isBoundary(owner));
+  return Boolean(
+    name && !isReactComponentName(name) && owner && isBoundary(owner),
+  );
 }
 
 function inlineStructuralTypeAtBoundary(node) {
   const parent = node.parent;
   const param = parent?.parent;
-  if (parent?.type !== "TSTypeAnnotation" || param?.type !== "Identifier") return false;
+  if (parent?.type !== "TSTypeAnnotation" || param?.type !== "Identifier") {
+    return false;
+  }
 
   const fn = functionForImplementationParameter(param);
   if (!fn) return false;
@@ -386,7 +598,13 @@ function inlineStructuralTypeAtBoundary(node) {
 }
 
 function collectTemplateLiteralString(node, parts) {
-  if (node.expressions.length === 0) parts.push(node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw).join(""));
+  if (node.expressions.length === 0) {
+    parts.push(
+      node.quasis
+        .map((quasi) => quasi.value.cooked ?? quasi.value.raw)
+        .join(""),
+    );
+  }
 }
 
 function collectConditionalStringParts(node, parts) {
@@ -436,7 +654,9 @@ function staticStringParts(node, parts = []) {
 function getJsxClassNameLiterals(node) {
   if (node.name?.name !== "className") return [];
   if (node.value?.type === "Literal") return staticStringParts(node.value);
-  if (node.value?.type === "JSXExpressionContainer") return staticStringParts(node.value.expression);
+  if (node.value?.type === "JSXExpressionContainer") {
+    return staticStringParts(node.value.expression);
+  }
   return [];
 }
 
@@ -457,28 +677,48 @@ function checkTrivialSelectorWrapper(node, context) {
   if (isTrivialSelectorWrapper(fn)) {
     context.report({
       node,
-      message: "Do not create a typed selector wrapper that only returns a property of its own parameter. Use inference directly or move the contract to the owned boundary.",
+      message:
+        "Do not create a typed selector wrapper that only returns a property of its own parameter. Use inference directly or move the contract to the owned boundary.",
     });
   }
 }
 
 function ruleNoTrivialSelectorWrapper() {
   return {
-    meta: { type: "problem", docs: { description: "Disallow typed selector wrappers that only restate property access." }, schema: [] },
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Disallow typed selector wrappers that only restate property access.",
+      },
+      schema: [],
+    },
     create(context) {
-      return callableVisitors((node) => checkTrivialSelectorWrapper(node, context));
+      return callableVisitors((node) =>
+        checkTrivialSelectorWrapper(node, context),
+      );
     },
   };
 }
 
 function ruleNoInlineStructuralTypeAtUseSite() {
   return {
-    meta: { type: "problem", docs: { description: "Disallow inline object type literals at use sites." }, schema: [] },
+    meta: {
+      type: "problem",
+      docs: {
+        description: "Disallow inline object type literals at use sites.",
+      },
+      schema: [],
+    },
     create(context) {
       return {
         TSTypeLiteral(node) {
           if (inlineStructuralTypeAtBoundary(node)) {
-            context.report({ node, message: "Do not define structural contracts at use sites. Import or create the owned named type." });
+            context.report({
+              node,
+              message:
+                "Do not define structural contracts at use sites. Import or create the owned named type.",
+            });
           }
         },
       };
@@ -486,109 +726,64 @@ function ruleNoInlineStructuralTypeAtUseSite() {
   };
 }
 
-function ruleNoCoupledStateSetters() {
-  return {
-    meta: { type: "problem", docs: { description: "Disallow functions that mutate many useState setters." }, schema: [{ type: "object", properties: { threshold: { type: "number" } }, additionalProperties: false }] },
-    create(context) {
-      const threshold = context.options[0]?.threshold ?? 3;
-      // ownedSetters: setters declared by each frame (the component that owns them).
-      // calledSetters: setters called within each frame.
-      // On exit, a handler frame reports if it calls >= threshold setters that belong to an ancestor.
-      // This scopes correctly: setters from ComponentA don't appear as ancestors when checking ComponentB.
-      const functionStack = [];
-
-      function enterFunction(node) { functionStack.push({ node, ownedSetters: new Set(), calledSetters: new Set() }); }
-      function exitFunction() {
-        const frame = functionStack.pop();
-        if (!frame) return;
-        const ancestorSetters = new Set();
-        for (const f of functionStack) {
-          for (const s of f.ownedSetters) ancestorSetters.add(s);
-        }
-        const calledAncestor = [...frame.calledSetters].filter((name) => ancestorSetters.has(name));
-        if (calledAncestor.length >= threshold) {
-          context.report({ node: frame.node, message: `This function updates ${calledAncestor.length} state cells. Model one transition with a reducer/resource instead.` });
-        }
-      }
-
-      return {
-        VariableDeclarator(node) {
-          if (node.init?.type !== "CallExpression" || node.init.callee?.name !== "useState") return;
-          if (node.id?.type !== "ArrayPattern") return;
-          const setter = node.id.elements?.[1];
-          if (setter?.type === "Identifier" && functionStack.length > 0) {
-            functionStack[functionStack.length - 1].ownedSetters.add(setter.name);
-          }
-        },
-        FunctionDeclaration: enterFunction,
-        "FunctionDeclaration:exit": exitFunction,
-        FunctionExpression: enterFunction,
-        "FunctionExpression:exit": exitFunction,
-        ArrowFunctionExpression: enterFunction,
-        "ArrowFunctionExpression:exit": exitFunction,
-        CallExpression(node) {
-          const calleeName = node.callee?.type === "Identifier" ? node.callee.name : null;
-          if (calleeName && functionStack.length > 0) {
-            functionStack[functionStack.length - 1].calledSetters.add(calleeName);
-          }
-        },
-      };
-    },
-  };
-}
-
-const lowerSet = (values) => new Set(values.map((value) => value.toLowerCase()));
-
-function ruleNoStatusTripletState() {
+function ruleNoHandrolledResourceLifecycleCells() {
   return {
     meta: {
       type: "problem",
-      docs: { description: "Disallow data/loading/error state triplets." },
-      schema: [{
-        type: "object",
-        properties: {
-          dataNames: { type: "array", items: { type: "string" } },
-          loadingNames: { type: "array", items: { type: "string" } },
-          errorNames: { type: "array", items: { type: "string" } },
+      docs: {
+        description:
+          "Disallow hand-rolled resource-lifecycle state machines: an async transition that toggles a boolean lifecycle cell, resets and assigns an error cell, and assigns an awaited resource cell. Broad multi-setter co-mutation is inventory only, never blocking.",
+      },
+      schema: [
+        {
+          type: "object",
+          properties: { threshold: { type: "number" } },
+          additionalProperties: false,
         },
-        additionalProperties: false,
-      }],
+      ],
     },
     create(context) {
-      const opts = context.options[0] ?? {};
-      const dataNames = lowerSet(opts.dataNames ?? ["data", "result", "user", "items"]);
-      const loadingNames = lowerSet(opts.loadingNames ?? ["loading", "isLoading", "pending", "isPending"]);
-      const errorNames = lowerSet(opts.errorNames ?? ["error", "loadError", "failure"]);
-      const functionStack = [];
-      function enterFunction(node) { functionStack.push({ node, names: new Set() }); }
-      function exitFunction() {
-        const frame = functionStack.pop();
-        if (!frame) return;
-        const names = [...frame.names].map((name) => name.toLowerCase());
-        const hasData = names.some((name) => dataNames.has(name));
-        const hasLoading = names.some((name) => loadingNames.has(name));
-        const hasError = names.some((name) => errorNames.has(name));
-        if (hasData && hasLoading && hasError) {
-          context.report({ node: frame.node, message: "Do not model async lifecycle as separate data/loading/error state cells. Use one reducer/resource value." });
-        }
-      }
-
-      return {
-        FunctionDeclaration: enterFunction,
-        "FunctionDeclaration:exit": exitFunction,
-        FunctionExpression: enterFunction,
-        "FunctionExpression:exit": exitFunction,
-        ArrowFunctionExpression: enterFunction,
-        "ArrowFunctionExpression:exit": exitFunction,
-        VariableDeclarator(node) {
-          if (functionStack.length === 0) return;
-          const init = node.init;
-          if (init?.type !== "CallExpression" || init.callee?.name !== "useState") return;
-          if (node.id?.type !== "ArrayPattern") return;
-          const name = node.id.elements?.[0];
-          if (name?.type === "Identifier") functionStack[functionStack.length - 1].names.add(name.name);
+      const threshold = context.options[0]?.threshold ?? 3;
+      const tracker = createReactStateTracker({
+        onFrameExit(frame) {
+          const proof = frame.isTransition
+            ? lifecycleProof(frame)
+            : { proven: false };
+          if (proof.proven && !frame.requestGuard) {
+            emitSemanticFact(context, frame.node, {
+              factKind: "resourceLifecycleProof",
+              ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+              adapterId: "react-state",
+              confidence: "deterministic-enforcement",
+              provenance: ["AST", "scope-binding", "control-flow"],
+              payload: {
+                boolCell: proof.boolCell,
+                errorCell: proof.errorCell,
+                payloadCell: proof.payloadCell,
+                ...frameStatePayload(frame),
+              },
+            });
+            context.report({
+              node: frame.node,
+              message:
+                "This async transition hand-rolls a resource lifecycle: a constant lifecycle cell is toggled around the request while sibling cells receive the resource value and caught error. Model one resource/reducer value instead of coupled setters.",
+            });
+            return;
+          }
+          // Broad co-mutation is name-agnostic but unproven: inventory only, never blocking.
+          if (frame.called.size >= threshold) {
+            emitSemanticFact(context, frame.node, {
+              factKind: "broadSetterCoMutation",
+              ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+              adapterId: "react-state",
+              confidence: "heuristic-inventory",
+              provenance: ["AST", "scope-binding"],
+              payload: frameStatePayload(frame),
+            });
+          }
         },
-      };
+      });
+      return tracker.visitors;
     },
   };
 }
@@ -596,14 +791,28 @@ function ruleNoStatusTripletState() {
 function isGlobalFetchCall(callee) {
   if (callee?.type === "Identifier") return callee.name === "fetch";
   if (callee?.type !== "MemberExpression" || callee.computed) return false;
-  const objectName = callee.object?.type === "Identifier" ? callee.object.name : "";
-  const propertyName = callee.property?.type === "Identifier" ? callee.property.name : "";
-  return propertyName === "fetch" && (objectName === "globalThis" || objectName === "window" || objectName === "self");
+  const objectName =
+    callee.object?.type === "Identifier" ? callee.object.name : "";
+  const propertyName =
+    callee.property?.type === "Identifier" ? callee.property.name : "";
+  return (
+    propertyName === "fetch" &&
+    (objectName === "globalThis" ||
+      objectName === "window" ||
+      objectName === "self")
+  );
 }
 
 function ruleRequireEffectDeps() {
   return {
-    meta: { type: "problem", docs: { description: "Require a dependency array for React effect hooks. A missing array runs the effect on every render — usually an agent oversight, and one exhaustive-deps does not flag (it only validates an array that already exists)." }, schema: [] },
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Require a dependency array for React effect hooks. A missing array runs the effect on every render — usually an agent oversight, and one exhaustive-deps does not flag (it only validates an array that already exists).",
+      },
+      schema: [],
+    },
     create(context) {
       // Local names that resolve to a React effect hook: imported/aliased bare names, plus default
       // and namespace import names accessed as `React.useEffect`. Only react imports are tracked.
@@ -613,9 +822,15 @@ function ruleRequireEffectDeps() {
         ImportDeclaration(node) {
           if (node.source.value !== "react") return;
           for (const spec of node.specifiers) {
-            if (spec.type === "ImportSpecifier" && reactEffectHooks.has(spec.imported.name)) {
+            if (
+              spec.type === "ImportSpecifier" &&
+              reactEffectHooks.has(spec.imported.name)
+            ) {
               directNames.add(spec.local.name);
-            } else if (spec.type === "ImportDefaultSpecifier" || spec.type === "ImportNamespaceSpecifier") {
+            } else if (
+              spec.type === "ImportDefaultSpecifier" ||
+              spec.type === "ImportNamespaceSpecifier"
+            ) {
               namespaceNames.add(spec.local.name);
             }
           }
@@ -626,14 +841,20 @@ function ruleRequireEffectDeps() {
           if (callee.type === "Identifier" && directNames.has(callee.name)) {
             hookName = callee.name;
           } else if (
-            callee.type === "MemberExpression" && !callee.computed &&
-            callee.object.type === "Identifier" && callee.property.type === "Identifier" &&
-            namespaceNames.has(callee.object.name) && reactEffectHooks.has(callee.property.name)
+            callee.type === "MemberExpression" &&
+            !callee.computed &&
+            callee.object.type === "Identifier" &&
+            callee.property.type === "Identifier" &&
+            namespaceNames.has(callee.object.name) &&
+            reactEffectHooks.has(callee.property.name)
           ) {
             hookName = callee.property.name;
           }
           if (hookName && node.arguments.length < 2) {
-            context.report({ node, message: `${hookName} must be called with a dependency array. Without it the effect runs on every render — pass [] or the real dependencies.` });
+            context.report({
+              node,
+              message: `${hookName} must be called with a dependency array. Without it the effect runs on every render — pass [] or the real dependencies.`,
+            });
           }
         },
       };
@@ -642,23 +863,40 @@ function ruleRequireEffectDeps() {
 }
 
 function ruleClassNamePattern(name, pattern, message) {
-  return {
-    meta: { type: "problem", docs: { description: message }, schema: [] },
+  return createRule({
+    name,
+    meta: {
+      type: "problem",
+      docs: { description: message },
+      messages: { forbiddenClassName: message },
+      schema: [],
+    },
+    defaultOptions: [],
     create(context) {
       return {
         JSXAttribute(node) {
-          if (getJsxClassNameLiterals(node).some((className) => pattern.test(className))) {
-            context.report({ node, message });
+          if (
+            getJsxClassNameLiterals(node).some((className) =>
+              pattern.test(className),
+            )
+          ) {
+            context.report({ node, messageId: "forbiddenClassName" });
           }
         },
       };
     },
-  };
+  });
 }
 
 function ruleNoRawFetchInComponent() {
   return {
-    meta: { type: "problem", docs: { description: "Disallow raw fetch calls inside React components." }, schema: [] },
+    meta: {
+      type: "problem",
+      docs: {
+        description: "Disallow raw fetch calls inside React components.",
+      },
+      schema: [],
+    },
     create(context) {
       const filename = context.filename ?? context.getFilename();
       const isComponentModule = /\.(?:jsx|tsx)$/u.test(filename);
@@ -666,7 +904,14 @@ function ruleNoRawFetchInComponent() {
       const moduleFetches = [];
       const reportedFetches = new WeakSet();
       let sawJsxInFile = false;
-      function enterFunction(node) { stack.push({ node, name: getFunctionName(node), sawJsx: false, sawFetch: null }); }
+      function enterFunction(node) {
+        stack.push({
+          node,
+          name: getFunctionName(node),
+          sawJsx: false,
+          sawFetch: null,
+        });
+      }
       function reportFetch(node, message) {
         if (reportedFetches.has(node)) return;
         reportedFetches.add(node);
@@ -674,8 +919,14 @@ function ruleNoRawFetchInComponent() {
       }
       function exitFunction() {
         const frame = stack.pop();
-        if (frame?.sawFetch && (frame.sawJsx || isReactComponentName(frame.name))) {
-          reportFetch(frame.sawFetch, "Do not call raw fetch inside React components. Use an API client, loader, or query resource.");
+        if (
+          frame?.sawFetch &&
+          (frame.sawJsx || isReactComponentName(frame.name))
+        ) {
+          reportFetch(
+            frame.sawFetch,
+            "Do not call raw fetch inside React components. Use an API client, loader, or query resource.",
+          );
         }
       }
 
@@ -700,79 +951,15 @@ function ruleNoRawFetchInComponent() {
         "Program:exit"() {
           if (!isComponentModule || !sawJsxInFile) return;
           for (const node of moduleFetches) {
-            reportFetch(node, "Do not call raw fetch inside React component modules. Move transport logic to an API client, loader, or query resource.");
+            reportFetch(
+              node,
+              "Do not call raw fetch inside React component modules. Move transport logic to an API client, loader, or query resource.",
+            );
           }
         },
       };
     },
   };
-}
-
-function isPromiseCombinator(callee) {
-  return callee?.type === "MemberExpression"
-    && callee.object?.type === "Identifier"
-    && callee.object.name === "Promise"
-    && callee.property?.type === "Identifier"
-    && (callee.property.name === "all" || callee.property.name === "allSettled" || callee.property.name === "race");
-}
-
-function getDeclaredVariable(sourceCode, declarator) {
-  if (declarator.id?.type !== "Identifier") return null;
-  return sourceCode.scopeManager?.getDeclaredVariables(declarator).find((variable) => variable.name === declarator.id.name) ?? null;
-}
-
-function findVariable(sourceCode, identifier) {
-  if (identifier?.type !== "Identifier" || typeof sourceCode.getScope !== "function") return null;
-  let scope = sourceCode.getScope(identifier);
-  while (scope) {
-    const variable = scope.set?.get(identifier.name);
-    if (variable) return variable;
-    scope = scope.upper;
-  }
-  return null;
-}
-
-function promiseCombinatorVariables(sourceCode, node) {
-  if (!isPromiseCombinator(node.callee)) return [];
-  return node.arguments.flatMap((arg) => {
-    if (arg.type === "Identifier") {
-      const variable = findVariable(sourceCode, arg);
-      return variable ? [variable] : [];
-    }
-    if (arg.type === "SpreadElement" && arg.argument.type === "Identifier") {
-      const variable = findVariable(sourceCode, arg.argument);
-      return variable ? [variable] : [];
-    }
-    return [];
-  });
-}
-
-function asyncCallbackArgument(node) {
-  const cb = node.arguments?.[0];
-  return (cb?.type === "ArrowFunctionExpression" || cb?.type === "FunctionExpression") && cb.async === true ? cb : null;
-}
-
-function markAwaitedPendingMaps(sourceCode, node, pendingAsyncMaps) {
-  const variables = promiseCombinatorVariables(sourceCode, node);
-  for (const variable of variables) {
-    for (const pending of pendingAsyncMaps) {
-      if (pending.variable === variable) pending.awaited = true;
-    }
-  }
-}
-
-function isDirectlyWrappedInPromiseCombinator(node) {
-  const parent = node.parent;
-  return parent?.type === "CallExpression" && isPromiseCombinator(parent.callee) && parent.arguments.includes(node);
-}
-
-function queuePendingAsyncMap(sourceCode, node, cb, method, pendingAsyncMaps) {
-  const parent = node.parent;
-  if (parent?.type !== "VariableDeclarator") return false;
-  const variable = getDeclaredVariable(sourceCode, parent);
-  if (!variable) return false;
-  pendingAsyncMaps.push({ variable, node: cb, method, awaited: false });
-  return true;
 }
 
 function asyncMapMessage(method) {
@@ -781,7 +968,14 @@ function asyncMapMessage(method) {
 
 function ruleNoAsyncArrayMethod() {
   return {
-    meta: { type: "problem", docs: { description: "Disallow async callbacks passed to array iteration methods that silently drop or mishandle the returned promises." }, schema: [] },
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Disallow async callbacks passed to array iteration methods that silently drop or mishandle the returned promises.",
+      },
+      schema: [],
+    },
     create(context) {
       const sourceCode = context.sourceCode ?? context.getSourceCode();
       const pendingAsyncMaps = [];
@@ -789,25 +983,42 @@ function ruleNoAsyncArrayMethod() {
         "Program:exit"() {
           for (const pending of pendingAsyncMaps) {
             if (!pending.awaited) {
-              context.report({ node: pending.node, message: asyncMapMessage(pending.method) });
+              context.report({
+                node: pending.node,
+                message: asyncMapMessage(pending.method),
+              });
             }
           }
         },
         CallExpression(node) {
           markAwaitedPendingMaps(sourceCode, node, pendingAsyncMaps);
-          const callee = node.callee;
-          if (callee?.type !== "MemberExpression" || callee.property?.type !== "Identifier") return;
-          const method = callee.property.name;
-          const cb = asyncCallbackArgument(node);
-          if (!cb) return;
-          if (arrayMethodsNeverAsync.has(method)) {
-            context.report({ node: cb, message: `.${method}() does not await its callback, so an async callback here runs unhandled. Use a for...of loop.` });
+          const classification = asyncArrayCallbackClassification(node);
+          if (!classification) return;
+          const { callback, method } = classification;
+          if (classification.kind === "never-await") {
+            context.report({
+              node: callback,
+              message: `.${method}() does not await its callback, so an async callback here runs unhandled. Use a for...of loop.`,
+            });
             return;
           }
-          if (arrayMethodsNeedingPromiseAll.has(method)) {
+          if (classification.kind === "requires-collection") {
             if (isDirectlyWrappedInPromiseCombinator(node)) return;
-            if (queuePendingAsyncMap(sourceCode, node, cb, method, pendingAsyncMaps)) return;
-            context.report({ node: cb, message: asyncMapMessage(method) });
+            if (
+              queuePendingAsyncMap(
+                sourceCode,
+                node,
+                callback,
+                method,
+                pendingAsyncMaps,
+              )
+            ) {
+              return;
+            }
+            context.report({
+              node: callback,
+              message: asyncMapMessage(method),
+            });
           }
         },
       };
@@ -815,58 +1026,39 @@ function ruleNoAsyncArrayMethod() {
   };
 }
 
-const sqlPattern = /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
-const sqlSentencePattern = /\b(?:SELECT\b[\s\S]*?\bFROM\b|INSERT\s+INTO\b|UPDATE\b[\s\S]*?\bSET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
+const sqlPattern =
+  /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
+const sqlSentencePattern =
+  /\b(?:SELECT\b[\s\S]*?\bFROM\b|INSERT\s+INTO\b|UPDATE\b[\s\S]*?\bSET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
 const parameterizedSqlTagNames = new Set(["sql", "sqlQuery", "sqlRun"]);
-const sqlInterpolationBeforeKeywords = [
-  "FROM",
-  "JOIN",
-  "UPDATE",
-  "INTO",
-  "TABLE",
-  "WHERE",
-  "AND",
-  "OR",
-  "IN",
-  "VALUES",
-  "SET",
-  "ON",
-  "LIKE",
-  "ORDER BY",
-  "GROUP BY",
-  "PARTITION BY",
-];
-const sqlInterpolationAfterKeywords = [
-  "AND",
-  "OR",
-  "WHERE",
-  "FROM",
-  "JOIN",
-  "ORDER BY",
-  "GROUP BY",
-  "PARTITION BY",
-  "LIMIT",
-  "OFFSET",
-  "HAVING",
-  "SET",
-  "VALUES",
-  "IN",
-];
 
 function templateText(node) {
-  return node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "").join(" ");
+  return node.quasis
+    .map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "")
+    .join(" ");
 }
 
 function staticStringValue(node) {
-  if (node?.type === "Literal" && typeof node.value === "string") return node.value;
-  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) return templateText(node);
+  if (node?.type === "Literal" && typeof node.value === "string") {
+    return node.value;
+  }
+  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) {
+    return templateText(node);
+  }
   return null;
 }
 
 function singleReturnExpression(node) {
   if (!node) return null;
-  if (node.type === "ArrowFunctionExpression" && node.body?.type !== "BlockStatement") return node.body;
-  if (node.body?.type !== "BlockStatement" || node.body.body.length !== 1) return null;
+  if (
+    node.type === "ArrowFunctionExpression" &&
+    node.body?.type !== "BlockStatement"
+  ) {
+    return node.body;
+  }
+  if (node.body?.type !== "BlockStatement" || node.body.body.length !== 1) {
+    return null;
+  }
   const statement = node.body.body[0];
   return statement?.type === "ReturnStatement" ? statement.argument : null;
 }
@@ -875,33 +1067,78 @@ function isEscapedReplaceCall(node, paramName, quote) {
   if (node?.type !== "CallExpression") return false;
   const callee = node.callee;
   if (callee?.type !== "MemberExpression" || callee.computed) return false;
-  if (callee.object?.type !== "Identifier" || callee.object.name !== paramName) return false;
-  if (callee.property?.type !== "Identifier" || callee.property.name !== "replace") return false;
+  if (
+    callee.object?.type !== "Identifier" ||
+    callee.object.name !== paramName
+  ) {
+    return false;
+  }
+  if (
+    callee.property?.type !== "Identifier" ||
+    callee.property.name !== "replace"
+  ) {
+    return false;
+  }
   const [pattern, replacement] = node.arguments;
-  const patternMatches = pattern?.type === "Literal"
-    && ((pattern.regex && pattern.regex.pattern === quote && pattern.regex.flags.includes("g")) || pattern.value === quote);
-  return patternMatches && staticStringValue(replacement) === `${quote}${quote}`;
+  const patternMatches =
+    pattern?.type === "Literal" &&
+    ((pattern.regex &&
+      pattern.regex.pattern === quote &&
+      pattern.regex.flags.includes("g")) ||
+      pattern.value === quote);
+  return (
+    patternMatches && staticStringValue(replacement) === `${quote}${quote}`
+  );
 }
 
 function sqlEscaperKindFromReturnExpression(node, paramName) {
-  if (node?.type !== "TemplateLiteral" || node.expressions.length !== 1) return null;
-  const before = node.quasis[0]?.value.cooked ?? node.quasis[0]?.value.raw ?? "";
+  if (node?.type !== "TemplateLiteral" || node.expressions.length !== 1) {
+    return null;
+  }
+  const before =
+    node.quasis[0]?.value.cooked ?? node.quasis[0]?.value.raw ?? "";
   const after = node.quasis[1]?.value.cooked ?? node.quasis[1]?.value.raw ?? "";
-  if (before === "\"" && after === "\"" && isEscapedReplaceCall(node.expressions[0], paramName, "\"")) return "identifier";
-  if (before === "'" && after === "'" && isEscapedReplaceCall(node.expressions[0], paramName, "'")) return "string";
+  if (
+    before === '"' &&
+    after === '"' &&
+    isEscapedReplaceCall(node.expressions[0], paramName, '"')
+  ) {
+    return "identifier";
+  }
+  if (
+    before === "'" &&
+    after === "'" &&
+    isEscapedReplaceCall(node.expressions[0], paramName, "'")
+  ) {
+    return "string";
+  }
   return null;
 }
 
 function sqlEscaperFunctionKind(node) {
-  if (node?.type !== "FunctionDeclaration" && node?.type !== "FunctionExpression" && node?.type !== "ArrowFunctionExpression") return null;
+  if (
+    node?.type !== "FunctionDeclaration" &&
+    node?.type !== "FunctionExpression" &&
+    node?.type !== "ArrowFunctionExpression"
+  ) {
+    return null;
+  }
   const param = node.params?.[0];
   if (node.params.length !== 1 || param?.type !== "Identifier") return null;
-  return sqlEscaperKindFromReturnExpression(singleReturnExpression(node), param.name);
+  return sqlEscaperKindFromReturnExpression(
+    singleReturnExpression(node),
+    param.name,
+  );
 }
 
 function tsStaticStringValue(node) {
   if (!node) return null;
-  if (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (
+    ts.isStringLiteralLike(node) ||
+    ts.isNoSubstitutionTemplateLiteral(node)
+  ) {
+    return node.text;
+  }
   return null;
 }
 
@@ -910,7 +1147,9 @@ function tsSingleReturnExpression(node) {
   if (!ts.isBlock(node.body)) return node.body;
   if (node.body.statements.length !== 1) return null;
   const statement = node.body.statements[0];
-  return ts.isReturnStatement(statement) ? statement.expression ?? null : null;
+  return ts.isReturnStatement(statement)
+    ? (statement.expression ?? null)
+    : null;
 }
 
 function tsTemplateParts(node) {
@@ -940,22 +1179,30 @@ function tsEscapedReplaceCall(node, paramName, quote) {
   let receiverRoot = null;
   if (ts.isIdentifier(receiver)) {
     receiverRoot = receiver;
-  } else if (ts.isPropertyAccessExpression(receiver) && ts.isIdentifier(receiver.expression)) {
+  } else if (
+    ts.isPropertyAccessExpression(receiver) &&
+    ts.isIdentifier(receiver.expression)
+  ) {
     receiverRoot = receiver.expression;
   }
   if (receiverRoot?.text !== paramName) return false;
   const [pattern, replacement] = node.arguments;
-  const patternMatches = method === "replaceAll"
-    ? tsStaticStringValue(pattern) === quote
-    : tsRegexMatchesGlobalQuote(pattern, quote);
-  return patternMatches && tsStaticStringValue(replacement) === `${quote}${quote}`;
+  const patternMatches =
+    method === "replaceAll"
+      ? tsStaticStringValue(pattern) === quote
+      : tsRegexMatchesGlobalQuote(pattern, quote);
+  return (
+    patternMatches && tsStaticStringValue(replacement) === `${quote}${quote}`
+  );
 }
 
 function tsTemplateSqlEscaperKind(node, paramName) {
   const template = tsTemplateParts(node);
   if (!template || template.expressions.length === 0) return null;
   const skeleton = template.parts.join("A");
-  const isIdentifierSkeleton = /^(?:"A"|`A`)(?:\.(?:"A"|`A`))*$/u.test(skeleton);
+  const isIdentifierSkeleton = /^(?:"A"|`A`)(?:\.(?:"A"|`A`))*$/u.test(
+    skeleton,
+  );
   const isStringSkeleton = skeleton === "'A'";
   if (!isIdentifierSkeleton && !isStringSkeleton) return null;
   const expectedQuotes = template.expressions.map((_, index) => {
@@ -964,23 +1211,47 @@ function tsTemplateSqlEscaperKind(node, paramName) {
     const quote = before.at(-1);
     return quote && quote === after?.[0] ? quote : null;
   });
-  if (expectedQuotes.some((quote) => quote !== "\"" && quote !== "'" && quote !== "`")) return null;
-  if (!template.expressions.every((expression, index) => tsEscapedReplaceCall(expression, paramName, expectedQuotes[index]))) return null;
+  if (
+    expectedQuotes.some(
+      (quote) => quote !== '"' && quote !== "'" && quote !== "`",
+    )
+  ) {
+    return null;
+  }
+  if (
+    !template.expressions.every((expression, index) =>
+      tsEscapedReplaceCall(expression, paramName, expectedQuotes[index]),
+    )
+  ) {
+    return null;
+  }
   return isStringSkeleton ? "string" : "identifier";
 }
 
 function tsSqlEscaperDeclarationKind(node) {
   if (!node) return null;
   let fn = null;
-  if (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node)) {
+  if (
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node)
+  ) {
     fn = node;
-  } else if (ts.isVariableDeclaration(node) && node.initializer && (ts.isFunctionExpression(node.initializer) || ts.isArrowFunction(node.initializer))) {
+  } else if (
+    ts.isVariableDeclaration(node) &&
+    node.initializer &&
+    (ts.isFunctionExpression(node.initializer) ||
+      ts.isArrowFunction(node.initializer))
+  ) {
     fn = node.initializer;
   }
   if (!fn || fn.parameters.length !== 1) return null;
   const param = fn.parameters[0];
   if (!ts.isIdentifier(param.name)) return null;
-  return tsTemplateSqlEscaperKind(tsSingleReturnExpression(fn), param.name.text);
+  return tsTemplateSqlEscaperKind(
+    tsSingleReturnExpression(fn),
+    param.name.text,
+  );
 }
 
 function hasOpenSqlQuote(value, quote) {
@@ -997,7 +1268,13 @@ function hasOpenSqlQuote(value, quote) {
 }
 
 function isUnquotedSqlInterpolation(before, after) {
-  if (hasOpenSqlQuote(before, "'") || hasOpenSqlQuote(before, "\"") || hasOpenSqlQuote(before, "`")) return false;
+  if (
+    hasOpenSqlQuote(before, "'") ||
+    hasOpenSqlQuote(before, '"') ||
+    hasOpenSqlQuote(before, "`")
+  ) {
+    return false;
+  }
   return !/^\s*['"`]/u.test(after);
 }
 
@@ -1013,7 +1290,9 @@ function collectReturnArguments(node, out) {
     return;
   }
   if (node.type === "BlockStatement") {
-    for (const statement of node.body ?? []) collectReturnArguments(statement, out);
+    for (const statement of node.body ?? []) {
+      collectReturnArguments(statement, out);
+    }
     return;
   }
   if (node.type === "IfStatement") {
@@ -1023,42 +1302,73 @@ function collectReturnArguments(node, out) {
 }
 
 function isStaticStringCallback(node) {
-  if (node?.type !== "ArrowFunctionExpression" && node?.type !== "FunctionExpression") return false;
+  if (
+    node?.type !== "ArrowFunctionExpression" &&
+    node?.type !== "FunctionExpression"
+  ) {
+    return false;
+  }
   return staticStringValue(node.body) !== null;
 }
 
 function isStaticFragmentMapJoin(node) {
   if (node?.type !== "CallExpression") return false;
   const join = node.callee;
-  if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
-  const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
+  if (
+    join?.type !== "MemberExpression" ||
+    join.computed ||
+    join.property?.type !== "Identifier" ||
+    join.property.name !== "join"
+  ) {
+    return false;
+  }
+  const separator = node.arguments[0]
+    ? staticStringValue(node.arguments[0])
+    : ",";
   if (!isAllowedSqlFragmentJoinSeparator(separator)) return false;
   const mapCall = join.object;
   if (mapCall?.type !== "CallExpression") return false;
   const map = mapCall.callee;
-  return map?.type === "MemberExpression"
-    && !map.computed
-    && map.property?.type === "Identifier"
-    && map.property.name === "map"
-    && isStaticStringCallback(mapCall.arguments[0]);
+  return (
+    map?.type === "MemberExpression" &&
+    !map.computed &&
+    map.property?.type === "Identifier" &&
+    map.property.name === "map" &&
+    isStaticStringCallback(mapCall.arguments[0])
+  );
 }
 
 function isIndexArithmeticExpression(node, indexName) {
   const unwrapped = unwrapExpression(node);
   if (unwrapped?.type === "Identifier") return unwrapped.name === indexName;
   if (unwrapped?.type === "Literal") return typeof unwrapped.value === "number";
-  if (unwrapped?.type !== "BinaryExpression" || !["+", "*"].includes(unwrapped.operator)) return false;
-  return isIndexArithmeticExpression(unwrapped.left, indexName)
-    && isIndexArithmeticExpression(unwrapped.right, indexName);
+  if (
+    unwrapped?.type !== "BinaryExpression" ||
+    !["+", "*"].includes(unwrapped.operator)
+  ) {
+    return false;
+  }
+  return (
+    isIndexArithmeticExpression(unwrapped.left, indexName) &&
+    isIndexArithmeticExpression(unwrapped.right, indexName)
+  );
 }
 
 function isPostgresPlaceholderTemplate(node, indexName) {
-  if (node?.type !== "TemplateLiteral" || node.expressions.length === 0) return false;
+  if (node?.type !== "TemplateLiteral" || node.expressions.length === 0) {
+    return false;
+  }
   for (let index = 0; index < node.expressions.length; index += 1) {
-    const before = node.quasis[index]?.value?.cooked ?? node.quasis[index]?.value?.raw ?? "";
-    const after = node.quasis[index + 1]?.value?.cooked ?? node.quasis[index + 1]?.value?.raw ?? "";
+    const before =
+      node.quasis[index]?.value?.cooked ?? node.quasis[index]?.value?.raw ?? "";
+    const after =
+      node.quasis[index + 1]?.value?.cooked ??
+      node.quasis[index + 1]?.value?.raw ??
+      "";
     if (!before.endsWith("$") || /^\d/u.test(after)) return false;
-    if (!isIndexArithmeticExpression(node.expressions[index], indexName)) return false;
+    if (!isIndexArithmeticExpression(node.expressions[index], indexName)) {
+      return false;
+    }
   }
   return true;
 }
@@ -1066,18 +1376,42 @@ function isPostgresPlaceholderTemplate(node, indexName) {
 function isPlaceholderSqlFragmentMapJoin(node) {
   if (node?.type !== "CallExpression") return false;
   const join = node.callee;
-  if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
-  const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
+  if (
+    join?.type !== "MemberExpression" ||
+    join.computed ||
+    join.property?.type !== "Identifier" ||
+    join.property.name !== "join"
+  ) {
+    return false;
+  }
+  const separator = node.arguments[0]
+    ? staticStringValue(node.arguments[0])
+    : ",";
   if (separator !== " OR " && separator !== " AND ") return false;
   const mapCall = join.object;
   if (mapCall?.type !== "CallExpression") return false;
   const map = mapCall.callee;
-  if (map?.type !== "MemberExpression" || map.computed || map.property?.type !== "Identifier" || map.property.name !== "map") return false;
+  if (
+    map?.type !== "MemberExpression" ||
+    map.computed ||
+    map.property?.type !== "Identifier" ||
+    map.property.name !== "map"
+  ) {
+    return false;
+  }
   const callback = mapCall.arguments[0];
-  if (callback?.type !== "ArrowFunctionExpression" && callback?.type !== "FunctionExpression") return false;
+  if (
+    callback?.type !== "ArrowFunctionExpression" &&
+    callback?.type !== "FunctionExpression"
+  ) {
+    return false;
+  }
   const indexParam = callback.params?.[1];
   if (indexParam?.type !== "Identifier") return false;
-  return isPostgresPlaceholderTemplate(singleReturnExpression(callback), indexParam.name);
+  return isPostgresPlaceholderTemplate(
+    singleReturnExpression(callback),
+    indexParam.name,
+  );
 }
 
 function isEmptyArrayExpression(node) {
@@ -1085,14 +1419,23 @@ function isEmptyArrayExpression(node) {
 }
 
 function isParameterizedSqlTag(node) {
-  if (node?.type === "Identifier") return parameterizedSqlTagNames.has(node.name);
-  if (node?.type === "ChainExpression") return isParameterizedSqlTag(node.expression);
+  if (node?.type === "Identifier") {
+    return parameterizedSqlTagNames.has(node.name);
+  }
+  if (node?.type === "ChainExpression") {
+    return isParameterizedSqlTag(node.expression);
+  }
   if (node?.type !== "MemberExpression" || node.computed) return false;
-  return node.property?.type === "Identifier" && parameterizedSqlTagNames.has(node.property.name);
+  return (
+    node.property?.type === "Identifier" &&
+    parameterizedSqlTagNames.has(node.property.name)
+  );
 }
 
 function isAllowedSqlFragmentJoinSeparator(value) {
-  return value === "," || value === ", " || value === " AND " || value === " OR ";
+  return (
+    value === "," || value === ", " || value === " AND " || value === " OR "
+  );
 }
 
 function sqlStringValuesFromType(typeNode) {
@@ -1108,7 +1451,9 @@ function sqlStringValuesFromType(typeNode) {
   }
   if (typeNode.type !== "TSLiteralType") return null;
   const literal = typeNode.literal;
-  return literal?.type === "Literal" && typeof literal.value === "string" ? new Set([literal.value]) : null;
+  return literal?.type === "Literal" && typeof literal.value === "string"
+    ? new Set([literal.value])
+    : null;
 }
 
 function sqlTypePropertyValues(typeNode, propertyName) {
@@ -1116,7 +1461,9 @@ function sqlTypePropertyValues(typeNode, propertyName) {
   for (const member of typeNode.members ?? []) {
     if (member.type !== "TSPropertySignature") continue;
     const keyName = sqlPropertyKeyName(member.key);
-    if (keyName === propertyName) return sqlStringValuesFromType(member.typeAnnotation?.typeAnnotation);
+    if (keyName === propertyName) {
+      return sqlStringValuesFromType(member.typeAnnotation?.typeAnnotation);
+    }
   }
   return null;
 }
@@ -1127,14 +1474,6 @@ function sqlPropertyKeyName(key) {
   return "";
 }
 
-function isSqlIdentifierTokenValue(value) {
-  return /^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?$/u.test(value);
-}
-
-function isSqlDirectionTokenValue(value) {
-  return value === "ASC" || value === "DESC" || value === "asc" || value === "desc";
-}
-
 function charClassAllowsOnlySqlIdentifierChars(value, { allowDigit }) {
   let i = 0;
   while (i < value.length) {
@@ -1143,7 +1482,13 @@ function charClassAllowsOnlySqlIdentifierChars(value, { allowDigit }) {
     const end = value[i + 2];
     if (next === "-" && end) {
       const range = `${char}-${end}`;
-      if (range !== "a-z" && range !== "A-Z" && (!allowDigit || range !== "0-9")) return false;
+      if (
+        range !== "a-z" &&
+        range !== "A-Z" &&
+        (!allowDigit || range !== "0-9")
+      ) {
+        return false;
+      }
       i += 3;
     } else {
       const isLetter = /[A-Za-z]/u.test(char);
@@ -1156,76 +1501,44 @@ function charClassAllowsOnlySqlIdentifierChars(value, { allowDigit }) {
 }
 
 function isSqlIdentifierRegexLiteral(node) {
-  const pattern = node?.type === "Literal" && node.regex ? node.regex.pattern : "";
+  const pattern =
+    node?.type === "Literal" && node.regex ? node.regex.pattern : "";
   const match = /^\^\[([^\]]+)\]\[([^\]]+)\]\*\$$/u.exec(pattern);
   if (!match) return false;
-  return charClassAllowsOnlySqlIdentifierChars(match[1], { allowDigit: false })
-    && charClassAllowsOnlySqlIdentifierChars(match[2], { allowDigit: true });
-}
-
-function isSqlIdentifierContext(before, after) {
-  return /(?:ORDER\s+BY|GROUP\s+BY|PARTITION\s+BY|FROM|JOIN|UPDATE|INTO|TABLE)\s*$/iu.test(before) || /^\s*=/.test(after);
-}
-
-function normalizedSqlContext(value) {
-  return value.toUpperCase().replace(/\s+/gu, " ").trim();
-}
-
-function removeTrailingSqlQuote(value) {
-  const trimmed = value.trimEnd();
-  const last = trimmed.at(-1);
-  return last === "'" || last === "\"" || last === "`" ? trimmed.slice(0, -1).trimEnd() : trimmed;
-}
-
-function endsWithSqlInterpolationKeyword(value) {
-  const normalized = normalizedSqlContext(removeTrailingSqlQuote(value));
-  return sqlInterpolationBeforeKeywords.some((keyword) => normalized === keyword || normalized.endsWith(` ${keyword}`) || normalized.endsWith(` ${keyword} (`));
-}
-
-function containsSqlStatementContext(value) {
-  return /\b(?:SELECT|FROM|JOIN|WHERE|VALUES|UPDATE|INSERT|DELETE|ORDER BY|GROUP BY|HAVING)\b/u.test(
-    normalizedSqlContext(value),
+  return (
+    charClassAllowsOnlySqlIdentifierChars(match[1], { allowDigit: false }) &&
+    charClassAllowsOnlySqlIdentifierChars(match[2], { allowDigit: true })
   );
-}
-
-function endsWithSqlInterpolationOperator(value) {
-  const normalized = removeTrailingSqlQuote(value);
-  return containsSqlStatementContext(normalized)
-    && ["=", "(", ","].some((operator) => normalized.endsWith(operator));
-}
-
-function startsWithSqlInterpolationKeyword(value) {
-  const trimmed = value.trimStart();
-  const first = trimmed.at(0);
-  const unquoted = first === "'" || first === "\"" || first === "`" ? trimmed.slice(1).trimStart() : trimmed;
-  const normalized = normalizedSqlContext(unquoted);
-  return normalized.startsWith(")") || normalized.startsWith(",") || sqlInterpolationAfterKeywords.some((keyword) => normalized.startsWith(keyword));
-}
-
-function isSqlInterpolationContext(before, after) {
-  const beforeTail = before.slice(-160);
-  const afterHead = after.slice(0, 160);
-  return endsWithSqlInterpolationKeyword(beforeTail)
-    || endsWithSqlInterpolationOperator(beforeTail)
-    || startsWithSqlInterpolationKeyword(afterHead);
 }
 
 function assignedSqlIdentifierNode(node) {
   if (node.left?.type === "Identifier") return node.left;
-  if (node.left?.type === "MemberExpression" && node.left.object?.type === "Identifier") return node.left.object;
+  if (
+    node.left?.type === "MemberExpression" &&
+    node.left.object?.type === "Identifier"
+  ) {
+    return node.left.object;
+  }
   return null;
 }
 
 function classMemberKey(node) {
   if (node?.type !== "MemberExpression" || node.computed) return null;
-  if (node.object?.type !== "ThisExpression" || node.property?.type !== "Identifier") return null;
+  if (
+    node.object?.type !== "ThisExpression" ||
+    node.property?.type !== "Identifier"
+  ) {
+    return null;
+  }
   return node.property.name;
 }
 
 function enclosingClass(node) {
   let cur = node?.parent ?? null;
   while (cur) {
-    if (cur.type === "ClassDeclaration" || cur.type === "ClassExpression") return cur;
+    if (cur.type === "ClassDeclaration" || cur.type === "ClassExpression") {
+      return cur;
+    }
     cur = cur.parent;
   }
   return null;
@@ -1233,9 +1546,13 @@ function enclosingClass(node) {
 
 function statementExits(node) {
   if (!node) return false;
-  if (node.type === "ThrowStatement" || node.type === "ReturnStatement") return true;
+  if (node.type === "ThrowStatement" || node.type === "ReturnStatement") {
+    return true;
+  }
   if (node.type === "BlockStatement") return statementExits(node.body.at(-1));
-  if (node.type === "IfStatement") return statementExits(node.consequent) && statementExits(node.alternate);
+  if (node.type === "IfStatement") {
+    return statementExits(node.consequent) && statementExits(node.alternate);
+  }
   return false;
 }
 
@@ -1246,10 +1563,12 @@ function unionStringValues(left, right) {
 
 function variableTypeNode(variable) {
   const def = variable?.defs?.[0];
-  return def?.name?.typeAnnotation?.typeAnnotation
-    ?? def?.node?.typeAnnotation?.typeAnnotation
-    ?? def?.node?.id?.typeAnnotation?.typeAnnotation
-    ?? null;
+  return (
+    def?.name?.typeAnnotation?.typeAnnotation ??
+    def?.node?.typeAnnotation?.typeAnnotation ??
+    def?.node?.id?.typeAnnotation?.typeAnnotation ??
+    null
+  );
 }
 
 function objectLiteralIdentifierValues(node) {
@@ -1264,60 +1583,52 @@ function objectLiteralIdentifierValues(node) {
   return values;
 }
 
-function templateStaticPartsAreSqlIdentifierSafe(node) {
-  const text = node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "").join("A");
-  return isSqlIdentifierTokenValue(text);
-}
-
-function valuesAreSqlIdentifiers(values) {
-  return Boolean(values?.size) && [...values].every(isSqlIdentifierTokenValue);
-}
-
-function valuesAreSqlDirections(values) {
-  return Boolean(values?.size) && [...values].every(isSqlDirectionTokenValue);
-}
-
 function templateInterpolationParts(node, index) {
   return {
-    before: node.quasis[index]?.value?.cooked ?? node.quasis[index]?.value?.raw ?? "",
-    after: node.quasis[index + 1]?.value?.cooked ?? node.quasis[index + 1]?.value?.raw ?? "",
+    before:
+      node.quasis[index]?.value?.cooked ?? node.quasis[index]?.value?.raw ?? "",
+    after:
+      node.quasis[index + 1]?.value?.cooked ??
+      node.quasis[index + 1]?.value?.raw ??
+      "",
   };
-}
-
-function safeIdentifierMemberSpecs(options) {
-  return (options.safeIdentifierMembers ?? [])
-    .filter(({ type, member }) => typeof type === "string" && typeof member === "string")
-    .map(({ type, member }) => ({ type, member }));
 }
 
 function ruleNoSqlStringConcat() {
   return {
     meta: {
       type: "problem",
-      docs: { description: "Disallow SQL assembled via string interpolation or concatenation." },
-      schema: [{
-        type: "object",
-        properties: {
-          safeIdentifierMembers: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                type: { type: "string" },
-                member: { type: "string" },
-                evidence: { type: "string" },
+      docs: {
+        description:
+          "Disallow SQL assembled via string interpolation or concatenation.",
+      },
+      schema: [
+        {
+          type: "object",
+          properties: {
+            safeIdentifierMembers: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  type: { type: "string" },
+                  member: { type: "string" },
+                  evidence: { type: "string" },
+                },
+                required: ["type", "member"],
+                additionalProperties: false,
               },
-              required: ["type", "member"],
-              additionalProperties: false,
             },
           },
+          additionalProperties: false,
         },
-        additionalProperties: false,
-      }],
+      ],
     },
     create(context) {
       const sourceCode = context.sourceCode;
-      const safeIdentifierMembers = safeIdentifierMemberSpecs(context.options[0] ?? {});
+      const safeIdentifierMembers = safeIdentifierMemberSpecs(
+        context.options[0] ?? {},
+      );
       const services = requireTypeServices(context);
       const checker = services?.program?.getTypeChecker() ?? null;
       const safeSqlFragmentArrays = new WeakSet();
@@ -1336,9 +1647,18 @@ function ruleNoSqlStringConcat() {
         return Boolean(variable && set.has(variable));
       }
       function isSafeFragmentMember(node) {
-        if (node?.type !== "MemberExpression" || node.computed || node.object?.type !== "Identifier" || node.property?.type !== "Identifier") return false;
+        if (
+          node?.type !== "MemberExpression" ||
+          node.computed ||
+          node.object?.type !== "Identifier" ||
+          node.property?.type !== "Identifier"
+        ) {
+          return false;
+        }
         const variable = findVariable(sourceCode, node.object);
-        const properties = variable ? safeSqlFragmentObjectValues.get(variable) : null;
+        const properties = variable
+          ? safeSqlFragmentObjectValues.get(variable)
+          : null;
         return Boolean(properties?.has(node.property.name));
       }
       function markSqlEscaperFunction(node) {
@@ -1348,28 +1668,48 @@ function ruleNoSqlStringConcat() {
         if (variable) sqlEscaperFunctions.set(variable, kind);
       }
       function scanSqlEscaperDeclaration(node) {
-        const declaration = node?.type === "ExportNamedDeclaration" || node?.type === "ExportDefaultDeclaration" ? node.declaration : node;
+        const declaration =
+          node?.type === "ExportNamedDeclaration" ||
+          node?.type === "ExportDefaultDeclaration"
+            ? node.declaration
+            : node;
         if (declaration?.type === "FunctionDeclaration") {
           markSqlEscaperFunction(declaration);
           return;
         }
         if (declaration?.type !== "VariableDeclaration") return;
-        for (const declarator of declaration.declarations ?? []) markSqlEscaperFunction(declarator);
+        for (const declarator of declaration.declarations ?? []) {
+          markSqlEscaperFunction(declarator);
+        }
       }
       function sqlEscaperCallbackKind(node) {
         if (node?.type === "Identifier") {
           const variable = findVariable(sourceCode, node);
-          return variable ? sqlEscaperFunctions.get(variable) ?? importedSqlEscaperKind(node) : importedSqlEscaperKind(node);
+          return variable
+            ? (sqlEscaperFunctions.get(variable) ??
+                importedSqlEscaperKind(node))
+            : importedSqlEscaperKind(node);
         }
         return sqlEscaperFunctionKind(node);
       }
       function importedSqlEscaperKind(node) {
-        if (!checker || !services?.esTreeNodeToTSNodeMap || node?.type !== "Identifier") return null;
+        if (
+          !checker ||
+          !services?.esTreeNodeToTSNodeMap ||
+          node?.type !== "Identifier"
+        ) {
+          return null;
+        }
         const tsNode = services.esTreeNodeToTSNodeMap.get(node);
         const symbol = tsNode && checker.getSymbolAtLocation(tsNode);
-        const resolved = symbol && (symbol.flags & ts.SymbolFlags.Alias) ? checker.getAliasedSymbol(symbol) : symbol;
+        const resolved =
+          symbol && symbol.flags & ts.SymbolFlags.Alias
+            ? checker.getAliasedSymbol(symbol)
+            : symbol;
         for (const declaration of resolved?.declarations ?? []) {
-          if (importedSqlEscaperDeclarations.has(declaration)) return importedSqlEscaperDeclarations.get(declaration);
+          if (importedSqlEscaperDeclarations.has(declaration)) {
+            return importedSqlEscaperDeclarations.get(declaration);
+          }
           const kind = tsSqlEscaperDeclarationKind(declaration);
           importedSqlEscaperDeclarations.set(declaration, kind);
           if (kind) return kind;
@@ -1377,20 +1717,46 @@ function ruleNoSqlStringConcat() {
         return null;
       }
       function sqlEscaperCallKind(node) {
-        if (node?.type !== "CallExpression" || node.arguments.length !== 1) return null;
+        if (node?.type !== "CallExpression" || node.arguments.length !== 1) {
+          return null;
+        }
         if (node.callee?.type !== "Identifier") return null;
         const variable = findVariable(sourceCode, node.callee);
-        return variable ? sqlEscaperFunctions.get(variable) ?? importedSqlEscaperKind(node.callee) : importedSqlEscaperKind(node.callee);
+        return variable
+          ? (sqlEscaperFunctions.get(variable) ??
+              importedSqlEscaperKind(node.callee))
+          : importedSqlEscaperKind(node.callee);
       }
       function safeSqlFragmentFunctionSummary(node) {
         const fn = getFunctionNode(node);
-        if (fn?.type !== "FunctionDeclaration" && fn?.type !== "FunctionExpression" && fn?.type !== "ArrowFunctionExpression") return null;
+        if (
+          fn?.type !== "FunctionDeclaration" &&
+          fn?.type !== "FunctionExpression" &&
+          fn?.type !== "ArrowFunctionExpression"
+        ) {
+          return null;
+        }
         const params = fn.params ?? [];
         if (params.some((param) => param.type !== "Identifier")) return null;
         const paramNames = new Set(params.map((param) => param.name));
         const identifierParams = new Set();
-        if (!isSafeSqlFragmentExpressionForSummary(singleReturnExpression(fn), paramNames, identifierParams)) return null;
-        return { arity: params.length, identifierParams: params.map((param, index) => identifierParams.has(param.name) ? index : null).filter((index) => index !== null) };
+        if (
+          !isSafeSqlFragmentExpressionForSummary(
+            singleReturnExpression(fn),
+            paramNames,
+            identifierParams,
+          )
+        ) {
+          return null;
+        }
+        return {
+          arity: params.length,
+          identifierParams: params
+            .map((param, index) =>
+              identifierParams.has(param.name) ? index : null,
+            )
+            .filter((index) => index !== null),
+        };
       }
       function markSafeSqlFragmentFunction(node) {
         const summary = safeSqlFragmentFunctionSummary(node);
@@ -1399,73 +1765,166 @@ function ruleNoSqlStringConcat() {
         if (variable) safeSqlFragmentFunctions.set(variable, summary);
       }
       function scanSafeSqlFragmentDeclaration(node) {
-        const declaration = node?.type === "ExportNamedDeclaration" || node?.type === "ExportDefaultDeclaration" ? node.declaration : node;
+        const declaration =
+          node?.type === "ExportNamedDeclaration" ||
+          node?.type === "ExportDefaultDeclaration"
+            ? node.declaration
+            : node;
         if (declaration?.type === "FunctionDeclaration") {
           markSafeSqlFragmentFunction(declaration);
           return;
         }
         if (declaration?.type !== "VariableDeclaration") return;
-        for (const declarator of declaration.declarations ?? []) markSafeSqlFragmentFunction(declarator);
+        for (const declarator of declaration.declarations ?? []) {
+          markSafeSqlFragmentFunction(declarator);
+        }
       }
       function safeSqlFragmentCallSummary(node) {
-        if (node?.type !== "CallExpression" || node.callee?.type !== "Identifier") return null;
+        if (
+          node?.type !== "CallExpression" ||
+          node.callee?.type !== "Identifier"
+        ) {
+          return null;
+        }
         const variable = findVariable(sourceCode, node.callee);
-        return variable ? safeSqlFragmentFunctions.get(variable) ?? null : null;
+        return variable
+          ? (safeSqlFragmentFunctions.get(variable) ?? null)
+          : null;
       }
       function isSafeSqlFragmentCall(node) {
         const summary = safeSqlFragmentCallSummary(node);
         if (!summary || node.arguments.length !== summary.arity) return false;
-        return summary.identifierParams.every((index) => isSafeSqlIdentifierExpression(node.arguments[index]));
+        return summary.identifierParams.every((index) =>
+          isSafeSqlIdentifierExpression(node.arguments[index]),
+        );
       }
       function isSqlEscaperMapJoin(node, kind, separators) {
         if (node?.type !== "CallExpression") return false;
         const join = node.callee;
-        if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
-        const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
+        if (
+          join?.type !== "MemberExpression" ||
+          join.computed ||
+          join.property?.type !== "Identifier" ||
+          join.property.name !== "join"
+        ) {
+          return false;
+        }
+        const separator = node.arguments[0]
+          ? staticStringValue(node.arguments[0])
+          : ",";
         if (!separators.has(separator)) return false;
         const mapCall = join.object;
         if (mapCall?.type !== "CallExpression") return false;
         const map = mapCall.callee;
-        return map?.type === "MemberExpression"
-          && !map.computed
-          && map.property?.type === "Identifier"
-          && map.property.name === "map"
-          && sqlEscaperCallbackKind(mapCall.arguments[0]) === kind;
+        return (
+          map?.type === "MemberExpression" &&
+          !map.computed &&
+          map.property?.type === "Identifier" &&
+          map.property.name === "map" &&
+          sqlEscaperCallbackKind(mapCall.arguments[0]) === kind
+        );
       }
-      function isSafeSqlFragmentMapJoinForSummary(node, paramNames, identifierParams) {
+      function isSafeSqlFragmentMapJoinForSummary(
+        node,
+        paramNames,
+        identifierParams,
+      ) {
         if (node?.type !== "CallExpression") return false;
         const join = node.callee;
-        if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
-        const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
-        if (!isAllowedSqlFragmentJoinSeparator(separator) && separator !== "\n") return false;
+        if (
+          join?.type !== "MemberExpression" ||
+          join.computed ||
+          join.property?.type !== "Identifier" ||
+          join.property.name !== "join"
+        ) {
+          return false;
+        }
+        const separator = node.arguments[0]
+          ? staticStringValue(node.arguments[0])
+          : ",";
+        if (
+          !isAllowedSqlFragmentJoinSeparator(separator) &&
+          separator !== "\n"
+        ) {
+          return false;
+        }
         const mapCall = join.object;
         if (mapCall?.type !== "CallExpression") return false;
         const map = mapCall.callee;
-        if (map?.type !== "MemberExpression" || map.computed || map.property?.type !== "Identifier" || map.property.name !== "map") return false;
+        if (
+          map?.type !== "MemberExpression" ||
+          map.computed ||
+          map.property?.type !== "Identifier" ||
+          map.property.name !== "map"
+        ) {
+          return false;
+        }
         const callback = mapCall.arguments[0];
-        if (callback?.type !== "ArrowFunctionExpression" && callback?.type !== "FunctionExpression") return false;
-        return isSafeSqlFragmentExpressionForSummary(singleReturnExpression(callback), paramNames, identifierParams);
+        if (
+          callback?.type !== "ArrowFunctionExpression" &&
+          callback?.type !== "FunctionExpression"
+        ) {
+          return false;
+        }
+        return isSafeSqlFragmentExpressionForSummary(
+          singleReturnExpression(callback),
+          paramNames,
+          identifierParams,
+        );
       }
-      function isSafeSqlFragmentTemplateForSummary(node, paramNames, identifierParams) {
+      function isSafeSqlFragmentTemplateForSummary(
+        node,
+        paramNames,
+        identifierParams,
+      ) {
         if (node?.type !== "TemplateLiteral") return false;
         for (let i = 0; i < node.expressions.length; i += 1) {
           const expression = node.expressions[i];
           const { before, after } = templateInterpolationParts(node, i);
-          if (expression.type === "Identifier" && paramNames.has(expression.name)) {
+          if (
+            expression.type === "Identifier" &&
+            paramNames.has(expression.name)
+          ) {
             if (!isUnquotedSqlInterpolation(before, after)) return false;
             identifierParams.add(expression.name);
             continue;
           }
-          if (!isSafeSqlFragmentExpressionForSummary(expression, paramNames, identifierParams)) return false;
+          if (
+            !isSafeSqlFragmentExpressionForSummary(
+              expression,
+              paramNames,
+              identifierParams,
+            )
+          ) {
+            return false;
+          }
         }
         return true;
       }
-      function isSafeSqlFragmentExpressionForSummary(node, paramNames, identifierParams) {
+      function isSafeSqlFragmentExpressionForSummary(
+        node,
+        paramNames,
+        identifierParams,
+      ) {
         if (staticStringValue(node) !== null) return true;
         if (sqlEscaperCallKind(node) === "string") return true;
-        if (isSqlEscaperMapJoin(node, "string", new Set([",", ", "]))) return true;
-        if (node?.type === "TemplateLiteral") return isSafeSqlFragmentTemplateForSummary(node, paramNames, identifierParams);
-        if (node?.type === "CallExpression") return isSafeSqlFragmentMapJoinForSummary(node, paramNames, identifierParams);
+        if (isSqlEscaperMapJoin(node, "string", new Set([",", ", "]))) {
+          return true;
+        }
+        if (node?.type === "TemplateLiteral") {
+          return isSafeSqlFragmentTemplateForSummary(
+            node,
+            paramNames,
+            identifierParams,
+          );
+        }
+        if (node?.type === "CallExpression") {
+          return isSafeSqlFragmentMapJoinForSummary(
+            node,
+            paramNames,
+            identifierParams,
+          );
+        }
         return false;
       }
       function markDynamicSqlIdentifierVariable(node) {
@@ -1494,40 +1953,69 @@ function ruleNoSqlStringConcat() {
       function unmarkDynamicSqlIdentifierMember(node) {
         const key = classMemberKey(node);
         const classNode = key && enclosingClass(node);
-        const members = classNode ? safeDynamicSqlIdentifierMembers.get(classNode) : null;
+        const members = classNode
+          ? safeDynamicSqlIdentifierMembers.get(classNode)
+          : null;
         if (key && members) members.delete(key);
       }
       function memberTypeStringValues(node) {
-        if (node?.type !== "MemberExpression" || node.computed || node.object?.type !== "Identifier") return null;
-        const propertyName = node.property?.type === "Identifier" ? node.property.name : "";
+        if (
+          node?.type !== "MemberExpression" ||
+          node.computed ||
+          node.object?.type !== "Identifier"
+        ) {
+          return null;
+        }
+        const propertyName =
+          node.property?.type === "Identifier" ? node.property.name : "";
         if (!propertyName) return null;
-        return sqlTypePropertyValues(variableTypeNode(findVariable(sourceCode, node.object)), propertyName);
+        return sqlTypePropertyValues(
+          variableTypeNode(findVariable(sourceCode, node.object)),
+          propertyName,
+        );
       }
       function identifierTokenValues(node) {
         const variable = findVariable(sourceCode, node);
-        return variable ? safeSqlIdentifierValues.get(variable) ?? null : null;
+        return variable
+          ? (safeSqlIdentifierValues.get(variable) ?? null)
+          : null;
       }
       function isSafeDynamicSqlIdentifierVariable(node) {
-        const variable = node?.type === "Identifier" ? findVariable(sourceCode, node) : null;
-        return Boolean(variable && safeDynamicSqlIdentifierVariables.has(variable));
+        const variable =
+          node?.type === "Identifier" ? findVariable(sourceCode, node) : null;
+        return Boolean(
+          variable && safeDynamicSqlIdentifierVariables.has(variable),
+        );
       }
       function isSafeDynamicSqlIdentifierMember(node) {
         const key = classMemberKey(node);
         const classNode = key && enclosingClass(node);
-        const members = classNode ? safeDynamicSqlIdentifierMembers.get(classNode) : null;
+        const members = classNode
+          ? safeDynamicSqlIdentifierMembers.get(classNode)
+          : null;
         return Boolean(key && members?.has(key));
       }
       function typeNames(type) {
-        return new Set([
-          checker.typeToString(type),
-          type.getSymbol()?.getName(),
-          type.aliasSymbol?.getName(),
-        ].filter(Boolean));
+        return new Set(
+          [
+            checker.typeToString(type),
+            type.getSymbol()?.getName(),
+            type.aliasSymbol?.getName(),
+          ].filter(Boolean),
+        );
       }
       function isConfiguredSafeSqlIdentifierMember(node) {
         if (!checker || safeIdentifierMembers.length === 0) return false;
-        if (node?.type !== "MemberExpression" || node.computed || node.property?.type !== "Identifier") return false;
-        const candidates = safeIdentifierMembers.filter(({ member }) => member === node.property.name);
+        if (
+          node?.type !== "MemberExpression" ||
+          node.computed ||
+          node.property?.type !== "Identifier"
+        ) {
+          return false;
+        }
+        const candidates = safeIdentifierMembers.filter(
+          ({ member }) => member === node.property.name,
+        );
         if (candidates.length === 0) return false;
         const tsObject = services?.esTreeNodeToTSNodeMap?.get(node.object);
         if (!tsObject) return false;
@@ -1537,18 +2025,30 @@ function ruleNoSqlStringConcat() {
       function memberTokenValues(node) {
         if (node.computed && node.object?.type === "Identifier") {
           const variable = findVariable(sourceCode, node.object);
-          return variable ? safeSqlIdentifierObjectValues.get(variable) ?? null : null;
+          return variable
+            ? (safeSqlIdentifierObjectValues.get(variable) ?? null)
+            : null;
         }
         return memberTypeStringValues(node);
       }
       function transformedCallTokenValues(node) {
         if (node.arguments.length > 0) return null;
         const callee = node.callee;
-        if (callee?.type !== "MemberExpression" || callee.computed || callee.property?.type !== "Identifier") return null;
+        if (
+          callee?.type !== "MemberExpression" ||
+          callee.computed ||
+          callee.property?.type !== "Identifier"
+        ) {
+          return null;
+        }
         const sourceValues = sqlTokenValues(callee.object);
         if (!sourceValues) return null;
-        if (callee.property.name === "toUpperCase") return new Set([...sourceValues].map((value) => value.toUpperCase()));
-        if (callee.property.name === "toLowerCase") return new Set([...sourceValues].map((value) => value.toLowerCase()));
+        if (callee.property.name === "toUpperCase") {
+          return new Set([...sourceValues].map((value) => value.toUpperCase()));
+        }
+        if (callee.property.name === "toLowerCase") {
+          return new Set([...sourceValues].map((value) => value.toLowerCase()));
+        }
         return null;
       }
       function sqlTokenValues(node) {
@@ -1558,40 +2058,72 @@ function ruleNoSqlStringConcat() {
         if (unwrapped !== node) return sqlTokenValues(unwrapped);
         if (node?.type === "Identifier") return identifierTokenValues(node);
         if (node?.type === "MemberExpression") return memberTokenValues(node);
-        if (node?.type === "LogicalExpression" && (node.operator === "??" || node.operator === "||")) {
-          return unionStringValues(sqlTokenValues(node.left), sqlTokenValues(node.right));
+        if (
+          node?.type === "LogicalExpression" &&
+          (node.operator === "??" || node.operator === "||")
+        ) {
+          return unionStringValues(
+            sqlTokenValues(node.left),
+            sqlTokenValues(node.right),
+          );
         }
         if (node?.type === "ConditionalExpression") {
-          return unionStringValues(sqlTokenValues(node.consequent), sqlTokenValues(node.alternate));
+          return unionStringValues(
+            sqlTokenValues(node.consequent),
+            sqlTokenValues(node.alternate),
+          );
         }
-        if (node?.type === "CallExpression") return transformedCallTokenValues(node);
+        if (node?.type === "CallExpression") {
+          return transformedCallTokenValues(node);
+        }
         return null;
       }
       function isSafeDynamicSqlIdentifierTemplate(node) {
-        return node?.type === "TemplateLiteral"
-          && node.expressions.length > 0
-          && templateStaticPartsAreSqlIdentifierSafe(node)
-          && node.expressions.every(isSafeSqlIdentifierExpression);
+        return (
+          node?.type === "TemplateLiteral" &&
+          node.expressions.length > 0 &&
+          templateStaticPartsAreSqlIdentifierSafe(node) &&
+          node.expressions.every(isSafeSqlIdentifierExpression)
+        );
       }
       function isSafeSqlIdentifierExpression(node) {
         if (sqlEscaperCallKind(node) === "identifier") return true;
-        if (isSqlEscaperMapJoin(node, "identifier", new Set(["."]))) return true;
+        if (isSqlEscaperMapJoin(node, "identifier", new Set(["."]))) {
+          return true;
+        }
         const values = sqlTokenValues(node);
         if (valuesAreSqlIdentifiers(values)) return true;
         if (isSafeDynamicSqlIdentifierVariable(node)) return true;
         if (isConfiguredSafeSqlIdentifierMember(node)) return true;
-        if (node?.type === "MemberExpression" && isSafeDynamicSqlIdentifierMember(node)) return true;
+        if (
+          node?.type === "MemberExpression" &&
+          isSafeDynamicSqlIdentifierMember(node)
+        ) {
+          return true;
+        }
         return isSafeDynamicSqlIdentifierTemplate(node);
       }
-      function safeSqlInterpolationState(expression, before, after, previousWasIdentifier) {
+      function safeSqlInterpolationState(
+        expression,
+        before,
+        after,
+        previousWasIdentifier,
+      ) {
         if (isSafeSqlFragmentExpression(expression)) {
           return { safe: true, previousWasIdentifier: false };
         }
-        if (isSafeSqlIdentifierExpression(expression) && isSqlIdentifierContext(before, after)) {
+        if (
+          isSafeSqlIdentifierExpression(expression) &&
+          isSqlIdentifierContext(before, after)
+        ) {
           return { safe: true, previousWasIdentifier: true };
         }
         const values = sqlTokenValues(expression);
-        if (valuesAreSqlDirections(values) && previousWasIdentifier && /^\s*$/u.test(before)) {
+        if (
+          valuesAreSqlDirections(values) &&
+          previousWasIdentifier &&
+          /^\s*$/u.test(before)
+        ) {
           return { safe: true, previousWasIdentifier: false };
         }
         return { safe: false, previousWasIdentifier: false };
@@ -1601,7 +2133,12 @@ function ruleNoSqlStringConcat() {
         for (let i = 0; i < node.expressions.length; i += 1) {
           const expression = node.expressions[i];
           const { before, after } = templateInterpolationParts(node, i);
-          const state = safeSqlInterpolationState(expression, before, after, previousWasIdentifier);
+          const state = safeSqlInterpolationState(
+            expression,
+            before,
+            after,
+            previousWasIdentifier,
+          );
           if (!state.safe) return false;
           previousWasIdentifier = state.previousWasIdentifier;
         }
@@ -1612,41 +2149,74 @@ function ruleNoSqlStringConcat() {
         for (let i = 0; i < node.expressions.length; i += 1) {
           const expression = node.expressions[i];
           const { before, after } = templateInterpolationParts(node, i);
-          const state = safeSqlInterpolationState(expression, before, after, previousWasIdentifier);
-          if (!state.safe && isSqlInterpolationContext(before, after)) return true;
+          const state = safeSqlInterpolationState(
+            expression,
+            before,
+            after,
+            previousWasIdentifier,
+          );
+          if (!state.safe && isSqlInterpolationContext(before, after)) {
+            return true;
+          }
           previousWasIdentifier = state.previousWasIdentifier;
         }
         return false;
       }
       function isDirectSafeSqlFragmentExpression(node) {
-        return staticStringValue(node) !== null
-          || sqlEscaperCallKind(node) === "string"
-          || isSafeSqlFragmentCall(node)
-          || isSqlEscaperMapJoin(node, "string", new Set([",", ", "]))
-          || isStaticFragmentMapJoin(node)
-          || isPlaceholderSqlFragmentMapJoin(node);
+        return (
+          staticStringValue(node) !== null ||
+          sqlEscaperCallKind(node) === "string" ||
+          isSafeSqlFragmentCall(node) ||
+          isSqlEscaperMapJoin(node, "string", new Set([",", ", "])) ||
+          isStaticFragmentMapJoin(node) ||
+          isPlaceholderSqlFragmentMapJoin(node)
+        );
       }
       function isSafeSqlFragmentExpression(node) {
         if (isDirectSafeSqlFragmentExpression(node)) return true;
-        if (node?.type === "Identifier") return isSafeFragmentVariable(node, safeSqlFragmentStrings);
+        if (node?.type === "Identifier") {
+          return isSafeFragmentVariable(node, safeSqlFragmentStrings);
+        }
         if (isSafeFragmentMember(node)) return true;
         if (node?.type === "ConditionalExpression") {
-          return isSafeSqlFragmentExpression(node.consequent) && isSafeSqlFragmentExpression(node.alternate);
+          return (
+            isSafeSqlFragmentExpression(node.consequent) &&
+            isSafeSqlFragmentExpression(node.alternate)
+          );
         }
         if (node?.type === "TemplateLiteral") {
           return isSafeSqlTemplateLiteral(node);
         }
         if (node?.type !== "CallExpression") return false;
         const join = node.callee;
-        if (join?.type !== "MemberExpression" || join.computed || join.property?.type !== "Identifier" || join.property.name !== "join") return false;
-        const separator = node.arguments[0] ? staticStringValue(node.arguments[0]) : ",";
+        if (
+          join?.type !== "MemberExpression" ||
+          join.computed ||
+          join.property?.type !== "Identifier" ||
+          join.property.name !== "join"
+        ) {
+          return false;
+        }
+        const separator = node.arguments[0]
+          ? staticStringValue(node.arguments[0])
+          : ",";
         if (!isAllowedSqlFragmentJoinSeparator(separator)) return false;
-        return join.object?.type === "Identifier" && isSafeFragmentVariable(join.object, safeSqlFragmentArrays);
+        return (
+          join.object?.type === "Identifier" &&
+          isSafeFragmentVariable(join.object, safeSqlFragmentArrays)
+        );
       }
       function isSafeSqlFragmentArrayExpression(node) {
-        return isEmptyArrayExpression(node)
-          || (node?.type === "ArrayExpression"
-            && node.elements.every((element) => element && element.type !== "SpreadElement" && isSafeSqlFragmentExpression(element)));
+        return (
+          isEmptyArrayExpression(node) ||
+          (node?.type === "ArrayExpression" &&
+            node.elements.every(
+              (element) =>
+                element &&
+                element.type !== "SpreadElement" &&
+                isSafeSqlFragmentExpression(element),
+            ))
+        );
       }
       function objectSqlFragmentProperties(node) {
         if (node?.type !== "ObjectExpression") return null;
@@ -1672,32 +2242,60 @@ function ruleNoSqlStringConcat() {
         return properties;
       }
       function iifeObjectSqlFragmentProperties(node) {
-        if (node?.type !== "CallExpression" || node.arguments.length !== 0) return null;
+        if (node?.type !== "CallExpression" || node.arguments.length !== 0) {
+          return null;
+        }
         const callee = node.callee;
-        if (callee?.type !== "ArrowFunctionExpression" && callee?.type !== "FunctionExpression") return null;
-        if (callee.body?.type === "ObjectExpression") return objectSqlFragmentProperties(callee.body);
+        if (
+          callee?.type !== "ArrowFunctionExpression" &&
+          callee?.type !== "FunctionExpression"
+        ) {
+          return null;
+        }
+        if (callee.body?.type === "ObjectExpression") {
+          return objectSqlFragmentProperties(callee.body);
+        }
         return returnedObjectSqlFragmentProperties(callee.body);
       }
       function objectSqlFragmentPropertiesFromExpression(node) {
-        return objectSqlFragmentProperties(node) ?? iifeObjectSqlFragmentProperties(node);
+        return (
+          objectSqlFragmentProperties(node) ??
+          iifeObjectSqlFragmentProperties(node)
+        );
       }
       function guardedSqlIdentifierVariable(node) {
         if (!statementExits(node.consequent)) return null;
         const test = node.test;
-        const call = test?.type === "UnaryExpression" && test.operator === "!" ? test.argument : null;
+        const call =
+          test?.type === "UnaryExpression" && test.operator === "!"
+            ? test.argument
+            : null;
         if (call?.type !== "CallExpression") return null;
         const callee = call.callee;
-        if (callee?.type !== "MemberExpression" || callee.computed || callee.property?.type !== "Identifier" || callee.property.name !== "test") return null;
+        if (
+          callee?.type !== "MemberExpression" ||
+          callee.computed ||
+          callee.property?.type !== "Identifier" ||
+          callee.property.name !== "test"
+        ) {
+          return null;
+        }
         if (callee.object?.type !== "Identifier") return null;
         const regexVariable = findVariable(sourceCode, callee.object);
-        if (!regexVariable || !sqlIdentifierRegexVariables.has(regexVariable)) return null;
+        if (!regexVariable || !sqlIdentifierRegexVariables.has(regexVariable)) {
+          return null;
+        }
         const arg = call.arguments[0];
         return arg?.type === "Identifier" ? arg : null;
       }
       return {
         Program(node) {
-          for (const statement of node.body ?? []) scanSqlEscaperDeclaration(statement);
-          for (const statement of node.body ?? []) scanSafeSqlFragmentDeclaration(statement);
+          for (const statement of node.body ?? []) {
+            scanSqlEscaperDeclaration(statement);
+          }
+          for (const statement of node.body ?? []) {
+            scanSafeSqlFragmentDeclaration(statement);
+          }
         },
         VariableDeclarator(node) {
           markSqlEscaperFunction(node);
@@ -1712,7 +2310,14 @@ function ruleNoSqlStringConcat() {
           if (objectValues && node.parent?.kind === "const") {
             safeSqlIdentifierObjectValues.set(variable, objectValues);
           }
-          if (tokenValues && [...tokenValues].every((value) => isSqlIdentifierTokenValue(value) || isSqlDirectionTokenValue(value))) {
+          if (
+            tokenValues &&
+            [...tokenValues].every(
+              (value) =>
+                isSqlIdentifierTokenValue(value) ||
+                isSqlDirectionTokenValue(value),
+            )
+          ) {
             safeSqlIdentifierValues.set(variable, tokenValues);
           }
           if (isSafeSqlIdentifierExpression(node.init)) {
@@ -1723,8 +2328,14 @@ function ruleNoSqlStringConcat() {
           } else if (isSafeSqlFragmentExpression(node.init)) {
             safeSqlFragmentStrings.add(variable);
           } else {
-            const sqlFragmentObjectProperties = objectSqlFragmentPropertiesFromExpression(node.init);
-            if (sqlFragmentObjectProperties && node.parent?.kind === "const") safeSqlFragmentObjectValues.set(variable, sqlFragmentObjectProperties);
+            const sqlFragmentObjectProperties =
+              objectSqlFragmentPropertiesFromExpression(node.init);
+            if (sqlFragmentObjectProperties && node.parent?.kind === "const") {
+              safeSqlFragmentObjectValues.set(
+                variable,
+                sqlFragmentObjectProperties,
+              );
+            }
           }
         },
         AssignmentExpression(node) {
@@ -1750,180 +2361,94 @@ function ruleNoSqlStringConcat() {
         },
         CallExpression(node) {
           const callee = node.callee;
-          if (callee?.type !== "MemberExpression" || callee.computed || callee.property?.type !== "Identifier" || callee.property.name !== "push") return;
+          if (
+            callee?.type !== "MemberExpression" ||
+            callee.computed ||
+            callee.property?.type !== "Identifier" ||
+            callee.property.name !== "push"
+          ) {
+            return;
+          }
           if (callee.object?.type !== "Identifier") return;
           const variable = findVariable(sourceCode, callee.object);
           if (!variable || !safeSqlFragmentArrays.has(variable)) return;
-          if (!node.arguments.every((arg) => isSafeSqlFragmentExpression(arg))) {
+          if (
+            !node.arguments.every((arg) => isSafeSqlFragmentExpression(arg))
+          ) {
             safeSqlFragmentArrays.delete(variable);
           }
         },
         TemplateLiteral(node) {
-          if (node.parent?.type === "TaggedTemplateExpression" && node.parent.quasi === node && isParameterizedSqlTag(node.parent.tag)) return;
-          if (node.expressions.length > 0 && (sqlPattern.test(templateText(node)) || sqlSentencePattern.test(templateText(node)))) {
+          if (
+            node.parent?.type === "TaggedTemplateExpression" &&
+            node.parent.quasi === node &&
+            isParameterizedSqlTag(node.parent.tag)
+          ) {
+            return;
+          }
+          if (
+            node.expressions.length > 0 &&
+            (sqlPattern.test(templateText(node)) ||
+              sqlSentencePattern.test(templateText(node)))
+          ) {
             if (!hasUnsafeSqlInterpolation(node)) return;
-            context.report({ node, message: "Do not interpolate values into SQL strings. Use parameterized queries / bound parameters." });
+            context.report({
+              node,
+              message:
+                "Do not interpolate values into SQL strings. Use parameterized queries / bound parameters.",
+            });
           }
         },
         BinaryExpression(node) {
           if (node.operator !== "+") return;
           const sides = [node.left, node.right];
-          const hasSqlLiteral = sides.some((side) => side?.type === "Literal" && typeof side.value === "string" && sqlPattern.test(side.value));
-          const hasNonLiteral = sides.some((side) => side && side.type !== "Literal");
+          const hasSqlLiteral = sides.some(
+            (side) =>
+              side?.type === "Literal" &&
+              typeof side.value === "string" &&
+              sqlPattern.test(side.value),
+          );
+          const hasNonLiteral = sides.some(
+            (side) => side && side.type !== "Literal",
+          );
           if (hasSqlLiteral && hasNonLiteral) {
-            context.report({ node, message: "Do not concatenate values into SQL strings. Use parameterized queries / bound parameters." });
+            context.report({
+              node,
+              message:
+                "Do not concatenate values into SQL strings. Use parameterized queries / bound parameters.",
+            });
           }
         },
       };
     },
   };
-}
-
-function sameExpression(left, right) {
-  const a = unwrapExpression(left);
-  const b = unwrapExpression(right);
-  if (!a || !b || a.type !== b.type) return false;
-  if (a.type === "Identifier") return a.name === b.name;
-  if (a.type === "ThisExpression" || a.type === "Super") return true;
-  if (a.type === "Literal") return a.value === b.value;
-  if (a.type !== "MemberExpression") return false;
-  if (a.computed !== b.computed || !sameExpression(a.object, b.object)) return false;
-  if (a.computed) return sameExpression(a.property, b.property);
-  if (a.property?.type === "Identifier" && b.property?.type === "Identifier") return a.property.name === b.property.name;
-  return a.property?.type === "PrivateIdentifier" && b.property?.type === "PrivateIdentifier" && a.property.name === b.property.name;
-}
-
-function isStringLiteralNode(node) {
-  const unwrapped = unwrapExpression(node);
-  return unwrapped?.type === "Literal" && unwrapped.value === "string";
-}
-
-function typeofOperand(node) {
-  const unwrapped = unwrapExpression(node);
-  return unwrapped?.type === "UnaryExpression" && unwrapped.operator === "typeof" ? unwrapExpression(unwrapped.argument) : null;
-}
-
-function stringTypeofGuard(condition, expression) {
-  const node = unwrapExpression(condition);
-  if (!node || node.type !== "BinaryExpression" || !["==", "===", "!=", "!=="].includes(node.operator)) return null;
-  const leftTypeof = typeofOperand(node.left);
-  const rightTypeof = typeofOperand(node.right);
-  let operand = null;
-  if (leftTypeof && isStringLiteralNode(node.right)) operand = leftTypeof;
-  else if (rightTypeof && isStringLiteralNode(node.left)) operand = rightTypeof;
-  if (!operand || !sameExpression(operand, expression)) return null;
-  const equals = node.operator === "==" || node.operator === "===";
-  return { truthy: equals, falsy: !equals };
-}
-
-function conditionEnsuresString(condition, expression, whenTruthy) {
-  const node = unwrapExpression(condition);
-  if (!node) return false;
-  const direct = stringTypeofGuard(node, expression);
-  if (direct) return whenTruthy ? direct.truthy : direct.falsy;
-  if (node.type === "UnaryExpression" && node.operator === "!") return conditionEnsuresString(node.argument, expression, !whenTruthy);
-  if (node.type !== "LogicalExpression") return false;
-  if (node.operator === "&&") {
-    if (whenTruthy) return conditionEnsuresString(node.left, expression, true) || conditionEnsuresString(node.right, expression, true);
-    return conditionEnsuresString(node.left, expression, false) && conditionEnsuresString(node.right, expression, false);
-  }
-  if (node.operator === "||") {
-    if (whenTruthy) return conditionEnsuresString(node.left, expression, true) && conditionEnsuresString(node.right, expression, true);
-    return conditionEnsuresString(node.left, expression, false) || conditionEnsuresString(node.right, expression, false);
-  }
-  return false;
-}
-
-function nodeWithin(node, ancestor) {
-  let cur = node;
-  while (cur) {
-    if (cur === ancestor) return true;
-    cur = cur.parent;
-  }
-  return false;
-}
-
-function statementAlwaysExits(statement) {
-  if (!statement) return false;
-  if (statement.type === "ReturnStatement" || statement.type === "ThrowStatement" || statement.type === "ContinueStatement" || statement.type === "BreakStatement") return true;
-  if (statement.type === "BlockStatement") return statement.body.length > 0 && statementAlwaysExits(statement.body[statement.body.length - 1]);
-  if (statement.type === "IfStatement") return statementAlwaysExits(statement.consequent) && statementAlwaysExits(statement.alternate);
-  return false;
-}
-
-function enclosingBlockStatement(node) {
-  let cur = node;
-  while (cur?.parent) {
-    if (cur.parent.type === "BlockStatement" && cur.parent.body.includes(cur)) return cur;
-    cur = cur.parent;
-  }
-  return null;
-}
-
-function safeBetweenStringGuardAndParse(statement) {
-  return statement?.type === "VariableDeclaration" && statement.declarations.every((declaration) => declaration.init == null);
-}
-
-function previousGuardInBlockEnsuresString(statement, expression) {
-  const block = statement?.parent;
-  if (!statement || block?.type !== "BlockStatement") return false;
-  const index = block.body.indexOf(statement);
-  let previousIndex = index - 1;
-  while (previousIndex >= 0 && safeBetweenStringGuardAndParse(block.body[previousIndex])) previousIndex -= 1;
-  const previous = previousIndex >= 0 ? block.body[previousIndex] : null;
-  if (previous?.type !== "IfStatement") return false;
-  if (statementAlwaysExits(previous.consequent) && conditionEnsuresString(previous.test, expression, false)) return true;
-  return Boolean(previous.alternate && statementAlwaysExits(previous.alternate) && conditionEnsuresString(previous.test, expression, true));
-}
-
-function priorGuardEnsuresString(node, expression) {
-  let cur = node;
-  while (cur) {
-    const statement = enclosingBlockStatement(cur);
-    if (!statement) return false;
-    if (previousGuardInBlockEnsuresString(statement, expression)) return true;
-    const blockOwner = statement.parent?.parent;
-    if (blockOwner?.type === "FunctionDeclaration" || blockOwner?.type === "FunctionExpression" || blockOwner?.type === "ArrowFunctionExpression") return false;
-    cur = blockOwner;
-  }
-  return false;
-}
-
-function branchGuardEnsuresString(node, expression) {
-  let cur = node.parent;
-  while (cur) {
-    if (cur.type === "IfStatement") {
-      if (nodeWithin(node, cur.consequent) && conditionEnsuresString(cur.test, expression, true)) return true;
-      if (cur.alternate && nodeWithin(node, cur.alternate) && conditionEnsuresString(cur.test, expression, false)) return true;
-    }
-    cur = cur.parent;
-  }
-  return false;
-}
-
-function hasLocalStringBoundary(node, expression) {
-  return branchGuardEnsuresString(node, expression) || priorGuardEnsuresString(node, expression);
 }
 
 function ruleNoUnsafeDeserialize() {
   return {
-    meta: { type: "problem", docs: { description: "Disallow JSON.parse on any/unknown values without validation." }, schema: [] },
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Disallow JSON.parse on any/unknown values without validation.",
+      },
+      schema: [],
+    },
     create(context) {
       const services = requireTypeServices(context);
-      if (!services) return missingTypeServicesVisitors(context, "no-unsafe-deserialize");
+      if (!services) {
+        return missingTypeServicesVisitors(context, "no-unsafe-deserialize");
+      }
       const checker = services.program.getTypeChecker();
 
       return {
         CallExpression(node) {
-          const callee = node.callee;
-          const isJsonParse = callee?.type === "MemberExpression"
-            && callee.object?.type === "Identifier" && callee.object.name === "JSON"
-            && callee.property?.type === "Identifier" && callee.property.name === "parse";
-          if (!isJsonParse) return;
-          const tsArg = node.arguments[0] && services.esTreeNodeToTSNodeMap.get(node.arguments[0]);
-          if (!tsArg) return;
-          if (isAnyOrUnknownType(checker.getTypeAtLocation(tsArg)) && !hasLocalStringBoundary(node, node.arguments[0])) {
-            context.report({ node, message: "Do not JSON.parse any/unknown input directly. Validate through a schema boundary instead." });
+          if (isUnsafeJsonParseInput(node, services, checker)) {
+            context.report({
+              node,
+              message:
+                "Do not JSON.parse any/unknown input directly. Validate through a schema boundary instead.",
+            });
           }
         },
       };
@@ -1931,49 +2456,40 @@ function ruleNoUnsafeDeserialize() {
   };
 }
 
-const defaultAuthzFunctions = ["requireUser", "authorize", "requireTenant", "can", "assertCan", "checkAccess", "requireRole", "ensureCan"];
-const requestParamRoots = new Set(["req", "request", "ctx", "context", "event"]);
-
-function callExpressionName(callee) {
-  if (callee?.type === "Identifier") return callee.name;
-  if (callee?.type === "MemberExpression" && callee.property?.type === "Identifier") return callee.property.name;
-  return null;
-}
-
 function ruleRequireAuthzCheck() {
   return {
-    meta: { type: "problem", docs: { description: "Require an authorization/ownership check when a handler reads request params." }, schema: [{ type: "object", properties: { authzFunctions: { type: "array", items: { type: "string" } } }, additionalProperties: false }] },
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Require an authorization/ownership check when a handler reads request params.",
+      },
+      schema: [
+        {
+          type: "object",
+          properties: {
+            authzFunctions: { type: "array", items: { type: "string" } },
+          },
+          additionalProperties: false,
+        },
+      ],
+    },
     create(context) {
-      const authz = new Set(context.options[0]?.authzFunctions ?? defaultAuthzFunctions);
-      const stack = [];
-      function enter(node) { stack.push({ node, paramsAccess: null, sawAuthz: false }); }
-      function exit() {
-        const frame = stack.pop();
-        if (frame?.paramsAccess && !frame.sawAuthz) {
-          context.report({ node: frame.paramsAccess, message: "Handler reads request params without an authorization/ownership check. Call requireUser/authorize (boundaries registry)." });
-        }
-      }
-      return {
-        FunctionDeclaration: enter,
-        "FunctionDeclaration:exit": exit,
-        FunctionExpression: enter,
-        "FunctionExpression:exit": exit,
-        ArrowFunctionExpression: enter,
-        "ArrowFunctionExpression:exit": exit,
-        MemberExpression(node) {
-          if (node.property?.type === "Identifier" && node.property.name === "params"
-            && node.object?.type === "Identifier" && requestParamRoots.has(node.object.name)
-            && stack.length > 0) {
-            stack[stack.length - 1].paramsAccess = node;
+      const tracker = createAuthBoundaryTracker({
+        authzFunctions: context.options[0]?.authzFunctions ?? [
+          ...DEFAULT_AUTHZ_FUNCTIONS,
+        ],
+        onFrameExit(frame) {
+          if (frame.paramsAccess && !frame.sawAuthz) {
+            context.report({
+              node: frame.paramsAccess,
+              message:
+                "Handler reads request params without an authorization/ownership check. Call requireUser/authorize (boundaries registry).",
+            });
           }
         },
-        CallExpression(node) {
-          const name = callExpressionName(node.callee);
-          if (name && authz.has(name) && stack.length > 0) {
-            stack[stack.length - 1].sawAuthz = true;
-          }
-        },
-      };
+      });
+      return tracker.visitors;
     },
   };
 }
@@ -1989,27 +2505,122 @@ function isStructuralFork(local, canonical) {
   return true;
 }
 
+function sortedProps(props) {
+  return [...props.entries()].sort(([left], [right]) =>
+    left.localeCompare(right),
+  );
+}
+
+function structuralCandidateRank(candidate) {
+  return candidate.authorityState === "accepted" ? 0 : 1;
+}
+
+function sortedStructuralCandidates(candidates) {
+  return [...candidates].sort(
+    (left, right) =>
+      structuralCandidateRank(left) - structuralCandidateRank(right) ||
+      left.label.localeCompare(right.label),
+  );
+}
+
+function structuralMatchProof(sym, local, candidate, diagnostic) {
+  const localProps = sortedProps(local);
+  return {
+    authorityState: candidate.authorityState ?? "proposal",
+    diagnostic,
+    localType: {
+      name: sym.getName(),
+      props: localProps,
+    },
+    ownerType: {
+      authority: candidate.authority ?? "unknown",
+      label: candidate.label,
+      props: sortedProps(candidate.props),
+    },
+    structuralMatch: {
+      matchedProps: localProps.map(([name]) => name),
+      relation: "local-subset-of-owner",
+      localPropCount: local.size,
+      ownerPropCount: candidate.props.size,
+    },
+  };
+}
+
+function emitStructuralMatchFact(context, node, ruleId, proof) {
+  return emitSemanticFact(context, node, {
+    factKind: "structuralMatch",
+    ruleId,
+    adapterId: "typescript-eslint/type-owner",
+    confidence: proof.diagnostic.emitted
+      ? "deterministic-enforcement"
+      : "deterministic-inventory",
+    provenance: ["AST", "TypeChecker"],
+    payload: proof,
+  });
+}
+
+function structuralDiagnosticFor(candidate, messageId) {
+  if (candidate.authorityState === "accepted") {
+    return { emitted: true, messageId };
+  }
+  return {
+    emitted: false,
+    reason: "owner-authority-unaccepted",
+  };
+}
+
+function findStructuralProof(sym, local, candidates, messageId) {
+  for (const candidate of sortedStructuralCandidates(candidates)) {
+    if (isStructuralFork(local, candidate.props)) {
+      return structuralMatchProof(
+        sym,
+        local,
+        candidate,
+        structuralDiagnosticFor(candidate, messageId),
+      );
+    }
+  }
+  return null;
+}
+
+function isAllOptionalObjectShape(node) {
+  let members = [];
+  if (
+    node.type === "TSTypeAliasDeclaration" &&
+    node.typeAnnotation?.type === "TSTypeLiteral"
+  ) {
+    members = node.typeAnnotation.members;
+  } else if (node.type === "TSInterfaceDeclaration") {
+    members = node.body.body;
+  }
+  const props = members.filter(
+    (member) => member.type === "TSPropertySignature",
+  );
+  return props.length > 0 && props.every((prop) => prop.optional);
+}
+
 // Canonical candidate list is cached per TypeScript Program (stable per ESLint process),
 // so the node_modules enumeration runs once rather than per linted file.
 const canonicalCache = new WeakMap();
-const antidriftBrandMarkerName = "__antidriftBrand";
-const TS_TYPE_FLAG_ANY = 1;
-const TS_TYPE_FLAG_UNKNOWN = 1 << 1;
-const TS_TYPE_FLAG_UNDEFINED = 1 << 15;
-const TS_TYPE_FLAG_NULL = 1 << 16;
 
 function typeReferenceName(typeNode) {
   if (typeNode?.typeName?.type === "Identifier") return typeNode.typeName.name;
-  if (typeNode?.typeName?.type === "TSQualifiedName") return typeNode.typeName.right?.name ?? typeNode.typeName.left?.name ?? "";
+  if (typeNode?.typeName?.type === "TSQualifiedName") {
+    return typeNode.typeName.right?.name ?? typeNode.typeName.left?.name ?? "";
+  }
   return "";
 }
 
 function typeReferenceArguments(typeNode) {
-  return typeNode?.typeArguments?.params ?? typeNode?.typeParameters?.params ?? [];
+  return (
+    typeNode?.typeArguments?.params ?? typeNode?.typeParameters?.params ?? []
+  );
 }
 
 function isDerivationSourceReference(typeNode) {
-  return typeNode?.type === "TSTypeReference" || typeNode?.type === "TSImportType";
+  return (
+    typeNode?.type === "TSTypeReference" || typeNode?.type === "TSImportType"
+  );
 }
 
 function isStructuralDerivationAlias(node) {
@@ -2017,171 +2628,24 @@ function isStructuralDerivationAlias(node) {
   const annotation = node.typeAnnotation;
   if (annotation?.type === "TSTupleType") return true;
   if (annotation?.type !== "TSTypeReference") return false;
-  if (!structuralDerivationUtilities.has(typeReferenceName(annotation))) return false;
+  if (!structuralDerivationUtilities.has(typeReferenceName(annotation))) {
+    return false;
+  }
   return isDerivationSourceReference(typeReferenceArguments(annotation)[0]);
-}
-
-function isAntidriftBrandMarkerProperty(prop) {
-  for (const decl of prop.declarations ?? []) {
-    const name = decl.name;
-    const sourceFile = decl.getSourceFile?.().fileName.replace(/\\/gu, "/") ?? "";
-    const isAntidriftDeclaration = sourceFile.endsWith("@joedeleeuw/antidrift/src/brand/index.d.mts")
-      || sourceFile.endsWith("tooling/antidrift/src/brand/index.d.mts");
-    if (!isAntidriftDeclaration) continue;
-    if (name?.getText?.() === `[${antidriftBrandMarkerName}]`) return true;
-  }
-  return false;
-}
-
-function isAntidriftBrandedType(type, seen = new Set()) {
-  if (!type || seen.has(type)) return false;
-  seen.add(type);
-  if ((type.getProperties?.() ?? []).some(isAntidriftBrandMarkerProperty)) return true;
-  const parts = type.types ?? [];
-  return parts.some((part) => isAntidriftBrandedType(part, seen));
-}
-
-function isAnyOrUnknownType(type) {
-  return Boolean(type && (type.flags & (TS_TYPE_FLAG_ANY | TS_TYPE_FLAG_UNKNOWN)));
-}
-
-function typeIncludesNullish(type, seen = new Set()) {
-  if (!type || seen.has(type)) return false;
-  seen.add(type);
-  if (type.flags & (TS_TYPE_FLAG_NULL | TS_TYPE_FLAG_UNDEFINED)) return true;
-  return (type.types ?? []).some((part) => typeIncludesNullish(part, seen));
-}
-
-function typeStringIncludesAnyOrUnknown(checker, type) {
-  return /\b(?:any|unknown)\b/u.test(checker.typeToString(type));
-}
-
-function isNamedTypeReference(typeNode) {
-  return typeNode?.type === "TSTypeReference";
-}
-
-function walkNode(node, visit) {
-  if (!node || typeof node.type !== "string") return;
-  visit(node);
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "parent" || key === "loc" || key === "range") continue;
-    if (Array.isArray(value)) {
-      for (const child of value) walkNode(child, visit);
-    } else if (value && typeof value.type === "string") {
-      walkNode(value, visit);
-    }
-  }
-}
-
-function isNullishLiteral(node) {
-  return node?.type === "Literal" && node.value === null
-    || node?.type === "Identifier" && node.name === "undefined";
-}
-
-function hasParamRoot(expression, paramNames) {
-  const root = memberExpressionRootName(expression);
-  return Boolean(root && paramNames.has(root));
-}
-
-function isObjectLiteral(node) {
-  return node?.type === "Literal" && node.value === "object";
-}
-
-function isTypeofObjectProbe(node, paramNames) {
-  if (node.type !== "UnaryExpression" || node.operator !== "typeof" || !hasParamRoot(node.argument, paramNames)) return false;
-  const parent = node.parent;
-  if (parent?.type !== "BinaryExpression" || !["==", "===", "!=", "!=="].includes(parent.operator)) return false;
-  return parent.left === node ? isObjectLiteral(parent.right) : isObjectLiteral(parent.left);
 }
 
 function isTypePredicateReturn(fn) {
   return fn?.returnType?.typeAnnotation?.type === "TSTypePredicate";
 }
 
-function countShapeProbesIn(node, paramNames) {
-  let count = 0;
-  walkNode(node, (node) => {
-    if (isTypeofObjectProbe(node, paramNames)) {
-      count += 1;
-      return;
-    }
-    if (node.type === "BinaryExpression" && node.operator === "in" && hasParamRoot(node.right, paramNames)) {
-      count += 1;
-      return;
-    }
-    if (node.type === "BinaryExpression" && ["==", "===", "!=", "!=="].includes(node.operator)) {
-      const leftIsProbe = hasParamRoot(node.left, paramNames) && isNullishLiteral(node.right);
-      const rightIsProbe = hasParamRoot(node.right, paramNames) && isNullishLiteral(node.left);
-      if (leftIsProbe || rightIsProbe) count += 1;
-      return;
-    }
-    if (
-      node.type === "CallExpression"
-      && node.callee?.type === "MemberExpression"
-      && node.callee.object?.type === "Identifier"
-      && node.callee.object.name === "Array"
-      && node.callee.property?.type === "Identifier"
-      && node.callee.property.name === "isArray"
-      && hasParamRoot(node.arguments?.[0], paramNames)
-    ) {
-      count += 1;
-    }
-  });
-  return count;
-}
-
-function isObjectEntriesCall(node) {
-  return node?.type === "CallExpression"
-    && node.callee?.type === "MemberExpression"
-    && node.callee.object?.type === "Identifier"
-    && node.callee.object.name === "Object"
-    && node.callee.property?.type === "Identifier"
-    && node.callee.property.name === "entries";
-}
-
-function objectEntriesValueBindings(callback, methodName) {
-  const entryParam = methodName === "reduce" ? callback.params?.[1] : callback.params?.[0];
-  const target = assignmentTarget(entryParam);
-  const bindings = [];
-  if (target?.type === "ArrayPattern") {
-    collectBindingIdentifiers(target.elements?.[1], bindings);
-  }
-  return bindings;
-}
-
-function objectEntriesCallbackProbe(node) {
-  const callee = node.callee;
-  if (callee?.type !== "MemberExpression" || callee.property?.type !== "Identifier") return null;
-  const methodName = callee.property.name;
-  if (!arrayTransformMethods.has(methodName)) return null;
-  if (!isObjectEntriesCall(callee.object)) return null;
-  const cb = node.arguments?.[0];
-  if (cb?.type !== "ArrowFunctionExpression" && cb?.type !== "FunctionExpression") return null;
-  const names = new Set();
-  for (const param of cb.params ?? []) collectBindingNames(param, names);
-  if (names.size === 0) return null;
-  return { callback: cb, paramNames: names, valueBindings: objectEntriesValueBindings(cb, methodName) };
-}
-
-function isBroadShapeProbeInputType(checker, type, seen = new Set()) {
-  if (!type || seen.has(type)) return false;
-  seen.add(type);
-  if (isAnyOrUnknownType(type) || typeStringIncludesAnyOrUnknown(checker, type)) return true;
-  return (type.types ?? []).some((part) => isBroadShapeProbeInputType(checker, part, seen));
-}
-
-function hasBroadObjectEntriesValue(probe, services, checker) {
-  return probe.valueBindings.some((binding) => {
-    const tsNode = services.esTreeNodeToTSNodeMap.get(binding);
-    return tsNode ? isBroadShapeProbeInputType(checker, checker.getTypeAtLocation(tsNode)) : false;
-  });
-}
-
 function ruleNoStructuralTypeFork() {
   return {
     meta: {
       type: "problem",
-      docs: { description: "Detect hand-written types structurally equivalent to (or a subset of) an installed package or configured generated source exported type." },
+      docs: {
+        description:
+          "Detect hand-written types structurally equivalent to (or a subset of) an installed package or configured generated source exported type.",
+      },
       schema: [
         {
           type: "object",
@@ -2197,28 +2661,64 @@ function ruleNoStructuralTypeFork() {
                 },
               },
             },
+            packageTypeOwners: {
+              type: "object",
+              additionalProperties: {
+                type: "object",
+                required: ["package", "exportName"],
+                additionalProperties: false,
+                properties: {
+                  package: { type: "string" },
+                  exportName: { type: "string" },
+                  reason: { type: "string" },
+                },
+              },
+            },
           },
         },
       ],
     },
     create(context) {
       const services = requireTypeServices(context);
-      if (!services) return missingTypeServicesVisitors(context, "no-structural-type-fork");
+      if (!services) {
+        return missingTypeServicesVisitors(context, "no-structural-type-fork");
+      }
       const program = services.program;
       const checker = program.getTypeChecker();
       const generatedSources = context.options[0]?.generatedSources ?? {};
+      const packageTypeOwners = context.options[0]?.packageTypeOwners ?? {};
+      const shouldCollectProposalFacts = Boolean(semanticFactSink(context));
 
-      let candidates = canonicalCache.get(program);
-      if (!candidates) {
-        candidates = collectCanonicalTypes(program, checker);
-        canonicalCache.set(program, candidates);
-      }
+      let candidates = [];
       if (Object.keys(generatedSources).length > 0) {
-        candidates = [...candidates, ...collectGeneratedCanonicalTypes(program, checker, generatedSources)];
+        candidates = collectGeneratedCanonicalTypes(
+          program,
+          checker,
+          generatedSources,
+        );
+      }
+      if (Object.keys(packageTypeOwners).length > 0) {
+        candidates = [
+          ...candidates,
+          ...collectAcceptedPackageCanonicalTypes(
+            program,
+            checker,
+            packageTypeOwners,
+          ),
+        ];
+      }
+      if (shouldCollectProposalFacts) {
+        let installedCandidates = canonicalCache.get(program);
+        if (!installedCandidates) {
+          installedCandidates = collectCanonicalTypes(program, checker);
+          canonicalCache.set(program, installedCandidates);
+        }
+        candidates = [...candidates, ...installedCandidates];
       }
       if (!candidates.length) return {};
 
       function check(node) {
+        if (isAllOptionalObjectShape(node)) return;
         if (isStructuralDerivationAlias(node)) return;
         const tsNode = services.esTreeNodeToTSNodeMap.get(node);
         const sym = tsNode?.name && checker.getSymbolAtLocation(tsNode.name);
@@ -2231,11 +2731,24 @@ function ruleNoStructuralTypeFork() {
         if (resolvesToGeneratedType(declared, generatedSources)) return;
         const local = typeProps(checker, declared);
         if (local.size < MIN_PROPS) return;
-        for (const { label, props } of candidates) {
-          if (isStructuralFork(local, props)) {
-            context.report({ node, message: `Type matches ${label} — import or derive from the owner instead of redeclaring.` });
-            return;
-          }
+        const proof = findStructuralProof(
+          sym,
+          local,
+          candidates,
+          "structuralTypeFork",
+        );
+        if (!proof) return;
+        emitStructuralMatchFact(
+          context,
+          node,
+          "antidrift/no-structural-type-fork",
+          proof,
+        );
+        if (proof.diagnostic.emitted) {
+          context.report({
+            node,
+            message: `Type matches ${proof.ownerType.label} — import or derive from the owner instead of redeclaring.`,
+          });
         }
       }
 
@@ -2251,7 +2764,10 @@ function ruleNoCanonicalModelFork() {
   return {
     meta: {
       type: "problem",
-      docs: { description: "Detect hand-written copies of configured repo-owned canonical domain models." },
+      docs: {
+        description:
+          "Detect hand-written copies of configured repo-owned canonical domain models.",
+      },
       schema: [
         {
           type: "object",
@@ -2279,15 +2795,27 @@ function ruleNoCanonicalModelFork() {
     },
     create(context) {
       const services = requireTypeServices(context);
-      if (!services) return missingTypeServicesVisitors(context, "no-canonical-model-fork");
+      if (!services) {
+        return missingTypeServicesVisitors(context, "no-canonical-model-fork");
+      }
       const program = services.program;
       const checker = program.getTypeChecker();
       const canonicalEntities = context.options[0]?.canonicalEntities ?? {};
-      const candidates = collectDomainCanonicalTypes(program, checker, canonicalEntities);
+      const candidates = collectDomainCanonicalTypes(
+        program,
+        checker,
+        canonicalEntities,
+      );
       if (!candidates.length) return {};
 
       function check(node) {
-        if (node.type === "TSTypeAliasDeclaration" && node.typeAnnotation?.type !== "TSTypeLiteral") return;
+        if (
+          node.type === "TSTypeAliasDeclaration" &&
+          node.typeAnnotation?.type !== "TSTypeLiteral"
+        ) {
+          return;
+        }
+        if (isAllOptionalObjectShape(node)) return;
         if (isStructuralDerivationAlias(node)) return;
         const tsNode = services.esTreeNodeToTSNodeMap.get(node);
         const sym = tsNode?.name && checker.getSymbolAtLocation(tsNode.name);
@@ -2297,11 +2825,24 @@ function ruleNoCanonicalModelFork() {
         if (resolvesToDomainCanonicalType(declared, canonicalEntities)) return;
         const local = typeProps(checker, declared);
         if (local.size < MIN_PROPS) return;
-        for (const { label, props } of candidates) {
-          if (isStructuralFork(local, props)) {
-            context.report({ node, message: `Type matches ${label} — import or derive from the canonical model owner instead of redeclaring.` });
-            return;
-          }
+        const proof = findStructuralProof(
+          sym,
+          local,
+          candidates,
+          "canonicalModelFork",
+        );
+        if (!proof) return;
+        emitStructuralMatchFact(
+          context,
+          node,
+          "antidrift/no-canonical-model-fork",
+          proof,
+        );
+        if (proof.diagnostic.emitted) {
+          context.report({
+            node,
+            message: `Type matches ${proof.ownerType.label} — import or derive from the canonical model owner instead of redeclaring.`,
+          });
         }
       }
 
@@ -2315,86 +2856,29 @@ function ruleNoCanonicalModelFork() {
 
 function ruleNoAppeasementCast() {
   return {
-    meta: { type: "problem", docs: { description: "Disallow casting any/unknown values into named object contracts." }, schema: [] },
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Disallow casting any/unknown values into named object contracts.",
+      },
+      schema: [],
+    },
     create(context) {
       const services = requireTypeServices(context);
-      if (!services) return missingTypeServicesVisitors(context, "no-appeasement-cast");
+      if (!services) {
+        return missingTypeServicesVisitors(context, "no-appeasement-cast");
+      }
       const checker = services.program.getTypeChecker();
 
       return {
         TSAsExpression(node) {
-          if (!isNamedTypeReference(node.typeAnnotation)) return;
-          if (node.expression?.type === "TSAsExpression" && node.expression.typeAnnotation?.type === "TSUnknownKeyword") return;
+          if (!isAppeasementContractCast(node, services, checker)) return;
 
-          const tsExpression = services.esTreeNodeToTSNodeMap.get(node.expression);
-          const tsTypeNode = services.esTreeNodeToTSNodeMap.get(node.typeAnnotation);
-          if (!tsExpression || !tsTypeNode) return;
-          const sourceType = checker.getTypeAtLocation(tsExpression);
-          if (!isAnyOrUnknownType(sourceType)) return;
-
-          const targetType = checker.getTypeFromTypeNode(tsTypeNode);
-          if (isAntidriftBrandedType(targetType)) return;
-          if ((targetType.getProperties?.() ?? []).length === 0) return;
-
-          context.report({ node, message: "Do not cast any/unknown into a named contract. Validate or narrow the value before assigning the type." });
-        },
-      };
-    },
-  };
-}
-
-function tupleElementTypeNode(element) {
-  if (element?.type === "TSNamedTupleMember") return element.elementType;
-  if (element?.type === "TSOptionalType") return element.typeAnnotation;
-  if (element?.type === "TSRestType") return element.typeAnnotation;
-  return element;
-}
-
-function tupleElementIsOptional(element) {
-  return element?.optional === true
-    || element?.type === "TSOptionalType"
-    || (element?.type === "TSNamedTupleMember" && element.elementType?.type === "TSOptionalType");
-}
-
-function typeNodeIncludesDirectNullish(typeNode) {
-  const node = tupleElementTypeNode(typeNode);
-  if (node?.type === "TSNullKeyword" || node?.type === "TSUndefinedKeyword" || node?.type === "TSVoidKeyword") return true;
-  if (node?.type === "TSUnionType") return node.types.some(typeNodeIncludesDirectNullish);
-  if (node?.type === "TSParenthesizedType") return typeNodeIncludesDirectNullish(node.typeAnnotation);
-  return false;
-}
-
-function tupleElementResolvesToNullish(element, services, checker) {
-  const typeNode = tupleElementTypeNode(element);
-  const tsTypeNode = typeNode && services?.esTreeNodeToTSNodeMap?.get(typeNode);
-  if (!tsTypeNode || !checker) return false;
-  return typeIncludesNullish(checker.getTypeFromTypeNode(tsTypeNode));
-}
-
-function tupleElementIsNullishSlot(element, services, checker) {
-  return tupleElementIsOptional(element)
-    || typeNodeIncludesDirectNullish(element)
-    || tupleElementResolvesToNullish(element, services, checker);
-}
-
-function ruleNoNullablePositionalTuple() {
-  return {
-    meta: {
-      type: "problem",
-      docs: { description: "Disallow tuple types that model multiple nullable positional slots." },
-      schema: [],
-    },
-    create(context) {
-      const services = context.sourceCode?.parserServices ?? context.parserServices;
-      const checker = services?.program?.getTypeChecker?.();
-
-      return {
-        TSTupleType(node) {
-          const nullishSlots = node.elementTypes.filter((element) => tupleElementIsNullishSlot(element, services, checker));
-          if (nullishSlots.length < 2) return;
           context.report({
             node,
-            message: "Do not model multi-field nullable state as a positional tuple. Use a named object or explicit state union.",
+            message:
+              "Do not cast any/unknown into a named contract. Validate or narrow the value before assigning the type.",
           });
         },
       };
@@ -2402,164 +2886,53 @@ function ruleNoNullablePositionalTuple() {
   };
 }
 
-function typePredicateParts(fn) {
-  const predicate = fn?.returnType?.typeAnnotation;
-  if (predicate?.type !== "TSTypePredicate") return null;
-  if (predicate.parameterName?.type !== "Identifier") return null;
-  const targetTypeNode = predicate.typeAnnotation?.typeAnnotation;
-  if (!targetTypeNode) return null;
-  return { paramName: predicate.parameterName.name, targetTypeNode };
-}
+function ruleNoNullablePositionalTuple() {
+  return {
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Disallow tuple types that model multiple nullable positional slots.",
+      },
+      schema: [],
+    },
+    create(context) {
+      const services =
+        context.sourceCode?.parserServices ?? context.parserServices;
+      const checker = services?.program?.getTypeChecker?.();
 
-function functionParameterByName(fn, name) {
-  return (fn.params ?? []).find((param) => param?.type === "Identifier" && param.name === name) ?? null;
-}
-
-function isBroadPredicateInputType(checker, type) {
-  if (isAnyOrUnknownType(type)) return true;
-  const typeName = checker.typeToString(type);
-  if (typeName === "object" || typeName === "{}") return true;
-  if (/^Record<\s*string\s*,\s*(?:unknown|any)\s*>$/u.test(typeName)) return true;
-  return typeName === "Object" && (type.getProperties?.() ?? []).length === 0;
-}
-
-const tsTypeFlagObject = 1 << 19; // ts.TypeFlags.Object
-
-function isPredicateObjectContract(type) {
-  if (!type) return false;
-  if (typeof type.isUnion === "function" && type.isUnion()) return false;
-  if (typeof type.isIntersection === "function" && type.isIntersection()) {
-    return (type.types ?? []).some((part) => isPredicateObjectContract(part));
-  }
-  return (type.flags & tsTypeFlagObject) !== 0;
-}
-
-function staticPropertyName(node) {
-  if (node?.type === "Identifier") return node.name;
-  if (node?.type === "PrivateIdentifier") return node.name;
-  if (node?.type === "Literal" && typeof node.value === "string") return node.value;
-  return null;
-}
-
-function memberExpressionPropertyName(node) {
-  const unwrapped = unwrapExpression(node);
-  if (unwrapped?.type !== "MemberExpression") return null;
-  return staticPropertyName(unwrapped.property);
-}
-
-function objectHasOwnPropertyName(node, paramNames) {
-  if (node?.type !== "CallExpression") return null;
-  const callee = node.callee;
-  if (callee?.type !== "MemberExpression") return null;
-  const method = staticPropertyName(callee.property);
-  if (method !== "hasOwn" && method !== "hasOwnProperty") return null;
-  if (callee.object?.type === "Identifier" && callee.object.name === "Object") {
-    return hasParamRoot(node.arguments?.[0], paramNames) ? staticPropertyName(node.arguments?.[1]) : null;
-  }
-  return hasParamRoot(callee.object, paramNames) ? staticPropertyName(node.arguments?.[0]) : null;
-}
-
-function directAliasName(node, paramNames) {
-  if (node?.type !== "VariableDeclarator" || node.id?.type !== "Identifier") return null;
-  const init = unwrapExpression(node.init);
-  return init?.type === "Identifier" && paramNames.has(init.name) ? node.id.name : null;
-}
-
-function predicateValueNames(node, paramName) {
-  const names = new Set([paramName]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    walkNode(node, (current) => {
-      const alias = directAliasName(current, names);
-      if (alias && !names.has(alias)) {
-        names.add(alias);
-        changed = true;
-      }
-    });
-  }
-  return names;
-}
-
-function destructuredTargetPropertyAliases(node, paramNames, targetProps) {
-  const aliases = new Map();
-  walkNode(node, (current) => {
-    if (current.type !== "VariableDeclarator" || current.id?.type !== "ObjectPattern") return;
-    if (!hasParamRoot(current.init, paramNames)) return;
-    for (const prop of current.id.properties ?? []) {
-      if (prop?.type !== "Property") continue;
-      const propName = staticPropertyName(prop.key);
-      if (!targetProps.has(propName)) continue;
-      const value = prop.value?.type === "AssignmentPattern" ? prop.value.left : prop.value;
-      if (value?.type === "Identifier") aliases.set(value.name, propName);
-    }
-  });
-  return aliases;
-}
-
-function isBindingIdentifier(node) {
-  const parent = node.parent;
-  if (parent?.type === "VariableDeclarator" && parent.id === node) return true;
-  if (parent?.type === "Property" && parent.value === node && parent.parent?.type === "ObjectPattern") return true;
-  if (parent?.type === "AssignmentPattern" && parent.left === node && parent.parent?.type === "Property") return true;
-  return false;
-}
-
-function checkedTargetProperties(node, paramName, targetProps) {
-  const checked = new Set();
-  const paramNames = predicateValueNames(node, paramName);
-  const propertyAliases = destructuredTargetPropertyAliases(node, paramNames, targetProps);
-  walkNode(node, (current) => {
-    if (current.type === "BinaryExpression" && current.operator === "in" && hasParamRoot(current.right, paramNames)) {
-      const prop = staticPropertyName(current.left);
-      if (targetProps.has(prop)) checked.add(prop);
-      return;
-    }
-    const hasOwnProp = objectHasOwnPropertyName(current, paramNames);
-    if (targetProps.has(hasOwnProp)) {
-      checked.add(hasOwnProp);
-      return;
-    }
-    if (current.type === "MemberExpression" && hasParamRoot(current, paramNames)) {
-      const prop = memberExpressionPropertyName(current);
-      if (targetProps.has(prop)) checked.add(prop);
-      return;
-    }
-    if (current.type === "Identifier" && !isBindingIdentifier(current)) {
-      const prop = propertyAliases.get(current.name);
-      if (targetProps.has(prop)) checked.add(prop);
-    }
-  });
-  return checked;
-}
-
-function callUsesPredicateParam(node, paramName) {
-  const paramNames = new Set([paramName]);
-  return (node.arguments ?? []).some((arg) => arg.type !== "SpreadElement" && hasParamRoot(arg, paramNames));
-}
-
-function hasValidatorDelegation(node, paramName) {
-  let sawDelegation = false;
-  walkNode(node, (current) => {
-    if (sawDelegation || current.type !== "CallExpression" || !callUsesPredicateParam(current, paramName)) return;
-    const name = callExpressionName(current.callee);
-    if (name && /^(?:safeParse|parse|parseAsync|validate|assert|check|is[A-Z]|has[A-Z])/u.test(name)) {
-      sawDelegation = true;
-    }
-  });
-  return sawDelegation;
+      return {
+        TSTupleType(node) {
+          if (!hasNullablePositionalTuple(node, services, checker)) return;
+          context.report({
+            node,
+            message:
+              "Do not model multi-field nullable state as a positional tuple. Use a named object or explicit state union.",
+          });
+        },
+      };
+    },
+  };
 }
 
 function ruleNoUndercheckedTypePredicate() {
   return {
     meta: {
       type: "problem",
-      docs: { description: "Disallow broad-input type predicates that assert object contracts without decisive runtime checks." },
+      docs: {
+        description:
+          "Disallow broad-input type predicates that assert object contracts without decisive runtime checks.",
+      },
       schema: [],
     },
     create(context) {
       const services = requireTypeServices(context);
-      if (!services) return missingTypeServicesVisitors(context, "no-underchecked-type-predicate");
+      if (!services) {
+        return missingTypeServicesVisitors(
+          context,
+          "no-underchecked-type-predicate",
+        );
+      }
       const checker = services.program.getTypeChecker();
 
       function check(fn) {
@@ -2567,7 +2940,9 @@ function ruleNoUndercheckedTypePredicate() {
         if (!parts) return;
         const param = functionParameterByName(fn, parts.paramName);
         const tsParam = param && services.esTreeNodeToTSNodeMap.get(param);
-        const tsTargetTypeNode = services.esTreeNodeToTSNodeMap.get(parts.targetTypeNode);
+        const tsTargetTypeNode = services.esTreeNodeToTSNodeMap.get(
+          parts.targetTypeNode,
+        );
         if (!tsParam || !tsTargetTypeNode) return;
 
         const paramType = checker.getTypeAtLocation(tsParam);
@@ -2575,16 +2950,21 @@ function ruleNoUndercheckedTypePredicate() {
 
         const targetType = checker.getTypeFromTypeNode(tsTargetTypeNode);
         if (!isPredicateObjectContract(targetType)) return;
-        const targetProps = typeProps(checker, targetType);
+        const targetProps = requiredTypeProps(checker, targetType);
         if (targetProps.size < 2) return;
         if (hasValidatorDelegation(fn.body, parts.paramName)) return;
 
-        const checked = checkedTargetProperties(fn.body, parts.paramName, targetProps);
+        const checked = checkedTargetProperties(
+          fn.body,
+          parts.paramName,
+          targetProps,
+        );
         if (checked.size >= Math.min(2, targetProps.size)) return;
 
         context.report({
           node: fn.returnType,
-          message: "Do not narrow broad input with an under-checked type predicate. Check the asserted fields or delegate to an owned schema/validator.",
+          message:
+            "Do not narrow broad input with an under-checked type predicate. Check the asserted fields or delegate to an owned schema/validator.",
         });
       }
 
@@ -2599,10 +2979,28 @@ function ruleNoUndercheckedTypePredicate() {
 
 function ruleNoDefensiveShapeProbing() {
   return {
-    meta: { type: "problem", docs: { description: "Disallow Object.entries normalizers that repeatedly probe broad object shape." }, schema: [{ type: "object", properties: { threshold: { type: "number" } }, additionalProperties: false }] },
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Disallow Object.entries normalizers that repeatedly probe broad object shape.",
+      },
+      schema: [
+        {
+          type: "object",
+          properties: { threshold: { type: "number" } },
+          additionalProperties: false,
+        },
+      ],
+    },
     create(context) {
       const services = requireTypeServices(context);
-      if (!services) return missingTypeServicesVisitors(context, "no-defensive-shape-probing");
+      if (!services) {
+        return missingTypeServicesVisitors(
+          context,
+          "no-defensive-shape-probing",
+        );
+      }
       const checker = services.program.getTypeChecker();
       const threshold = context.options[0]?.threshold ?? 4;
 
@@ -2611,8 +3009,17 @@ function ruleNoDefensiveShapeProbing() {
           const probe = objectEntriesCallbackProbe(node);
           if (!probe || isTypePredicateReturn(probe.callback)) return;
           if (!hasBroadObjectEntriesValue(probe, services, checker)) return;
-          if (countShapeProbesIn(probe.callback.body, probe.paramNames) < threshold) return;
-          context.report({ node: probe.callback, message: "Do not unpack broad object shapes by probing property names inside Object.entries(...). Move the normalization to an owned schema or converter." });
+          if (
+            countShapeProbesIn(probe.callback.body, probe.paramNames) <
+            threshold
+          ) {
+            return;
+          }
+          context.report({
+            node: probe.callback,
+            message:
+              "Do not unpack broad object shapes by probing property names inside Object.entries(...). Move the normalization to an owned schema or converter.",
+          });
         },
       };
     },
@@ -2625,184 +3032,54 @@ function fileMatchesPath(filename, filePath) {
 
 function ruleNoStatusLiteralInType() {
   return {
-    meta: { type: "problem", docs: { description: "Disallow re-declaring canonical domain status values as type literals outside the owning module (domain registry)." }, schema: [{ type: "object", properties: { statuses: { type: "object" } }, additionalProperties: false }] },
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Disallow re-declaring canonical domain status values as type literals outside the owning module (domain registry).",
+      },
+      schema: [
+        {
+          type: "object",
+          properties: { statuses: { type: "object" } },
+          additionalProperties: false,
+        },
+      ],
+    },
     create(context) {
       const statuses = context.options[0]?.statuses ?? {};
-      const entries = Object.entries(statuses);
-      if (entries.length === 0) return {};
+      if (Object.keys(statuses).length === 0) return {};
       const filename = context.filename ?? context.getFilename();
       return {
         TSLiteralType(node) {
-          const value = node.literal?.value;
-          if (typeof value !== "string") return;
-          for (const [name, entry] of entries) {
-            if (!(entry.values ?? []).includes(value)) continue;
-            if (fileMatchesPath(filename, entry.owner)) continue;
-            if (!isStatusLiteralContext(node, name)) continue;
-            context.report({ node, message: `String literal '${value}' duplicates a canonical status from ${entry.owner}. Import the type instead.` });
-          }
+          const owner = canonicalStatusLiteralOwner(node, statuses);
+          if (!owner) return;
+          if (fileMatchesPath(filename, owner.owner)) return;
+          context.report({
+            node,
+            message: `String literal '${owner.value}' duplicates a canonical status from ${owner.owner}. Import the type instead.`,
+          });
         },
       };
     },
   };
 }
 
-function normalizedContextName(value) {
-  return String(value ?? "").replace(/[^a-z0-9]/giu, "").toLowerCase();
-}
-
-function isStatusContextName(contextName, statusName) {
-  const normalized = normalizedContextName(contextName);
-  if (!normalized) return false;
-  return normalized.includes("status") || normalized === normalizedContextName(statusName);
-}
-
-function nodeKeyName(node) {
-  if (node?.type === "Identifier" || node?.type === "PrivateIdentifier") return node.name;
-  if (node?.type === "Literal" && typeof node.value === "string") return node.value;
-  return "";
-}
-
-function isStatusLiteralContext(node, statusName) {
-  let cur = node.parent;
-  while (cur) {
-    if (cur.type === "TSTypeAliasDeclaration") return isStatusContextName(cur.id?.name, statusName);
-    if (cur.type === "TSInterfaceDeclaration") return isStatusContextName(cur.id?.name, statusName);
-    if (cur.type === "TSPropertySignature") return isStatusContextName(nodeKeyName(cur.key), statusName);
-    if (cur.type === "Identifier") return isStatusContextName(cur.name, statusName);
-    if (cur.type === "VariableDeclarator" && cur.id?.type === "Identifier") return isStatusContextName(cur.id.name, statusName);
-    cur = cur.parent;
-  }
-  return false;
-}
-
-// True when an identifier's symbol (e.g. the `parse` method being called) is declared inside the
-// installed `zod` / `@zod/*` package — the type-aware way to confirm a `.parse()` is Zod's, with no
-// name-matching (a bare `x.parse()` could be JSON, Date, a custom parser, anything).
-function isZodMethod(checker, tsNameNode) {
-  const sym = tsNameNode && checker.getSymbolAtLocation(tsNameNode);
-  for (const decl of sym?.declarations ?? []) {
-    const file = decl.getSourceFile().fileName.replace(/\\/gu, "/");
-    const idx = file.lastIndexOf("/node_modules/");
-    if (idx === -1) continue;
-    const rest = file.slice(idx + "/node_modules/".length);
-    if (rest === "zod" || rest.startsWith("zod/") || rest.startsWith("@zod/")) return true;
-  }
-  return false;
-}
-
-function staticMemberName(node) {
-  if (node?.type !== "MemberExpression" || node.computed) return null;
-  return node.property.type === "Identifier" ? node.property.name : null;
-}
-
-function isExpectCall(node) {
-  if (node?.type !== "CallExpression") return false;
-  if (node.callee.type === "Identifier") return node.callee.name === "expect";
-  return node.callee.type === "MemberExpression"
-    && !node.callee.computed
-    && node.callee.object.type === "Identifier"
-    && node.callee.object.name === "expect";
-}
-
-function hasThrowAssertionMatcher(expectCall) {
-  let current = expectCall.parent;
-  while (current) {
-    if (current.type === "MemberExpression") {
-      if (throwAssertionMatchers.has(staticMemberName(current))) {
-        return current.parent?.type === "CallExpression" && current.parent.callee === current;
-      }
-      current = current.parent;
-      continue;
-    }
-    if (current.type === "CallExpression" || current.type === "ChainExpression") {
-      current = current.parent;
-      continue;
-    }
-    break;
-  }
-  return false;
-}
-
-function nearestFunctionExpression(node) {
-  let current = node.parent;
-  while (current) {
-    if (current.type === "ArrowFunctionExpression" || current.type === "FunctionExpression") return current;
-    if (current.type === "FunctionDeclaration") return null;
-    current = current.parent;
-  }
-  return null;
-}
-
-function isDirectThrowAssertionExpression(node, fn) {
-  if (fn.body === node) return true;
-  return node.parent?.type === "ExpressionStatement"
-    && node.parent.parent?.type === "BlockStatement"
-    && node.parent.parent.parent === fn;
-}
-
-function isThrowAssertionCallbackParse(node) {
-  const fn = nearestFunctionExpression(node);
-  if (!fn || !isDirectThrowAssertionExpression(node, fn)) return false;
-  const expectCall = fn.parent?.type === "CallExpression" && fn.parent.arguments.includes(fn) ? fn.parent : null;
-  return Boolean(isExpectCall(expectCall) && hasThrowAssertionMatcher(expectCall));
-}
-
-function zodParseCallParts(node, services, checker) {
-  const callee = node.callee;
-  if (callee.type !== "MemberExpression" || callee.computed) return null;
-  if (callee.property.type !== "Identifier" || !zodParseMethods.has(callee.property.name)) return null;
-  if (node.arguments.length === 0) return null;
-  const tsCall = services.esTreeNodeToTSNodeMap.get(node);
-  if (!isZodMethod(checker, tsCall?.expression?.name)) return null;
-  return { callee, tsCall, arg: node.arguments[0] };
-}
-
-function isAwaitedCallInitializer(node) {
-  return node?.type === "AwaitExpression" && node.argument?.type === "CallExpression";
-}
-
-function isCallResultExpression(node) {
-  return node?.type === "CallExpression" || isAwaitedCallInitializer(node);
-}
-
-function isZodParseExpression(node, services, checker) {
-  if (node?.type === "CallExpression") return Boolean(zodParseCallParts(node, services, checker));
-  if (node?.type === "AwaitExpression" && node.argument?.type === "CallExpression") {
-    return Boolean(zodParseCallParts(node.argument, services, checker));
-  }
-  return false;
-}
-
-function parsedCallResultMatchesSchemaOutput(checker, services, tsCall, arg) {
-  const tsArg = services.esTreeNodeToTSNodeMap.get(arg);
-  const argType = tsArg ? checker.getTypeAtLocation(tsArg) : null;
-  const parseReturnType = checker.getTypeAtLocation(tsCall);
-  return Boolean(
-    argType
-    && !isAnyOrUnknownType(argType)
-    && !isAnyOrUnknownType(parseReturnType)
-    && !typeStringIncludesAnyOrUnknown(checker, parseReturnType)
-    && checker.isTypeAssignableTo(argType, parseReturnType)
-    && checker.isTypeAssignableTo(parseReturnType, argType)
-  );
-}
-
-function recordParsedConst(node, schemaSym, symbolOf, validatedBy) {
-  let decl = node.parent;
-  if (decl?.type === "AwaitExpression") decl = decl.parent;
-  if (!schemaSym || decl?.type !== "VariableDeclarator" || decl.id.type !== "Identifier") return;
-  if (decl.parent?.type !== "VariableDeclaration" || decl.parent.kind !== "const") return;
-  const declSym = symbolOf(decl.id);
-  if (declSym) validatedBy.set(declSym, schemaSym);
-}
-
 function ruleNoRedundantZodParse() {
   return {
-    meta: { type: "problem", docs: { description: "Detect re-parsing a value with the same Zod schema that already produced it. Validate once at the boundary and pass the parsed value inward instead of re-validating in every layer." }, schema: [] },
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Detect re-parsing a value with the same Zod schema that already produced it. Validate once at the boundary and pass the parsed value inward instead of re-validating in every layer.",
+      },
+      schema: [],
+    },
     create(context) {
       const services = requireTypeServices(context);
-      if (!services) return missingTypeServicesVisitors(context, "no-redundant-zod-parse");
+      if (!services) {
+        return missingTypeServicesVisitors(context, "no-redundant-zod-parse");
+      }
       const checker = services.program.getTypeChecker();
       // Symbol of a value already validated → symbol of the schema that validated it.
       const validatedBy = new Map();
@@ -2813,7 +3090,12 @@ function ruleNoRedundantZodParse() {
       const callResultSymbols = new Set();
       return {
         VariableDeclarator(node) {
-          if (node.id.type !== "Identifier" || !isAwaitedCallInitializer(node.init)) return;
+          if (
+            node.id.type !== "Identifier" ||
+            !isAwaitedCallInitializer(node.init)
+          ) {
+            return;
+          }
           const sym = symbolOf(node.id);
           if (sym) callResultSymbols.add(sym);
         },
@@ -2821,24 +3103,51 @@ function ruleNoRedundantZodParse() {
           const parts = zodParseCallParts(node, services, checker);
           if (!parts) return;
           const { callee, tsCall, arg } = parts;
-          const schemaSym = callee.object.type === "Identifier" ? symbolOf(callee.object) : undefined;
+          const schemaSym =
+            callee.object.type === "Identifier"
+              ? symbolOf(callee.object)
+              : undefined;
           if (isThrowAssertionCallbackParse(node)) return;
 
           // Re-parse: the argument is a value already validated by this exact schema (same binding).
-          if (arg.type === "Identifier" && schemaSym && validatedBy.get(symbolOf(arg)) === schemaSym) {
-            context.report({ node, message: "Redundant Zod parse: this value was already validated by the same schema. Validate once at the boundary and pass the parsed value inward instead of re-parsing." });
+          if (
+            arg.type === "Identifier" &&
+            schemaSym &&
+            validatedBy.get(symbolOf(arg)) === schemaSym
+          ) {
+            context.report({
+              node,
+              message:
+                "Redundant Zod parse: this value was already validated by the same schema. Validate once at the boundary and pass the parsed value inward instead of re-parsing.",
+            });
             return;
           }
 
           // Service-to-boundary re-parse: a called helper/service already returned the schema's
           // output type, and the caller immediately validates that typed contract again.
-          if (arg.type === "Identifier" && callResultSymbols.has(symbolOf(arg)) && parsedCallResultMatchesSchemaOutput(checker, services, tsCall, arg)) {
-            context.report({ node, message: "Redundant Zod parse: this call result is already typed as the schema output. Validate once at the boundary and pass the parsed value inward instead of re-parsing." });
+          if (
+            arg.type === "Identifier" &&
+            callResultSymbols.has(symbolOf(arg)) &&
+            parsedCallResultMatchesSchemaOutput(checker, services, tsCall, arg)
+          ) {
+            context.report({
+              node,
+              message:
+                "Redundant Zod parse: this call result is already typed as the schema output. Validate once at the boundary and pass the parsed value inward instead of re-parsing.",
+            });
             return;
           }
 
-          if (isCallResultExpression(arg) && !isZodParseExpression(arg, services, checker) && parsedCallResultMatchesSchemaOutput(checker, services, tsCall, arg)) {
-            context.report({ node, message: "Redundant Zod parse: this call result is already typed as the schema output. Validate once at the boundary and pass the parsed value inward instead of re-parsing." });
+          if (
+            isCallResultExpression(arg) &&
+            !isZodParseExpression(arg, services, checker) &&
+            parsedCallResultMatchesSchemaOutput(checker, services, tsCall, arg)
+          ) {
+            context.report({
+              node,
+              message:
+                "Redundant Zod parse: this call result is already typed as the schema output. Validate once at the boundary and pass the parsed value inward instead of re-parsing.",
+            });
             return;
           }
 
@@ -2852,16 +3161,24 @@ function ruleNoRedundantZodParse() {
 
 const rules = {
   "no-trivial-selector-wrapper": ruleNoTrivialSelectorWrapper(),
-  "no-inline-structural-type-at-use-site": ruleNoInlineStructuralTypeAtUseSite(),
+  "no-inline-structural-type-at-use-site":
+    ruleNoInlineStructuralTypeAtUseSite(),
   "no-appeasement-cast": ruleNoAppeasementCast(),
   "no-nullable-positional-tuple": ruleNoNullablePositionalTuple(),
   "no-underchecked-type-predicate": ruleNoUndercheckedTypePredicate(),
   "no-defensive-shape-probing": ruleNoDefensiveShapeProbing(),
-  "no-coupled-state-setters": ruleNoCoupledStateSetters(),
-  "no-status-triplet-state": ruleNoStatusTripletState(),
+  "no-handrolled-resource-lifecycle-cells": ruleNoHandrolledResourceLifecycleCells(),
   "require-effect-deps": ruleRequireEffectDeps(),
-  "no-raw-tailwind-color": ruleClassNamePattern("no-raw-tailwind-color", rawTailwindColorPattern, "Use semantic design tokens instead of raw Tailwind color utilities."),
-  "no-hover-translate-card": ruleClassNamePattern("no-hover-translate-card", hoverTranslatePattern, "Do not move pointer targets on hover. Use shadow, border, color, or inner transforms."),
+  "no-raw-tailwind-color": ruleClassNamePattern(
+    "no-raw-tailwind-color",
+    rawTailwindColorPattern,
+    "Use semantic design tokens instead of raw Tailwind color utilities.",
+  ),
+  "no-hover-translate-card": ruleClassNamePattern(
+    "no-hover-translate-card",
+    hoverTranslatePattern,
+    "Do not move pointer targets on hover. Use shadow, border, color, or inner transforms.",
+  ),
   "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
   "no-async-array-method": ruleNoAsyncArrayMethod(),
   "no-sql-string-concat": ruleNoSqlStringConcat(),
@@ -2874,6 +3191,6 @@ const rules = {
 };
 
 export default {
-  meta: { name: "@joedeleeuw/antidrift/eslint-plugin", version: "0.1.0" },
+  meta: { name: "@joedeleeuw/antidrift/eslint-plugin", version: "0.2.0" },
   rules,
 };

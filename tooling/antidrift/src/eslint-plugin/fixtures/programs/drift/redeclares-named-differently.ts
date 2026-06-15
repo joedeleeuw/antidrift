@@ -1,5 +1,5 @@
-// Same shape as firebase/auth UserInfo but under a different name — classic agent drift.
-// Expected: 1 error on AuthUser
+// Same shape as firebase/auth UserInfo but under a different name.
+// Unaccepted installed-package authority emits inventory facts only.
 
 export type AuthUser = {
   uid: string;

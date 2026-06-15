@@ -119,7 +119,7 @@ Owned files:
 Acceptance:
 
 - `no-unsafe-deserialize` uses TypeScript `any`/`unknown` argument type, not `req`/`ctx` root names.
-- `no-status-triplet-state` remains an explicit heuristic but its name groups are configurable.
+- `no-status-triplet-state` is retired; behavior-based lifecycle proof lives in `no-handrolled-resource-lifecycle-cells`.
 - The repo corpus is clean under the updated rules.
 
 ### S6: Add Defensive Shape Probing And Cycle Detection

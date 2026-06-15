@@ -25,5 +25,6 @@ export function loadRegistriesSync(policyDir = "policy") {
     architecture: loadOne(policyDir, "architecture"),
     boundaries: loadOne(policyDir, "boundaries"),
     generated: loadOne(policyDir, "generated"),
+    ownership: loadOne(policyDir, "ownership"),
   };
 }

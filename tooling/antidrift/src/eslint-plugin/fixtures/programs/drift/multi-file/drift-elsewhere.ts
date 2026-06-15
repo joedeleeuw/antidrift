@@ -1,6 +1,5 @@
 // Separate file in the same project that redeclares firebase shapes without importing.
-// The rule must catch this even though correct-import.ts exists in the same directory.
-// Expected: 1 error on UserData
+// The rule should emit an installed-package inventory fact even though a sibling imports correctly.
 
 export type UserData = {
   uid: string;

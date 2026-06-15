@@ -1,6 +1,6 @@
 // Zod schema whose inferred type mirrors firebase/auth UserInfo — no import from firebase.
-// The agent defined the shape inline in zod instead of importing the canonical type.
-// Expected: 1 error on UserInfo (the inferred type alias matches firebase/auth#UserInfo)
+// The agent defined the shape inline in zod instead of importing the package type.
+// Unaccepted installed-package authority emits inventory facts only.
 
 import { z } from "zod";
 

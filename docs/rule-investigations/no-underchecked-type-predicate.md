@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented as `antidrift/no-underchecked-type-predicate`.
+Implemented as `antidrift/no-underchecked-type-predicate`, currently default-off and under-proven.
 
 ## Scope
 
@@ -13,9 +13,9 @@ This is not a general boolean-predicate rule. Ordinary predicates and valid disc
 The implemented v1 reports only when all of these are true:
 
 1. The predicate input is broad (`any`, `unknown`, `object`, `{}`, or `Record<string, unknown>`).
-2. The asserted target is a nontrivial object contract with at least two properties.
+2. The asserted target is a nontrivial object contract with at least two required properties.
 3. The body does not delegate to a validator/schema.
-4. The body checks fewer than two asserted target properties.
+4. The body checks fewer than two required asserted target properties.
 
 ## Ecosystem Check
 
@@ -25,7 +25,7 @@ Known adjacent rules:
 - `@typescript-eslint/no-unnecessary-condition` can flag impossible or redundant conditions.
 - `@typescript-eslint/no-redundant-type-constituents` catches useless union/intersection constituents.
 
-These do not prove that a custom type predicate actually validates the asserted target type. Keep this as `research` unless an ecosystem rule is found that checks predicate-body sufficiency.
+These do not prove that a custom type predicate actually validates the asserted target type. No ecosystem replacement has been found; keep the custom rule default-off until corpus evidence proves the required-field drift threshold.
 
 ## Custom Solve
 
@@ -39,9 +39,9 @@ Use TypeChecker plus AST/control-flow evidence:
 
 ## Real Corpus Evidence
 
-Chaski drift:
+Former Chaski candidate, now clean:
 
-- `src/frontend/bff/api/routers/retool/service-stop-router.ts` line 394: `z.custom<RetoolLineItemData>` uses `(value): value is RetoolLineItemData => value != null && typeof value === "object"`. The asserted type resolves as an intersection (`Partial<LineItemData> & { ... }`), so the rule must handle object intersections without weakening the structural type-fork rule.
+- `src/frontend/bff/api/routers/retool/service-stop-router.ts` line 394: `z.custom<RetoolLineItemData>` uses `(value): value is RetoolLineItemData => value != null && typeof value === "object"`. The asserted type resolves as an optional-heavy intersection (`Partial<LineItemData> & { ... }`). This remains useful inventory, but it is not a blocking finding under the current required-property proof floor.
 
 Chaski clean controls:
 
@@ -49,7 +49,7 @@ Chaski clean controls:
 - `src/frontend/bff/api/schemas/powersync.ts`: discriminant predicates narrow already-typed unions by table/data shape.
 - `src/frontend/monolithui/src/components/AccountDetails.tsx`: `isDateStruct` destructures `year`, `month`, and `day` from `Record<string, unknown>` before checking each primitive. This is a clean guard that protects the destructured-field-check edge.
 
-Broad Chaski BFF inventory reported exactly one finding across 177 files: the accepted `RetoolLineItemData` predicate.
+Broad Chaski BFF inventory originally reported exactly one candidate across 177 files: the `RetoolLineItemData` predicate. The required-property narrowing demoted it from blocking evidence.
 
 Codebase Atlas clean controls:
 
@@ -63,17 +63,33 @@ Sudocode clean controls:
 - `frontend/src/components/workflows/CreateWorkflowDialog.tsx`: `isValidPersistedSettings` narrows `unknown` localStorage data after checking several persisted settings fields.
 - `server/src/execution/output/coalesced-types.ts`: `isCoalescedUpdate` narrows a broad event to a union by discriminant. The union target stays out of the report path.
 
-Opencode known drift candidate:
+Former Opencode candidate, now clean:
 
-- `packages/ui/src/components/basic-tool.tsx`: `isTriggerTitle` checks only `"title" in val` before claiming `TriggerTitle`, whose optional fields still carry typed contracts if present. This may be a useful second drift case, but the local checkout cannot run the UI package type-aware because `packages/ui/tsconfig.json` extends missing `@tsconfig/node22/tsconfig.json`.
+- `packages/ui/src/components/basic-tool.tsx` line 19: `isTriggerTitle(val: any): val is TriggerTitle` checks object/null/title/Node before claiming `TriggerTitle`. Claude review found `title` is the only required field; optional-field sufficiency remains inventory/research rather than blocking proof.
 
-The 2026-06-09 sweep over Chaski, Codebase Atlas, Sudocode, Opencode, Cloudflare Agents, and Murderbox did not find a second evaluable drift repository. It did add clean pressure for field-complete guards, localStorage guards, and discriminant-union guards.
+Reproducible inventory:
+
+```bash
+pnpm policy:inventory-underchecked-predicate
+```
+
+Current result:
+
+- 1,321 type-aware files checked.
+- 63 type-predicate candidate files.
+- 111 type-predicate signatures.
+- 0 parser errors.
+- 0 `antidrift/no-underchecked-type-predicate` findings.
+- 0 drift repositories.
+- 0 same-line overlaps with adjacent TypeScript ESLint unsafe rules.
+
+This does not satisfy the old "second evaluable drift" blocker. The prior Chaski and Opencode findings are now clean controls for the stricter required-field proof floor.
 
 ## Known Risks
 
 - Valid discriminated-union guards may only check one discriminant.
 - Guards may delegate to a validator helper that needs provenance tracking.
-- Required-property counting can overstate what a runtime guard must check.
+- Optional-property counting can overstate what a runtime guard must check; optional-field sufficiency stays inventory/research unless a stronger proof exists.
 - The validator delegation escape is name-shaped (`safeParse`, `validate`, `assert`, `check`, `isX`, `hasX`), so a trivial helper with a validator-looking name can hide a false negative.
 - Incidental member reads can count as checked fields if they are not part of a real guard expression.
 
@@ -86,12 +102,19 @@ The review agreed:
 - No supported ecosystem rule checks predicate-body sufficiency.
 - The TypeChecker entry gates are real: broad input, asserted object target, intersection handling, and property count all need type services.
 - The verdict layer is necessarily heuristic because runtime validation sufficiency cannot be proved generally.
-- Keep the rule `ready`, not stable.
+- At the time, keep the rule `ready`, not stable; the June 15 review below supersedes that maturity call for optional-property cases.
 - Do not promote until another real repository supplies an underchecked broad-input predicate drift case.
 - Add or seek clean controls for destructuring, assertion signatures, and validator delegation names outside the current regex.
 
+Claude Opus 4.8 advisory review on June 15, 2026 (`reports/claude-rule-review-no-underchecked-type-predicate-20260615.md`) challenged the promotion evidence:
+
+- The Opencode case was only a one-file target, not an independent broad inventory.
+- `TriggerTitle` has one required field; optional fields should not have been counted as required predicate proof.
+- The rule should narrow required-property handling before promotion.
+- After narrowing and broadening Opencode UI to `packages/ui/src/**/*.{ts,tsx}`, the inventory is parser-clean with 0 custom findings.
+
 ## Promotion Conditions
 
-- Another real repository contains an under-checked `x is T` or `asserts x is T` drift case.
+- Another real repository contains an under-checked `x is T` or `asserts x is T` drift case that misses required asserted fields. Current status: unsatisfied.
 - Another real repository contains clean validator-backed and discriminant-only controls. Codebase Atlas now supplies additional clean controls for alias-backed field checks, primitive predicates, and third-party union predicates.
-- Claude Opus 4.8 review has read the rule code, corpus cases, and this investigation doc.
+- Claude Opus 4.8 review has read the narrowed rule code and corpus cases; rerun advisory review before promotion if new required-field drift appears.

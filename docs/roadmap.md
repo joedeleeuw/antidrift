@@ -27,11 +27,11 @@ These were the next project scope because they are the project, not because a br
 
 - `no-appeasement-cast`: block `any`/`unknown as NamedObject` source-boundary appeasement casts. Double-cast tunnels are delegated to `@typescript-eslint/no-unsafe-type-assertion`.
 - `no-trivial-selector-wrapper` structural rewrite: no `getXFromY` name fingerprint.
-- `no-status-triplet-state`: kept as an honest configurable heuristic.
+- `no-handrolled-resource-lifecycle-cells`: behavior-based React state graph rule for hand-rolled async resource lifecycle machines; broad multi-setter co-mutation is inventory only and classified with `pnpm policy:inventory-react-state`.
 - `no-unsafe-deserialize`: use an `any`/`unknown` type signal instead of a `req`/`ctx` name fingerprint.
 - `no-defensive-shape-probing`: provisional only where real corpus evidence shows deterministic broad-value mini-parsing; do not expand to general boolean predicates.
 - `no-nullable-positional-tuple`: block tuple types with multiple nullable or optional slots, such as `[Date | null, Date | null]`.
-- `no-underchecked-type-predicate`: block broad-input type predicates that claim object contracts without checking asserted fields or delegating to a validator.
+- `no-underchecked-type-predicate`: default-off inventory for broad-input type predicates that claim object contracts without checking required asserted fields or delegating to a validator.
 - `no-canonical-model-fork`: registry-backed structural detection for first-party canonical model redeclarations.
 - Brand kit: `Brand<T, Name>` plus `brand() -> { make, safe, is }`. The separate `no-cast-to-branded` custom rule is retired until real non-test brand-forgery evidence appears.
 - `import-x/no-cycle`: circular-dependency detection through maintained ecosystem import-graph coverage.
@@ -51,12 +51,12 @@ Completed no-regret cleanup:
 Completed in this batch:
 
 - `no-trivial-selector-wrapper`: replace the `get|select|extract...From...` name gate with structural detection of a wrapper that returns a member access rooted in one of its own parameters. **Implemented in this batch.**
-- `no-status-triplet-state`: configurable data/loading/error name groups.
+- `no-status-triplet-state`: retired after the behavior-based lifecycle proof moved into `no-handrolled-resource-lifecycle-cells`.
 - `no-unsafe-cast-chain`: retired in favor of `@typescript-eslint/no-unsafe-type-assertion`; `no-appeasement-cast` covers plain `any`/`unknown as NamedObject`.
 - `no-unsafe-deserialize`: type-aware `any`/`unknown` argument signal, not request-root names.
 - `no-defensive-shape-probing`: limited to real-corpus-backed broad-value extractor patterns; predicate helpers remain review-first until the rule can prove a validation/type authority bypass.
 - `no-nullable-positional-tuple`: narrow deterministic syntax rule for multi-slot nullable tuples; ordinary non-null tuples and hook-style tuples with one nullable value slot stay clean.
-- `no-underchecked-type-predicate`: TypeChecker-backed v1 for broad-input object predicates; discriminant guards over typed unions and schema delegation stay clean.
+- `no-underchecked-type-predicate`: TypeChecker-backed v1 for broad-input object predicates; discriminant guards over typed unions and schema delegation stay clean, and blocking stays off until required-field drift appears.
 - `no-canonical-model-fork`: TypeChecker-backed v1 for configured first-party model owners; real Chaski report-model forks flag while the owner and a different weekly digest report model stay clean.
 - `no-cycle`: retired custom relative graph traversal in favor of `import-x/no-cycle`.
 - Brand kit: branded values should cross the brand validation boundary. The custom brand-cast lint rule is retired until real adoption and forgery evidence justify reopening it.
@@ -90,7 +90,7 @@ Each future progress slice must clear these gates before it is considered done:
 2. **Pattern gate**: the desired construction path is documented or already present in `docs/build-patterns.md`. A rule should point to a better way to build, not only say no.
 3. **Signal gate**: the slice declares its strongest required signal: TypeChecker, registry facts, scope/binding, deterministic AST shape, or import graph. If it relies on AST shape as a proxy for intent, stop.
 4. **Real-corpus gate**: assert at least one real drift path and one real clean path for the changed rule, preferably in Chaski. If Chaski has only clean controls, use a narrowly accepted fallback repo and document the fallback in `docs/real-corpus-validation.md`.
-5. **Inventory gate**: run `pnpm policy:validate-corpus` for the full custom-rule inventory, and run the changed rules against the real repository corpus (`apps`, `packages`, and `tooling`) with `pnpm policy:repo-corpus -- --slice <slice-name> --rules antidrift/<rule-name>`.
+5. **Inventory gate**: run `pnpm policy:validate-corpus` for the full custom-rule inventory, and run the changed rules against the real repository corpus (`apps`, `packages`, and `tooling`) with `pnpm policy:repo-corpus -- --slice <slice-name> --rules antidrift/<rule-name>`. For React state broad co-mutation, run `pnpm policy:inventory-react-state`; those facts are classification evidence, not diagnostics.
 6. **Rule surface gate**: any custom rule is exported, configured, and covered by RuleTester or a real corpus case; `pnpm policy:check-rule-surface` must pass.
 7. **Self-host gate**: `pnpm check` must pass against this repository. If a rule flags antidrift itself, either fix the repo pattern or narrow the rule with real corpus evidence.
 8. **Package gate**: when exports, package shape, or shipped config change, `pnpm test:integration` must pass against the packed tarball consumer.

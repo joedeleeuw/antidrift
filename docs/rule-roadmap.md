@@ -1,8 +1,14 @@
 # Rule Roadmap
 
-Last updated: 2026-06-13.
+Last updated: 2026-06-14.
 
-This is the decision layer over `policy/registries/rules.yaml`. The registry owns per-rule status, evidence, ownership facts, and examples; `docs/rule-status-registry.md` is its readable index. This document owns the product answer: which rules antidrift keeps as custom code, which it delegates, which it stops carrying, and what each kept rule must still prove. When this document and the registry disagree, fix the registry first and realign this file.
+This is the decision layer over `policy/registries/rules.yaml`. The registry owns per-rule status, evidence, accepted authority facts, and examples; `docs/rule-status-registry.md` is its readable index. Treat the registry as a project authority index, not a manually curated dependency allowlist: broad scans and repo analytics can propose owners, but blocking rules should rely on accepted or generated ownership facts. This document owns the product answer: which rules antidrift keeps as custom code, which it delegates, which it stops carrying, and what each kept rule must still prove. When this document and the registry disagree, fix the registry first and realign this file.
+
+The north star is `docs/semantic-drift-goal.md`: prove semantic associations from code, type, registry,
+graph, or corpus evidence first; keep agent-ops as the minimized fallback for session facts that code
+semantics cannot recover; and treat fixtures as regression aids, never promotion evidence.
+`docs/semantic-validation-matrix.md` is the operational checklist for which rules move to semantic
+adapters, which stay plain source rules, and what validation evidence each carrier needs.
 
 ## Problem Kind Comes First
 
@@ -22,39 +28,52 @@ The custom surface clusters around three root agent failure modes, and new candi
 
 A custom rule is carried only with all six fields filled: a value statement (the real failure it prevents), a preferred construction pattern, an ecosystem comparison, a declared proof signal, real-code evidence status, and a named false-positive concern. Candidate discovery from work history follows `docs/rule-mining-protocol.md`.
 
+## Authority Index, Not Dependency List
+
+Ownership rules need repo facts that source syntax alone cannot prove. The registry exists for those facts; it should not become a hand-written list of every dependency a consumer might install.
+
+The intended flow for package and generated ownership is:
+
+1. **Discover** possible owners automatically. TypeChecker scans can find local shapes that match package exports, generated outputs, or domain owner exports.
+2. **Score** the match with repo evidence. Confidence rises when the repo already imports the owner type, derives from it with `Pick`/`Omit`, receives it from an SDK/generated API, or routes access through a generated wrapper.
+3. **Record** accepted ownership in the authority index. Generated sources, domain owners, gateways, authz APIs, and approved package-type owners become explicit project facts.
+4. **Enforce** only accepted facts. Unapproved all-`node_modules` matches stay inventory/discovery because structural similarity does not prove the package export is this repo's intended contract.
+
+This keeps examples like `firebase/auth#User` useful without hardcoding Firebase into Antidrift. The detector can say a local type matches `firebase/auth#User`; the authority index is what says this repo should import or derive from that owner instead of redeclaring it.
+
 ## Proof Surface Buckets
 
-Every candidate must land in one proof bucket before implementation, or stay in research with its likely target bucket named. "Could be found with AST" is not enough; the bucket is defined by the smallest proof object that can justify blocking or advising. Buckets are proof surfaces, not ownership status: a row can be AST-proven and still be delegated to an ecosystem rule if the ecosystem already owns it.
+Every candidate must land in one proof bucket before implementation, or stay in research with its likely target bucket named. "Could be found with AST" is not enough; the bucket is defined by the smallest proof object that can justify blocking or advising. Syntax finds suspects; semantic proof earns enforcement. Buckets are proof surfaces, not ownership status: a row can be AST-proven and still be delegated to an ecosystem rule if the ecosystem already owns it.
 
-| Bucket                                         | Proof object                                                                                                                       | Carrier                                                                               | Current rows                                                                                                                                                                                                                                                                                                                                                  | Promotion rule                                                                                                                                                 |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A. Local AST/source-shape proof**            | One file's syntax, import bindings, string literals, or lexical scope proves the construction                                      | ESLint custom rule or maintained ESLint rule                                          | `antidrift/no-trivial-selector-wrapper`, `antidrift/require-effect-deps`, `antidrift/no-async-array-method`, `antidrift/no-coupled-state-setters`, `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-nullable-positional-tuple`, `antidrift/no-raw-fetch-in-component`, `antidrift/no-raw-tailwind-color`, `antidrift/no-hover-translate-card` | Can block when real drift plus clean controls show the construction is actually harmful. If a maintained rule covers the exact construction, delegate.         |
-| **B. Type/provenance/control-flow proof**      | AST plus TypeChecker facts, schema provenance, SQL/context control flow, or validated broad-input flow proves the contract failure | Type-aware ESLint custom rule                                                         | `antidrift/no-appeasement-cast`, `antidrift/no-unsafe-deserialize`, `antidrift/no-sql-string-concat`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-redundant-zod-parse`                                                                                                                                                                          | Can block only with parser-services behavior and non-type-aware fallback behavior characterized against drift and clean controls.                              |
-| **C. Registry/ownership proof**                | Source shape plus domain, generated, authz, or owner registry facts proves the code forked or bypassed an owner                    | Registry-backed ESLint rule or generated config                                       | `antidrift/no-structural-type-fork`, `antidrift/no-canonical-model-fork`, `antidrift/no-status-literal-in-type`, `antidrift/require-authz-check`, generated source-owner routing                                                                                                                                                                              | Registry absence means no proof. These rules must fail closed to "not configured" or advisory, not infer owners from names alone.                              |
-| **D. Graph/config source proof**               | Import graph, file graph, configured path zones, package graph, or generated import restrictions prove the violation               | Import/boundaries plugins, generated `no-restricted-imports`, package graph checks    | `arch/no-cross-layer-import`, `arch/no-deep-import`, `arch/no-new-dependency-cycle`, `boundary/no-sdk-direct-use-outside-gateway`, `gen/require-import-from-generated`, mock-import candidates, barrel-file candidates                                                                                                                                        | Prefer maintained graph/config tools first; custom graph logic needs a measured gap and explicit project facts.                                                |
-| **E. Ecosystem/toolchain-owned source policy** | A maintained tool already owns the source, test, React, security, style, or quality law                                            | Existing ESLint plugin, TypeScript rule, Sonar, stylelint/native lint, secret scanner | `react/no-derived-state-effect`, Vitest integrity rules, disable-description policy, `errors/preserve-caught-error`, `perf/no-await-in-loop-with-io`, `sec/no-hardcoded-secret`, broad raw-color checks when a platform scanner owns them                                                                                                                     | Custom code is a last resort after a measured false-negative gap against real code; otherwise the row stays ecosystem-covered or retired.                      |
-| **F. Repo/session/runtime proof**              | Diff shape, task scope, command history, artifact freshness, runtime/device evidence, or tool config proves the failure            | Shared `agent-ops` policy script with Codex/Claude/OpenCode/PR/transcript adapters    | diff-scope creep, stale or skipped verification, existing-owner-before-new-file, high-touch file growth, feature scatter, runtime proof missing, MCP/tooling config drift, vague agent rules                                                                                                                                                                  | Not an ESLint rule. AST or structural search can be a helper, but blocking proof comes from git/session/runtime/config facts.                                  |
-| **G. Unassigned research or drop**             | The real failure, owner, proof object, or ecosystem gap is not established                                                         | Research inventory, advisory docs, or locked retirement                               | `antidrift/no-same-schema-recertification`, `react/no-use-state-waterfall`, `react/no-effect-fetch-waterfall`, fallback-to-empty, env-in-client, unbounded Promise fan-out, fire-and-forget, one-use-helper, tRPC output schemas, broad domain-literal/schema-fork ideas                                                                                      | No blocking behavior. Move to A-F only after the likely bucket, real drift file, clean control, ecosystem comparison, and false-positive concern are recorded. |
+| Bucket                                         | Proof object                                                                                                                                                                   | Carrier                                                                               | Current rows                                                                                                                                                                                                                                                                                             | Promotion rule                                                                                                                                                 |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. Local AST/source-shape proof**            | One file's syntax, import bindings, string literals, or lexical scope proves the construction                                                                                  | ESLint custom rule or maintained ESLint rule                                          | `antidrift/no-trivial-selector-wrapper`, `antidrift/require-effect-deps`, never-await branch of `antidrift/no-async-array-method`, `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-nullable-positional-tuple`, `antidrift/no-raw-fetch-in-component`, JSX class-string design rules     | Can block when the construction is the violation. If source shape only names a suspect, demote to inventory or move to B/C/F.                                  |
+| **B. Semantic source/type/provenance proof**   | AST plus local dataflow, setter transition evidence, TypeChecker facts, schema provenance, SQL/context control flow, or validated broad-input flow proves the contract failure | Type-aware or semantic ESLint custom rule                                             | `antidrift/no-appeasement-cast`, `antidrift/no-unsafe-deserialize`, `antidrift/no-sql-string-concat`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-redundant-zod-parse`, blocking branches of `antidrift/no-handrolled-resource-lifecycle-cells`, map/flatMap branch of `antidrift/no-async-array-method` | Can block only after the semantic proof and fallback behavior are characterized against drift and clean controls.                                              |
+| **C. Authority-index ownership proof**         | Source shape plus accepted package, domain, generated, authz, or owner facts proves the code forked or bypassed an owner                                                       | Registry-backed ESLint rule or generated config                                       | `antidrift/no-structural-type-fork`, `antidrift/no-canonical-model-fork`, `antidrift/no-status-literal-in-type`, `antidrift/require-authz-check`, generated source-owner routing                                                                                                                         | Registry absence means no blocking proof. These rules must fail closed to "not configured" or advisory, not infer owners from names alone.                     |
+| **D. Graph/config source proof**               | Import graph, file graph, configured path zones, package graph, or generated import restrictions prove the violation                                                           | Import/boundaries plugins, generated `no-restricted-imports`, package graph checks    | `arch/no-cross-layer-import`, `arch/no-deep-import`, `arch/no-new-dependency-cycle`, `boundary/no-sdk-direct-use-outside-gateway`, `gen/require-import-from-generated`, mock-import candidates, barrel-file candidates                                                                                   | Prefer maintained graph/config tools first; custom graph logic needs a measured gap and explicit project facts.                                                |
+| **E. Ecosystem/toolchain-owned source policy** | A maintained tool already owns the source, test, React, security, style, or quality law                                                                                        | Existing ESLint plugin, TypeScript rule, Sonar, stylelint/native lint, secret scanner | `react/no-derived-state-effect`, Vitest integrity rules, disable-description policy, `errors/preserve-caught-error`, `perf/no-await-in-loop-with-io`, `sec/no-hardcoded-secret`, broad raw-color checks when a platform scanner owns them                                                                | Custom code is a last resort after a measured false-negative gap against real code; otherwise the row stays ecosystem-covered or retired.                      |
+| **F. Repo/session/runtime proof**              | Diff shape, task scope, command history, artifact freshness, runtime/device evidence, or tool config proves the failure                                                        | Shared `agent-ops` policy script with Codex/Claude/OpenCode/PR/transcript adapters    | diff-scope creep, stale or skipped verification, existing-owner-before-new-file, high-touch file growth, feature scatter, runtime proof missing, MCP/tooling config drift, vague agent rules                                                                                                             | Not an ESLint rule. AST or structural search can be a helper, but blocking proof comes from git/session/runtime/config facts.                                  |
+| **G. Unassigned research or drop**             | The real failure, owner, proof object, or ecosystem gap is not established                                                                                                     | Research inventory, advisory docs, or locked retirement                               | `antidrift/no-same-schema-recertification`, `react/no-use-state-waterfall`, `react/no-effect-fetch-waterfall`, fallback-to-empty, env-in-client, unbounded Promise fan-out, fire-and-forget, one-use-helper, tRPC output schemas, broad domain-literal/schema-fork ideas                                 | No blocking behavior. Move to A-F only after the likely bucket, real drift file, clean control, ecosystem comparison, and false-positive concern are recorded. |
 
 The decision flow is:
 
 1. State the failure without naming syntax. If the sentence cannot explain user harm, keep it in G.
-2. Ask what proof would convince a skeptical reviewer. If the proof is just local source shape, choose A. If it needs types, provenance, or local control flow, choose B. If it needs declared owners, choose C. If it needs import/file/package graph facts, choose D. If a maintained tool owns the exact construction, choose E. If the proof says "changed," "before/after," "task," "ran," "artifact," "screenshot," "permission," or "config precedence," choose F.
+2. Ask what proof would convince a skeptical reviewer. If the proof is just local source shape and the construction is itself the violation, choose A. If syntax only inventories suspects, require B/C/F proof before blocking. If it needs types, provenance, setter transitions, or local control flow, choose B. If it needs declared owners, choose C. If it needs import/file/package graph facts, choose D. If a maintained tool owns the exact construction, choose E. If the proof says "changed," "before/after," "task," "ran," "artifact," "screenshot," "permission," or "config precedence," choose F.
 3. Pick the cheapest carrier for that bucket. Do not escalate repo/session proof into a custom ESLint rule; do not build an agent-ops script for a construction already proven by a maintained lint rule.
 4. Promote only after the carrier reports real drift and clean controls in the relevant environment. "Low noise" means named clean controls plus no known false positives under the configured scope, not a vibe.
 
 ## Classification Summary
 
-| Classification                           | Rules                                                                                                                                                                                                                                                                                                                                                                       |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stable custom (5)                        | `no-raw-fetch-in-component`, `no-redundant-zod-parse`, `no-trivial-selector-wrapper`, `no-unsafe-deserialize`, `require-effect-deps`                                                                                                                                                                                                                                        |
-| Custom, needs real-corpus promotion (13) | `no-appeasement-cast`, `no-sql-string-concat`, `no-underchecked-type-predicate`, `no-structural-type-fork`, `no-canonical-model-fork`, `no-coupled-state-setters`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type`, `require-authz-check`, `no-raw-tailwind-color`, `no-hover-translate-card` |
-| Default-off inventory (2)                | `no-defensive-shape-probing` (sunset condition below), `no-status-triplet-state` (fold-and-retire recommendation below)                                                                                                                                                                                                                                                     |
-| Ecosystem-covered                        | See delegated surface table                                                                                                                                                                                                                                                                                                                                                 |
-| Generated-config-covered                 | `boundary/no-sdk-direct-use-outside-gateway`, `gen/require-import-from-generated`                                                                                                                                                                                                                                                                                           |
-| Hook/policy-script-covered               | `agent/*` (4 hooks), `policy/no-check-weakening-without-policy-task`, `sonar/import-custom-eslint-issues`, `rules/one-source-generates-agent-files`                                                                                                                                                                                                                         |
-| Retire                                   | 10 locked retired rules; plus 2 pending recommendations (`no-status-triplet-state`, `no-defensive-shape-probing` at sunset)                                                                                                                                                                                                                                                 |
-| Research only                            | `no-same-schema-recertification` plus the policy research/spec-only rows                                                                                                                                                                                                                                                                                                    |
+| Classification                           | Rules                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stable custom (6)                        | `no-raw-fetch-in-component`, `no-redundant-zod-parse`, `no-sql-string-concat`, `no-trivial-selector-wrapper`, `no-unsafe-deserialize`, `require-effect-deps`                                                                                                                                                      |
+| Custom, needs real-corpus promotion (11) | `no-appeasement-cast`, `no-structural-type-fork`, `no-canonical-model-fork`, `no-handrolled-resource-lifecycle-cells`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type`, `require-authz-check`, `no-raw-tailwind-color`, `no-hover-translate-card` |
+| Default-off / pending retirement (2)     | `no-defensive-shape-probing` (sunset condition below), `no-underchecked-type-predicate` (required-field drift search below)                                                                                                                                                                                       |
+| Ecosystem-covered                        | See delegated surface table                                                                                                                                                                                                                                                                                       |
+| Generated-config-covered                 | `boundary/no-sdk-direct-use-outside-gateway`, `gen/require-import-from-generated`                                                                                                                                                                                                                                 |
+| Hook/policy-script-covered               | `agent/*` (4 hooks), `policy/no-check-weakening-without-policy-task`, `sonar/import-custom-eslint-issues`, `rules/one-source-generates-agent-files`                                                                                                                                                               |
+| Retire                                   | 11 locked retired rules; plus `no-defensive-shape-probing` at sunset if no distinct drift appears                                                                                                                                                                                                                 |
+| Research only                            | `no-same-schema-recertification` plus the policy research/spec-only rows                                                                                                                                                                                                                                          |
 
 ## Agent-Ops Roadmap
 
@@ -98,7 +117,7 @@ Research anchors:
 
 ## Stable Custom
 
-These five passed the stable bar: independent multi-repo drift not created for the rule, clean controls, zero known false positives, advisory review.
+These six passed the stable bar: independent multi-repo drift not created for the rule, clean controls, zero known false positives, zero known false negatives in the inspected corpus, no unresolved production concerns, and advisory review.
 
 ### `antidrift/no-raw-fetch-in-component`
 
@@ -108,7 +127,7 @@ These five passed the stable bar: independent multi-repo drift not created for t
 - Ecosystem: `no-restricted-syntax` could ban `fetch` per glob but cannot express component context; no maintained component-boundary rule exists.
 - Signal: import-scope plus AST (`fetch`, `globalThis.fetch`, `window.fetch`, `self.fetch`).
 - Evidence: drift in Chaski, Codebase Atlas, and Murderbox; clean controls include API modules and query-hook components.
-- False-positive concern: none known; aliased/destructured fetch is an accepted false negative until real evidence appears. The separate raw-transport future rule now has its first complaint provenance ("why is there axios in the BFF", 2026-06-10 sweep).
+- False-positive concern: none known; aliased/destructured fetch is an unobserved scope boundary to monitor until real evidence appears. The separate raw-transport future rule now has its first complaint provenance ("why is there axios in the BFF", 2026-06-10 sweep).
 
 ### `antidrift/no-redundant-zod-parse`
 
@@ -167,14 +186,14 @@ Implemented and enabled; each card names what still blocks stable promotion.
 
 ### `antidrift/no-sql-string-concat`
 
-- Value: SQL assembled by interpolation or concatenation reaches the database without a binding or escaping boundary — injection and quoting bugs. Measured SonarJS coverage misses every real case (0 vs 16 findings on 268 files; 0 vs 31 on the 24-repo fleet).
+- Value: SQL assembled by interpolation or concatenation reaches the database without a binding or escaping boundary — injection and quoting bugs. Measured SonarJS coverage misses every real case (0 vs 16 findings on 338 files; 0 vs 31 on the 24-repo fleet).
 - Problem kind: two branches with different proof burdens. Value interpolation is a problem in itself once SQL syntax context is proven. Identifier interpolation is an authority claim: clean only with allowlist, typed union, static map, anchored regex exit guard, or escaper proof — and imported-escaper/safe-member proof requires parser services.
 - Pattern: bound parameters for values; allowlists, escapers, or `sql.identifier(...)` for identifiers; parameterized tags.
 - Ecosystem: `sonarjs/sql-queries` is adjacent but missed every real finding; SQL-template plugins assume chosen tag conventions (partial overlap).
 - Signal: SQL-context AST plus scope-binding guard control flow plus TypeChecker escaper/member proof.
 - Evidence: production drift in Chaski (HogQL) and PowerSync service; lower-strength test/demo drift in Sudocode and Cloudflare; the 24-repo fleet is classified with 0 known type-aware false positives.
-- False-positive concern: without parser services, three known-clean PowerSync escaper controls degrade to conservative reports — the open severity-split decision.
-- Blocker: adopt the severity split (decision 4 below), then promote.
+- False-positive concern: without parser services, three known-clean PowerSync escaper controls degrade to conservative reports. `parserServiceDeltas` classifies those as inventory because the type-aware plans prove them clean and there are zero missing non-type-aware findings.
+- Status: stable for the observed SQL interpolation and identifier-proof surface. Keep the benchmark and source-fleet inventories as regression gates before widening SQL tag, guard, placeholder arithmetic, or builder-append coverage.
 
 ### `antidrift/no-underchecked-type-predicate`
 
@@ -183,20 +202,20 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Pattern: check the asserted fields, discriminate an already-typed union, or delegate to the owning schema/validator.
 - Ecosystem: no type-aware rule validates predicate-body sufficiency (net-antidrift).
 - Signal: TypeChecker plus AST/control-flow checks.
-- Evidence: Chaski `z.custom<RetoolLineItemData>` drift (1 finding/177 files); clean controls in Chaski, Codebase Atlas, and Sudocode; Opencode candidate blocked by an unresolvable tsconfig dependency.
+- Evidence: after required-property narrowing, `pnpm policy:inventory-underchecked-predicate` checks 1,321 type-aware files with 0 parser errors, 63 predicate candidate files, 111 predicate signatures, and 0 findings across Chaski BFF, Chaski monolith UI, Codebase Atlas, Sudocode CLI/frontend/server, and Opencode UI. The former Chaski `RetoolLineItemData` and Opencode `TriggerTitle` findings are optional-heavy clean controls under the current proof floor.
 - False-positive concern: the verdict layer is heuristic — validator-looking helper names can produce false negatives; keep the blocking branch at the degenerate claim.
-- Blocker: a second evaluable drift (recheck Opencode when resolvable); confirm decision 2 below.
+- Blocker: default-off until a real broad-input predicate misses required asserted fields. Optional-field sufficiency remains inventory/research unless a stronger proof exists.
 
 ### `antidrift/no-structural-type-fork`
 
 - Value: hand-written copies of types a package or generated source already exports drift silently when the owner changes; consumers keep compiling against stale shapes.
-- Problem kind: authority claim. Generated-source and registry modes carry real owner facts; the unconfigured all-`node_modules` sweep infers an ownership intent that may not exist — not every package export is a contract the app was meant to import.
+- Problem kind: authority claim. Generated-source, domain, and accepted package-owner modes carry real owner facts; the unconfigured all-`node_modules` sweep is analytics for finding candidate owners, not proof that every matching package export is this repo's intended contract.
 - Pattern: import the owner's type; project with `Pick`/`Omit` from the owner.
 - Ecosystem: none compares local shapes against package/generated exports (net-antidrift).
-- Signal: TypeChecker structural comparison plus generated registry.
-- Evidence: two generated-source forks in Chaski BFF (123 files); 0 findings across 804 Portal files with installed-only sources.
+- Signal: TypeChecker structural comparison plus authority-index facts.
+- Evidence: two generated-source forks in Chaski BFF (123 files); 0 findings across 804 Portal files with installed-only sources; fixture coverage proves accepted package owners from `ownership.yaml` report while unaccepted package matches stay inventory-only.
 - False-positive concern: projected boundary DTOs with four or more identical owner fields may be legitimate translation contracts; the installed-package mode is the weak-authority branch.
-- Blocker: make declared owners (generated sources, domain registry, registry-named packages) the blocking path; the unconfigured all-`node_modules` sweep stays inventory/discovery (decision 3 below); seek independent replication.
+- Blocker: stable promotion needs independent generated-source replication and real accepted package-owner evidence before any package owner is added to `ownership.yaml`; the unconfigured all-`node_modules` sweep stays inventory/discovery.
 
 ### `antidrift/no-canonical-model-fork`
 
@@ -205,20 +224,20 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Pattern: import the owner's model; schema-inferred DTO aliases stay clean.
 - Ecosystem: no rule can know repo model ownership (net-antidrift).
 - Signal: TypeChecker plus domain registry.
-- Evidence: three redeclarations in one Chaski report-types file; the owner file and a different weekly-digest model stay clean.
+- Evidence: three redeclarations in one Chaski report-types file; Sudocode `frontend/src/types/project.ts` redeclares server-owned `ProjectInfo`; owner files and a different weekly-digest model stay clean.
 - False-positive concern: boundary DTOs and view models legitimately overlap; the four-property threshold keeps small shapes out.
-- Blocker: a second configured-owner repo inventory.
+- Blocker: fresh adversarial review and broader boundary DTO/view-model clean pressure before stable promotion.
 
-### `antidrift/no-coupled-state-setters`
+### `antidrift/no-handrolled-resource-lifecycle-cells`
 
 - Value: one handler mutating several state cells is an implicit state machine; transitions drift independently and produce impossible intermediate states.
-- Problem kind: scope-binding proves co-mutation directly, but classification is still needed to separate true state machines from acceptable multi-cell handlers.
+- Problem kind: scope-binding proves co-mutation inventory, not blocking harm. Blocking needs semantic transition evidence, such as a redundant constant lifecycle cell written whenever a sibling receives the resource value.
 - Pattern: a reducer, a discriminated-union cell, or a resource hook.
 - Ecosystem: none models coupled setter bindings (net-antidrift).
-- Signal: scope-binding.
-- Evidence: Chaski drift; 102 findings across 40 files remain unclassified.
-- False-positive concern: legitimate multi-cell form handlers — the unclassified inventory is the promotion risk.
-- Blocker: implement the redundant-constant-cell branch as the blocking core (decision 1, confirmed); classify the 102-finding co-mutation inventory; broad co-mutation alone must not block.
+- Signal: source binding plus local transition/control-flow proof.
+- Evidence: `pnpm policy:inventory-react-state` scanned 1,533 Chaski frontend files and classified 102 broad co-mutation facts: 78 synchronous multi-cell updates, 19 async transition co-mutations, and 5 async resource updates. A repaired live scan across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode, Cloudflare Agents, and PowerSync checked 6,501 files and classified 255 inventory facts: 135 synchronous multi-cell updates, 83 async transition co-mutations, 27 async resource updates, and 10 request-guarded transitions. It produced 0 blocking lifecycle diagnostics.
+- False-positive concern: legitimate multi-cell form and view-state handlers dominate broad co-mutation, so broad co-mutation remains inventory only.
+- Blocker: find real deterministic resource-lifecycle drift before stable promotion. The redundant-constant-cell branch is implemented and fixture-regressed, but broad co-mutation alone must not block.
 
 ### `antidrift/no-async-array-method`
 
@@ -301,19 +320,19 @@ Implemented and enabled; each card names what still blocks stable promotion.
 
 Severity discipline applies: these must not block while under-proven.
 
-### `antidrift/no-status-triplet-state` — fold and retire
+### `antidrift/no-status-triplet-state` — retired
 
 - Intended value: derivable async resource lifecycle state modeled as independent mutable cells — `loading`/`error`/`data` can disagree because every transition is hand-written.
 - Problem kind: symptom detector. Name groups detect the vocabulary, not the failure; identically-named cells fed by TanStack Query are clean. The deterministic proof of the real failure — one setter writing a constant whenever a sibling setter receives the resource value — is a coupled-setters branch, not a name rule.
 - Evidence: 2 findings/2 files in Chaski; honest but name-based.
-- Disposition: implement the redundant-constant-cell branch inside `no-coupled-state-setters`, then retire this rule and lock it. The intent survives; the standalone symptom detector does not. Confirmed 2026-06-10.
+- Disposition: retired and locked. The redundant-constant-cell branch now lives inside `no-handrolled-resource-lifecycle-cells`; the intent survives, but the standalone symptom detector does not.
 
 ### `antidrift/no-defensive-shape-probing` — sunset condition
 
 - Intended value: broad-value mini-parsers probing `any`/`unknown` member-by-member claim type authority through weak local probing instead of the owning schema/converter.
 - Problem kind: mostly owned by broader upstream rules on current evidence. The only real drift is `any`-typed and `@typescript-eslint/no-unsafe-member-access` reports its property reads in the same file; antidrift adds the callback-level grouping and replacement path, which has not yet proven distinct value. The predicate version of this failure is owned by `no-underchecked-type-predicate`.
-- Evidence: one Chaski drift; clean controls in four repos; the 2026-06-09 sweep found no second drift.
-- Disposition: stays inventory/off. Sunset: if the next corpus sweep (new repo or refreshed fleet) produces no `unknown`-typed drift that upstream unsafe rules do not explain, retire and lock.
+- Evidence: one Chaski drift; clean controls in four repos; `pnpm policy:inventory-defensive-shape` checked 1,648 type-aware files, 72 syntax candidates, and found no second drift with 0 parser errors.
+- Disposition: stays inventory/off. Sunset result is negative for second drift; retire and lock unless a new repo produces `unknown`-typed drift that upstream unsafe rules do not explain.
 
 ## Delegated Surface
 
@@ -346,18 +365,19 @@ The SonarJS SQL note stands: `sonarjs/sql-queries` is tracked as ecosystem cover
 
 Reopening any of these requires checker-lock changes plus new real-code evidence; see `decisionLocks` in `policy/registries/rules.yaml`.
 
-| Rule                                     | Why it died                                                                                                                 |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `no-cycle`                               | Ecosystem owns import graphs (`import-x/no-cycle`).                                                                         |
-| `no-inline-disable-without-ticket`       | Descriptions are the maintainable policy; ticket strings were not.                                                          |
-| `no-sdk-direct-use`                      | Generated config from registry facts is simpler than custom code.                                                           |
-| `no-explicit-return-type-private-helper` | Real code showed private return annotations are often legitimate contracts — the symptom was not a problem.                 |
-| `no-silent-catch`                        | Maintained rules cover the low-value surface; the real target is fallback-to-empty (research).                              |
-| `no-thin-typed-factory-wrapper`          | No real non-test exact-forward drift; clean facades false-positive — the "only returns another call" framing was too broad. |
-| `no-obvious-comment`                     | Comment restatement is review guidance, not deterministic lint.                                                             |
-| `no-role-literal-in-type`                | Role words are too generic without canonical-model context.                                                                 |
-| `no-cast-to-branded`                     | No real forgery; the brand marker had no adoption.                                                                          |
-| `no-unsafe-cast-chain`                   | Upstream owns double-cast tunnels; `no-appeasement-cast` keeps the narrow boundary policy.                                  |
+| Rule                                     | Why it died                                                                                                                         |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `no-cycle`                               | Ecosystem owns import graphs (`import-x/no-cycle`).                                                                                 |
+| `no-inline-disable-without-ticket`       | Descriptions are the maintainable policy; ticket strings were not.                                                                  |
+| `no-sdk-direct-use`                      | Generated config from registry facts is simpler than custom code.                                                                   |
+| `no-explicit-return-type-private-helper` | Real code showed private return annotations are often legitimate contracts — the symptom was not a problem.                         |
+| `no-silent-catch`                        | Maintained rules cover the low-value surface; the real target is fallback-to-empty (research).                                      |
+| `no-thin-typed-factory-wrapper`          | No real non-test exact-forward drift; clean facades false-positive — the "only returns another call" framing was too broad.         |
+| `no-obvious-comment`                     | Comment restatement is review guidance, not deterministic lint.                                                                     |
+| `no-role-literal-in-type`                | Role words are too generic without canonical-model context.                                                                         |
+| `no-cast-to-branded`                     | No real forgery; the brand marker had no adoption.                                                                                  |
+| `no-unsafe-cast-chain`                   | Upstream owns double-cast tunnels; `no-appeasement-cast` keeps the narrow boundary policy.                                          |
+| `no-status-triplet-state`                | Name groups inventory resource-state suspects but do not prove lifecycle drift; semantic proof lives in `no-handrolled-resource-lifecycle-cells`. |
 
 ## Research Only
 
@@ -386,10 +406,10 @@ Not implemented. Each needs ecosystem review plus real drift and clean controls 
 
 These are the live grill questions reduced to recommended outcomes. Each changes rule surface, so confirm before executing.
 
-1. **Status triplet**: fold the redundant-constant-cell proof into `no-coupled-state-setters`; retire and lock the standalone rule. Confirmed 2026-06-10: any-co-mutation blocking is false-positive-prone by definition; the derivable-constant-cell branch is the blocking core and broad co-mutation stays classification inventory.
+1. **Status triplet**: closed. The redundant-constant-cell proof is folded into `no-handrolled-resource-lifecycle-cells`, and the standalone name-group rule is retired and locked.
 2. **Broad-input authority blocking**: block only degenerate zero/near-zero-field authority claims; keep sufficiency-threshold findings as inventory. Recommended: yes.
-3. **One-owner forks**: projected boundary DTOs at real translation boundaries are clean. Installed-package blocking requires declared package owners — registry facts naming which packages' exported types are contracts (the `firebase/auth` `User` case) — and the unconfigured all-`node_modules` sweep stays inventory/discovery for finding owners worth declaring. Recommended: yes.
-4. **SQL severity split**: value interpolation blocks everywhere; dynamic identifier interpolation downgrades to inventory when parser services are absent, and type-proof is never replaced with name exemptions. Recommended: yes.
+3. **One-owner forks**: projected boundary DTOs at real translation boundaries are clean. Installed-package blocking requires accepted package-owner facts, ideally proposed from analytics such as existing imports, `Pick`/`Omit` derivations, SDK return provenance, or repeated structural forks. The unconfigured all-`node_modules` sweep stays inventory/discovery for finding owners worth accepting. Recommended: yes.
+4. **SQL severity split**: value interpolation blocks everywhere; dynamic identifier interpolation downgrades to inventory when parser services are absent, and type-proof is never replaced with name exemptions. Codified through `parserServiceDeltas`.
 5. **Nullable tuples**: nullability stays the policy boundary. Recommended: yes (already the rule's shape).
 6. **Async arrays**: never-await methods may promote on deterministic evidence plus the one real drift; `map`/`flatMap`-not-collected keeps a separate evidence gate. Recommended: yes.
 7. **Authz**: move from absence detection toward typed policy-wrapper registration as the construction pattern; freeze the current Express-scope rule until then. Recommended: yes.
@@ -397,10 +417,9 @@ These are the live grill questions reduced to recommended outcomes. Each changes
 
 ## Next Slices
 
-1. Decide 4 (SQL severity split) and promote `no-sql-string-concat` — highest security value, evidence already classified.
-2. Execute confirmed decision 1: implement the redundant-constant-cell branch in `no-coupled-state-setters`, classify its 102-finding inventory, retire `no-status-triplet-state`.
-3. Decide 3: registry/generated modes become the blocking path for `no-structural-type-fork`; demote the unconfigured installed-package sweep.
-4. Run the `no-defensive-shape-probing` sunset sweep; retire on no new `unknown`-typed drift.
-5. Second-repo evidence passes for `no-canonical-model-fork` and `no-underchecked-type-predicate` (recheck Opencode tsconfig).
-6. Decide 8 (theme vs lint) before further design-system promotion work.
-7. Decide 7 (authz wrapper pattern); no authz widening before that.
+1. Find real deterministic resource-lifecycle drift for `no-handrolled-resource-lifecycle-cells`; broad seven-repo co-mutation is classified inventory and the deterministic lifecycle branch is already the blocking core.
+2. Find independent generated-source replication and real accepted package-owner evidence for `no-structural-type-fork`; the unconfigured installed-package sweep is now analytics/inventory.
+3. Keep `no-defensive-shape-probing` as explicit default-off inventory; do not spend promotion work there unless new broad-value drift appears.
+4. Run adversarial review for `no-canonical-model-fork` against Chaski plus Sudocode evidence; keep `no-underchecked-type-predicate` default-off while seeking real required-field drift.
+5. Decide 8 (theme vs lint) before further design-system promotion work.
+6. Decide 7 (authz wrapper pattern); no authz widening before that.

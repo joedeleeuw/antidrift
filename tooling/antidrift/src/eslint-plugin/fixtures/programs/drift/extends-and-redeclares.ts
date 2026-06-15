@@ -1,6 +1,5 @@
 // File correctly extends firebase User in one place but also redeclares the base shape.
-// Tests that a correct usage in the same file doesn't suppress the drift error elsewhere.
-// Expected: 1 error on UserBase (the redeclaration), 0 errors on AppUser (the extension)
+// Tests that a correct usage in the same file does not suppress the inventory fact elsewhere.
 
 import type { User } from "firebase/auth";
 
