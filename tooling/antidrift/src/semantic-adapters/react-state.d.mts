@@ -14,6 +14,7 @@ export interface ReactStateWriteContext {
 
 export interface ReactStateFrame {
   node: unknown;
+  paramNames: Set<string>;
   setters: Set<string>;
   cellOf: Map<string, string>;
   awaitedNames: Set<string>;
@@ -21,6 +22,10 @@ export interface ReactStateFrame {
   called: Set<string>;
   isTransition: boolean;
   requestGuard: boolean;
+  sourceMemberWrites: ReactStateSourceMemberWrite[];
+  sourceMemberTransitions: ReactStateSourceMemberTransition[];
+  eventEditedCells: Set<string>;
+  controlledCells: Set<string>;
   ownerSetters?: Set<string>;
 }
 
@@ -47,6 +52,32 @@ export interface ReactStateLifecycleProof {
   proven: boolean;
 }
 
+export interface ReactStateSourceMemberWrite {
+  setter: string;
+  cell: string;
+  source: string;
+  property: string;
+}
+
+export interface ReactStateSourceMemberTransition {
+  source: string;
+  entries: ReactStateSourceMemberWrite[];
+  node: unknown;
+  transition: boolean;
+  requestGuard: boolean;
+}
+
+export interface ReactStateSourceShardProof {
+  source?: string;
+  sourceInit?: unknown;
+  entries: ReactStateSourceMemberWrite[];
+  editableCells: string[];
+  node?: unknown;
+  transition?: boolean;
+  requestGuard?: boolean;
+  proven: boolean;
+}
+
 export function classifyWriteValue(
   arg: unknown,
   context: ReactStateWriteContext,
@@ -59,6 +90,11 @@ export function createReactStateTracker(options?: {
 export function lifecycleProof(
   frame: ReactStateFrame,
 ): ReactStateLifecycleProof;
+
+export function sourceShardProof(
+  frame: ReactStateFrame,
+  options?: { threshold?: number },
+): ReactStateSourceShardProof;
 
 export function frameStatePayload(
   frame: ReactStateFrame,

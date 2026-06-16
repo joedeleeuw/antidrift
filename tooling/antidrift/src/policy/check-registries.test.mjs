@@ -820,7 +820,7 @@ ${rows}
       }),
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "docs/semantic-validation-matrix.md row for antidrift/no-handrolled-resource-lifecycle-cells association must include one shipped semantic adapter association: React state setter to cell; state cell to resource lifecycle role.",
+      "docs/semantic-validation-matrix.md row for antidrift/no-handrolled-resource-lifecycle-cells association must include one shipped semantic adapter association: React state setter to cell; source object member to state cell; state cell to resource lifecycle role.",
     );
   });
 

@@ -102,16 +102,22 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     id: "react-state",
     exportName: "reactState",
     subpath: "@joedeleeuw/antidrift/semantic-adapters/react-state",
-    rules: Object.freeze(["antidrift/no-handrolled-resource-lifecycle-cells"]),
+    rules: Object.freeze([
+      "antidrift/no-handrolled-resource-lifecycle-cells",
+      "antidrift/no-shattered-ingested-entity-state",
+    ]),
     proofBuckets: Object.freeze(["semantic-source-type-provenance"]),
     semanticFactAdapterIds: Object.freeze(["react-state"]),
     semanticFactKinds: Object.freeze([
       "broadSetterCoMutation",
       "resourceLifecycleProof",
+      "sourceMemberStateShard",
+      "sourceMemberStateShardCandidate",
     ]),
     associations: Object.freeze([
       "React state setter to cell",
       "state cell to resource lifecycle role",
+      "source object member to state cell",
     ]),
     carrier: "React state graph semantic adapter",
   }),

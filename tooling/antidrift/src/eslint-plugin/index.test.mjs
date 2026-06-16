@@ -53,8 +53,9 @@ const typedRuleTester = new RuleTester({
   languageOptions: {
     parser: tsParser,
     parserOptions: {
+      ecmaFeatures: { jsx: true },
       projectService: {
-        allowDefaultProject: ["*.ts"],
+        allowDefaultProject: ["*.ts", "*.tsx"],
         defaultProject: resolve(fixturesDir, "tsconfig.json"),
       },
       tsconfigRootDir: fixturesDir,
@@ -69,6 +70,7 @@ const typeServiceGuardedRules = [
   "no-canonical-model-fork",
   "no-defensive-shape-probing",
   "no-redundant-zod-parse",
+  "no-shattered-ingested-entity-state",
   "no-structural-type-fork",
   "no-underchecked-type-predicate",
   "no-unsafe-deserialize",
@@ -260,6 +262,187 @@ ruleTester.run("no-handrolled-resource-lifecycle-cells", rule("no-handrolled-res
   ],
 });
 
+const generatedStructuralOptions = {
+  generatedSources: {
+    fixtureGenerated: {
+      generated: "programs/generated",
+    },
+  },
+};
+
+const sourceShardDomainOptions = {
+  canonicalEntities: {
+    User: "programs/correct/packages/domain/src/user.ts",
+  },
+};
+
+typedRuleTester.run(
+  "no-shattered-ingested-entity-state",
+  rule("no-shattered-ingested-entity-state"),
+  {
+    valid: [
+      {
+        code: `
+          declare namespace JSX { interface IntrinsicElements { input: any; form: any; } }
+          declare function useState<T>(v: T): [T, (v: T) => void];
+          declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
+          function ProfileForm() {
+            const [id, setId] = useState("");
+            const [name, setName] = useState("");
+            async function load() {
+              const profile = await fetchProfile();
+              setId(profile.id);
+              setName(profile.displayName);
+            }
+            return <form>
+              <input value={id} onChange={(event) => setId(event.currentTarget.value)} />
+              <input value={name} onChange={(event) => setName(event.currentTarget.value)} />
+            </form>;
+          }
+          void ProfileForm;
+        `,
+        filename: "profile-form.tsx",
+      },
+      `
+        declare function useState<T>(v: T): [T, (v: T) => void];
+        declare function fetchUser(): Promise<{ id: string; name: string }>;
+        function UserPanel() {
+          const [user, setUser] = useState<{ id: string; name: string } | null>(null);
+          return async function load() {
+            const next = await fetchUser();
+            setUser(next);
+          };
+        }
+        void UserPanel;
+      `,
+      `
+        declare function useState<T>(v: T): [T, (v: T) => void];
+        declare function fetchUser(): Promise<{ id: string; name: string }>;
+        function UserPanel() {
+          const [id, setId] = useState("");
+          const [label, setLabel] = useState("");
+          return async function load() {
+            const next = await fetchUser();
+            setId(next.id);
+            setLabel("loaded");
+          };
+        }
+        void UserPanel;
+      `,
+      {
+        code: `
+          import type { User } from "./programs/correct/packages/domain/src/user";
+          declare function useState<T>(v: T): [T, (v: T) => void];
+          declare function fetchUsersPage(): Promise<{
+            items: User[];
+            nextCursor: string | null;
+          }>;
+          function UsersPage() {
+            const [items, setItems] = useState<User[]>([]);
+            const [nextCursor, setNextCursor] = useState<string | null>(null);
+            return async function load() {
+              const page = await fetchUsersPage();
+              setItems(page.items);
+              setNextCursor(page.nextCursor);
+            };
+          }
+          void UsersPage;
+        `,
+        filename: "users-page.tsx",
+        options: [sourceShardDomainOptions],
+      },
+      {
+        code: `
+          import type { User } from "./programs/correct/packages/domain/src/user";
+          declare function useState<T>(v: T): [T, (v: T) => void];
+          declare function fetchUserEnvelope(): Promise<{
+            entity: User;
+            fetchedAt: string;
+          }>;
+          function UserEnvelopePanel() {
+            const [entity, setEntity] = useState<User | null>(null);
+            const [fetchedAt, setFetchedAt] = useState("");
+            return async function load() {
+              const envelope = await fetchUserEnvelope();
+              setEntity(envelope.entity);
+              setFetchedAt(envelope.fetchedAt);
+            };
+          }
+          void UserEnvelopePanel;
+        `,
+        filename: "user-envelope-panel.tsx",
+        options: [sourceShardDomainOptions],
+      },
+    ],
+    invalid: [
+      {
+        code: `
+          import type { User } from "./programs/correct/packages/domain/src/user";
+          declare function useState<T>(v: T): [T, (v: T) => void];
+          declare function fetchUser(): Promise<User>;
+          function UserCard() {
+            const [id, setId] = useState("");
+            const [displayName, setDisplayName] = useState("");
+            return async function load() {
+              const user = await fetchUser();
+              setId(user.id);
+              setDisplayName(user.displayName);
+            };
+          }
+          void UserCard;
+        `,
+        filename: "user-card.tsx",
+        options: [sourceShardDomainOptions],
+        errors: 1,
+      },
+      {
+        code: `
+          import type { GeneratedRelease } from "./programs/generated/release";
+          declare function useState<T>(v: T): [T, (v: T) => void];
+          declare function fetchProfile(): Promise<GeneratedRelease>;
+          function ProfileCard() {
+            const [id, setId] = useState("");
+            const [name, setName] = useState("");
+            return async function load() {
+              const profile = await fetchProfile();
+              setId(profile.id);
+              setName(profile.version);
+            };
+          }
+          void ProfileCard;
+        `,
+        filename: "profile-card.tsx",
+        options: [generatedStructuralOptions],
+        errors: 1,
+      },
+      {
+        code: `
+          import type { GeneratedRelease } from "./programs/generated/release";
+          declare function useState<T>(v: T): [T, (v: T) => void];
+          declare function useEffect(fn: () => void, deps: unknown[]): void;
+          declare function fetchReport(): Promise<GeneratedRelease>;
+          function ReportPanel() {
+            const [rows, setRows] = useState("");
+            const [summary, setSummary] = useState("");
+            useEffect(() => {
+              async function load() {
+                const report = await fetchReport();
+                setRows(report.id);
+                setSummary(report.version);
+              }
+              void load();
+            }, []);
+          }
+          void ReportPanel;
+        `,
+        filename: "report-panel.tsx",
+        options: [generatedStructuralOptions],
+        errors: 1,
+      },
+    ],
+  },
+);
+
 ruleTester.run(
   "no-inline-structural-type-at-use-site",
   rule("no-inline-structural-type-at-use-site"),
@@ -405,14 +588,6 @@ ruleTester.run("require-authz-check", rule("require-authz-check"), {
     },
   ],
 });
-
-const generatedStructuralOptions = {
-  generatedSources: {
-    fixtureGenerated: {
-      generated: "programs/generated",
-    },
-  },
-};
 
 const acceptedPackageStructuralOptions = {
   packageTypeOwners: {
@@ -657,7 +832,14 @@ async function lintWithCoupledStateFacts(file, options = {}) {
         files: ["**/*.ts"],
         languageOptions: {
           parser: tsParser,
-          parserOptions: { ecmaFeatures: { jsx: true } },
+          parserOptions: {
+            ecmaFeatures: { jsx: true },
+            projectService: {
+              allowDefaultProject: ["*.ts", "*.tsx"],
+              defaultProject: resolve(fixturesDir, "tsconfig.json"),
+            },
+            tsconfigRootDir: fixturesDir,
+          },
         },
         plugins: {
           antidrift: plugin,
@@ -683,6 +865,52 @@ async function lintWithCoupledStateFacts(file, options = {}) {
 
   const [result] = await eslint.lintText(program.code, {
     filePath: program.filename,
+  });
+  return { facts, result };
+}
+
+async function lintSourceShardWithFacts(code, options = {}) {
+  const facts = [];
+  const eslint = new ESLint({
+    overrideConfigFile: true,
+    overrideConfig: [
+      {
+        files: ["**/*.{ts,tsx}"],
+        languageOptions: {
+          parser: tsParser,
+          parserOptions: {
+            ecmaFeatures: { jsx: true },
+            projectService: {
+              allowDefaultProject: ["*.ts", "*.tsx"],
+              defaultProject: resolve(fixturesDir, "tsconfig.json"),
+            },
+            tsconfigRootDir: fixturesDir,
+          },
+        },
+        plugins: {
+          antidrift: plugin,
+        },
+        rules: {
+          "antidrift/no-shattered-ingested-entity-state": ["error", options],
+        },
+        settings: {
+          antidrift: {
+            semanticFacts: {
+              repoRoot: fixturesDir,
+              sink: {
+                emit(fact) {
+                  facts.push(fact);
+                },
+              },
+            },
+          },
+        },
+      },
+    ],
+  });
+
+  const [result] = await eslint.lintText(code, {
+    filePath: resolve(fixturesDir, "source-shard.tsx"),
   });
   return { facts, result };
 }
@@ -762,6 +990,90 @@ it("downgrades a request-guarded lifecycle to heuristic-inventory with no diagno
   );
 });
 
+it("emits a deterministic source-member shard fact from one awaited entity", async () => {
+  const { facts, result } = await lintSourceShardWithFacts(
+    `
+    import type { GeneratedRelease } from "./programs/generated/release";
+    declare function useState<T>(v: T): [T, (v: T) => void];
+    declare function fetchProfile(): Promise<GeneratedRelease>;
+    function ProfileCard() {
+      const [id, setId] = useState("");
+      const [name, setName] = useState("");
+      return async function load() {
+        const profile = await fetchProfile();
+        setId(profile.id);
+        setName(profile.version);
+      };
+    }
+    void ProfileCard;
+  `,
+    generatedStructuralOptions,
+  );
+
+  expect(result.messages).toHaveLength(1);
+  expect(facts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        factKind: "sourceMemberStateShard",
+        ruleId: "antidrift/no-shattered-ingested-entity-state",
+        adapterId: "react-state",
+        confidence: "deterministic-enforcement",
+        provenance: expect.arrayContaining([
+          "AST",
+          "control-flow",
+          "scope-binding",
+        ]),
+        payload: expect.objectContaining({
+          source: "profile",
+          owner: { authority: "generated", typeName: "GeneratedRelease" },
+          editableCells: [],
+          members: expect.arrayContaining([
+            { setter: "setId", cell: "id", property: "id" },
+            { setter: "setName", cell: "name", property: "version" },
+          ]),
+        }),
+      }),
+    ]),
+  );
+});
+
+it("keeps unowned source-member shards as candidate facts without diagnostics", async () => {
+  const { facts, result } = await lintSourceShardWithFacts(`
+    declare function useState<T>(v: T): [T, (v: T) => void];
+    declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
+    function ProfileCard() {
+      const [id, setId] = useState("");
+      const [name, setName] = useState("");
+      return async function load() {
+        const profile = await fetchProfile();
+        setId(profile.id);
+        setName(profile.displayName);
+      };
+    }
+    void ProfileCard;
+  `);
+
+  expect(result.messages).toHaveLength(0);
+  expect(facts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        factKind: "sourceMemberStateShardCandidate",
+        ruleId: "antidrift/no-shattered-ingested-entity-state",
+        adapterId: "react-state",
+        confidence: "heuristic-inventory",
+        payload: expect.objectContaining({
+          source: "profile",
+          editableCells: [],
+          members: expect.arrayContaining([
+            { setter: "setId", cell: "id", property: "id" },
+            { setter: "setName", cell: "name", property: "displayName" },
+          ]),
+        }),
+      }),
+    ]),
+  );
+});
+
 it("emits semantic facts that satisfy the registered public payload contract", async () => {
   const structural = await lintWithStructuralFacts(
     "programs/drift/redeclares-full.ts",
@@ -773,10 +1085,48 @@ it("emits semantic facts that satisfy the registered public payload contract", a
     "programs/correct/sibling-payload-setters.ts",
     { threshold: 2 },
   );
-  const facts = [...structural.facts, ...lifecycle.facts, ...inventory.facts];
+  const sourceShard = await lintSourceShardWithFacts(
+    `
+    import type { GeneratedRelease } from "./programs/generated/release";
+    declare function useState<T>(v: T): [T, (v: T) => void];
+    declare function fetchProfile(): Promise<GeneratedRelease>;
+    function ProfileCard() {
+      const [id, setId] = useState("");
+      const [name, setName] = useState("");
+      return async function load() {
+        const profile = await fetchProfile();
+        setId(profile.id);
+        setName(profile.version);
+      };
+    }
+    void ProfileCard;
+  `,
+    generatedStructuralOptions,
+  );
+  const sourceShardCandidate = await lintSourceShardWithFacts(`
+    declare function useState<T>(v: T): [T, (v: T) => void];
+    declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
+    function ProfileCard() {
+      const [id, setId] = useState("");
+      const [name, setName] = useState("");
+      return async function load() {
+        const profile = await fetchProfile();
+        setId(profile.id);
+        setName(profile.displayName);
+      };
+    }
+    void ProfileCard;
+  `);
+  const facts = [
+    ...structural.facts,
+    ...lifecycle.facts,
+    ...inventory.facts,
+    ...sourceShard.facts,
+    ...sourceShardCandidate.facts,
+  ];
 
-  expect(new Set(facts.map((fact) => fact.factKind))).toEqual(
-    new Set(Object.keys(semanticFactKinds)),
+  expect(facts.map((fact) => fact.factKind)).toEqual(
+    expect.arrayContaining(Object.keys(semanticFactKinds)),
   );
   for (const fact of facts) {
     expectFactMatchesRegistry(fact);

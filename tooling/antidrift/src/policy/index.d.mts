@@ -1,5 +1,11 @@
 export interface PolicyRule {
   id: string;
+  status?: string;
+  severity?: string;
+  detector?: string;
+  message?: string;
+  replacement?: string;
+  mergedInto?: string;
 }
 
 export interface PolicyCluster {
@@ -88,6 +94,12 @@ export interface RuleStatusSemanticAdapterStatus {
   reason: string;
 }
 
+export interface RuleStatusExamples {
+  exhaustive: false;
+  flags: readonly string[];
+  allows: readonly string[];
+}
+
 export type SqlParserServiceDeltaClassification =
   | "not-applicable"
   | "equivalent-without-parser-services"
@@ -143,12 +155,14 @@ export interface RuleStatusManifestEntry {
   proofBuckets?: readonly RuleStatusProofBucket[];
   referenceDoc?: string;
   replacement?: string;
+  mergedInto?: string;
   reason?: string;
   nextAction?: string;
   antidriftRule?: string;
   coverage?: string;
   corpusRepositories?: readonly string[];
   external?: unknown;
+  examples?: RuleStatusExamples;
   promotion?: RuleStatusPromotion;
   semanticAdapterStatus?: RuleStatusSemanticAdapterStatus;
 }
@@ -197,6 +211,8 @@ export interface SemanticFactKindContractEntry extends SemanticFactKindContract 
 export type SemanticFactKind =
   | "broadSetterCoMutation"
   | "resourceLifecycleProof"
+  | "sourceMemberStateShard"
+  | "sourceMemberStateShardCandidate"
   | "structuralMatch";
 
 export interface SqlParserServiceDeltaInput {

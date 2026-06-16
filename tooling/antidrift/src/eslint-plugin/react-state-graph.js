@@ -59,6 +59,98 @@ function memberName(node) {
     : "";
 }
 
+function staticMemberName(node) {
+  if (!node) return "";
+  if (!node.computed) return memberName(node);
+  const property = unwrapCasts(node.property);
+  if (
+    property?.type === "Literal" &&
+    (typeof property.value === "string" || typeof property.value === "number")
+  ) {
+    return String(property.value);
+  }
+  return "";
+}
+
+function identifierName(node) {
+  const value = unwrapCasts(node);
+  return value?.type === "Identifier" ? value.name : "";
+}
+
+function paramNames(params = []) {
+  return new Set(
+    params
+      .map((param) => identifierName(param))
+      .filter((name) => name.length > 0),
+  );
+}
+
+function baseIdentifierName(node) {
+  const value = unwrapCasts(node);
+  if (value?.type === "Identifier") return value.name;
+  if (value?.type === "MemberExpression") return baseIdentifierName(value.object);
+  return "";
+}
+
+// Only first-level member access on the awaited source (`source.prop`) is a shard
+// write; deeper access (`source.a.b`) is not attributed to `source`, so a leaf name
+// that happens to match an owner property cannot be mis-counted as a fanned member.
+function sourceMemberWrite(arg, awaitedNames) {
+  const value = unwrapCasts(arg);
+  if (value?.type !== "MemberExpression") return null;
+  const object = unwrapCasts(value.object);
+  if (object?.type !== "Identifier") return null;
+  const property = staticMemberName(value);
+  if (!object.name || !property || !awaitedNames.has(object.name)) return null;
+  return { source: object.name, property };
+}
+
+function isParamDerivedValue(node, names) {
+  const value = unwrapCasts(node);
+  if (!value) return false;
+  if (value.type === "Identifier") return names.has(value.name);
+  if (value.type === "MemberExpression") {
+    return names.has(baseIdentifierName(value.object));
+  }
+  if (value.type === "CallExpression") {
+    return value.arguments.some((arg) => isParamDerivedValue(arg, names));
+  }
+  if (value.type === "TemplateLiteral") {
+    return value.expressions.some((expr) => isParamDerivedValue(expr, names));
+  }
+  if (value.type === "LogicalExpression" || value.type === "BinaryExpression") {
+    return (
+      isParamDerivedValue(value.left, names) ||
+      isParamDerivedValue(value.right, names)
+    );
+  }
+  if (value.type === "ConditionalExpression") {
+    return (
+      isParamDerivedValue(value.test, names) ||
+      isParamDerivedValue(value.consequent, names) ||
+      isParamDerivedValue(value.alternate, names)
+    );
+  }
+  return false;
+}
+
+function sourceMemberTransitions(frame) {
+  const bySource = new Map();
+  for (const write of frame.sourceMemberWrites) {
+    const entries = bySource.get(write.source) ?? [];
+    entries.push(write);
+    bySource.set(write.source, entries);
+  }
+  return [...bySource.entries()].map(([source, entries]) => ({
+    source,
+    sourceInit: frame.awaitedSourceInits.get(source) ?? null,
+    entries,
+    node: frame.node,
+    transition: Boolean(frame.isTransition),
+    requestGuard: frame.requestGuard,
+  }));
+}
+
 function isAbortCall(callee) {
   return callee?.type === "MemberExpression" && memberName(callee) === "abort";
 }
@@ -73,6 +165,8 @@ export function createReactStateTracker({ onFrameExit } = {}) {
   const top = () => functionStack[functionStack.length - 1] ?? null;
   const setterInScope = (name) =>
     functionStack.some((frame) => frame.setters.has(name));
+  const cellInScope = (name) =>
+    functionStack.some((frame) => [...frame.cellOf.values()].includes(name));
   // A setter's cell is declared in the owning component frame, but its writes happen
   // in a nested transition frame, so resolve the binding up the stack.
   const cellFor = (name) => {
@@ -86,13 +180,19 @@ export function createReactStateTracker({ onFrameExit } = {}) {
   function enter(node) {
     functionStack.push({
       node,
+      paramNames: paramNames(node.params),
       setters: new Set(),
       cellOf: new Map(),
       awaitedNames: new Set(),
+      awaitedSourceInits: new Map(),
       writes: new Map(),
       called: new Set(),
       isTransition: false,
       requestGuard: false,
+      sourceMemberWrites: [],
+      sourceMemberTransitions: [],
+      eventEditedCells: new Set(),
+      controlledCells: new Set(),
     });
   }
 
@@ -114,6 +214,12 @@ export function createReactStateTracker({ onFrameExit } = {}) {
     frame.ownerSetters = parent
       ? new Set([...frame.setters, ...parent.setters])
       : frame.setters;
+    frame.sourceMemberTransitions.push(...sourceMemberTransitions(frame));
+    if (parent) {
+      for (const cell of frame.eventEditedCells) parent.eventEditedCells.add(cell);
+      for (const cell of frame.controlledCells) parent.controlledCells.add(cell);
+      parent.sourceMemberTransitions.push(...frame.sourceMemberTransitions);
+    }
     if (onFrameExit) onFrameExit(frame);
   }
 
@@ -143,6 +249,7 @@ export function createReactStateTracker({ onFrameExit } = {}) {
           node.id?.type === "Identifier"
         ) {
           frame.awaitedNames.add(node.id.name);
+          frame.awaitedSourceInits.set(node.id.name, init);
         }
       },
       AwaitExpression() {
@@ -158,6 +265,17 @@ export function createReactStateTracker({ onFrameExit } = {}) {
         if (frame && isAbortStatusRead(node)) {
           frame.requestGuard = true;
         }
+      },
+      JSXAttribute(node) {
+        const frame = top();
+        if (!frame) return;
+        const name = node.name?.name;
+        if (name !== "value" && name !== "checked") return;
+        const cell =
+          node.value?.type === "JSXExpressionContainer"
+            ? identifierName(node.value.expression)
+            : "";
+        if (cell && cellInScope(cell)) frame.controlledCells.add(cell);
       },
       CatchClause(node) {
         catchParams.push(
@@ -183,6 +301,21 @@ export function createReactStateTracker({ onFrameExit } = {}) {
         frame.called.add(calleeName);
         const arg = node.arguments?.[0];
         if (!arg) return;
+        const cell = frame.cellOf.get(calleeName) ?? cellFor(calleeName);
+        if (cell && !frame.cellOf.has(calleeName)) {
+          frame.cellOf.set(calleeName, cell);
+        }
+        if (cell && isParamDerivedValue(arg, frame.paramNames)) {
+          frame.eventEditedCells.add(cell);
+        }
+        const sourceWrite = sourceMemberWrite(arg, frame.awaitedNames);
+        if (sourceWrite && cell) {
+          frame.sourceMemberWrites.push({
+            ...sourceWrite,
+            setter: calleeName,
+            cell,
+          });
+        }
         const valueClass = classifyWriteValue(arg, {
           awaitedNames: frame.awaitedNames,
           catchParams,
@@ -193,10 +326,6 @@ export function createReactStateTracker({ onFrameExit } = {}) {
         const classes = frame.writes.get(calleeName) ?? new Set();
         classes.add(valueClass);
         frame.writes.set(calleeName, classes);
-        if (!frame.cellOf.has(calleeName)) {
-          const cell = cellFor(calleeName);
-          if (cell) frame.cellOf.set(calleeName, cell);
-        }
       },
     },
   };
@@ -231,6 +360,43 @@ export function lifecycleProof(frame) {
       )?.[0] ?? null)
     : null;
   return { boolCell, errorCell, payloadCell, proven: Boolean(payloadCell) };
+}
+
+// Source-member shard: at least `threshold` distinct state cells each receive a
+// distinct member of the SAME freshly awaited source object in one transition,
+// excluding controlled-input draft cells that are independently edited from events.
+// This is behavioral fan-out only; owned-entity proof is added by the rule layer.
+export function sourceShardProof(frame, { threshold = 2 } = {}) {
+  const editableCells = new Set(
+    [...frame.eventEditedCells].filter((cell) => frame.controlledCells.has(cell)),
+  );
+  for (const transition of frame.sourceMemberTransitions) {
+    if (!transition.transition) continue;
+    const byCell = new Map();
+    for (const entry of transition.entries) {
+      if (editableCells.has(entry.cell)) continue;
+      byCell.set(entry.cell, entry);
+    }
+    const entries = [...byCell.values()];
+    const properties = new Set(entries.map((entry) => entry.property));
+    if (entries.length >= threshold && properties.size >= threshold) {
+      return {
+        ...transition,
+        entries,
+        editableCells: [...editableCells].sort((left, right) =>
+          left.localeCompare(right),
+        ),
+        proven: true,
+      };
+    }
+  }
+  return {
+    entries: [],
+    editableCells: [...editableCells].sort((left, right) =>
+      left.localeCompare(right),
+    ),
+    proven: false,
+  };
 }
 
 // Serializable, sanitizable view of a frame's state graph for fact payloads.

@@ -22,6 +22,8 @@ describe("semantic facts", () => {
     ).toEqual([
       "broadSetterCoMutation",
       "resourceLifecycleProof",
+      "sourceMemberStateShard",
+      "sourceMemberStateShardCandidate",
       "structuralMatch",
     ]);
     expect(SEMANTIC_FACT_KINDS.structuralMatch).toMatchObject({
@@ -49,13 +51,20 @@ describe("semantic facts", () => {
     ).toEqual([
       "broadSetterCoMutation",
       "resourceLifecycleProof",
+      "sourceMemberStateShard",
+      "sourceMemberStateShardCandidate",
       "structuralMatch",
     ]);
     expect(
       semanticFactKindContractsForAdapterId("react-state").map(
         (entry) => entry.factKind,
       ),
-    ).toEqual(["broadSetterCoMutation", "resourceLifecycleProof"]);
+    ).toEqual([
+      "broadSetterCoMutation",
+      "resourceLifecycleProof",
+      "sourceMemberStateShard",
+      "sourceMemberStateShardCandidate",
+    ]);
     expect(
       semanticFactKindContractsForRule(
         "antidrift/no-handrolled-resource-lifecycle-cells",
@@ -69,17 +78,25 @@ describe("semantic facts", () => {
       semanticFactKindContractsForEmission("inventory-only").map(
         (entry) => entry.factKind,
       ),
-    ).toEqual(["broadSetterCoMutation"]);
+    ).toEqual(["broadSetterCoMutation", "sourceMemberStateShardCandidate"]);
     expect(
       semanticFactKindContractsForEmission("blocking-diagnostic").map(
         (entry) => entry.factKind,
       ),
-    ).toEqual(["resourceLifecycleProof", "structuralMatch"]);
+    ).toEqual([
+      "resourceLifecycleProof",
+      "sourceMemberStateShard",
+      "structuralMatch",
+    ]);
     expect(
       semanticFactKindContractsForConfidence("deterministic-enforcement").map(
         (entry) => entry.factKind,
       ),
-    ).toEqual(["resourceLifecycleProof", "structuralMatch"]);
+    ).toEqual([
+      "resourceLifecycleProof",
+      "sourceMemberStateShard",
+      "structuralMatch",
+    ]);
     expect(semanticFactKindContractsForEmission("not-real")).toEqual([]);
   });
 

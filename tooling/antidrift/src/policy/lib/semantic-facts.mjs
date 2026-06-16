@@ -40,6 +40,43 @@ export const SEMANTIC_FACT_KINDS = Object.freeze({
       "cells",
     ]),
   }),
+  sourceMemberStateShard: Object.freeze({
+    rules: Object.freeze(["antidrift/no-shattered-ingested-entity-state"]),
+    adapterId: "react-state",
+    carrier: "semantic-adapter",
+    confidence: Object.freeze(["deterministic-enforcement"]),
+    emission: Object.freeze(["blocking-diagnostic"]),
+    association:
+      "React state cells to distinct members of one freshly awaited source object, excluding controlled input draft cells with event-derived edits.",
+    noSinkBehavior:
+      "The diagnostic still reports; only the serialized source-member shard fact is skipped.",
+    payloadFields: Object.freeze([
+      "owner",
+      "source",
+      "members",
+      "editableCells",
+      "transition",
+      "requestGuard",
+    ]),
+  }),
+  sourceMemberStateShardCandidate: Object.freeze({
+    rules: Object.freeze(["antidrift/no-shattered-ingested-entity-state"]),
+    adapterId: "react-state",
+    carrier: "semantic-adapter",
+    confidence: Object.freeze(["heuristic-inventory"]),
+    emission: Object.freeze(["inventory-only"]),
+    association:
+      "React state cells to distinct members of one freshly awaited source object before accepted owned-entity proof is established.",
+    noSinkBehavior:
+      "No diagnostic is produced; behavioral source-member shard candidates remain inventory-only until type-owner proof holds.",
+    payloadFields: Object.freeze([
+      "source",
+      "members",
+      "editableCells",
+      "transition",
+      "requestGuard",
+    ]),
+  }),
   structuralMatch: Object.freeze({
     rules: Object.freeze([
       "antidrift/no-canonical-model-fork",

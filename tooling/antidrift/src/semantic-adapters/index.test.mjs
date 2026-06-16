@@ -25,7 +25,12 @@ describe("semantic adapter manifest", () => {
       semanticAdapterManifestForAdapterId(
         "react-state",
       )?.semanticFactContracts.map((entry) => entry.factKind),
-    ).toEqual(["broadSetterCoMutation", "resourceLifecycleProof"]);
+    ).toEqual([
+      "broadSetterCoMutation",
+      "resourceLifecycleProof",
+      "sourceMemberStateShard",
+      "sourceMemberStateShardCandidate",
+    ]);
     expect(
       semanticAdapterManifestForAdapterId(
         "type-owner",

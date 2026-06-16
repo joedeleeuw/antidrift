@@ -5,6 +5,7 @@ import {
   createReactStateTracker,
   frameStatePayload,
   lifecycleProof,
+  sourceShardProof,
 } from "./react-state-graph.js";
 import {
   emitSemanticFact,
@@ -801,6 +802,156 @@ function isGlobalFetchCall(callee) {
       objectName === "window" ||
       objectName === "self")
   );
+}
+
+function sourceShardPayload(proof) {
+  return {
+    source: proof.source,
+    members: proof.entries.map(({ setter, cell, property }) => ({
+      setter,
+      cell,
+      property,
+    })),
+    editableCells: proof.editableCells,
+    transition: Boolean(proof.transition),
+    requestGuard: Boolean(proof.requestGuard),
+  };
+}
+
+// Type-owner tier: the behavioral shard only blocks when the awaited source resolves
+// to exactly one accepted owned entity (domain or generated authority) and every
+// fanned member is a property of that owned type. Reuses the same owner machinery as
+// no-structural-type-fork; otherwise the shard stays inventory-only.
+function sourceShardOwnedEntityProof(services, checker, proof, options) {
+  if (!proof.sourceInit) return null;
+  const tsSourceInit = services.esTreeNodeToTSNodeMap.get(proof.sourceInit);
+  if (!tsSourceInit) return null;
+  const sourceType = checker.getTypeAtLocation(tsSourceInit);
+  const canonicalEntities = options.canonicalEntities ?? {};
+  const generatedSources = options.generatedSources ?? {};
+  const resolvesToDomain = resolvesToDomainCanonicalType(
+    sourceType,
+    canonicalEntities,
+  );
+  const resolvesToGenerated = resolvesToGeneratedType(
+    sourceType,
+    generatedSources,
+  );
+  if (Number(resolvesToDomain) + Number(resolvesToGenerated) !== 1) {
+    return null;
+  }
+  const props = typeProps(checker, sourceType);
+  if (!proof.entries.every((entry) => props.has(entry.property))) {
+    return null;
+  }
+  return {
+    authority: resolvesToDomain ? "domain" : "generated",
+    typeName: checker.typeToString(sourceType),
+  };
+}
+
+function ruleNoShatteredIngestedEntityState() {
+  return {
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Disallow splitting one freshly ingested entity object into sibling React state cells unless those cells are proven editable draft fields.",
+      },
+      schema: [
+        {
+          type: "object",
+          properties: {
+            threshold: { type: "number" },
+            canonicalEntities: {
+              type: "object",
+              additionalProperties: {
+                oneOf: [
+                  { type: "string" },
+                  {
+                    type: "object",
+                    additionalProperties: true,
+                    properties: {
+                      owner: { type: "string" },
+                      exportName: { type: "string" },
+                    },
+                  },
+                ],
+              },
+            },
+            generatedSources: {
+              type: "object",
+              additionalProperties: {
+                type: "object",
+                additionalProperties: true,
+                properties: {
+                  generated: { type: "string" },
+                },
+              },
+            },
+          },
+          additionalProperties: false,
+        },
+      ],
+    },
+    create(context) {
+      const services = requireTypeServices(context);
+      if (!services) {
+        return missingTypeServicesVisitors(
+          context,
+          "no-shattered-ingested-entity-state",
+        );
+      }
+      const checker = services.program.getTypeChecker();
+      const options = context.options[0] ?? {};
+      const threshold = options.threshold ?? 2;
+      const tracker = createReactStateTracker({
+        onFrameExit(frame) {
+          // Only the component frame declares useState cells; a nested async
+          // transition frame has no setters and bubbles its transitions (and the
+          // controlled/event-edited exclusions) up to this frame, which is the one
+          // evaluated. Dropping this guard would double-evaluate without exclusions.
+          if (frame.setters.size === 0) return;
+          const proof = sourceShardProof(frame, { threshold });
+          if (!proof.proven) return;
+          const owner = sourceShardOwnedEntityProof(
+            services,
+            checker,
+            proof,
+            options,
+          );
+          if (!owner) {
+            emitSemanticFact(context, proof.node ?? frame.node, {
+              factKind: "sourceMemberStateShardCandidate",
+              ruleId: "antidrift/no-shattered-ingested-entity-state",
+              adapterId: "react-state",
+              confidence: "heuristic-inventory",
+              provenance: ["AST", "scope-binding", "control-flow"],
+              payload: sourceShardPayload(proof),
+            });
+            return;
+          }
+          emitSemanticFact(context, proof.node ?? frame.node, {
+            factKind: "sourceMemberStateShard",
+            ruleId: "antidrift/no-shattered-ingested-entity-state",
+            adapterId: "react-state",
+            confidence: "deterministic-enforcement",
+            provenance: ["AST", "scope-binding", "control-flow", "TypeChecker"],
+            payload: {
+              ...sourceShardPayload(proof),
+              owner,
+            },
+          });
+          context.report({
+            node: proof.node ?? frame.node,
+            message:
+              "This transition splits one freshly ingested source object into sibling React state cells. Keep the entity/resource together unless these are editable draft fields.",
+          });
+        },
+      });
+      return tracker.visitors;
+    },
+  };
 }
 
 function ruleRequireEffectDeps() {
@@ -3168,6 +3319,7 @@ const rules = {
   "no-underchecked-type-predicate": ruleNoUndercheckedTypePredicate(),
   "no-defensive-shape-probing": ruleNoDefensiveShapeProbing(),
   "no-handrolled-resource-lifecycle-cells": ruleNoHandrolledResourceLifecycleCells(),
+  "no-shattered-ingested-entity-state": ruleNoShatteredIngestedEntityState(),
   "require-effect-deps": ruleRequireEffectDeps(),
   "no-raw-tailwind-color": ruleClassNamePattern(
     "no-raw-tailwind-color",
