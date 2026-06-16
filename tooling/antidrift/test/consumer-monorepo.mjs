@@ -798,11 +798,11 @@ try {
       '  throw new Error("Missing rule status registry behavior");\n' +
       "}\n" +
       "\n" +
-      'if (ruleStatusSemanticSummaryForId("antidrift/no-async-array-method", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "async-control-flow" || ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "react-state" || ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", runtimeRuleStatus)?.semanticFactContracts.map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShard,sourceMemberStateShardCandidate" || ruleStatusSemanticSummaryForId("antidrift/no-raw-fetch-in-component", runtimeRuleStatus)?.proofBuckets.join(",") !== "local-ast-source-shape" || ruleStatusSemanticSummaryForId("antidrift/no-nullable-positional-tuple", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "tuple-shape" || ruleStatusSemanticSummaries(runtimeRuleStatus).length !== 8) {\n' +
+      'if (ruleStatusSemanticSummaryForId("antidrift/no-async-array-method", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "async-control-flow" || ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "react-state" || ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", runtimeRuleStatus)?.semanticFactContracts.map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" || ruleStatusSemanticSummaryForId("antidrift/no-raw-fetch-in-component", runtimeRuleStatus)?.proofBuckets.join(",") !== "local-ast-source-shape" || ruleStatusSemanticSummaryForId("antidrift/no-nullable-positional-tuple", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "tuple-shape" || ruleStatusSemanticSummaries(runtimeRuleStatus).length !== 8) {\n' +
       '  throw new Error("Missing joined rule semantic summary behavior");\n' +
       "}\n" +
       "\n" +
-      'if (semanticFactKindContractsForEmission("inventory-only").map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,sourceMemberStateShardCandidate" || semanticFactKindContractsForEmission("blocking-diagnostic").length !== 3 || semanticFactKindContractsForConfidence("deterministic-enforcement").length !== 3 || semanticFactKindContractsForEmission("not-real").length !== 0) {\n' +
+      'if (semanticFactKindContractsForEmission("inventory-only").map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,sourceMemberStateShardCandidate" || semanticFactKindContractsForEmission("blocking-diagnostic").length !== 2 || semanticFactKindContractsForConfidence("deterministic-enforcement").length !== 2 || semanticFactKindContractsForEmission("not-real").length !== 0) {\n' +
       '  throw new Error("Missing semantic fact contract emission/confidence lookup behavior");\n' +
       "}\n" +
       "\n" +
@@ -841,7 +841,7 @@ try {
       '  throw new Error("Missing semantic adapter contract metadata");\n' +
       "}\n" +
       "\n" +
-      'if (SEMANTIC_ADAPTER_MANIFEST.length !== 9 || semanticAdapterManifestForAdapterId("async-control-flow")?.rules[0] !== "antidrift/no-async-array-method" || semanticAdapterManifestForAdapterId("parse-input")?.rules[0] !== "antidrift/no-unsafe-deserialize" || semanticAdapterManifestForAdapterId("react-state")?.semanticFactContracts.map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShard,sourceMemberStateShardCandidate" || semanticAdapterManifestForAdapterId("tuple-shape")?.rules[0] !== "antidrift/no-nullable-positional-tuple" || semanticAdapterManifestForAdapterId("not-real") !== null) {\n' +
+      'if (SEMANTIC_ADAPTER_MANIFEST.length !== 9 || semanticAdapterManifestForAdapterId("async-control-flow")?.rules[0] !== "antidrift/no-async-array-method" || semanticAdapterManifestForAdapterId("parse-input")?.rules[0] !== "antidrift/no-unsafe-deserialize" || semanticAdapterManifestForAdapterId("react-state")?.semanticFactContracts.map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" || semanticAdapterManifestForAdapterId("tuple-shape")?.rules[0] !== "antidrift/no-nullable-positional-tuple" || semanticAdapterManifestForAdapterId("not-real") !== null) {\n' +
       '  throw new Error("Missing semantic adapter manifest behavior");\n' +
       "}\n" +
       "\n" +
@@ -973,7 +973,7 @@ try {
   if (
     reactStateManifest?.semanticFactContracts
       ?.map((entry) => entry.factKind)
-      .join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShard,sourceMemberStateShardCandidate" ||
+      .join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" ||
     !typeOwnerManifest?.proofBuckets?.includes("authority-index-ownership")
   ) {
     fail(
@@ -1217,7 +1217,7 @@ try {
       .join(",") !== "react-state" ||
     reactStateSemanticSummary.summaries?.[0]?.semanticFactContracts
       ?.map((entry) => entry.factKind)
-      .join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShard,sourceMemberStateShardCandidate" ||
+      .join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" ||
     !localAstSemanticSummary.summaries?.some(
       (summary) =>
         summary.entry.id === "antidrift/no-async-array-method" &&

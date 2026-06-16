@@ -1,5 +1,12 @@
 # Spec: type-owner tier for `antidrift/no-shattered-ingested-entity-state`
 
+> **SUPERSEDED (historical).** The type-owner enforcement tier specified below was built, then
+> removed after multi-repo scans (chaski, sudocode) found zero real human-authored owned-entity
+> shatters. The rule is now **inventory-only** (records `sourceMemberStateShardCandidate`, never
+> blocks). This document is kept as the design record; the live status is in the referenceDoc and
+> `policy/registries/rules.yaml`. Rebuilding this tier needs real cross-repo positives (likely an
+> agent-generated corpus).
+
 Design spec for the promotion path. The rule stays `under-proven` / default-off; this is the work
 that makes it *promotable* to `error`. Build sequence: this spec → `gpt-5.5-extra-high` review →
 `gpt-5.5-medium` implementation → `gpt-5.5-high` review → gate chain.
@@ -59,8 +66,8 @@ This rule becomes type-aware, so follow the existing typed-rule pattern, NOT sil
 ## KEY decision — what counts as an "entity" (the xhigh review changed this)
 
 Domain/generated-only **empties the drift set**: registries hold only `User`/`Project`
-(`domain.yaml`), generated sources are empty (`generated.yaml`), and the pinned Chaski drift's
-source (`GetListWeeklyDigestReportResponse`) is an ad-hoc API response, not registered. So scope (b)
+(`domain.yaml`), generated sources are empty (`generated.yaml`), and a pinned Chaski candidate's
+source (an ad-hoc API response envelope) is not registered. So scope (b)
 catches ~nothing real, and "any named type" re-admits the envelope FP (a view response IS a named
 type).
 
@@ -76,7 +83,7 @@ rule = don't *shatter* it across state cells.**
 Consequence (honest): the blockable drift set is only as large as the owned-entity set (today
 `User`/`Project`) and grows with the authority index — the same growth `no-structural-type-fork`
 rides. The rule is valuable as a per-owned-entity guardrail, not as a high-volume corpus finding.
-The `weekly-digest` "drift" whose source is an unregistered ad-hoc response is therefore **not**
+A candidate whose source is an unregistered ad-hoc response is therefore **not**
 flagged by this tier (correctly — it isn't an owned entity); it stays behavioral inventory only.
 
 New FP to control before the `off`→`error` flip: an owned entity intentionally split into

@@ -111,7 +111,6 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     semanticFactKinds: Object.freeze([
       "broadSetterCoMutation",
       "resourceLifecycleProof",
-      "sourceMemberStateShard",
       "sourceMemberStateShardCandidate",
     ]),
     associations: Object.freeze([

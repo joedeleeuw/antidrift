@@ -24,9 +24,9 @@ clusters:
         severity: error
         detector: sameFunctionDistinctStateSettersGte:3
         message: Model one transition instead of scattering updates across setters.
-      - id: react/no-shattered-ingested-entity-state # A transition splits one freshly ingested source object into sibling state cells instead of preserving the entity/resource association. Under-proven; antidrift lint rule is default-off.
+      - id: react/no-shattered-ingested-entity-state # A transition splits one freshly ingested source object into sibling state cells instead of preserving the entity/resource association. Inventory-only; the antidrift rule records candidates and never blocks.
         severity: warn
-        detector: sourceMemberStateShard
+        detector: sourceMemberStateShardCandidate
         message: Keep an ingested entity together unless the split cells are proven editable draft fields.
       - id: react/no-status-triplet-state # data/loading/error triplets are a common async lifecycle smell.
         severity: error

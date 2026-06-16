@@ -699,16 +699,6 @@ export const defaultCases = [
     paths: ["src/frontend/monolithui/src/components/SequenceOps.tsx"],
   },
   {
-    id: "portal-weekly-digest-envelope-split-clean",
-    ruleId: "antidrift/no-shattered-ingested-entity-state",
-    kind: "correct",
-    classification: "inventory-only",
-    subproject: "frontend",
-    typeAware: true,
-    tsconfig: "src/frontend/portal/tsconfig.json",
-    paths: ["src/frontend/portal/pages/reports/weekly-digest.tsx"],
-  },
-  {
     id: "monolith-edit-po-modal-controlled-input-clean",
     ruleId: "antidrift/no-shattered-ingested-entity-state",
     kind: "correct",

@@ -22,7 +22,6 @@ describe("semantic facts", () => {
     ).toEqual([
       "broadSetterCoMutation",
       "resourceLifecycleProof",
-      "sourceMemberStateShard",
       "sourceMemberStateShardCandidate",
       "structuralMatch",
     ]);
@@ -51,7 +50,6 @@ describe("semantic facts", () => {
     ).toEqual([
       "broadSetterCoMutation",
       "resourceLifecycleProof",
-      "sourceMemberStateShard",
       "sourceMemberStateShardCandidate",
       "structuralMatch",
     ]);
@@ -62,7 +60,6 @@ describe("semantic facts", () => {
     ).toEqual([
       "broadSetterCoMutation",
       "resourceLifecycleProof",
-      "sourceMemberStateShard",
       "sourceMemberStateShardCandidate",
     ]);
     expect(
@@ -85,7 +82,6 @@ describe("semantic facts", () => {
       ),
     ).toEqual([
       "resourceLifecycleProof",
-      "sourceMemberStateShard",
       "structuralMatch",
     ]);
     expect(
@@ -94,7 +90,6 @@ describe("semantic facts", () => {
       ),
     ).toEqual([
       "resourceLifecycleProof",
-      "sourceMemberStateShard",
       "structuralMatch",
     ]);
     expect(semanticFactKindContractsForEmission("not-real")).toEqual([]);

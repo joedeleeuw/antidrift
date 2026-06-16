@@ -28,7 +28,6 @@ describe("semantic adapter manifest", () => {
     ).toEqual([
       "broadSetterCoMutation",
       "resourceLifecycleProof",
-      "sourceMemberStateShard",
       "sourceMemberStateShardCandidate",
     ]);
     expect(

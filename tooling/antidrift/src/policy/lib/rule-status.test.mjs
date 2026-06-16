@@ -183,7 +183,6 @@ describe("rule status manifest", () => {
       semanticFactContracts: [
         { factKind: "broadSetterCoMutation" },
         { factKind: "resourceLifecycleProof" },
-        { factKind: "sourceMemberStateShard" },
         { factKind: "sourceMemberStateShardCandidate" },
       ],
     });

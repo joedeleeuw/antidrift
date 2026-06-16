@@ -26,9 +26,9 @@ The behavioral proof is AST plus local scope/control-flow:
 
 This deliberately excludes name-prefix inventory, raw state-cell count, and recombination alone. Those remain research/inventory signals for `react/no-use-state-waterfall`.
 
-The enforcement tier adds TypeChecker ownership proof at the rule layer. After the behavioral source-member fan-out is proven, the rule resolves the awaited source binding's initializer with TypeScript parser services and requires the resulting type to resolve to exactly one accepted owned entity from the domain/generated authority index. Every fanned member must also be present in `typeProps` for that owned type. Only this behavioral plus type-owner intersection emits the blocking `sourceMemberStateShard` fact and diagnostic.
+There is no enforcement tier. An earlier type-owner tier — which resolved the awaited source's type against the domain/generated authority index (the same machinery as `no-structural-type-fork`) and blocked only owned-entity shatters — was removed after multi-repo scans (chaski, sudocode) found zero real human-authored owned-entity shatters; every behavioral hit was a response envelope, value object, or computed result, which the rule correctly leaves alone.
 
-Behavioral source-member fan-out without owned-entity proof is still useful evidence, but it is inventory-only. Those cases emit `sourceMemberStateShardCandidate` and do not block.
+The rule is inventory-only: behavioral source-member fan-out is recorded as `sourceMemberStateShardCandidate` and never blocks. Rebuilding the enforcement tier requires several real owned-entity shatters across more than one repo (likely an agent-generated corpus).
 
 ## False-Positive Boundary
 
@@ -47,9 +47,9 @@ No maintained React, React Hooks, or `typescript-eslint` rule was found that mod
 
 ## Current Evidence
 
-- Drift: Chaski `src/frontend/portal/pages/reports/weekly-digest.tsx` line 81 fetches one report object, then writes `weeklyDigestReports` and `teamOverview` into sibling state cells.
-- Clean: Chaski `src/frontend/monolithui/src/components/EditPOModal.tsx` keeps a controlled input draft cell clean.
-- Type-owner tier: the Chaski weekly-digest source is an unregistered response object, so it stays `sourceMemberStateShardCandidate` inventory rather than an enforcement finding. Blocking coverage grows with the accepted owned entity set.
+- No real-corpus enforcement positive yet: a type-aware scan of 335 portal components found zero owned-entity shatters (the one behavioral candidate was a response-envelope split, correctly not blocked). Owner-confirmed enforcement is exercised only synthetically (RuleTester `User`/`GeneratedRelease` splits).
+- Clean control: Chaski `src/frontend/monolithui/src/components/EditPOModal.tsx` keeps a controlled input draft cell clean.
+- Next: mine a real owned-entity shatter across the available repos before any `off`→`error` flip; blocking coverage grows with the accepted owned-entity set.
 
 ## Validation Plan
 

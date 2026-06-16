@@ -70,7 +70,6 @@ const typeServiceGuardedRules = [
   "no-canonical-model-fork",
   "no-defensive-shape-probing",
   "no-redundant-zod-parse",
-  "no-shattered-ingested-entity-state",
   "no-structural-type-fork",
   "no-underchecked-type-predicate",
   "no-unsafe-deserialize",
@@ -270,12 +269,6 @@ const generatedStructuralOptions = {
   },
 };
 
-const sourceShardDomainOptions = {
-  canonicalEntities: {
-    User: "programs/correct/packages/domain/src/user.ts",
-  },
-};
-
 typedRuleTester.run(
   "no-shattered-ingested-entity-state",
   rule("no-shattered-ingested-entity-state"),
@@ -349,7 +342,6 @@ typedRuleTester.run(
           void UsersPage;
         `,
         filename: "users-page.tsx",
-        options: [sourceShardDomainOptions],
       },
       {
         code: `
@@ -371,75 +363,9 @@ typedRuleTester.run(
           void UserEnvelopePanel;
         `,
         filename: "user-envelope-panel.tsx",
-        options: [sourceShardDomainOptions],
       },
     ],
-    invalid: [
-      {
-        code: `
-          import type { User } from "./programs/correct/packages/domain/src/user";
-          declare function useState<T>(v: T): [T, (v: T) => void];
-          declare function fetchUser(): Promise<User>;
-          function UserCard() {
-            const [id, setId] = useState("");
-            const [displayName, setDisplayName] = useState("");
-            return async function load() {
-              const user = await fetchUser();
-              setId(user.id);
-              setDisplayName(user.displayName);
-            };
-          }
-          void UserCard;
-        `,
-        filename: "user-card.tsx",
-        options: [sourceShardDomainOptions],
-        errors: 1,
-      },
-      {
-        code: `
-          import type { GeneratedRelease } from "./programs/generated/release";
-          declare function useState<T>(v: T): [T, (v: T) => void];
-          declare function fetchProfile(): Promise<GeneratedRelease>;
-          function ProfileCard() {
-            const [id, setId] = useState("");
-            const [name, setName] = useState("");
-            return async function load() {
-              const profile = await fetchProfile();
-              setId(profile.id);
-              setName(profile.version);
-            };
-          }
-          void ProfileCard;
-        `,
-        filename: "profile-card.tsx",
-        options: [generatedStructuralOptions],
-        errors: 1,
-      },
-      {
-        code: `
-          import type { GeneratedRelease } from "./programs/generated/release";
-          declare function useState<T>(v: T): [T, (v: T) => void];
-          declare function useEffect(fn: () => void, deps: unknown[]): void;
-          declare function fetchReport(): Promise<GeneratedRelease>;
-          function ReportPanel() {
-            const [rows, setRows] = useState("");
-            const [summary, setSummary] = useState("");
-            useEffect(() => {
-              async function load() {
-                const report = await fetchReport();
-                setRows(report.id);
-                setSummary(report.version);
-              }
-              void load();
-            }, []);
-          }
-          void ReportPanel;
-        `,
-        filename: "report-panel.tsx",
-        options: [generatedStructuralOptions],
-        errors: 1,
-      },
-    ],
+    invalid: [],
   },
 );
 
@@ -990,54 +916,7 @@ it("downgrades a request-guarded lifecycle to heuristic-inventory with no diagno
   );
 });
 
-it("emits a deterministic source-member shard fact from one awaited entity", async () => {
-  const { facts, result } = await lintSourceShardWithFacts(
-    `
-    import type { GeneratedRelease } from "./programs/generated/release";
-    declare function useState<T>(v: T): [T, (v: T) => void];
-    declare function fetchProfile(): Promise<GeneratedRelease>;
-    function ProfileCard() {
-      const [id, setId] = useState("");
-      const [name, setName] = useState("");
-      return async function load() {
-        const profile = await fetchProfile();
-        setId(profile.id);
-        setName(profile.version);
-      };
-    }
-    void ProfileCard;
-  `,
-    generatedStructuralOptions,
-  );
-
-  expect(result.messages).toHaveLength(1);
-  expect(facts).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        factKind: "sourceMemberStateShard",
-        ruleId: "antidrift/no-shattered-ingested-entity-state",
-        adapterId: "react-state",
-        confidence: "deterministic-enforcement",
-        provenance: expect.arrayContaining([
-          "AST",
-          "control-flow",
-          "scope-binding",
-        ]),
-        payload: expect.objectContaining({
-          source: "profile",
-          owner: { authority: "generated", typeName: "GeneratedRelease" },
-          editableCells: [],
-          members: expect.arrayContaining([
-            { setter: "setId", cell: "id", property: "id" },
-            { setter: "setName", cell: "name", property: "version" },
-          ]),
-        }),
-      }),
-    ]),
-  );
-});
-
-it("keeps unowned source-member shards as candidate facts without diagnostics", async () => {
+it("emits a source-member shard candidate fact (inventory-only, no diagnostic)", async () => {
   const { facts, result } = await lintSourceShardWithFacts(`
     declare function useState<T>(v: T): [T, (v: T) => void];
     declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
@@ -1085,24 +964,6 @@ it("emits semantic facts that satisfy the registered public payload contract", a
     "programs/correct/sibling-payload-setters.ts",
     { threshold: 2 },
   );
-  const sourceShard = await lintSourceShardWithFacts(
-    `
-    import type { GeneratedRelease } from "./programs/generated/release";
-    declare function useState<T>(v: T): [T, (v: T) => void];
-    declare function fetchProfile(): Promise<GeneratedRelease>;
-    function ProfileCard() {
-      const [id, setId] = useState("");
-      const [name, setName] = useState("");
-      return async function load() {
-        const profile = await fetchProfile();
-        setId(profile.id);
-        setName(profile.version);
-      };
-    }
-    void ProfileCard;
-  `,
-    generatedStructuralOptions,
-  );
   const sourceShardCandidate = await lintSourceShardWithFacts(`
     declare function useState<T>(v: T): [T, (v: T) => void];
     declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
@@ -1121,7 +982,6 @@ it("emits semantic facts that satisfy the registered public payload contract", a
     ...structural.facts,
     ...lifecycle.facts,
     ...inventory.facts,
-    ...sourceShard.facts,
     ...sourceShardCandidate.facts,
   ];
 

@@ -64,24 +64,6 @@ semanticFactKinds:
       - requestGuard
       - setterCount
       - cells
-  sourceMemberStateShard:
-    rules:
-      - antidrift/no-shattered-ingested-entity-state
-    adapterId: react-state
-    carrier: semantic-adapter
-    confidence:
-      - deterministic-enforcement
-    emission:
-      - blocking-diagnostic
-    association: React state cells to distinct members of one freshly awaited source object, excluding controlled input draft cells with event-derived edits.
-    noSinkBehavior: The diagnostic still reports; only the serialized source-member shard fact is skipped.
-    payloadFields:
-      - owner
-      - source
-      - members
-      - editableCells
-      - transition
-      - requestGuard
   sourceMemberStateShardCandidate:
     rules:
       - antidrift/no-shattered-ingested-entity-state
@@ -658,11 +640,10 @@ rules:
     referenceDoc: docs/rule-investigations/no-shattered-ingested-entity-state.md
     corpusRepositories: [chaski]
     concerns:
-      - One Chaski drift is pinned, but no independent repo replication exists yet.
-      - The TYPE-OWNER tier blocks only after behavioral source-member fan-out resolves through TypeScript parser services to exactly one accepted domain/generated owned entity and every fanned member is present in that owned type's `typeProps`.
-      - Behavioral fan-out from non-owned response envelopes, pagination records, anonymous view models, or ambiguous owner proof is inventory-only via `sourceMemberStateShardCandidate`; it must not emit the enforcement `sourceMemberStateShard` fact.
-      - Editable draft fields must stay clean when cells are controlled by input value/checked props and event-derived setters.
-      - Pagination, query metadata, response envelopes, and deliberate denormalized view state need real clean controls before this rule can be enabled by default.
+      - This rule is inventory-only — it records behavioral source-member fan-out as `sourceMemberStateShardCandidate` and never reports a diagnostic.
+      - The owned-entity enforcement tier was removed after multi-repo scans (chaski, sudocode) found zero real human-authored owned-entity shatters; every behavioral hit was a response envelope, value object, or computed result, which the rule correctly leaves alone.
+      - Editable draft fields stay clean when cells are controlled by input value/checked props and event-derived setters.
+      - Re-promotion to enforcement requires several real human-authored owned-entity shatters across more than one repo (likely an agent-generated corpus), plus pagination/query-metadata/envelope/denormalized-view-state clean controls.
     external:
       state: net-antidrift
       support: none
@@ -676,7 +657,7 @@ rules:
       allows:
         - "const user = await fetchUser(); setUser(user);"
         - "<input value={name} onChange={(event) => setName(event.currentTarget.value)} />"
-    nextAction: Run the source-member shard candidate/enforcement split over additional real React repo copies, pin pagination/query/view-state clean controls and independent owned-entity drift, then decide whether this remains its own rule or becomes the proven subset of react/no-use-state-waterfall.
+    nextAction: Mine an agent-generated corpus (plus additional real React repos) for genuine owned-entity shatters; only with several cross-repo positives and envelope/pagination/view-state clean controls should the enforcement tier be rebuilt. Until then this stays inventory-only.
   antidrift/no-defensive-shape-probing:
     status: under-proven
     stable: false

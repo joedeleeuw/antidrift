@@ -818,91 +818,30 @@ function sourceShardPayload(proof) {
   };
 }
 
-// Type-owner tier: the behavioral shard only blocks when the awaited source resolves
-// to exactly one accepted owned entity (domain or generated authority) and every
-// fanned member is a property of that owned type. Reuses the same owner machinery as
-// no-structural-type-fork; otherwise the shard stays inventory-only.
-function sourceShardOwnedEntityProof(services, checker, proof, options) {
-  if (!proof.sourceInit) return null;
-  const tsSourceInit = services.esTreeNodeToTSNodeMap.get(proof.sourceInit);
-  if (!tsSourceInit) return null;
-  const sourceType = checker.getTypeAtLocation(tsSourceInit);
-  const canonicalEntities = options.canonicalEntities ?? {};
-  const generatedSources = options.generatedSources ?? {};
-  const resolvesToDomain = resolvesToDomainCanonicalType(
-    sourceType,
-    canonicalEntities,
-  );
-  const resolvesToGenerated = resolvesToGeneratedType(
-    sourceType,
-    generatedSources,
-  );
-  if (Number(resolvesToDomain) + Number(resolvesToGenerated) !== 1) {
-    return null;
-  }
-  const props = typeProps(checker, sourceType);
-  if (!proof.entries.every((entry) => props.has(entry.property))) {
-    return null;
-  }
-  return {
-    authority: resolvesToDomain ? "domain" : "generated",
-    typeName: checker.typeToString(sourceType),
-  };
-}
-
+// Inventory-only: the React-state shard detector records behavioral source-member
+// fan-out (>=2 distinct members of one freshly awaited source written into >=2 sibling
+// cells, after excluding controlled-input draft cells) as a candidate fact. It never
+// reports — the type-owner enforcement tier was removed after multi-repo scans found the
+// owned-entity shatter does not occur in human-written code; revisit with an agent corpus.
 function ruleNoShatteredIngestedEntityState() {
   return {
     meta: {
-      type: "problem",
+      type: "suggestion",
       docs: {
         description:
-          "Disallow splitting one freshly ingested entity object into sibling React state cells unless those cells are proven editable draft fields.",
+          "Record (inventory-only) React transitions that split one freshly ingested source object into sibling state cells.",
       },
       schema: [
         {
           type: "object",
           properties: {
             threshold: { type: "number" },
-            canonicalEntities: {
-              type: "object",
-              additionalProperties: {
-                oneOf: [
-                  { type: "string" },
-                  {
-                    type: "object",
-                    additionalProperties: true,
-                    properties: {
-                      owner: { type: "string" },
-                      exportName: { type: "string" },
-                    },
-                  },
-                ],
-              },
-            },
-            generatedSources: {
-              type: "object",
-              additionalProperties: {
-                type: "object",
-                additionalProperties: true,
-                properties: {
-                  generated: { type: "string" },
-                },
-              },
-            },
           },
           additionalProperties: false,
         },
       ],
     },
     create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-shattered-ingested-entity-state",
-        );
-      }
-      const checker = services.program.getTypeChecker();
       const options = context.options[0] ?? {};
       const threshold = options.threshold ?? 2;
       const tracker = createReactStateTracker({
@@ -914,38 +853,13 @@ function ruleNoShatteredIngestedEntityState() {
           if (frame.setters.size === 0) return;
           const proof = sourceShardProof(frame, { threshold });
           if (!proof.proven) return;
-          const owner = sourceShardOwnedEntityProof(
-            services,
-            checker,
-            proof,
-            options,
-          );
-          if (!owner) {
-            emitSemanticFact(context, proof.node ?? frame.node, {
-              factKind: "sourceMemberStateShardCandidate",
-              ruleId: "antidrift/no-shattered-ingested-entity-state",
-              adapterId: "react-state",
-              confidence: "heuristic-inventory",
-              provenance: ["AST", "scope-binding", "control-flow"],
-              payload: sourceShardPayload(proof),
-            });
-            return;
-          }
           emitSemanticFact(context, proof.node ?? frame.node, {
-            factKind: "sourceMemberStateShard",
+            factKind: "sourceMemberStateShardCandidate",
             ruleId: "antidrift/no-shattered-ingested-entity-state",
             adapterId: "react-state",
-            confidence: "deterministic-enforcement",
-            provenance: ["AST", "scope-binding", "control-flow", "TypeChecker"],
-            payload: {
-              ...sourceShardPayload(proof),
-              owner,
-            },
-          });
-          context.report({
-            node: proof.node ?? frame.node,
-            message:
-              "This transition splits one freshly ingested source object into sibling React state cells. Keep the entity/resource together unless these are editable draft fields.",
+            confidence: "heuristic-inventory",
+            provenance: ["AST", "scope-binding", "control-flow"],
+            payload: sourceShardPayload(proof),
           });
         },
       });
