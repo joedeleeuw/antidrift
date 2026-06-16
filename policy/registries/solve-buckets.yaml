@@ -1,0 +1,104 @@
+# Solve-bucket taxonomy + per-rule triage.
+#
+# A "solve bucket" is the CATEGORY of detection/proof MECHANISM. It is a coarser axis than the
+# `proofBuckets` field in rules.yaml (those — local-ast-source-shape, semantic-source-type-provenance,
+# authority-index-ownership, graph-config-source — are the fine-grained mechanisms WITHIN semantic-ast).
+#
+# This file is labeling/triage ONLY. No systems are built or specced here.
+#   current = the bucket a rule uses today
+#   fit     = whether that bucket actually PROVES the rule (proven | under-proven | inventory-only | approximation)
+#   target  = the bucket the rule would be MOST provable in ("where it should be")
+# When a rule is found unprovable with the tools we have (semantic-ast), set `target` to the correct bucket.
+#
+# Direction (validated by an opus-4-8 architecture review, 2026): the lint/semantic-ast spine is
+# well-composed but SATURATING. Three verified structural walls — per-file, intra-procedural,
+# snapshot-in-time — make the plurality of measured complaints (diff-scope-creep, net-new-bias,
+# silent-fallback) STRUCTURALLY unprovable here; they are change/graph properties, not file snapshots.
+# Plan: EXTEND the fact/registry backbone with change-relative + repo-graph proof spines that emit the
+# SAME semantic facts; do NOT rewrite the lint layer; DELEGATE inter-procedural flow to CodeQL/Semgrep.
+
+schemaVersion: 1
+
+categories:
+  semantic-ast:
+    status: available
+    summary: >-
+      ESLint + scope/control-flow + TypeScript parser services. Per-file, mostly intra-procedural,
+      snapshot-in-time. Our primary (and, today, almost only) static proof mechanism; nearly saturated.
+    subBuckets: [local-ast-source-shape, semantic-source-type-provenance, authority-index-ownership, graph-config-source]
+  agent-ops:
+    status: available
+    summary: >-
+      Runtime hooks intercepting shell/edit/stop (block-dangerous-shell, block-generated-policy-edits,
+      lint-after-edit, require-checks-before-stop). Coarse behavioral enforcement, not a static proof.
+      NOT to be used as the fallback home for change/graph behaviors.
+  diff-relative:
+    status: not-yet-available
+    summary: >-
+      AST-diff vs the git merge-base (tree-diff e.g. GumTree/ChangeDistiller; refactoring detection
+      e.g. RefactoringMiner). Proves change-relative properties the snapshot cannot see. Cheapest first
+      step: run the EXISTING adapters diff-scoped (a proof FILTER over patch hunks), then add change
+      classification ("added a new owner / new entry point"). This is real proof on a diff baseline,
+      NOT a line-count heuristic and NOT an agent-ops hook.
+  dependency-graph:
+    status: not-yet-available
+    summary: >-
+      Whole-repo module graph / architecture conformance (reflexion models, architectural fitness
+      functions over history). Proves layering, cycles, feature-scatter, and — critically — owner
+      DISCOVERY / uniqueness ("a second owner for concept X now exists"), which the per-file
+      authority-index cannot, because it only knows registry-DECLARED owners.
+  dataflow-taint:
+    status: not-yet-available
+    summary: >-
+      Inter-procedural dataflow / taint (IFDS/IDE). Proves value-reaches-sink (injection, secrets,
+      swallowed errors) instead of approximating it with AST patterns. Pragmatic path: DELEGATE to
+      CodeQL/Semgrep and keep antidrift as the policy/fact layer; do not hand-roll an IFDS engine.
+  clone-detection:
+    status: not-yet-available
+    summary: >-
+      Cross-file structural clone / near-duplicate detection (Software Bertillonage; Type-2/Type-3
+      clones; CPG/Joern as a unifying substrate). Proves "this is a copy of an owner elsewhere in the
+      repo" — the top VALIDATED complaint family (duplication, one-owner-fork) that within-file Sonar
+      CPD misses.
+  type-prevention:
+    status: not-yet-available
+    summary: >-
+      Make-illegal-states-unrepresentable (branded/nominal owner types, exhaustive unions). Prevention
+      over detection. GATED ON CONSUMER ADOPTION — antidrift cannot force target repos to adopt nominal
+      owners; `no-cast-to-branded` was retired for exactly this reason. Keep opt-in; do not over-invest.
+
+# Per-rule labeling. current is semantic-ast for every active rule today (we have no other static bucket).
+rules:
+  antidrift/require-authz-check:                    { current: semantic-ast, fit: proven,         target: dataflow-taint, note: "authz-reachability; the graph-config proof works, but reachability is a flow property — taint is the provable ideal." }
+  antidrift/no-sql-string-concat:                   { current: semantic-ast, fit: approximation,  target: dataflow-taint, note: "SQL injection is a taint property; the ~800-line single-file escaper-reachability is a stable hand-rolled approximation of what a flow engine does for free." }
+  antidrift/no-unsafe-deserialize:                  { current: semantic-ast, fit: approximation,  target: dataflow-taint, note: "deserialization safety is input-provenance; taint is the ideal. Stable as an approximation." }
+  antidrift/no-canonical-model-fork:                { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "authority-index whole-program type resolution; correctly placed for DECLARED owners. (Discovering NEW duplicate owners needs dependency-graph — see gaps.net-new-bias.)" }
+  antidrift/no-structural-type-fork:                { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "authority-index; correctly placed for declared owners." }
+  antidrift/no-status-literal-in-type:              { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "authority-index domain-vocabulary." }
+  antidrift/no-appeasement-cast:                    { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "type-escape-hatch; type-provenance." }
+  antidrift/no-redundant-zod-parse:                 { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "validation-boundary; schema-provenance. Stable." }
+  antidrift/no-trivial-selector-wrapper:            { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "inference-appeasement; AST return-shape. Stable." }
+  antidrift/no-inline-structural-type-at-use-site:  { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "type-contract-shape; local AST." }
+  antidrift/no-nullable-positional-tuple:           { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "type-contract-shape; AST + TypeChecker." }
+  antidrift/no-async-array-method:                  { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "promise-control-flow; local AST + collection flow." }
+  antidrift/require-effect-deps:                    { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "react-effect-lifecycle. Stable." }
+  antidrift/no-raw-fetch-in-component:              { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "side-effect-boundary; import-scope + AST. Stable." }
+  antidrift/no-hover-translate-card:                { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "design-system-interaction; local AST." }
+  antidrift/no-raw-tailwind-color:                  { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "design-token-drift; local AST." }
+  antidrift/no-defensive-shape-probing:             { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "broad-value-shape-probing; type-provenance is the right bucket, just not yet proven." }
+  antidrift/no-underchecked-type-predicate:         { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "type-guard-laundering; TypeChecker predicate-coverage is the right bucket, not yet proven." }
+  antidrift/no-handrolled-resource-lifecycle-cells: { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "proof mis-shaped (catches 0/102); fixable in semantic-ast — not a bucket problem." }
+  antidrift/no-shattered-ingested-entity-state:     { current: semantic-ast, fit: inventory-only, target: semantic-ast,   note: "behavior detectable in semantic-ast; enforcement needs owner-config + agent-corpus evidence, not a new bucket." }
+
+# Behaviors the taxonomy reveals we have NO rule for, because the required bucket does not exist yet.
+# (This is the payoff of the labeling: the gap is a missing bucket, not a missing rule.) Measured n
+# from the 2026-06-10 complaint sweep.
+gaps:
+  diff-scope-creep:        { needs: diff-relative,    measured: 60, note: "top measured behavior; snapshot lint structurally cannot see it. Cheapest bridge: existing adapters diff-scoped." }
+  duplication:             { needs: clone-detection,  measured: 31, note: "top VALIDATED family; cross-file structural clone detection; Sonar CPD misses semantic forks." }
+  one-owner-fork:          { needs: clone-detection,  measured: 28, note: "near-duplicate of an existing owner across files." }
+  net-new-bias:            { needs: dependency-graph, measured: 25, note: "authority-index only enforces REGISTRY-DECLARED owners; it cannot catch the agent minting a NEW duplicate owner. Real fix: whole-repo owner-discovery/uniqueness (reflexion) pass." }
+  silent-fallback:         { needs: dataflow-taint,   measured: 24, note: "does a caught error flow to a real sink or nowhere — reachability, not an AST shape. Delegate flow to CodeQL/Semgrep." }
+  feature-scatter:         { needs: dependency-graph, measured: 13, note: "whole-repo architecture model (reflexion / fitness functions over history)." }
+  cross-layer-import:      { needs: dependency-graph,  note: "currently ecosystem-covered (import-x); a real module graph is the provable bucket." }
+  unearned-type-authority: { needs: type-prevention,   note: "detection (no-*-fork) works; prevention is adoption-gated — see categories.type-prevention." }
