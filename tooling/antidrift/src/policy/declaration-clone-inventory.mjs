@@ -7,61 +7,133 @@ import ts from "typescript";
 
 import { MIN_PROPS, isObjectType } from "./lib/type-index.mjs";
 
-const repoCandidates = [
+const selfRepoCandidates = [
   process.env.ANTIDRIFT_REPO,
   process.env.AGENT_GUARDRAILS_REPO,
   process.cwd(),
+].filter(Boolean);
+const chaskiRepoCandidates = [
+  process.env.CHASKI_REPO,
+  "/Users/sushi/code/chaski",
+].filter(Boolean);
+const codebaseAtlasRepoCandidates = [
+  process.env.CODEBASE_ATLAS_REPO,
+  "/Users/sushi/code/codebase-atlas",
+].filter(Boolean);
+const sudocodeRepoCandidates = [
+  process.env.SUDOCODE_REPO,
+  "/Users/sushi/code/sudocode-main",
+].filter(Boolean);
+const opencodeRepoCandidates = [
+  process.env.OPENCODE_REPO,
+  "/Users/sushi/code/opencode",
 ].filter(Boolean);
 
 const corpusPlans = [
   {
     repo: "agent-guardrails-monorepo-template",
     label: "domain",
-    repoCandidates,
+    repoCandidates: selfRepoCandidates,
     tsconfig: "packages/domain/tsconfig.json",
     targets: ["packages/domain/src/**/*.ts"],
   },
   {
     repo: "agent-guardrails-monorepo-template",
     label: "contracts",
-    repoCandidates,
+    repoCandidates: selfRepoCandidates,
     tsconfig: "packages/contracts/tsconfig.json",
     targets: ["packages/contracts/src/**/*.ts"],
   },
   {
     repo: "agent-guardrails-monorepo-template",
     label: "ui",
-    repoCandidates,
+    repoCandidates: selfRepoCandidates,
     tsconfig: "packages/ui/tsconfig.json",
     targets: ["packages/ui/src/**/*.{ts,tsx}"],
   },
   {
     repo: "agent-guardrails-monorepo-template",
     label: "gateways",
-    repoCandidates,
+    repoCandidates: selfRepoCandidates,
     tsconfig: "packages/gateways/tsconfig.json",
     targets: ["packages/gateways/src/**/*.ts"],
   },
   {
     repo: "agent-guardrails-monorepo-template",
     label: "api",
-    repoCandidates,
+    repoCandidates: selfRepoCandidates,
     tsconfig: "packages/api/tsconfig.json",
     targets: ["packages/api/src/**/*.ts"],
   },
   {
     repo: "agent-guardrails-monorepo-template",
     label: "web",
-    repoCandidates,
+    repoCandidates: selfRepoCandidates,
     tsconfig: "apps/web/tsconfig.json",
     targets: ["apps/web/src/**/*.{ts,tsx}", "apps/web/app/**/*.{ts,tsx}"],
   },
   {
     repo: "agent-guardrails-monorepo-template",
     label: "antidrift",
-    repoCandidates,
+    repoCandidates: selfRepoCandidates,
     tsconfig: "tooling/antidrift/tsconfig.json",
     targets: ["tooling/antidrift/src/**/*.{ts,tsx,mts,cts}"],
+  },
+  {
+    repo: "chaski",
+    label: "bff",
+    defaultEnabled: false,
+    repoCandidates: chaskiRepoCandidates,
+    tsconfig: "src/frontend/bff/tsconfig.json",
+    targets: ["src/frontend/bff/**/*.ts"],
+  },
+  {
+    repo: "chaski",
+    label: "monolithui",
+    defaultEnabled: false,
+    repoCandidates: chaskiRepoCandidates,
+    tsconfig: "src/frontend/monolithui/tsconfig.json",
+    targets: ["src/frontend/monolithui/src/**/*.{ts,tsx}"],
+  },
+  {
+    repo: "codebase-atlas",
+    label: "app",
+    defaultEnabled: false,
+    repoCandidates: codebaseAtlasRepoCandidates,
+    tsconfig: "tsconfig.json",
+    targets: ["src/**/*.{ts,tsx}", "tools/**/*.ts"],
+  },
+  {
+    repo: "sudocode-main",
+    label: "cli",
+    defaultEnabled: false,
+    repoCandidates: sudocodeRepoCandidates,
+    tsconfig: "cli/tsconfig.json",
+    targets: ["cli/src/**/*.ts"],
+  },
+  {
+    repo: "sudocode-main",
+    label: "frontend",
+    defaultEnabled: false,
+    repoCandidates: sudocodeRepoCandidates,
+    tsconfig: "frontend/tsconfig.json",
+    targets: ["frontend/src/**/*.{ts,tsx}"],
+  },
+  {
+    repo: "sudocode-main",
+    label: "server",
+    defaultEnabled: false,
+    repoCandidates: sudocodeRepoCandidates,
+    tsconfig: "server/tsconfig.json",
+    targets: ["server/src/**/*.ts"],
+  },
+  {
+    repo: "opencode",
+    label: "ui",
+    defaultEnabled: false,
+    repoCandidates: opencodeRepoCandidates,
+    tsconfig: "packages/ui/tsconfig.json",
+    targets: ["packages/ui/src/**/*.{ts,tsx}"],
   },
 ];
 
@@ -118,13 +190,21 @@ function firstExisting(candidates) {
 }
 
 function selectedPlans(repo, plans) {
-  if (!repo) return plans;
+  if (!repo) return plans.filter((plan) => plan.defaultEnabled !== false);
   const requested = new Set(repo);
   return plans.filter((plan) => requested.has(plan.repo));
 }
 
 function normalizePath(path) {
   return path.replace(/\\/gu, "/");
+}
+
+function sourceKind(path) {
+  return /(^|\/)(?:gen|generated|__generated__)(?:\/|$)|\.generated\./u.test(
+    path,
+  )
+    ? "generated"
+    : "source";
 }
 
 function expandBraces(patterns) {
@@ -301,12 +381,14 @@ function declarationFor(repoRoot, plan, sourceFile, checker, node) {
   if (!isObjectType(declared)) return null;
   const properties = declarationProperties(checker, declared, node);
   if (properties.length < MIN_PROPS) return null;
+  const path = normalizePath(relative(repoRoot, sourceFile.fileName));
   return {
     ...info,
     repo: plan.repo,
     label: plan.label,
     tsconfig: plan.tsconfig,
-    path: normalizePath(relative(repoRoot, sourceFile.fileName)),
+    path,
+    sourceKind: sourceKind(path),
     ...location(sourceFile, node),
     propCount: properties.length,
     fingerprint: fingerprint(properties),
@@ -360,6 +442,12 @@ function groupDeclarations(declarations) {
           left.name.localeCompare(right.name),
       );
       const paths = new Set(sorted.map((entry) => entry.path));
+      const sourceKinds = [
+        ...new Set(sorted.map((entry) => entry.sourceKind)),
+      ].sort((left, right) => left.localeCompare(right));
+      const generatedDeclarationCount = sorted.filter(
+        (entry) => entry.sourceKind === "generated",
+      ).length;
       const [first] = sorted;
       return {
         fingerprint: groupFingerprint,
@@ -367,6 +455,12 @@ function groupDeclarations(declarations) {
         propCount: first.propCount,
         properties: first.properties,
         crossFile: paths.size > 1,
+        sourceKinds,
+        generatedOnly: generatedDeclarationCount === sorted.length,
+        mixedGenerated:
+          generatedDeclarationCount > 0 &&
+          generatedDeclarationCount < sorted.length,
+        generatedDeclarationCount,
         declarations: sorted.map(({ properties: _properties, ...entry }) => entry),
       };
     })
@@ -398,6 +492,16 @@ function globalDeclarations(results) {
     }
   }
   return declarations;
+}
+
+function cloneGroupSourceKindCounts(groups) {
+  return {
+    generatedOnly: groups.filter((group) => group.generatedOnly).length,
+    mixedGenerated: groups.filter((group) => group.mixedGenerated).length,
+    sourceOnly: groups.filter(
+      (group) => !group.generatedOnly && !group.mixedGenerated,
+    ).length,
+  };
 }
 
 function diagnosticSummary(repoRoot, diagnostics) {
@@ -457,6 +561,7 @@ function runPlan(plan, targetsOverride) {
     checkedFiles: matchedSourceFiles.length,
     declarationCount: declarations.length,
     cloneGroupCount: cloneGroups.length,
+    cloneGroupSourceKindCounts: cloneGroupSourceKindCounts(cloneGroups),
     cloneDeclarationCount: cloneGroups.reduce(
       (sum, group) => sum + group.declarations.length,
       0,
@@ -486,6 +591,7 @@ function summarize({ results, slice }) {
       0,
     ),
     cloneGroupCount: cloneGroups.length,
+    cloneGroupSourceKindCounts: cloneGroupSourceKindCounts(cloneGroups),
     cloneDeclarationCount: cloneGroups.reduce(
       (sum, group) => sum + group.declarations.length,
       0,

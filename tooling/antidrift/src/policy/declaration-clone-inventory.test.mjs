@@ -278,4 +278,146 @@ export type ApiUser = {
       expect.objectContaining({ label: "domain", name: "DomainUser" }),
     ]);
   });
+
+  it("classifies generated and source declarations in clone groups", async () => {
+    const root = tempRepo();
+    writeTsconfig(root);
+    writeProgram(
+      root,
+      "src/domain.ts",
+      `
+export interface DomainUser {
+  id: string;
+  email: string;
+  active: boolean;
+  createdAt: Date;
+}
+`,
+    );
+    writeProgram(
+      root,
+      "src/generated/api.ts",
+      `
+export interface ApiUser {
+  id: string;
+  email: string;
+  active: boolean;
+  createdAt: Date;
+}
+`,
+    );
+
+    const result = await declarationCloneInventory({
+      plans: [
+        {
+          repo: "fixture",
+          label: "app",
+          repoCandidates: [root],
+          tsconfig: "tsconfig.json",
+          targets: ["src/**/*.ts"],
+        },
+      ],
+      progress: () => {},
+      report: () => {},
+    });
+
+    expect(result.cloneGroupSourceKindCounts).toEqual({
+      generatedOnly: 0,
+      mixedGenerated: 1,
+      sourceOnly: 0,
+    });
+    expect(result.cloneGroups[0]).toMatchObject({
+      sourceKinds: ["generated", "source"],
+      generatedOnly: false,
+      mixedGenerated: true,
+      generatedDeclarationCount: 1,
+    });
+    expect(result.cloneGroups[0].declarations).toEqual([
+      expect.objectContaining({ name: "DomainUser", sourceKind: "source" }),
+      expect.objectContaining({
+        name: "ApiUser",
+        sourceKind: "generated",
+      }),
+    ]);
+  });
+
+  it("keeps non-default corpus plans opt-in", async () => {
+    const defaultRoot = tempRepo();
+    const fleetRoot = tempRepo();
+    writeTsconfig(defaultRoot);
+    writeTsconfig(fleetRoot);
+    writeProgram(
+      defaultRoot,
+      "src/domain.ts",
+      `
+export interface DefaultUser {
+  id: string;
+  email: string;
+  active: boolean;
+  createdAt: Date;
+}
+`,
+    );
+    writeProgram(
+      fleetRoot,
+      "src/domain.ts",
+      `
+export interface FleetDomainUser {
+  id: string;
+  email: string;
+  active: boolean;
+  createdAt: Date;
+}
+`,
+    );
+    writeProgram(
+      fleetRoot,
+      "src/api.ts",
+      `
+export interface FleetApiUser {
+  id: string;
+  email: string;
+  active: boolean;
+  createdAt: Date;
+}
+`,
+    );
+
+    const plans = [
+      {
+        repo: "default",
+        label: "app",
+        repoCandidates: [defaultRoot],
+        tsconfig: "tsconfig.json",
+        targets: ["src/**/*.ts"],
+      },
+      {
+        repo: "fleet",
+        label: "app",
+        defaultEnabled: false,
+        repoCandidates: [fleetRoot],
+        tsconfig: "tsconfig.json",
+        targets: ["src/**/*.ts"],
+      },
+    ];
+
+    const defaultResult = await declarationCloneInventory({
+      plans,
+      progress: () => {},
+      report: () => {},
+    });
+    const fleetResult = await declarationCloneInventory({
+      repo: ["fleet"],
+      plans,
+      progress: () => {},
+      report: () => {},
+    });
+
+    expect(defaultResult.results).toHaveLength(1);
+    expect(defaultResult.results[0]).toMatchObject({ repo: "default" });
+    expect(defaultResult.cloneGroupCount).toBe(0);
+    expect(fleetResult.results).toHaveLength(1);
+    expect(fleetResult.results[0]).toMatchObject({ repo: "fleet" });
+    expect(fleetResult.cloneGroupCount).toBe(1);
+  });
 });
