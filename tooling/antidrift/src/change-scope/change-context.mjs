@@ -31,13 +31,19 @@ export function mergeBase({ base, head, cwd }) {
  * @returns {Array<{ status: string, operation: string, path: string, oldPath: string | null }>}
  */
 export function changedFilesBetween({ base, head, cwd }) {
-  const raw = gitOrThrow(["diff", "--name-status", "--find-renames", `--diff-filter=${GIT_DIFF_FILTER}`, base, head], cwd);
+  const raw = gitOrThrow(
+    ["diff", "--name-status", "--find-renames", "--ignore-submodules=none", `--diff-filter=${GIT_DIFF_FILTER}`, base, head],
+    cwd,
+  );
   const entries = [];
   for (const line of raw.split("\n")) {
     if (line.trim().length === 0) continue;
     const parts = line.split("\t");
     const letter = parts[0][0];
-    const operation = STATUS_OPERATION[letter] ?? "modify";
+    const operation = STATUS_OPERATION[letter];
+    if (operation === undefined) {
+      throw new Error(`unsupported git status "${parts[0]}" for path ${parts[1] ?? ""} in ${cwd}`);
+    }
     if (letter === "R" || letter === "C") {
       entries.push({ status: parts[0], operation, path: parts[2], oldPath: parts[1] });
     } else {
@@ -54,7 +60,12 @@ export function changedFilesBetween({ base, head, cwd }) {
  */
 function manifestAt({ ref, path, cwd }) {
   const result = spawnSync("git", ["show", `${ref}:${path}`], { cwd, encoding: "utf8", maxBuffer: MAX_GIT_BUFFER });
-  if (result.status !== 0) return null;
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    const stderr = (result.stderr ?? "").trim();
+    if (/does not exist in|but not in/iu.test(stderr)) return null;
+    throw new Error(`git show ${ref}:${path} failed in ${cwd} (status ${result.status}): ${stderr}`);
+  }
   return JSON.parse(result.stdout);
 }
 

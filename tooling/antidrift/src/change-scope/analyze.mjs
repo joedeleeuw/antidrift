@@ -18,8 +18,13 @@ export function globToRegExp(glob) {
   while (index < glob.length) {
     const char = glob[index];
     if (char === "*" && glob[index + 1] === "*") {
-      pattern += ".*";
-      index += glob[index + 2] === "/" ? 3 : 2;
+      if (glob[index + 2] === "/") {
+        pattern += "(?:[^/]+/)*";
+        index += 3;
+      } else {
+        pattern += ".*";
+        index += 2;
+      }
     } else if (char === "*") {
       pattern += "[^/]*";
       index += 1;
@@ -50,7 +55,8 @@ function fileViolations(file, scope) {
         path: candidate,
         detail: `changed path ${candidate} matches a forbidden path`,
       });
-    } else if (!matchesAnyGlob(candidate, scope.allowedPaths)) {
+    }
+    if (!matchesAnyGlob(candidate, scope.allowedPaths)) {
       violations.push({
         type: VIOLATION_TYPES.pathOutOfScope,
         path: candidate,

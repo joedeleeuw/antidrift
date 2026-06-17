@@ -46,6 +46,19 @@ describe("globToRegExp", () => {
     expect(globToRegExp("src/*.ts").test("src/a.ts")).toBe(true);
     expect(globToRegExp("src/*.ts").test("src/a/b.ts")).toBe(false);
   });
+
+  it("treats **/ as zero or more directory segments, not arbitrary characters", () => {
+    const matcher = globToRegExp("src/**/foo.ts");
+    expect(matcher.test("src/foo.ts")).toBe(true);
+    expect(matcher.test("src/a/foo.ts")).toBe(true);
+    expect(matcher.test("src/a/b/foo.ts")).toBe(true);
+    expect(matcher.test("src/afoo.ts")).toBe(false);
+  });
+
+  it("matches dotfiles and gitlink paths", () => {
+    expect(matchesAnyGlob(".gitmodules", ["**"])).toBe(true);
+    expect(matchesAnyGlob("references/beads", ["references/**"])).toBe(true);
+  });
 });
 
 describe("analyzeChangeScope", () => {
@@ -66,6 +79,16 @@ describe("analyzeChangeScope", () => {
       surface({ changedFiles: [changedFile("apps/shop/src/billing/tax.ts")] }),
     );
     expect(result.map((violation) => violation.type)).toContain(VIOLATION_TYPES.forbiddenPath);
+  });
+
+  it("emits forbidden and out-of-scope independently", () => {
+    const result = analyzeChangeScope(
+      contract({ allowedPaths: ["apps/orders/**"], forbiddenPaths: ["apps/billing/**"] }),
+      surface({ changedFiles: [changedFile("apps/billing/secret.ts")] }),
+    );
+    const types = result.map((violation) => violation.type);
+    expect(types).toContain(VIOLATION_TYPES.forbiddenPath);
+    expect(types).toContain(VIOLATION_TYPES.pathOutOfScope);
   });
 
   it("considers the old path of a rename for scope", () => {

@@ -99,12 +99,66 @@ function validateDependencyFields(scope, problems) {
   }
 }
 
+function validateExports(scope, problems) {
+  if (scope.allowedExports === undefined) return;
+  if (!Array.isArray(scope.allowedExports)) {
+    problems.push("scope.allowedExports must be an array");
+    return;
+  }
+  for (const entry of scope.allowedExports) {
+    if (!isObject(entry) || typeof entry.file !== "string" || typeof entry.name !== "string") {
+      problems.push("scope.allowedExports entries must be objects with string file and name");
+    }
+  }
+}
+
+function validateEntrypoints(scope, problems) {
+  if (scope.allowedEntrypoints === undefined) return;
+  if (!isStringArray(scope.allowedEntrypoints)) {
+    problems.push("scope.allowedEntrypoints must be an array of strings");
+    return;
+  }
+  for (const path of scope.allowedEntrypoints) checkPath(path, "scope.allowedEntrypoints", problems);
+}
+
+function validateOwnerSymbols(scope, problems) {
+  if (scope.allowedOwnerSymbols !== undefined && !isStringArray(scope.allowedOwnerSymbols)) {
+    problems.push("scope.allowedOwnerSymbols must be an array of strings");
+  }
+}
+
+function validateModuleRadius(scope, problems) {
+  const radius = scope.maxTouchedModuleRadius;
+  if (radius !== undefined && (typeof radius !== "number" || !Number.isInteger(radius) || radius < 0)) {
+    problems.push("scope.maxTouchedModuleRadius must be a non-negative integer");
+  }
+}
+
 function validateScope(scope, refactorApproved, problems) {
   validateUnknownScopeKeys(scope, problems);
   validateAllowedPaths(scope, refactorApproved, problems);
   validateForbiddenPaths(scope, problems);
   validateChangeTypes(scope, problems);
   validateDependencyFields(scope, problems);
+  validateExports(scope, problems);
+  validateEntrypoints(scope, problems);
+  validateOwnerSymbols(scope, problems);
+  validateModuleRadius(scope, problems);
+}
+
+function validateRefactor(raw, problems) {
+  const refactor = isObject(raw.refactor) ? raw.refactor : {};
+  if (refactor.approved !== undefined && typeof refactor.approved !== "boolean") {
+    problems.push("refactor.approved must be a boolean");
+  }
+  if (refactor.justification !== undefined && typeof refactor.justification !== "string") {
+    problems.push("refactor.justification must be a string");
+  }
+  const approved = refactor.approved === true;
+  if (approved && (typeof refactor.justification !== "string" || refactor.justification.trim().length === 0)) {
+    problems.push("refactor.approved: true requires a non-empty refactor.justification");
+  }
+  return { approved, justification: typeof refactor.justification === "string" ? refactor.justification : "" };
 }
 
 /**
@@ -124,11 +178,7 @@ export function validateContract(raw) {
     problems.push("contractId must be a non-empty string");
   }
 
-  const refactor = isObject(raw.refactor) ? raw.refactor : {};
-  if (refactor.approved !== undefined && typeof refactor.approved !== "boolean") {
-    problems.push("refactor.approved must be a boolean");
-  }
-  const refactorApproved = refactor.approved === true;
+  const { approved: refactorApproved, justification } = validateRefactor(raw, problems);
 
   if (isObject(raw.scope)) {
     validateScope(raw.scope, refactorApproved, problems);
@@ -142,14 +192,17 @@ export function validateContract(raw) {
   return Object.freeze({
     schemaVersion: 1,
     contractId: raw.contractId.trim(),
+    task: raw.task ?? null,
+    authorship: raw.authorship ?? null,
     scope: Object.freeze({
+      ...scope,
       allowedPaths: frozenStringArray(scope.allowedPaths),
       forbiddenPaths: frozenStringArray(scope.forbiddenPaths),
       allowedChangeTypes: frozenStringArray(scope.allowedChangeTypes),
       allowedRuntimeDependencies: frozenStringArray(scope.allowedRuntimeDependencies),
       allowedDevDependencies: frozenStringArray(scope.allowedDevDependencies),
     }),
-    refactor: Object.freeze({ approved: refactorApproved }),
+    refactor: Object.freeze({ approved: refactorApproved, justification }),
   });
 }
 

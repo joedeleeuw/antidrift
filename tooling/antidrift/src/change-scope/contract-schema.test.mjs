@@ -51,9 +51,28 @@ describe("validateContract", () => {
     expect(() => validateContract(rawContract({ scope: { allowedPaths: ["**"] } }))).toThrow(/broad glob/u);
   });
 
-  it("accepts a broad glob when refactor.approved is true", () => {
-    const contract = validateContract(rawContract({ scope: { allowedPaths: ["**"] }, refactor: { approved: true } }));
+  it("accepts a broad glob when refactor.approved has a justification", () => {
+    const contract = validateContract(
+      rawContract({ scope: { allowedPaths: ["**"] }, refactor: { approved: true, justification: "repo-wide format sweep" } }),
+    );
     expect(contract.refactor.approved).toBe(true);
+    expect(contract.refactor.justification).toBe("repo-wide format sweep");
+  });
+
+  it("rejects refactor.approved without a justification", () => {
+    expect(() => validateContract(rawContract({ scope: { allowedPaths: ["**"] }, refactor: { approved: true } }))).toThrow(/justification/u);
+  });
+
+  it("rejects a malformed allowedExports entry", () => {
+    expect(() => validateContract(rawContract({ scope: { allowedPaths: [NARROW_GLOB], allowedExports: [{ file: "a.ts" }] } }))).toThrow(/allowedExports/u);
+  });
+
+  it("preserves declared-but-unenforced scope fields", () => {
+    const contract = validateContract(
+      rawContract({ scope: { allowedPaths: [NARROW_GLOB], allowedEntrypoints: ["apps/shop/page.tsx"], allowedExports: [{ file: "a.ts", name: "f" }] } }),
+    );
+    expect(contract.scope.allowedEntrypoints).toEqual(["apps/shop/page.tsx"]);
+    expect(contract.scope.allowedExports).toEqual([{ file: "a.ts", name: "f" }]);
   });
 
   it("rejects an unknown top-level key", () => {
