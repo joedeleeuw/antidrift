@@ -19,6 +19,9 @@ function run(cmd, args, cwd) {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    timeout: 300_000,
+    killSignal: "SIGKILL",
+    maxBuffer: 64 * 1024 * 1024,
   });
 }
 
@@ -881,7 +884,7 @@ try {
   );
 
   console.log("3/7  installing the tarball into the consumer ...");
-  run("pnpm", ["install", "--config.confirmModulesPurge=false"], work);
+  run("pnpm", ["install", "--prefer-offline", "--config.confirmModulesPurge=false"], work);
 
   console.log("4/7  linting consumer files through the shipped config ...");
   const semanticFactFile = join(work, "semantic-facts.jsonl");

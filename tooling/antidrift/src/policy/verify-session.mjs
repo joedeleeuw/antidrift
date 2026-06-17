@@ -15,8 +15,13 @@ export function verifySession() {
     ["pnpm", ["test"]],
   ];
 
+  const STEP_TIMEOUT_MS = 360_000;
   for (const [command, args] of commands) {
-    const result = spawnSync(command, args, { stdio: "inherit" });
+    const result = spawnSync(command, args, { stdio: "inherit", timeout: STEP_TIMEOUT_MS, killSignal: "SIGKILL" });
+    if (result.error?.code === "ETIMEDOUT") {
+      console.error(`Required verification timed out after ${STEP_TIMEOUT_MS / 60_000}m: ${command} ${args.join(" ")}`);
+      process.exit(1);
+    }
     if (result.status !== 0) {
       console.error(`Required verification failed: ${command} ${args.join(" ")}`);
       process.exit(result.status ?? 1);
