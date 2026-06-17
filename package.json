@@ -33,6 +33,7 @@
     "policy:inventory-react-state": "antidrift inventory-react-state --slice react-state-chaski --output reports/react-state-inventory.json",
     "policy:inventory-schema-roundtrip": "antidrift inventory-schema-roundtrip --slice same-schema-recertification-research --output reports/schema-roundtrip-inventory.json",
     "policy:inventory-underchecked-predicate": "NODE_OPTIONS=--max-old-space-size=8192 antidrift inventory-underchecked-predicate --slice underchecked-predicate-promotion --output reports/underchecked-predicate-inventory.json",
+    "policy:inventory-change-contract": "antidrift change-contract",
     "policy:repo-corpus": "antidrift repo-corpus",
     "policy:validate-chaski": "antidrift chaski-corpus --slice chaski-local",
     "policy:check:changed": "antidrift check-changed",

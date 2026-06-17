@@ -7,6 +7,7 @@ export function verifySession() {
     ["pnpm", ["policy:check-generated"]],
     ["pnpm", ["policy:check-registries"]],
     ["pnpm", ["policy:check-rule-surface"]],
+    ["pnpm", ["policy:inventory-change-contract"]],
     ["pnpm", ["policy:validate-corpus"]],
     ["pnpm", ["policy:validate-external-corpus"]],
     ["pnpm", ["package:verify"]],

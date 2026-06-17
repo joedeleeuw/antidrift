@@ -6,7 +6,11 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { VIOLATION_TYPES } from "./analyze.mjs";
-import { CHANGE_CONTRACT_CLAIM, runChangeContract } from "./change-contract.mjs";
+import {
+  CHANGE_CONTRACT_CLAIM,
+  parseArgs,
+  runChangeContract,
+} from "./change-contract.mjs";
 
 const BASE = "HEAD~1";
 const HEAD = "HEAD";
@@ -89,5 +93,23 @@ describe("runChangeContract", () => {
     ]);
     const result = runChangeContract({ contractPath: CONTRACT_PATH, base: BASE, head: HEAD, cwd: dir });
     expect(result.violations).toEqual([]);
+  });
+});
+
+describe("change-contract CLI", () => {
+  it("parses flags with inventory defaults", () => {
+    const parsed = parseArgs(["--contract", "c.yaml", "--base", "main", "--require-contract"]);
+    expect(parsed.contractPath).toBe("c.yaml");
+    expect(parsed.base).toBe("main");
+    expect(parsed.requireContract).toBe(true);
+    expect(parsed.head).toBe("HEAD");
+    expect(parsed.mode).toBe("inventory");
+  });
+
+  it("requires a base ref when a contract is present", () => {
+    writeContract(["schemaVersion: 1", "contractId: B-1", "scope:", "  allowedPaths:", "    - apps/**"]);
+    expect(() => runChangeContract({ contractPath: CONTRACT_PATH, base: null, head: HEAD, cwd: dir })).toThrow(
+      /base ref is required/u,
+    );
   });
 });
