@@ -1353,6 +1353,12 @@ researchCandidates:
     solveType: type-boundary-coercion
     referenceDoc: docs/rule-family-type-contract-authority.md
     nextAction: Use policy:inventory-non-edge-type-coercion to gather real test and production examples where agents repair type uncertainty away from data edges; keep edge decoders, config/env/query parsing, and generated-registry loading clean. Use agent-ops only if the proof depends on diff intent or review provenance rather than source/type semantics.
+  inventory/declaration-clone:
+    status: research
+    signal: TypeChecker declared-member fingerprint inventory
+    solveType: declaration-clone-spine
+    referenceDoc: docs/specs/ruleset-buildout-plan.md
+    nextAction: Keep inventory-only; use policy:inventory-declaration-clone to gather duplicate object contract evidence before any promoted rule or lint enforcement.
 
 decisionLocks:
   antidrift/no-cycle:

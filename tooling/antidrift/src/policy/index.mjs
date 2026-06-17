@@ -33,6 +33,7 @@ export { checkGenerated } from "./check-generated-policy-artifacts.mjs";
 export { checkChanged } from "./check-changed.mjs";
 export { checkRegistries } from "./check-registries.mjs";
 export { checkRuleSurface } from "./check-rule-surface.mjs";
+export { declarationCloneInventory } from "./declaration-clone-inventory.mjs";
 export { defensiveShapeInventory } from "./defensive-shape-inventory.mjs";
 export { repoCorpus } from "./repo-corpus.mjs";
 export { chaskiCorpus } from "./chaski-corpus.mjs";

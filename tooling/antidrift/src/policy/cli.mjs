@@ -8,6 +8,10 @@ import { checkGenerated } from "./check-generated-policy-artifacts.mjs";
 import { checkRegistries } from "./check-registries.mjs";
 import { checkRuleSurface } from "./check-rule-surface.mjs";
 import {
+  declarationCloneInventory,
+  parseArgs as parseDeclarationCloneInventoryArgs,
+} from "./declaration-clone-inventory.mjs";
+import {
   defensiveShapeInventory,
   parseArgs as parseDefensiveShapeInventoryArgs,
 } from "./defensive-shape-inventory.mjs";
@@ -208,6 +212,8 @@ const commands = {
     sqlBroadInventory(parseSqlBroadInventoryArgs(args)),
   "inventory-defensive-shape": () =>
     defensiveShapeInventory(parseDefensiveShapeInventoryArgs(args)),
+  "inventory-declaration-clone": () =>
+    declarationCloneInventory(parseDeclarationCloneInventoryArgs(args)),
   "inventory-react-state": () =>
     reactStateInventory(parseReactStateInventoryArgs(args)),
   "inventory-schema-roundtrip": () =>

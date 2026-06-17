@@ -300,6 +300,9 @@ export function checkRuleSurface(options?: PolicyCommandOptions): unknown;
 export function defensiveShapeInventory(
   options?: PolicyCommandOptions,
 ): Promise<unknown>;
+export function declarationCloneInventory(
+  options?: PolicyCommandOptions,
+): Promise<unknown>;
 export function repoCorpus(options?: PolicyCommandOptions): Promise<unknown>;
 export function chaskiCorpus(options?: PolicyCommandOptions): Promise<unknown>;
 export function externalCorpus(
