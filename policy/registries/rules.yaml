@@ -1357,8 +1357,8 @@ researchCandidates:
     status: research
     signal: TypeChecker declared-member fingerprint inventory
     solveType: declaration-clone-spine
-    referenceDoc: docs/specs/ruleset-buildout-plan.md
-    nextAction: Keep inventory-only; use policy:inventory-declaration-clone to gather duplicate object contract evidence before any promoted rule or lint enforcement.
+    referenceDoc: docs/rule-investigations/declaration-clone-inventory.md
+    nextAction: Keep inventory-only; use policy:inventory-declaration-clone-source-fleet to gather duplicate object contract evidence and classify generated-only, mixed generated/source, and source-only groups before any promoted rule or lint enforcement.
 
 decisionLocks:
   antidrift/no-cycle:
