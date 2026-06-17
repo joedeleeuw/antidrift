@@ -1,0 +1,112 @@
+import { spawnSync } from "node:child_process";
+
+const MAX_GIT_BUFFER = 64 * 1024 * 1024;
+const GIT_DIFF_FILTER = "ACDMRTUXB";
+const RUNTIME_DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies"];
+const STATUS_OPERATION = Object.freeze({ A: "add", M: "modify", D: "delete", R: "rename", C: "rename", T: "modify" });
+
+/**
+ * Run git and fail loudly on any error. Never returns a partial result on failure.
+ * @param {string[]} args
+ * @param {string} cwd
+ */
+export function gitOrThrow(args, cwd) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: MAX_GIT_BUFFER });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`);
+  }
+  return result.stdout;
+}
+
+/** @param {{ base: string, head: string, cwd: string }} params */
+export function mergeBase({ base, head, cwd }) {
+  const output = gitOrThrow(["merge-base", base, head], cwd).trim();
+  if (output.length === 0) throw new Error(`no merge-base between ${base} and ${head} in ${cwd}`);
+  return output;
+}
+
+/**
+ * @param {{ base: string, head: string, cwd: string }} params
+ * @returns {Array<{ status: string, operation: string, path: string, oldPath: string | null }>}
+ */
+export function changedFilesBetween({ base, head, cwd }) {
+  const raw = gitOrThrow(["diff", "--name-status", "--find-renames", `--diff-filter=${GIT_DIFF_FILTER}`, base, head], cwd);
+  const entries = [];
+  for (const line of raw.split("\n")) {
+    if (line.trim().length === 0) continue;
+    const parts = line.split("\t");
+    const letter = parts[0][0];
+    const operation = STATUS_OPERATION[letter] ?? "modify";
+    if (letter === "R" || letter === "C") {
+      entries.push({ status: parts[0], operation, path: parts[2], oldPath: parts[1] });
+    } else {
+      entries.push({ status: parts[0], operation, path: parts[1], oldPath: null });
+    }
+  }
+  return entries;
+}
+
+/**
+ * Read and parse a JSON manifest at a git ref. Returns null when the file is absent at that ref
+ * (an added or deleted manifest); throws loudly when the manifest is present but unparseable.
+ * @param {{ ref: string, path: string, cwd: string }} params
+ */
+function manifestAt({ ref, path, cwd }) {
+  const result = spawnSync("git", ["show", `${ref}:${path}`], { cwd, encoding: "utf8", maxBuffer: MAX_GIT_BUFFER });
+  if (result.status !== 0) return null;
+  return JSON.parse(result.stdout);
+}
+
+function dependencyNames(manifest, fields) {
+  const names = new Set();
+  if (manifest === null) return names;
+  for (const field of fields) {
+    const block = manifest[field];
+    if (block && typeof block === "object") {
+      for (const name of Object.keys(block)) names.add(name);
+    }
+  }
+  return names;
+}
+
+function addedNames(before, after, fields) {
+  const beforeNames = dependencyNames(before, fields);
+  const added = [];
+  for (const name of dependencyNames(after, fields)) {
+    if (!beforeNames.has(name)) added.push(name);
+  }
+  return added;
+}
+
+/** @param {{ base: string, head: string, cwd: string, changedFiles: Array<{ path: string }> }} params */
+export function addedDependencies({ base, head, cwd, changedFiles }) {
+  const manifests = changedFiles
+    .map((file) => file.path)
+    .filter((path) => path === "package.json" || path.endsWith("/package.json"));
+  const runtime = new Set();
+  const dev = new Set();
+  for (const manifestPath of manifests) {
+    const before = manifestAt({ ref: base, path: manifestPath, cwd });
+    const after = manifestAt({ ref: head, path: manifestPath, cwd });
+    for (const name of addedNames(before, after, RUNTIME_DEPENDENCY_FIELDS)) runtime.add(name);
+    for (const name of addedNames(before, after, ["devDependencies"])) dev.add(name);
+  }
+  return { runtime: [...runtime], dev: [...dev] };
+}
+
+/**
+ * Collect the deterministic change surface between a base ref and head, diffed from their merge-base.
+ * @param {{ base: string, head: string, cwd: string }} params
+ */
+export function collectChangeSurface({ base, head, cwd }) {
+  const mergeBaseRef = mergeBase({ base, head, cwd });
+  const changedFiles = changedFilesBetween({ base: mergeBaseRef, head, cwd });
+  const { runtime, dev } = addedDependencies({ base: mergeBaseRef, head, cwd, changedFiles });
+  return {
+    mergeBase: mergeBaseRef,
+    changedFiles,
+    addedRuntimeDependencies: runtime,
+    addedDevDependencies: dev,
+  };
+}
