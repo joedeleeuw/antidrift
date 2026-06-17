@@ -287,6 +287,9 @@ export function validateContract(raw) {
         scope.allowedRuntimeDependencies,
       ),
       allowedDevDependencies: frozenStringArray(scope.allowedDevDependencies),
+      allowedEntrypoints: frozenStringArray(scope.allowedEntrypoints),
+      allowedOwnerSymbols: frozenStringArray(scope.allowedOwnerSymbols),
+      maxTouchedModuleRadius: scope.maxTouchedModuleRadius ?? null,
     }),
     refactor: Object.freeze({ approved: refactorApproved, justification }),
   });

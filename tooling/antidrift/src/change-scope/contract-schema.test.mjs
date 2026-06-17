@@ -121,10 +121,14 @@ describe("validateContract", () => {
           allowedPaths: [NARROW_GLOB],
           allowedEntrypoints: ["apps/shop/page.tsx"],
           allowedExports: [{ file: "a.ts", name: "f", kind: "value" }],
+          allowedOwnerSymbols: ["GeneratedUser"],
+          maxTouchedModuleRadius: 1,
         },
       }),
     );
     expect(contract.scope.allowedEntrypoints).toEqual(["apps/shop/page.tsx"]);
+    expect(contract.scope.allowedOwnerSymbols).toEqual(["GeneratedUser"]);
+    expect(contract.scope.maxTouchedModuleRadius).toBe(1);
     expect(contract.scope.allowedExports).toEqual([
       { file: "a.ts", name: "f", kind: "value" },
     ]);

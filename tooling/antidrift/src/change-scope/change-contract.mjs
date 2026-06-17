@@ -4,6 +4,7 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { analyzeChangeScope } from "./analyze.mjs";
 import { collectChangeSurface } from "./change-context.mjs";
 import { parseContract } from "./contract-schema.mjs";
+import { collectTouchedModuleGraph } from "./module-graph.mjs";
 import {
   semanticFact,
   semanticFactToJsonLine,
@@ -51,16 +52,41 @@ function contractStateFor(contractRelativePath, changedFiles) {
   return match.operation === "add" ? "new-in-diff" : "modified-in-diff";
 }
 
+function moduleGraphConfigured(scope) {
+  return (
+    scope.allowedEntrypoints.length > 0 ||
+    typeof scope.maxTouchedModuleRadius === "number"
+  );
+}
+
+function touchedModuleGraphFor({ contract, surface, cwd, head, tsconfig }) {
+  if (!moduleGraphConfigured(contract.scope)) return null;
+  if (contract.scope.allowedEntrypoints.length === 0) {
+    throw new Error(
+      "change-contract: scope.allowedEntrypoints is required when scope.maxTouchedModuleRadius is configured",
+    );
+  }
+  return collectTouchedModuleGraph({
+    cwd,
+    head,
+    tsconfig,
+    changedFiles: surface.changedFiles,
+    allowedEntrypoints: contract.scope.allowedEntrypoints,
+    maxTouchedModuleRadius: contract.scope.maxTouchedModuleRadius,
+  });
+}
+
 /**
  * Inventory-only (v0): never blocks. A missing contract is not a failure; an invalid contract throws
  * loudly (ContractValidationError). Violations are reported, not enforced.
- * @param {{ contractPath: string, base: string, head: string, cwd: string, requireContract?: boolean }} params
+ * @param {{ contractPath: string, base: string, head: string, cwd: string, tsconfig?: string | null, requireContract?: boolean }} params
  */
 export function runChangeContract({
   contractPath,
   base,
   head,
   cwd,
+  tsconfig = null,
   requireContract = false,
 }) {
   const resolvedContract = isAbsolute(contractPath)
@@ -95,6 +121,13 @@ export function runChangeContract({
     surface.changedFiles,
   );
   const violations = analyzeChangeScope(contract, surface);
+  const touchedModuleGraph = touchedModuleGraphFor({
+    contract,
+    surface,
+    cwd,
+    head,
+    tsconfig,
+  });
 
   return {
     contractState,
@@ -108,6 +141,7 @@ export function runChangeContract({
       removedExports: surface.removedExports,
       addedRuntimeDependencies: surface.addedRuntimeDependencies,
       addedDevDependencies: surface.addedDevDependencies,
+      touchedModuleGraph,
     },
     violations,
     decision: "inventory",
@@ -118,6 +152,7 @@ const CHANGE_CONTRACT_VALUE_FLAGS = Object.freeze({
   "--contract": "contractPath",
   "--base": "base",
   "--head": "head",
+  "--tsconfig": "tsconfig",
   "--output": "output",
   "--facts-out": "factsOut",
   "--mode": "mode",
@@ -131,6 +166,7 @@ export function parseArgs(argv) {
     base: process.env.ANTIDRIFT_BASE_REF ?? null,
     head: "HEAD",
     cwd: process.cwd(),
+    tsconfig: null,
     output: null,
     factsOut: null,
     requireContract: false,
@@ -175,6 +211,7 @@ export function changeContractCommand(argv) {
     base: parsed.base,
     head: parsed.head,
     cwd: parsed.cwd,
+    tsconfig: parsed.tsconfig,
     requireContract: parsed.requireContract,
   });
   if (parsed.output) {

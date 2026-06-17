@@ -1,4 +1,4 @@
-<!-- Authored by codex gpt-5.5/xhigh against the repo (solve-buckets, semantic-facts, cli, check-registries, git plumbing) + the additional-approaches discussion. The implementation target for the change-contract spine. v0 inventory, TS export extraction, and diff-scoped adapter inventory are implemented; enforcement remains gated on real evidence. -->
+<!-- Authored by codex gpt-5.5/xhigh against the repo (solve-buckets, semantic-facts, cli, check-registries, git plumbing) + the additional-approaches discussion. The implementation target for the change-contract spine. v0 inventory, TS export extraction, diff-scoped adapter inventory, and module graph radius inventory are implemented; enforcement remains gated on real evidence. -->
 
 **SPEC: Change-Contract Conformance Spine**
 Grounding: this is the deterministic core already described in [additional-approaches-discussion.md](/Users/sushi/code/agent-guardrails-monorepo-template/docs/research/additional-approaches-discussion.md:9): prove “the diff exceeded the declared scope contract,” not intent. It belongs in the missing change-relative seam called out in [solve-bucket-architecture-review.md](/Users/sushi/code/agent-guardrails-monorepo-template/docs/solve-bucket-architecture-review.md:29), targets the n=60 `diff-scope-creep` gap in [solve-buckets.yaml](/Users/sushi/code/agent-guardrails-monorepo-template/policy/registries/solve-buckets.yaml:97), and must emit the existing `semanticFact` shape from [semantic-facts.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/lib/semantic-facts.mjs:189).
@@ -139,5 +139,5 @@ LLM may draft or critique the contract. LLM may not decide conformance, widen sc
 6. Add `policy:inventory-change-contract` to verify-session, non-blocking on no-contract and violations.
 7. Land TS Program before/after export extraction.
 8. Land diff-scoped existing-adapter inventory.
-9. Next PR: module graph radius inventory.
+9. Land module graph radius inventory.
 10. Only after multi-repo evidence: add `deterministic-enforcement` and `blocking-diagnostic` to the fact contract, plus `--mode enforce`.

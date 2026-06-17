@@ -42,6 +42,15 @@ beforeAll(() => {
   mkdirSync(join(dir, "apps/orders"), { recursive: true });
   writeFileSync(join(dir, "apps/orders/format.ts"), "export const f = 1;\n");
   writeJson("package.json", { name: "x", dependencies: { left: "1.0.0" } });
+  writeJson("tsconfig.json", {
+    compilerOptions: {
+      module: "ESNext",
+      moduleResolution: "Bundler",
+      target: "ES2022",
+      strict: true,
+    },
+    include: ["apps/**/*.ts"],
+  });
   runGit(["add", "."]);
   runGit(["commit", "-q", "-m", "base"]);
 
@@ -133,6 +142,43 @@ describe("runChangeContract", () => {
     });
     expect(result.violations).toEqual([]);
   });
+
+  it("records module graph radius inventory when the contract declares an entrypoint", () => {
+    writeContract([
+      "schemaVersion: 1",
+      "contractId: ORDERS-3",
+      "scope:",
+      "  allowedPaths:",
+      "    - apps/**",
+      "    - package.json",
+      "  allowedEntrypoints:",
+      "    - apps/orders/format.ts",
+      "  maxTouchedModuleRadius: 0",
+    ]);
+    const result = runChangeContract({
+      contractPath: CONTRACT_PATH,
+      base: BASE,
+      head: HEAD,
+      cwd: dir,
+      tsconfig: "tsconfig.json",
+    });
+    const graph = result.actualChangeSurface.touchedModuleGraph;
+    expect(graph.entrypoints).toEqual(["apps/orders/format.ts"]);
+    expect(
+      Object.fromEntries(
+        graph.touchedFiles.map((file) => [file.path, file.distance]),
+      ),
+    ).toEqual({
+      "apps/billing/tax.ts": null,
+      "apps/orders/format.ts": 0,
+    });
+    expect(graph.outOfRadius).toEqual([
+      expect.objectContaining({
+        path: "apps/billing/tax.ts",
+        reason: "unreachable-from-entrypoint",
+      }),
+    ]);
+  });
 });
 
 describe("change-contract CLI", () => {
@@ -142,10 +188,13 @@ describe("change-contract CLI", () => {
       "c.yaml",
       "--base",
       "main",
+      "--tsconfig",
+      "tsconfig.json",
       "--require-contract",
     ]);
     expect(parsed.contractPath).toBe("c.yaml");
     expect(parsed.base).toBe("main");
+    expect(parsed.tsconfig).toBe("tsconfig.json");
     expect(parsed.requireContract).toBe(true);
     expect(parsed.head).toBe("HEAD");
     expect(parsed.mode).toBe("inventory");
