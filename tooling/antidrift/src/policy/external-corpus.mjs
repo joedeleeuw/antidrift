@@ -727,7 +727,7 @@ const murderboxCases = [
     expectedFindings: [
       {
         path: "apps/client/src/components/chat/message-list.tsx",
-        line: 193,
+        line: 192,
       },
     ],
   },
