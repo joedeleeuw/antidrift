@@ -985,8 +985,11 @@ it("emits semantic facts that satisfy the registered public payload contract", a
     ...sourceShardCandidate.facts,
   ];
 
+  const pluginEmittedKinds = Object.entries(semanticFactKinds)
+    .filter(([, contract]) => (contract.rules?.length ?? 0) > 0)
+    .map(([kind]) => kind);
   expect(facts.map((fact) => fact.factKind)).toEqual(
-    expect.arrayContaining(Object.keys(semanticFactKinds)),
+    expect.arrayContaining(pluginEmittedKinds),
   );
   for (const fact of facts) {
     expectFactMatchesRegistry(fact);

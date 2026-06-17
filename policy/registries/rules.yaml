@@ -101,6 +101,25 @@ semanticFactKinds:
       - localType
       - ownerType
       - structuralMatch
+  changeContractConformance:
+    rules: []
+    commandIds:
+      - antidrift/change-contract
+    adapterId: change-contract
+    carrier: change-relative
+    confidence:
+      - deterministic-inventory
+    emission:
+      - inventory-only
+    association: Merge-base diff surface to a machine-readable change contract.
+    noSinkBehavior: The CLI still prints the conformance summary; only the serialized semantic fact is skipped.
+    payloadFields:
+      - contractState
+      - changeContext
+      - declaredScope
+      - actualChangeSurface
+      - violations
+      - decision
 
 statuses:
   ready: Implemented, enabled, and backed by at least one real drift and clean assertion under the current local gate.

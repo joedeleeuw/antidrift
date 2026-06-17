@@ -193,18 +193,21 @@ function replaceYamlSectionField(text, sectionName, fieldName, value) {
 function semanticFactKindSections() {
   const entries = Object.entries(SEMANTIC_FACT_KINDS)
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(
-      ([factKind, contract]) => `  ${factKind}:
+    .map(([factKind, contract]) => {
+      const commandIdsLine = contract.commandIds
+        ? `    commandIds: ${yamlFlowStrings(contract.commandIds)}\n`
+        : "";
+      return `  ${factKind}:
     rules: ${yamlFlowStrings(contract.rules)}
-    adapterId: ${contract.adapterId}
+${commandIdsLine}    adapterId: ${contract.adapterId}
     carrier: ${contract.carrier}
     confidence: ${yamlFlowStrings(contract.confidence)}
     emission: ${yamlFlowStrings(contract.emission)}
     association: ${JSON.stringify(contract.association)}
     noSinkBehavior: ${JSON.stringify(contract.noSinkBehavior)}
     payloadFields: ${yamlFlowStrings(contract.payloadFields)}
-`,
-    )
+`;
+    })
     .join("");
 
   return `semanticFactKinds:

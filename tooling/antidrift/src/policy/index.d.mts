@@ -43,7 +43,8 @@ export type SemanticFactCarrier =
   | "repo-graph"
   | "agent-ops"
   | "model-assisted"
-  | "policy-script";
+  | "policy-script"
+  | "change-relative";
 
 export type SemanticFactEmission =
   | "blocking-diagnostic"
@@ -56,7 +57,10 @@ export type SemanticFactProvenance =
   | "control-flow"
   | "parser-services-required"
   | "registry"
-  | "scope-binding";
+  | "scope-binding"
+  | "change-contract"
+  | "git-diff"
+  | "package-manifest";
 
 export type RuleStatusEntryKind =
   | "active"
@@ -195,6 +199,7 @@ export interface RuleStatusSemanticSummary {
 
 export interface SemanticFactKindContract {
   rules: readonly string[];
+  commandIds?: readonly string[];
   adapterId: string;
   carrier: SemanticFactCarrier;
   confidence: readonly SemanticFactConfidence[];
@@ -212,7 +217,8 @@ export type SemanticFactKind =
   | "broadSetterCoMutation"
   | "resourceLifecycleProof"
   | "sourceMemberStateShardCandidate"
-  | "structuralMatch";
+  | "structuralMatch"
+  | "changeContractConformance";
 
 export interface SqlParserServiceDeltaInput {
   parserErrors?: number;

@@ -4,8 +4,33 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { analyzeChangeScope } from "./analyze.mjs";
 import { collectChangeSurface } from "./change-context.mjs";
 import { parseContract } from "./contract-schema.mjs";
+import { semanticFact } from "../policy/lib/semantic-facts.mjs";
 
 export const CHANGE_CONTRACT_CLAIM = "the diff exceeded the declared scope contract";
+
+/**
+ * Build the inventory-only semantic fact for a change-contract conformance result.
+ * @param {ReturnType<typeof runChangeContract>} result
+ * @param {string} contractPath
+ */
+export function changeContractFact(result, contractPath) {
+  return semanticFact({
+    factKind: "changeContractConformance",
+    ruleId: "antidrift/change-contract-conformance",
+    adapterId: "change-contract",
+    confidence: "deterministic-inventory",
+    provenance: ["change-contract", "git-diff", "package-manifest"],
+    filePath: contractPath,
+    payload: {
+      contractState: result.contractState,
+      changeContext: result.changeContext,
+      declaredScope: result.declaredScope,
+      actualChangeSurface: result.actualChangeSurface,
+      violations: result.violations,
+      decision: result.decision,
+    },
+  });
+}
 
 function contractStateFor(contractRelativePath, changedFiles) {
   const match = changedFiles.find(

@@ -82,6 +82,26 @@ export const SEMANTIC_FACT_KINDS = Object.freeze({
       "structuralMatch",
     ]),
   }),
+  changeContractConformance: Object.freeze({
+    rules: Object.freeze([]),
+    commandIds: Object.freeze(["antidrift/change-contract"]),
+    adapterId: "change-contract",
+    carrier: "change-relative",
+    confidence: Object.freeze(["deterministic-inventory"]),
+    emission: Object.freeze(["inventory-only"]),
+    association:
+      "Merge-base diff surface to a machine-readable change contract.",
+    noSinkBehavior:
+      "The CLI still prints the conformance summary; only the serialized semantic fact is skipped.",
+    payloadFields: Object.freeze([
+      "contractState",
+      "changeContext",
+      "declaredScope",
+      "actualChangeSurface",
+      "violations",
+      "decision",
+    ]),
+  }),
 });
 
 export const SEMANTIC_FACT_KIND_CONTRACT_LIST = Object.freeze(

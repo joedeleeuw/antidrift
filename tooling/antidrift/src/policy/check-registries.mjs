@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -592,6 +592,7 @@ const allowedSemanticFactCarriers = new Set([
   "repo-graph",
   "agent-ops",
   "model-assisted",
+  "change-relative",
 ]);
 const allowedSemanticFactConfidences = new Set([
   "deterministic-enforcement",
@@ -1023,18 +1024,38 @@ function activeAntidriftRules() {
   );
 }
 
+function factKindLiteralsIn(source) {
+  return [...source.matchAll(/\bfactKind:\s*["']([^"']+)["']/gu)].map(
+    (match) => match[1],
+  );
+}
+
 function emittedSemanticFactKinds(repoRoot) {
+  const kinds = new Set();
   const pluginSource = safeRepoPath(
     repoRoot,
     "tooling/antidrift/src/eslint-plugin/index.js",
   );
-  if (!pluginSource || !existsSync(pluginSource)) return new Set();
-  const source = readFileSync(pluginSource, "utf8");
-  return new Set(
-    [...source.matchAll(/\bfactKind:\s*["']([^"']+)["']/gu)].map(
-      (match) => match[1],
-    ),
+  if (pluginSource && existsSync(pluginSource)) {
+    for (const kind of factKindLiteralsIn(readFileSync(pluginSource, "utf8"))) {
+      kinds.add(kind);
+    }
+  }
+  const changeScopeDir = safeRepoPath(
+    repoRoot,
+    "tooling/antidrift/src/change-scope",
   );
+  if (changeScopeDir && existsSync(changeScopeDir)) {
+    for (const file of readdirSync(changeScopeDir)) {
+      if (!file.endsWith(".mjs") || file.endsWith(".test.mjs")) continue;
+      for (const kind of factKindLiteralsIn(
+        readFileSync(join(changeScopeDir, file), "utf8"),
+      )) {
+        kinds.add(kind);
+      }
+    }
+  }
+  return kinds;
 }
 
 function checkStablePromotionRequirements(stable, errors) {
@@ -1240,6 +1261,11 @@ function checkShippedSemanticFactKindContract(entry, shipped, label, errors) {
       );
     }
   }
+  if (!equalStringSets(entry.commandIds ?? [], shipped.commandIds ?? [])) {
+    errors.push(
+      `${label}.commandIds must match the shipped semantic fact contract: ${sortedStrings(shipped.commandIds ?? []).join(", ")}.`,
+    );
+  }
 }
 
 function checkSemanticFactKindEntry(entry, label, activeRules, errors) {
@@ -1247,11 +1273,22 @@ function checkSemanticFactKindEntry(entry, label, activeRules, errors) {
     errors.push(`${label} must be a mapping.`);
     return;
   }
-  const rules = stringArray(entry.rules, `${label}.rules`, errors);
+  const rules = stringArray(entry.rules, `${label}.rules`, errors, {
+    allowEmpty: true,
+  });
   for (const rule of rules) {
     if (!activeRules.has(rule)) {
       errors.push(`${label}.rules references unknown active rule: ${rule}`);
     }
+  }
+  const commandIds =
+    entry.commandIds === undefined
+      ? []
+      : stringArray(entry.commandIds, `${label}.commandIds`, errors);
+  if (rules.length === 0 && commandIds.length === 0) {
+    errors.push(
+      `${label} must declare at least one rule or commandId (command-owned facts require commandIds).`,
+    );
   }
   requireString(entry.adapterId, `${label}.adapterId`, errors);
   requireString(entry.carrier, `${label}.carrier`, errors);

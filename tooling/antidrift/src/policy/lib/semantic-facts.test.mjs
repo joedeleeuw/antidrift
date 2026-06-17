@@ -21,6 +21,7 @@ describe("semantic facts", () => {
       ),
     ).toEqual([
       "broadSetterCoMutation",
+      "changeContractConformance",
       "resourceLifecycleProof",
       "sourceMemberStateShardCandidate",
       "structuralMatch",
@@ -49,6 +50,7 @@ describe("semantic facts", () => {
       ),
     ).toEqual([
       "broadSetterCoMutation",
+      "changeContractConformance",
       "resourceLifecycleProof",
       "sourceMemberStateShardCandidate",
       "structuralMatch",
@@ -75,7 +77,11 @@ describe("semantic facts", () => {
       semanticFactKindContractsForEmission("inventory-only").map(
         (entry) => entry.factKind,
       ),
-    ).toEqual(["broadSetterCoMutation", "sourceMemberStateShardCandidate"]);
+    ).toEqual([
+      "broadSetterCoMutation",
+      "sourceMemberStateShardCandidate",
+      "changeContractConformance",
+    ]);
     expect(
       semanticFactKindContractsForEmission("blocking-diagnostic").map(
         (entry) => entry.factKind,

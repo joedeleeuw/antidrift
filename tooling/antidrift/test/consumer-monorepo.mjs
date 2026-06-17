@@ -805,7 +805,7 @@ try {
       '  throw new Error("Missing joined rule semantic summary behavior");\n' +
       "}\n" +
       "\n" +
-      'if (semanticFactKindContractsForEmission("inventory-only").map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,sourceMemberStateShardCandidate" || semanticFactKindContractsForEmission("blocking-diagnostic").length !== 2 || semanticFactKindContractsForConfidence("deterministic-enforcement").length !== 2 || semanticFactKindContractsForEmission("not-real").length !== 0) {\n' +
+      'if (semanticFactKindContractsForEmission("inventory-only").map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,sourceMemberStateShardCandidate,changeContractConformance" || semanticFactKindContractsForEmission("blocking-diagnostic").length !== 2 || semanticFactKindContractsForConfidence("deterministic-enforcement").length !== 2 || semanticFactKindContractsForEmission("not-real").length !== 0) {\n' +
       '  throw new Error("Missing semantic fact contract emission/confidence lookup behavior");\n' +
       "}\n" +
       "\n" +
