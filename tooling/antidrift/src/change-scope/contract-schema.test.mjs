@@ -1,0 +1,76 @@
+import { describe, expect, it } from "vitest";
+
+import { ContractValidationError, parseContract, validateContract } from "./contract-schema.mjs";
+
+const CONTRACT_ID = "TASK-1";
+const NARROW_GLOB = "apps/shop/src/orders/**";
+
+function rawContract(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    contractId: CONTRACT_ID,
+    scope: { allowedPaths: [NARROW_GLOB] },
+    ...overrides,
+  };
+}
+
+describe("parseContract", () => {
+  it("parses and normalizes a valid YAML contract", () => {
+    const contract = parseContract(
+      ["schemaVersion: 1", `contractId: ${CONTRACT_ID}`, "scope:", `  allowedPaths:`, `    - ${NARROW_GLOB}`, "  allowedChangeTypes:", "    - modify"].join("\n"),
+    );
+    expect(contract.contractId).toBe(CONTRACT_ID);
+    expect(contract.scope.allowedPaths).toEqual([NARROW_GLOB]);
+    expect(contract.scope.allowedChangeTypes).toEqual(["modify"]);
+    expect(contract.refactor.approved).toBe(false);
+  });
+
+  it("throws loudly on unparseable input", () => {
+    expect(() => parseContract("contractId: [unterminated")).toThrow(ContractValidationError);
+  });
+});
+
+describe("validateContract", () => {
+  it("rejects an empty contractId", () => {
+    expect(() => validateContract(rawContract({ contractId: "" }))).toThrow(/contractId/u);
+  });
+
+  it("rejects empty allowedPaths", () => {
+    expect(() => validateContract(rawContract({ scope: { allowedPaths: [] } }))).toThrow(/allowedPaths/u);
+  });
+
+  it("rejects an absolute path", () => {
+    expect(() => validateContract(rawContract({ scope: { allowedPaths: ["/etc/passwd"] } }))).toThrow(/absolute/u);
+  });
+
+  it("rejects a parent-directory traversal", () => {
+    expect(() => validateContract(rawContract({ scope: { allowedPaths: ["../secrets/**"] } }))).toThrow(/\.\./u);
+  });
+
+  it("rejects a broad glob without refactor.approved", () => {
+    expect(() => validateContract(rawContract({ scope: { allowedPaths: ["**"] } }))).toThrow(/broad glob/u);
+  });
+
+  it("accepts a broad glob when refactor.approved is true", () => {
+    const contract = validateContract(rawContract({ scope: { allowedPaths: ["**"] }, refactor: { approved: true } }));
+    expect(contract.refactor.approved).toBe(true);
+  });
+
+  it("rejects an unknown top-level key", () => {
+    expect(() => validateContract(rawContract({ bogus: 1 }))).toThrow(/unknown top-level key/u);
+  });
+
+  it("rejects an invalid change type", () => {
+    expect(() => validateContract(rawContract({ scope: { allowedPaths: [NARROW_GLOB], allowedChangeTypes: ["frobnicate"] } }))).toThrow(/allowedChangeTypes/u);
+  });
+
+  it("collects multiple problems in one error", () => {
+    try {
+      validateContract({ schemaVersion: 2, contractId: "", scope: { allowedPaths: [] } });
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ContractValidationError);
+      expect(error.problems.length).toBeGreaterThanOrEqual(3);
+    }
+  });
+});
