@@ -1,4 +1,4 @@
-<!-- Authored by codex gpt-5.5/xhigh against the repo (solve-buckets, semantic-facts, cli, check-registries, git plumbing) + the additional-approaches discussion. The implementation target for the change-contract spine. v0 inventory and TS export extraction are implemented; enforcement remains gated on real evidence. -->
+<!-- Authored by codex gpt-5.5/xhigh against the repo (solve-buckets, semantic-facts, cli, check-registries, git plumbing) + the additional-approaches discussion. The implementation target for the change-contract spine. v0 inventory, TS export extraction, and diff-scoped adapter inventory are implemented; enforcement remains gated on real evidence. -->
 
 **SPEC: Change-Contract Conformance Spine**
 Grounding: this is the deterministic core already described in [additional-approaches-discussion.md](/Users/sushi/code/agent-guardrails-monorepo-template/docs/research/additional-approaches-discussion.md:9): prove “the diff exceeded the declared scope contract,” not intent. It belongs in the missing change-relative seam called out in [solve-bucket-architecture-review.md](/Users/sushi/code/agent-guardrails-monorepo-template/docs/solve-bucket-architecture-review.md:29), targets the n=60 `diff-scope-creep` gap in [solve-buckets.yaml](/Users/sushi/code/agent-guardrails-monorepo-template/policy/registries/solve-buckets.yaml:97), and must emit the existing `semanticFact` shape from [semantic-facts.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/lib/semantic-facts.mjs:189).
@@ -119,7 +119,7 @@ CLI: add `parseArgs as parseChangeContractArgs` and `changeContractConformance` 
 
 Verify-session: add root script `policy:inventory-change-contract` and include it in [verify-session.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/verify-session.mjs:6) after registry checks. It exits 0 when no contract exists; if a contract exists, invalid schema or missing base fails. Keep v0 violations non-blocking. `policy:verify-session` is already the full gate via [package.json](/Users/sushi/code/agent-guardrails-monorepo-template/package.json:39).
 
-Phase-0 precursor: add `diff-scoped-adapters` inventory using the same change context. It runs ESLint only on changed JS/TS files like [check-changed.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/check-changed.mjs:7), captures messages and semantic facts, filters to changed hunks, and writes inventory. This is not the conformance proof; it validates the merge-base/hunk plumbing and reuses existing adapters as recommended in [solve-bucket-architecture-review.md](/Users/sushi/code/agent-guardrails-monorepo-template/docs/solve-bucket-architecture-review.md:106).
+Phase-0 precursor: `diff-scoped-adapters` inventory uses the same change context. It runs ESLint only on changed JS/TS files like [check-changed.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/check-changed.mjs:7), captures messages and semantic facts, filters to changed hunks, and writes inventory. This is not the conformance proof; it validates the merge-base/hunk plumbing and reuses existing adapters as recommended in [solve-bucket-architecture-review.md](/Users/sushi/code/agent-guardrails-monorepo-template/docs/solve-bucket-architecture-review.md:106).
 
 **6. FP Controls And Maturity**
 No contract, new-in-diff contract, modified-in-diff contract, or broad refactor contract can produce blocking output in v0. Broad refactors require `refactor.approved: true`, non-empty `justification`, and explicit broad paths. Generated files are not silently ignored; they must be in `allowedPaths` or derived from accepted generated registry facts in a later phase.
@@ -138,6 +138,6 @@ LLM may draft or critique the contract. LLM may not decide conformance, widen sc
 5. Add `antidrift change-contract` CLI with JSON summary and optional JSONL facts.
 6. Add `policy:inventory-change-contract` to verify-session, non-blocking on no-contract and violations.
 7. Land TS Program before/after export extraction.
-8. Next PR: diff-scoped existing-adapter inventory.
+8. Land diff-scoped existing-adapter inventory.
 9. Next PR: module graph radius inventory.
 10. Only after multi-repo evidence: add `deterministic-enforcement` and `blocking-diagnostic` to the fact contract, plus `--mode enforce`.

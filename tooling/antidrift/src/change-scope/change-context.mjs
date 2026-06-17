@@ -17,6 +17,13 @@ const STATUS_OPERATION = Object.freeze({
   C: "rename",
   T: "modify",
 });
+const HUNK_RE = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/u;
+
+function compareStrings(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
 
 /**
  * Run git and fail loudly on any error. Never returns a partial result on failure.
@@ -92,6 +99,44 @@ export function changedFilesBetween({ base, head, cwd }) {
     }
   }
   return entries;
+}
+
+export function patchHunksBetween({ base, head, cwd }) {
+  const raw = gitOrThrow(
+    [
+      "diff",
+      "--unified=0",
+      "--find-renames",
+      "--ignore-submodules=none",
+      `--diff-filter=${GIT_DIFF_FILTER}`,
+      base,
+      head,
+    ],
+    cwd,
+  );
+  const hunksByPath = {};
+  let currentPath = null;
+  for (const line of raw.split("\n")) {
+    if (line.startsWith("+++ b/") || line === "+++ /dev/null") {
+      currentPath =
+        line === "+++ /dev/null" ? null : line.replace(/^\+\+\+ b\//u, "");
+      continue;
+    }
+    const match = HUNK_RE.exec(line);
+    if (!match || currentPath === null) continue;
+    const start = Number(match[1]);
+    const count = match[2] === undefined ? 1 : Number(match[2]);
+    if (count === 0) continue;
+    hunksByPath[currentPath] ??= [];
+    hunksByPath[currentPath].push({ start, end: start + count - 1 });
+  }
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(hunksByPath).sort(([left], [right]) =>
+        compareStrings(left, right),
+      ),
+    ),
+  );
 }
 
 /**
@@ -175,6 +220,7 @@ export function addedDependencies({ base, head, cwd, changedFiles }) {
 export function collectChangeSurface({ base, head, cwd }) {
   const mergeBaseRef = mergeBase({ base, head, cwd });
   const changedFiles = changedFilesBetween({ base: mergeBaseRef, head, cwd });
+  const patchHunks = patchHunksBetween({ base: mergeBaseRef, head, cwd });
   const { runtime, dev } = addedDependencies({
     base: mergeBaseRef,
     head,
@@ -190,6 +236,7 @@ export function collectChangeSurface({ base, head, cwd }) {
   return {
     mergeBase: mergeBaseRef,
     changedFiles,
+    patchHunks,
     addedExports,
     removedExports,
     addedRuntimeDependencies: runtime,

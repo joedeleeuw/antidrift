@@ -64,6 +64,7 @@ import {
 } from "./unsafe-type-assertion-benchmark.mjs";
 import { verifySession } from "./verify-session.mjs";
 import { changeContractCommand } from "../change-scope/change-contract.mjs";
+import { diffScopedAdaptersCommand } from "../change-scope/diff-scoped-adapters.mjs";
 import {
   SEMANTIC_ADAPTER_MANIFEST,
   semanticAdapterManifestForAdapterId,
@@ -223,6 +224,7 @@ const commands = {
       parseUndercheckedPredicateInventoryArgs(args),
     ),
   "change-contract": () => changeContractCommand(args),
+  "diff-scoped-adapters": () => diffScopedAdaptersCommand(args),
   "verify-session": verifySession,
   "semantic-manifest": () => {
     process.stdout.write(

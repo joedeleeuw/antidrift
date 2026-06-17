@@ -10,6 +10,7 @@ import {
   changedFilesBetween,
   collectChangeSurface,
   mergeBase,
+  patchHunksBetween,
 } from "./change-context.mjs";
 
 const BASE = "HEAD~1";
@@ -128,6 +129,7 @@ describe("change-context", () => {
     const surface = collectChangeSurface({ base: BASE, head: HEAD, cwd: dir });
     expect(surface.changedFiles).toHaveLength(4);
     expect(surface.addedRuntimeDependencies).toContain("right");
+    expect(surface.patchHunks[SRC_FILE]).toEqual([{ start: 1, end: 1 }]);
     expect(surface.addedExports).toEqual([
       { file: "src/renamed.ts", name: "moved", kind: "value" },
     ]);
@@ -159,5 +161,58 @@ describe("change-context", () => {
       collectChangeSurface({ base: BASE, head: HEAD, cwd: bad }),
     ).toThrow();
     rmSync(bad, { recursive: true, force: true });
+  });
+
+  it("does not confuse added increment statements for patch file headers", () => {
+    const counter = mkdtempSync(join(tmpdir(), "change-context-counter-"));
+    const counterGit = (args) =>
+      execFileSync("git", args, { cwd: counter, encoding: "utf8" });
+    counterGit(["init", "-q", "-b", "main"]);
+    counterGit(["config", "user.email", "test@example.com"]);
+    counterGit(["config", "user.name", "Test"]);
+    counterGit(["config", "commit.gpgsign", "false"]);
+    counterGit(["config", "core.hooksPath", "/dev/null"]);
+    writeFileSync(
+      join(counter, "counter.js"),
+      [
+        "export function one() {",
+        "  return 1;",
+        "}",
+        "",
+        "export function two() {",
+        "  return 2;",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    counterGit(["add", "-A"]);
+    counterGit(["commit", "-q", "-m", "base"]);
+    writeFileSync(
+      join(counter, "counter.js"),
+      [
+        "export function one() {",
+        "  let count = 0;",
+        "  ++ count;",
+        "  return count;",
+        "}",
+        "",
+        "export function two() {",
+        "  return 3;",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    counterGit(["add", "-A"]);
+    counterGit(["commit", "-q", "-m", "head"]);
+
+    expect(patchHunksBetween({ base: BASE, head: HEAD, cwd: counter })).toEqual(
+      {
+        "counter.js": [
+          { start: 2, end: 4 },
+          { start: 8, end: 8 },
+        ],
+      },
+    );
+    rmSync(counter, { recursive: true, force: true });
   });
 });
