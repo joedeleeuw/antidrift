@@ -106,6 +106,14 @@ describe("change-contract CLI", () => {
     expect(parsed.mode).toBe("inventory");
   });
 
+  it("rejects an unknown flag", () => {
+    expect(() => parseArgs(["--bogus"])).toThrow(/unknown argument/u);
+  });
+
+  it("rejects a value flag that swallows the next flag", () => {
+    expect(() => parseArgs(["--contract", "--base", "main"])).toThrow(/requires a value/u);
+  });
+
   it("requires a base ref when a contract is present", () => {
     writeContract(["schemaVersion: 1", "contractId: B-1", "scope:", "  allowedPaths:", "    - apps/**"]);
     expect(() => runChangeContract({ contractPath: CONTRACT_PATH, base: null, head: HEAD, cwd: dir })).toThrow(

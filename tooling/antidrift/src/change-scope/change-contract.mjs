@@ -119,10 +119,15 @@ export function parseArgs(argv) {
       continue;
     }
     const key = CHANGE_CONTRACT_VALUE_FLAGS[arg];
-    if (key !== undefined && argv[index + 1] !== undefined) {
-      parsed[key] = argv[index + 1];
-      index += 1;
+    if (key === undefined) {
+      throw new Error(`change-contract: unknown argument "${arg}"`);
     }
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith("--")) {
+      throw new Error(`change-contract: ${arg} requires a value`);
+    }
+    parsed[key] = value;
+    index += 1;
   }
   return parsed;
 }
