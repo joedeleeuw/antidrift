@@ -1,9 +1,22 @@
 import { spawnSync } from "node:child_process";
 
+import { collectExportChanges } from "./exports.mjs";
+
 const MAX_GIT_BUFFER = 64 * 1024 * 1024;
 const GIT_DIFF_FILTER = "ACDMRTUXB";
-const RUNTIME_DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies"];
-const STATUS_OPERATION = Object.freeze({ A: "add", M: "modify", D: "delete", R: "rename", C: "rename", T: "modify" });
+const RUNTIME_DEPENDENCY_FIELDS = [
+  "dependencies",
+  "optionalDependencies",
+  "peerDependencies",
+];
+const STATUS_OPERATION = Object.freeze({
+  A: "add",
+  M: "modify",
+  D: "delete",
+  R: "rename",
+  C: "rename",
+  T: "modify",
+});
 
 /**
  * Run git and fail loudly on any error. Never returns a partial result on failure.
@@ -11,10 +24,16 @@ const STATUS_OPERATION = Object.freeze({ A: "add", M: "modify", D: "delete", R: 
  * @param {string} cwd
  */
 export function gitOrThrow(args, cwd) {
-  const result = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: MAX_GIT_BUFFER });
+  const result = spawnSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: MAX_GIT_BUFFER,
+  });
   if (result.error) throw result.error;
   if (result.status !== 0) {
-    throw new Error(`git ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`);
+    throw new Error(
+      `git ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`,
+    );
   }
   return result.stdout;
 }
@@ -22,7 +41,9 @@ export function gitOrThrow(args, cwd) {
 /** @param {{ base: string, head: string, cwd: string }} params */
 export function mergeBase({ base, head, cwd }) {
   const output = gitOrThrow(["merge-base", base, head], cwd).trim();
-  if (output.length === 0) throw new Error(`no merge-base between ${base} and ${head} in ${cwd}`);
+  if (output.length === 0) {
+    throw new Error(`no merge-base between ${base} and ${head} in ${cwd}`);
+  }
   return output;
 }
 
@@ -32,7 +53,15 @@ export function mergeBase({ base, head, cwd }) {
  */
 export function changedFilesBetween({ base, head, cwd }) {
   const raw = gitOrThrow(
-    ["diff", "--name-status", "--find-renames", "--ignore-submodules=none", `--diff-filter=${GIT_DIFF_FILTER}`, base, head],
+    [
+      "diff",
+      "--name-status",
+      "--find-renames",
+      "--ignore-submodules=none",
+      `--diff-filter=${GIT_DIFF_FILTER}`,
+      base,
+      head,
+    ],
     cwd,
   );
   const entries = [];
@@ -42,15 +71,48 @@ export function changedFilesBetween({ base, head, cwd }) {
     const letter = parts[0][0];
     const operation = STATUS_OPERATION[letter];
     if (operation === undefined) {
-      throw new Error(`unsupported git status "${parts[0]}" for path ${parts[1] ?? ""} in ${cwd}`);
+      throw new Error(
+        `unsupported git status "${parts[0]}" for path ${parts[1] ?? ""} in ${cwd}`,
+      );
     }
     if (letter === "R" || letter === "C") {
-      entries.push({ status: parts[0], operation, path: parts[2], oldPath: parts[1] });
+      entries.push({
+        status: parts[0],
+        operation,
+        path: parts[2],
+        oldPath: parts[1],
+      });
     } else {
-      entries.push({ status: parts[0], operation, path: parts[1], oldPath: null });
+      entries.push({
+        status: parts[0],
+        operation,
+        path: parts[1],
+        oldPath: null,
+      });
     }
   }
   return entries;
+}
+
+/**
+ * Read a file at a git ref. Returns null when the file is absent at that ref.
+ * @param {{ ref: string, path: string, cwd: string }} params
+ */
+export function fileAt({ ref, path, cwd }) {
+  const result = spawnSync("git", ["show", `${ref}:${path}`], {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: MAX_GIT_BUFFER,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    const stderr = (result.stderr ?? "").trim();
+    if (/does not exist in|but not in/iu.test(stderr)) return null;
+    throw new Error(
+      `git show ${ref}:${path} failed in ${cwd} (status ${result.status}): ${stderr}`,
+    );
+  }
+  return result.stdout;
 }
 
 /**
@@ -58,15 +120,9 @@ export function changedFilesBetween({ base, head, cwd }) {
  * (an added or deleted manifest); throws loudly when the manifest is present but unparseable.
  * @param {{ ref: string, path: string, cwd: string }} params
  */
-function manifestAt({ ref, path, cwd }) {
-  const result = spawnSync("git", ["show", `${ref}:${path}`], { cwd, encoding: "utf8", maxBuffer: MAX_GIT_BUFFER });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    const stderr = (result.stderr ?? "").trim();
-    if (/does not exist in|but not in/iu.test(stderr)) return null;
-    throw new Error(`git show ${ref}:${path} failed in ${cwd} (status ${result.status}): ${stderr}`);
-  }
-  return JSON.parse(result.stdout);
+function manifestAt(params) {
+  const content = fileAt(params);
+  return content === null ? null : JSON.parse(content);
 }
 
 function dependencyNames(manifest, fields) {
@@ -94,14 +150,20 @@ function addedNames(before, after, fields) {
 export function addedDependencies({ base, head, cwd, changedFiles }) {
   const manifests = changedFiles
     .map((file) => file.path)
-    .filter((path) => path === "package.json" || path.endsWith("/package.json"));
+    .filter(
+      (path) => path === "package.json" || path.endsWith("/package.json"),
+    );
   const runtime = new Set();
   const dev = new Set();
   for (const manifestPath of manifests) {
     const before = manifestAt({ ref: base, path: manifestPath, cwd });
     const after = manifestAt({ ref: head, path: manifestPath, cwd });
-    for (const name of addedNames(before, after, RUNTIME_DEPENDENCY_FIELDS)) runtime.add(name);
-    for (const name of addedNames(before, after, ["devDependencies"])) dev.add(name);
+    for (const name of addedNames(before, after, RUNTIME_DEPENDENCY_FIELDS)) {
+      runtime.add(name);
+    }
+    for (const name of addedNames(before, after, ["devDependencies"])) {
+      dev.add(name);
+    }
   }
   return { runtime: [...runtime], dev: [...dev] };
 }
@@ -113,10 +175,23 @@ export function addedDependencies({ base, head, cwd, changedFiles }) {
 export function collectChangeSurface({ base, head, cwd }) {
   const mergeBaseRef = mergeBase({ base, head, cwd });
   const changedFiles = changedFilesBetween({ base: mergeBaseRef, head, cwd });
-  const { runtime, dev } = addedDependencies({ base: mergeBaseRef, head, cwd, changedFiles });
+  const { runtime, dev } = addedDependencies({
+    base: mergeBaseRef,
+    head,
+    cwd,
+    changedFiles,
+  });
+  const { addedExports, removedExports } = collectExportChanges({
+    base: mergeBaseRef,
+    head,
+    cwd,
+    changedFiles,
+  });
   return {
     mergeBase: mergeBaseRef,
     changedFiles,
+    addedExports,
+    removedExports,
     addedRuntimeDependencies: runtime,
     addedDevDependencies: dev,
   };

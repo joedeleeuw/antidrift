@@ -9,7 +9,8 @@ import {
   semanticFactToJsonLine,
 } from "../policy/lib/semantic-facts.mjs";
 
-export const CHANGE_CONTRACT_CLAIM = "the diff exceeded the declared scope contract";
+export const CHANGE_CONTRACT_CLAIM =
+  "the diff exceeded the declared scope contract";
 
 /**
  * Build the inventory-only semantic fact for a change-contract conformance result.
@@ -22,7 +23,12 @@ export function changeContractFact(result, contractPath) {
     ruleId: "antidrift/change-contract-conformance",
     adapterId: "change-contract",
     confidence: "deterministic-inventory",
-    provenance: ["change-contract", "git-diff", "package-manifest"],
+    provenance: [
+      "change-contract",
+      "git-diff",
+      "package-manifest",
+      "ts-program",
+    ],
     filePath: contractPath,
     payload: {
       contractState: result.contractState,
@@ -37,7 +43,9 @@ export function changeContractFact(result, contractPath) {
 
 function contractStateFor(contractRelativePath, changedFiles) {
   const match = changedFiles.find(
-    (file) => file.path === contractRelativePath || file.oldPath === contractRelativePath,
+    (file) =>
+      file.path === contractRelativePath ||
+      file.oldPath === contractRelativePath,
   );
   if (!match) return "present";
   return match.operation === "add" ? "new-in-diff" : "modified-in-diff";
@@ -48,11 +56,21 @@ function contractStateFor(contractRelativePath, changedFiles) {
  * loudly (ContractValidationError). Violations are reported, not enforced.
  * @param {{ contractPath: string, base: string, head: string, cwd: string, requireContract?: boolean }} params
  */
-export function runChangeContract({ contractPath, base, head, cwd, requireContract = false }) {
-  const resolvedContract = isAbsolute(contractPath) ? contractPath : resolve(cwd, contractPath);
+export function runChangeContract({
+  contractPath,
+  base,
+  head,
+  cwd,
+  requireContract = false,
+}) {
+  const resolvedContract = isAbsolute(contractPath)
+    ? contractPath
+    : resolve(cwd, contractPath);
 
   if (!existsSync(resolvedContract)) {
-    if (requireContract) throw new Error(`change contract not found: ${contractPath}`);
+    if (requireContract) {
+      throw new Error(`change contract not found: ${contractPath}`);
+    }
     return {
       contractState: "missing",
       claim: CHANGE_CONTRACT_CLAIM,
@@ -72,7 +90,10 @@ export function runChangeContract({ contractPath, base, head, cwd, requireContra
     );
   }
   const surface = collectChangeSurface({ base, head, cwd });
-  const contractState = contractStateFor(relative(cwd, resolvedContract), surface.changedFiles);
+  const contractState = contractStateFor(
+    relative(cwd, resolvedContract),
+    surface.changedFiles,
+  );
   const violations = analyzeChangeScope(contract, surface);
 
   return {
@@ -83,6 +104,8 @@ export function runChangeContract({ contractPath, base, head, cwd, requireContra
     declaredScope: contract.scope,
     actualChangeSurface: {
       changedFiles: surface.changedFiles,
+      addedExports: surface.addedExports,
+      removedExports: surface.removedExports,
       addedRuntimeDependencies: surface.addedRuntimeDependencies,
       addedDevDependencies: surface.addedDevDependencies,
     },
@@ -103,7 +126,8 @@ const CHANGE_CONTRACT_VALUE_FLAGS = Object.freeze({
 export function parseArgs(argv) {
   const parsed = {
     contractPath:
-      process.env.ANTIDRIFT_CHANGE_CONTRACT ?? ".antidrift/change-contract.yaml",
+      process.env.ANTIDRIFT_CHANGE_CONTRACT ??
+      ".antidrift/change-contract.yaml",
     base: process.env.ANTIDRIFT_BASE_REF ?? null,
     head: "HEAD",
     cwd: process.cwd(),

@@ -48,7 +48,10 @@ beforeAll(() => {
   writeFileSync(join(dir, "apps/orders/format.ts"), "export const f = 2;\n");
   mkdirSync(join(dir, "apps/billing"), { recursive: true });
   writeFileSync(join(dir, "apps/billing/tax.ts"), "export const t = 1;\n");
-  writeJson("package.json", { name: "x", dependencies: { left: "1.0.0", "@copilotkit/react-core": "1.0.0" } });
+  writeJson("package.json", {
+    name: "x",
+    dependencies: { left: "1.0.0", "@copilotkit/react-core": "1.0.0" },
+  });
   runGit(["add", "."]);
   runGit(["commit", "-q", "-m", "fix orders"]);
 });
@@ -59,7 +62,12 @@ afterAll(() => {
 
 describe("runChangeContract", () => {
   it("is inventory-only with no violations when the contract is missing", () => {
-    const result = runChangeContract({ contractPath: "nope.yaml", base: BASE, head: HEAD, cwd: dir });
+    const result = runChangeContract({
+      contractPath: "nope.yaml",
+      base: BASE,
+      head: HEAD,
+      cwd: dir,
+    });
     expect(result.contractState).toBe("missing");
     expect(result.violations).toEqual([]);
     expect(result.decision).toBe("inventory");
@@ -67,16 +75,38 @@ describe("runChangeContract", () => {
 
   it("throws when a contract is required but missing", () => {
     expect(() =>
-      runChangeContract({ contractPath: "nope.yaml", base: BASE, head: HEAD, cwd: dir, requireContract: true }),
+      runChangeContract({
+        contractPath: "nope.yaml",
+        base: BASE,
+        head: HEAD,
+        cwd: dir,
+        requireContract: true,
+      }),
     ).toThrow(/not found/u);
   });
 
-  it("flags an out-of-scope path and an undeclared runtime dependency", () => {
-    writeContract(["schemaVersion: 1", "contractId: ORDERS-1", "scope:", "  allowedPaths:", "    - apps/orders/**", "  allowedRuntimeDependencies: []"]);
-    const result = runChangeContract({ contractPath: CONTRACT_PATH, base: BASE, head: HEAD, cwd: dir });
+  it("flags an out-of-scope path, undeclared runtime dependency, and undeclared added export", () => {
+    writeContract([
+      "schemaVersion: 1",
+      "contractId: ORDERS-1",
+      "scope:",
+      "  allowedPaths:",
+      "    - apps/orders/**",
+      "  allowedRuntimeDependencies: []",
+    ]);
+    const result = runChangeContract({
+      contractPath: CONTRACT_PATH,
+      base: BASE,
+      head: HEAD,
+      cwd: dir,
+    });
     const types = result.violations.map((violation) => violation.type);
     expect(types).toContain(VIOLATION_TYPES.pathOutOfScope);
     expect(types).toContain(VIOLATION_TYPES.undeclaredRuntimeDependency);
+    expect(types).toContain(VIOLATION_TYPES.undeclaredAddedExport);
+    expect(result.actualChangeSurface.addedExports).toEqual([
+      { file: "apps/billing/tax.ts", name: "t", kind: "value" },
+    ]);
     expect(result.claim).toBe(CHANGE_CONTRACT_CLAIM);
   });
 
@@ -88,17 +118,32 @@ describe("runChangeContract", () => {
       "  allowedPaths:",
       "    - apps/**",
       "    - package.json",
+      "  allowedExports:",
+      "    - file: apps/billing/tax.ts",
+      "      name: t",
+      "      kind: value",
       "  allowedRuntimeDependencies:",
       "    - '@copilotkit/react-core'",
     ]);
-    const result = runChangeContract({ contractPath: CONTRACT_PATH, base: BASE, head: HEAD, cwd: dir });
+    const result = runChangeContract({
+      contractPath: CONTRACT_PATH,
+      base: BASE,
+      head: HEAD,
+      cwd: dir,
+    });
     expect(result.violations).toEqual([]);
   });
 });
 
 describe("change-contract CLI", () => {
   it("parses flags with inventory defaults", () => {
-    const parsed = parseArgs(["--contract", "c.yaml", "--base", "main", "--require-contract"]);
+    const parsed = parseArgs([
+      "--contract",
+      "c.yaml",
+      "--base",
+      "main",
+      "--require-contract",
+    ]);
     expect(parsed.contractPath).toBe("c.yaml");
     expect(parsed.base).toBe("main");
     expect(parsed.requireContract).toBe(true);
@@ -111,13 +156,26 @@ describe("change-contract CLI", () => {
   });
 
   it("rejects a value flag that swallows the next flag", () => {
-    expect(() => parseArgs(["--contract", "--base", "main"])).toThrow(/requires a value/u);
+    expect(() => parseArgs(["--contract", "--base", "main"])).toThrow(
+      /requires a value/u,
+    );
   });
 
   it("requires a base ref when a contract is present", () => {
-    writeContract(["schemaVersion: 1", "contractId: B-1", "scope:", "  allowedPaths:", "    - apps/**"]);
-    expect(() => runChangeContract({ contractPath: CONTRACT_PATH, base: null, head: HEAD, cwd: dir })).toThrow(
-      /base ref is required/u,
-    );
+    writeContract([
+      "schemaVersion: 1",
+      "contractId: B-1",
+      "scope:",
+      "  allowedPaths:",
+      "    - apps/**",
+    ]);
+    expect(() =>
+      runChangeContract({
+        contractPath: CONTRACT_PATH,
+        base: null,
+        head: HEAD,
+        cwd: dir,
+      }),
+    ).toThrow(/base ref is required/u);
   });
 });

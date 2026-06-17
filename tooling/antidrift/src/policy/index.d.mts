@@ -60,6 +60,7 @@ export type SemanticFactProvenance =
   | "scope-binding"
   | "change-contract"
   | "git-diff"
+  | "ts-program"
   | "package-manifest";
 
 export type RuleStatusEntryKind =

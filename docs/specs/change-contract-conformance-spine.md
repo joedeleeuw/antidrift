@@ -1,4 +1,4 @@
-<!-- Authored by codex gpt-5.5/xhigh against the repo (solve-buckets, semantic-facts, cli, check-registries, git plumbing) + the additional-approaches discussion. The implementation target for the change-contract spine. Implementation pending the real-evidence MVP-shapes go/no-go. -->
+<!-- Authored by codex gpt-5.5/xhigh against the repo (solve-buckets, semantic-facts, cli, check-registries, git plumbing) + the additional-approaches discussion. The implementation target for the change-contract spine. v0 inventory and TS export extraction are implemented; enforcement remains gated on real evidence. -->
 
 **SPEC: Change-Contract Conformance Spine**
 Grounding: this is the deterministic core already described in [additional-approaches-discussion.md](/Users/sushi/code/agent-guardrails-monorepo-template/docs/research/additional-approaches-discussion.md:9): prove “the diff exceeded the declared scope contract,” not intent. It belongs in the missing change-relative seam called out in [solve-bucket-architecture-review.md](/Users/sushi/code/agent-guardrails-monorepo-template/docs/solve-bucket-architecture-review.md:29), targets the n=60 `diff-scope-creep` gap in [solve-buckets.yaml](/Users/sushi/code/agent-guardrails-monorepo-template/policy/registries/solve-buckets.yaml:97), and must emit the existing `semanticFact` shape from [semantic-facts.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/lib/semantic-facts.mjs:189).
@@ -9,6 +9,7 @@ Default path: `.antidrift/change-contract.yaml`. CLI must also accept `--contrac
 Authoring: human-owned. An agent may draft it only as an echo-back artifact, but proof treats it as deterministic input only after human acceptance. For future blocking, the contract must be immutable relative to the change: either present unchanged at merge-base, or supplied by CI as an external artifact with a pinned hash. If the contract is new or modified inside the same diff, v0 records `contractState: "new-in-diff"` or `"modified-in-diff"` and never blocks.
 
 Schema, all arrays explicit:
+
 ```yaml
 schemaVersion: 1
 contractId: "TASK-123"
@@ -35,7 +36,8 @@ refactor:
   approved: false
   justification: ""
 ```
-Validation: implement as a Zod schema in `tooling/antidrift/src/change-scope/contract-schema.mjs`. Because this runs in the shipped CLI, either move `zod` into `tooling/antidrift/package.json` `dependencies`, or use a local structural validator. Given repo conventions prefer Zod. Reject unknown top-level keys, empty `contractId`, non-relative paths, absolute paths, `..`, empty glob arrays, broad `**/*` unless `refactor.approved: true`, and missing `scope`.
+
+Validation: implemented as a local structural validator in `tooling/antidrift/src/change-scope/contract-schema.mjs` because this runs in the shipped CLI and should not add a new runtime dependency for a small fixed schema. Reject unknown top-level keys, empty `contractId`, non-relative paths, absolute paths, `..`, empty glob arrays, broad `**/*` unless `refactor.approved: true`, missing `scope`, and any `allowedExports` entry without exact `file`, `name`, and `kind`.
 
 **2. Change Surface**
 Add merge-base plumbing beside existing [git.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/lib/git.mjs:10), preserving `changedFiles()` for `check-changed`. New helpers:
@@ -44,18 +46,20 @@ Add merge-base plumbing beside existing [git.mjs](/Users/sushi/code/agent-guardr
 Base resolution: `--base <ref>` or `ANTIDRIFT_BASE_REF` is required when a contract exists. `--head` defaults to `HEAD`. Compute `mergeBase = git merge-base baseRef headRef`, then diff `mergeBase` to `headRef`.
 
 Collect these deterministic surfaces:
+
 - `changedFiles`: from `git diff --name-status --find-renames --diff-filter=ACDMRTUXB <mergeBase> <head>`. Include `path`, `oldPath`, and `status`.
 - `patchHunks`: from `git diff --unified=0 <mergeBase> <head>`, only for Phase-0 diff-scoped adapter filtering.
-- `addedExports` and `removedExports`: build a TS Program for HEAD and a TS Program for merge-base. Use a temp materialized base tree or a CompilerHost over `git show`; do not parse regex. For each changed TS source, use `checker.getSymbolAtLocation(sourceFile)` plus `checker.getExportsOfModule(moduleSymbol)`, following the existing TypeChecker/export pattern in [type-index.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/lib/type-index.mjs:97). Compare `{file, name, kind}` sets. For deleted files, all baseline exports are removed; for added files, all HEAD exports are added.
+- `addedExports` and `removedExports`: build a TS Program for HEAD and a TS Program for merge-base. Use a temp materialized base tree or a CompilerHost over `git show`; do not parse regex. For each changed TS source, each declaration file, and each unchanged TS file that re-exports a changed TS source through relative export declarations, use `checker.getSymbolAtLocation(sourceFile)` plus `checker.getExportsOfModule(moduleSymbol)`, following the existing TypeChecker/export pattern in [type-index.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/lib/type-index.mjs:97). Compare exact `{file, name, kind}` sets. The ref-backed CompilerHost must resolve relative TS source re-exports (`export { x } from`, `export type { T } from`, `export * from`, `export * as ns from`) from the git tree, including ESM `.js` specifiers that point at TS sources. If a public re-export module cannot be resolved, fail loudly instead of silently dropping exports. For deleted files, all baseline exports are removed; for added files, all HEAD exports are added. File path is part of the public surface identity: a rename records removed exports at the old path and added exports at the new path.
 - `addedDependencies`: parse changed `package.json` files at base and head. Runtime dependency buckets are `dependencies`, `optionalDependencies`, and `peerDependencies`; `devDependencies` is separate. Added means package key absent at base and present at head, or moved from dev to runtime. Lockfile-only changes are inventory-only in v0.
 - `touchedModuleGraph`: build from HEAD TS Program using static `import`, `export ... from`, and string-literal dynamic `import()`. Compute undirected shortest-path distance from `scope.allowedEntrypoints` to each touched TS file. This is v1 inventory first, not v0 blocking.
 
 **3. Conformance Checks**
 v0 deterministic violation types:
+
 - `forbidden-path-touched`: any changed `path` or `oldPath` matches `scope.forbiddenPaths`.
 - `path-out-of-scope`: any changed `path` or `oldPath` fails all `scope.allowedPaths`.
 - `undeclared-change-type`: git status maps to an operation not in `scope.allowedChangeTypes`.
-- `undeclared-added-export`: an added export is not exactly listed in `scope.allowedExports`.
+- `undeclared-added-export`: an added export is not exactly listed in `scope.allowedExports`. `file`, `name`, and `kind` must all match; omitted `kind` is invalid schema, not a wildcard.
 - `undeclared-runtime-dependency`: added runtime dependency not listed in `scope.allowedRuntimeDependencies`.
 - `undeclared-dev-dependency`: added dev dependency not listed in `scope.allowedDevDependencies`, inventory-only by default.
 
@@ -63,6 +67,7 @@ Later phases: `module-radius-exceeded`, `undeclared-owner-symbol`, `public-route
 
 **4. Semantic Fact**
 Add `changeContractConformance` to `SEMANTIC_FACT_KINDS` in [semantic-facts.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/lib/semantic-facts.mjs:6):
+
 ```js
 changeContractConformance: Object.freeze({
   rules: Object.freeze([]),
@@ -72,7 +77,8 @@ changeContractConformance: Object.freeze({
   confidence: Object.freeze(["deterministic-inventory"]),
   emission: Object.freeze(["inventory-only"]),
   association: "Merge-base diff surface to a machine-readable change contract.",
-  noSinkBehavior: "The CLI still prints the conformance summary; only serialized semantic fact output is skipped.",
+  noSinkBehavior:
+    "The CLI still prints the conformance summary; only serialized semantic fact output is skipped.",
   payloadFields: Object.freeze([
     "contractState",
     "changeContext",
@@ -81,11 +87,13 @@ changeContractConformance: Object.freeze({
     "violations",
     "decision",
   ]),
-})
+});
 ```
+
 Fact emission uses `semanticFact({ ruleId: "antidrift/change-contract-conformance", adapterId: "change-contract", confidence: "deterministic-inventory", provenance: ["git-diff", "change-contract", "ts-program", "package-manifest"], filePath: contractPath, payload })`.
 
 Registry ripple:
+
 - Add `carrier: change-relative` to checker allowed carriers, currently limited in [check-registries.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/check-registries.mjs:588), and to `SemanticFactCarrier` in [index.d.mts](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/index.d.mts:39).
 - Add provenance literals to [index.d.mts](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/index.d.mts:53).
 - Mirror the fact in `policy/registries/rules.yaml` under `semanticFactKinds`, matching the shipped contract exactly as required by [check-registries.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/check-registries.mjs:1227).
@@ -95,6 +103,7 @@ Registry ripple:
 
 **5. Architecture Integration**
 Module layout:
+
 - `tooling/antidrift/src/change-scope/contract-schema.mjs`
 - `tooling/antidrift/src/change-scope/change-context.mjs`
 - `tooling/antidrift/src/change-scope/surface.mjs`
@@ -121,15 +130,14 @@ Evidence plan: mine the n=60 complaint corpus from [reports/complaint-sweep-2026
 LLM may draft or critique the contract. LLM may not decide conformance, widen scope at proof time, infer unstated intent, or produce blocking output. The proof inputs are only merge-base tree, HEAD tree, package manifests, TS Program facts, module graph, and the validated contract. The claim string in output must be exactly: `the diff exceeded the declared scope contract`.
 
 **8. First-PR Build Order**
+
 1. Land `change-context` git helpers and tests with a temp git repo.
 2. Land contract schema/parser and pure `analyzeChangeScope()` tests for path, operation, dependency, and export violation semantics.
 3. Land v0 surface extraction for changed files and package dependencies.
 4. Add `changeContractConformance` fact contract plus registry-check support for command-owned facts.
 5. Add `antidrift change-contract` CLI with JSON summary and optional JSONL facts.
 6. Add `policy:inventory-change-contract` to verify-session, non-blocking on no-contract and violations.
-7. Next PR: TS Program before/after export extraction.
+7. Land TS Program before/after export extraction.
 8. Next PR: diff-scoped existing-adapter inventory.
 9. Next PR: module graph radius inventory.
 10. Only after multi-repo evidence: add `deterministic-enforcement` and `blocking-diagnostic` to the fact contract, plus `--mode enforce`.
-
-

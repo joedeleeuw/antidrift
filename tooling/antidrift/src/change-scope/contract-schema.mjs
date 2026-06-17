@@ -1,6 +1,13 @@
 import { parse as parseYaml } from "yaml";
 
-const TOP_LEVEL_KEYS = new Set(["schemaVersion", "contractId", "task", "authorship", "scope", "refactor"]);
+const TOP_LEVEL_KEYS = new Set([
+  "schemaVersion",
+  "contractId",
+  "task",
+  "authorship",
+  "scope",
+  "refactor",
+]);
 const SCOPE_KEYS = new Set([
   "allowedPaths",
   "forbiddenPaths",
@@ -13,8 +20,12 @@ const SCOPE_KEYS = new Set([
   "allowedOwnerSymbols",
 ]);
 const CHANGE_TYPES = new Set(["add", "modify", "delete", "rename"]);
+const EXPORT_KINDS = new Set(["value", "type", "default", "namespace"]);
 const BROAD_GLOBS = new Set(["*", "**", "**/*", "**/**", "/**"]);
-const DEPENDENCY_FIELDS = ["allowedRuntimeDependencies", "allowedDevDependencies"];
+const DEPENDENCY_FIELDS = [
+  "allowedRuntimeDependencies",
+  "allowedDevDependencies",
+];
 
 export class ContractValidationError extends Error {
   /** @param {string[]} problems */
@@ -30,11 +41,26 @@ function isObject(value) {
 }
 
 function isStringArray(value) {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
 }
 
 function frozenStringArray(value) {
   return Object.freeze(isStringArray(value) ? [...value] : []);
+}
+
+function frozenAllowedExports(value) {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze(
+    value.map((entry) =>
+      Object.freeze({
+        file: entry.file,
+        name: entry.name,
+        kind: entry.kind,
+      }),
+    ),
+  );
 }
 
 function checkPath(path, field, problems) {
@@ -52,13 +78,17 @@ function checkPath(path, field, problems) {
 
 function validateAllowedPaths(scope, refactorApproved, problems) {
   if (!isStringArray(scope.allowedPaths) || scope.allowedPaths.length === 0) {
-    problems.push("scope.allowedPaths must be a non-empty array of repo-relative globs");
+    problems.push(
+      "scope.allowedPaths must be a non-empty array of repo-relative globs",
+    );
     return;
   }
   for (const path of scope.allowedPaths) {
     checkPath(path, "scope.allowedPaths", problems);
     if (BROAD_GLOBS.has(path) && !refactorApproved) {
-      problems.push(`scope.allowedPaths uses broad glob "${path}" without refactor.approved: true`);
+      problems.push(
+        `scope.allowedPaths uses broad glob "${path}" without refactor.approved: true`,
+      );
     }
   }
 }
@@ -75,7 +105,9 @@ function validateForbiddenPaths(scope, problems) {
     problems.push("scope.forbiddenPaths must be an array of strings");
     return;
   }
-  for (const path of scope.forbiddenPaths) checkPath(path, "scope.forbiddenPaths", problems);
+  for (const path of scope.forbiddenPaths) {
+    checkPath(path, "scope.forbiddenPaths", problems);
+  }
 }
 
 function validateChangeTypes(scope, problems) {
@@ -86,7 +118,9 @@ function validateChangeTypes(scope, problems) {
   }
   for (const type of scope.allowedChangeTypes) {
     if (!CHANGE_TYPES.has(type)) {
-      problems.push(`scope.allowedChangeTypes has invalid value "${type}" (expected add|modify|delete|rename)`);
+      problems.push(
+        `scope.allowedChangeTypes has invalid value "${type}" (expected add|modify|delete|rename)`,
+      );
     }
   }
 }
@@ -106,8 +140,21 @@ function validateExports(scope, problems) {
     return;
   }
   for (const entry of scope.allowedExports) {
-    if (!isObject(entry) || typeof entry.file !== "string" || typeof entry.name !== "string") {
-      problems.push("scope.allowedExports entries must be objects with string file and name");
+    if (
+      !isObject(entry) ||
+      typeof entry.file !== "string" ||
+      typeof entry.name !== "string"
+    ) {
+      problems.push(
+        "scope.allowedExports entries must be objects with string file and name",
+      );
+      continue;
+    }
+    checkPath(entry.file, "scope.allowedExports.file", problems);
+    if (!EXPORT_KINDS.has(entry.kind)) {
+      problems.push(
+        `scope.allowedExports kind must be one of value|type|default|namespace: ${entry.kind}`,
+      );
     }
   }
 }
@@ -118,19 +165,29 @@ function validateEntrypoints(scope, problems) {
     problems.push("scope.allowedEntrypoints must be an array of strings");
     return;
   }
-  for (const path of scope.allowedEntrypoints) checkPath(path, "scope.allowedEntrypoints", problems);
+  for (const path of scope.allowedEntrypoints) {
+    checkPath(path, "scope.allowedEntrypoints", problems);
+  }
 }
 
 function validateOwnerSymbols(scope, problems) {
-  if (scope.allowedOwnerSymbols !== undefined && !isStringArray(scope.allowedOwnerSymbols)) {
+  if (
+    scope.allowedOwnerSymbols !== undefined &&
+    !isStringArray(scope.allowedOwnerSymbols)
+  ) {
     problems.push("scope.allowedOwnerSymbols must be an array of strings");
   }
 }
 
 function validateModuleRadius(scope, problems) {
   const radius = scope.maxTouchedModuleRadius;
-  if (radius !== undefined && (typeof radius !== "number" || !Number.isInteger(radius) || radius < 0)) {
-    problems.push("scope.maxTouchedModuleRadius must be a non-negative integer");
+  if (
+    radius !== undefined &&
+    (typeof radius !== "number" || !Number.isInteger(radius) || radius < 0)
+  ) {
+    problems.push(
+      "scope.maxTouchedModuleRadius must be a non-negative integer",
+    );
   }
 }
 
@@ -148,17 +205,33 @@ function validateScope(scope, refactorApproved, problems) {
 
 function validateRefactor(raw, problems) {
   const refactor = isObject(raw.refactor) ? raw.refactor : {};
-  if (refactor.approved !== undefined && typeof refactor.approved !== "boolean") {
+  if (
+    refactor.approved !== undefined &&
+    typeof refactor.approved !== "boolean"
+  ) {
     problems.push("refactor.approved must be a boolean");
   }
-  if (refactor.justification !== undefined && typeof refactor.justification !== "string") {
+  if (
+    refactor.justification !== undefined &&
+    typeof refactor.justification !== "string"
+  ) {
     problems.push("refactor.justification must be a string");
   }
   const approved = refactor.approved === true;
-  if (approved && (typeof refactor.justification !== "string" || refactor.justification.trim().length === 0)) {
-    problems.push("refactor.approved: true requires a non-empty refactor.justification");
+  if (
+    approved &&
+    (typeof refactor.justification !== "string" ||
+      refactor.justification.trim().length === 0)
+  ) {
+    problems.push(
+      "refactor.approved: true requires a non-empty refactor.justification",
+    );
   }
-  return { approved, justification: typeof refactor.justification === "string" ? refactor.justification : "" };
+  return {
+    approved,
+    justification:
+      typeof refactor.justification === "string" ? refactor.justification : "",
+  };
 }
 
 /**
@@ -168,17 +241,27 @@ function validateRefactor(raw, problems) {
  */
 export function validateContract(raw) {
   const problems = [];
-  if (!isObject(raw)) throw new ContractValidationError(["contract must be a mapping"]);
+  if (!isObject(raw)) {
+    throw new ContractValidationError(["contract must be a mapping"]);
+  }
 
   for (const key of Object.keys(raw)) {
-    if (!TOP_LEVEL_KEYS.has(key)) problems.push(`unknown top-level key: ${key}`);
+    if (!TOP_LEVEL_KEYS.has(key)) {
+      problems.push(`unknown top-level key: ${key}`);
+    }
   }
   if (raw.schemaVersion !== 1) problems.push("schemaVersion must be 1");
-  if (typeof raw.contractId !== "string" || raw.contractId.trim().length === 0) {
+  if (
+    typeof raw.contractId !== "string" ||
+    raw.contractId.trim().length === 0
+  ) {
     problems.push("contractId must be a non-empty string");
   }
 
-  const { approved: refactorApproved, justification } = validateRefactor(raw, problems);
+  const { approved: refactorApproved, justification } = validateRefactor(
+    raw,
+    problems,
+  );
 
   if (isObject(raw.scope)) {
     validateScope(raw.scope, refactorApproved, problems);
@@ -199,7 +282,10 @@ export function validateContract(raw) {
       allowedPaths: frozenStringArray(scope.allowedPaths),
       forbiddenPaths: frozenStringArray(scope.forbiddenPaths),
       allowedChangeTypes: frozenStringArray(scope.allowedChangeTypes),
-      allowedRuntimeDependencies: frozenStringArray(scope.allowedRuntimeDependencies),
+      allowedExports: frozenAllowedExports(scope.allowedExports),
+      allowedRuntimeDependencies: frozenStringArray(
+        scope.allowedRuntimeDependencies,
+      ),
       allowedDevDependencies: frozenStringArray(scope.allowedDevDependencies),
     }),
     refactor: Object.freeze({ approved: refactorApproved, justification }),
@@ -215,7 +301,9 @@ export function parseContract(text) {
   try {
     raw = parseYaml(text);
   } catch (error) {
-    throw new ContractValidationError([`contract is not valid YAML/JSON: ${error.message}`]);
+    throw new ContractValidationError([
+      `contract is not valid YAML/JSON: ${error.message}`,
+    ]);
   }
   return validateContract(raw);
 }

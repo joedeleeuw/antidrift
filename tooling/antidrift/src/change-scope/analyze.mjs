@@ -2,6 +2,7 @@ export const VIOLATION_TYPES = Object.freeze({
   forbiddenPath: "forbidden-path-touched",
   pathOutOfScope: "path-out-of-scope",
   undeclaredChangeType: "undeclared-change-type",
+  undeclaredAddedExport: "undeclared-added-export",
   undeclaredRuntimeDependency: "undeclared-runtime-dependency",
   undeclaredDevDependency: "undeclared-dev-dependency",
 });
@@ -65,7 +66,10 @@ function fileViolations(file, scope) {
     }
   }
 
-  if (scope.allowedChangeTypes.length > 0 && !scope.allowedChangeTypes.includes(file.operation)) {
+  if (
+    scope.allowedChangeTypes.length > 0 &&
+    !scope.allowedChangeTypes.includes(file.operation)
+  ) {
     violations.push({
       type: VIOLATION_TYPES.undeclaredChangeType,
       path: file.path,
@@ -90,21 +94,45 @@ function dependencyViolations(added, allowed, type, label) {
   return violations;
 }
 
+function exportAllowed(addedExport, allowedExports) {
+  return allowedExports.some(
+    (allowed) =>
+      allowed.file === addedExport.file &&
+      allowed.name === addedExport.name &&
+      allowed.kind === addedExport.kind,
+  );
+}
+
+function exportViolations(addedExports, allowedExports) {
+  const violations = [];
+  for (const addedExport of addedExports) {
+    if (!exportAllowed(addedExport, allowedExports)) {
+      violations.push({
+        type: VIOLATION_TYPES.undeclaredAddedExport,
+        path: addedExport.file,
+        exportName: addedExport.name,
+        exportKind: addedExport.kind,
+        detail: `export "${addedExport.name}" (${addedExport.kind}) was added in ${addedExport.file} but is not declared in scope.allowedExports`,
+      });
+    }
+  }
+  return violations;
+}
+
 /**
  * Pure deterministic conformance check: does the change surface exceed the declared contract?
  * @param {object} contract normalized contract from validateContract
- * @param {{ changedFiles: Array<{ path: string, oldPath: string | null, operation: string }>, addedRuntimeDependencies: string[], addedDevDependencies: string[] }} surface
- * @returns {Array<{ type: string, path?: string, dependency?: string, detail: string }>}
+ * @param {{ changedFiles: Array<{ path: string, oldPath: string | null, operation: string }>, addedExports?: Array<{ file: string, name: string, kind: string }>, addedRuntimeDependencies: string[], addedDevDependencies: string[] }} surface
+ * @returns {Array<{ type: string, path?: string, dependency?: string, exportName?: string, exportKind?: string, detail: string }>}
  */
 export function analyzeChangeScope(contract, surface) {
   const { scope } = contract;
-  const violations = [];
-
-  for (const file of surface.changedFiles) {
-    violations.push(...fileViolations(file, scope));
-  }
-
-  violations.push(
+  const fileViolationList = surface.changedFiles.flatMap((file) =>
+    fileViolations(file, scope),
+  );
+  return [
+    ...fileViolationList,
+    ...exportViolations(surface.addedExports ?? [], scope.allowedExports ?? []),
     ...dependencyViolations(
       surface.addedRuntimeDependencies,
       scope.allowedRuntimeDependencies,
@@ -117,7 +145,5 @@ export function analyzeChangeScope(contract, surface) {
       VIOLATION_TYPES.undeclaredDevDependency,
       "dev",
     ),
-  );
-
-  return violations;
+  ];
 }

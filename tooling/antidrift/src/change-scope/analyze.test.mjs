@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { VIOLATION_TYPES, analyzeChangeScope, globToRegExp, matchesAnyGlob } from "./analyze.mjs";
+import {
+  VIOLATION_TYPES,
+  analyzeChangeScope,
+  globToRegExp,
+  matchesAnyGlob,
+} from "./analyze.mjs";
 
 const ORDERS_GLOB = "apps/shop/src/orders/**";
 
@@ -34,12 +39,18 @@ function changedFile(path, operation = "modify", oldPath = null) {
 
 describe("globToRegExp", () => {
   it("matches ** across path separators", () => {
-    expect(globToRegExp(ORDERS_GLOB).test("apps/shop/src/orders/format.ts")).toBe(true);
-    expect(globToRegExp(ORDERS_GLOB).test("apps/shop/src/orders/deep/nested.ts")).toBe(true);
+    expect(
+      globToRegExp(ORDERS_GLOB).test("apps/shop/src/orders/format.ts"),
+    ).toBe(true);
+    expect(
+      globToRegExp(ORDERS_GLOB).test("apps/shop/src/orders/deep/nested.ts"),
+    ).toBe(true);
   });
 
   it("does not match a sibling directory", () => {
-    expect(matchesAnyGlob("apps/shop/src/billing/index.ts", [ORDERS_GLOB])).toBe(false);
+    expect(
+      matchesAnyGlob("apps/shop/src/billing/index.ts", [ORDERS_GLOB]),
+    ).toBe(false);
   });
 
   it("treats a single star as segment-local", () => {
@@ -63,27 +74,43 @@ describe("globToRegExp", () => {
 
 describe("analyzeChangeScope", () => {
   it("stays clean when every change is in scope", () => {
-    const result = analyzeChangeScope(contract(), surface({ changedFiles: [changedFile("apps/shop/src/orders/format.ts")] }));
+    const result = analyzeChangeScope(
+      contract(),
+      surface({
+        changedFiles: [changedFile("apps/shop/src/orders/format.ts")],
+      }),
+    );
     expect(result).toEqual([]);
   });
 
   it("flags a path outside the allowed scope", () => {
-    const result = analyzeChangeScope(contract(), surface({ changedFiles: [changedFile("apps/shop/src/billing/tax.ts")] }));
+    const result = analyzeChangeScope(
+      contract(),
+      surface({ changedFiles: [changedFile("apps/shop/src/billing/tax.ts")] }),
+    );
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe(VIOLATION_TYPES.pathOutOfScope);
   });
 
   it("flags a forbidden path even inside an allowed tree", () => {
     const result = analyzeChangeScope(
-      contract({ allowedPaths: ["apps/shop/**"], forbiddenPaths: ["apps/shop/src/billing/**"] }),
+      contract({
+        allowedPaths: ["apps/shop/**"],
+        forbiddenPaths: ["apps/shop/src/billing/**"],
+      }),
       surface({ changedFiles: [changedFile("apps/shop/src/billing/tax.ts")] }),
     );
-    expect(result.map((violation) => violation.type)).toContain(VIOLATION_TYPES.forbiddenPath);
+    expect(result.map((violation) => violation.type)).toContain(
+      VIOLATION_TYPES.forbiddenPath,
+    );
   });
 
   it("emits forbidden and out-of-scope independently", () => {
     const result = analyzeChangeScope(
-      contract({ allowedPaths: ["apps/orders/**"], forbiddenPaths: ["apps/billing/**"] }),
+      contract({
+        allowedPaths: ["apps/orders/**"],
+        forbiddenPaths: ["apps/billing/**"],
+      }),
       surface({ changedFiles: [changedFile("apps/billing/secret.ts")] }),
     );
     const types = result.map((violation) => violation.type);
@@ -94,14 +121,29 @@ describe("analyzeChangeScope", () => {
   it("considers the old path of a rename for scope", () => {
     const result = analyzeChangeScope(
       contract({ allowedPaths: ["apps/shop/src/orders/**"] }),
-      surface({ changedFiles: [changedFile("apps/shop/src/orders/new.ts", "rename", "apps/shop/src/billing/old.ts")] }),
+      surface({
+        changedFiles: [
+          changedFile(
+            "apps/shop/src/orders/new.ts",
+            "rename",
+            "apps/shop/src/billing/old.ts",
+          ),
+        ],
+      }),
     );
-    expect(result.map((violation) => violation.type)).toContain(VIOLATION_TYPES.pathOutOfScope);
+    expect(result.map((violation) => violation.type)).toContain(
+      VIOLATION_TYPES.pathOutOfScope,
+    );
   });
 
   it("flags an undeclared runtime dependency", () => {
-    const result = analyzeChangeScope(contract(), surface({ addedRuntimeDependencies: ["@copilotkit/react-core"] }));
-    expect(result.map((violation) => violation.type)).toContain(VIOLATION_TYPES.undeclaredRuntimeDependency);
+    const result = analyzeChangeScope(
+      contract(),
+      surface({ addedRuntimeDependencies: ["@copilotkit/react-core"] }),
+    );
+    expect(result.map((violation) => violation.type)).toContain(
+      VIOLATION_TYPES.undeclaredRuntimeDependency,
+    );
   });
 
   it("allows a declared runtime dependency", () => {
@@ -115,8 +157,105 @@ describe("analyzeChangeScope", () => {
   it("flags a change type outside the declared set", () => {
     const result = analyzeChangeScope(
       contract({ allowedChangeTypes: ["modify"] }),
-      surface({ changedFiles: [changedFile("apps/shop/src/orders/old.ts", "delete")] }),
+      surface({
+        changedFiles: [changedFile("apps/shop/src/orders/old.ts", "delete")],
+      }),
     );
-    expect(result.map((violation) => violation.type)).toContain(VIOLATION_TYPES.undeclaredChangeType);
+    expect(result.map((violation) => violation.type)).toContain(
+      VIOLATION_TYPES.undeclaredChangeType,
+    );
+  });
+
+  it("flags an added export that is not declared in the contract", () => {
+    const result = analyzeChangeScope(
+      contract(),
+      surface({
+        addedExports: [
+          {
+            file: "apps/shop/src/orders/format.ts",
+            name: "formatOrder",
+            kind: "value",
+          },
+        ],
+      }),
+    );
+    expect(result.map((violation) => violation.type)).toContain(
+      VIOLATION_TYPES.undeclaredAddedExport,
+    );
+  });
+
+  it("allows a declared added export", () => {
+    const result = analyzeChangeScope(
+      contract({
+        allowedExports: [
+          {
+            file: "apps/shop/src/orders/format.ts",
+            name: "formatOrder",
+            kind: "value",
+          },
+        ],
+      }),
+      surface({
+        addedExports: [
+          {
+            file: "apps/shop/src/orders/format.ts",
+            name: "formatOrder",
+            kind: "value",
+          },
+        ],
+      }),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("requires export kind to match when declared", () => {
+    const result = analyzeChangeScope(
+      contract({
+        allowedExports: [
+          {
+            file: "apps/shop/src/orders/format.ts",
+            name: "FormatOrder",
+            kind: "type",
+          },
+        ],
+      }),
+      surface({
+        addedExports: [
+          {
+            file: "apps/shop/src/orders/format.ts",
+            name: "FormatOrder",
+            kind: "value",
+          },
+        ],
+      }),
+    );
+    expect(result.map((violation) => violation.type)).toContain(
+      VIOLATION_TYPES.undeclaredAddedExport,
+    );
+  });
+
+  it("does not treat omitted export kind as a wildcard", () => {
+    const result = analyzeChangeScope(
+      contract({
+        allowedExports: [
+          {
+            file: "apps/shop/src/orders/format.ts",
+            name: "formatOrder",
+          },
+        ],
+      }),
+      surface({
+        addedExports: [
+          {
+            file: "apps/shop/src/orders/format.ts",
+            name: "formatOrder",
+            kind: "value",
+          },
+        ],
+      }),
+    );
+    expect(result.map((violation) => violation.type)).toContain(
+      VIOLATION_TYPES.undeclaredAddedExport,
+    );
   });
 });
