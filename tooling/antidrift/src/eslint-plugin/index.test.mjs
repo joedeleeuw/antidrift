@@ -724,6 +724,29 @@ ruleTester.run(
   },
 );
 
+typedRuleTester.run(
+  "no-nullable-positional-tuple type-aware aliases",
+  rule("no-nullable-positional-tuple"),
+  {
+    valid: [
+      "type MaybeDate = Date | null; type OpenRange = [MaybeDate, Date];",
+    ],
+    invalid: [
+      {
+        code: "type MaybeDate = Date | null; type CustomRange = [MaybeDate, MaybeDate];",
+        errors: 1,
+      },
+      {
+        code: `
+          type Maybe<T> = T | null;
+          type CustomRange = [Maybe<Date>, Maybe<Date>];
+        `,
+        errors: 1,
+      },
+    ],
+  },
+);
+
 ruleTester.run("require-authz-check", rule("require-authz-check"), {
   valid: [
     fixture("programs/correct/authz-before-params.ts"),

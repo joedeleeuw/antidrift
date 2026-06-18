@@ -769,6 +769,24 @@ rules:
     signal: deterministic AST
     solveType: type-contract-shape
     proofBuckets: [local-ast-source-shape, semantic-source-type-provenance]
+    promotion:
+      proofBucket: local-ast-source-shape
+      association: Tuple element positions to direct optional/nullish syntax, or to TypeChecker-resolved nullable aliases when parser services are available.
+      blockingThreshold: A tuple type reports only when two or more tuple slots are optional, directly nullish, or TypeChecker-resolved to include null or undefined.
+      ecosystemComparison: No maintained TypeScript ESLint rule covers the narrow smell of multi-slot nullable positional tuples without banning ordinary tuple use.
+      corpusEvidence: Chaski supplies one real drift, `CustomRange = [Date | null, Date | null]`, plus one clean control for a non-null numeric coordinate pair.
+      realCorpusInventory: "docs/rule-investigations/no-nullable-positional-tuple.md records the documented broad Chaski frontend inventory count: one finding across 1,533 files. No saved report artifact is currently checked in for this count."
+      realCorpusInventoryRefs:
+        - docs/rule-investigations/no-nullable-positional-tuple.md
+        - docs/rule-roadmap.md
+        - docs/rule-status-registry.md
+        - docs/real-corpus-validation.md
+      replicationsNotIntroducedForTest: true
+      knownFalsePositives: 0
+      knownFalseNegatives: Alias and generic-chain nullability are missed without TypeScript parser services; imported owner range aliases are intentionally out of scope unless redeclared as local tuple syntax.
+      productionConcerns: Evidence is precise but low-yield and Chaski-only. Keep default-off until another real nullable or optional multi-slot tuple appears with real-corpus clean controls for ordinary tuples, hook tuples, imported owner aliases, arrays, whole-null tuple values, and intentionally positional protocol/API tuples.
+      noSinkBehavior: This rule emits no semantic facts; diagnostics depend on local tuple syntax and optional TypeChecker alias resolution, not sink availability.
+      noDeadWorkBehavior: The current corpus proves non-null coordinate pairs stay clean; hook-style tuples with only one nullable slot, imported owner tuple aliases, arrays, and whole-null tuple values are implementation/case-matrix boundaries that still need real-corpus clean pressure before promotion.
     referenceDoc: docs/rule-investigations/no-nullable-positional-tuple.md
     corpusRepositories: [chaski]
     concerns:
