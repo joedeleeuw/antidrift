@@ -45,7 +45,7 @@ export function matchesAnyGlob(path, globs) {
   return globs.some((glob) => globToRegExp(glob).test(path));
 }
 
-function fileViolations(file, scope) {
+function pathViolations(file, scope) {
   const violations = [];
   const candidatePaths = file.oldPath ? [file.oldPath, file.path] : [file.path];
 
@@ -65,7 +65,11 @@ function fileViolations(file, scope) {
       });
     }
   }
+  return violations;
+}
 
+function changeTypeViolations(file, scope) {
+  const violations = [];
   if (
     scope.allowedChangeTypes.length > 0 &&
     !scope.allowedChangeTypes.includes(file.operation)
@@ -119,31 +123,53 @@ function exportViolations(addedExports, allowedExports) {
   return violations;
 }
 
+function requiresSurface(scope, surface) {
+  if (!Array.isArray(scope.checkedSurfaces)) {
+    throw new TypeError("scope.checkedSurfaces is required before analysis");
+  }
+  return scope.checkedSurfaces.includes(surface);
+}
+
 /**
  * Pure deterministic conformance check: does the change surface exceed the declared contract?
- * @param {object} contract normalized contract from validateContract
- * @param {{ changedFiles: Array<{ path: string, oldPath: string | null, operation: string }>, addedExports?: Array<{ file: string, name: string, kind: string }>, addedRuntimeDependencies: string[], addedDevDependencies: string[] }} surface
- * @returns {Array<{ type: string, path?: string, dependency?: string, exportName?: string, exportKind?: string, detail: string }>}
  */
 export function analyzeChangeScope(contract, surface) {
   const { scope } = contract;
-  const fileViolationList = surface.changedFiles.flatMap((file) =>
-    fileViolations(file, scope),
-  );
+  const fileViolationList = [];
+  if (requiresSurface(scope, "paths")) {
+    fileViolationList.push(
+      ...surface.changedFiles.flatMap((file) => pathViolations(file, scope)),
+    );
+  }
+  if (requiresSurface(scope, "changeTypes")) {
+    fileViolationList.push(
+      ...surface.changedFiles.flatMap((file) =>
+        changeTypeViolations(file, scope),
+      ),
+    );
+  }
+  const dependencyViolationList = requiresSurface(scope, "dependencies")
+    ? [
+        ...dependencyViolations(
+          surface.addedRuntimeDependencies,
+          scope.allowedRuntimeDependencies,
+          VIOLATION_TYPES.undeclaredRuntimeDependency,
+          "runtime",
+        ),
+        ...dependencyViolations(
+          surface.addedDevDependencies,
+          scope.allowedDevDependencies,
+          VIOLATION_TYPES.undeclaredDevDependency,
+          "dev",
+        ),
+      ]
+    : [];
+  const exportViolationList = requiresSurface(scope, "exports")
+    ? exportViolations(surface.addedExports ?? [], scope.allowedExports ?? [])
+    : [];
   return [
     ...fileViolationList,
-    ...exportViolations(surface.addedExports ?? [], scope.allowedExports ?? []),
-    ...dependencyViolations(
-      surface.addedRuntimeDependencies,
-      scope.allowedRuntimeDependencies,
-      VIOLATION_TYPES.undeclaredRuntimeDependency,
-      "runtime",
-    ),
-    ...dependencyViolations(
-      surface.addedDevDependencies,
-      scope.allowedDevDependencies,
-      VIOLATION_TYPES.undeclaredDevDependency,
-      "dev",
-    ),
+    ...exportViolationList,
+    ...dependencyViolationList,
   ];
 }

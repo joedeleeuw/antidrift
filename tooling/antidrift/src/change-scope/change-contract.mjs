@@ -59,6 +59,10 @@ function moduleGraphConfigured(scope) {
   );
 }
 
+function surfaceConfigured(scope, surface) {
+  return scope.checkedSurfaces.includes(surface);
+}
+
 function touchedModuleGraphFor({ contract, surface, cwd, head, tsconfig }) {
   if (!moduleGraphConfigured(contract.scope)) return null;
   if (contract.scope.allowedEntrypoints.length === 0) {
@@ -115,7 +119,13 @@ export function runChangeContract({
       "change-contract: a base ref is required when a contract is present (pass --base or ANTIDRIFT_BASE_REF)",
     );
   }
-  const surface = collectChangeSurface({ base, head, cwd });
+  const surface = collectChangeSurface({
+    base,
+    head,
+    cwd,
+    includeExports: surfaceConfigured(contract.scope, "exports"),
+    includePatchHunks: false,
+  });
   const contractState = contractStateFor(
     relative(cwd, resolvedContract),
     surface.changedFiles,

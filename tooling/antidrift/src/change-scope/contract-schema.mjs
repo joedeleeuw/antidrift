@@ -9,6 +9,7 @@ const TOP_LEVEL_KEYS = new Set([
   "refactor",
 ]);
 const SCOPE_KEYS = new Set([
+  "checkedSurfaces",
   "allowedPaths",
   "forbiddenPaths",
   "allowedChangeTypes",
@@ -18,6 +19,12 @@ const SCOPE_KEYS = new Set([
   "allowedEntrypoints",
   "maxTouchedModuleRadius",
   "allowedOwnerSymbols",
+]);
+const CHECKED_SURFACES = new Set([
+  "paths",
+  "changeTypes",
+  "dependencies",
+  "exports",
 ]);
 const CHANGE_TYPES = new Set(["add", "modify", "delete", "rename"]);
 const EXPORT_KINDS = new Set(["value", "type", "default", "namespace"]);
@@ -88,6 +95,25 @@ function validateAllowedPaths(scope, refactorApproved, problems) {
     if (BROAD_GLOBS.has(path) && !refactorApproved) {
       problems.push(
         `scope.allowedPaths uses broad glob "${path}" without refactor.approved: true`,
+      );
+    }
+  }
+}
+
+function validateCheckedSurfaces(scope, problems) {
+  if (
+    !isStringArray(scope.checkedSurfaces) ||
+    scope.checkedSurfaces.length === 0
+  ) {
+    problems.push(
+      "scope.checkedSurfaces must be a non-empty array of deterministic surface names",
+    );
+    return;
+  }
+  for (const surface of scope.checkedSurfaces) {
+    if (!CHECKED_SURFACES.has(surface)) {
+      problems.push(
+        `scope.checkedSurfaces has invalid value "${surface}" (expected paths|changeTypes|dependencies|exports)`,
       );
     }
   }
@@ -193,6 +219,7 @@ function validateModuleRadius(scope, problems) {
 
 function validateScope(scope, refactorApproved, problems) {
   validateUnknownScopeKeys(scope, problems);
+  validateCheckedSurfaces(scope, problems);
   validateAllowedPaths(scope, refactorApproved, problems);
   validateForbiddenPaths(scope, problems);
   validateChangeTypes(scope, problems);
@@ -279,6 +306,7 @@ export function validateContract(raw) {
     authorship: raw.authorship ?? null,
     scope: Object.freeze({
       ...scope,
+      checkedSurfaces: frozenStringArray(scope.checkedSurfaces),
       allowedPaths: frozenStringArray(scope.allowedPaths),
       forbiddenPaths: frozenStringArray(scope.forbiddenPaths),
       allowedChangeTypes: frozenStringArray(scope.allowedChangeTypes),

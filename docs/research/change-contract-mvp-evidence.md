@@ -20,6 +20,9 @@ Implementation status: v0 inventory is now built and wired into the shipped pack
 `antidrift change-contract`, `policy:inventory-change-contract`, the command-owned
 `changeContractConformance` semantic fact, TS export-surface extraction, diff-scoped adapter
 inventory, module graph radius inventory, package consumer verification, and `policy:verify-session`.
+The documented 5 gold TPs + 7 TN controls are replayed by
+`pnpm policy:validate-change-contract-evidence` against local frozen `sudocode-main` and `chaski`
+copies.
 
 **NO — to any blocking gate or stable-promotion claim.** FP rate is uncharacterized (zero freshly
 mined clean controls), the violation taxonomy is concentrated/singleton-heavy, and the high-yield
@@ -72,7 +75,8 @@ and regenerated bindings) · `chaski@59e1bee78` (declared mock ERP removal) · `
 
 ## Next move
 
-1. **Replay the 5 gold TPs + 7 TN controls through the built v0 spine** as a real validation corpus.
-   Quarantine the opencode cases as ambiguous inventory, never gold.
+1. **Run `pnpm policy:validate-change-contract-evidence`** after change-contract edits to keep the 5
+   gold TPs + 7 TN controls executable against the built v0 spine. Quarantine the opencode cases as
+   ambiguous inventory, never gold.
 2. **Before any enforcement mode:** a second targeted mine over `refactor:*` / `test:*` / `ci:*`/`build:*`
    subjects **plus a clean-control sweep** of mined non-TPs — the missing FP-characterization step.

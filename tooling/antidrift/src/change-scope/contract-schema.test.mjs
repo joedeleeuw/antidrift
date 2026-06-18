@@ -10,11 +10,17 @@ const CONTRACT_ID = "TASK-1";
 const NARROW_GLOB = "apps/shop/src/orders/**";
 
 function rawContract(overrides = {}) {
+  const { scope: scopeOverride = {}, ...topLevelOverrides } = overrides;
+  const scope = {
+    allowedPaths: [NARROW_GLOB],
+    checkedSurfaces: ["paths"],
+    ...scopeOverride,
+  };
   return {
     schemaVersion: 1,
     contractId: CONTRACT_ID,
-    scope: { allowedPaths: [NARROW_GLOB] },
-    ...overrides,
+    ...topLevelOverrides,
+    scope,
   };
 }
 
@@ -25,6 +31,9 @@ describe("parseContract", () => {
         "schemaVersion: 1",
         `contractId: ${CONTRACT_ID}`,
         "scope:",
+        "  checkedSurfaces:",
+        "    - paths",
+        "    - changeTypes",
         `  allowedPaths:`,
         `    - ${NARROW_GLOB}`,
         "  allowedChangeTypes:",
@@ -33,6 +42,7 @@ describe("parseContract", () => {
     );
     expect(contract.contractId).toBe(CONTRACT_ID);
     expect(contract.scope.allowedPaths).toEqual([NARROW_GLOB]);
+    expect(contract.scope.checkedSurfaces).toEqual(["paths", "changeTypes"]);
     expect(contract.scope.allowedChangeTypes).toEqual(["modify"]);
     expect(contract.refactor.approved).toBe(false);
   });
@@ -55,6 +65,24 @@ describe("validateContract", () => {
     expect(() =>
       validateContract(rawContract({ scope: { allowedPaths: [] } })),
     ).toThrow(/allowedPaths/u);
+  });
+
+  it("rejects missing checked surfaces", () => {
+    expect(() =>
+      validateContract({
+        schemaVersion: 1,
+        contractId: CONTRACT_ID,
+        scope: { allowedPaths: [NARROW_GLOB] },
+      }),
+    ).toThrow(/checkedSurfaces/u);
+  });
+
+  it("rejects invalid checked surfaces", () => {
+    expect(() =>
+      validateContract(
+        rawContract({ scope: { checkedSurfaces: ["telepathy"] } }),
+      ),
+    ).toThrow(/checkedSurfaces/u);
   });
 
   it("rejects an absolute path", () => {

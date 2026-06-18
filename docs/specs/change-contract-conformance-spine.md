@@ -20,6 +20,7 @@ authorship:
   kind: "human" # human | agent-draft-human-accepted
   approvedBy: "sushi"
 scope:
+  checkedSurfaces: ["paths", "changeTypes", "dependencies", "exports"]
   allowedPaths: ["apps/shop/src/orders/**"]
   forbiddenPaths: ["apps/shop/src/billing/**"]
   allowedChangeTypes: ["modify"] # add | modify | delete | rename
@@ -37,7 +38,7 @@ refactor:
   justification: ""
 ```
 
-Validation: implemented as a local structural validator in `tooling/antidrift/src/change-scope/contract-schema.mjs` because this runs in the shipped CLI and should not add a new runtime dependency for a small fixed schema. Reject unknown top-level keys, empty `contractId`, non-relative paths, absolute paths, `..`, empty glob arrays, broad `**/*` unless `refactor.approved: true`, missing `scope`, and any `allowedExports` entry without exact `file`, `name`, and `kind`.
+Validation: implemented as a local structural validator in `tooling/antidrift/src/change-scope/contract-schema.mjs` because this runs in the shipped CLI and should not add a new runtime dependency for a small fixed schema. Reject unknown top-level keys, empty `contractId`, non-relative paths, absolute paths, `..`, empty glob arrays, broad `**/*` unless `refactor.approved: true`, missing `scope`, missing/unknown `scope.checkedSurfaces`, and any `allowedExports` entry without exact `file`, `name`, and `kind`.
 
 **2. Change Surface**
 Add merge-base plumbing beside existing [git.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/lib/git.mjs:10), preserving `changedFiles()` for `check-changed`. New helpers:
@@ -45,7 +46,7 @@ Add merge-base plumbing beside existing [git.mjs](/Users/sushi/code/agent-guardr
 
 Base resolution: `--base <ref>` or `ANTIDRIFT_BASE_REF` is required when a contract exists. `--head` defaults to `HEAD`. Compute `mergeBase = git merge-base baseRef headRef`, then diff `mergeBase` to `headRef`.
 
-Collect these deterministic surfaces:
+Collect the deterministic surfaces named in `scope.checkedSurfaces`:
 
 - `changedFiles`: from `git diff --name-status --find-renames --diff-filter=ACDMRTUXB <mergeBase> <head>`. Include `path`, `oldPath`, and `status`.
 - `patchHunks`: from `git diff --unified=0 <mergeBase> <head>`, only for Phase-0 diff-scoped adapter filtering.

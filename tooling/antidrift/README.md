@@ -82,6 +82,7 @@ pnpm policy:validate-corpus
 pnpm policy:validate-chaski
 pnpm policy:benchmark-sql-queries
 pnpm policy:inventory-change-contract
+pnpm policy:validate-change-contract-evidence
 pnpm policy:inventory-diff-scoped-adapters
 pnpm policy:inventory-defensive-shape
 pnpm policy:inventory-declaration-clone
@@ -101,6 +102,7 @@ The first two validate registry-backed rule facts and verify every custom rule e
 `policy:validate-chaski` is an optional local corpus gate: it runs explicit assertions against real Chaski frontend/BFF files when `CHASKI_REPO` or `/Users/sushi/code/chaski` is available, and skips otherwise so consumers do not need the private corpus.
 `policy:benchmark-sql-queries` compares `antidrift/no-sql-string-concat` with `sonarjs/sql-queries` on real SQL programs and emits `parserServiceDeltas`: extra-only non-type-aware identifier reports are inventory, while missing non-type-aware findings or parser errors block promotion.
 `policy:inventory-change-contract` runs the inventory-only change-contract spine. Missing contracts exit 0, invalid contracts fail loudly, and present contracts compare merge-base change surfaces against declared paths, dependencies, exports, and optional module graph radius (`--tsconfig` is required when graph entrypoints are declared).
+`policy:validate-change-contract-evidence` replays the documented change-contract MVP gold true-positive and true-negative commits against local `sudocode-main` and `chaski` clones. It fails loudly when a required repo or SHA is unavailable, writes `reports/change-contract-evidence.json`, and is a source-repo evidence gate rather than a consumer requirement.
 `policy:inventory-diff-scoped-adapters` runs existing ESLint adapters against changed JS/TS files and filters diagnostics plus semantic facts to changed patch hunks. It is an inventory proof filter over the diff, not a blocking gate.
 `policy:inventory-defensive-shape` is a non-blocking sunset inventory for `no-defensive-shape-probing`. It compares the default-off custom rule with adjacent TypeScript ESLint unsafe rules under parser services and records syntax pressure separately from diagnostics.
 `policy:inventory-declaration-clone` is a non-blocking research inventory for duplicate object contract declarations. It uses the TypeScript checker to group interface declarations and literal object type aliases by exact declared-member name/type/optional/readonly fingerprints, and separates generated-only, mixed generated/source, and source-only clone groups. `policy:inventory-declaration-clone-source-fleet` runs the same inventory against configured local real-code corpora for promotion evidence mining.

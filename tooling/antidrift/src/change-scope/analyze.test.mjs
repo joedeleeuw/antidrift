@@ -14,6 +14,7 @@ function contract(scopeOverrides = {}) {
     contractId: "TASK-1",
     scope: {
       allowedPaths: [ORDERS_GLOB],
+      checkedSurfaces: ["paths", "changeTypes", "dependencies", "exports"],
       forbiddenPaths: [],
       allowedChangeTypes: [],
       allowedRuntimeDependencies: [],
@@ -166,6 +167,19 @@ describe("analyzeChangeScope", () => {
     );
   });
 
+  it("does not check change types when only paths are selected", () => {
+    const result = analyzeChangeScope(
+      contract({
+        checkedSurfaces: ["paths"],
+        allowedChangeTypes: ["modify"],
+      }),
+      surface({
+        changedFiles: [changedFile("apps/shop/src/orders/old.ts", "delete")],
+      }),
+    );
+    expect(result).toEqual([]);
+  });
+
   it("flags an added export that is not declared in the contract", () => {
     const result = analyzeChangeScope(
       contract(),
@@ -182,6 +196,22 @@ describe("analyzeChangeScope", () => {
     expect(result.map((violation) => violation.type)).toContain(
       VIOLATION_TYPES.undeclaredAddedExport,
     );
+  });
+
+  it("does not check exports when the export surface is not selected", () => {
+    const result = analyzeChangeScope(
+      contract({ checkedSurfaces: ["paths"] }),
+      surface({
+        addedExports: [
+          {
+            file: "apps/shop/src/orders/format.ts",
+            name: "formatOrder",
+            kind: "value",
+          },
+        ],
+      }),
+    );
+    expect(result).toEqual([]);
   });
 
   it("allows a declared added export", () => {

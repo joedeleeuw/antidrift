@@ -422,6 +422,9 @@ function comparedSourcePaths({
 export function collectExportChanges({ base, head, cwd, changedFiles }) {
   const addedExports = [];
   const removedExports = [];
+  if (changedTsPaths(changedFiles).length === 0) {
+    return { addedExports, removedExports };
+  }
   const baseFileNames = gitPathsAt({ ref: base, cwd }).map(fileNameFor);
   const headFileNames = gitPathsAt({ ref: head, cwd }).map(fileNameFor);
   const paths = comparedSourcePaths({

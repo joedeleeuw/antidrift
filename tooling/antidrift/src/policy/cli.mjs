@@ -63,6 +63,7 @@ import {
   unsafeTypeAssertionBenchmark,
 } from "./unsafe-type-assertion-benchmark.mjs";
 import { verifySession } from "./verify-session.mjs";
+import { changeContractEvidenceCommand } from "../change-scope/change-contract-evidence.mjs";
 import { changeContractCommand } from "../change-scope/change-contract.mjs";
 import { diffScopedAdaptersCommand } from "../change-scope/diff-scoped-adapters.mjs";
 import {
@@ -223,6 +224,7 @@ const commands = {
     undercheckedPredicateInventory(
       parseUndercheckedPredicateInventoryArgs(args),
     ),
+  "change-contract-evidence": () => changeContractEvidenceCommand(args),
   "change-contract": () => changeContractCommand(args),
   "diff-scoped-adapters": () => diffScopedAdaptersCommand(args),
   "verify-session": verifySession,

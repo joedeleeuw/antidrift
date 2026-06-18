@@ -36,6 +36,7 @@
     "policy:inventory-schema-roundtrip": "antidrift inventory-schema-roundtrip --slice same-schema-recertification-research --output reports/schema-roundtrip-inventory.json",
     "policy:inventory-underchecked-predicate": "NODE_OPTIONS=--max-old-space-size=8192 antidrift inventory-underchecked-predicate --slice underchecked-predicate-promotion --output reports/underchecked-predicate-inventory.json",
     "policy:inventory-change-contract": "antidrift change-contract",
+    "policy:validate-change-contract-evidence": "antidrift change-contract-evidence --output reports/change-contract-evidence.json",
     "policy:inventory-diff-scoped-adapters": "antidrift diff-scoped-adapters",
     "policy:repo-corpus": "antidrift repo-corpus",
     "policy:validate-chaski": "antidrift chaski-corpus --slice chaski-local",

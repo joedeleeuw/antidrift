@@ -217,22 +217,32 @@ export function addedDependencies({ base, head, cwd, changedFiles }) {
  * Collect the deterministic change surface between a base ref and head, diffed from their merge-base.
  * @param {{ base: string, head: string, cwd: string }} params
  */
-export function collectChangeSurface({ base, head, cwd }) {
+export function collectChangeSurface({
+  base,
+  head,
+  cwd,
+  includeExports = true,
+  includePatchHunks = true,
+}) {
   const mergeBaseRef = mergeBase({ base, head, cwd });
   const changedFiles = changedFilesBetween({ base: mergeBaseRef, head, cwd });
-  const patchHunks = patchHunksBetween({ base: mergeBaseRef, head, cwd });
+  const patchHunks = includePatchHunks
+    ? patchHunksBetween({ base: mergeBaseRef, head, cwd })
+    : {};
   const { runtime, dev } = addedDependencies({
     base: mergeBaseRef,
     head,
     cwd,
     changedFiles,
   });
-  const { addedExports, removedExports } = collectExportChanges({
-    base: mergeBaseRef,
-    head,
-    cwd,
-    changedFiles,
-  });
+  const { addedExports, removedExports } = includeExports
+    ? collectExportChanges({
+        base: mergeBaseRef,
+        head,
+        cwd,
+        changedFiles,
+      })
+    : { addedExports: [], removedExports: [] };
   return {
     mergeBase: mergeBaseRef,
     changedFiles,
