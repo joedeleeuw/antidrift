@@ -1299,6 +1299,14 @@ retiredRules:
     referenceDoc: docs/rule-investigations/no-status-triplet-state.md
 
 researchCandidates:
+  antidrift/change-contract-conformance:
+    status: research
+    signal: change-contract command facts over merge-base diff surface
+    solveType: diff-scope-creep
+    proofBuckets: [diff-relative]
+    referenceDoc: docs/specs/change-contract-conformance-spine.md
+    reason: Command-owned inventory proof exists, but no blocking/stable rule is promoted.
+    nextAction: Keep conformance inventory loud and command-owned; do not promote to blocking without real corpus evidence and a separate promotion review.
   ecosystem/discriminated-union-exhaustiveness:
     status: ecosystem-covered
     signal: TypeChecker

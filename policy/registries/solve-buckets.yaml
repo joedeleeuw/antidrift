@@ -1,8 +1,9 @@
 # Solve-bucket taxonomy + per-rule triage.
 #
 # A "solve bucket" is the CATEGORY of detection/proof MECHANISM. It is a coarser axis than the
-# `proofBuckets` field in rules.yaml (those — local-ast-source-shape, semantic-source-type-provenance,
-# authority-index-ownership, graph-config-source — are the fine-grained mechanisms WITHIN semantic-ast).
+# `proofBuckets` field in rules.yaml. The semantic-ast proof buckets are local-ast-source-shape,
+# semantic-source-type-provenance, authority-index-ownership, and graph-config-source; diff-relative
+# is a separate command-owned proof bucket over git change surfaces.
 #
 # This file is labeling/triage ONLY. No systems are built or specced here.
 #   current = the bucket a rule uses today
@@ -33,13 +34,12 @@ categories:
       lint-after-edit, require-checks-before-stop). Coarse behavioral enforcement, not a static proof.
       NOT to be used as the fallback home for change/graph behaviors.
   diff-relative:
-    status: not-yet-available
+    status: available
     summary: >-
-      AST-diff vs the git merge-base (tree-diff e.g. GumTree/ChangeDistiller; refactoring detection
-      e.g. RefactoringMiner). Proves change-relative properties the snapshot cannot see. Cheapest first
-      step: run the EXISTING adapters diff-scoped (a proof FILTER over patch hunks), then add change
-      classification ("added a new owner / new entry point"). This is real proof on a diff baseline,
-      NOT a line-count heuristic and NOT an agent-ops hook.
+      Command-owned change-relative proof against a git diff baseline. The current spine includes
+      change-contract conformance inventory and diff-scoped adapter inventory over patch hunks;
+      deeper tree-diff/refactoring classification remains future work. This is real proof on a diff
+      baseline, NOT a line-count heuristic and NOT an agent-ops hook.
   dependency-graph:
     status: not-yet-available
     summary: >-
@@ -90,11 +90,11 @@ rules:
   antidrift/no-handrolled-resource-lifecycle-cells: { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "proof mis-shaped (catches 0/102); fixable in semantic-ast — not a bucket problem." }
   antidrift/no-shattered-ingested-entity-state:     { current: semantic-ast, fit: inventory-only, target: semantic-ast,   note: "behavior detectable in semantic-ast; enforcement needs owner-config + agent-corpus evidence, not a new bucket." }
 
-# Behaviors the taxonomy reveals we have NO rule for, because the required bucket does not exist yet.
-# (This is the payoff of the labeling: the gap is a missing bucket, not a missing rule.) Measured n
-# from the 2026-06-10 complaint sweep.
+# Behaviors the taxonomy reveals we do not have blocking coverage for yet. Some need a missing
+# bucket; others, like diff-scope-creep, now have an inventory spine but still need promotion
+# evidence before enforcement. Measured n from the 2026-06-10 complaint sweep.
 gaps:
-  diff-scope-creep:        { needs: diff-relative,    measured: 60, note: "top measured behavior; snapshot lint structurally cannot see it. Cheapest bridge: existing adapters diff-scoped." }
+  diff-scope-creep:        { needs: diff-relative,    measured: 60, note: "top measured behavior; snapshot lint structurally cannot see it. First bridge: change-contract conformance plus existing adapters diff-scoped." }
   duplication:             { needs: clone-detection,  measured: 31, note: "top VALIDATED family; cross-file structural clone detection; Sonar CPD misses semantic forks." }
   one-owner-fork:          { needs: clone-detection,  measured: 28, note: "near-duplicate of an existing owner across files." }
   net-new-bias:            { needs: dependency-graph, measured: 25, note: "authority-index only enforces REGISTRY-DECLARED owners; it cannot catch the agent minting a NEW duplicate owner. Real fix: whole-repo owner-discovery/uniqueness (reflexion) pass." }

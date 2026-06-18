@@ -74,7 +74,8 @@ export type RuleStatusProofBucket =
   | "semantic-source-type-provenance"
   | "authority-index-ownership"
   | "graph-config-source"
-  | "repo-session-runtime";
+  | "repo-session-runtime"
+  | "diff-relative";
 
 export interface RuleStatusPromotion {
   proofBucket: RuleStatusProofBucket;

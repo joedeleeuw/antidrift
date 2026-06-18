@@ -653,6 +653,205 @@ ${lockedRuleSections(root)}
     );
   });
 
+  it("rejects diff-relative proof buckets in active rule registry rows", () => {
+    const root = workspace();
+    writeValidRulesRegistry(root);
+    const existing = join(root, "policy", "registries", "rules.yaml");
+    const text = readFileSync(existing, "utf8");
+    writeFileSync(
+      existing,
+      text.replace(
+        "    proofBuckets: [local-ast-source-shape]\n",
+        "    proofBuckets: [diff-relative]\n",
+      ),
+    );
+    const messages = [];
+
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "policy/registries/rules.yaml rules.antidrift/no-appeasement-cast.proofBuckets contains unsupported value 'diff-relative'",
+    );
+  });
+
+  it("rejects diff-relative proof buckets in stable active rule registry rows", () => {
+    const root = workspace();
+    touch(root, "docs/test-corpus.md");
+    touch(root, "reports/test-advisory.md");
+    writeValidRulesRegistry(root);
+    const registry = join(root, "policy", "registries", "rules.yaml");
+    const registryText = readFileSync(registry, "utf8");
+    writeFileSync(
+      registry,
+      registryText.replace(
+        `  antidrift/no-async-array-method:
+    status: ready
+    stable: false
+    signal: test-signal
+    solveType: test-solve
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-roadmap.md
+    corpusRepositories: []
+`,
+        `  antidrift/no-async-array-method:
+    status: ready
+    stable: true
+    signal: test-signal
+    solveType: test-solve
+    proofBuckets: [diff-relative]
+    referenceDoc: docs/rule-roadmap.md
+    corpusRepositories: [repo-one, repo-two]
+    promotion:
+      proofBucket: local-ast-source-shape
+      association: async array callback to collection method semantics
+      blockingThreshold: Test threshold.
+      ecosystemComparison: Test ecosystem comparison.
+      corpusEvidence: Test corpus evidence.
+      realCorpusInventory: Test real corpus inventory.
+      realCorpusInventoryRefs: [docs/test-corpus.md]
+      claudeAdvisoryReview: Test advisory review.
+      claudeAdvisoryReviewRefs: [reports/test-advisory.md]
+      replicationsNotIntroducedForTest: true
+      knownFalsePositives: 0
+      knownFalseNegatives: 0
+      productionConcerns: none
+      noSinkBehavior: Test no-sink behavior.
+      noDeadWorkBehavior: Test no-dead-work behavior.
+`,
+      ),
+    );
+    const ledger = join(root, "docs", "real-corpus-validation.md");
+    writeFileSync(
+      ledger,
+      readFileSync(ledger, "utf8").replace(
+        "| `antidrift/no-async-array-method` | ready | Test real-source evidence. |",
+        "| `antidrift/no-async-array-method` | ready/stable | Test corpus evidence. |",
+      ),
+    );
+    const matrix = join(root, "docs", "semantic-validation-matrix.md");
+    writeFileSync(
+      matrix,
+      readFileSync(matrix, "utf8").replace(
+        /(\| `antidrift\/no-async-array-method` \| [^|]+ \| [^|]+ \| )[^|]+(\|)/u,
+        "$1Test threshold. $2",
+      ),
+    );
+    writeFileSync(
+      matrix,
+      readFileSync(matrix, "utf8").replace(
+        /(\| `antidrift\/no-async-array-method` \| [^|]+ \| [^|]+ \| [^|]+ \| [^|]+ \| )[^|]+/u,
+        "$1Test no-sink behavior. Test no-dead-work behavior. ",
+      ),
+    );
+    writeFileSync(
+      join(root, "docs", "stable-promotion-inventory.md"),
+      `
+# Stable Promotion Inventory
+
+| Rank | Rule | Promotion bucket | Utility lens | Drift repos | Clean repos | Why |
+| ---: | ---- | ---------------- | ------------ | ----------- | ----------- | --- |
+| 1 | \`antidrift/no-async-array-method\` | stable | monitor | repo-one, repo-two | repo-one | Test ecosystem comparison. |
+`,
+    );
+    const messages = [];
+
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.proofBuckets contains unsupported value 'diff-relative'",
+    );
+  });
+
+  it("accepts diff-relative proof buckets in research candidate rows", () => {
+    const root = workspace();
+    writeValidRulesRegistry(root);
+    touch(root, "docs/specs/change-contract-conformance-spine.md");
+    const existing = join(root, "policy", "registries", "rules.yaml");
+    const text = readFileSync(existing, "utf8");
+    writeFileSync(
+      existing,
+      text.replace(
+        "researchCandidates:\n",
+        `researchCandidates:
+  antidrift/change-contract-conformance:
+    status: research
+    signal: change-contract command facts over merge-base diff surface
+    solveType: diff-scope-creep
+    proofBuckets: [diff-relative]
+    referenceDoc: docs/specs/change-contract-conformance-spine.md
+    nextAction: Keep inventory-only until promotion evidence exists.
+`,
+      ),
+    );
+    const messages = [];
+
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(true);
+    expect(messages).toEqual([]);
+  });
+
+  it("rejects command-owned proof buckets in unrelated research candidate rows", () => {
+    const root = workspace();
+    writeValidRulesRegistry(root);
+    const existing = join(root, "policy", "registries", "rules.yaml");
+    const text = readFileSync(existing, "utf8");
+    writeFileSync(
+      existing,
+      text.replace(
+        "  ecosystem/discriminated-union-exhaustiveness:\n    status: ecosystem-covered\n",
+        "  ecosystem/discriminated-union-exhaustiveness:\n    status: ecosystem-covered\n    proofBuckets: [diff-relative]\n",
+      ),
+    );
+    const messages = [];
+
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "policy/registries/rules.yaml researchCandidates.ecosystem/discriminated-union-exhaustiveness.proofBuckets contains command-owned proof bucket 'diff-relative' but no command-owned semantic fact maps to ecosystem/discriminated-union-exhaustiveness.",
+    );
+  });
+
+  it("rejects unsupported proof buckets in research candidate rows", () => {
+    const root = workspace();
+    writeValidRulesRegistry(root);
+    const existing = join(root, "policy", "registries", "rules.yaml");
+    const text = readFileSync(existing, "utf8");
+    writeFileSync(
+      existing,
+      text.replace(
+        "  ecosystem/discriminated-union-exhaustiveness:\n    status: ecosystem-covered\n",
+        "  ecosystem/discriminated-union-exhaustiveness:\n    status: ecosystem-covered\n    proofBuckets: [not-a-proof-bucket]\n",
+      ),
+    );
+    const messages = [];
+
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "policy/registries/rules.yaml researchCandidates.ecosystem/discriminated-union-exhaustiveness.proofBuckets contains unsupported value 'not-a-proof-bucket'",
+    );
+  });
+
   it("requires the semantic validation matrix document", () => {
     const root = workspace();
     writeValidRulesRegistry(root);
@@ -2116,7 +2315,7 @@ rules:
           exportName: "wrongExport",
           subpath: "@joedeleeuw/antidrift/semantic-adapters/react-state",
           rules: ["antidrift/not-real"],
-          proofBuckets: ["not-a-proof-bucket"],
+          proofBuckets: ["diff-relative"],
           semanticFactAdapterIds: [""],
           semanticFactKinds: [""],
           associations: [],
@@ -2157,7 +2356,7 @@ rules:
       "test semantic adapter contracts.reactState.rules references unknown active rule: antidrift/not-real",
     );
     expect(output).toContain(
-      "test semantic adapter contracts.reactState.proofBuckets contains unsupported value 'not-a-proof-bucket'",
+      "test semantic adapter contracts.reactState.proofBuckets contains unsupported value 'diff-relative'",
     );
     expect(output).toContain(
       "test semantic adapter contracts.reactState.semanticFactAdapterIds must be an array of strings.",

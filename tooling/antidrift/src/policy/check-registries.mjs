@@ -611,7 +611,16 @@ const allowedProofBuckets = new Set([
   "authority-index-ownership",
   "graph-config-source",
   "repo-session-runtime",
+  "diff-relative",
 ]);
+const allowedActiveRuleProofBuckets = new Set([
+  "local-ast-source-shape",
+  "semantic-source-type-provenance",
+  "authority-index-ownership",
+  "graph-config-source",
+]);
+const allowedSemanticAdapterProofBuckets = allowedActiveRuleProofBuckets;
+const commandOwnedProofBuckets = new Set(["diff-relative"]);
 const stableProofBucketsRequiringSemanticAdapterClaim = new Set([
   "semantic-source-type-provenance",
   "authority-index-ownership",
@@ -807,6 +816,10 @@ function checkRulePromotion(promotion, label, errors) {
     errors.push(
       `${label}.promotion.proofBucket must be one of: ${[...allowedProofBuckets].join(", ")}.`,
     );
+  } else if (!allowedActiveRuleProofBuckets.has(promotion.proofBucket)) {
+    errors.push(
+      `${label}.promotion.proofBucket contains unsupported active rule proof bucket '${promotion.proofBucket}'. Allowed values: ${[...allowedActiveRuleProofBuckets].join(", ")}.`,
+    );
   }
   requireString(
     promotion.association,
@@ -860,10 +873,14 @@ function checkStableRuleEntry(entry, label, errors) {
 
 function checkNonStableRuleEntry(entry, label, errors) {
   requireString(entry.nextAction, `${label}.nextAction`, errors);
-  const proofBuckets = stringArray(entry.proofBuckets, `${label}.proofBuckets`, errors);
+  const proofBuckets = stringArray(
+    entry.proofBuckets,
+    `${label}.proofBuckets`,
+    errors,
+  );
   checkAllowedValues(
     proofBuckets,
-    allowedProofBuckets,
+    allowedActiveRuleProofBuckets,
     `${label}.proofBuckets`,
     errors,
   );
@@ -872,6 +889,23 @@ function checkNonStableRuleEntry(entry, label, errors) {
       `${label} must document at least one non-stable blocker in concerns, unproven, or openReviewConcerns.`,
     );
   }
+}
+
+function checkOptionalRuleProofBuckets(entry, label, errors, { active }) {
+  if (entry.proofBuckets === undefined || (active && entry.stable === false)) {
+    return;
+  }
+  const proofBuckets = stringArray(
+    entry.proofBuckets,
+    `${label}.proofBuckets`,
+    errors,
+  );
+  checkAllowedValues(
+    proofBuckets,
+    active ? allowedActiveRuleProofBuckets : allowedProofBuckets,
+    `${label}.proofBuckets`,
+    errors,
+  );
 }
 
 function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
@@ -920,6 +954,7 @@ function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
       checkNonStableRuleEntry(entry, label, errors);
     }
   }
+  checkOptionalRuleProofBuckets(entry, label, errors, { active });
   if (entry.nextAction !== undefined) {
     requireString(entry.nextAction, `${label}.nextAction`, errors);
   }
@@ -931,6 +966,27 @@ function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
       errors,
     );
   }
+}
+
+function commandOwnedRuleIdsFromSemanticFactKinds(semanticFactKinds) {
+  const commandOwned = new Set();
+  if (!isRecord(semanticFactKinds)) return commandOwned;
+  for (const entry of Object.values(semanticFactKinds)) {
+    if (!isRecord(entry)) continue;
+    if (
+      Array.isArray(entry.rules) &&
+      entry.rules.length === 0 &&
+      Array.isArray(entry.commandIds) &&
+      entry.commandIds.some((commandId) => typeof commandId === "string")
+    ) {
+      for (const commandId of entry.commandIds) {
+        if (typeof commandId === "string" && commandId.length > 0) {
+          commandOwned.add(`${commandId}-conformance`);
+        }
+      }
+    }
+  }
+  return commandOwned;
 }
 
 function checkStableRuleRequirements(
@@ -1790,7 +1846,7 @@ function checkSemanticAdapterContractEntry(
   );
   checkAllowedValues(
     proofBuckets,
-    allowedProofBuckets,
+    allowedSemanticAdapterProofBuckets,
     `${contractLabel}.proofBuckets`,
     errors,
   );
@@ -2703,7 +2759,12 @@ function checkRetiredRules(retiredRules, repoRoot, errors) {
   }
 }
 
-function checkResearchCandidates(researchCandidates, repoRoot, errors) {
+function checkResearchCandidates(
+  researchCandidates,
+  repoRoot,
+  commandOwnedRuleIds,
+  errors,
+) {
   if (researchCandidates === undefined) return;
   if (!isRecord(researchCandidates)) {
     errors.push(
@@ -2737,6 +2798,16 @@ function checkResearchCandidates(researchCandidates, repoRoot, errors) {
       errors.push(
         `policy/registries/rules.yaml researchCandidates.${rule}.referenceDoc is required.`,
       );
+    }
+    for (const proofBucket of ruleEntryProofBuckets(entry)) {
+      if (
+        commandOwnedProofBuckets.has(proofBucket) &&
+        !commandOwnedRuleIds.has(rule)
+      ) {
+        errors.push(
+          `policy/registries/rules.yaml researchCandidates.${rule}.proofBuckets contains command-owned proof bucket '${proofBucket}' but no command-owned semantic fact maps to ${rule}.`,
+        );
+      }
     }
   }
 }
@@ -3429,7 +3500,12 @@ function checkRulesRegistry(registry, repoRoot, policySource, errors) {
   );
   checkSemanticFactKinds(registry, repoRoot, errors);
   checkRetiredRules(registry.retiredRules, repoRoot, errors);
-  checkResearchCandidates(registry.researchCandidates, repoRoot, errors);
+  checkResearchCandidates(
+    registry.researchCandidates,
+    repoRoot,
+    commandOwnedRuleIdsFromSemanticFactKinds(registry.semanticFactKinds),
+    errors,
+  );
   checkDecisionLocks(registry, repoRoot, errors);
   checkRuleFamilies(registry.ruleFamilies, registry, repoRoot, errors);
   checkPolicyRuleReviews(registry, policySource, errors);

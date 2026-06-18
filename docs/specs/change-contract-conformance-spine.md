@@ -93,14 +93,13 @@ changeContractConformance: Object.freeze({
 
 Fact emission uses `semanticFact({ ruleId: "antidrift/change-contract-conformance", adapterId: "change-contract", confidence: "deterministic-inventory", provenance: ["git-diff", "change-contract", "ts-program", "package-manifest"], filePath: contractPath, payload })`.
 
-Registry ripple:
+Registry status:
 
-- Add `carrier: change-relative` to checker allowed carriers, currently limited in [check-registries.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/check-registries.mjs:588), and to `SemanticFactCarrier` in [index.d.mts](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/index.d.mts:39).
-- Add provenance literals to [index.d.mts](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/index.d.mts:53).
-- Mirror the fact in `policy/registries/rules.yaml` under `semanticFactKinds`, matching the shipped contract exactly as required by [check-registries.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/check-registries.mjs:1227).
-- Extend `checkSemanticFactKindEntry` so `rules: []` is valid only when `commandIds` is non-empty. Existing validation assumes active ESLint rules at [check-registries.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/check-registries.mjs:1245), which would reject this command-owned fact.
-- Extend emitted-kind discovery beyond the ESLint plugin source, currently regex-scoped to one file at [check-registries.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/check-registries.mjs:1026). Scan production `src/policy` and `src/change-scope`, excluding tests and fixtures.
-- Add `diff-relative` to proof-bucket types/checker if any registry entry references this spine; current allowed buckets stop at `repo-session-runtime` in [check-registries.mjs](/Users/sushi/code/agent-guardrails-monorepo-template/tooling/antidrift/src/policy/check-registries.mjs:607).
+- `change-relative` is an allowed semantic fact carrier in registry validation and public policy types.
+- Change-contract provenance literals are part of the public policy type surface.
+- `changeContractConformance` is mirrored in `policy/registries/rules.yaml` under `semanticFactKinds` as a command-owned fact with `rules: []` and `commandIds: ["antidrift/change-contract"]`.
+- `diff-relative` is an accepted command-owned proof bucket in registry validation and public rule-status types; it is rejected for active plugin-rule rows and semantic adapter contracts.
+- `antidrift/change-contract-conformance` is tracked as a research candidate with `proofBuckets: [diff-relative]`; it is not an active ESLint rule, not stable, and not blocking.
 
 **5. Architecture Integration**
 Module layout:

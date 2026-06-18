@@ -125,6 +125,12 @@ describe("rule status manifest", () => {
           proofBuckets: ["local-ast-source-shape"],
         },
       },
+      researchCandidates: {
+        "antidrift/change-contract-conformance": {
+          status: "research",
+          proofBuckets: ["diff-relative"],
+        },
+      },
     };
 
     expect(
@@ -146,6 +152,11 @@ describe("rule status manifest", () => {
       "antidrift/no-hover-translate-card",
       "antidrift/no-raw-fetch-in-component",
     ]);
+    expect(
+      ruleStatusEntriesForProofBucket("diff-relative", registry).map(
+        (entry) => entry.id,
+      ),
+    ).toEqual(["antidrift/change-contract-conformance"]);
     expect(ruleStatusEntriesForSemanticAdapter("not-real", registry)).toEqual(
       [],
     );
