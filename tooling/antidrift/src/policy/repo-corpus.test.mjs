@@ -9,11 +9,23 @@ describe("repoCorpusDecision", () => {
         "antidrift/under-proven": { status: "under-proven", signal: "TypeChecker" },
         "antidrift/heuristic": { status: "ready", signal: "token-overlap" },
         "antidrift/retired": { status: "retired", signal: "no-op stub" },
+        "antidrift/default-off": {
+          status: "ready",
+          stable: false,
+          defaultOff: true,
+          signal: "TypeChecker",
+        },
         "antidrift/stable": { status: "ready", signal: "TypeChecker" },
       },
     });
 
-    expect([...allowedInactiveRules].sort((a, b) => a.localeCompare(b))).toEqual(["antidrift/heuristic", "antidrift/retired", "antidrift/under-proven"]);
+    expect([...allowedInactiveRules].sort((a, b) => a.localeCompare(b))).toEqual([
+      "antidrift/default-off",
+      "antidrift/heuristic",
+      "antidrift/retired",
+      "antidrift/under-proven",
+    ]);
+    expect(repoCorpusDecision({ findings: [], inactiveRules: ["antidrift/default-off"], allowedInactiveRules })).toBe("pass");
     expect(repoCorpusDecision({ findings: [], inactiveRules: ["antidrift/under-proven"], allowedInactiveRules })).toBe("pass");
     expect(repoCorpusDecision({ findings: [], inactiveRules: ["antidrift/retired"], allowedInactiveRules })).toBe("pass");
     expect(repoCorpusDecision({ findings: [], inactiveRules: ["antidrift/stable"], allowedInactiveRules })).toBe("fail");

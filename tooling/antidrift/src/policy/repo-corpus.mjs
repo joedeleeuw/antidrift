@@ -95,7 +95,13 @@ function isHeuristicSignal(signal) {
 export function allowedInactiveRulesFromRegistry(ruleRegistry) {
   const out = new Set();
   for (const [ruleId, entry] of Object.entries(ruleRegistry?.rules ?? {})) {
-    if (blockingDisallowedStatuses.has(entry?.status) || isHeuristicSignal(entry?.signal)) out.add(normalizeRuleId(ruleId));
+    if (
+      blockingDisallowedStatuses.has(entry?.status) ||
+      isHeuristicSignal(entry?.signal) ||
+      (entry?.defaultOff === true && entry?.stable !== true)
+    ) {
+      out.add(normalizeRuleId(ruleId));
+    }
   }
   return out;
 }

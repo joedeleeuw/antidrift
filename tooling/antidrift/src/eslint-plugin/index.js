@@ -52,6 +52,7 @@ import {
   isSqlIdentifierTokenValue,
   isSqlInterpolationContext,
   safeIdentifierMemberSpecs,
+  safeTemplateTagSpecs,
   templateStaticPartsAreSqlIdentifierSafe,
   valuesAreSqlDirections,
   valuesAreSqlIdentifiers,
@@ -753,7 +754,7 @@ function sourceShardPayload(proof) {
   };
 }
 
-// Inventory-only: the React-state shard detector records behavioral source-member
+// Inventory-only: the React-state shard detector records semantic source-member
 // fan-out (>=2 distinct members of one freshly awaited source written into >=2 sibling
 // cells, after excluding controlled-input draft cells) as a candidate fact. It never
 // reports — the type-owner enforcement tier was removed after multi-repo scans found the
@@ -1585,6 +1586,44 @@ function templateInterpolationParts(node, index) {
   };
 }
 
+function declarationOwnerNames(declaration) {
+  const parent = declaration?.parent;
+  return new Set(
+    [
+      parent?.name?.text,
+      parent?.symbol?.getName?.(),
+      parent?.localSymbol?.getName?.(),
+    ].filter(Boolean),
+  );
+}
+
+function normalizedSourcePath(value) {
+  return String(value).replace(/\\/gu, "/");
+}
+
+function declarationSourceMatches(declaration, source) {
+  const fileName = declaration?.getSourceFile?.().fileName;
+  return (
+    typeof fileName === "string" &&
+    typeof source === "string" &&
+    normalizedSourcePath(fileName).endsWith(normalizedSourcePath(source))
+  );
+}
+
+function importedSpecifierName(def) {
+  const node = def?.node;
+  if (node?.type !== "ImportSpecifier") {
+    return node?.local?.name ?? null;
+  }
+  return node.imported?.type === "Identifier"
+    ? node.imported.name
+    : node.imported?.value;
+}
+
+function importSourceValue(def) {
+  return def?.parent?.source?.value ?? def?.node?.parent?.source?.value;
+}
+
 function ruleNoSqlStringConcat() {
   return {
     meta: {
@@ -1610,6 +1649,33 @@ function ruleNoSqlStringConcat() {
                 additionalProperties: false,
               },
             },
+            safeTemplateTags: {
+              type: "array",
+              items: {
+                type: "object",
+                oneOf: [
+                  {
+                    properties: {
+                      module: { type: "string" },
+                      export: { type: "string" },
+                      evidence: { type: "string" },
+                    },
+                    required: ["module", "export"],
+                    additionalProperties: false,
+                  },
+                  {
+                    properties: {
+                      type: { type: "string" },
+                      member: { type: "string" },
+                      source: { type: "string", pattern: String.raw`[/\\]` },
+                      evidence: { type: "string" },
+                    },
+                    required: ["type", "member", "source"],
+                    additionalProperties: false,
+                  },
+                ],
+              },
+            },
           },
           additionalProperties: false,
         },
@@ -1620,6 +1686,7 @@ function ruleNoSqlStringConcat() {
       const safeIdentifierMembers = safeIdentifierMemberSpecs(
         context.options[0] ?? {},
       );
+      const safeTemplateTags = safeTemplateTagSpecs(context.options[0] ?? {});
       const services = requireTypeServices(context);
       const checker = services?.program?.getTypeChecker() ?? null;
       const safeSqlFragmentArrays = new WeakSet();
@@ -1995,6 +2062,54 @@ function ruleNoSqlStringConcat() {
           ].filter(Boolean),
         );
       }
+      function collectTypeNames(type, names = new Set(), seen = new Set()) {
+        if (!type || seen.has(type)) return names;
+        seen.add(type);
+        for (const name of typeNames(type)) names.add(name);
+        if (type.isUnionOrIntersection?.()) {
+          for (const member of type.types ?? []) {
+            collectTypeNames(member, names, seen);
+          }
+        }
+        const apparent = checker.getApparentType(type);
+        if (apparent && apparent !== type) collectTypeNames(apparent, names, seen);
+        if (type.isClassOrInterface?.()) {
+          for (const base of checker.getBaseTypes(type) ?? []) {
+            collectTypeNames(base, names, seen);
+          }
+        }
+        return names;
+      }
+      function typeMatchesTrustedMemberSpec(type, member, candidates) {
+        const names = collectTypeNames(type);
+        if (candidates.some(({ type: typeName }) => names.has(typeName))) {
+          return true;
+        }
+        const property = checker.getPropertyOfType(type, member);
+        for (const declaration of property?.declarations ?? []) {
+          const owners = declarationOwnerNames(declaration);
+          if (candidates.some(({ type: typeName }) => owners.has(typeName))) {
+            return true;
+          }
+        }
+        return false;
+      }
+      function typeMatchesTrustedTemplateMemberSpec(type, member, candidates) {
+        const property = checker.getPropertyOfType(type, member);
+        for (const declaration of property?.declarations ?? []) {
+          const owners = declarationOwnerNames(declaration);
+          if (
+            candidates.some(
+              ({ type: typeName, source }) =>
+                owners.has(typeName) &&
+                declarationSourceMatches(declaration, source),
+            )
+          ) {
+            return true;
+          }
+        }
+        return false;
+      }
       function isConfiguredSafeSqlIdentifierMember(node) {
         if (!checker || safeIdentifierMembers.length === 0) return false;
         if (
@@ -2010,8 +2125,179 @@ function ruleNoSqlStringConcat() {
         if (candidates.length === 0) return false;
         const tsObject = services?.esTreeNodeToTSNodeMap?.get(node.object);
         if (!tsObject) return false;
-        const names = typeNames(checker.getTypeAtLocation(tsObject));
-        return candidates.some(({ type }) => names.has(type));
+        return typeMatchesTrustedMemberSpec(
+          checker.getTypeAtLocation(tsObject),
+          node.property.name,
+          candidates,
+        );
+      }
+      function isTrustedImportedTemplateTag(node) {
+        if (
+          node?.type !== "Identifier" ||
+          safeTemplateTags.imported.length === 0
+        ) {
+          return false;
+        }
+        const variable = findVariable(sourceCode, node);
+        const importDef = variable?.defs?.find(
+          (def) => def.type === "ImportBinding",
+        );
+        const source = importSourceValue(importDef);
+        const imported = importedSpecifierName(importDef);
+        return safeTemplateTags.imported.some(
+          (spec) => spec.module === source && spec.exportName === imported,
+        );
+      }
+      function isTrustedImportedBuilderMemberCall(node, member) {
+        const callee = node?.callee;
+        return (
+          node?.type === "CallExpression" &&
+          callee?.type === "MemberExpression" &&
+          !callee.computed &&
+          callee.property?.type === "Identifier" &&
+          callee.property.name === member &&
+          isTrustedImportedTemplateTag(callee.object)
+        );
+      }
+      function isTrustedMemberBuilderMemberCall(node, member) {
+        const callee = node?.callee;
+        return (
+          node?.type === "CallExpression" &&
+          callee?.type === "MemberExpression" &&
+          !callee.computed &&
+          callee.property?.type === "Identifier" &&
+          callee.property.name === member &&
+          isTrustedMemberTemplateTag(callee.object)
+        );
+      }
+      function isUnsafeTrustedRawSqlFragment(node) {
+        if (
+          node?.type === "TSAsExpression" ||
+          node?.type === "TSTypeAssertion" ||
+          node?.type === "TSNonNullExpression" ||
+          node?.type === "ChainExpression"
+        ) {
+          return isUnsafeTrustedRawSqlFragment(node.expression);
+        }
+        if (
+          (isTrustedImportedBuilderMemberCall(node, "raw") ||
+            isTrustedMemberBuilderMemberCall(node, "raw")) &&
+          node.arguments.some((argument) => staticStringValue(argument) === null)
+        ) {
+          return true;
+        }
+        if (node?.type === "ConditionalExpression") {
+          return (
+            isUnsafeTrustedRawSqlFragment(node.test) ||
+            isUnsafeTrustedRawSqlFragment(node.consequent) ||
+            isUnsafeTrustedRawSqlFragment(node.alternate)
+          );
+        }
+        if (
+          node?.type === "LogicalExpression" ||
+          node?.type === "BinaryExpression"
+        ) {
+          return (
+            isUnsafeTrustedRawSqlFragment(node.left) ||
+            isUnsafeTrustedRawSqlFragment(node.right)
+          );
+        }
+        if (node?.type === "SequenceExpression") {
+          return node.expressions.some(isUnsafeTrustedRawSqlFragment);
+        }
+        if (
+          node?.type === "UnaryExpression" ||
+          node?.type === "AwaitExpression"
+        ) {
+          return isUnsafeTrustedRawSqlFragment(node.argument);
+        }
+        if (node?.type === "CallExpression") {
+          return (
+            isUnsafeTrustedRawSqlFragment(node.callee) ||
+            node.arguments.some((argument) => {
+              if (argument?.type === "SpreadElement") {
+                return isUnsafeTrustedRawSqlFragment(argument.argument);
+              }
+              return isUnsafeTrustedRawSqlFragment(argument);
+            })
+          );
+        }
+        if (node?.type === "MemberExpression") {
+          return (
+            isUnsafeTrustedRawSqlFragment(node.object) ||
+            (node.computed && isUnsafeTrustedRawSqlFragment(node.property))
+          );
+        }
+        if (node?.type === "ArrayExpression") {
+          return node.elements.some(isUnsafeTrustedRawSqlFragment);
+        }
+        if (node?.type === "ObjectExpression") {
+          return node.properties.some((property) => {
+            if (property.type === "SpreadElement") {
+              return isUnsafeTrustedRawSqlFragment(property.argument);
+            }
+            return (
+              (property.computed &&
+                isUnsafeTrustedRawSqlFragment(property.key)) ||
+              isUnsafeTrustedRawSqlFragment(property.value)
+            );
+          });
+        }
+        if (node?.type === "TaggedTemplateExpression") {
+          return (
+            isUnsafeTrustedRawSqlFragment(node.tag) ||
+            isUnsafeTrustedRawSqlFragment(node.quasi)
+          );
+        }
+        if (node?.type === "TemplateLiteral") {
+          return node.expressions.some(isUnsafeTrustedRawSqlFragment);
+        }
+        return false;
+      }
+      function reportUnsafeTrustedRawSqlFragments(node) {
+        let reported = false;
+        for (const expression of node.expressions) {
+          if (!isUnsafeTrustedRawSqlFragment(expression)) continue;
+          context.report({
+            node: expression,
+            message:
+              "Do not pass dynamic values through raw SQL builder fragments. Use bound parameters or a proven identifier escape.",
+          });
+          reported = true;
+        }
+        return reported;
+      }
+      function isTrustedMemberTemplateTag(node) {
+        if (!checker || safeTemplateTags.members.length === 0) return false;
+        if (
+          node?.type !== "MemberExpression" ||
+          node.computed ||
+          node.property?.type !== "Identifier"
+        ) {
+          return false;
+        }
+        const candidates = safeTemplateTags.members.filter(
+          ({ member }) => member === node.property.name,
+        );
+        if (candidates.length === 0) return false;
+        const tsObject = services?.esTreeNodeToTSNodeMap?.get(node.object);
+        if (!tsObject) return false;
+        return typeMatchesTrustedTemplateMemberSpec(
+          checker.getTypeAtLocation(tsObject),
+          node.property.name,
+          candidates,
+        );
+      }
+      function isTrustedSqlTemplateTag(node) {
+        if (node?.type === "TSNonNullExpression") {
+          return isTrustedSqlTemplateTag(node.expression);
+        }
+        if (node?.type === "ChainExpression") {
+          return isTrustedSqlTemplateTag(node.expression);
+        }
+        return (
+          isTrustedImportedTemplateTag(node) || isTrustedMemberTemplateTag(node)
+        );
       }
       function memberTokenValues(node) {
         if (node.computed && node.object?.type === "Identifier") {
@@ -2369,7 +2655,31 @@ function ruleNoSqlStringConcat() {
             safeSqlFragmentArrays.delete(variable);
           }
         },
+        TaggedTemplateExpression(node) {
+          if (isTrustedSqlTemplateTag(node.tag)) {
+            if (reportUnsafeTrustedRawSqlFragments(node.quasi)) return;
+            return;
+          }
+          if (
+            node.quasi.expressions.length > 0 &&
+            (sqlPattern.test(templateText(node.quasi)) ||
+              sqlSentencePattern.test(templateText(node.quasi)))
+          ) {
+            if (!hasUnsafeSqlInterpolation(node.quasi)) return;
+            context.report({
+              node: node.quasi,
+              message:
+                "Do not interpolate values into SQL strings. Use parameterized queries / bound parameters.",
+            });
+          }
+        },
         TemplateLiteral(node) {
+          if (
+            node.parent?.type === "TaggedTemplateExpression" &&
+            node.parent.quasi === node
+          ) {
+            return;
+          }
           if (
             node.expressions.length > 0 &&
             (sqlPattern.test(templateText(node)) ||

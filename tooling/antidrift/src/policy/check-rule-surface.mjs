@@ -70,6 +70,9 @@ function collectBlockingMaturityViolations(configuredSettings, ruleRegistry) {
     if (setting.severity === 0) continue;
     const entry = registryEntryFor(ruleRegistry, ruleName);
     if (!entry) continue;
+    if (entry.defaultOff === true) {
+      out.push({ ruleName, prefix: "Custom rule configured as blocking despite defaultOff metadata" });
+    }
     if (blockingDisallowedStatuses.has(entry.status)) {
       out.push({ ruleName, prefix: `Custom rule configured as blocking despite registry status ${entry.status}` });
     }

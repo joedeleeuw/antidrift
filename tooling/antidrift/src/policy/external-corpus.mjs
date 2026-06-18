@@ -44,6 +44,51 @@ const powersyncSqlRuleOptions = {
             "PowerSync SourceTable.escapedIdentifier is the owned table identifier escape API; TypeScript proves the receiver type before this exemption applies.",
         },
       ],
+      safeTemplateTags: [
+        {
+          type: "AbstractPostgresConnection",
+          member: "sql",
+          source:
+            "libs/lib-postgres/dist/db/connection/AbstractPostgresConnection.d.ts",
+          evidence:
+            "PowerSync AbstractPostgresConnection.sql turns template expressions into pgwire statement params; TypeScript proves the receiver/member declaration source in the built package surface before this exemption applies.",
+        },
+      ],
+    },
+  ],
+};
+const cloudflareAgentsSqlRuleOptions = {
+  "antidrift/no-sql-string-concat": [
+    {
+      safeTemplateTags: [
+        {
+          type: "Agent",
+          member: "sql",
+          source: "packages/agents/src/index.ts",
+          evidence:
+            "Cloudflare Agent.sql converts template expressions into storage SQL placeholders before execution; TypeScript proves the receiver/member declaration source before this exemption applies.",
+        },
+      ],
+    },
+  ],
+};
+const opencodeSqlRuleOptions = {
+  "antidrift/no-sql-string-concat": [
+    {
+      safeTemplateTags: [
+        {
+          module: "drizzle-orm/sql/sql",
+          export: "sql",
+          evidence:
+            "Drizzle sql imported from drizzle-orm/sql/sql is the query-builder tag used with sql.identifier fragments in opencode migrations.",
+        },
+        {
+          module: "drizzle-orm",
+          export: "sql",
+          evidence:
+            "Drizzle sql imported from drizzle-orm is the public query-builder tag used with sql.identifier fragments in opencode core migrations.",
+        },
+      ],
     },
   ],
 };
@@ -816,7 +861,7 @@ const cloudflareAgentsCases = [
     subproject: "packages/voice",
     paths: ["packages/voice/src/voice.ts"],
     reason:
-      "Cloudflare Durable Object SQL tagged templates appear to bind interpolated values, but the current rule no longer trusts tag names alone and this corpus case does not provide symbol-level builder proof.",
+      "Cloudflare Voice uses Agent.sql through a generic mixin constraint, but this external checkout's package tsconfig extends agents/tsconfig without an install-resolvable package path. Keep parked until the member proof can run type-aware without a local tsconfig shim.",
   },
   {
     id: "cloudflare-ai-chat-parameterized-sql-tag-clean",
@@ -826,17 +871,18 @@ const cloudflareAgentsCases = [
     subproject: "packages/ai-chat",
     paths: ["packages/ai-chat/src/index.ts"],
     reason:
-      "Cloudflare Durable Object SQL tagged templates appear to bind interpolated values, but the current rule no longer trusts tag names alone and this corpus case does not provide symbol-level builder proof.",
+      "Cloudflare AI Chat extends Agent and uses Agent.sql, but this external checkout's package tsconfig extends agents/tsconfig without an install-resolvable package path. Keep parked until the member proof can run type-aware without a local tsconfig shim.",
   },
   {
     id: "cloudflare-agents-parameterized-sql-tag-clean",
     ruleId: "antidrift/no-sql-string-concat",
-    kind: "known-gap",
-    classification: "under-proven",
+    kind: "correct",
+    classification: "ready",
     subproject: "packages/agents",
+    typeAware: true,
+    tsconfig: "packages/agents/tsconfig.json",
+    ruleOptions: cloudflareAgentsSqlRuleOptions,
     paths: ["packages/agents/src/index.ts"],
-    reason:
-      "Cloudflare Durable Object SQL tagged templates appear to bind interpolated values, but the current rule no longer trusts tag names alone and this corpus case does not provide symbol-level builder proof.",
   },
   {
     id: "cloudflare-shell-sanitized-namespace-table-identifiers",
@@ -1037,17 +1083,16 @@ const opencodeCases = [
   {
     id: "opencode-drizzle-sql-template-identifiers-clean",
     ruleId: "antidrift/no-sql-string-concat",
-    kind: "known-gap",
-    classification: "under-proven",
+    kind: "correct",
+    classification: "ready",
     subproject: "effect-drizzle-sqlite",
+    ruleOptions: opencodeSqlRuleOptions,
     paths: [
       "packages/effect-drizzle-sqlite/src/up-migrations/effect-sqlite.ts",
       "packages/effect-drizzle-sqlite/src/up-migrations/sqlite.ts",
       "packages/effect-drizzle-sqlite/src/sqlite-core/effect/session.ts",
       "packages/core/src/database/migration.ts",
     ],
-    reason:
-      "Drizzle SQL builder templates and sql.identifier fragments appear to encode values and identifiers through the builder, but the current rule no longer trusts sql tag/member names alone and this corpus case does not provide symbol-level Drizzle builder proof.",
   },
   {
     id: "opencode-stats-local-sql-escaper-clean",
@@ -1148,16 +1193,15 @@ const powersyncServiceCases = [
   {
     id: "powersync-postgres-storage-numbered-placeholder-fragment-clean",
     ruleId: "antidrift/no-sql-string-concat",
-    kind: "known-gap",
-    classification: "under-proven",
+    kind: "correct",
+    classification: "ready",
     subproject: "module-postgres-storage",
     typeAware: true,
     tsconfig: "modules/module-postgres-storage/tsconfig.json",
+    ruleOptions: powersyncSqlRuleOptions,
     paths: [
       "modules/module-postgres-storage/src/storage/PostgresSyncRulesStorage.ts",
     ],
-    reason:
-      "PowerSync db.sql templates use typed value objects and numbered placeholder fragments, but the current rule no longer trusts sql member names alone and this corpus case does not provide symbol-level builder proof.",
   },
 ];
 
@@ -1382,8 +1426,16 @@ export async function externalCorpus(options = {}) {
     return summary;
   }
 
+  const requireIndividualRepository = Boolean(
+    sharedOptions.require && (corpus || sharedOptions.repo),
+  );
   const repositories = await Promise.all(
-    corpora.map((entry) => runExternalCorpus(entry, sharedOptions)),
+    corpora.map((entry) =>
+      runExternalCorpus(entry, {
+        ...sharedOptions,
+        require: requireIndividualRepository,
+      }),
+    ),
   );
 
   const passed = repositories.filter(

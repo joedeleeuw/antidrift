@@ -426,9 +426,9 @@ export function createConfig({
 
         // AI-specific custom rules from the local plugin.
         "antidrift/no-trivial-selector-wrapper": "error",
-        "antidrift/no-inline-structural-type-at-use-site": "error",
-        "antidrift/no-appeasement-cast": "error",
-        "antidrift/no-nullable-positional-tuple": "error",
+        "antidrift/no-inline-structural-type-at-use-site": "off",
+        "antidrift/no-appeasement-cast": "off",
+        "antidrift/no-nullable-positional-tuple": "off",
         "antidrift/no-underchecked-type-predicate": "off",
         "antidrift/no-defensive-shape-probing": "off",
         "antidrift/no-handrolled-resource-lifecycle-cells": "off",
@@ -436,35 +436,21 @@ export function createConfig({
         "antidrift/require-effect-deps": "error",
         "antidrift/no-raw-tailwind-color": "off",
         "antidrift/no-hover-translate-card": "off",
-        "antidrift/no-raw-fetch-in-component": "error",
-        "antidrift/no-async-array-method": "error",
+        "antidrift/no-raw-fetch-in-component": "off",
+        "antidrift/no-async-array-method": "off",
 
-        // generated-type-drift: structural fork detection against installed package types (type-aware).
-        "antidrift/no-structural-type-fork": [
-          "error",
-          {
-            generatedSources: registries.generated?.generatedSources ?? {},
-            packageTypeOwners: registries.ownership?.packageTypeOwners ?? {},
-          },
-        ],
-        "antidrift/no-canonical-model-fork": [
-          "error",
-          { canonicalEntities: registries.domain?.canonicalEntities ?? {} },
-        ],
+        "antidrift/no-structural-type-fork": "off",
+        "antidrift/no-canonical-model-fork": "off",
 
         // validation-drift: re-parsing a value with the schema that already produced it (type-aware).
         "antidrift/no-redundant-zod-parse": "error",
 
-        // Data-lifecycle security rules. Secret scanning is delegated to a maintained
-        // scanner in consumer CI; variable-name heuristics in lint rules overreport.
-        "antidrift/no-sql-string-concat": "warn",
+        // Data-lifecycle security rules. SQL interpolation stays in inventory until
+        // remaining SQL-builder clean controls have type-service proof.
+        "antidrift/no-sql-string-concat": "off",
         "antidrift/no-unsafe-deserialize": "error",
 
-        // Registry-driven rules: options are loaded from policy registries at config-construction time.
-        "antidrift/no-status-literal-in-type": [
-          "error",
-          { statuses: registries.domain?.statuses ?? {} },
-        ],
+        "antidrift/no-status-literal-in-type": "off",
         ...(restrictedImportPatterns.length > 0
           ? {
               "no-restricted-imports": restrictedImportsRule(

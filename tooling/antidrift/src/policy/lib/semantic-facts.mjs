@@ -49,7 +49,7 @@ export const SEMANTIC_FACT_KINDS = Object.freeze({
     association:
       "React state cells to distinct members of one freshly awaited source object before accepted owned-entity proof is established.",
     noSinkBehavior:
-      "No diagnostic is produced; behavioral source-member shard candidates remain inventory-only until type-owner proof holds.",
+      "No diagnostic is produced; semantic source-member shard candidates remain inventory-only until type-owner proof holds.",
     payloadFields: Object.freeze([
       "source",
       "members",

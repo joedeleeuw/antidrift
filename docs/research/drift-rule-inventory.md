@@ -76,7 +76,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
 - **Detection approach:** Builds a cross-file import table from all `ParseResult.imports`, then
   checks whether each exported name appears as an imported name in any other file.
   `incremental_scope = "repo_wide"` (default).
-- **Type:** warn / inventory.
+- **Type:** default-off inventory.
 - **Adversarial note:** This is a genuine cross-file reachability check on the import graph,
   which is more than pure per-file AST. However it is NOT inter-procedural dataflow — it only
   checks static import references, not call sites. Dynamic imports (`importlib`, `require()`
@@ -256,7 +256,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
 - **Detection approach:** Parses Markdown (via `mistune` AST) extracting links, code blocks, and
   prose module references. Checks that referenced file paths exist on disk. Optional
   embedding-based claim validation (opt-in). `incremental_scope = "file_local"`.
-- **Type:** warn / inventory.
+- **Type:** default-off inventory.
 - **Adversarial note:** The primary proof is path-existence on disk — a genuine check.
   The embedding-based "claim validation" is opt-in and uses semantic similarity to assess
   whether prose claims align with code; this is inherently probabilistic, not deterministic.
@@ -342,7 +342,7 @@ Signals that require git history or cross-commit comparison.
   `ingestion/git_history.py`). Counts co-occurrence in commits, computes weighted confidence
   score, then cross-checks against the import graph to suppress pairs that have explicit
   imports. `incremental_scope = "git_dependent"`.
-- **Type:** warn / inventory.
+- **Type:** default-off inventory.
 - **Adversarial note:** This is a genuine change-mining / coupling signal. Co-change analysis
   is a well-studied technique (association rule mining on commit sets). The key claim —
   "changed together without explicit import" — is real proof of hidden coupling, not a naming

@@ -498,6 +498,24 @@ ruleTester.run("no-sql-string-concat", rule("no-sql-string-concat"), {
     fixture("programs/correct/static-parameterized-sql-template.ts"),
     "const msg = `generated from ${source}`;",
     fixture("programs/correct/parameterized-sql-query.ts"),
+    {
+      code: 'import { sql as drizzleSql } from "drizzle-orm/sql/sql";\ndeclare const id: string;\nconst rows = drizzleSql`SELECT * FROM users WHERE id = ${id}`;\nvoid rows;',
+      options: [
+        {
+          safeTemplateTags: [
+            { module: "drizzle-orm/sql/sql", export: "sql" },
+          ],
+        },
+      ],
+    },
+    {
+      code: 'import { sql } from "drizzle-orm";\nconst rows = sql`SELECT ${sql.raw("CURRENT_TIMESTAMP")}`;\nvoid rows;',
+      options: [
+        {
+          safeTemplateTags: [{ module: "drizzle-orm", export: "sql" }],
+        },
+      ],
+    },
   ],
   invalid: [
     { ...fixture("programs/drift/sql-template-interpolation.ts"), errors: 1 },
@@ -510,8 +528,134 @@ ruleTester.run("no-sql-string-concat", rule("no-sql-string-concat"), {
       code: "const db = { sql(strings, ...values) { return String.raw({ raw: strings }, ...values); } };\nfunction loadUser(id) { return db.sql`SELECT * FROM users WHERE id = ${id}`; }\nvoid loadUser;",
       errors: 1,
     },
+    {
+      code: "declare const id: string;\nconst db = { sql(strings, ...values) { return String.raw({ raw: strings }, ...values); } };\nconst row = db.sql`SELECT * FROM users WHERE id = ${id}`;\nvoid row;",
+      options: [
+        {
+          safeTemplateTags: [
+            {
+              type: "DatabaseClient",
+              member: "sql",
+              source: "/database-client.ts",
+            },
+          ],
+        },
+      ],
+      errors: 1,
+    },
+    {
+      code: 'import { sql } from "drizzle-orm";\ndeclare const columnName: string;\nconst rows = sql`SELECT ${sql.raw(columnName)} FROM users`;\nvoid rows;',
+      options: [
+        {
+          safeTemplateTags: [{ module: "drizzle-orm", export: "sql" }],
+        },
+      ],
+      errors: 1,
+    },
+    {
+      code: 'import { sql } from "drizzle-orm";\ndeclare const columnName: string;\ndeclare const useDynamic: boolean;\nconst rows = sql`SELECT ${useDynamic ? sql.raw(columnName) : sql.raw("id")} FROM users`;\nvoid rows;',
+      options: [
+        {
+          safeTemplateTags: [{ module: "drizzle-orm", export: "sql" }],
+        },
+      ],
+      errors: 1,
+    },
+    {
+      code: 'import { sql } from "drizzle-orm";\ndeclare const columnName: string;\ndeclare const fallback: string;\nconst rows = sql`SELECT ${fallback || sql.raw(columnName)} FROM users`;\nvoid rows;',
+      options: [
+        {
+          safeTemplateTags: [{ module: "drizzle-orm", export: "sql" }],
+        },
+      ],
+      errors: 1,
+    },
   ],
 });
+
+typedRuleTester.run(
+  "no-sql-string-concat safe template tag provenance",
+  rule("no-sql-string-concat"),
+  {
+    valid: [
+      {
+        code: "declare const id: string;\nabstract class AbstractPostgresConnection { sql(strings: TemplateStringsArray, ...values: unknown[]) { return [strings, values]; } }\nclass DatabaseClient extends AbstractPostgresConnection {}\ndeclare const db: DatabaseClient;\nconst rows = db.sql`SELECT * FROM users WHERE id = ${id}`;\nvoid rows;",
+        filename: resolve(fixturesDir, "coupled-state.ts"),
+        options: [
+          {
+            safeTemplateTags: [
+              {
+                type: "AbstractPostgresConnection",
+                member: "sql",
+                source: "/coupled-state.ts",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        code: "declare const id: string;\nclass Agent { sql(strings: TemplateStringsArray, ...values: unknown[]) { return [strings, values]; } }\nclass AIChatAgent extends Agent { load() { return this.sql`SELECT * FROM users WHERE id = ${id}`; } }\nvoid AIChatAgent;",
+        filename: resolve(fixturesDir, "coupled-state.ts"),
+        options: [
+          {
+            safeTemplateTags: [
+              { type: "Agent", member: "sql", source: "/coupled-state.ts" },
+            ],
+          },
+        ],
+      },
+    ],
+    invalid: [
+      {
+        code: "declare const id: string;\nclass UntrustedDatabase { sql(strings: TemplateStringsArray, ...values: unknown[]) { return String.raw({ raw: strings }, ...values); } }\ndeclare const db: UntrustedDatabase;\nconst row = db.sql`SELECT * FROM users WHERE id = ${id}`;\nvoid row;",
+        options: [
+          {
+            safeTemplateTags: [
+              {
+                type: "DatabaseClient",
+                member: "sql",
+                source: "/database-client.ts",
+              },
+            ],
+          },
+        ],
+        errors: 1,
+      },
+      {
+        code: "declare const id: string;\nclass Agent { sql(strings: TemplateStringsArray, ...values: unknown[]) { return String.raw({ raw: strings }, ...values); } }\ndeclare const agent: Agent;\nconst row = agent.sql`SELECT * FROM users WHERE id = ${id}`;\nvoid row;",
+        filename: resolve(fixturesDir, "coupled-state.ts"),
+        options: [
+          {
+            safeTemplateTags: [
+              {
+                type: "Agent",
+                member: "sql",
+                source: "/not-the-source.ts",
+              },
+            ],
+          },
+        ],
+        errors: 1,
+      },
+      {
+        code: "declare const columnName: string;\ninterface SqlTag { (strings: TemplateStringsArray, ...values: unknown[]): unknown; raw(value: string): unknown; }\nclass AbstractPostgresConnection { sql: SqlTag = Object.assign((strings: TemplateStringsArray, ...values: unknown[]) => [strings, values], { raw: (value: string) => value }); }\ndeclare const db: AbstractPostgresConnection;\nconst rows = db.sql`SELECT ${db.sql.raw(columnName)} FROM users`;\nvoid rows;",
+        filename: resolve(fixturesDir, "coupled-state.ts"),
+        options: [
+          {
+            safeTemplateTags: [
+              {
+                type: "AbstractPostgresConnection",
+                member: "sql",
+                source: "/coupled-state.ts",
+              },
+            ],
+          },
+        ],
+        errors: 1,
+      },
+    ],
+  },
+);
 
 typedRuleTester.run("no-unsafe-deserialize", rule("no-unsafe-deserialize"), {
   valid: [

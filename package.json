@@ -23,7 +23,7 @@
     "policy:check-registries": "antidrift check-registries",
     "policy:check-rule-surface": "antidrift check-rule-surface",
     "policy:validate-corpus": "antidrift repo-corpus --slice validation-gate",
-    "policy:validate-external-corpus": "antidrift external-corpus --slice external-local",
+    "policy:validate-external-corpus": "antidrift external-corpus --slice external-local --require --min-repositories 2",
     "policy:validate-appeasement-remediation": "antidrift no-appeasement-remediation-corpus --slice no-appeasement-remediation-copy",
     "policy:benchmark-unsafe-type-assertion": "NODE_OPTIONS=--max-old-space-size=8192 antidrift benchmark-unsafe-type-assertion --slice upstream-delta --output reports/unsafe-type-assertion-benchmark.json",
     "policy:benchmark-sql-queries": "antidrift benchmark-sql-queries --slice upstream-delta --output reports/sql-query-benchmark.json",

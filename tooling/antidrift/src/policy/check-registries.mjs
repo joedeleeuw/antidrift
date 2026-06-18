@@ -836,6 +836,17 @@ function checkOptionalRuleProofBuckets(entry, label, errors, { active }) {
   );
 }
 
+function checkDefaultOffRuleMetadata(entry, label, errors, { active }) {
+  if (entry.defaultOff === undefined) return;
+  if (typeof entry.defaultOff !== "boolean") {
+    errors.push(`${label}.defaultOff must be a boolean.`);
+    return;
+  }
+  if (active && entry.defaultOff && entry.stable === true) {
+    errors.push(`${label}.defaultOff must not be true for stable rules.`);
+  }
+}
+
 function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
   if (!isRecord(entry)) {
     errors.push(`${label} must be a mapping.`);
@@ -849,6 +860,7 @@ function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
   if (active && typeof entry.stable !== "boolean") {
     errors.push(`${label}.stable must be a boolean.`);
   }
+  checkDefaultOffRuleMetadata(entry, label, errors, { active });
   if (active) {
     requireString(entry.signal, `${label}.signal`, errors);
     requireString(entry.solveType, `${label}.solveType`, errors);

@@ -26,9 +26,9 @@ The behavioral proof is AST plus local scope/control-flow:
 
 This deliberately excludes name-prefix inventory, raw state-cell count, and recombination alone. Those remain research/inventory signals for `react/no-use-state-waterfall`.
 
-There is no enforcement tier. An earlier type-owner tier — which resolved the awaited source's type against the domain/generated authority index (the same machinery as `no-structural-type-fork`) and blocked only owned-entity shatters — was removed after multi-repo scans (chaski, sudocode) found zero real human-authored owned-entity shatters; every behavioral hit was a response envelope, value object, or computed result, which the rule correctly leaves alone.
+There is no enforcement tier. An earlier type-owner tier — which resolved the awaited source's type against the domain/generated authority index (the same machinery as `no-structural-type-fork`) and blocked only owned-entity shatters — was removed after multi-repo scans (chaski, sudocode) found zero real human-authored owned-entity shatters; every semantic source-member hit was a response envelope, value object, or computed result, which the rule correctly leaves alone.
 
-The rule is inventory-only: behavioral source-member fan-out is recorded as `sourceMemberStateShardCandidate` and never blocks. Rebuilding the enforcement tier requires several real owned-entity shatters across more than one repo (likely an agent-generated corpus).
+The rule is inventory-only: semantic source-member fan-out is recorded as `sourceMemberStateShardCandidate` and never blocks. Rebuilding the enforcement tier requires several real owned-entity shatters across more than one repo (likely an agent-generated corpus).
 
 ## False-Positive Boundary
 

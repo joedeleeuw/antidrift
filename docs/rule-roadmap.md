@@ -117,9 +117,9 @@ Research anchors:
 - ast-grep structural search/linting: <https://ast-grep.github.io/>
 - Semgrep custom rule syntax: <https://docs.semgrep.dev/writing-rules/overview>
 
-## Stable Custom
+## Custom Rule Inventory
 
-These six passed the stable bar: independent multi-repo drift not created for the rule, clean controls, zero known false positives, zero known false negatives in the inspected corpus, no unresolved production concerns, and advisory review.
+Only rules whose registry entries are `stable: true` are default-on in the distributable config. Useful `ready` rules stay exported as default-off inventory until their own evidence clears independent real-repo drift, clean controls, zero known false positives, zero known false negatives in the inspected corpus, no unresolved production concerns, and advisory review.
 
 ### `antidrift/no-raw-fetch-in-component`
 
@@ -130,6 +130,7 @@ These six passed the stable bar: independent multi-repo drift not created for th
 - Signal: import-scope plus AST (`fetch`, `globalThis.fetch`, `window.fetch`, `self.fetch`).
 - Evidence: drift in Chaski, Codebase Atlas, and Murderbox; clean controls include API modules and query-hook components.
 - False-positive concern: none known; aliased/destructured fetch is an unobserved scope boundary to monitor until real evidence appears. The separate raw-transport future rule now has its first complaint provenance ("why is there axios in the BFF", 2026-06-10 sweep).
+- Status: ready, default-off inventory until the narrowed same-frame JSX-return proof is re-inventoried across real repos.
 
 ### `antidrift/no-redundant-zod-parse`
 
@@ -184,6 +185,7 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: TypeChecker.
 - Evidence: drift in Chaski, Codebase Atlas, and Sudocode; copy-backed repairs prove the replacement patterns; production BFF clean (0 findings/112 files).
 - False-positive concern: typed-source conversions stay clean by design; test-file casts report but do not count toward promotion.
+- Status: ready, default-off inventory.
 - Blocker: rerun broad inventory after real consumer cleanup; no further copy-only remediation.
 
 ### `antidrift/no-sql-string-concat`
@@ -194,8 +196,8 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Ecosystem: `sonarjs/sql-queries` is adjacent but missed every real finding; SQL-template plugins assume chosen tag conventions (partial overlap).
 - Signal: SQL-context AST plus scope-binding guard control flow plus TypeChecker escaper/member proof.
 - Evidence: production drift in Chaski (HogQL) and PowerSync service; lower-strength test/demo drift in Sudocode and Cloudflare; the 24-repo fleet still has SQL-builder/tagged-template clean-control gaps.
-- False-positive concern: without parser services, three known-clean PowerSync escaper controls degrade to conservative reports. `parserServiceDeltas` classifies those as inventory because the type-aware plans prove them clean and there are zero missing non-type-aware findings. Separately, Cloudflare Durable Object SQL tags, Drizzle builders, and PowerSync `db.sql` require symbol/type provenance before they can be clean.
-- Status: ready, non-blocking. Keep the benchmark and source-fleet inventories as regression gates, but do not restore blocking severity until SQL tag/member APIs are proven without name trust.
+- False-positive concern: without parser services, known-clean PowerSync escaper and member-builder controls degrade to conservative reports. `parserServiceDeltas` classifies those as inventory because the type-aware plans prove them clean and there are zero missing non-type-aware findings. Separately, unproven Cloudflare Durable Object SQL tags, Prisma, Kysely, Slonik, and aliased builders require import/declaration-source provenance before they can be clean.
+- Status: ready, default-off inventory. Keep the benchmark and source-fleet inventories as regression gates, but do not restore blocking severity until SQL tag/member APIs are proven without name trust.
 
 ### `antidrift/no-underchecked-type-predicate`
 
@@ -217,7 +219,8 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: TypeChecker structural comparison plus authority-index facts.
 - Evidence: two generated-source forks in Chaski BFF (123 files); 0 findings across 804 Portal files with installed-only sources; fixture coverage proves accepted package owners from `ownership.yaml` report while unaccepted package matches stay inventory-only.
 - False-positive concern: projected boundary DTOs with four or more identical owner fields may be legitimate translation contracts; the installed-package mode is the weak-authority branch.
-- Blocker: stable promotion needs independent generated-source replication and real accepted package-owner evidence before any package owner is added to `ownership.yaml`; the unconfigured all-`node_modules` sweep stays inventory/discovery.
+- Status: ready, default-off inventory.
+- Blocker: blocking promotion needs independent generated-source replication and real accepted package-owner evidence before any package owner is added to `ownership.yaml`; the unconfigured all-`node_modules` sweep stays inventory/discovery.
 
 ### `antidrift/no-canonical-model-fork`
 
@@ -228,7 +231,8 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: TypeChecker plus domain registry.
 - Evidence: three redeclarations in one Chaski report-types file; Sudocode `frontend/src/types/project.ts` redeclares server-owned `ProjectInfo`; owner files and a different weekly-digest model stay clean.
 - False-positive concern: boundary DTOs and view models legitimately overlap; the four-property threshold keeps small shapes out.
-- Blocker: fresh adversarial review and broader boundary DTO/view-model clean pressure before stable promotion.
+- Status: ready, default-off inventory.
+- Blocker: fresh adversarial review and broader boundary DTO/view-model clean pressure before blocking promotion.
 
 ### `antidrift/no-handrolled-resource-lifecycle-cells`
 
@@ -250,6 +254,7 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: AST.
 - Evidence: one real drift across 2,293 files (Sudocode test cleanup `forEach(async ...)`); broad clean controls.
 - False-positive concern: low; the open question is promotion policy, not signal quality.
+- Status: ready, default-off inventory.
 - Blocker: decision 6 below — branch-split promotion.
 
 ### `antidrift/no-nullable-positional-tuple`
@@ -261,6 +266,7 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: deterministic AST; alias/generic-chain nullability needs parser services.
 - Evidence: exactly 1 finding across 1,533 Chaski frontend files — precise and low-yield.
 - False-positive concern: hook-style tuples with one nullable slot stay clean; imported owner range aliases are out of scope. Low frequency lowers priority, not validity.
+- Status: ready, default-off inventory.
 - Blocker: a second real nullable tuple plus clean tuple controls.
 
 ### `antidrift/no-inline-structural-type-at-use-site`
@@ -272,7 +278,8 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: AST.
 - Evidence: Chaski only — 24 findings across 4 files after narrowing.
 - False-positive concern: local UI props and callback payload exclusions need more independent pressure.
-- Blocker: independent repo replication.
+- Status: ready, default-off inventory.
+- Blocker: independent repo replication before blocking severity.
 
 ### `antidrift/no-status-literal-in-type`
 
@@ -283,6 +290,7 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: registry plus AST context.
 - Evidence: Chaski orders-ops redeclaration; the owner file stays clean.
 - False-positive concern: generic UI variant unions that resemble domain statuses — already guarded by status-context narrowing after a real Portal false positive.
+- Status: ready, default-off inventory.
 - Blocker: independent status-fork replication with configured domain facts.
 
 ### `antidrift/require-authz-check`
@@ -413,7 +421,7 @@ These are the live grill questions reduced to recommended outcomes. Each changes
 1. **Status triplet**: closed. The redundant-constant-cell proof is folded into `no-handrolled-resource-lifecycle-cells`, and the standalone name-group rule is retired and locked.
 2. **Broad-input authority blocking**: block only degenerate zero/near-zero-field authority claims; keep sufficiency-threshold findings as inventory. Recommended: yes.
 3. **One-owner forks**: projected boundary DTOs at real translation boundaries are clean. Installed-package blocking requires accepted package-owner facts, ideally proposed from analytics such as existing imports, `Pick`/`Omit` derivations, SDK return provenance, or repeated structural forks. The unconfigured all-`node_modules` sweep stays inventory/discovery for finding owners worth accepting. Recommended: yes.
-4. **SQL severity split**: keep the rule non-blocking while SQL-builder/tagged-template APIs are known gaps. Value interpolation remains the core signal, dynamic identifier interpolation downgrades to inventory when parser services are absent, and type-proof is never replaced with name exemptions.
+4. **SQL severity split**: keep the rule off in the shipped config while remaining SQL-builder/tagged-template APIs are known gaps. Inventory still runs through benchmark and corpus tooling. Value interpolation remains the core signal, dynamic identifier interpolation downgrades to inventory when parser services are absent, and type-proof is never replaced with name exemptions.
 5. **Nullable tuples**: nullability stays the policy boundary. Recommended: yes (already the rule's shape).
 6. **Async arrays**: never-await methods may promote on deterministic evidence plus the one real drift; `map`/`flatMap`-not-collected keeps a separate evidence gate. Recommended: yes.
 7. **Authz**: move from absence detection toward typed policy-wrapper registration as the construction pattern; freeze the current Express-scope rule until then. Recommended: yes.

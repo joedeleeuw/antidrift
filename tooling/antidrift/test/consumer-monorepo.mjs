@@ -210,6 +210,27 @@ try {
       "});\n",
   );
   file(
+    "eslint.structural.config.mjs",
+    'import { appendFileSync } from "node:fs";\n' +
+      'import { createConfig } from "@joedeleeuw/antidrift/eslint-config";\n' +
+      'import { createJsonlFactSink } from "@joedeleeuw/antidrift/policy";\n' +
+      "\n" +
+      'const factFile = new URL("./semantic-facts.jsonl", import.meta.url);\n' +
+      "const sink = createJsonlFactSink((line) => appendFileSync(factFile, line));\n" +
+      "\n" +
+      "export default [\n" +
+      "  ...createConfig({\n" +
+      "    tsconfigRootDir: import.meta.dirname,\n" +
+      "    semanticFacts: { repoRoot: import.meta.dirname, sink },\n" +
+      "  }),\n" +
+      "  {\n" +
+      "    rules: {\n" +
+      '      "antidrift/no-structural-type-fork": ["error", { generatedSources: { appGenerated: { generated: "packages/app/src/generated" } }, packageTypeOwners: {} }],\n' +
+      "    },\n" +
+      "  },\n" +
+      "];\n",
+  );
+  file(
     "packages/app/tsconfig.json",
     JSON.stringify(
       {
@@ -271,7 +292,7 @@ try {
       'import { conditionEnsuresString, hasLocalStringBoundary, isJsonParseCall, isUnsafeJsonParseInput, jsonParseArgument, type TypeScriptParserServices as ParseInputParserServices } from "@joedeleeuw/antidrift/semantic-adapters/parse-input";\n' +
       'import { classifyWriteValue, createReactStateTracker, frameStatePayload, lifecycleProof, type ReactStateFrame, type ReactStateFramePayload, type ReactStateLifecycleProof, type ReactStateWriteClass } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
       'import { ZOD_PARSE_METHODS, ZOD_THROW_ASSERTION_MATCHERS, isAwaitedCallInitializer, isCallResultExpression, isThrowAssertionCallbackParse, isZodParseExpression, parsedCallResultMatchesSchemaOutput, recordParsedConst, zodParseCallParts, type TypeScriptParserServices, type ZodParseCallParts } from "@joedeleeuw/antidrift/semantic-adapters/schema-provenance";\n' +
-      'import { isSqlDirectionTokenValue, isSqlIdentifierContext, isSqlIdentifierTokenValue, isSqlInterpolationContext, normalizedSqlContext, removeTrailingSqlQuote, safeIdentifierMemberSpecs, valuesAreSqlDirections, valuesAreSqlIdentifiers, type SafeIdentifierMemberSpec } from "@joedeleeuw/antidrift/semantic-adapters/sql";\n' +
+      'import { isSqlDirectionTokenValue, isSqlIdentifierContext, isSqlIdentifierTokenValue, isSqlInterpolationContext, normalizedSqlContext, removeTrailingSqlQuote, safeIdentifierMemberSpecs, safeTemplateTagSpecs, valuesAreSqlDirections, valuesAreSqlIdentifiers, type SafeIdentifierMemberSpec, type SafeTemplateTagSpecs } from "@joedeleeuw/antidrift/semantic-adapters/sql";\n' +
       'import { hasNullablePositionalTuple, nullableTupleSlots, tupleElementIsNullishSlot, tupleElementIsOptional, tupleElementResolvesToNullish, tupleElementTypeNode, typeIncludesNullish, typeNodeIncludesDirectNullish, type TypeScriptParserServices as TupleShapeParserServices } from "@joedeleeuw/antidrift/semantic-adapters/tuple-shape";\n' +
       'import { MIN_PROPS, canonicalStatusLiteralOwner, collectAcceptedPackageCanonicalTypes, collectCanonicalTypes, collectDomainCanonicalTypes, collectGeneratedCanonicalTypes, isObjectType, isStatusContextName, isStatusLiteralContext, normalizedContextName, nodeKeyName, resolvesToDomainCanonicalType, resolvesToGeneratedType, resolvesToInstalledType, typeProps, type DomainCanonicalEntityRegistry, type DomainStatusRegistry, type GeneratedSourceRegistry, type PackageTypeOwnerRegistry, type StatusLiteralOwner, type StructuralTypeCandidate } from "@joedeleeuw/antidrift/semantic-adapters/type-owner";\n' +
       "\n" +
@@ -293,6 +314,7 @@ try {
       "const parseParserServices = parserServices satisfies ParseInputParserServices;\n" +
       "const tupleParserServices = parserServices satisfies TupleShapeParserServices;\n" +
       'const safeIdentifierMembers = safeIdentifierMemberSpecs({ safeIdentifierMembers: [{ type: "SourceTable", member: "escapedIdentifier" }, { type: 1, member: "bad" }] });\n' +
+      'const safeTemplateTags = safeTemplateTagSpecs({ safeTemplateTags: [{ module: "drizzle-orm", export: "sql", evidence: "builder" }, { type: "Agent", member: "sql", source: "packages/agents/src/index.ts", evidence: "member" }, { type: "Agent", member: "sql" }] });\n' +
       'const jsonParseCall = { type: "CallExpression", callee: { type: "MemberExpression", object: { type: "Identifier", name: "JSON" }, property: { type: "Identifier", name: "parse" } }, arguments: [{ type: "Identifier", name: "raw" }] };\n' +
       'const generatedRegistry = { appGenerated: { generated: "packages/app/src/generated" } } satisfies GeneratedSourceRegistry;\n' +
       'const packageOwners = { firebaseAuthUser: { package: "@firebase/auth", exportName: "User", reason: "test owner" } } satisfies PackageTypeOwnerRegistry;\n' +
@@ -352,6 +374,7 @@ try {
       "rawFetchPromotion satisfies RuleStatusPromotion | undefined;\n" +
       "rawFetchPromotion?.proofBucket satisfies string | undefined;\n" +
       "statusLiteralOwner satisfies StatusLiteralOwner | null;\n" +
+      "safeTemplateTags satisfies SafeTemplateTagSpecs;\n" +
       'normalizedContextName("User Status") satisfies string;\n' +
       'isStatusContextName("user_status", "UserStatus") satisfies boolean;\n' +
       'isStatusLiteralContext(statusLiteral, "UserStatus") satisfies boolean;\n' +
@@ -889,15 +912,15 @@ try {
   console.log("3/7  installing the tarball into the consumer ...");
   run("pnpm", ["install", "--prefer-offline", "--config.confirmModulesPurge=false"], work);
 
-  console.log("4/7  linting consumer files through the shipped config ...");
+  console.log("4/7  linting consumer files through shipped and opt-in configs ...");
   const semanticFactFile = join(work, "semantic-facts.jsonl");
   rmSync(semanticFactFile, { force: true });
 
-  function lint(relFile) {
+  function lint(relFile, config = "eslint.config.mjs") {
     try {
       return runJson(
         "pnpm",
-        ["exec", "eslint", relFile, "--format", "json"],
+        ["exec", "eslint", relFile, "--format", "json", "--config", config],
         work,
       );
     } catch (error) {
@@ -914,19 +937,31 @@ try {
   }
 
   const RULE = "antidrift/no-structural-type-fork";
-  const driftRules = lint("packages/app/src/drift.ts").flatMap((r) =>
+  const defaultDriftRules = lint("packages/app/src/drift.ts").flatMap((r) =>
     r.messages.map((m) => m.ruleId),
   );
-  const cleanRules = lint("packages/app/src/clean.ts").flatMap((r) =>
-    r.messages.map((m) => m.ruleId),
-  );
-  const packageCopyRules = lint("packages/app/src/package-copy.ts").flatMap(
+  if (defaultDriftRules.includes(RULE)) {
+    fail(
+      `default config must keep ${RULE} off, got: ${JSON.stringify(defaultDriftRules)}`,
+    );
+  }
+
+  rmSync(semanticFactFile, { force: true });
+  const structuralConfig = "eslint.structural.config.mjs";
+  const driftRules = lint("packages/app/src/drift.ts", structuralConfig).flatMap(
     (r) => r.messages.map((m) => m.ruleId),
   );
+  const cleanRules = lint("packages/app/src/clean.ts", structuralConfig).flatMap(
+    (r) => r.messages.map((m) => m.ruleId),
+  );
+  const packageCopyRules = lint(
+    "packages/app/src/package-copy.ts",
+    structuralConfig,
+  ).flatMap((r) => r.messages.map((m) => m.ruleId));
 
   if (!driftRules.includes(RULE)) {
     fail(
-      `drift.ts should have reported ${RULE}, got: ${JSON.stringify(driftRules)}`,
+      `opt-in config drift.ts should have reported ${RULE}, got: ${JSON.stringify(driftRules)}`,
     );
   }
   if (cleanRules.includes(RULE)) {
@@ -957,7 +992,7 @@ try {
 
   if (!generatedStructuralFact) {
     fail(
-      `drift.ts should have emitted a generated-source structuralMatch fact, got: ${JSON.stringify(semanticFacts)}`,
+      `opt-in config drift.ts should have emitted a generated-source structuralMatch fact, got: ${JSON.stringify(semanticFacts)}`,
     );
   }
 
@@ -1266,7 +1301,7 @@ try {
     `\n✓ tarball installs, type-checks, imports, and enforces in a consumer monorepo`,
   );
   console.log(
-    `  drift.ts -> ${RULE} fired from generated authority and emitted a structuralMatch fact; clean.ts and package-copy.ts stayed clean; public exports and semantic adapters passed Bundler and NodeNext.`,
+    `  default config kept ${RULE} off; opt-in config fired on drift.ts, emitted a structuralMatch fact, and kept clean.ts/package-copy.ts clean; public exports and semantic adapters passed Bundler and NodeNext.`,
   );
   rmSync(work, { recursive: true, force: true });
 } catch (error) {

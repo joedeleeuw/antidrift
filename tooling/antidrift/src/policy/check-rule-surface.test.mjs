@@ -151,6 +151,38 @@ describe("checkRuleSurface", () => {
     expect(messages).toEqual([]);
   });
 
+  it("rejects default-off custom rules with nonzero severity", () => {
+    const messages = [];
+    const ok = checkRuleSurface({
+      pluginRules: {
+        alpha: {},
+      },
+      configs: [
+        {
+          rules: {
+            "antidrift/alpha": "warn",
+          },
+        },
+      ],
+      corpusCases: [{ ruleId: "antidrift/alpha" }],
+      ruleRegistry: {
+        rules: {
+          "antidrift/alpha": {
+            status: "ready",
+            defaultOff: true,
+            signal: "TypeChecker",
+          },
+        },
+      },
+      report: (message) => messages.push(message),
+    });
+
+    expect(ok).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "configured as blocking despite defaultOff metadata: antidrift/alpha",
+    );
+  });
+
   it("fails when the runtime config surface is missing instead of skipping missing source layout", () => {
     const messages = [];
     const ok = checkRuleSurface({

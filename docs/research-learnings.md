@@ -110,8 +110,8 @@ Applies to:
 Basis: `docs/whitepaper-agent-code-drift-proofs.md` §2.4 (inter-procedural dataflow/taint section; Joern F1 0.856 vs Semgrep 0.081; IRIS arXiv:2405.17238; ZeroFalse arXiv:2510.02534); `docs/solve-bucket-architecture-review.md` §3 bucket (3) and §2 table row "Injection / value-reaches-sink"; `policy/registries/solve-buckets.yaml` (antidrift/no-sql-string-concat: `fit: approximation, target: dataflow-taint`).
 
 Applies to:
-- `antidrift/no-sql-string-concat` — useful but no longer stable; solve-bucket target is `dataflow-taint`. Do not hand-roll SQL-builder ecosystems by tag name. The architecture review recommendation is to delegate escaper/reachability to CodeQL/Semgrep or prove SQL-builder APIs through symbol/type provenance while keeping antidrift as the policy/fact/governance layer.
-- `antidrift/no-unsafe-deserialize` — same: `fit: approximation, target: dataflow-taint` (solve-buckets.yaml). Stable as-is; the delegation path is the long-term direction.
+- `antidrift/no-sql-string-concat` — useful but no longer stable; solve-bucket target is `dataflow-taint`. Do not hand-roll SQL-builder ecosystems by tag name. The architecture review recommendation is to delegate escaper/reachability to CodeQL/Semgrep or prove SQL-builder APIs through import/declaration-source provenance while keeping antidrift as the policy/fact/governance layer.
+- `antidrift/no-unsafe-deserialize` — scoped parse-input rule: `fit: proven, target: semantic-ast` (solve-buckets.yaml). Broader interprocedural deserialization taint remains out of scope and belongs in delegated dataflow/taint research.
 - `antidrift/require-authz-check` — solve-buckets.yaml: `fit: under-proven, target: dataflow-taint`. Handler-local params plus configured callee names are inventory; blocking needs typed route construction or delegated dominance/taint proof.
 - Gap `silent-fallback` (n=24, solve-buckets.yaml) — this is the clearest case for delegation; "does a caught error flow to a real sink or nowhere" is a taint query, not an AST shape.
 

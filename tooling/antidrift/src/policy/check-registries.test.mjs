@@ -388,6 +388,74 @@ packageTypeOwners:
     );
   });
 
+  it("rejects malformed default-off rule metadata", () => {
+    const root = workspace();
+    const messages = [];
+    writeValidRulesRegistry(root);
+    const registryPath = join(root, "policy/registries/rules.yaml");
+    const source = readFileSync(registryPath, "utf8");
+    writeFileSync(
+      registryPath,
+      source.replace(
+        [
+          "  antidrift/no-sql-string-concat:",
+          "    status: ready",
+          "    stable: false",
+        ].join("\n"),
+        [
+          "  antidrift/no-sql-string-concat:",
+          "    status: ready",
+          "    stable: false",
+          "    defaultOff: yes",
+        ].join("\n"),
+      ),
+    );
+
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "policy/registries/rules.yaml rules.antidrift/no-sql-string-concat.defaultOff must be a boolean.",
+    );
+  });
+
+  it("rejects stable rules marked default-off", () => {
+    const root = workspace();
+    const messages = [];
+    writeValidRulesRegistry(root);
+    const registryPath = join(root, "policy/registries/rules.yaml");
+    const source = readFileSync(registryPath, "utf8");
+    writeFileSync(
+      registryPath,
+      source.replace(
+        [
+          "  antidrift/no-sql-string-concat:",
+          "    status: ready",
+          "    stable: false",
+        ].join("\n"),
+        [
+          "  antidrift/no-sql-string-concat:",
+          "    status: ready",
+          "    stable: true",
+          "    defaultOff: true",
+        ].join("\n"),
+      ),
+    );
+
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "policy/registries/rules.yaml rules.antidrift/no-sql-string-concat.defaultOff must not be true for stable rules.",
+    );
+  });
+
   it("rejects malformed package owner facts", () => {
     const root = workspace();
     const messages = [];

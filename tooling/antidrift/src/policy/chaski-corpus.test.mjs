@@ -308,6 +308,19 @@ export interface OpenProjectInfo extends ProjectInfo {
 });
 
 describe("externalCorpus", () => {
+  it("fails a named required external repository when its checkout is missing", async () => {
+    const result = await externalCorpus({
+      corpus: "claude-code-source",
+      repo: "/definitely/not/claude-code-source",
+      require: true,
+      report: () => {},
+    });
+
+    expect(result.decision).toBe("fail");
+    expect(result.repositories[0]?.decision).toBe("fail");
+    expect(result.repositories[0]?.reason).toContain("repo not found");
+  });
+
   it("can require more than one external repository for promotion gates", async () => {
     const root = tempRepo();
     writeProgram(

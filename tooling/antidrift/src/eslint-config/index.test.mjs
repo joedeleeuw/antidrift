@@ -130,7 +130,7 @@ describe("createConfig", () => {
     });
   });
 
-  it("wires ownership registry package owners into structural fork rule options", () => {
+  it("keeps structural fork detection default-off even when package owners exist", () => {
     const root = tempPolicyRoot();
     writeFileSync(
       join(root, "policy", "registries", "ownership.yaml"),
@@ -145,18 +145,6 @@ describe("createConfig", () => {
 
     const rules = collectRules(createConfig({ tsconfigRootDir: root }));
 
-    expect(rules["antidrift/no-structural-type-fork"]).toEqual([
-      "error",
-      {
-        generatedSources: {},
-        packageTypeOwners: {
-          firebaseAuthUser: {
-            package: "@firebase/auth",
-            exportName: "User",
-            reason: "Firebase Auth User is the accepted auth user contract.",
-          },
-        },
-      },
-    ]);
+    expect(rules["antidrift/no-structural-type-fork"]).toBe("off");
   });
 });

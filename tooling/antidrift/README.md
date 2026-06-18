@@ -34,7 +34,7 @@ export default createConfig({ tsconfigRootDir: import.meta.dirname });
 
 That gives you the type-aware base (typescript-eslint, sonarjs, architecture boundaries, react-hooks) plus every antidrift rule. It also includes the general monorepo hygiene layer: import grouping and spacing, sorted named imports, top-level `import type` declarations, package dependency checks, promise-misuse and unnecessary-condition checks, type-union/intersection sorting, React component/key conventions, JSX prop ordering, duplicate-import protection, import-cycle detection, and single-blank-line formatting. If you keep a `policy/` directory with registries, `createConfig` reads them and wires up the domain-specific rules on its own.
 
-If you wire `@joedeleeuw/antidrift/eslint-plugin` by hand instead of using `createConfig`, configure `@typescript-eslint/parser` with parser services (`projectService` or `project`). Fully type-aware antidrift rules report a configuration error when enabled without those services so missing type information cannot silently weaken the rule set. Hybrid rules such as `antidrift/no-sql-string-concat` still run their AST and local-flow proof without parser services, but imported escaper and configured safe-member proofs are parser-service-only and are classified by the SQL benchmark.
+If you wire `@joedeleeuw/antidrift/eslint-plugin` by hand instead of using `createConfig`, configure `@typescript-eslint/parser` with parser services (`projectService` or `project`). Fully type-aware antidrift rules report a configuration error when enabled without those services so missing type information cannot silently weaken the rule set. Hybrid rules such as `antidrift/no-sql-string-concat` still run their AST and local-flow proof without parser services, but imported escaper, configured safe-member, and configured declaration-source safe-template-member proofs are parser-service-only and are classified by the SQL benchmark.
 
 To collect non-blocking semantic inventory facts, pass a fact sink through `createConfig`:
 
@@ -126,7 +126,7 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/semantic-adapters/parse-input` — JSON.parse input provenance and local string-boundary proof shared by `no-unsafe-deserialize`
 - `@joedeleeuw/antidrift/semantic-adapters/react-state` — React state graph adapter primitives for tooling that needs the same lifecycle proof used by `no-handrolled-resource-lifecycle-cells`
 - `@joedeleeuw/antidrift/semantic-adapters/schema-provenance` — Zod parse/provenance helpers shared by `no-redundant-zod-parse`
-- `@joedeleeuw/antidrift/semantic-adapters/sql` — SQL context, identifier-token, and safe-member classifiers shared by `no-sql-string-concat`
+- `@joedeleeuw/antidrift/semantic-adapters/sql` — SQL context, identifier-token, safe-member, and import/declaration-source safe-template-tag classifiers shared by `no-sql-string-concat`
 - `@joedeleeuw/antidrift/semantic-adapters/tuple-shape` — tuple nullish-slot classifiers shared by `no-nullable-positional-tuple`
 - `@joedeleeuw/antidrift/semantic-adapters/type-owner` — TypeChecker-backed owner candidate collectors for generated, domain, and installed-package structural authority
 - `antidrift` — the CLI binary for generate/check/report commands, plus `semantic-manifest` and `rule-status` for machine-readable metadata

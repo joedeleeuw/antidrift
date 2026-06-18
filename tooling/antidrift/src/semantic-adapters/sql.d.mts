@@ -19,6 +19,39 @@ export interface SafeIdentifierMemberSpec {
   member: string;
 }
 
+export interface SafeTemplateImportedTagSpecInput {
+  module?: unknown;
+  export?: unknown;
+  evidence?: unknown;
+}
+
+export interface SafeTemplateMemberTagSpecInput {
+  type?: unknown;
+  member?: unknown;
+  source?: unknown;
+  evidence?: unknown;
+}
+
+export type SafeTemplateTagSpecInput =
+  | SafeTemplateImportedTagSpecInput
+  | SafeTemplateMemberTagSpecInput;
+
+export interface SafeTemplateImportedTagSpec {
+  module: string;
+  exportName: string;
+}
+
+export interface SafeTemplateMemberTagSpec {
+  type: string;
+  member: string;
+  source: string;
+}
+
+export interface SafeTemplateTagSpecs {
+  imported: SafeTemplateImportedTagSpec[];
+  members: SafeTemplateMemberTagSpec[];
+}
+
 export const SQL_INTERPOLATION_BEFORE_KEYWORDS: readonly string[];
 export const SQL_INTERPOLATION_AFTER_KEYWORDS: readonly string[];
 
@@ -49,3 +82,6 @@ export function valuesAreSqlDirections(
 export function safeIdentifierMemberSpecs(options: {
   safeIdentifierMembers?: readonly SafeIdentifierMemberSpecInput[];
 }): SafeIdentifierMemberSpec[];
+export function safeTemplateTagSpecs(options: {
+  safeTemplateTags?: readonly SafeTemplateTagSpecInput[];
+}): SafeTemplateTagSpecs;

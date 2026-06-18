@@ -138,3 +138,30 @@ export function safeIdentifierMemberSpecs(options) {
     )
     .map(({ type, member }) => ({ type, member }));
 }
+
+function isPathQualifiedSource(value) {
+  return typeof value === "string" && /[/\\]/u.test(value);
+}
+
+export function safeTemplateTagSpecs(options) {
+  const imported = [];
+  const members = [];
+  for (const spec of options.safeTemplateTags ?? []) {
+    if (typeof spec?.module === "string" && typeof spec.export === "string") {
+      imported.push({ module: spec.module, exportName: spec.export });
+      continue;
+    }
+    if (
+      typeof spec?.type === "string" &&
+      typeof spec.member === "string" &&
+      isPathQualifiedSource(spec.source)
+    ) {
+      members.push({
+        type: spec.type,
+        member: spec.member,
+        source: spec.source,
+      });
+    }
+  }
+  return { imported, members };
+}
