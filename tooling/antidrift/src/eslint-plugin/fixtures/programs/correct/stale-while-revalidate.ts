@@ -1,4 +1,5 @@
-declare function useState<T>(value: T): [T, (value: T) => void];
+import { useState } from "react";
+
 declare function fetchItems(query: string): Promise<string[]>;
 
 function SearchResults() {

@@ -41,7 +41,8 @@ describe("reactStateInventory", () => {
       root,
       "src/component.tsx",
       `
-declare function useState<T>(value: T): [T, (value: T) => void];
+import { useState } from "react";
+
 declare function loadUsers(): Promise<string[]>;
 
 export function Users() {

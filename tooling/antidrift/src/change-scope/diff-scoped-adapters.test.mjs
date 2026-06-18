@@ -50,6 +50,8 @@ beforeAll(() => {
   writeFileSync(
     resolve(dir, "app.js"),
     [
+      "import { useState } from 'react';",
+      "",
       "export async function preexisting(items) {",
       "  items.forEach(async (item) => {",
       "    await item.save();",
@@ -63,6 +65,8 @@ beforeAll(() => {
   writeFileSync(
     resolve(dir, "app.js"),
     [
+      "import { useState } from 'react';",
+      "",
       "export async function preexisting(items) {",
       "  items.forEach(async (item) => {",
       "    await item.save();",
@@ -116,7 +120,7 @@ describe("diffScopedAdapters", () => {
       expect.objectContaining({
         path: "app.js",
         ruleId: "antidrift/no-async-array-method",
-        line: 8,
+        line: 10,
       }),
     ]);
     expect(summary.factCounts.total).toBe(1);

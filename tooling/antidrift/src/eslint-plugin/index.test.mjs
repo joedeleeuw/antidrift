@@ -235,31 +235,35 @@ typedRuleTester.run(
   },
 );
 
-ruleTester.run("no-handrolled-resource-lifecycle-cells", rule("no-handrolled-resource-lifecycle-cells"), {
-  valid: [
-    fixture("programs/correct/single-state-setter-handler.ts"),
-    fixture("programs/correct/sibling-payload-setters.ts"),
-    fixture("programs/correct/sibling-component-setter-scope.ts"),
-    // Synchronous multi-setter UI cleanup is not a lifecycle machine.
-    fixture("programs/correct/multi-setter-ui-cleanup.ts"),
-    // Loading + data with no error/catch cell: stale-while-revalidate.
-    fixture("programs/correct/stale-while-revalidate.ts"),
-    // Append via updater fn is incremental pagination, not a fresh resource load.
-    fixture("programs/correct/pagination-next-page.ts"),
-    // Full lifecycle shape, but request-identity guarded by AbortController.
-    fixture("programs/correct/abort-guarded-fetch.ts"),
-    // Owned resource hook: no local useState cells to couple.
-    fixture("programs/correct/owned-resource-hook.ts"),
-    // Request guard constructed at component scope (useRef) still exempts the transition.
-    fixture("programs/correct/abort-guarded-component-scope.ts"),
-  ],
-  invalid: [
-    {
-      ...fixture("programs/drift/handrolled-resource-lifecycle.ts"),
-      errors: 1,
-    },
-  ],
-});
+ruleTester.run(
+  "no-handrolled-resource-lifecycle-cells",
+  rule("no-handrolled-resource-lifecycle-cells"),
+  {
+    valid: [
+      fixture("programs/correct/single-state-setter-handler.ts"),
+      fixture("programs/correct/sibling-payload-setters.ts"),
+      fixture("programs/correct/sibling-component-setter-scope.ts"),
+      // Synchronous multi-setter UI cleanup is not a lifecycle machine.
+      fixture("programs/correct/multi-setter-ui-cleanup.ts"),
+      // Loading + data with no error/catch cell: stale-while-revalidate.
+      fixture("programs/correct/stale-while-revalidate.ts"),
+      // Append via updater fn is incremental pagination, not a fresh resource load.
+      fixture("programs/correct/pagination-next-page.ts"),
+      // Full lifecycle shape, but request-identity guarded by AbortController.
+      fixture("programs/correct/abort-guarded-fetch.ts"),
+      // Owned resource hook: no local useState cells to couple.
+      fixture("programs/correct/owned-resource-hook.ts"),
+      // Request guard constructed at component scope (useRef) still exempts the transition.
+      fixture("programs/correct/abort-guarded-component-scope.ts"),
+    ],
+    invalid: [
+      {
+        ...fixture("programs/drift/handrolled-resource-lifecycle.ts"),
+        errors: 1,
+      },
+    ],
+  },
+);
 
 const generatedStructuralOptions = {
   generatedSources: {
@@ -276,8 +280,8 @@ typedRuleTester.run(
     valid: [
       {
         code: `
+          import { useState } from "react";
           declare namespace JSX { interface IntrinsicElements { input: any; form: any; } }
-          declare function useState<T>(v: T): [T, (v: T) => void];
           declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
           function ProfileForm() {
             const [id, setId] = useState("");
@@ -297,7 +301,7 @@ typedRuleTester.run(
         filename: "profile-form.tsx",
       },
       `
-        declare function useState<T>(v: T): [T, (v: T) => void];
+        import { useState } from "react";
         declare function fetchUser(): Promise<{ id: string; name: string }>;
         function UserPanel() {
           const [user, setUser] = useState<{ id: string; name: string } | null>(null);
@@ -309,7 +313,7 @@ typedRuleTester.run(
         void UserPanel;
       `,
       `
-        declare function useState<T>(v: T): [T, (v: T) => void];
+        import { useState } from "react";
         declare function fetchUser(): Promise<{ id: string; name: string }>;
         function UserPanel() {
           const [id, setId] = useState("");
@@ -324,8 +328,8 @@ typedRuleTester.run(
       `,
       {
         code: `
+          import { useState } from "react";
           import type { User } from "./programs/correct/packages/domain/src/user";
-          declare function useState<T>(v: T): [T, (v: T) => void];
           declare function fetchUsersPage(): Promise<{
             items: User[];
             nextCursor: string | null;
@@ -345,8 +349,8 @@ typedRuleTester.run(
       },
       {
         code: `
+          import { useState } from "react";
           import type { User } from "./programs/correct/packages/domain/src/user";
-          declare function useState<T>(v: T): [T, (v: T) => void];
           declare function fetchUserEnvelope(): Promise<{
             entity: User;
             fetchedAt: string;
@@ -770,7 +774,10 @@ async function lintCoupledStateProgramWithFacts(program, options = {}) {
           antidrift: plugin,
         },
         rules: {
-          "antidrift/no-handrolled-resource-lifecycle-cells": ["error", options],
+          "antidrift/no-handrolled-resource-lifecycle-cells": [
+            "error",
+            options,
+          ],
         },
         settings: {
           antidrift: {
@@ -911,7 +918,7 @@ it("keeps sibling payload setters inventory-only under an aggressive threshold",
 
 it("proves lifecycle from derived catch writes and awaited source-member payloads", async () => {
   const { facts, result } = await lintCoupledStateCodeWithFacts(`
-    declare function useState<T>(value: T): [T, (value: T) => void];
+    import { useState } from "react";
     declare function fetchRows(): Promise<{ rows: string[] }>;
     declare function codeFrom(error: unknown): string;
 
@@ -952,6 +959,57 @@ it("proves lifecycle from derived catch writes and awaited source-member payload
   );
 });
 
+it("ignores local useState impostors for React-state facts", async () => {
+  const lifecycle = await lintCoupledStateCodeWithFacts(`
+    function useState<T>(value: T): [T, (value: T) => void] {
+      return [value, () => undefined];
+    }
+    declare function loadUsers(): Promise<string[]>;
+
+    function UsersPanel() {
+      const [users, setUsers] = useState<string[]>([]);
+      const [pending, setPending] = useState(false);
+      const [failure, setFailure] = useState<Error | null>(null);
+
+      return async function load() {
+        setPending(true);
+        setFailure(null);
+        try {
+          const result = await loadUsers();
+          setUsers(result);
+        } catch (err) {
+          setFailure(err);
+        } finally {
+          setPending(false);
+        }
+      };
+    }
+
+    void UsersPanel;
+  `);
+  const sourceShard = await lintSourceShardWithFacts(`
+    function useState<T>(value: T): [T, (value: T) => void] {
+      return [value, () => undefined];
+    }
+    declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
+    function ProfileCard() {
+      const [id, setId] = useState("");
+      const [name, setName] = useState("");
+      return async function load() {
+        const profile = await fetchProfile();
+        setId(profile.id);
+        setName(profile.displayName);
+      };
+    }
+    void ProfileCard;
+  `);
+
+  expect(lifecycle.result.messages).toHaveLength(0);
+  expect(sourceShard.result.messages).toHaveLength(0);
+  expect(lifecycle.facts).toHaveLength(0);
+  expect(sourceShard.facts).toHaveLength(0);
+});
+
 it("downgrades a request-guarded lifecycle to heuristic-inventory with no diagnostic", async () => {
   const { facts, result } = await lintWithCoupledStateFacts(
     "programs/correct/abort-guarded-fetch.ts",
@@ -972,9 +1030,78 @@ it("downgrades a request-guarded lifecycle to heuristic-inventory with no diagno
   );
 });
 
+it("does not downgrade lifecycle proof for unrelated abort-shaped members", async () => {
+  const { facts, result } = await lintCoupledStateCodeWithFacts(`
+    import { useState } from "react";
+    declare const request: { aborted: boolean };
+    declare const fake: { abort(): void; signal: { aborted: boolean } };
+    declare function loadUsers(): Promise<string[]>;
+
+    function UsersPanel() {
+      const [users, setUsers] = useState<string[]>([]);
+      const [pending, setPending] = useState(false);
+      const [failure, setFailure] = useState<Error | null>(null);
+
+      return async function load() {
+        setPending(true);
+        setFailure(null);
+        try {
+          const result = await loadUsers();
+          if (request.aborted) return;
+          fake.abort();
+          if (fake.signal.aborted) return;
+          setUsers(result);
+        } catch (err) {
+          setFailure(err);
+        } finally {
+          setPending(false);
+        }
+      };
+    }
+
+    void UsersPanel;
+  `);
+
+  expect(result.messages).toHaveLength(1);
+  expect(facts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        factKind: "resourceLifecycleProof",
+        confidence: "deterministic-enforcement",
+        payload: expect.objectContaining({
+          boolCell: "setPending",
+          errorCell: "setFailure",
+          payloadCell: "setUsers",
+          requestGuard: false,
+        }),
+      }),
+    ]),
+  );
+});
+
+it("downgrades a useRef AbortController lifecycle to heuristic-inventory with no diagnostic", async () => {
+  const { facts, result } = await lintWithCoupledStateFacts(
+    "programs/correct/abort-guarded-component-scope.ts",
+  );
+
+  expect(result.messages).toHaveLength(0);
+  expect(facts.map((fact) => fact.factKind)).not.toContain(
+    "resourceLifecycleProof",
+  );
+  expect(facts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        factKind: "broadSetterCoMutation",
+        confidence: "heuristic-inventory",
+        payload: expect.objectContaining({ requestGuard: true }),
+      }),
+    ]),
+  );
+});
+
 it("emits a source-member shard candidate fact (inventory-only, no diagnostic)", async () => {
   const { facts, result } = await lintSourceShardWithFacts(`
-    declare function useState<T>(v: T): [T, (v: T) => void];
+    import { useState } from "react";
     declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
     function ProfileCard() {
       const [id, setId] = useState("");
@@ -1021,7 +1148,7 @@ it("emits semantic facts that satisfy the registered public payload contract", a
     { threshold: 2 },
   );
   const sourceShardCandidate = await lintSourceShardWithFacts(`
-    declare function useState<T>(v: T): [T, (v: T) => void];
+    import { useState } from "react";
     declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
     function ProfileCard() {
       const [id, setId] = useState("");

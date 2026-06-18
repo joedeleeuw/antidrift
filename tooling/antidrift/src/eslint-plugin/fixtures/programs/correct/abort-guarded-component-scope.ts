@@ -1,5 +1,5 @@
-declare function useState<T>(value: T): [T, (value: T) => void];
-declare function useRef<T>(value: T): { current: T };
+import { useRef, useState } from "react";
+
 declare function fetchUser(id: string, signal: AbortSignal): Promise<string>;
 
 function Profile() {

@@ -1,4 +1,5 @@
-declare function useState<T>(value: T): [T, (value: T) => void];
+import { useState } from "react";
+
 declare function fetchPage(cursor: number): Promise<{ items: string[]; next: number }>;
 
 function FeedList() {

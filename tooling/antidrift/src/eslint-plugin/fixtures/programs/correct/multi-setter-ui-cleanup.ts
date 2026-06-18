@@ -1,4 +1,4 @@
-declare function useState<T>(value: T): [T, (value: T) => void];
+import { useState } from "react";
 
 function FilterPanel() {
   const [query, setQuery] = useState("");

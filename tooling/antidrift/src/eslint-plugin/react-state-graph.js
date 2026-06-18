@@ -88,8 +88,26 @@ function paramNames(params = []) {
 function baseIdentifierName(node) {
   const value = unwrapCasts(node);
   if (value?.type === "Identifier") return value.name;
-  if (value?.type === "MemberExpression") return baseIdentifierName(value.object);
+  if (value?.type === "MemberExpression") {
+    return baseIdentifierName(value.object);
+  }
   return "";
+}
+
+function importedName(specifier) {
+  const imported = specifier?.imported;
+  if (imported?.type === "Identifier") return imported.name;
+  if (imported?.type === "Literal") return String(imported.value);
+  return "";
+}
+
+function isNewAbortController(node) {
+  const value = unwrapCasts(node);
+  return (
+    value?.type === "NewExpression" &&
+    value.callee?.type === "Identifier" &&
+    value.callee.name === "AbortController"
+  );
 }
 
 // Only first-level member access on the awaited source (`source.prop`) is a shard
@@ -151,22 +169,23 @@ function sourceMemberTransitions(frame) {
   }));
 }
 
-function isAbortCall(callee) {
-  return callee?.type === "MemberExpression" && memberName(callee) === "abort";
-}
-
-function isAbortStatusRead(node) {
-  return node?.type === "MemberExpression" && memberName(node) === "aborted";
-}
-
 export function createReactStateTracker({ onFrameExit } = {}) {
   const functionStack = [];
   const catchParams = [];
+  const reactObjectLocals = new Set();
+  const reactHookLocals = new Map([
+    ["useRef", new Set()],
+    ["useState", new Set()],
+  ]);
   const top = () => functionStack[functionStack.length - 1] ?? null;
   const setterInScope = (name) =>
     functionStack.some((frame) => frame.setters.has(name));
   const cellInScope = (name) =>
     functionStack.some((frame) => [...frame.cellOf.values()].includes(name));
+  const abortControllerInScope = (name) =>
+    functionStack.some((frame) => frame.abortControllers.has(name));
+  const abortControllerRefInScope = (name) =>
+    functionStack.some((frame) => frame.abortControllerRefs.has(name));
   // A setter's cell is declared in the owning component frame, but its writes happen
   // in a nested transition frame, so resolve the binding up the stack.
   const cellFor = (name) => {
@@ -176,6 +195,70 @@ export function createReactStateTracker({ onFrameExit } = {}) {
     }
     return null;
   };
+
+  function isReactHookCallee(callee, hookName) {
+    const value = unwrapCasts(callee);
+    if (value?.type === "Identifier") {
+      return reactHookLocals.get(hookName)?.has(value.name) ?? false;
+    }
+    if (value?.type !== "MemberExpression" || memberName(value) !== hookName) {
+      return false;
+    }
+    const object = unwrapCasts(value.object);
+    return object?.type === "Identifier" && reactObjectLocals.has(object.name);
+  }
+
+  function isAbortControllerRefInit(node) {
+    const value = unwrapCasts(node);
+    return (
+      value?.type === "CallExpression" &&
+      isReactHookCallee(value.callee, "useRef") &&
+      isNewAbortController(value.arguments?.[0])
+    );
+  }
+
+  function isAbortControllerCurrent(node) {
+    const value = unwrapCasts(node);
+    if (value?.type !== "MemberExpression" || memberName(value) !== "current") {
+      return false;
+    }
+    const object = unwrapCasts(value.object);
+    return (
+      object?.type === "Identifier" && abortControllerRefInScope(object.name)
+    );
+  }
+
+  function isKnownAbortController(node) {
+    const value = unwrapCasts(node);
+    return (
+      (value?.type === "Identifier" && abortControllerInScope(value.name)) ||
+      isAbortControllerCurrent(value)
+    );
+  }
+
+  function isKnownAbortSignalStatusRead(node) {
+    const value = unwrapCasts(node);
+    if (value?.type !== "MemberExpression" || memberName(value) !== "aborted") {
+      return false;
+    }
+    const signal = unwrapCasts(value.object);
+    if (
+      signal?.type !== "MemberExpression" ||
+      memberName(signal) !== "signal"
+    ) {
+      return false;
+    }
+    return isKnownAbortController(signal.object);
+  }
+
+  function isKnownAbortCall(callee) {
+    const value = unwrapCasts(callee);
+    return (
+      value?.type === "MemberExpression" &&
+      memberName(value) === "abort" &&
+      isKnownAbortController(value.object)
+    );
+  }
 
   function enter(node) {
     functionStack.push({
@@ -195,6 +278,8 @@ export function createReactStateTracker({ onFrameExit } = {}) {
       controlledCells: new Set(),
       catchSetters: new Set(),
       updaterSetters: new Set(),
+      abortControllers: new Set(),
+      abortControllerRefs: new Set(),
     });
   }
 
@@ -218,8 +303,12 @@ export function createReactStateTracker({ onFrameExit } = {}) {
       : frame.setters;
     frame.sourceMemberTransitions.push(...sourceMemberTransitions(frame));
     if (parent) {
-      for (const cell of frame.eventEditedCells) parent.eventEditedCells.add(cell);
-      for (const cell of frame.controlledCells) parent.controlledCells.add(cell);
+      for (const cell of frame.eventEditedCells) {
+        parent.eventEditedCells.add(cell);
+      }
+      for (const cell of frame.controlledCells) {
+        parent.controlledCells.add(cell);
+      }
       parent.sourceMemberTransitions.push(...frame.sourceMemberTransitions);
     }
     if (onFrameExit) onFrameExit(frame);
@@ -227,13 +316,35 @@ export function createReactStateTracker({ onFrameExit } = {}) {
 
   return {
     visitors: {
+      ImportDeclaration(node) {
+        if (node.source?.value !== "react") return;
+        for (const specifier of node.specifiers ?? []) {
+          const localName = specifier.local?.name;
+          if (!localName) continue;
+          if (
+            specifier.type === "ImportDefaultSpecifier" ||
+            specifier.type === "ImportNamespaceSpecifier"
+          ) {
+            reactObjectLocals.add(localName);
+            continue;
+          }
+          const hookLocals = reactHookLocals.get(importedName(specifier));
+          if (hookLocals) hookLocals.add(localName);
+        }
+      },
       VariableDeclarator(node) {
         const frame = top();
         if (!frame) return;
-        const init = node.init;
+        const init = unwrapCasts(node.init);
+        if (node.id?.type === "Identifier" && isNewAbortController(init)) {
+          frame.abortControllers.add(node.id.name);
+        }
+        if (node.id?.type === "Identifier" && isAbortControllerRefInit(init)) {
+          frame.abortControllerRefs.add(node.id.name);
+        }
         if (
           init?.type === "CallExpression" &&
-          init.callee?.name === "useState" &&
+          isReactHookCallee(init.callee, "useState") &&
           node.id?.type === "ArrayPattern"
         ) {
           const cell = node.id.elements?.[0];
@@ -264,7 +375,7 @@ export function createReactStateTracker({ onFrameExit } = {}) {
       },
       MemberExpression(node) {
         const frame = top();
-        if (frame && isAbortStatusRead(node)) {
+        if (frame && isKnownAbortSignalStatusRead(node)) {
           frame.requestGuard = true;
         }
       },
@@ -296,7 +407,7 @@ export function createReactStateTracker({ onFrameExit } = {}) {
       CallExpression(node) {
         const frame = top();
         if (!frame) return;
-        if (isAbortCall(node.callee)) frame.requestGuard = true;
+        if (isKnownAbortCall(node.callee)) frame.requestGuard = true;
         const calleeName =
           node.callee?.type === "Identifier" ? node.callee.name : null;
         if (!calleeName || !setterInScope(calleeName)) return;
@@ -351,7 +462,12 @@ function payloadCellFromSourceMember(frame, owned, blocked) {
 export function lifecycleProof(frame) {
   const owned = frame.ownerSetters ?? frame.setters;
   if ([...frame.updaterSetters].some((setter) => owned.has(setter))) {
-    return { boolCell: null, errorCell: null, payloadCell: null, proven: false };
+    return {
+      boolCell: null,
+      errorCell: null,
+      payloadCell: null,
+      proven: false,
+    };
   }
   const entries = [...frame.writes.entries()].filter(([setter]) =>
     owned.has(setter),
@@ -366,12 +482,11 @@ export function lifecycleProof(frame) {
       ) ?? null)
     : null;
   const blocked = new Set([boolCell, errorCell].filter(Boolean));
-  const directPayloadCell =
-    errorCell
-      ? (entries.find(
-          ([name, classes]) => !blocked.has(name) && classes.has("awaited"),
-        )?.[0] ?? null)
-      : null;
+  const directPayloadCell = errorCell
+    ? (entries.find(
+        ([name, classes]) => !blocked.has(name) && classes.has("awaited"),
+      )?.[0] ?? null)
+    : null;
   const payloadCell =
     directPayloadCell ??
     (errorCell ? payloadCellFromSourceMember(frame, owned, blocked) : null);
@@ -384,7 +499,9 @@ export function lifecycleProof(frame) {
 // This is behavioral fan-out only; owned-entity proof is added by the rule layer.
 export function sourceShardProof(frame, { threshold = 2 } = {}) {
   const editableCells = new Set(
-    [...frame.eventEditedCells].filter((cell) => frame.controlledCells.has(cell)),
+    [...frame.eventEditedCells].filter((cell) =>
+      frame.controlledCells.has(cell),
+    ),
   );
   for (const transition of frame.sourceMemberTransitions) {
     if (!transition.transition) continue;
