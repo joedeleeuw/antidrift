@@ -1062,7 +1062,9 @@ rules:
       - Only exported canonical object types with at least four properties are candidates, so small helper shapes are intentionally ignored.
       - Schema-inferred DTO aliases stay clean because the rule only reports handwritten object type/interface declarations.
       - Boundary DTOs and view models can legitimately overlap, so stable promotion needs broader clean-pressure classification.
-      - "Sudocode supplies second-repo configured-owner drift: frontend ProjectInfo redeclares server-owned ProjectInfo while the server owner stays clean through an explicit cross-project TypeScript Program."
+      - Empty or nominal interface extensions can still report if the inherited shape exactly matches the owner; interface derivation is not explicitly exempted.
+      - Name-agnostic structural equality can attribute a coincidental exact shape to the wrong configured owner as the owner registry grows.
+      - "Sudocode supplies second-repo configured-owner drift through an explicit cross-project TypeScript Program; normal per-package linting only sees cross-tsconfig owners if consumers configure a unified Program."
     external:
       state: net-antidrift
       support: none
