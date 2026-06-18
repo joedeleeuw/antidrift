@@ -193,6 +193,8 @@ export function createReactStateTracker({ onFrameExit } = {}) {
       sourceMemberTransitions: [],
       eventEditedCells: new Set(),
       controlledCells: new Set(),
+      catchSetters: new Set(),
+      updaterSetters: new Set(),
     });
   }
 
@@ -299,6 +301,7 @@ export function createReactStateTracker({ onFrameExit } = {}) {
           node.callee?.type === "Identifier" ? node.callee.name : null;
         if (!calleeName || !setterInScope(calleeName)) return;
         frame.called.add(calleeName);
+        if (catchParams.length > 0) frame.catchSetters.add(calleeName);
         const arg = node.arguments?.[0];
         if (!arg) return;
         const cell = frame.cellOf.get(calleeName) ?? cellFor(calleeName);
@@ -320,6 +323,7 @@ export function createReactStateTracker({ onFrameExit } = {}) {
           awaitedNames: frame.awaitedNames,
           catchParams,
         });
+        if (valueClass === "updater") frame.updaterSetters.add(calleeName);
         if (!valueClass || valueClass === "updater" || valueClass === "other") {
           return;
         }
@@ -331,13 +335,24 @@ export function createReactStateTracker({ onFrameExit } = {}) {
   };
 }
 
+function payloadCellFromSourceMember(frame, owned, blocked) {
+  return (
+    frame.sourceMemberWrites.find(
+      (write) => owned.has(write.setter) && !blocked.has(write.setter),
+    )?.setter ?? null
+  );
+}
+
 // Derive resource-lifecycle roles from a frame's behavior-classified writes. The
-// proof is the FULL hand-rolled machine: one boolean cell toggled true->false, a
-// distinct error cell reset to a constant and assigned the caught error, and a
-// distinct payload cell assigned the awaited value. requestGuard is reported
-// separately so consumers decide whether to downgrade.
+// proof is one boolean cell toggled true->false, a distinct error cell written
+// inside catch, and a distinct payload cell assigned the awaited value or an
+// awaited source member. requestGuard is reported separately so consumers decide
+// whether to downgrade.
 export function lifecycleProof(frame) {
   const owned = frame.ownerSetters ?? frame.setters;
+  if ([...frame.updaterSetters].some((setter) => owned.has(setter))) {
+    return { boolCell: null, errorCell: null, payloadCell: null, proven: false };
+  }
   const entries = [...frame.writes.entries()].filter(([setter]) =>
     owned.has(setter),
   );
@@ -346,19 +361,20 @@ export function lifecycleProof(frame) {
       ([, classes]) => classes.has("trueConst") && classes.has("falseConst"),
     )?.[0] ?? null;
   const errorCell = boolCell
-    ? (entries.find(
-        ([name, classes]) =>
-          name !== boolCell &&
-          classes.has("nullConst") &&
-          classes.has("caughtError"),
-      )?.[0] ?? null)
+    ? ([...frame.catchSetters].find(
+        (name) => name !== boolCell && owned.has(name),
+      ) ?? null)
     : null;
-  const payloadCell = errorCell
-    ? (entries.find(
-        ([name, classes]) =>
-          name !== boolCell && name !== errorCell && classes.has("awaited"),
-      )?.[0] ?? null)
-    : null;
+  const blocked = new Set([boolCell, errorCell].filter(Boolean));
+  const directPayloadCell =
+    errorCell
+      ? (entries.find(
+          ([name, classes]) => !blocked.has(name) && classes.has("awaited"),
+        )?.[0] ?? null)
+      : null;
+  const payloadCell =
+    directPayloadCell ??
+    (errorCell ? payloadCellFromSourceMember(frame, owned, blocked) : null);
   return { boolCell, errorCell, payloadCell, proven: Boolean(payloadCell) };
 }
 

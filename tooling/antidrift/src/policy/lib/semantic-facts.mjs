@@ -27,7 +27,7 @@ export const SEMANTIC_FACT_KINDS = Object.freeze({
     confidence: Object.freeze(["deterministic-enforcement"]),
     emission: Object.freeze(["blocking-diagnostic"]),
     association:
-      "React state cells to lifecycle roles through async transition writes, awaited resource assignment, caught error assignment, and request-guard evidence.",
+      "React state cells to lifecycle roles through async transition writes, catch-scope error writes, awaited or awaited-member resource assignment, updater invalidation, and request-guard evidence.",
     noSinkBehavior:
       "The diagnostic still reports; only the serialized semantic fact is skipped.",
     payloadFields: Object.freeze([

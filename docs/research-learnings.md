@@ -6,14 +6,14 @@ Distilled, cited learnings from the 2026 antidrift research pass: the whitepaper
 
 ## Learnings
 
-**1. The lifecycle proof catches 0/102 real instances due to two mis-shaped value-class requirements**
+**1. The lifecycle proof rewrite fixed two mis-shaped value-class requirements but remains under-proven**
 
-Real catch blocks store a derived error code or message (`setErrorCode("DATA_INVALID")`, `setErrorCode(deriveCode(err))`), not the raw caught-error parameter. Real payload cells receive a member of the awaited object (`setData(resp.items)`), not the bare awaited value. The `lifecycleProof` requires both `caughtError` (raw param) and `awaited` (bare value) — the exact combination that does not occur in 1,533 corpus files.
+Real catch blocks store a derived error code or message (`setErrorCode("DATA_INVALID")`, `setErrorCode(deriveCode(err))`), not the raw caught-error parameter. Real payload cells receive a member of the awaited object (`setData(resp.items)`), not the bare awaited value. The fixed `lifecycleProof` now accepts catch-scope error setters and first-level awaited source-member payload setters, while updater setters invalidate the proof to keep pagination clean.
 
-Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2 (Diagnosis); corroborated by both external reviewers (codex-out.md §2a "Why the current proof catches 0 of 102"; opencode-out.md §2a identical diagnosis). Measured: 1,533 Chaski frontend files, 102 broadSetterCoMutation inventory facts, 0 resourceLifecycleProof diagnostics.
+Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2-4; corroborated by both external reviewers (codex-out.md §2a; opencode-out.md §2a). Current fixed-proof measurement: 1,533 Chaski frontend files, 100 broadSetterCoMutation inventory facts, and 2 resourceLifecycleProof diagnostics.
 
 Applies to:
-- `antidrift/no-handrolled-resource-lifecycle-cells` — **proof rewrite required**. Broaden errorCell to "any write inside a catch block" (any value class, anchored by a new per-write `inCatch` boolean in `react-state-graph.js`). Broaden payloadCell to accept a member-of-awaited-source via `frame.sourceMemberWrites`. The status toggle (trueConst + falseConst) is correct and unchanged. Both external reviews specify identical implementation in react-state-graph.js:339-363.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — **proof rewrite implemented, still default-off**. Next proof work is not another adapter rewrite; it is second-repo validation plus human review of the 2 Chaski positives and clean controls.
 
 ---
 
@@ -24,7 +24,7 @@ Applies to:
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2 bullet "errorCell"; codex-out.md §2a (`classifyWriteValue` r-s-g.js:50-52 returns `"other"` for derived values).
 
 Applies to:
-- `antidrift/no-handrolled-resource-lifecycle-cells` — same rewrite as Learning 1. The `inCatch` boolean is the minimal adapter change: keep `classifyWriteValue` unchanged, add `inCatch = catchParams.length > 0` at the CallExpression write-record site, then accept any write-class in `catch` scope as the errorCell signal.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — implemented by recording catch-scope setter writes and accepting any owned catch-scope setter as the errorCell signal.
 
 ---
 
@@ -35,7 +35,7 @@ Applies to:
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §3 (payloadCell bullet); opencode-out.md §2b payloadCell definition; codex-out.md §2b "payloadCell — broaden to accept members."
 
 Applies to:
-- `antidrift/no-handrolled-resource-lifecycle-cells` — use `frame.sourceMemberWrites` in the payloadCell check. The existing `sourceMemberWrite` adapter fn (react-state-graph.js:98) is already the correct detector; wire it into `lifecycleProof`.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — implemented by using `frame.sourceMemberWrites` in the payloadCell check, with updater setters invalidating enforcement to preserve pagination.
 - `antidrift/no-shattered-ingested-entity-state` — informational: the `sourceMemberWrites` infrastructure is shared; the shard rule already consumes it correctly. This learning confirms the adapter substrate is sound; the shard rule's problem is corpus evidence, not adapter shape.
 
 ---
@@ -58,7 +58,7 @@ Both React-state rules were shipped on synthetic RuleTester fixtures without mea
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §1 ("real-corpus-first, multi-repo baseline, synthetic tests are a wiring guard not evidence"). This lesson is explicit in the investigation as a committed decision (`064142a`).
 
 Applies to:
-- `antidrift/no-handrolled-resource-lifecycle-cells` — the rewrite must be validated against the 102-instance corpus (chaski) before promotion, then against ≥1 second repo per `promotionRequirements.stable`.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — the rewrite is validated against Chaski and found 2 fixed-proof diagnostics, not 102. Promotion now requires ≥1 second repo per `promotionRequirements.stable` plus review of the Chaski positives.
 - `antidrift/no-shattered-ingested-entity-state` — the existing `nextAction` in `rules.yaml` mandates an agent-generated corpus before any enforcement tier rebuild.
 - All `under-proven` rules — the lesson is general: no rule moves from `under-proven` to `error` on synthetic fixtures alone.
 
@@ -173,6 +173,6 @@ The project's promotion requirements (`rules.yaml` promotionRequirements.stable)
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §4 ("Whether to enable the rule as blocking is a separate promotion decision requiring the must-catch/must-ignore set to hold cleanly across ≥2 repos"); `policy/registries/rules.yaml` promotionRequirements.stable block; `docs/rule-investigations/no-shattered-ingested-entity-state.md` §Validation Plan (multi-repo requirement).
 
 Applies to:
-- `antidrift/no-handrolled-resource-lifecycle-cells` — the proof rewrite (Learnings 1–3) is necessary but not sufficient for `error` severity. Promotion additionally requires the must-catch/must-ignore set to hold across ≥2 independent repos. The rewrite should fix the proof; the corpus-evidence pass is a separate subsequent slice.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — the proof rewrite (Learnings 1–3) is done but not sufficient for `error` severity. Promotion additionally requires the must-catch/must-ignore set to hold across ≥2 independent repos. The next slice is corpus validation, not another rewrite.
 - `antidrift/no-shattered-ingested-entity-state` — re-promotion needs real owned-entity shatters across more than one repo. The current corpus (two repos, zero positives) is the evidence floor, not just a gap to paper over with agent-generated synthetic fixtures.
 - All `under-proven` rules — `minIndependentRepositories: 2` is a hard gate; no `under-proven` rule should move to `error` on evidence from a single codebase.

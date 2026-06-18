@@ -21,7 +21,7 @@ Ladder: **codified-proven · codified-under-proven · codified-inventory · spec
 
 | Behavior                                    | Maturity                                  | Single biggest unknown (kills it if false)                                                                   |
 | ------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `no-handrolled-resource-lifecycle-cells`    | codified-under-proven (0/102)             | reshaped proof catches ≥1 _real_ drift, not normal React style → else retire                                 |
+| `no-handrolled-resource-lifecycle-cells`    | codified-under-proven (2 Chaski positives) | second-repo validation and human review prove the fixed lifecycle diagnostics are drift, not normal React style → else keep default-off or retire |
 | `no-shattered-ingested-entity-state`        | codified-inventory-only (0/335)           | do real owned-entity shatters exist _at all_ (even in agent code) → else retire                              |
 | `no-defensive-shape-probing`                | codified-under-proven                     | 2nd repo has a broad-value mini-parser not already explained by upstream unsafe rules                        |
 | `no-underchecked-type-predicate`            | codified-under-proven                     | real required-field predicate drift exists (current broad inventory: 0 findings)                             |

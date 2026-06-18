@@ -236,9 +236,9 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Pattern: a reducer, a discriminated-union cell, or a resource hook.
 - Ecosystem: none models coupled setter bindings (net-antidrift).
 - Signal: source binding plus local transition/control-flow proof.
-- Evidence: `pnpm policy:inventory-react-state` scanned 1,533 Chaski frontend files and classified 102 broad co-mutation facts: 78 synchronous multi-cell updates, 19 async transition co-mutations, and 5 async resource updates. A repaired live scan across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode, Cloudflare Agents, and PowerSync checked 6,501 files and classified 255 inventory facts: 135 synchronous multi-cell updates, 83 async transition co-mutations, 27 async resource updates, and 10 request-guarded transitions. It produced 0 blocking lifecycle diagnostics.
+- Evidence: current fixed-proof `pnpm policy:inventory-react-state` checked 1,533 Chaski frontend files, kept 100 broad co-mutation facts inventory-only, and emitted 2 blocking lifecycle diagnostics in Chaski reporting screens. The older seven-repo broad co-mutation scan is still useful false-positive pressure, but it predates the fixed lifecycle proof and no longer settles enforcement readiness.
 - False-positive concern: legitimate multi-cell form and view-state handlers dominate broad co-mutation, so broad co-mutation remains inventory only.
-- Blocker: find real deterministic resource-lifecycle drift before stable promotion. The redundant-constant-cell branch is implemented and fixture-regressed, but broad co-mutation alone must not block.
+- Blocker: validate the fixed lifecycle proof in a second independent React repo and review the 2 Chaski positives before stable promotion. Broad co-mutation alone must not block.
 
 ### `antidrift/no-async-array-method`
 

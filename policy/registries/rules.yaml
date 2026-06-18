@@ -54,7 +54,7 @@ semanticFactKinds:
       - deterministic-enforcement
     emission:
       - blocking-diagnostic
-    association: React state cells to lifecycle roles through async transition writes, awaited resource assignment, caught error assignment, and request-guard evidence.
+    association: React state cells to lifecycle roles through async transition writes, catch-scope error writes, awaited or awaited-member resource assignment, updater invalidation, and request-guard evidence.
     noSinkBehavior: The diagnostic still reports; only the serialized semantic fact is skipped.
     payloadFields:
       - boolCell
@@ -632,9 +632,9 @@ rules:
     referenceDoc: docs/rule-roadmap.md
     corpusRepositories: [chaski, sudocode-main]
     concerns:
-      - "pnpm policy:inventory-react-state classified Chaski broad co-mutation as 102 inventory facts across 1,533 frontend files: 78 synchronous multi-cell updates, 19 async transition co-mutations, and 5 async resource updates."
-      - "A repaired live scan across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode, Cloudflare Agents, and PowerSync checked 6,501 files and classified 255 inventory facts with 0 blocking resource-lifecycle diagnostics: 135 synchronous multi-cell updates, 83 async transition co-mutations, 27 async resource updates, and 10 request-guarded transitions."
-      - Broad co-mutation is inventory only; blocking requires semantic transition evidence such as a redundant constant lifecycle cell written whenever a sibling receives the resource value.
+      - "After the lifecycle proof rewrite, pnpm policy:inventory-react-state checked 1,533 Chaski frontend files, classified 100 broad co-mutation inventory facts, and emitted 2 blocking resourceLifecycleProof diagnostics."
+      - "The two Chaski diagnostics are src/frontend/crow-v2/app/(drawer)/reporting/action-items/index.tsx:78 and src/frontend/crow-v2/app/(drawer)/reporting/weekly-digest/index.tsx:87."
+      - Broad co-mutation is inventory only; blocking requires a transition that toggles a boolean lifecycle cell, writes a distinct error cell inside catch, and assigns a distinct payload cell from an awaited value or first-level awaited source member.
       - The status-triplet derivability branch belongs here as a redundant-constant-cell proof instead of remaining a standalone name-group rule.
     external:
       state: net-antidrift
@@ -649,7 +649,7 @@ rules:
       allows:
         - "setDataOne(left); setDataTwo(right);"
         - 'dispatch({ type: "loaded", data });'
-    nextAction: Find real deterministic resource-lifecycle drift for the blocking branch; broad co-mutation is classified inventory and must not widen enforcement by itself.
+    nextAction: Validate the fixed proof across at least one additional independent React repo and review the two Chaski diagnostics plus pagination/request-guard clean controls before enabling the default-off rule.
   antidrift/no-shattered-ingested-entity-state:
     status: under-proven
     stable: false

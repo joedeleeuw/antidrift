@@ -748,9 +748,8 @@ it("emits blocking structural facts from accepted package owners", async () => {
   );
 });
 
-async function lintWithCoupledStateFacts(file, options = {}) {
+async function lintCoupledStateProgramWithFacts(program, options = {}) {
   const facts = [];
-  const program = fixture(file);
   const eslint = new ESLint({
     overrideConfigFile: true,
     overrideConfig: [
@@ -793,6 +792,20 @@ async function lintWithCoupledStateFacts(file, options = {}) {
     filePath: program.filename,
   });
   return { facts, result };
+}
+
+async function lintWithCoupledStateFacts(file, options = {}) {
+  return lintCoupledStateProgramWithFacts(fixture(file), options);
+}
+
+async function lintCoupledStateCodeWithFacts(code, options = {}) {
+  return lintCoupledStateProgramWithFacts(
+    {
+      code,
+      filename: resolve(fixturesDir, "coupled-state.ts"),
+    },
+    options,
+  );
 }
 
 async function lintSourceShardWithFacts(code, options = {}) {
@@ -891,6 +904,49 @@ it("keeps sibling payload setters inventory-only under an aggressive threshold",
         factKind: "broadSetterCoMutation",
         confidence: "heuristic-inventory",
         payload: expect.objectContaining({ setterCount: 2 }),
+      }),
+    ]),
+  );
+});
+
+it("proves lifecycle from derived catch writes and awaited source-member payloads", async () => {
+  const { facts, result } = await lintCoupledStateCodeWithFacts(`
+    declare function useState<T>(value: T): [T, (value: T) => void];
+    declare function fetchRows(): Promise<{ rows: string[] }>;
+    declare function codeFrom(error: unknown): string;
+
+    function RowsPanel() {
+      const [rows, setRows] = useState<string[]>([]);
+      const [pending, setPending] = useState(false);
+      const [errorCode, setErrorCode] = useState("");
+
+      return async function load() {
+        setPending(true);
+        try {
+          const response = await fetchRows();
+          setRows(response.rows);
+        } catch (err) {
+          setErrorCode(codeFrom(err));
+        } finally {
+          setPending(false);
+        }
+      };
+    }
+
+    void RowsPanel;
+  `);
+
+  expect(result.messages).toHaveLength(1);
+  expect(facts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        factKind: "resourceLifecycleProof",
+        confidence: "deterministic-enforcement",
+        payload: expect.objectContaining({
+          boolCell: "setPending",
+          errorCell: "setErrorCode",
+          payloadCell: "setRows",
+        }),
       }),
     ]),
   );

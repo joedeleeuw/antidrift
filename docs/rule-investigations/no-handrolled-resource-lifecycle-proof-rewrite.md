@@ -1,6 +1,6 @@
 # Proposal: rewrite the lifecycle-rule proof + direction for the React-state rules
 
-Status: proposal (pre-implementation). Target rule: `antidrift/no-handrolled-resource-lifecycle-cells`.
+Status: implemented proof rewrite; still under-proven and default-off. Target rule: `antidrift/no-handrolled-resource-lifecycle-cells`.
 Adapter: `react-state` (`tooling/antidrift/src/eslint-plugin/react-state-graph.js`).
 
 ## 1. Context — what we measured and learned
@@ -35,23 +35,22 @@ real-corpus-first, multi-repo baseline, synthetic tests are a wiring guard not e
 The only fixture that fires is the synthetic `handrolled-resource-lifecycle.ts` (`setUsers(result)`
 + `setFailure(err)`) — exactly the shape that does not occur in the 1,533-file corpus.
 
-## 3. Proposed rewrite (local, reuses the adapter)
+## 3. Implemented rewrite (local, reuses the adapter)
 
 Three touch points; does not change the two-layer architecture or rule wiring.
 
-**Adapter** (`react-state-graph.js`): add a per-write `inCatch` boolean at the `CallExpression`
-visitor (`= catchParams.length > 0` at write time). Reuse `classifyWriteValue` and `sourceMemberWrites` unchanged.
+**Adapter** (`react-state-graph.js`): records setter writes that happen under a `catch` clause and records updater setters as a conservative invalidation signal. `classifyWriteValue` and `sourceMemberWrites` stay name-agnostic.
 
 **Proof** (`lifecycleProof`): broaden two roles over `owned = frame.ownerSetters ?? frame.setters`,
 on `frame.isTransition` frames only.
 
 1. **statusCell** — unchanged: one setter with both `trueConst` and `falseConst`.
-2. **errorCell** — a distinct setter with ≥1 write `inCatch`, of any value class (`caughtError`,
+2. **errorCell** — a distinct setter with at least one write inside `catch`, of any value class (`caughtError`,
    `other`, or `nullConst`). Reset-to-null no longer required. Covers `setError(err)`,
    `setErrorCode("DATA_INVALID")`, `setErrorCode(deriveCode(err))`.
 3. **payloadCell** — a distinct setter assigned either class `awaited` (direct) **or** a member of
    the awaited source via `frame.sourceMemberWrites` (e.g. `setData(resp.items)`).
-4. **proven** = statusCell && errorCell && payloadCell exist and are pairwise distinct.
+4. **proven** = statusCell && errorCell && payloadCell exist and are pairwise distinct, with no owned updater setter in the transition.
 
 **False-positive guards (kept):**
 
@@ -59,36 +58,28 @@ on `frame.isTransition` frames only.
 - `requestGuard` downgrade — abort-guarded fetches stay exempt;
 - catch-anchored error is the critical guard — a happy-path `setError(null)` reset with no catch
   write does not qualify (keeps stale-while-revalidate out);
-- updater payloads excluded (`classifyWriteValue` → `updater`) — keeps pagination
+- updater payloads invalidate the proof (`classifyWriteValue` → `updater`) — keeps pagination
   (`setItems(prev => [...prev, ...p.items])`) inventory;
 - distinct roles — one cohesive cell cannot fill two roles.
 
-**Fact contract:** payload likely moves from singular `payloadCell` to `payloadCells` (plural). This
-edits a frozen fact's `payloadFields` → `[policy-change]` + possibly `SEMANTIC_FACT_SCHEMA_VERSION` bump.
+**Fact contract:** the implementation kept singular `payloadCell` because the proof selects the first deterministic payload setter. No schema bump was needed.
 
-**Acceptance set:**
+**Current acceptance set:**
 
-- Must now CATCH (→ `resourceLifecycleProof`): chaski `portal/pages/reports/weekly-digest.tsx`, the
-  102 corpus instances sharing the shape, and the existing `handrolled-resource-lifecycle.ts`
-  fixture (regression).
+- Catches the existing `handrolled-resource-lifecycle.ts` fixture and derived-catch/member-payload regression.
+- Current Chaski scan catches 2 real diagnostics: `src/frontend/crow-v2/app/(drawer)/reporting/action-items/index.tsx:78` and `src/frontend/crow-v2/app/(drawer)/reporting/weekly-digest/index.tsx:87`.
 - Must still IGNORE (→ inventory or nothing): stale-while-revalidate (no catch), pagination
   (updater), UI-cleanup (no transition), abort-guarded (requestGuard), owned-resource-hook
   (no local useState cells).
 
 ## 4. Direction / promotion path
 
-The rewrite makes the *proof correct* — it will finally identify the 102 real instances. Whether to
-**enable** the rule as blocking (`severity: error`) is a *separate* promotion decision requiring the
-must-catch/must-ignore set to hold cleanly across **≥2 repos** (`minIndependentRepositories: 2`).
-Under-proven ⇒ default-off until then. The shard rule stays inventory-only; option B (keep a
-type-owner tier as a non-blocking measurement tag) and an agent-generated-corpus revisit are future,
-additive.
+The rewrite makes the proof less synthetic, but it did **not** turn the 102 broad Chaski co-mutations into 102 blocking diagnostics. Current fixed-proof inventory checked 1,533 Chaski frontend files, kept 100 broad co-mutation facts as inventory, and emitted 2 `resourceLifecycleProof` diagnostics. Whether to **enable** the rule as blocking (`severity: error`) is a separate promotion decision requiring the must-catch/must-ignore set to hold cleanly across **at least two repos** (`minIndependentRepositories: 2`). Under-proven means default-off until then. The shard rule stays inventory-only; option B (keep a type-owner tier as a non-blocking measurement tag) and an agent-generated-corpus revisit are future, additive.
 
 ## 5. Concerns / open questions (attack these)
 
 1. **Is the pattern actually bad?** Hand-rolling loading/error/data is extremely common; is it a
-   genuine defect, a style preference, or sometimes correct (no query lib available)? 102 instances
-   could be "normal," in which case enforcement is wrong even if the proof is fixed.
+   genuine defect, a style preference, or sometimes correct (no query lib available)? The 2 fixed-proof diagnostics need human review before any default enablement.
 2. **Is "any write inside `catch`" too broad?** Could it flag components that set an error cell in
    catch but are not really a hand-rolled resource machine (e.g. fire-and-forget mutations, form
    submit handlers)? Where does errorCell over-match?
@@ -96,8 +87,7 @@ additive.
    "payload" cells are actually independent view state seeded from one response (the envelope case
    the shard rule deliberately ignores)? Could the lifecycle rule now fire on weekly-digest *because*
    of the envelope split, conflating two different patterns?
-4. **Multi-repo**: the 102 is chaski-only. Does the same shape exist in sudocode and elsewhere, and
-   does the broadened proof behave the same there?
+4. **Multi-repo**: the fixed-proof positives are Chaski-only so far. Does the same shape exist in sudocode and elsewhere, and does the broadened proof behave the same there?
 5. **Contract churn**: payloadCells + schema bump ripples through the frozen contract, manifest,
    types, consumer-monorepo, docs. Is the value worth the breaking change, or should payload stay
    singular (first sorted cell)?
