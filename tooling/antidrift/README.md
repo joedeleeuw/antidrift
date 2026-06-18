@@ -18,6 +18,10 @@ pnpm add -D @joedeleeuw/antidrift eslint typescript typescript-eslint @typescrip
 
 ESLint, TypeScript, typescript-eslint, and the parser are peer dependencies, so you bring your own versions: ESLint 9+, TypeScript 5+, typescript-eslint 8+.
 
+## Stability
+
+Experimental inventory commands, semantic fact payloads, registry metadata, and research rules are distributable evidence surfaces, not backward-compatible APIs. They may change between releases until promoted. Invalid configuration should fail loudly instead of falling back to weaker analysis.
+
 ## Use the config
 
 Your whole `eslint.config.mjs` is one call:
@@ -77,6 +81,8 @@ pnpm package:verify
 pnpm policy:validate-corpus
 pnpm policy:validate-chaski
 pnpm policy:benchmark-sql-queries
+pnpm policy:inventory-change-contract
+pnpm policy:inventory-diff-scoped-adapters
 pnpm policy:inventory-defensive-shape
 pnpm policy:inventory-declaration-clone
 pnpm policy:inventory-declaration-clone-source-fleet
@@ -94,6 +100,8 @@ The first two validate registry-backed rule facts and verify every custom rule e
 `policy:validate-corpus` lints the maintained project inventory with every custom rule, while `repo-corpus` can narrow the evidence to the rules changed in a slice.
 `policy:validate-chaski` is an optional local corpus gate: it runs explicit assertions against real Chaski frontend/BFF files when `CHASKI_REPO` or `/Users/sushi/code/chaski` is available, and skips otherwise so consumers do not need the private corpus.
 `policy:benchmark-sql-queries` compares `antidrift/no-sql-string-concat` with `sonarjs/sql-queries` on real SQL programs and emits `parserServiceDeltas`: extra-only non-type-aware identifier reports are inventory, while missing non-type-aware findings or parser errors block promotion.
+`policy:inventory-change-contract` runs the inventory-only change-contract spine. Missing contracts exit 0, invalid contracts fail loudly, and present contracts compare merge-base change surfaces against declared paths, dependencies, exports, and optional module graph radius (`--tsconfig` is required when graph entrypoints are declared).
+`policy:inventory-diff-scoped-adapters` runs existing ESLint adapters against changed JS/TS files and filters diagnostics plus semantic facts to changed patch hunks. It is an inventory proof filter over the diff, not a blocking gate.
 `policy:inventory-defensive-shape` is a non-blocking sunset inventory for `no-defensive-shape-probing`. It compares the default-off custom rule with adjacent TypeScript ESLint unsafe rules under parser services and records syntax pressure separately from diagnostics.
 `policy:inventory-declaration-clone` is a non-blocking research inventory for duplicate object contract declarations. It uses the TypeScript checker to group interface declarations and literal object type aliases by exact declared-member name/type/optional/readonly fingerprints, and separates generated-only, mixed generated/source, and source-only clone groups. `policy:inventory-declaration-clone-source-fleet` runs the same inventory against configured local real-code corpora for promotion evidence mining.
 `policy:inventory-react-state` is a non-blocking semantic fact inventory for React state co-mutation. It classifies broad setter co-mutation separately from `no-handrolled-resource-lifecycle-cells` diagnostics so broad inventory cannot become accidental enforcement. Pass `--repo` and `--targets "src/**/*.{ts,tsx}"` to scan a specific checkout; target splitting preserves brace globs.
