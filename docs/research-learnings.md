@@ -10,7 +10,7 @@ Distilled, cited learnings from the 2026 antidrift research pass: the whitepaper
 
 Real catch blocks store a derived error code or message (`setErrorCode("DATA_INVALID")`, `setErrorCode(deriveCode(err))`), not the raw caught-error parameter. Real payload cells receive a member of the awaited object (`setData(resp.items)`), not the bare awaited value. The fixed `lifecycleProof` now accepts catch-scope error setters and first-level awaited source-member payload setters, while updater setters invalidate the proof to keep pagination clean.
 
-Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2-4; corroborated by both external reviewers (codex-out.md §2a; opencode-out.md §2a). Current fixed-proof measurement: 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; 230 broadSetterCoMutation inventory facts; and 9 resourceLifecycleProof diagnostics across Chaski, Sudocode, and Cloudflare Agents.
+Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2-4; corroborated by both external reviewers (codex-out.md §2a; opencode-out.md §2a). Current fixed-proof measurement: 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; 230 broadSetterCoMutation inventory facts; and a pinned corpus covering 9 resourceLifecycleProof diagnostics across Chaski, Sudocode, and Cloudflare Agents.
 
 Applies to:
 - `antidrift/no-handrolled-resource-lifecycle-cells` — **proof rewrite implemented, still default-off**. Next proof work is not another adapter rewrite; it is human review of the Chaski, Sudocode, and Cloudflare positives plus clean-control pressure.
@@ -58,7 +58,7 @@ Both React-state rules were shipped on synthetic RuleTester fixtures without mea
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §1 ("real-corpus-first, multi-repo baseline, synthetic tests are a wiring guard not evidence"). This lesson is explicit in the investigation as a committed decision (`064142a`).
 
 Applies to:
-- `antidrift/no-handrolled-resource-lifecycle-cells` — the rewrite is validated against Chaski, Sudocode, and Cloudflare and found 9 fixed-proof diagnostics, not a broad co-mutation flood. Promotion now requires review of the positives plus real clean controls, not synthetic fixtures.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — the rewrite is validated against Chaski, Sudocode, and Cloudflare and now pins 9 fixed-proof diagnostics, not a broad co-mutation flood. Promotion still requires review of the positives plus real clean controls, not synthetic fixtures.
 - `antidrift/no-shattered-ingested-entity-state` — the existing `nextAction` in `rules.yaml` mandates an agent-generated corpus before any enforcement tier rebuild.
 - All `under-proven` rules — the lesson is general: no rule moves from `under-proven` to `error` on synthetic fixtures alone.
 
@@ -110,9 +110,9 @@ Applies to:
 Basis: `docs/whitepaper-agent-code-drift-proofs.md` §2.4 (inter-procedural dataflow/taint section; Joern F1 0.856 vs Semgrep 0.081; IRIS arXiv:2405.17238; ZeroFalse arXiv:2510.02534); `docs/solve-bucket-architecture-review.md` §3 bucket (3) and §2 table row "Injection / value-reaches-sink"; `policy/registries/solve-buckets.yaml` (antidrift/no-sql-string-concat: `fit: approximation, target: dataflow-taint`).
 
 Applies to:
-- `antidrift/no-sql-string-concat` — stable but solve-bucket target is `dataflow-taint`. Do not hand-roll further; the architecture review recommendation is to delegate the 800-line escaper-reachability function to CodeQL/Semgrep and keep antidrift as the policy/fact/governance layer.
+- `antidrift/no-sql-string-concat` — useful but no longer stable; solve-bucket target is `dataflow-taint`. Do not hand-roll SQL-builder ecosystems by tag name. The architecture review recommendation is to delegate escaper/reachability to CodeQL/Semgrep or prove SQL-builder APIs through symbol/type provenance while keeping antidrift as the policy/fact/governance layer.
 - `antidrift/no-unsafe-deserialize` — same: `fit: approximation, target: dataflow-taint` (solve-buckets.yaml). Stable as-is; the delegation path is the long-term direction.
-- `antidrift/require-authz-check` — solve-buckets.yaml: `fit: proven, target: dataflow-taint`. The graph-config proof works today; reachability is the provable ideal.
+- `antidrift/require-authz-check` — solve-buckets.yaml: `fit: under-proven, target: dataflow-taint`. Handler-local params plus configured callee names are inventory; blocking needs typed route construction or delegated dominance/taint proof.
 - Gap `silent-fallback` (n=24, solve-buckets.yaml) — this is the clearest case for delegation; "does a caught error flow to a real sink or nowhere" is a taint query, not an AST shape.
 
 ---

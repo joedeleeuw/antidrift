@@ -18,9 +18,9 @@ Use TypeChecker plus generated and ownership registries:
 
 1. Resolve configured generated wrapper exports into canonical object types.
 2. Resolve accepted package owner exports from `policy/registries/ownership.yaml`.
-3. Compare local type/interface declarations against canonical required-property fingerprints.
+3. Compare local type/interface declarations against canonical exact-property fingerprints.
 4. Allow anchored derivations such as imports, aliases, `Pick`, `Omit`, and sanctioned boundary DTOs.
-5. Report hand-written structural copies that should import or derive from the accepted owner.
+5. Report hand-written exact structural copies that should import or derive from the accepted owner.
 
 This is the implemented shape. The shared ESLint config passes `policy/registries/generated.yaml` and optional `policy/registries/ownership.yaml` into `antidrift/no-structural-type-fork`.
 
@@ -33,6 +33,6 @@ This is the implemented shape. The shared ESLint config passes `policy/registrie
 
 ## Entry Conditions
 
-- Satisfied locally by Chaski BFF: `orders-ops-router.ts` redeclares `LineItemDetailRow` from generated `LineItemDetail`, and `service-stop-router.ts` redeclares `LineItemCounts` from generated `LineItemCountsByOrder`.
-- Clean controls include generated imports, installed base-client aliases, local tuple aliases, and `Omit<ViewState, "padding">` utility derivation.
+- Chaski BFF now supplies projection clean controls: `orders-ops-router.ts` declares `LineItemDetailRow` as a local subset of generated `LineItemDetail`, and `service-stop-router.ts` declares `LineItemCounts` as a local subset of generated `LineItemCountsByOrder`. Those are not exact owner copies and should stay clean.
+- Clean controls include generated imports, installed base-client aliases, local tuple aliases, projected DTOs, and `Omit<ViewState, "padding">` utility derivation.
 - Stable promotion still needs another independent repository, broad inventory classification when generated sources are configured, and real accepted package-owner evidence before package owners are added.

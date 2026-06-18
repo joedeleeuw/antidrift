@@ -67,14 +67,14 @@ on `frame.isTransition` frames only.
 **Current acceptance set:**
 
 - Catches the existing `handrolled-resource-lifecycle.ts` fixture and derived-catch/member-payload regression.
-- Current fixed-proof scans catch 9 real diagnostics across Chaski, Sudocode, and Cloudflare Agents, including `src/frontend/crow-v2/app/(drawer)/reporting/action-items/index.tsx:78`, `frontend/src/components/executions/ExecutionView.tsx:463`, and `examples/worker-bundler-playground/src/client.tsx:76`.
+- Current pinned fixed-proof corpus covers 9 real diagnostics across Chaski, Sudocode, and Cloudflare Agents, including `src/frontend/crow-v2/app/(drawer)/reporting/action-items/index.tsx:78`, `frontend/src/components/executions/ExecutionView.tsx:463`, and `examples/worker-bundler-playground/src/client.tsx:76`.
 - Must still IGNORE (→ inventory or nothing): stale-while-revalidate (no catch), pagination
   (updater), UI-cleanup (no transition), abort-guarded (requestGuard), owned-resource-hook
   (no local useState cells).
 
 ## 4. Direction / promotion path
 
-The rewrite makes the proof less synthetic, but it did **not** turn broad co-mutations into blocking diagnostics. Current fixed-proof inventory checked 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; kept 230 broad co-mutation facts as inventory; and emitted 9 `resourceLifecycleProof` diagnostics across Chaski, Sudocode, and Cloudflare Agents. Whether to **enable** the rule as blocking (`severity: error`) is a separate promotion decision requiring the must-catch/must-ignore set to hold cleanly across independent repos. Under-proven means default-off until then. The shard rule stays inventory-only; option B (keep a type-owner tier as a non-blocking measurement tag) and an agent-generated-corpus revisit are future, additive.
+The rewrite makes the proof less synthetic, but it did **not** turn broad co-mutations into blocking diagnostics. Current fixed-proof inventory checked 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; kept 230 broad co-mutation facts as inventory; and the pinned corpus now covers 9 `resourceLifecycleProof` diagnostics across Chaski, Sudocode, and Cloudflare Agents. Whether to **enable** the rule as blocking (`severity: error`) is a separate promotion decision requiring the must-catch/must-ignore set to hold cleanly across independent repos. Under-proven means default-off until then. The shard rule stays inventory-only; option B (keep a type-owner tier as a non-blocking measurement tag) and an agent-generated-corpus revisit are future, additive.
 
 ## 5. Concerns / open questions (attack these)
 

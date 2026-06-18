@@ -66,9 +66,10 @@ The decision flow is:
 
 | Classification                           | Rules                                                                                                                                                                                                                                                                                                                           |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stable custom (6)                        | `no-raw-fetch-in-component`, `no-redundant-zod-parse`, `no-sql-string-concat`, `no-trivial-selector-wrapper`, `no-unsafe-deserialize`, `require-effect-deps`                                                                                                                                                                    |
-| Custom, needs real-corpus promotion (11) | `no-appeasement-cast`, `no-structural-type-fork`, `no-canonical-model-fork`, `no-handrolled-resource-lifecycle-cells`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type`, `require-authz-check`, `no-raw-tailwind-color`, `no-hover-translate-card` |
+| Stable custom (4)                        | `no-redundant-zod-parse`, `no-trivial-selector-wrapper`, `no-unsafe-deserialize`, `require-effect-deps`                                                                                                                                                                                                                         |
+| Custom, needs real-corpus promotion (11) | `no-appeasement-cast`, `no-structural-type-fork`, `no-canonical-model-fork`, `no-handrolled-resource-lifecycle-cells`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type`, `require-authz-check`, `no-raw-fetch-in-component`, `no-sql-string-concat` |
 | Default-off / pending retirement (2)     | `no-defensive-shape-probing` (sunset condition below), `no-underchecked-type-predicate` (required-field drift search below)                                                                                                                                                                                                     |
+| Retired custom stubs                     | `no-raw-tailwind-color`, `no-hover-translate-card`                                                                                                                                                                                                                                                                              |
 | Ecosystem-covered                        | See delegated surface table                                                                                                                                                                                                                                                                                                     |
 | Generated-config-covered                 | `boundary/no-sdk-direct-use-outside-gateway`, `gen/require-import-from-generated`                                                                                                                                                                                                                                               |
 | Hook/policy-script-covered               | `agent/*` (4 hooks), `policy/no-check-weakening-without-policy-task`, `sonar/import-custom-eslint-issues`, `rules/one-source-generates-agent-files`                                                                                                                                                                             |
@@ -192,9 +193,9 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Pattern: bound parameters for values; allowlists, escapers, or `sql.identifier(...)` for identifiers; parameterized tags.
 - Ecosystem: `sonarjs/sql-queries` is adjacent but missed every real finding; SQL-template plugins assume chosen tag conventions (partial overlap).
 - Signal: SQL-context AST plus scope-binding guard control flow plus TypeChecker escaper/member proof.
-- Evidence: production drift in Chaski (HogQL) and PowerSync service; lower-strength test/demo drift in Sudocode and Cloudflare; the 24-repo fleet is classified with 0 known type-aware false positives.
-- False-positive concern: without parser services, three known-clean PowerSync escaper controls degrade to conservative reports. `parserServiceDeltas` classifies those as inventory because the type-aware plans prove them clean and there are zero missing non-type-aware findings.
-- Status: stable for the observed SQL interpolation and identifier-proof surface. Keep the benchmark and source-fleet inventories as regression gates before widening SQL tag, guard, placeholder arithmetic, or builder-append coverage.
+- Evidence: production drift in Chaski (HogQL) and PowerSync service; lower-strength test/demo drift in Sudocode and Cloudflare; the 24-repo fleet still has SQL-builder/tagged-template clean-control gaps.
+- False-positive concern: without parser services, three known-clean PowerSync escaper controls degrade to conservative reports. `parserServiceDeltas` classifies those as inventory because the type-aware plans prove them clean and there are zero missing non-type-aware findings. Separately, Cloudflare Durable Object SQL tags, Drizzle builders, and PowerSync `db.sql` require symbol/type provenance before they can be clean.
+- Status: ready, non-blocking. Keep the benchmark and source-fleet inventories as regression gates, but do not restore blocking severity until SQL tag/member APIs are proven without name trust.
 
 ### `antidrift/no-underchecked-type-predicate`
 
@@ -288,34 +289,36 @@ Implemented and enabled; each card names what still blocks stable promotion.
 
 - Value: a handler that reads route params and acts on the resource without any co-located authorization/ownership decision is a missing boundary check.
 - Problem kind: absence detection — inherently fragile because middleware, higher-order handlers, and framework wrappers can legitimately own the check. The durable form is a positive construction pattern: handlers registered through a typed policy-bearing wrapper.
-- Pattern: handler-local authz call today; typed policy-wrapper registration as the target pattern.
+- Pattern: handler-local authz-call inventory today; typed policy-wrapper registration or dataflow/dominance proof as the target pattern.
 - Ecosystem: no rule knows repo authz policy (net-antidrift); the calls that count are registry facts.
-- Signal: AST control flow plus registry.
+- Signal: handler-local request-param shape plus configured callee names.
 - Evidence: Sudocode route drift (4 files); Chaski is non-applicable (tRPC boundaries) and stays a clean corpus for this shape.
-- False-positive concern: middleware-dominant apps would over-report — the rule stays glob-scoped opt-in and must not widen until decision 7 lands.
+- False-positive concern: middleware-dominant apps would over-report — the rule stays default-off and must not widen until decision 7 lands.
 - Blocker: decision 7 below; scope frozen meanwhile.
 
 ### `antidrift/no-raw-tailwind-color`
 
+- Status: retired as a deprecated no-op compatibility stub.
 - Value: raw palette utilities (`text-red-500`) bypass semantic tokens, so design changes stop propagating and the UI drifts off-theme.
 - Problem kind: the class string is the policy surface (no intent inference needed) — but the failure may be owned by another layer: a theme that does not expose raw palette utilities makes the drift unconstructable.
 - Pattern: semantic token classes; preferably theme-level removal of the raw palette.
 - Ecosystem: Tailwind plugins validate utility correctness, not token governance (config-replacement candidate).
-- Signal: class-string extraction.
-- Evidence: Chaski drift; 252 findings across 61 files (cleanup-scale inventory).
-- False-positive concern: the regex is a sampler unless tied to the project's actual token surface; coverage must be stated honestly.
-- Blocker: decision 8 below — control layer — before more promotion effort.
+- Signal: none in the shipped stub; the old class-string extractor was retired.
+- Evidence: historical Chaski inventory only; no blocking diagnostics remain.
+- False-positive concern: the old regex was a sampler unless tied to the project's actual token surface.
+- Reopen condition: explicit design-token authority plus real clean/drift corpus evidence.
 
 ### `antidrift/no-hover-translate-card`
 
+- Status: retired as a deprecated no-op compatibility stub.
 - Value: hover-translate on card-like pointer targets is a banned interaction pattern in the local design language.
 - Problem kind: the class string is the policy surface; same control-layer question as raw colors.
 - Pattern: hover elevation/color tokens instead of movement.
-- Ecosystem: nothing owns this interaction policy; `no-restricted-syntax` would be less readable (config-replacement candidate).
-- Signal: class-string extraction (JSX only; CSS `@apply` is a known false-negative boundary).
-- Evidence: Sudocode FAB drift; Chaski clean (0 findings).
-- False-positive concern: translate outside hover or on non-pointer targets stays clean; lowest strategic leverage in the active set — keep only because it is cheap.
-- Blocker: second UI repo inventory; decision 8 below.
+- Ecosystem: no maintained rule owns this interaction policy, but the old custom sampler still did not prove card or pointer-target context.
+- Signal: none in the shipped stub; the old class-string extractor was retired.
+- Evidence: historical Sudocode/Chaski inventory only; no blocking diagnostics remain.
+- False-positive concern: the old class-string match did not prove card or pointer-target context.
+- Reopen condition: real interaction-target proof plus clean controls for non-card transforms.
 
 ## Default-Off Inventory
 
@@ -362,9 +365,9 @@ Policy IDs from `policyRuleReviews` that antidrift deliberately does not impleme
 
 The SonarJS SQL note stands: `sonarjs/sql-queries` is tracked as ecosystem coverage, but the measured benchmark reports 0 findings against the custom rule's 16/31, so it is adjacent coverage, not a replacement.
 
-## Retired (Locked)
+## Retired
 
-Reopening any of these requires checker-lock changes plus new real-code evidence; see `decisionLocks` in `policy/registries/rules.yaml`.
+Reopening any of these requires moving the rule-status row out of `status: retired`, updating the shipped config/surface checks, and adding new real-code evidence.
 
 | Rule                                     | Why it died                                                                                                                                       |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -410,7 +413,7 @@ These are the live grill questions reduced to recommended outcomes. Each changes
 1. **Status triplet**: closed. The redundant-constant-cell proof is folded into `no-handrolled-resource-lifecycle-cells`, and the standalone name-group rule is retired and locked.
 2. **Broad-input authority blocking**: block only degenerate zero/near-zero-field authority claims; keep sufficiency-threshold findings as inventory. Recommended: yes.
 3. **One-owner forks**: projected boundary DTOs at real translation boundaries are clean. Installed-package blocking requires accepted package-owner facts, ideally proposed from analytics such as existing imports, `Pick`/`Omit` derivations, SDK return provenance, or repeated structural forks. The unconfigured all-`node_modules` sweep stays inventory/discovery for finding owners worth accepting. Recommended: yes.
-4. **SQL severity split**: value interpolation blocks everywhere; dynamic identifier interpolation downgrades to inventory when parser services are absent, and type-proof is never replaced with name exemptions. Codified through `parserServiceDeltas`.
+4. **SQL severity split**: keep the rule non-blocking while SQL-builder/tagged-template APIs are known gaps. Value interpolation remains the core signal, dynamic identifier interpolation downgrades to inventory when parser services are absent, and type-proof is never replaced with name exemptions.
 5. **Nullable tuples**: nullability stays the policy boundary. Recommended: yes (already the rule's shape).
 6. **Async arrays**: never-await methods may promote on deterministic evidence plus the one real drift; `map`/`flatMap`-not-collected keeps a separate evidence gate. Recommended: yes.
 7. **Authz**: move from absence detection toward typed policy-wrapper registration as the construction pattern; freeze the current Express-scope rule until then. Recommended: yes.

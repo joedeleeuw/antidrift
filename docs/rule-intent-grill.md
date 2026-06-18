@@ -52,7 +52,7 @@ Better split:
 
 - The retired `no-status-triplet-state` rule was really about derivable resource lifecycle facts.
 - `no-handrolled-resource-lifecycle-cells` is about local state cells behaving like one implicit resource lifecycle machine.
-- The behavior-based subset collapsed into `no-handrolled-resource-lifecycle-cells` plus a redundant-constant-cell proof: one setter writes a constant such as `false` or `null` whenever another setter receives the resource value.
+- The semantic AST subset collapsed into `no-handrolled-resource-lifecycle-cells` plus a redundant-constant-cell proof: one setter writes a constant such as `false` or `null` whenever another setter receives the resource value.
 - Fetch/effect waterfall is a separate data-loading architecture problem, mostly pressured by `no-raw-fetch-in-component` and React Hooks rules.
 
 Recommended default:

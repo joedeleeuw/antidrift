@@ -28,10 +28,10 @@ clusters:
         severity: warn
         detector: sourceMemberStateShardCandidate
         message: Keep an ingested entity together unless the split cells are proven editable draft fields.
-      - id: react/no-status-triplet-state # data/loading/error triplets are a common async lifecycle smell.
-        severity: error
-        detector: stateNamesInclude:data/loading/error
-        message: Represent async lifecycle as one resource or reducer value.
+      - id: react/no-status-triplet-state # Retired standalone name inventory; semantic AST lifecycle proof lives in no-handrolled-resource-lifecycle-cells.
+        severity: off
+        detector: retiredNameInventoryOnly
+        message: Use react/no-handrolled-resource-lifecycle-cells for deterministic lifecycle proof.
       - id: react/no-derived-state-effect # Setting derived state in effects creates extra renders and stale state.
         severity: error
         detector: useEffectSynchronouslyCallsSetterFromDeps
@@ -52,10 +52,10 @@ clusters:
         severity: error
         detector: singlePropertyReturnWithExplicitReturnType
         message: Use inference directly or move the contract to the owning boundary.
-      - id: ts/no-mechanical-get-x-from-y # Name shape is a high-signal pattern for AI-created type appeasement helpers.
-        severity: error
-        detector: nameMatches:^(get|select|extract)[A-Z].*From[A-Z]
-        message: Do not create getXFromY helpers unless they contain real domain logic.
+      - id: ts/no-mechanical-get-x-from-y # Merged into structural selector-wrapper detection; names alone are not proof.
+        severity: off
+        detector: mergedInto:ts/no-trivial-selector-wrapper
+        message: Do not use helper names as proof; use the structural selector-wrapper rule.
       - id: ts/no-inline-structural-type-at-use-site # Use-site structural contracts fork domain ownership.
         severity: error
         detector: inlineObjectTypeInParameterOrVariable

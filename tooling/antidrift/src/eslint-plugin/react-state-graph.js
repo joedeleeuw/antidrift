@@ -169,11 +169,74 @@ function sourceMemberTransitions(frame) {
   }));
 }
 
-export function createReactStateTracker({ onFrameExit } = {}) {
+function statementExits(node) {
+  if (!node) return false;
+  if (
+    node.type === "ReturnStatement" ||
+    node.type === "ThrowStatement" ||
+    node.type === "BreakStatement" ||
+    node.type === "ContinueStatement"
+  ) {
+    return true;
+  }
+  if (node.type === "BlockStatement") {
+    const last = node.body.at(-1);
+    return Boolean(last && statementExits(last));
+  }
+  if (node.type === "IfStatement") {
+    return Boolean(
+      node.alternate &&
+        statementExits(node.consequent) &&
+        statementExits(node.alternate),
+    );
+  }
+  return false;
+}
+
+function statementBlock(node) {
+  let current = node;
+  while (current?.parent) {
+    if (
+      current.parent.type === "BlockStatement" ||
+      current.parent.type === "Program"
+    ) {
+      return current.parent;
+    }
+    if (
+      current.parent.type === "FunctionDeclaration" ||
+      current.parent.type === "FunctionExpression" ||
+      current.parent.type === "ArrowFunctionExpression"
+    ) {
+      return null;
+    }
+    current = current.parent;
+  }
+  return null;
+}
+
+function hasAbortStatusGuardFor(frame, node) {
+  const block = statementBlock(node);
+  if (!block) return false;
+  const start = node.range?.[0] ?? Number.POSITIVE_INFINITY;
+  return frame.abortStatusGuards.some((guard) => {
+    if (guard.block !== block) return false;
+    if (guard.start !== undefined) {
+      return guard.start <= start && start <= guard.end;
+    }
+    return guard.end <= start;
+  });
+}
+
+export function createReactStateTracker({ context, onFrameExit, sourceCode } = {}) {
+  const eslintSourceCode =
+    sourceCode ?? context?.sourceCode ?? context?.getSourceCode?.();
+  if (!eslintSourceCode) {
+    throw new Error("createReactStateTracker requires ESLint sourceCode.");
+  }
   const functionStack = [];
   const catchParams = [];
-  const reactObjectLocals = new Set();
-  const reactHookLocals = new Map([
+  const reactObjectBindings = new Set();
+  const reactHookBindings = new Map([
     ["useRef", new Set()],
     ["useState", new Set()],
   ]);
@@ -195,17 +258,31 @@ export function createReactStateTracker({ onFrameExit } = {}) {
     }
     return null;
   };
+  const variableForIdentifier = (node) => {
+    if (node?.type !== "Identifier") return null;
+    let scope = eslintSourceCode.getScope(node);
+    while (scope) {
+      const variable = scope.set.get(node.name);
+      if (variable) return variable;
+      scope = scope.upper;
+    }
+    return null;
+  };
 
   function isReactHookCallee(callee, hookName) {
     const value = unwrapCasts(callee);
     if (value?.type === "Identifier") {
-      return reactHookLocals.get(hookName)?.has(value.name) ?? false;
+      const variable = variableForIdentifier(value);
+      return Boolean(
+        variable && reactHookBindings.get(hookName)?.has(variable),
+      );
     }
     if (value?.type !== "MemberExpression" || memberName(value) !== hookName) {
       return false;
     }
     const object = unwrapCasts(value.object);
-    return object?.type === "Identifier" && reactObjectLocals.has(object.name);
+    const variable = variableForIdentifier(object);
+    return Boolean(variable && reactObjectBindings.has(variable));
   }
 
   function isAbortControllerRefInit(node) {
@@ -251,12 +328,24 @@ export function createReactStateTracker({ onFrameExit } = {}) {
     return isKnownAbortController(signal.object);
   }
 
-  function isKnownAbortCall(callee) {
-    const value = unwrapCasts(callee);
+  function isAbortStatusGuardTest(node) {
+    const value = unwrapCasts(node);
+    if (isKnownAbortSignalStatusRead(value)) return true;
+    if (value?.type === "LogicalExpression") {
+      return (
+        isAbortStatusGuardTest(value.left) ||
+        isAbortStatusGuardTest(value.right)
+      );
+    }
+    return false;
+  }
+
+  function isNegatedAbortStatusGuardTest(node) {
+    const value = unwrapCasts(node);
     return (
-      value?.type === "MemberExpression" &&
-      memberName(value) === "abort" &&
-      isKnownAbortController(value.object)
+      value?.type === "UnaryExpression" &&
+      value.operator === "!" &&
+      isAbortStatusGuardTest(value.argument)
     );
   }
 
@@ -280,6 +369,8 @@ export function createReactStateTracker({ onFrameExit } = {}) {
       updaterSetters: new Set(),
       abortControllers: new Set(),
       abortControllerRefs: new Set(),
+      abortStatusGuards: [],
+      abortGuardedSetters: new Set(),
     });
   }
 
@@ -287,20 +378,17 @@ export function createReactStateTracker({ onFrameExit } = {}) {
     const frame = functionStack.pop();
     if (!frame) return;
     const parent = functionStack[functionStack.length - 1] ?? null;
-    // A request-identity guard is component-wide: one built in a nested helper bubbles
-    // up, and one on an ancestor (e.g. useRef(new AbortController())) is inherited down,
-    // so the transition is exempt wherever the controller is actually constructed.
-    if (frame.requestGuard && parent) parent.requestGuard = true;
-    if (!frame.requestGuard) {
-      frame.requestGuard = functionStack.some(
-        (ancestor) => ancestor.requestGuard,
-      );
-    }
     // A transition only proves with setters it owns or that its immediate component
     // parent owns; setters reached from a deeper ancestor (a nested closure) do not prove.
     frame.ownerSetters = parent
       ? new Set([...frame.setters, ...parent.setters])
       : frame.setters;
+    const proof = frame.isTransition ? lifecycleProof(frame) : { proven: false };
+    frame.requestGuard = Boolean(
+      proof.proven &&
+        proof.payloadCell &&
+        frame.abortGuardedSetters.has(proof.payloadCell),
+    );
     frame.sourceMemberTransitions.push(...sourceMemberTransitions(frame));
     if (parent) {
       for (const cell of frame.eventEditedCells) {
@@ -318,18 +406,25 @@ export function createReactStateTracker({ onFrameExit } = {}) {
     visitors: {
       ImportDeclaration(node) {
         if (node.source?.value !== "react") return;
+        const bindings = new Map(
+          eslintSourceCode
+            .getDeclaredVariables(node)
+            .map((variable) => [variable.name, variable]),
+        );
         for (const specifier of node.specifiers ?? []) {
           const localName = specifier.local?.name;
           if (!localName) continue;
+          const binding = bindings.get(localName);
+          if (!binding) continue;
           if (
             specifier.type === "ImportDefaultSpecifier" ||
             specifier.type === "ImportNamespaceSpecifier"
           ) {
-            reactObjectLocals.add(localName);
+            reactObjectBindings.add(binding);
             continue;
           }
-          const hookLocals = reactHookLocals.get(importedName(specifier));
-          if (hookLocals) hookLocals.add(localName);
+          const hookBindings = reactHookBindings.get(importedName(specifier));
+          if (hookBindings) hookBindings.add(binding);
         }
       },
       VariableDeclarator(node) {
@@ -373,10 +468,31 @@ export function createReactStateTracker({ onFrameExit } = {}) {
         const frame = top();
         if (frame) frame.isTransition = true;
       },
-      MemberExpression(node) {
+      IfStatement(node) {
         const frame = top();
-        if (frame && isKnownAbortSignalStatusRead(node)) {
-          frame.requestGuard = true;
+        if (
+          frame &&
+          isAbortStatusGuardTest(node.test) &&
+          statementExits(node.consequent)
+        ) {
+          const block = statementBlock(node);
+          if (block) {
+            frame.abortStatusGuards.push({
+              block,
+              end: node.range?.[1] ?? Number.NEGATIVE_INFINITY,
+            });
+          }
+        }
+        if (
+          frame &&
+          isNegatedAbortStatusGuardTest(node.test) &&
+          node.consequent?.type === "BlockStatement"
+        ) {
+          frame.abortStatusGuards.push({
+            block: node.consequent,
+            start: node.consequent.range?.[0] ?? Number.NEGATIVE_INFINITY,
+            end: node.consequent.range?.[1] ?? Number.POSITIVE_INFINITY,
+          });
         }
       },
       JSXAttribute(node) {
@@ -407,11 +523,13 @@ export function createReactStateTracker({ onFrameExit } = {}) {
       CallExpression(node) {
         const frame = top();
         if (!frame) return;
-        if (isKnownAbortCall(node.callee)) frame.requestGuard = true;
         const calleeName =
           node.callee?.type === "Identifier" ? node.callee.name : null;
         if (!calleeName || !setterInScope(calleeName)) return;
         frame.called.add(calleeName);
+        if (hasAbortStatusGuardFor(frame, node)) {
+          frame.abortGuardedSetters.add(calleeName);
+        }
         if (catchParams.length > 0) frame.catchSetters.add(calleeName);
         const arg = node.arguments?.[0];
         if (!arg) return;

@@ -159,4 +159,6 @@ export function callUsesPredicateParam(
 export function hasValidatorDelegation(
   node: unknown,
   paramName: string,
+  services: TypeScriptParserServices,
+  checker: ts.TypeChecker,
 ): boolean;

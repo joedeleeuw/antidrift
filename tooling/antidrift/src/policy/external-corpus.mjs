@@ -109,6 +109,38 @@ const sudocodeCases = [
         path: "frontend/src/components/executions/ExecutionView.tsx",
         line: 463,
       },
+      {
+        path: "frontend/src/components/executions/ExecutionView.tsx",
+        line: 644,
+      },
+    ],
+  },
+  {
+    id: "sudocode-inline-execution-delete-worktree-resource-lifecycle",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "frontend",
+    paths: ["frontend/src/components/executions/InlineExecutionView.tsx"],
+    expectedFindings: [
+      {
+        path: "frontend/src/components/executions/InlineExecutionView.tsx",
+        line: 342,
+      },
+    ],
+  },
+  {
+    id: "sudocode-voice-config-resource-lifecycle",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "frontend",
+    paths: ["frontend/src/hooks/useVoiceConfig.ts"],
+    expectedFindings: [
+      {
+        path: "frontend/src/hooks/useVoiceConfig.ts",
+        line: 123,
+      },
     ],
   },
   {
@@ -239,7 +271,7 @@ const sudocodeCases = [
     id: "sudocode-issues-route-params-without-authz",
     ruleId: "antidrift/require-authz-check",
     kind: "drift",
-    classification: "ready",
+    classification: "under-proven",
     subproject: "server",
     paths: ["server/src/routes/issues.ts"],
     expectedFindings: [
@@ -265,7 +297,7 @@ const sudocodeCases = [
     id: "sudocode-specs-route-params-without-authz",
     ruleId: "antidrift/require-authz-check",
     kind: "drift",
-    classification: "ready",
+    classification: "under-proven",
     subproject: "server",
     paths: ["server/src/routes/specs.ts"],
     expectedFindings: [
@@ -291,7 +323,7 @@ const sudocodeCases = [
     id: "sudocode-relationships-route-params-without-authz",
     ruleId: "antidrift/require-authz-check",
     kind: "drift",
-    classification: "ready",
+    classification: "under-proven",
     subproject: "server",
     paths: ["server/src/routes/relationships.ts"],
     expectedFindings: [
@@ -313,7 +345,7 @@ const sudocodeCases = [
     id: "sudocode-executions-route-params-without-authz",
     ruleId: "antidrift/require-authz-check",
     kind: "drift",
-    classification: "ready",
+    classification: "under-proven",
     subproject: "server",
     paths: ["server/src/routes/executions.ts"],
     expectedFindings: [
@@ -427,29 +459,23 @@ const sudocodeCases = [
     id: "sudocode-version-route-no-params-clean",
     ruleId: "antidrift/require-authz-check",
     kind: "correct",
-    classification: "ready",
+    classification: "under-proven",
     subproject: "server",
     paths: ["server/src/routes/version.ts"],
   },
   {
     id: "sudocode-chat-widget-hover-translate-fab",
     ruleId: "antidrift/no-hover-translate-card",
-    kind: "drift",
-    classification: "ready",
+    kind: "correct",
+    classification: "retired",
     subproject: "frontend",
     paths: ["frontend/src/components/chat-widget/ChatWidgetFAB.tsx"],
-    expectedFindings: [
-      {
-        path: "frontend/src/components/chat-widget/ChatWidgetFAB.tsx",
-        line: 23,
-      },
-    ],
   },
   {
     id: "sudocode-ui-button-no-hover-translate-clean",
     ruleId: "antidrift/no-hover-translate-card",
     kind: "correct",
-    classification: "ready",
+    classification: "retired",
     subproject: "frontend",
     paths: ["frontend/src/components/ui/button.tsx"],
   },
@@ -785,26 +811,32 @@ const cloudflareAgentsCases = [
   {
     id: "cloudflare-voice-parameterized-sql-tag-clean",
     ruleId: "antidrift/no-sql-string-concat",
-    kind: "correct",
-    classification: "ready",
+    kind: "known-gap",
+    classification: "under-proven",
     subproject: "packages/voice",
     paths: ["packages/voice/src/voice.ts"],
+    reason:
+      "Cloudflare Durable Object SQL tagged templates appear to bind interpolated values, but the current rule no longer trusts tag names alone and this corpus case does not provide symbol-level builder proof.",
   },
   {
     id: "cloudflare-ai-chat-parameterized-sql-tag-clean",
     ruleId: "antidrift/no-sql-string-concat",
-    kind: "correct",
-    classification: "ready",
+    kind: "known-gap",
+    classification: "under-proven",
     subproject: "packages/ai-chat",
     paths: ["packages/ai-chat/src/index.ts"],
+    reason:
+      "Cloudflare Durable Object SQL tagged templates appear to bind interpolated values, but the current rule no longer trusts tag names alone and this corpus case does not provide symbol-level builder proof.",
   },
   {
     id: "cloudflare-agents-parameterized-sql-tag-clean",
     ruleId: "antidrift/no-sql-string-concat",
-    kind: "correct",
-    classification: "ready",
+    kind: "known-gap",
+    classification: "under-proven",
     subproject: "packages/agents",
     paths: ["packages/agents/src/index.ts"],
+    reason:
+      "Cloudflare Durable Object SQL tagged templates appear to bind interpolated values, but the current rule no longer trusts tag names alone and this corpus case does not provide symbol-level builder proof.",
   },
   {
     id: "cloudflare-shell-sanitized-namespace-table-identifiers",
@@ -847,6 +879,48 @@ const cloudflareAgentsCases = [
       {
         path: "examples/worker-bundler-playground/src/client.tsx",
         line: 76,
+      },
+    ],
+  },
+  {
+    id: "cloudflare-github-webhook-connect-resource-lifecycle",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "examples/github-webhook",
+    paths: ["examples/github-webhook/src/client.tsx"],
+    expectedFindings: [
+      {
+        path: "examples/github-webhook/src/client.tsx",
+        line: 160,
+      },
+    ],
+  },
+  {
+    id: "cloudflare-think-chat-webhook-setup-resource-lifecycle",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "examples/think-chat-sdk",
+    paths: ["examples/think-chat-sdk/src/client.tsx"],
+    expectedFindings: [
+      {
+        path: "examples/think-chat-sdk/src/client.tsx",
+        line: 90,
+      },
+    ],
+  },
+  {
+    id: "cloudflare-think-submissions-submit-resource-lifecycle",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "examples/think-submissions",
+    paths: ["examples/think-submissions/src/client.tsx"],
+    expectedFindings: [
+      {
+        path: "examples/think-submissions/src/client.tsx",
+        line: 139,
       },
     ],
   },
@@ -963,8 +1037,8 @@ const opencodeCases = [
   {
     id: "opencode-drizzle-sql-template-identifiers-clean",
     ruleId: "antidrift/no-sql-string-concat",
-    kind: "correct",
-    classification: "ready",
+    kind: "known-gap",
+    classification: "under-proven",
     subproject: "effect-drizzle-sqlite",
     paths: [
       "packages/effect-drizzle-sqlite/src/up-migrations/effect-sqlite.ts",
@@ -972,6 +1046,8 @@ const opencodeCases = [
       "packages/effect-drizzle-sqlite/src/sqlite-core/effect/session.ts",
       "packages/core/src/database/migration.ts",
     ],
+    reason:
+      "Drizzle SQL builder templates and sql.identifier fragments appear to encode values and identifiers through the builder, but the current rule no longer trusts sql tag/member names alone and this corpus case does not provide symbol-level Drizzle builder proof.",
   },
   {
     id: "opencode-stats-local-sql-escaper-clean",
@@ -1072,14 +1148,16 @@ const powersyncServiceCases = [
   {
     id: "powersync-postgres-storage-numbered-placeholder-fragment-clean",
     ruleId: "antidrift/no-sql-string-concat",
-    kind: "correct",
-    classification: "ready",
+    kind: "known-gap",
+    classification: "under-proven",
     subproject: "module-postgres-storage",
     typeAware: true,
     tsconfig: "modules/module-postgres-storage/tsconfig.json",
     paths: [
       "modules/module-postgres-storage/src/storage/PostgresSyncRulesStorage.ts",
     ],
+    reason:
+      "PowerSync db.sql templates use typed value objects and numbered placeholder fragments, but the current rule no longer trusts sql member names alone and this corpus case does not provide symbol-level builder proof.",
   },
 ];
 

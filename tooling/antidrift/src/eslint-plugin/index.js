@@ -71,9 +71,6 @@ import {
   typeProps,
 } from "../semantic-adapters/type-owner.mjs";
 
-const rawTailwindColorPattern =
-  /\b(?:text|bg|border|ring)-(?:red|blue|green|yellow|gray|slate|zinc|neutral)-\d{2,3}\b/u;
-const hoverTranslatePattern = /hover:-?translate-[xy]/u;
 const createRule = ESLintUtils.RuleCreator(
   (name) =>
     `https://github.com/joedeleeuw/antidrift/tree/main/tooling/antidrift#${name}`,
@@ -598,69 +595,6 @@ function inlineStructuralTypeAtBoundary(node) {
   return isBoundaryObjectMethod(fn) || isExportedLowercaseFunction(fn);
 }
 
-function collectTemplateLiteralString(node, parts) {
-  if (node.expressions.length === 0) {
-    parts.push(
-      node.quasis
-        .map((quasi) => quasi.value.cooked ?? quasi.value.raw)
-        .join(""),
-    );
-  }
-}
-
-function collectConditionalStringParts(node, parts) {
-  staticStringParts(node.consequent, parts);
-  staticStringParts(node.alternate, parts);
-}
-
-function collectLogicalStringParts(node, parts) {
-  staticStringParts(node.left, parts);
-  staticStringParts(node.right, parts);
-}
-
-function collectArrayStringParts(node, parts) {
-  for (const element of node.elements ?? []) staticStringParts(element, parts);
-}
-
-function collectCallStringParts(node, parts) {
-  for (const arg of node.arguments ?? []) {
-    if (arg.type !== "SpreadElement") staticStringParts(arg, parts);
-  }
-}
-
-function collectObjectKeyStringParts(node, parts) {
-  for (const property of node.properties ?? []) {
-    if (property.type === "Property") staticStringParts(property.key, parts);
-  }
-}
-
-function staticStringParts(node, parts = []) {
-  if (!node) return parts;
-  if (node.type === "Literal" && typeof node.value === "string") {
-    parts.push(node.value);
-    return parts;
-  }
-  const collectors = {
-    ArrayExpression: collectArrayStringParts,
-    CallExpression: collectCallStringParts,
-    ConditionalExpression: collectConditionalStringParts,
-    LogicalExpression: collectLogicalStringParts,
-    ObjectExpression: collectObjectKeyStringParts,
-    TemplateLiteral: collectTemplateLiteralString,
-  };
-  collectors[node.type]?.(node, parts);
-  return parts;
-}
-
-function getJsxClassNameLiterals(node) {
-  if (node.name?.name !== "className") return [];
-  if (node.value?.type === "Literal") return staticStringParts(node.value);
-  if (node.value?.type === "JSXExpressionContainer") {
-    return staticStringParts(node.value.expression);
-  }
-  return [];
-}
-
 // Visit free functions, arrow consts, and class methods/fields uniformly — agents hide the same
 // inference-appeasement patterns in any of these forms.
 const callableVisitors = (check) => ({
@@ -746,6 +680,7 @@ function ruleNoHandrolledResourceLifecycleCells() {
     create(context) {
       const threshold = context.options[0]?.threshold ?? 3;
       const tracker = createReactStateTracker({
+        context,
         onFrameExit(frame) {
           const proof = frame.isTransition
             ? lifecycleProof(frame)
@@ -845,6 +780,7 @@ function ruleNoShatteredIngestedEntityState() {
       const options = context.options[0] ?? {};
       const threshold = options.threshold ?? 2;
       const tracker = createReactStateTracker({
+        context,
         onFrameExit(frame) {
           // Only the component frame declares useState cells; a nested async
           // transition frame has no setters and bubbles its transitions (and the
@@ -927,30 +863,35 @@ function ruleRequireEffectDeps() {
   };
 }
 
-function ruleClassNamePattern(name, pattern, message) {
+function ruleDeprecatedNoop(name, description) {
   return createRule({
     name,
     meta: {
       type: "problem",
-      docs: { description: message },
-      messages: { forbiddenClassName: message },
+      deprecated: true,
+      docs: { description },
+      messages: {},
       schema: [],
     },
     defaultOptions: [],
-    create(context) {
-      return {
-        JSXAttribute(node) {
-          if (
-            getJsxClassNameLiterals(node).some((className) =>
-              pattern.test(className),
-            )
-          ) {
-            context.report({ node, messageId: "forbiddenClassName" });
-          }
-        },
-      };
+    create() {
+      return {};
     },
   });
+}
+
+function containsJsxNode(node) {
+  if (!node || typeof node !== "object") return false;
+  if (node.type === "JSXElement" || node.type === "JSXFragment") return true;
+  if (isFunctionLike(node)) return false;
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "parent") continue;
+    if (Array.isArray(value) && value.some((item) => containsJsxNode(item))) {
+      return true;
+    }
+    if (value?.type && containsJsxNode(value)) return true;
+  }
+  return false;
 }
 
 function ruleNoRawFetchInComponent() {
@@ -963,35 +904,28 @@ function ruleNoRawFetchInComponent() {
       schema: [],
     },
     create(context) {
-      const filename = context.filename ?? context.getFilename();
-      const isComponentModule = /\.(?:jsx|tsx)$/u.test(filename);
       const stack = [];
-      const moduleFetches = [];
-      const reportedFetches = new WeakSet();
-      let sawJsxInFile = false;
       function enterFunction(node) {
         stack.push({
-          node,
-          name: getFunctionName(node),
-          sawJsx: false,
-          sawFetch: null,
+          returnsJsx:
+            node.type === "ArrowFunctionExpression" && containsJsxNode(node.body),
+          fetches: [],
+          jsxLocals: new Set(),
         });
-      }
-      function reportFetch(node, message) {
-        if (reportedFetches.has(node)) return;
-        reportedFetches.add(node);
-        context.report({ node, message });
       }
       function exitFunction() {
         const frame = stack.pop();
-        if (
-          frame?.sawFetch &&
-          (frame.sawJsx || isReactComponentName(frame.name))
-        ) {
-          reportFetch(
-            frame.sawFetch,
-            "Do not call raw fetch inside React components. Use an API client, loader, or query resource.",
-          );
+        if (!frame) return;
+        if (!frame.returnsJsx) {
+          stack[stack.length - 1]?.fetches.push(...frame.fetches);
+          return;
+        }
+        for (const node of frame.fetches) {
+          context.report({
+            node,
+            message:
+              "Do not call raw fetch inside React components. Use an API client, loader, or query resource.",
+          });
         }
       }
 
@@ -1002,24 +936,31 @@ function ruleNoRawFetchInComponent() {
         "FunctionExpression:exit": exitFunction,
         ArrowFunctionExpression: enterFunction,
         "ArrowFunctionExpression:exit": exitFunction,
-        JSXElement() {
-          sawJsxInFile = true;
-          if (stack.length > 0) stack[stack.length - 1].sawJsx = true;
+        VariableDeclarator(node) {
+          const frame = stack[stack.length - 1];
+          if (
+            frame &&
+            node.id?.type === "Identifier" &&
+            containsJsxNode(node.init)
+          ) {
+            frame.jsxLocals.add(node.id.name);
+          }
+        },
+        ReturnStatement(node) {
+          if (stack.length === 0) return;
+          const frame = stack[stack.length - 1];
+          if (
+            containsJsxNode(node.argument) ||
+            (node.argument?.type === "Identifier" &&
+              frame.jsxLocals.has(node.argument.name))
+          ) {
+            frame.returnsJsx = true;
+          }
         },
         CallExpression(node) {
           if (isGlobalFetchCall(node.callee) && stack.length > 0) {
             const frame = stack[stack.length - 1];
-            frame.sawFetch = node;
-            if (!isReactComponentName(frame.name)) moduleFetches.push(node);
-          }
-        },
-        "Program:exit"() {
-          if (!isComponentModule || !sawJsxInFile) return;
-          for (const node of moduleFetches) {
-            reportFetch(
-              node,
-              "Do not call raw fetch inside React component modules. Move transport logic to an API client, loader, or query resource.",
-            );
+            frame.fetches.push(node);
           }
         },
       };
@@ -1095,7 +1036,6 @@ const sqlPattern =
   /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
 const sqlSentencePattern =
   /\b(?:SELECT\b[\s\S]*?\bFROM\b|INSERT\s+INTO\b|UPDATE\b[\s\S]*?\bSET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
-const parameterizedSqlTagNames = new Set(["sql", "sqlQuery", "sqlRun"]);
 
 function templateText(node) {
   return node.quasis
@@ -1481,20 +1421,6 @@ function isPlaceholderSqlFragmentMapJoin(node) {
 
 function isEmptyArrayExpression(node) {
   return node?.type === "ArrayExpression" && node.elements.length === 0;
-}
-
-function isParameterizedSqlTag(node) {
-  if (node?.type === "Identifier") {
-    return parameterizedSqlTagNames.has(node.name);
-  }
-  if (node?.type === "ChainExpression") {
-    return isParameterizedSqlTag(node.expression);
-  }
-  if (node?.type !== "MemberExpression" || node.computed) return false;
-  return (
-    node.property?.type === "Identifier" &&
-    parameterizedSqlTagNames.has(node.property.name)
-  );
 }
 
 function isAllowedSqlFragmentJoinSeparator(value) {
@@ -2445,13 +2371,6 @@ function ruleNoSqlStringConcat() {
         },
         TemplateLiteral(node) {
           if (
-            node.parent?.type === "TaggedTemplateExpression" &&
-            node.parent.quasi === node &&
-            isParameterizedSqlTag(node.parent.tag)
-          ) {
-            return;
-          }
-          if (
             node.expressions.length > 0 &&
             (sqlPattern.test(templateText(node)) ||
               sqlSentencePattern.test(templateText(node)))
@@ -2559,11 +2478,8 @@ function ruleRequireAuthzCheck() {
   };
 }
 
-// Local type is a structural fork of a canonical type when every one of its resolved properties
-// matches a canonical property by name AND type string (i.e. local ⊆ canonical). This fires on
-// exact copies and subsets (drift) but never on supersets like `User & { tenantId }` — a real
-// extension has extra properties not present in the canonical type, so it is not a subset.
-function isStructuralFork(local, canonical) {
+function isExactStructuralFork(local, canonical) {
+  if (local.size !== canonical.size) return false;
   for (const [name, typeStr] of local) {
     if (canonical.get(name) !== typeStr) return false;
   }
@@ -2604,7 +2520,7 @@ function structuralMatchProof(sym, local, candidate, diagnostic) {
     },
     structuralMatch: {
       matchedProps: localProps.map(([name]) => name),
-      relation: "local-subset-of-owner",
+      relation: "exact-owner-copy",
       localPropCount: local.size,
       ownerPropCount: candidate.props.size,
     },
@@ -2636,7 +2552,7 @@ function structuralDiagnosticFor(candidate, messageId) {
 
 function findStructuralProof(sym, local, candidates, messageId) {
   for (const candidate of sortedStructuralCandidates(candidates)) {
-    if (isStructuralFork(local, candidate.props)) {
+    if (isExactStructuralFork(local, candidate.props)) {
       return structuralMatchProof(
         sym,
         local,
@@ -2709,7 +2625,7 @@ function ruleNoStructuralTypeFork() {
       type: "problem",
       docs: {
         description:
-          "Detect hand-written types structurally equivalent to (or a subset of) an installed package or configured generated source exported type.",
+          "Detect hand-written types that exactly redeclare an installed package or configured generated source exported type.",
       },
       schema: [
         {
@@ -3014,17 +2930,22 @@ function ruleNoUndercheckedTypePredicate() {
         if (!isBroadPredicateInputType(checker, paramType)) return;
 
         const targetType = checker.getTypeFromTypeNode(tsTargetTypeNode);
+        if (checker.isArrayType(targetType) || checker.isTupleType(targetType)) {
+          return;
+        }
         if (!isPredicateObjectContract(targetType)) return;
         const targetProps = requiredTypeProps(checker, targetType);
-        if (targetProps.size < 2) return;
-        if (hasValidatorDelegation(fn.body, parts.paramName)) return;
+        if (targetProps.size === 0) return;
+        if (hasValidatorDelegation(fn.body, parts.paramName, services, checker)) {
+          return;
+        }
 
         const checked = checkedTargetProperties(
           fn.body,
           parts.paramName,
           targetProps,
         );
-        if (checked.size >= Math.min(2, targetProps.size)) return;
+        if ([...targetProps].every((prop) => checked.has(prop))) return;
 
         context.report({
           node: fn.returnType,
@@ -3235,15 +3156,13 @@ const rules = {
   "no-handrolled-resource-lifecycle-cells": ruleNoHandrolledResourceLifecycleCells(),
   "no-shattered-ingested-entity-state": ruleNoShatteredIngestedEntityState(),
   "require-effect-deps": ruleRequireEffectDeps(),
-  "no-raw-tailwind-color": ruleClassNamePattern(
+  "no-raw-tailwind-color": ruleDeprecatedNoop(
     "no-raw-tailwind-color",
-    rawTailwindColorPattern,
-    "Use semantic design tokens instead of raw Tailwind color utilities.",
+    "Deprecated compatibility stub for a retired regex Tailwind color sampler.",
   ),
-  "no-hover-translate-card": ruleClassNamePattern(
+  "no-hover-translate-card": ruleDeprecatedNoop(
     "no-hover-translate-card",
-    hoverTranslatePattern,
-    "Do not move pointer targets on hover. Use shadow, border, color, or inner transforms.",
+    "Deprecated compatibility stub for a retired hover translate class sampler.",
   ),
   "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
   "no-async-array-method": ruleNoAsyncArrayMethod(),

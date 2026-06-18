@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { checkRuleSurface } from "./check-rule-surface.mjs";
 
 describe("checkRuleSurface", () => {
-  it("requires exported custom rules to be configured and tested", () => {
+  it("requires exported custom rules to be configured and corpus covered", () => {
     const messages = [];
     const ok = checkRuleSurface({
       pluginRules: {
@@ -18,7 +18,6 @@ describe("checkRuleSurface", () => {
           },
         },
       ],
-      testSource: 'ruleTester.run("alpha", rule("alpha"), { valid: [], invalid: [] });',
       corpusCases: [],
       report: (message) => messages.push(message),
     });
@@ -26,46 +25,33 @@ describe("checkRuleSurface", () => {
     expect(ok).toBe(false);
     expect(messages.join("\n")).toContain("configured but not exported: antidrift/gamma");
     expect(messages.join("\n")).toContain("exported but not configured: antidrift/beta");
-    expect(messages.join("\n")).toContain("exported but not covered by RuleTester: antidrift/beta");
     expect(messages.join("\n")).toContain("exported but not covered by corpus evidence: antidrift/beta");
   });
 
-  it("requires exported custom rules to have both RuleTester and corpus coverage", () => {
+  it("does not promote RuleTester source shape to a required surface", () => {
     const messages = [];
     const ok = checkRuleSurface({
       pluginRules: {
         alpha: {},
         beta: {},
-        gamma: {},
       },
       configs: [
         {
           rules: {
             "antidrift/alpha": "error",
             "antidrift/beta": "error",
-            "antidrift/gamma": "error",
           },
         },
       ],
-      testSource: [
-        'ruleTester.run("alpha", rule("alpha"), { valid: [], invalid: [] });',
-        'ruleTester.run("gamma", rule("gamma"), { valid: [], invalid: [] });',
-      ].join("\n"),
       corpusCases: [
+        { ruleId: "antidrift/alpha" },
         { ruleId: "antidrift/beta" },
-        { ruleId: "antidrift/gamma" },
       ],
       report: (message) => messages.push(message),
     });
 
-    expect(ok).toBe(false);
-    expect(messages.join("\n")).toContain(
-      "exported but not covered by RuleTester: antidrift/beta",
-    );
-    expect(messages.join("\n")).toContain(
-      "exported but not covered by corpus evidence: antidrift/alpha",
-    );
-    expect(messages.join("\n")).not.toContain("antidrift/gamma");
+    expect(ok).toBe(true);
+    expect(messages).toEqual([]);
   });
 
   it("counts default external corpus cases as surface evidence", () => {
@@ -81,8 +67,6 @@ describe("checkRuleSurface", () => {
           },
         },
       ],
-      testSource:
-        'ruleTester.run("require-authz-check", rule("require-authz-check"), { valid: [], invalid: [] });',
       ruleRegistry: {
         rules: {
           "antidrift/require-authz-check": {
@@ -100,15 +84,11 @@ describe("checkRuleSurface", () => {
 
   it("rejects blocking custom rules whose registry status is not mature enough", () => {
     const messages = [];
-    const testSource = [
-      'ruleTester.run("alpha", rule("alpha"), { valid: [], invalid: [] });',
-      'ruleTester.run("beta", rule("beta"), { valid: [], invalid: [] });',
-      'ruleTester.run("stable", rule("stable"), { valid: [], invalid: [] });',
-    ].join("\n");
     const ok = checkRuleSurface({
       pluginRules: {
         alpha: {},
         beta: {},
+        retired: {},
         stable: {},
       },
       configs: [
@@ -116,20 +96,22 @@ describe("checkRuleSurface", () => {
           rules: {
             "antidrift/alpha": "error",
             "antidrift/beta": "warn",
+            "antidrift/retired": "error",
             "antidrift/stable": "error",
           },
         },
       ],
-      testSource,
       corpusCases: [
         { ruleId: "antidrift/alpha" },
         { ruleId: "antidrift/beta" },
+        { ruleId: "antidrift/retired" },
         { ruleId: "antidrift/stable" },
       ],
       ruleRegistry: {
         rules: {
           "antidrift/alpha": { status: "under-proven", signal: "TypeChecker" },
           "antidrift/beta": { status: "ready", signal: "heuristic" },
+          "antidrift/retired": { status: "retired", signal: "no-op stub" },
           "antidrift/stable": { status: "ready", signal: "TypeChecker" },
         },
       },
@@ -138,6 +120,7 @@ describe("checkRuleSurface", () => {
 
     expect(ok).toBe(false);
     expect(messages.join("\n")).toContain("blocking despite registry status under-proven: antidrift/alpha");
+    expect(messages.join("\n")).toContain("blocking despite registry status retired: antidrift/retired");
     expect(messages.join("\n")).toContain("blocking despite heuristic signal heuristic: antidrift/beta");
     expect(messages.join("\n")).not.toContain("antidrift/stable");
   });
@@ -155,7 +138,6 @@ describe("checkRuleSurface", () => {
           },
         },
       ],
-      testSource: 'ruleTester.run("alpha", rule("alpha"), { valid: [], invalid: [] });',
       corpusCases: [{ ruleId: "antidrift/alpha" }],
       ruleRegistry: {
         rules: {
@@ -169,15 +151,31 @@ describe("checkRuleSurface", () => {
     expect(messages).toEqual([]);
   });
 
-  it("skips cleanly when run outside the self-hosted source layout", () => {
+  it("fails when the runtime config surface is missing instead of skipping missing source layout", () => {
     const messages = [];
     const ok = checkRuleSurface({
       repoRoot: "not-the-antidrift-source-repo",
+      pluginRules: {
+        alpha: {},
+      },
       configs: [],
+      corpusCases: [{ ruleId: "antidrift/alpha" }],
+      ruleRegistry: {},
       report: (message) => messages.push(message),
     });
 
-    expect(ok).toBe(true);
-    expect(messages.join("\n")).toContain("check-rule-surface skipped");
+    expect(ok).toBe(false);
+    expect(messages.join("\n")).toContain("Custom rule exported but not configured: antidrift/alpha");
+  });
+
+  it("throws when the self-hosted registry is missing", () => {
+    expect(() =>
+      checkRuleSurface({
+        repoRoot: "not-the-antidrift-source-repo",
+        pluginRules: {},
+        configs: [],
+        corpusCases: [],
+      }),
+    ).toThrow(/rules\.yaml/u);
   });
 });

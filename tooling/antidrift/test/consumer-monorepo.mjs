@@ -286,7 +286,8 @@ try {
       'const branded = brand("UserId", (value): value is string => typeof value === "string");\n' +
       "const authBoundaryTracker = createAuthBoundaryTracker({ onFrameExit(frame) { frame satisfies AuthBoundaryFrame; } });\n" +
       'const writeClass = classifyWriteValue({ type: "Literal", value: false }, { awaitedNames: new Set<string>(), catchParams: [] });\n' +
-      "const tracker = createReactStateTracker({ onFrameExit(frame) { frame satisfies ReactStateFrame; } });\n" +
+      "const reactSourceCode = { getScope: (_node: unknown) => ({ set: new Map<string, unknown>(), upper: null }), getDeclaredVariables: (_node: unknown) => [] };\n" +
+      "const tracker = createReactStateTracker({ sourceCode: reactSourceCode, onFrameExit(frame) { frame satisfies ReactStateFrame; } });\n" +
       "const parserServices = { esTreeNodeToTSNodeMap: { get: (_node: unknown) => undefined } } satisfies TypeScriptParserServices;\n" +
       "const broadParserServices = parserServices satisfies BroadInputParserServices;\n" +
       "const parseParserServices = parserServices satisfies ParseInputParserServices;\n" +
@@ -452,7 +453,7 @@ try {
       "isBindingIdentifier satisfies (node: unknown) => boolean;\n" +
       "checkedTargetProperties satisfies (node: unknown, paramName: string, targetProps: ReadonlySet<string>) => Set<string>;\n" +
       "callUsesPredicateParam satisfies (node: unknown, paramName: string) => boolean;\n" +
-      "hasValidatorDelegation satisfies (node: unknown, paramName: string) => boolean;\n" +
+      "hasValidatorDelegation satisfies (node: unknown, paramName: string, services: BroadInputParserServices, checker: ts.TypeChecker) => boolean;\n" +
       "broadParserServices satisfies BroadInputParserServices;\n" +
       "writeClass satisfies ReactStateWriteClass | null;\n" +
       "tracker.visitors satisfies Record<string, (node: unknown) => void>;\n" +

@@ -28,7 +28,7 @@ One protocol, two products. Mining work history recovers (1) lint/policy rule ca
 3. **Chronicle, if enabled** — discovery only; confirm details in the source system.
 4. **Repo evidence**: `docs/handoff.md`, `reports/`, `docs/rule-investigations/`, the registries.
 5. **Real corpora** under `/Users/sushi/code` (Chaski, Codebase Atlas, Sudocode, ...) to confirm the complaint exists in real code, not just in conversation.
-6. **Existing surface, before creating anything**: active rules and `decisionLocks` in `policy/registries/rules.yaml`, the shared ESLint config, hooks, policy scripts, and existing skills/automations. Reuse or extend; locked decisions do not reopen via mining.
+6. **Existing surface, before creating anything**: active and retired rule-status rows in `policy/registries/rules.yaml`, the shared ESLint config, hooks, policy scripts, and existing skills/automations. Reuse or extend; retired decisions do not reopen via mining.
 
 ## Search Probes
 

@@ -11,7 +11,12 @@ const defaultTargets = ["apps", "packages", "tooling"];
 const defaultRules = Object.keys(plugin.rules).map((name) => `antidrift/${name}`).sort((a, b) => a.localeCompare(b));
 const ignoredPolicy = ["**/fixtures/**", "**/dist/**", "**/*.d.ts", "**/*.d.mts", "**/*.d.cts"];
 const coreRuleIds = new Set(["no-restricted-imports"]);
-const blockingDisallowedStatuses = new Set(["under-proven", "false-positive-prone", "research"]);
+const blockingDisallowedStatuses = new Set([
+  "false-positive-prone",
+  "research",
+  "retired",
+  "under-proven",
+]);
 
 function parseCsv(value) {
   return value.split(",").map((item) => item.trim()).filter(Boolean);

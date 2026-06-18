@@ -239,7 +239,7 @@ policyRuleReviews:
     replacement: antidrift/no-handrolled-resource-lifecycle-cells
     coverage: Retired as a standalone name-group inventory rule; the provable resource-lifecycle subset is enforced by antidrift/no-handrolled-resource-lifecycle-cells through the React state graph adapter.
     reason: Names such as data/loading/error can inventory suspects but cannot prove derivable resource lifecycle drift.
-    nextAction: Keep the locked retired custom decision in place; use no-handrolled-resource-lifecycle-cells for behavior-based lifecycle proof.
+    nextAction: Keep the locked retired custom decision in place; use no-handrolled-resource-lifecycle-cells for semantic AST lifecycle proof.
   react/no-derived-state-effect:
     status: ecosystem-covered
     replacement: react-hooks/no-deriving-state-in-effects
@@ -333,9 +333,9 @@ policyRuleReviews:
   boundary/no-raw-fetch-in-component:
     status: active-custom
     antidriftRule: antidrift/no-raw-fetch-in-component
-    coverage: Implemented as a component-boundary fetch rule.
-    reason: A generated selector could ban fetch broadly, but the custom rule narrows to component context.
-    nextAction: Stable; only widen to raw transport if real non-fetch evidence appears.
+    coverage: Implemented as a direct-fetch rule for JSX-returning lexical component frames.
+    reason: A generated selector could ban fetch broadly, but the custom rule narrows to component-boundary context.
+    nextAction: Re-inventory the narrowed JSX-returning lexical proof before restoring stable status; only widen to raw transport if real non-fetch evidence appears.
   boundary/no-sdk-direct-use-outside-gateway:
     status: generated-config
     replacement: no-restricted-imports from policy/registries/gateways.yaml
@@ -384,9 +384,9 @@ policyRuleReviews:
   auth/require-authz-check:
     status: active-custom
     antidriftRule: antidrift/require-authz-check
-    coverage: Implemented for registry-scoped server boundary globs with handler-local request param reads.
-    reason: Project authz calls are registry facts and no maintained rule knows the local boundary contract.
-    nextAction: Decide middleware dominance and tRPC procedure scope separately before widening.
+    coverage: Implemented but default-off; current handler-local request-param/authz-call matching is inventory, not blocking proof.
+    reason: Project authz calls are registry facts, but absence of a nearby call does not prove the route lacks middleware, wrapper, or framework-owned authorization.
+    nextAction: Replace absence-of-call detection with typed policy-wrapper route registration or a dataflow/dominance proof before enabling.
   errors/preserve-caught-error:
     status: ecosystem-covered
     replacement: preserve-caught-error
@@ -417,17 +417,19 @@ policyRuleReviews:
     reason: Maintained test plugins are preferable to custom assertion counting.
     nextAction: Keep Vitest recommended rules enabled.
   ui/no-raw-tailwind-color:
-    status: active-custom
+    status: retired
     antidriftRule: antidrift/no-raw-tailwind-color
-    coverage: Implemented for JSX class string extraction.
-    reason: The policy is semantic token ownership, not Tailwind validity.
-    nextAction: Classify broad design-system inventory before stable promotion.
+    replacement: none
+    coverage: Retired as a blocking design-system rule; the shipped rule id is a deprecated no-op compatibility stub.
+    reason: The implementation was a tiny regex palette sampler, not proof of project semantic token ownership.
+    nextAction: Reintroduce only with an explicit design-token authority source and real clean/drift corpus evidence.
   ui/no-hover-translate-card:
-    status: active-custom
+    status: retired
     antidriftRule: antidrift/no-hover-translate-card
-    coverage: Implemented for JSX class string extraction.
-    reason: The interaction policy is local design-system guidance, not a generic CSS validity rule.
-    nextAction: Run another UI repo inventory and decide CSS @apply scope.
+    replacement: none
+    coverage: Retired as a blocking design-system rule; the shipped rule id is a deprecated no-op compatibility stub.
+    reason: The implementation sampled hover translate class strings without proving card or pointer-target context.
+    nextAction: Reintroduce only with real interaction-target proof and clean controls for non-card transforms.
   ui/no-generic-ai-copy:
     status: spec-only
     coverage: Not enforced locally.
@@ -481,7 +483,7 @@ policyRuleReviews:
     antidriftRule: antidrift/no-sql-string-concat
     coverage: Implemented for SQL structure built through interpolation or concatenation, layered with sonarjs/sql-queries.
     reason: The local SonarJS benchmark missed real HogQL/template interpolation cases that antidrift reports.
-    nextAction: Stable; continue using benchmark-sql-queries parserServiceDeltas and the source-fleet inventory before widening SQL ecosystem coverage.
+    nextAction: Keep non-blocking until SQL-builder tags and member APIs are proven by symbol/type provenance instead of tag-name heuristics or parked known-gap cases.
   sec/no-unsafe-deserialize:
     status: active-custom
     antidriftRule: antidrift/no-unsafe-deserialize
@@ -711,28 +713,29 @@ rules:
         - "Object.entries(typedMap).map(([id, value]) => value.name)"
     nextAction: Keep as explicit default-off package inventory after the parser-clean sunset sweep; do not promote unless a second real drift repository appears, preferably with unknown-typed broad values not already explained by upstream unsafe-member rules.
   antidrift/no-hover-translate-card:
-    status: ready
+    status: retired
     stable: false
-    signal: AST string literal extraction
-    solveType: design-system-interaction
+    signal: deprecated no-op compatibility stub
+    solveType: retired-regex-class-sampler
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-roadmap.md
     corpusRepositories: [chaski, sudocode-main]
     concerns:
-      - CSS @apply remains outside current JSX scope.
+      - The retired implementation sampled hover translate class strings without proving card or pointer-target context.
+      - Existing corpus entries remain historical inventory examples, not blocking semantic proof.
     external:
       state: config-replacement
       support: high
       candidates: ["ESLint no-restricted-syntax"]
-      decision: own-antidrift
-      whyThisState: "A generated selector could ban hover translate tokens, but the custom extractor handles static class expressions more clearly."
-      whyNotOtherState: "Not ecosystem-covered because the desired policy is design-system interaction guidance, not generic Tailwind validity."
+      decision: retired
+      whyThisState: "The shipped id is retained only as a deprecated no-op compatibility stub because the prior custom extractor was a regex sampler."
+      whyNotOtherState: "Do not treat broad class-token matching as semantic interaction proof without card and pointer-target evidence."
     examples:
       flags:
-        - 'className="card hover:-translate-y-0.5"'
+        - 'retired sampler matched className="card hover:-translate-y-0.5"'
       allows:
-        - 'className="card hover:shadow-md"'
-    nextAction: Stable promotion requires inventory classification across another UI repo.
+        - 'deprecated compatibility stub reports no diagnostics'
+    nextAction: Reintroduce only with real interaction-target proof and clean controls for non-card transforms.
   antidrift/no-inline-structural-type-at-use-site:
     status: ready
     stable: false
@@ -783,15 +786,16 @@ rules:
     nextAction: Seek another real nullable positional tuple and clean tuple-control replication before stable promotion.
   antidrift/no-raw-fetch-in-component:
     status: ready
-    stable: true
-    signal: import-scope plus AST
+    stable: false
+    signal: JSX-return lexical function frame plus AST
     solveType: side-effect-boundary
+    proofBuckets: [local-ast-source-shape]
     promotion:
       proofBucket: local-ast-source-shape
-      association: Component-scope function frames to direct fetch, globalThis.fetch, window.fetch, or self.fetch calls.
-      blockingThreshold: Any raw fetch call inside a component frame reports; raw fetch in non-component helpers stays clean.
-      ecosystemComparison: Generated no-restricted-syntax selectors can ban fetch in broad globs, but do not prove component-boundary context.
-      corpusEvidence: Chaski, Codebase Atlas, Sudocode, and Murderbox provide drift and clean component/helper controls for the fetch-specific boundary.
+      association: JSX-return proof on a component lexical frame to direct fetch, globalThis.fetch, window.fetch, or self.fetch calls inside that frame or nested callbacks/helpers declared in it.
+      blockingThreshold: Raw fetch calls under a JSX-returning lexical component frame report; module-scope helpers and PascalCase-only functions stay clean.
+      ecosystemComparison: Generated no-restricted-syntax selectors can ban fetch in broad globs, but do not prove component lexical-boundary context.
+      corpusEvidence: Chaski, Codebase Atlas, Sudocode, and Murderbox provide historical drift and clean component/helper controls for the fetch-specific boundary.
       realCorpusInventory: docs/rule-investigations/no-raw-fetch-in-component.md and docs/stable-promotion-inventory.md record multi-repo drift and clean controls from Chaski, Codebase Atlas, Sudocode, Murderbox, and Taskme.
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-raw-fetch-in-component.md
@@ -801,55 +805,57 @@ rules:
         - docs/rule-investigations/no-raw-fetch-in-component.md
       replicationsNotIntroducedForTest: true
       knownFalsePositives: 0
-      knownFalseNegatives: 0
-      productionConcerns: none
+      knownFalseNegatives: JSX-free component returns, aliased fetch calls, and module-scope helper calls from components are outside the narrowed enforcement proof.
+      productionConcerns: Narrowed on June 17, 2026 to remove file-extension, PascalCase-only, and JSX-bearing-module helper heuristics.
       noSinkBehavior: This rule emits no semantic facts; diagnostics do not depend on an optional fact sink.
-      noDeadWorkBehavior: Helper-level fetches and hook/query abstractions stay clean, so the rule does not force wrapping already-owned data access.
+      noDeadWorkBehavior: Helper-level fetches, lower-case utilities in TSX modules, and hook/query abstractions stay clean, so the rule does not force wrapping already-owned data access.
     referenceDoc: docs/rule-investigations/no-raw-fetch-in-component.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main, murderbox]
     concerns:
       - Scope decision resolved on June 4, 2026; keep this rule fetch-specific and put broader raw transport ownership in a separate registry-backed rule if real non-fetch drift justifies it.
+      - Enforcement now requires JSX-return proof in the lexical component frame. File extension, PascalCase names, and JSX elsewhere in the module are not component proof.
       - The rule models fetch, globalThis.fetch, window.fetch, and self.fetch. Aliased or destructured fetch is out of scope until real corpus evidence appears.
     external:
       state: config-replacement
       support: high
       candidates: ["ESLint no-restricted-syntax"]
       decision: own-antidrift
-      whyThisState: "A generated selector could ban fetch in broad file globs, but this rule narrows to component context."
-      whyNotOtherState: "Not ecosystem-covered because the replacement would lose the component-boundary ambition and produce cruder reports."
+      whyThisState: "A generated selector could ban fetch in broad file globs, but this rule narrows to JSX-returning lexical component context."
+      whyNotOtherState: "Not ecosystem-covered because the replacement would lose the JSX-returning lexical component-boundary ambition and produce cruder reports."
     examples:
       flags:
-        - 'function Orders() { fetch("/api/orders"); return null; }'
-        - "async function loadImage(url) { return globalThis.fetch(url); }"
+        - 'function Orders() { fetch("/api/orders"); return <div />; }'
+        - 'function Orders() { globalThis.fetch("/api/orders"); return <div />; }'
       allows:
         - 'async function loadOrders() { return fetch("/api/orders"); }'
+        - 'async function downloadQrCode(url) { return fetch(url); } function QrActionCard() { return <button />; }'
         - "function Orders() { const { data } = useOrders(); return <div>{data.length}</div>; }"
-    nextAction: Stable; monitor for real aliased/destructured fetch evidence and keep broader raw transport as a separate future rule.
+    nextAction: Re-inventory real component fetch findings under the narrowed same-frame JSX-return proof before restoring stable status.
   antidrift/no-raw-tailwind-color:
-    status: ready
+    status: retired
     stable: false
-    signal: class-string
-    solveType: design-token-drift
+    signal: deprecated no-op compatibility stub
+    solveType: retired-regex-class-sampler
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-roadmap.md
     corpusRepositories: [chaski]
     concerns:
-      - Broad Chaski inventory has many findings and may need cleanup before wide enforcement.
-      - Current raw-color regex is a source-scanning sampler unless it is tied to the project's actual token surface.
+      - The retired implementation hardcoded a tiny Tailwind palette and did not prove project semantic token ownership.
+      - Existing corpus entries remain historical inventory examples, not blocking semantic proof.
       - Theme/design-system constraints may be a stronger primary control than lint for making raw utilities unconstructable.
     external:
       state: config-replacement
       support: high
       candidates: ["ESLint no-restricted-syntax"]
-      decision: own-antidrift
-      whyThisState: "Generated selectors could ban raw class tokens, but the custom extractor is clearer for JSX class expressions."
-      whyNotOtherState: "Not equivalent to Tailwind correctness plugins because the policy is semantic token ownership, not valid utility syntax."
+      decision: retired
+      whyThisState: "The shipped id is retained only as a deprecated no-op compatibility stub because the prior custom extractor was a regex sampler."
+      whyNotOtherState: "Do not treat broad class-token matching as semantic token proof without an explicit token authority source."
     examples:
       flags:
-        - 'className="text-red-500"'
+        - 'retired sampler matched className="text-red-500"'
       allows:
-        - 'className="text-danger"'
-    nextAction: Decide lint-vs-theme control layer; if lint stays, classify inventory findings and make token coverage explicit.
+        - 'deprecated compatibility stub reports no diagnostics'
+    nextAction: Reintroduce only with an explicit design-token authority source and real clean/drift corpus evidence.
   antidrift/no-redundant-zod-parse:
     status: ready
     stable: true
@@ -897,16 +903,17 @@ rules:
     nextAction: Stable; monitor for first-boundary schema pipelines that need additional clean exclusions.
   antidrift/no-sql-string-concat:
     status: ready
-    stable: true
+    stable: false
     referenceDoc: docs/rule-investigations/no-sql-string-concat.md
     signal: SQL keyword/context AST plus scope-binding guard control-flow plus TypeChecker imported-escaper and configured safe-identifier-member proof
     solveType: injection-boundary
+    proofBuckets: [semantic-source-type-provenance]
     promotion:
       proofBucket: semantic-source-type-provenance
       association: SQL string fragments to bound values, identifier allowlists, escaping helpers, safe members, or unsafe interpolation.
       blockingThreshold: Unsafe value interpolation in SQL context reports; identifier interpolation reports only when the checker cannot prove a bound, allowlisted, escaped, static, or configured-safe source.
       ecosystemComparison: SonarJS and SQL plugins cover nearby SQL construction, but measured benchmarks missed the real HogQL/template interpolation and identifier-proof surface.
-      corpusEvidence: The source-fleet SQL inventory checked 1,375 SQL-candidate files across 24 repos with 31 custom findings, 0 SonarJS findings, 0 parser errors, and no known type-aware false positives.
+      corpusEvidence: The source-fleet SQL inventory checked 1,375 SQL-candidate files across 24 repos with 31 custom findings, 0 SonarJS findings, and 0 parser errors, but SQL-builder/tagged-template clean controls are still parked as known gaps.
       realCorpusInventory: docs/rule-investigations/no-sql-string-concat.md, reports/sql-query-benchmark.json, and reports/sql-broad-inventory-source-fleet.json record production drift, clean controls, and source-fleet coverage.
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-sql-string-concat.md
@@ -917,11 +924,11 @@ rules:
         - reports/claude-rule-review-no-sql-string-concat-20260609-0803-rerun.md
         - docs/rule-investigations/no-sql-string-concat.md
       replicationsNotIntroducedForTest: true
-      knownFalsePositives: 0
+      knownFalsePositives: 5
       knownFalseNegatives: 0
-      productionConcerns: none
+      productionConcerns: Known false positives remain for Cloudflare Durable Object SQL tags, Drizzle SQL builders, and PowerSync db.sql templates because the rule no longer trusts tag/member names and does not yet prove SQL-builder binding semantics by symbol/type provenance.
       noSinkBehavior: This rule emits no semantic facts; benchmark and inventory tooling read diagnostics and parser-service deltas directly.
-      noDeadWorkBehavior: Parameterized tags, placeholder lists, static fragments, typed unions, regex exit guards, and quote-doubling escapers stay clean.
+      noDeadWorkBehavior: Bound query APIs, placeholder lists, static fragments, typed unions, regex exit guards, and quote-doubling escapers stay clean.
     corpusRepositories:
       [
         chaski,
@@ -933,33 +940,32 @@ rules:
       ]
     proven:
       - "Production drift evidence exists in Chaski HogQL/template interpolation and PowerSync service raw `sourceTable.table` interpolation."
-      - "Bound-value SQL stays clean for positional placeholder lists, parameterized `sql`/`sqlQuery`/`sqlRun` tags, ORM-owned SQL composition, and numbered Postgres placeholder fragments that interpolate only index plus/multiply arithmetic after `$` while values remain in bound params."
+      - "Bound-value SQL stays clean for positional placeholder lists, direct bound-parameter query APIs, and numbered Postgres placeholder fragments that interpolate only index plus/multiply arithmetic after `$` while values remain in bound params."
       - "Static SQL fragments stay clean for literal fragment arrays, finite static object fragment maps, and static condition fragments joined into SET/WHERE shapes."
       - "Closed SQL identifiers stay clean when proven by typed service-boundary unions, static object-literal column maps, anchored regex guards that definitely exit on failure, local quote-doubling escapers, imported quote-doubling escapers, or configured safe identifier members with parser services."
       - "Dynamic object-key column lists and non-allowlisted table names are intentional drift findings."
-      - "The source-fleet inventory checked 1,375 SQL-candidate files across 24 primary repositories with 31 custom findings, 0 SonarJS findings, 0 parser errors, and no known type-aware false positives after the numbered-placeholder and Figma payload fixes."
+      - "The source-fleet inventory checked 1,375 SQL-candidate files across 24 primary repositories with 31 custom findings, 0 SonarJS findings, and 0 parser errors, but SQL-builder/tagged-template clean controls are still known gaps after removing name-based tag trust."
       - "The June 9 adversarial cleanup restored short-circuit safety checks and keeps numbered-placeholder proof limited to the real observed plus/multiply arithmetic shape; subtraction and arbitrary arithmetic are not accepted."
     concerns:
       - The benchmark on 338 real files reports 16 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal.
       - Dynamic placeholder lists such as `ids.map(() => "?").join(",")`, and numbered Postgres placeholder fragments that interpolate only index plus/multiply arithmetic after `$`, are accepted clean because values remain bound parameters.
       - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
-      - Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are accepted clean because the tag owns value binding.
-      - Opencode Drizzle-style `sql` tags and `sql.identifier(...)` usage are accepted clean as ORM-owned SQL composition.
+      - SQL template tag names such as `sql`, `sqlQuery`, `sqlRun`, or arbitrary `.sql` members are not accepted clean by name; interpolated SQL templates must be proven safe through the rule's existing fragment, identifier, placeholder, or escaper mechanisms.
       - Closed SQL identifier fragments from typed service-boundary unions and static object-literal column maps are accepted only in SQL identifier/direction positions.
       - Dynamic object-key column lists and non-allowlisted table names are intentional drift findings.
       - Constructor-validated dynamic SQL identifiers are accepted only when an anchored identifier regex guard definitely exits on failure, the derived identifier template remains identifier-shaped, and interpolation is in an SQL identifier position.
       - Opencode stats local `sqlIdentifier` / `sqlString` quote-doubling helpers are accepted only when the helper body proves matching quote escaping; local SQL-fragment builders are accepted only for single-template bodies with unquoted identifier parameters and identifier-safe call-site arguments.
       - Finite static object fragments such as Opencode `dimensionSql.select` / `dimensionSql.groupBy` are accepted only when all returned object branches expose safe SQL fragment properties.
-      - Current stable production drift evidence is Chaski plus PowerSync service. Sudocode, Cloudflare, and PowerSync tests add useful but lower-strength pressure because those findings are in test helpers, demo/playground code, or integration tests.
+      - Current production drift evidence is Chaski plus PowerSync service. Sudocode, Cloudflare, and PowerSync tests add useful but lower-strength pressure because those findings are in test helpers, demo/playground code, or integration tests.
       - "PowerSync service supplies the guard/escaper lower edge: `sourceTable.table` still reports when a neighboring escaped table-name helper exists. The imported `escapeMysqlTableName(table)` call stays clean through a TypeScript symbol-to-declaration proof of quote-doubled identifier escaping, Postgres `SourceTable.escapedIdentifier` stays clean only through an explicit type/member contract that requires parser services to prove the receiver type, and numbered Postgres placeholder fragments stay clean through local structure."
       - "The June 9, 2026 advisory review found the PowerSync imported-escaper proof sound and the rule locally ready, but not stable until parser-service policy was decided. That policy is now codified: extra-only non-type-aware identifier reports are conservative inventory, while missing non-type-aware findings or parser errors block promotion."
-      - The source-fleet SQL inventory across 24 primary repos is now classified with zero known type-aware false positives after the numbered-placeholder and Figma payload fixes. Worktrees, remediation copies, baseline copies, scratch folders, `.sst`, and `.open-next` artifacts do not count as promotion evidence.
-      - "The SQL benchmark now inventories promotion boundaries: 202 SQL tagged-template uses are all in the currently allowed `sql`/`sqlQuery`/`sqlRun` shape, while Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags still need real-code inventory before widening the allowlist."
+      - The source-fleet SQL inventory across 24 primary repos still has known SQL-builder/tagged-template clean-control gaps after removing name-based tag trust. Worktrees, remediation copies, baseline copies, scratch folders, `.sst`, and `.open-next` artifacts do not count as promotion evidence.
+      - "The SQL benchmark tagged-template inventory is a widening boundary, not an allowlist: Prisma `$queryRaw`, Kysely, Slonik, Drizzle, and aliases need real symbol/type proof before any tag-specific clean path is added."
       - Equivalent positive guard, allowlist, and regex-variant identifier sanitizers remain monitored expansion boundaries; the current benchmark finds the supported negative regex/exit shape plus one quantifier branch that stays clean.
       - The current concatenation branch does not cover SQL-builder `+=`; the benchmark sees 37 static builder appends and 8 dynamic builder append candidates. The dynamic candidates are currently classified clean, so do not widen builder-append linting until a real unsafe dynamic append appears.
       - The widened sentence-pattern trigger catches long unsafe Chaski templates at lines 626, 650, 1111, and 1367 that the old 200-character `SELECT ... FROM` window missed, while Cloudflare and Opencode SQL controls stay clean.
       - "The benchmark directly measures the non-type-aware boundary through `parserServiceDeltas`: without parser services, PowerSync `modules/module-mysql/src/replication/BinLogStream.ts:311`, `modules/module-postgres/src/replication/replication-utils.ts:290`, and `modules/module-postgres/src/replication/WalStream.ts:437` become conservative reports, with zero missing non-type-aware findings."
-      - "The reproducible source-fleet SQL inventory command checked 1,375 SQL-candidate files across 24 primary repos with 31 custom findings and 0 SonarJS findings; the run is classified as 1 production drift, 3 parser-services-only conservative reports, 27 lower-strength demo/test drift findings, and 0 known type-aware false positives."
+      - "The reproducible source-fleet SQL inventory command checked 1,375 SQL-candidate files across 24 primary repos with 31 custom findings and 0 SonarJS findings; the run still parks SQL-builder/tagged-template clean controls until symbol/type provenance can prove the binding API."
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
       - Figma JavaScript payload strings are clean when words like "select" and "from" appear outside SQL syntax; operator-position interpolation now requires nearby SQL statement context.
     external:
@@ -972,17 +978,17 @@ rules:
     examples:
       flags:
         - "const sql = `SELECT * FROM users WHERE id = ${id}`;"
+        - "function sql(strings, ...values) { return String.raw({ raw: strings }, ...values); } sql`SELECT * FROM users WHERE id = ${id}`;"
         - 'const setClause = Object.keys(updates).map((field) => `${field} = ?`).join(", "); db.prepare(`UPDATE executions SET ${setClause} WHERE id = ?`);'
         - "setQuery(`SELECT * FROM ${tableName} LIMIT 10`);"
       allows:
         - 'db.query("SELECT * FROM users WHERE id = ?", [id]);'
         - 'const placeholders = ids.map(() => "?").join(","); db.prepare(`SELECT id FROM issues WHERE id IN (${placeholders})`).all(...ids);'
-        - "await this.sqlRun`UPDATE files SET modified_at = ${timestamp} WHERE path = ${path}`;"
         - 'const sortBy = options.sortBy ?? "created_at"; db.prepare(`SELECT * FROM executions ORDER BY ${sortBy}`);'
         - 'if (!VALID_NAMESPACE.test(ns)) throw new Error("bad namespace"); this.tableName = `cf_workspace_${ns}`; this.sql.run(`SELECT * FROM ${this.tableName}`);'
         - 'const table = [catalog, database, name].map(sqlIdentifier).join("."); db.prepare(`SELECT * FROM ${table}`);'
         - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
-    nextAction: Stable; keep benchmark-sql-queries and inventory-sql-source-fleet as regression gates before widening SQL tag, guard, placeholder arithmetic, or builder-append coverage.
+    nextAction: Keep as non-blocking warning/inventory until SQL-builder tag and member APIs are proven by symbol/type provenance or delegated to a dataflow/taint engine.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
@@ -1018,9 +1024,9 @@ rules:
       - The unconfigured all-node_modules sweep is analytics/inventory for discovering possible owners, not a distributable hard gate by itself.
       - Installed package fork blocking now requires accepted package-owner facts from policy/registries/ownership.yaml, preferably proposed from existing imports, owner-type derivations, SDK return provenance, generated wrappers, or repeated structural forks.
       - Generated-source matching is registry-gated and should stay off when no generated source is declared.
-      - Boundary DTOs may intentionally overlap generated types and need real clean controls before broad enablement.
+      - Boundary DTOs may intentionally overlap generated types and stay clean unless they exactly redeclare the owner shape.
       - Installed-package exported object types are not always contracts the consuming app was expected to import, so that mode has a weaker owner-authority claim than generated/domain registry modes.
-      - "Subset matching raises a boundary DTO question: projected DTOs with four or more owner fields may be legitimate translation contracts."
+      - "Subset matching was removed from enforcement because projected DTOs with four or more owner fields may be legitimate translation contracts."
     external:
       state: net-antidrift
       support: none
@@ -1033,7 +1039,7 @@ rules:
         - "type AuthUser = { uid: string; email: string | null; displayName: string | null; photoURL: string | null; providerId: string; phoneNumber: string | null; };"
       allows:
         - 'import type { User } from "firebase/auth";'
-    nextAction: Keep generated and accepted package-owner modes blocking; use unconfigured installed-package matches as analytics that proposes package-owner facts before enforcement, and seek independent generated-source replication.
+    nextAction: Keep exact generated and accepted package-owner copies blocking; use unconfigured installed-package matches as analytics that proposes package-owner facts before enforcement, and seek independent generated-source replication.
   antidrift/no-canonical-model-fork:
     status: ready
     stable: false
@@ -1184,15 +1190,16 @@ rules:
         - "const parsed = schema.parse(JSON.parse(text));"
     nextAction: Stable; monitor for real aliased JSON.parse calls or helper-based string guards before widening.
   antidrift/require-authz-check:
-    status: ready
+    status: under-proven
     stable: false
-    signal: AST control-flow plus registry
+    signal: handler-local request-param shape plus configured callee names
     solveType: authorization-boundary
-    proofBuckets: [graph-config-source]
+    proofBuckets: [local-ast-source-shape, graph-config-source]
     referenceDoc: docs/rule-roadmap.md
     corpusRepositories: [chaski, sudocode-main]
     concerns:
-      - Current rule is Express-style and does not prove tRPC procedure coverage.
+      - Current rule is Express-style and does not prove tRPC procedure coverage, framework route ownership, or middleware dominance.
+      - The implementation recognizes configured callee names and request-param roots; it does not prove that authorization dominates the resource access.
       - Absence-of-call detection is fragile when authentication or authorization is provided by middleware, higher-order handlers, or framework wrappers.
       - A typed policy-wrapper registration pattern may be a stronger construction rule than scanning handlers for nearby authz calls.
     external:
@@ -1207,7 +1214,7 @@ rules:
         - 'app.get("/users/:id", (req) => read(req.params.id));'
       allows:
         - 'app.get("/users/:id", (req) => { requireUser(req); read(req.params.id); });'
-    nextAction: Decide whether typed policy-wrapper route registration should replace absence-of-call detection before widening framework scope.
+    nextAction: Keep default-off until typed policy-wrapper route registration or a dataflow/dominance proof replaces absence-of-call detection.
   antidrift/require-effect-deps:
     status: ready
     stable: true
@@ -1295,7 +1302,7 @@ retiredRules:
     reason: Replaced by maintained @typescript-eslint/no-unsafe-type-assertion coverage for double-cast tunnels; no-appeasement-cast owns the narrower source-boundary authority policy.
   antidrift/no-status-triplet-state:
     status: retired
-    reason: Retired after the provable resource-lifecycle subset moved into antidrift/no-handrolled-resource-lifecycle-cells through behavior-based React state graph proof; standalone configurable name groups are inventory, not enforcement.
+    reason: Retired after the provable resource-lifecycle subset moved into antidrift/no-handrolled-resource-lifecycle-cells through semantic AST React state graph proof; standalone configurable name groups are inventory, not enforcement.
     referenceDoc: docs/rule-investigations/no-status-triplet-state.md
 
 researchCandidates:
@@ -1367,95 +1374,3 @@ researchCandidates:
     solveType: declaration-clone-spine
     referenceDoc: docs/rule-investigations/declaration-clone-inventory.md
     nextAction: Keep inventory-only; use policy:inventory-declaration-clone-source-fleet to gather duplicate object contract evidence and classify generated-only, mixed generated/source, and source-only groups before any promoted rule or lint enforcement.
-
-decisionLocks:
-  antidrift/no-cycle:
-    status: retired
-    location: retiredRules
-    replacement: import-x/no-cycle
-    reason: Maintained import-graph coverage owns cycle detection; do not rebuild custom graph traversal without changing the checker lock.
-  antidrift/no-inline-disable-without-ticket:
-    status: retired
-    location: retiredRules
-    replacement: "@eslint-community/eslint-comments/require-description plus @typescript-eslint/ban-ts-comment"
-    reason: Maintained directive-description rules own local disable justification; do not revive ticket-string matching.
-  antidrift/no-sdk-direct-use:
-    status: retired
-    location: retiredRules
-    replacement: generated no-restricted-imports from policy/registries/gateways.yaml
-    reason: Core ESLint restrictions plus gateway registry facts own direct SDK import blocking.
-  antidrift/no-explicit-return-type-private-helper:
-    status: retired
-    location: retiredRules
-    replacement: none
-    reason: Real corpus review showed private helper return annotations are often legitimate contracts, not deterministic appeasement.
-  antidrift/no-silent-catch:
-    status: retired
-    location: retiredRules
-    replacement: "ESLint no-empty, no-console, sonarjs/no-ignored-exceptions, preserve-caught-error"
-    reason: Maintained rules cover enough low-value catch handling; future custom error work should target fallback-to-empty.
-  antidrift/no-thin-typed-factory-wrapper:
-    status: retired
-    location: retiredRules
-    replacement: none
-    reason: No real non-test exact-forward internal drift was found, while broad factory-wrapper variants false-positive on clean constructors and facades.
-  antidrift/no-obvious-comment:
-    status: retired
-    location: retiredRules
-    replacement: "ESLint no-warning-comments for tagged warning comments"
-    reason: Comment-restatement detection is heuristic review guidance, not a deterministic custom lint rule.
-  antidrift/no-role-literal-in-type:
-    status: retired
-    location: retiredRules
-    replacement: domain/no-canonical-model-fork
-    reason: Role literals are too generic without a stronger model-fork context.
-  antidrift/no-cast-to-branded:
-    status: retired
-    location: retiredRules
-    replacement: "@typescript-eslint/no-unsafe-type-assertion"
-    reason: The package-specific brand marker had no real adoption or forgery evidence.
-  antidrift/no-unsafe-cast-chain:
-    status: retired
-    location: retiredRules
-    replacement: "@typescript-eslint/no-unsafe-type-assertion"
-    reason: Maintained unsafe assertion coverage owns double-cast tunnels.
-  antidrift/no-status-triplet-state:
-    status: retired
-    location: retiredRules
-    replacement: antidrift/no-handrolled-resource-lifecycle-cells
-    reason: Names can seed resource-state inventory, but deterministic lifecycle enforcement lives in no-handrolled-resource-lifecycle-cells.
-  ecosystem/discriminated-union-exhaustiveness:
-    status: ecosystem-covered
-    location: researchCandidates
-    replacement: "@typescript-eslint/switch-exhaustiveness-check and related type-aware rules"
-    reason: Discriminated-union handling is ecosystem-covered until real code proves a gap those rules cannot express.
-  ecosystem/import-cycle:
-    status: ecosystem-covered
-    location: researchCandidates
-    replacement: import-x/no-cycle
-    reason: Keep custom cycle traversal retired unless maintained import-graph coverage becomes unusable.
-  ecosystem/disable-comment-description:
-    status: ecosystem-covered
-    location: researchCandidates
-    replacement: "@eslint-community/eslint-comments/require-description plus @typescript-eslint/ban-ts-comment"
-    reason: Disable-comment descriptions are maintained ecosystem scope.
-  ecosystem/gateway-restricted-imports:
-    status: ecosystem-covered
-    location: researchCandidates
-    replacement: generated no-restricted-imports
-    reason: Gateway import boundaries are expressible through generated core ESLint config.
-  ecosystem/vitest-test-integrity:
-    status: ecosystem-covered
-    location: researchCandidates
-    replacement: "@vitest/eslint-plugin"
-    reason: Vitest-focused test integrity is maintained plugin scope.
-  ecosystem/react-hooks-compiler:
-    status: ecosystem-covered
-    location: researchCandidates
-    replacement: eslint-plugin-react-hooks recommended-latest
-    reason: React compiler-era hook rules are maintained React plugin scope.
-  ecosystem/sonar-sql-queries:
-    status: ecosystem-covered
-    location: researchCandidates
-    replacement: sonarjs/sql-queries
-    reason: SonarJS SQL coverage stays tracked as ecosystem coverage even though antidrift keeps its narrower HogQL/template interpolation rule.

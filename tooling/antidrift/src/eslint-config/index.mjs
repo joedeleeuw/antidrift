@@ -434,8 +434,8 @@ export function createConfig({
         "antidrift/no-handrolled-resource-lifecycle-cells": "off",
         "antidrift/no-shattered-ingested-entity-state": "off",
         "antidrift/require-effect-deps": "error",
-        "antidrift/no-raw-tailwind-color": "error",
-        "antidrift/no-hover-translate-card": "error",
+        "antidrift/no-raw-tailwind-color": "off",
+        "antidrift/no-hover-translate-card": "off",
         "antidrift/no-raw-fetch-in-component": "error",
         "antidrift/no-async-array-method": "error",
 
@@ -457,7 +457,7 @@ export function createConfig({
 
         // Data-lifecycle security rules. Secret scanning is delegated to a maintained
         // scanner in consumer CI; variable-name heuristics in lint rules overreport.
-        "antidrift/no-sql-string-concat": "error",
+        "antidrift/no-sql-string-concat": "warn",
         "antidrift/no-unsafe-deserialize": "error",
 
         // Registry-driven rules: options are loaded from policy registries at config-construction time.
@@ -487,22 +487,13 @@ export function createConfig({
       },
     },
     {
-      // require-authz-check: scoped to server boundaries declared in the boundaries registry.
+      // require-authz-check stays default-off until authz dominance is proven by construction.
       files: [
         "packages/*/src/routes/**/*.{ts,tsx}",
         "packages/*/src/actions/**/*.{ts,tsx}",
       ],
       rules: {
-        "antidrift/require-authz-check": [
-          "error",
-          {
-            authzFunctions: [
-              ...(registries.boundaries?.requiredCalls?.authentication ?? []),
-              ...(registries.boundaries?.requiredCalls?.authorization ?? []),
-              ...(registries.boundaries?.requiredCalls?.tenancy ?? []),
-            ],
-          },
-        ],
+        "antidrift/require-authz-check": "off",
       },
     },
     ...gatewayWrapperOverrides(registries, generatedPatterns),

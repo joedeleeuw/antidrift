@@ -69,8 +69,8 @@ categories:
 
 # Per-rule labeling. current is semantic-ast for every active rule today (we have no other static bucket).
 rules:
-  antidrift/require-authz-check:                    { current: semantic-ast, fit: proven,         target: dataflow-taint, note: "authz-reachability; the graph-config proof works, but reachability is a flow property — taint is the provable ideal." }
-  antidrift/no-sql-string-concat:                   { current: semantic-ast, fit: approximation,  target: dataflow-taint, note: "SQL injection is a taint property; the ~800-line single-file escaper-reachability is a stable hand-rolled approximation of what a flow engine does for free." }
+  antidrift/require-authz-check:                    { current: semantic-ast, fit: under-proven,   target: dataflow-taint, note: "handler-local params plus configured callee names are inventory; authz dominance/reachability is a flow property, so blocking needs typed route construction or delegated taint/dominance proof." }
+  antidrift/no-sql-string-concat:                   { current: semantic-ast, fit: approximation,  target: dataflow-taint, note: "SQL injection is a taint property; the ~800-line single-file escaper-reachability remains a useful warning/inventory approximation, but SQL-builder APIs need symbol/type provenance or delegated taint before blocking." }
   antidrift/no-unsafe-deserialize:                  { current: semantic-ast, fit: approximation,  target: dataflow-taint, note: "deserialization safety is input-provenance; taint is the ideal. Stable as an approximation." }
   antidrift/no-canonical-model-fork:                { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "authority-index whole-program type resolution; correctly placed for DECLARED owners. (Discovering NEW duplicate owners needs dependency-graph — see gaps.net-new-bias.)" }
   antidrift/no-structural-type-fork:                { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "authority-index; correctly placed for declared owners." }
@@ -82,9 +82,9 @@ rules:
   antidrift/no-nullable-positional-tuple:           { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "type-contract-shape; AST + TypeChecker." }
   antidrift/no-async-array-method:                  { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "promise-control-flow; local AST + collection flow." }
   antidrift/require-effect-deps:                    { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "react-effect-lifecycle. Stable." }
-  antidrift/no-raw-fetch-in-component:              { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "side-effect-boundary; import-scope + AST. Stable." }
-  antidrift/no-hover-translate-card:                { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "design-system-interaction; local AST." }
-  antidrift/no-raw-tailwind-color:                  { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "design-token-drift; local AST." }
+  antidrift/no-raw-fetch-in-component:              { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "narrowed to direct fetch in JSX-returning lexical component frames; ready for inventory, but stable promotion waits on re-inventory after removing file/PascalCase/module-helper heuristics." }
+  antidrift/no-hover-translate-card:                { current: semantic-ast, fit: inventory-only, target: semantic-ast,   note: "retired deprecated no-op; former class-string sampler did not prove card or pointer-target context." }
+  antidrift/no-raw-tailwind-color:                  { current: semantic-ast, fit: inventory-only, target: semantic-ast,   note: "retired deprecated no-op; former class-token sampler did not prove semantic token authority." }
   antidrift/no-defensive-shape-probing:             { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "broad-value-shape-probing; type-provenance is the right bucket, just not yet proven." }
   antidrift/no-underchecked-type-predicate:         { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "type-guard-laundering; TypeChecker predicate-coverage is the right bucket, not yet proven." }
   antidrift/no-handrolled-resource-lifecycle-cells: { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "fixed proof now catches Chaski/Sudocode/Cloudflare lifecycle diagnostics while keeping broad co-mutation inventory-only; still needs human review and clean-control pressure before default enablement." }

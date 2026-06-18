@@ -33,6 +33,39 @@ export interface ReactStateTracker {
   visitors: Record<string, (node: unknown) => void>;
 }
 
+export interface ReactStateScope {
+  set: { get(name: string): unknown };
+  upper?: ReactStateScope | null;
+}
+
+export interface ReactStateSourceCode {
+  getScope(node: unknown): ReactStateScope;
+  getDeclaredVariables(node: unknown): readonly { name: string }[];
+}
+
+export type ReactStateTrackerContext =
+  | {
+      sourceCode: ReactStateSourceCode;
+      getSourceCode?: () => ReactStateSourceCode;
+    }
+  | {
+      sourceCode?: ReactStateSourceCode;
+      getSourceCode: () => ReactStateSourceCode;
+    };
+
+export type ReactStateTrackerOptions = {
+  onFrameExit?: (frame: ReactStateFrame) => void;
+} & (
+  | {
+      context: ReactStateTrackerContext;
+      sourceCode?: ReactStateSourceCode;
+    }
+  | {
+      context?: ReactStateTrackerContext;
+      sourceCode: ReactStateSourceCode;
+    }
+);
+
 export interface ReactStateCellPayload {
   cell: string | null;
   writes: ReactStateWriteClass[];
@@ -83,9 +116,9 @@ export function classifyWriteValue(
   context: ReactStateWriteContext,
 ): ReactStateWriteClass | null;
 
-export function createReactStateTracker(options?: {
-  onFrameExit?: (frame: ReactStateFrame) => void;
-}): ReactStateTracker;
+export function createReactStateTracker(
+  options: ReactStateTrackerOptions,
+): ReactStateTracker;
 
 export function lifecycleProof(
   frame: ReactStateFrame,

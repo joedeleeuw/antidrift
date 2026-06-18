@@ -6,7 +6,7 @@ Retired and locked.
 
 The former detector used React-specific configurable `useState` name groups for data/result/user/items, loading/pending, and error/failure. It reported when one function owned at least one state cell from each group. That was an inventory signal, not proof.
 
-The provable subset now lives in `antidrift/no-handrolled-resource-lifecycle-cells`, backed by the React state graph adapter and behavior-classified lifecycle writes.
+The provable subset now lives in `antidrift/no-handrolled-resource-lifecycle-cells`, backed by the React state graph adapter and semantic AST classification of lifecycle writes.
 
 ## Problem To Preserve
 
@@ -34,7 +34,7 @@ The replacement is the narrower React split-resource-lifecycle branch in `no-han
 
 1. multiple local state cells in one component/hook;
 2. async/resource boundary evidence in the same scope;
-3. behavior-classified setter coupling in the same effect, handler, or lifecycle branch;
+3. semantic setter-transition coupling in the same effect, handler, or lifecycle branch;
 4. evidence that at least one lifecycle cell is derivable from the resource state or transition;
 5. a clean replacement path to one resource value, reducer, query state, or discriminated union.
 

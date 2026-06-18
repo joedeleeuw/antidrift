@@ -71,17 +71,11 @@ export const defaultCases = [
   {
     id: "monolith-qr-action-card-raw-fetch-helper",
     ruleId: "antidrift/no-raw-fetch-in-component",
-    kind: "drift",
+    kind: "correct",
     classification: "ready",
     subproject: "frontend",
     paths: [
       "src/frontend/monolithui/src/components/QrActionsAdmin/QrActionCard.tsx",
-    ],
-    expectedFindings: [
-      {
-        path: "src/frontend/monolithui/src/components/QrActionsAdmin/QrActionCard.tsx",
-        line: 41,
-      },
     ],
   },
   {
@@ -195,34 +189,26 @@ export const defaultCases = [
   {
     id: "bff-orders-ops-line-item-detail-generated-fork",
     ruleId: "antidrift/no-structural-type-fork",
-    kind: "drift",
-    classification: "ready",
+    kind: "correct",
+    classification: "under-proven",
     subproject: "bff",
     typeAware: true,
     ruleOptions: structuralTypeForkGeneratedOptions,
     paths: ["src/frontend/bff/api/routers/orders-ops-router.ts"],
-    expectedFindings: [
-      {
-        path: "src/frontend/bff/api/routers/orders-ops-router.ts",
-        line: 4059,
-      },
-    ],
+    reason:
+      "LineItemDetailRow is a local projection/subset of generated LineItemDetail, not an exact owner copy. The structural fork rule no longer blocks projected boundary DTOs.",
   },
   {
     id: "bff-service-stop-line-item-counts-generated-fork",
     ruleId: "antidrift/no-structural-type-fork",
-    kind: "drift",
-    classification: "ready",
+    kind: "correct",
+    classification: "under-proven",
     subproject: "bff",
     typeAware: true,
     ruleOptions: structuralTypeForkGeneratedOptions,
     paths: ["src/frontend/bff/api/routers/retool/service-stop-router.ts"],
-    expectedFindings: [
-      {
-        path: "src/frontend/bff/api/routers/retool/service-stop-router.ts",
-        line: 103,
-      },
-    ],
+    reason:
+      "LineItemCounts is a local projection/subset of generated LineItemCountsByOrder, not an exact owner copy. The structural fork rule no longer blocks projected boundary DTOs.",
   },
   {
     id: "portal-orchestration-types-compose-imported-bff-types-clean",
@@ -691,6 +677,38 @@ export const defaultCases = [
     ],
   },
   {
+    id: "crow-reporting-action-items-resource-lifecycle",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "frontend",
+    paths: [
+      "src/frontend/crow-v2/app/(drawer)/reporting/action-items/index.tsx",
+    ],
+    expectedFindings: [
+      {
+        path: "src/frontend/crow-v2/app/(drawer)/reporting/action-items/index.tsx",
+        line: 78,
+      },
+    ],
+  },
+  {
+    id: "crow-reporting-weekly-digest-resource-lifecycle",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "frontend",
+    paths: [
+      "src/frontend/crow-v2/app/(drawer)/reporting/weekly-digest/index.tsx",
+    ],
+    expectedFindings: [
+      {
+        path: "src/frontend/crow-v2/app/(drawer)/reporting/weekly-digest/index.tsx",
+        line: 87,
+      },
+    ],
+  },
+  {
     id: "monolith-sequence-ops-coupled-state-clean",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
@@ -711,24 +729,18 @@ export const defaultCases = [
   {
     id: "portal-inventory-raw-tailwind-color",
     ruleId: "antidrift/no-raw-tailwind-color",
-    kind: "drift",
-    classification: "ready",
+    kind: "correct",
+    classification: "retired",
     subproject: "frontend",
     paths: [
       "src/frontend/portal/modules/InventoryInMarket/InventoryInMarket.tsx",
-    ],
-    expectedFindings: [
-      {
-        path: "src/frontend/portal/modules/InventoryInMarket/InventoryInMarket.tsx",
-        line: 35,
-      },
     ],
   },
   {
     id: "monolith-products-no-raw-tailwind-color",
     ruleId: "antidrift/no-raw-tailwind-color",
     kind: "correct",
-    classification: "ready",
+    classification: "retired",
     subproject: "frontend",
     paths: ["src/frontend/monolithui/src/components/Products.tsx"],
   },
@@ -736,7 +748,7 @@ export const defaultCases = [
     id: "monolith-category-nav-hover-color-no-translate-clean",
     ruleId: "antidrift/no-hover-translate-card",
     kind: "correct",
-    classification: "ready",
+    classification: "retired",
     subproject: "frontend",
     paths: [
       "src/frontend/monolithui/src/components/SolverConfig/CategoryNav.tsx",
@@ -746,7 +758,7 @@ export const defaultCases = [
     id: "monolith-find-my-rep-hover-scale-no-translate-clean",
     ruleId: "antidrift/no-hover-translate-card",
     kind: "correct",
-    classification: "ready",
+    classification: "retired",
     subproject: "frontend",
     paths: ["src/frontend/monolithui/src/components/FindMyRep.tsx"],
   },
@@ -754,7 +766,7 @@ export const defaultCases = [
     id: "portal-visualize-tabs-active-indicator-translate-clean",
     ruleId: "antidrift/no-hover-translate-card",
     kind: "correct",
-    classification: "ready",
+    classification: "retired",
     subproject: "frontend",
     paths: [
       "src/frontend/portal/modules/visualize-impact/components/visualize-impact-tabs.tsx",

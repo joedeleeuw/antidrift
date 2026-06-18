@@ -4,7 +4,7 @@
 
 Disallow SQL strings assembled with interpolated values or concatenated values.
 
-This is an injection-boundary rule, not a general "SQL keyword" scanner. Static SQL and bound parameters are allowed. Dynamic placeholder lists such as `ids.map(() => "?").join(",")`, and numbered Postgres placeholder fragments that interpolate only index plus/multiply arithmetic after `$`, are allowed because values remain separately bound to the database driver. Locally built arrays of static SQL fragments may be joined into `SET` / `WHERE` clauses; arbitrary dynamic fragments still report. Parameterized SQL template tags such as `sql`, `sqlQuery`, and `sqlRun` are treated as SQL binding APIs rather than raw string interpolation. Closed SQL identifier fragments are allowed only when the rule can prove the token set from local structure, such as a typed service-boundary union, a static object-literal column map, an anchored identifier regex guard that definitely exits on failure before deriving an identifier-shaped template, or a local quote-doubling SQL identifier escaper. Local SQL-fragment builder helpers are accepted only when their body is a single safe template, parameter interpolations are unquoted identifier positions, call-site arguments are identifier-safe, and dynamic value fragments pass through a proven string escaper. A template literal reports only when the unsafe interpolation itself is in SQL syntax; SQL-looking sample text elsewhere in the same template does not make unrelated interpolations a SQL sink.
+This is an injection-boundary rule, not a general "SQL keyword" scanner. Static SQL and bound parameters are allowed. Dynamic placeholder lists such as `ids.map(() => "?").join(",")`, and numbered Postgres placeholder fragments that interpolate only index plus/multiply arithmetic after `$`, are allowed because values remain separately bound to the database driver. Locally built arrays of static SQL fragments may be joined into `SET` / `WHERE` clauses; arbitrary dynamic fragments still report. SQL template tags and `.sql` member APIs are no longer trusted by name; Drizzle, Cloudflare Durable Object SQL, PowerSync `db.sql`, Prisma, Kysely, Slonik, and aliases need symbol/type provenance that proves the binding API before they can be clean. Closed SQL identifier fragments are allowed only when the rule can prove the token set from local structure, such as a typed service-boundary union, a static object-literal column map, an anchored identifier regex guard that definitely exits on failure before deriving an identifier-shaped template, or a local quote-doubling SQL identifier escaper. Local SQL-fragment builder helpers are accepted only when their body is a single safe template, parameter interpolations are unquoted identifier positions, call-site arguments are identifier-safe, and dynamic value fragments pass through a proven string escaper. A template literal reports only when the unsafe interpolation itself is in SQL syntax; SQL-looking sample text elsewhere in the same template does not make unrelated interpolations a SQL sink.
 
 ## Should Flag
 
@@ -66,14 +66,6 @@ db.prepare(`UPDATE workflows SET ${setClauses.join(", ")} WHERE id = ?`).run(
 ```
 
 Why: the interpolated SQL text is assembled only from static fragments, and all values remain bound parameters.
-
-```ts
-await this.sqlRun`
-  UPDATE files SET modified_at = ${timestamp} WHERE path = ${path}
-`;
-```
-
-Why: the template is passed to a parameterized SQL tag; the interpolation is API-level value binding, not raw string construction.
 
 ```ts
 async function listExecutions(options: {
@@ -154,7 +146,7 @@ Why: the SQL-looking text is sample payload data; the interpolation is not part 
 
 `sonarjs/sql-queries` is active as adjacent maintained coverage, but Sonar documents that rule as a security-sensitive formatted-query hotspot, not SQL injection detection. The local benchmark currently reports 0 SonarJS findings against this rule's 12 real-corpus findings, so it is not a replacement for the HogQL/template interpolation signal.
 
-SQL tag ecosystems are relevant clean controls, not drift. Prisma documents `$queryRaw` and `$executeRaw` as tagged templates that parameterize values, while warning that identifiers such as table names and column names cannot be passed through placeholders. Drizzle documents its `sql` template as parameterized and identifier-aware through table/column objects and helpers such as `sql.identifier(...)`. That matches this rule's shape: treat known SQL tags as owned binding APIs, and keep raw string interpolation suspicious unless the identifier token set is locally closed.
+SQL tag ecosystems are relevant clean controls, not drift. Prisma documents `$queryRaw` and `$executeRaw` as tagged templates that parameterize values, while warning that identifiers such as table names and column names cannot be passed through placeholders. Drizzle documents its `sql` template as parameterized and identifier-aware through table/column objects and helpers such as `sql.identifier(...)`. That matches this rule's target shape, but the current implementation no longer treats tag names as proof. A clean path for these APIs must be symbol/type-backed or delegated to a SQL-aware dataflow tool.
 
 External references checked during the June 9, 2026 review:
 
@@ -183,27 +175,27 @@ Clean:
 - `/Users/sushi/code/sudocode-main/cli/src/operations/tags.ts`, `cli/src/operations/relationships.ts`, and `cli/src/id-generator.ts` stay clean for entity-table tokens selected from an `EntityType` union.
 - `/Users/sushi/code/cloudflare-agents/packages/ai-chat/e2e/chat.spec.ts` line 1571 stays clean because the template serializes a browser test payload; the interpolation is a tool output string, not SQL assembly.
 - `/Users/sushi/code/cloudflare-agents/packages/shell/src/filesystem.ts` stays clean because `VALID_NAMESPACE.test(ns)` exits on failure before deriving `this.tableName` and `this.indexName`, and those fields are interpolated only in SQL identifier positions.
-- `/Users/sushi/code/opencode/packages/effect-drizzle-sqlite/src` and `/Users/sushi/code/opencode/packages/core/src/database/migration.ts` stay clean for Drizzle-style `sql` tags and `sql.identifier(...)` composition.
+- `/Users/sushi/code/opencode/packages/effect-drizzle-sqlite/src` and `/Users/sushi/code/opencode/packages/core/src/database/migration.ts` are pinned as known gaps for Drizzle-style `sql` tags and `sql.identifier(...)` composition until the rule proves Drizzle builder semantics by symbol/type provenance.
 - `/Users/sushi/code/opencode/packages/stats/core/src/domain/inference.ts` stays clean for local `sqlIdentifier` / `sqlString` quote-doubling helpers, finite static `dimensionSql` fragments, and local SQL-fragment builders that only receive identifier-safe literal arguments.
 
 Imported escaper clean:
 
 - `/Users/sushi/code/powersync-service/modules/module-mysql/src/replication/BinLogStream.ts` line 311 stays clean because the imported `escapeMysqlTableName(table)` symbol resolves to a function whose body quote-doubles backticks in schema and table names before returning an identifier fragment.
 
-Current benchmark result after placeholder-list, numbered Postgres placeholder-fragment, static-fragment, tag, closed-identifier, constructor-validated identifier narrowing, and type-aware PowerSync plans:
+Current benchmark result after placeholder-list, numbered Postgres placeholder-fragment, static-fragment, closed-identifier, constructor-validated identifier narrowing, and type-aware PowerSync plans:
 
 - 338 checked files.
 - 0 parser errors.
 - 16 `antidrift/no-sql-string-concat` findings.
 - 0 `sonarjs/sql-queries` findings.
-- PowerSync service contributes one raw-table finding and zero findings for imported escaper, configured escaped-identifier, and numbered-placeholder clean controls under type-aware plans.
+- PowerSync service contributes one raw-table finding and zero findings for imported escaper, configured escaped-identifier, and numbered-placeholder clean controls under type-aware plans; PowerSync `db.sql` tagged-template storage code remains a known gap until builder provenance exists.
 
 Widened local scan:
 
 - A fresh ad hoc SQL-pattern scan across `/Users/sushi/code`, excluding the antidrift repo and Chaski roots, checked 1,024 candidate files with this rule.
 - It reported 168 findings and 0 parser errors.
 - Sudocode's typed `ORDER BY ${sortBy} ${order}` service code now stays clean, as does the matching integration helper.
-- Cloudflare Agents parameterized SQL tags, the Codemode static column-map update builder, and the Workspace sanitized namespace table identifiers now stay clean.
+- Cloudflare Agents parameterized SQL tags and PowerSync `db.sql` templates are known gaps after removing name-based tag trust. Codemode static column-map update builders and Cloudflare Workspace sanitized namespace table identifiers stay clean through local structure.
 - The named Sudocode/Cloudflare findings are now classified: dynamic `Object.keys(updates)` update helpers and the playground table-name query are drift; browser/test payload SQL-looking strings and constructor-validated namespace table identifiers are clean. Many other findings are duplicate Chaski-derived local roots, so they do not provide independent replication.
 - The scan is now reproducible through `pnpm policy:inventory-sql-broad`. The finite source-fleet gate is `pnpm policy:inventory-sql-source-fleet`: 24 primary source repos, excluding worktrees, remediation copies, baseline copies, scratch folders, and generated artifacts. The current source-fleet run checked 1,375 SQL-candidate files, reported 31 custom findings, reported 0 SonarJS findings, and had 0 parser errors.
 - The source-fleet run confirmed the parser-services boundary: escaped identifier controls such as `table.escapedIdentifier` and `escapeMysqlTableName(table)` report unless the inventory has TypeScript parser services to resolve the getter/helper proof. It also classified and fixed the PowerSync Postgres storage false positive by proving the dynamic fragment interpolates only generated `$<number>` placeholders while all values remain bound in `params`.
@@ -216,31 +208,31 @@ Current source-fleet finding classification:
 | Production drift | 1 | PowerSync `MySQLRouteAPIAdapter.ts:235` raw `sourceTable.table` interpolation | Keep reporting. |
 | Parser-services-only conservative reports | 3 | PowerSync `BinLogStream.ts:311`, `WalStream.ts:437`, `replication-utils.ts:290` | Clean in type-aware plans; do not add name-only exemptions. |
 | Lower-strength demo/test drift | 27 | Cloudflare demo `SqlDemo.tsx:133`, Sudocode dynamic test update helpers, PowerSync integration-test SQL interpolation | Keep as pressure evidence, not stable-production evidence. |
-| Known false positives after this slice | 0 | Previously PowerSync Postgres storage numbered placeholder fragments | Fixed structurally. |
+| Known false positives after this slice | 5 | Cloudflare Durable Object SQL tags, Opencode Drizzle builders, PowerSync `db.sql` templates | Keep rule non-blocking until symbol/type provenance proves these binding APIs. |
 
 ## Promotion State
 
-Status: `ready`, `stable: true`.
+Status: `ready`, `stable: false`.
 
-The stable scope is the observed SQL interpolation and identifier-proof surface, not every possible SQL builder ecosystem. Production drift exists in Chaski HogQL/template interpolation and PowerSync raw `sourceTable.table` interpolation. The second independent sanitized identifier clean-control gap is resolved: Cloudflare Workspace covers anchored-regex/early-exit identifier derivation, and Opencode stats covers quote-doubling identifier and string escapers plus bounded local SQL-fragment builders. PowerSync service supplies the lower-edge pressure case: raw table access reports next to escaped table-name APIs, imported `escapeMysqlTableName(table)` stays clean through TypeScript symbol-to-declaration proof, Postgres `SourceTable.escapedIdentifier` stays clean only through an explicit type/member contract that requires parser services, and Postgres storage numbered placeholder fragments stay clean through local structure.
+The observed SQL interpolation and identifier-proof surface is useful, but it is not stable while real SQL-builder clean controls are parked as known gaps. Production drift exists in Chaski HogQL/template interpolation and PowerSync raw `sourceTable.table` interpolation. The second independent sanitized identifier clean-control gap is resolved: Cloudflare Workspace covers anchored-regex/early-exit identifier derivation, and Opencode stats covers quote-doubling identifier and string escapers plus bounded local SQL-fragment builders. PowerSync service supplies the lower-edge pressure case: raw table access reports next to escaped table-name APIs, imported `escapeMysqlTableName(table)` stays clean through TypeScript symbol-to-declaration proof, Postgres `SourceTable.escapedIdentifier` stays clean only through an explicit type/member contract that requires parser services, and numbered placeholder fragments stay clean through local structure.
 
-Accepted stable evidence:
+Accepted ready evidence:
 
 - Chaski and PowerSync service provide independent production drift.
-- Chaski, Codebase Atlas, Sudocode, Cloudflare, Opencode, and PowerSync service supply clean and pressure controls for placeholder lists, static SQL fragments, parameterized SQL tags, ORM-owned SQL composition, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, local and imported quote escapers, finite static object fragments, numbered placeholder fragments, and bound values.
-- `pnpm policy:benchmark-sql-queries` currently checks 338 files, reports 16 custom findings, 0 SonarJS findings, 0 parser errors, 202 allowed SQL tags, 0 unclassified SQL tags, and no missing non-type-aware findings.
+- Chaski, Codebase Atlas, Sudocode, Cloudflare, Opencode, and PowerSync service supply clean and pressure controls for placeholder lists, static SQL fragments, SQL tag ecosystems, ORM-owned SQL composition, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, local and imported quote escapers, finite static object fragments, numbered placeholder fragments, and bound values.
+- `pnpm policy:benchmark-sql-queries` currently checks 338 files, reports 16 custom findings, 0 SonarJS findings, and 0 parser errors. The tagged-template inventory is now promotion pressure, not an allowlist.
 - `pnpm policy:inventory-sql-source-fleet` currently checks 1,375 SQL-candidate files across 24 primary source repos, reports 31 custom findings, 0 SonarJS findings, and 0 parser errors.
-- `pnpm exec antidrift external-corpus --slice sql-stable-promotion --min-drift-repositories 2` passes.
+- `pnpm exec antidrift external-corpus --slice sql-stable-promotion --min-drift-repositories 2` is not a promotion proof while SQL-builder clean controls are classified as known gaps.
 - The June 9 adversarial cleanup keeps the placeholder proof limited to `+` and `*` index arithmetic and restores short-circuit safety checks.
 
-Accepted stable boundaries:
+Accepted boundaries before stable promotion:
 
 - Source-fleet membership is fixed for the current promotion. New primary source repos require a fresh inventory slice; worktrees, copied remediation repos, generated bundles, and scratch folders do not count.
-- Test/demo drift remains lower-strength pressure. The stable production evidence is Chaski plus PowerSync.
+- Test/demo drift remains lower-strength pressure. The production drift evidence is Chaski plus PowerSync.
 - Non-type-aware inventory cannot prove imported escapers or configured safe identifier members by design. The codified policy is that extra-only non-type-aware reports are conservative inventory, while missing non-type-aware findings or parser errors block promotion.
-- SQL tag ecosystems beyond observed `sql`, `sqlQuery`, and `sqlRun` remain monitoring boundaries. Prisma `$queryRaw`, Kysely, Slonik, and aliased Drizzle tags need real-code inventory before widening the allowlist.
+- SQL tag ecosystems are proof boundaries, not allowlists. Cloudflare Durable Object SQL, Drizzle, PowerSync `db.sql`, Prisma `$queryRaw`, Kysely, Slonik, and aliased tags need real symbol/type proof before any tag-specific clean path is added.
 - Positive guard, allowlist, quantifier, and regex-variant SQL identifier sanitizers remain monitored expansion boundaries. The current benchmark finds the supported negative regex/exit shape and one clean quantifier branch.
 - Unsafe dynamic SQL-builder `+=`, `.concat()`, and array-join examples have not been found. Do not widen builder linting without a real unsafe program.
 - Placeholder arithmetic beyond index `+`/`*` numeric expressions remains unsupported until real clean code proves it.
 
-The June 8, 2026 advisory review was grounded in repo reads and kept the rule at `ready`, not stable. The June 9, 2026 advisory review (`reports/claude-rule-review-no-sql-string-concat-20260609-0803-rerun.md`) found the PowerSync imported-escaper proof sound and the rule locally ready, but held stable promotion on parser-service policy. That policy is now codified through `parserServiceDeltas`, so the remaining boundaries are monitoring and expansion gates rather than stable blockers. Safe identifier controls remain parser-services-only; do not add name-only exemptions to make non-type-aware inventory quiet.
+The June 8, 2026 advisory review was grounded in repo reads and kept the rule at `ready`, not stable. The June 9, 2026 advisory review (`reports/claude-rule-review-no-sql-string-concat-20260609-0803-rerun.md`) found the PowerSync imported-escaper proof sound and the rule locally ready, but held stable promotion on parser-service policy. That policy is codified through `parserServiceDeltas`, but the later removal of name-based SQL tag trust exposed real SQL-builder clean-control gaps. Safe identifier controls remain parser-services-only; do not add name-only exemptions to make non-type-aware inventory quiet.

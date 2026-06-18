@@ -24,8 +24,9 @@ function analyze(code) {
       probe: {
         rules: {
           collect: {
-            create() {
+            create(context) {
               const tracker = createReactStateTracker({
+                context,
                 onFrameExit(frame) {
                   frames.push({
                     proof: lifecycleProof(frame),
@@ -119,6 +120,62 @@ describe("react-state-graph adapter", () => {
       void P;
     `);
     expect(frames.some((frame) => frame.proof.proven)).toBe(true);
+  });
+
+  it("ignores imported useState when a local binding shadows it", () => {
+    const frames = analyze(`
+      import { useState } from "react";
+      declare function load(): Promise<string[]>;
+      function P() {
+        function useState<T>(v: T): [T, (v: T) => void] {
+          return [v, () => undefined];
+        }
+        const [rows, setRows] = useState<string[]>([]);
+        const [busy, setBusy] = useState(false);
+        const [oops, setOops] = useState<Error | null>(null);
+        return async function go() {
+          setBusy(true);
+          setOops(null);
+          try { const r = await load(); setRows(r); }
+          catch (e) { setOops(e); }
+          finally { setBusy(false); }
+        };
+      }
+      void P;
+    `);
+    expect(frames.some((frame) => frame.proof.proven)).toBe(false);
+    expect(
+      frames.every((frame) => Object.keys(frame.state.cells).length === 0),
+    ).toBe(true);
+  });
+
+  it("ignores imported React objects when a local binding shadows them", () => {
+    const frames = analyze(`
+      import React from "react";
+      declare function load(): Promise<string[]>;
+      function P() {
+        const React = {
+          useState<T>(v: T): [T, (v: T) => void] {
+            return [v, () => undefined];
+          },
+        };
+        const [rows, setRows] = React.useState<string[]>([]);
+        const [busy, setBusy] = React.useState(false);
+        const [oops, setOops] = React.useState<Error | null>(null);
+        return async function go() {
+          setBusy(true);
+          setOops(null);
+          try { const r = await load(); setRows(r); }
+          catch (e) { setOops(e); }
+          finally { setBusy(false); }
+        };
+      }
+      void P;
+    `);
+    expect(frames.some((frame) => frame.proof.proven)).toBe(false);
+    expect(
+      frames.every((frame) => Object.keys(frame.state.cells).length === 0),
+    ).toBe(true);
   });
 
   it("ignores local useState impostors", () => {
@@ -255,6 +312,54 @@ describe("react-state-graph adapter", () => {
           setBusy(true);
           setOops(null);
           try { const u = await fetchUser(controller.signal); setUser(u); }
+          catch (e) { setOops(e); }
+          finally { setBusy(false); }
+        };
+      }
+      void P;
+    `);
+    const proven = frames.find((frame) => frame.proof.proven);
+    expect(proven).toBeTruthy();
+    expect(proven.state.requestGuard).toBe(false);
+  });
+
+  it("does not treat an abort status read after the payload setter as a request guard", () => {
+    const frames = analyze(`
+      import { useState } from "react";
+      declare function fetchUser(s: AbortSignal): Promise<string>;
+      function P() {
+        const [user, setUser] = useState<string | null>(null);
+        const [busy, setBusy] = useState(false);
+        const [oops, setOops] = useState<Error | null>(null);
+        return async function go() {
+          const controller = new AbortController();
+          setBusy(true);
+          setOops(null);
+          try { const u = await fetchUser(controller.signal); setUser(u); if (controller.signal.aborted) return; }
+          catch (e) { setOops(e); }
+          finally { setBusy(false); }
+        };
+      }
+      void P;
+    `);
+    const proven = frames.find((frame) => frame.proof.proven);
+    expect(proven).toBeTruthy();
+    expect(proven.state.requestGuard).toBe(false);
+  });
+
+  it("does not treat abort calls as request guards", () => {
+    const frames = analyze(`
+      import { useState } from "react";
+      declare function fetchUser(s: AbortSignal): Promise<string>;
+      function P() {
+        const [user, setUser] = useState<string | null>(null);
+        const [busy, setBusy] = useState(false);
+        const [oops, setOops] = useState<Error | null>(null);
+        return async function go() {
+          const controller = new AbortController();
+          setBusy(true);
+          setOops(null);
+          try { const u = await fetchUser(controller.signal); controller.abort(); setUser(u); }
           catch (e) { setOops(e); }
           finally { setBusy(false); }
         };

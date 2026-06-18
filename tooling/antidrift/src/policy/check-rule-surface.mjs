@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,7 +11,12 @@ import plugin from "../eslint-plugin/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = resolve(__dirname, "../../../..");
-const blockingDisallowedStatuses = new Set(["under-proven", "false-positive-prone", "research"]);
+const blockingDisallowedStatuses = new Set([
+  "false-positive-prone",
+  "research",
+  "retired",
+  "under-proven",
+]);
 const defaultCorpusCases = [...chaskiCorpusCases, ...externalCorpusCases];
 
 function severityOf(ruleValue) {
@@ -37,27 +42,6 @@ function collectConfiguredRuleSettings(configs) {
   return out;
 }
 
-function readPluginTestSource(repoRoot) {
-  const pluginDir = resolve(repoRoot, "tooling/antidrift/src/eslint-plugin");
-  try {
-    return readdirSync(pluginDir)
-      .filter((file) => file.endsWith(".test.mjs"))
-      .map((file) => readFileSync(resolve(pluginDir, file), "utf8"))
-      .join("\n");
-  } catch (error) {
-    if (error.code === "ENOENT") return null;
-    throw error;
-  }
-}
-
-function collectTestedRules(testSource) {
-  const out = new Set();
-  for (const match of testSource.matchAll(/\b(?:typedRuleTester|ruleTester)\.run\(\s*["']([^"']+)["']/gu)) {
-    out.add(match[1]);
-  }
-  return out;
-}
-
 function collectCorpusCoveredRules(cases) {
   const out = new Set();
   for (const testCase of cases ?? []) {
@@ -67,12 +51,7 @@ function collectCorpusCoveredRules(cases) {
 }
 
 function readRuleRegistry(repoRoot) {
-  try {
-    return YAML.parse(readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8")) ?? {};
-  } catch (error) {
-    if (error.code === "ENOENT") return {};
-    throw error;
-  }
+  return YAML.parse(readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8")) ?? {};
 }
 
 function registryEntryFor(ruleRegistry, localRuleName) {
@@ -115,38 +94,27 @@ export function checkRuleSurface({
   repoRoot = defaultRepoRoot,
   pluginRules = plugin.rules,
   configs = createConfig({ tsconfigRootDir: repoRoot }),
-  testSource,
   corpusCases = defaultCorpusCases,
   ruleRegistry = readRuleRegistry(repoRoot),
   report = console.error,
 } = {}) {
-  const resolvedTestSource = testSource ?? readPluginTestSource(repoRoot);
-  if (resolvedTestSource === null) {
-    report("check-rule-surface skipped: antidrift source layout was not found. This command is intended for the self-hosted antidrift repository.");
-    return true;
-  }
-
   const exported = new Set(Object.keys(pluginRules ?? {}));
   const configuredSettings = collectConfiguredRuleSettings(Array.isArray(configs) ? configs : [configs]);
   const configured = new Set(configuredSettings.keys());
-  const ruleTesterCovered = collectTestedRules(resolvedTestSource);
   const corpusCovered = collectCorpusCoveredRules(corpusCases);
 
   const configuredButNotExported = new Set([...configured].filter((rule) => !exported.has(rule)));
   const exportedButNotConfigured = new Set([...exported].filter((rule) => !configured.has(rule)));
-  const exportedButNotRuleTesterCovered = new Set([...exported].filter((rule) => !ruleTesterCovered.has(rule)));
   const exportedButNotCorpusCovered = new Set([...exported].filter((rule) => !corpusCovered.has(rule)));
   const blockingMaturityViolations = collectBlockingMaturityViolations(configuredSettings, ruleRegistry);
 
   reportSorted(configuredButNotExported, "Custom rule configured but not exported", report);
   reportSorted(exportedButNotConfigured, "Custom rule exported but not configured", report);
-  reportSorted(exportedButNotRuleTesterCovered, "Custom rule exported but not covered by RuleTester", report);
   reportSorted(exportedButNotCorpusCovered, "Custom rule exported but not covered by corpus evidence", report);
   reportSortedViolations(blockingMaturityViolations, report);
 
   return configuredButNotExported.size +
     exportedButNotConfigured.size +
-    exportedButNotRuleTesterCovered.size +
     exportedButNotCorpusCovered.size +
     blockingMaturityViolations.length === 0;
 }

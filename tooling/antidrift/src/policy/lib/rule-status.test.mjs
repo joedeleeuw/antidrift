@@ -19,6 +19,11 @@ describe("rule status manifest", () => {
         stable: { minIndependentRepositories: 2 },
       },
       rules: {
+        "antidrift/no-hover-translate-card": {
+          status: "retired",
+          replacement: "deprecated compatibility stub",
+          reason: "Regex class sampler is not semantic proof.",
+        },
         "antidrift/no-structural-type-fork": {
           status: "ready",
           stable: false,
@@ -76,6 +81,7 @@ describe("rule status manifest", () => {
     expect(
       manifest.entries.map((entry) => `${entry.kind}:${entry.id}`),
     ).toEqual([
+      "retired:antidrift/no-hover-translate-card",
       "active:antidrift/no-structural-type-fork",
       "retired:antidrift/no-status-triplet-state",
       "research:ecosystem/import-cycle",
@@ -96,6 +102,10 @@ describe("rule status manifest", () => {
       },
     });
     expect(ruleStatusEntriesForStatus("retired", manifest)).toEqual([
+      expect.objectContaining({
+        id: "antidrift/no-hover-translate-card",
+        replacement: "deprecated compatibility stub",
+      }),
       expect.objectContaining({
         id: "antidrift/no-status-triplet-state",
         replacement: "antidrift/no-handrolled-resource-lifecycle-cells",

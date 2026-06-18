@@ -1,11 +1,13 @@
 import ts from "typescript";
 
 import { callExpressionName } from "./auth-boundary.mjs";
+import { isZodMethod } from "./schema-provenance.mjs";
 
 const TS_TYPE_FLAG_ANY = 1;
 const TS_TYPE_FLAG_UNKNOWN = 2;
 const TS_TYPE_FLAG_OBJECT = 1 << 19;
 const antidriftBrandMarkerName = "__antidriftBrand";
+const ZOD_VALIDATOR_METHODS = new Set(["parse", "parseAsync", "safeParse"]);
 
 export const BROAD_INPUT_ARRAY_TRANSFORM_METHODS = new Set([
   "map",
@@ -535,7 +537,7 @@ export function callUsesPredicateParam(node, paramName) {
   );
 }
 
-export function hasValidatorDelegation(node, paramName) {
+export function hasValidatorDelegation(node, paramName, services, checker) {
   let sawDelegation = false;
   walkNode(node, (current) => {
     if (
@@ -545,12 +547,15 @@ export function hasValidatorDelegation(node, paramName) {
     ) {
       return;
     }
-    const name = callExpressionName(current.callee);
+    const callee = current.callee;
+    const methodName = callExpressionName(callee);
+    const tsCall = services?.esTreeNodeToTSNodeMap.get(current);
     if (
-      name &&
-      /^(?:safeParse|parse|parseAsync|validate|assert|check|is[A-Z]|has[A-Z])/u.test(
-        name,
-      )
+      callee?.type === "MemberExpression" &&
+      !callee.computed &&
+      methodName &&
+      ZOD_VALIDATOR_METHODS.has(methodName) &&
+      isZodMethod(checker, tsCall?.expression?.name)
     ) {
       sawDelegation = true;
     }

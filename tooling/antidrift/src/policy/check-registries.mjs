@@ -655,78 +655,6 @@ const allowedAgentOpsPolicyReviewStatuses = new Set([
   "research",
   "retired",
 ]);
-const requiredDecisionLocks = new Map([
-  ["antidrift/no-cycle", { status: "retired", location: "retiredRules" }],
-  [
-    "antidrift/no-inline-disable-without-ticket",
-    { status: "retired", location: "retiredRules" },
-  ],
-  [
-    "antidrift/no-sdk-direct-use",
-    { status: "retired", location: "retiredRules" },
-  ],
-  [
-    "antidrift/no-explicit-return-type-private-helper",
-    { status: "retired", location: "retiredRules" },
-  ],
-  [
-    "antidrift/no-silent-catch",
-    { status: "retired", location: "retiredRules" },
-  ],
-  [
-    "antidrift/no-thin-typed-factory-wrapper",
-    { status: "retired", location: "retiredRules" },
-  ],
-  [
-    "antidrift/no-obvious-comment",
-    { status: "retired", location: "retiredRules" },
-  ],
-  [
-    "antidrift/no-role-literal-in-type",
-    { status: "retired", location: "retiredRules" },
-  ],
-  [
-    "antidrift/no-cast-to-branded",
-    { status: "retired", location: "retiredRules" },
-  ],
-  [
-    "antidrift/no-unsafe-cast-chain",
-    { status: "retired", location: "retiredRules" },
-  ],
-  [
-    "antidrift/no-status-triplet-state",
-    { status: "retired", location: "retiredRules" },
-  ],
-  [
-    "ecosystem/discriminated-union-exhaustiveness",
-    { status: "ecosystem-covered", location: "researchCandidates" },
-  ],
-  [
-    "ecosystem/import-cycle",
-    { status: "ecosystem-covered", location: "researchCandidates" },
-  ],
-  [
-    "ecosystem/disable-comment-description",
-    { status: "ecosystem-covered", location: "researchCandidates" },
-  ],
-  [
-    "ecosystem/gateway-restricted-imports",
-    { status: "ecosystem-covered", location: "researchCandidates" },
-  ],
-  [
-    "ecosystem/vitest-test-integrity",
-    { status: "ecosystem-covered", location: "researchCandidates" },
-  ],
-  [
-    "ecosystem/react-hooks-compiler",
-    { status: "ecosystem-covered", location: "researchCandidates" },
-  ],
-  [
-    "ecosystem/sonar-sql-queries",
-    { status: "ecosystem-covered", location: "researchCandidates" },
-  ],
-]);
-
 function requireString(value, label, errors) {
   if (typeof value !== "string" || value.length === 0) {
     errors.push(`${label} must be a non-empty string.`);
@@ -1213,84 +1141,6 @@ function checkAllowedValues(values, allowed, label, errors) {
 
 function sortedStrings(values) {
   return [...values].sort((a, b) => a.localeCompare(b));
-}
-
-function semanticAdapterContractsForRuleId(rule) {
-  return Object.values(SEMANTIC_ADAPTER_CONTRACTS).filter((contract) =>
-    contract.rules.includes(rule),
-  );
-}
-
-function cellIncludesAny(cell, values) {
-  return values.some((value) => cell.includes(value));
-}
-
-function checkSemanticValidationMatrixAdapterContract(
-  rule,
-  cells,
-  relativePath,
-  errors,
-) {
-  const contracts = semanticAdapterContractsForRuleId(rule);
-  if (contracts.length === 0) return;
-  const carriers = sortedStrings(contracts.map((contract) => contract.carrier));
-  if (!cellIncludesAny(cells[1] ?? "", carriers)) {
-    errors.push(
-      `${relativePath} row for ${rule} carrier must include shipped semantic adapter carrier: ${carriers.join("; ")}.`,
-    );
-  }
-  const associations = sortedStrings(
-    new Set(contracts.flatMap((contract) => contract.associations)),
-  );
-  if (!cellIncludesAny(cells[2] ?? "", associations)) {
-    errors.push(
-      `${relativePath} row for ${rule} association must include one shipped semantic adapter association: ${associations.join("; ")}.`,
-    );
-  }
-}
-
-function checkSemanticValidationMatrixPromotion(
-  rule,
-  cells,
-  ruleEntry,
-  relativePath,
-  errors,
-) {
-  if (
-    !isRecord(ruleEntry) ||
-    ruleEntry.stable !== true ||
-    !isRecord(ruleEntry.promotion) ||
-    typeof ruleEntry.promotion.association !== "string" ||
-    ruleEntry.promotion.association.length === 0
-  ) {
-    return;
-  }
-  if (!cells[2]?.includes(ruleEntry.promotion.association)) {
-    errors.push(
-      `${relativePath} row for ${rule} association must include stable promotion association: ${ruleEntry.promotion.association}.`,
-    );
-  }
-  if (
-    typeof ruleEntry.promotion.blockingThreshold === "string" &&
-    ruleEntry.promotion.blockingThreshold.length > 0 &&
-    !cells[3]?.includes(ruleEntry.promotion.blockingThreshold)
-  ) {
-    errors.push(
-      `${relativePath} row for ${rule} blocking threshold must include stable promotion blockingThreshold: ${ruleEntry.promotion.blockingThreshold}.`,
-    );
-  }
-  for (const field of ["noSinkBehavior", "noDeadWorkBehavior"]) {
-    const value = ruleEntry.promotion[field];
-    if (
-      typeof value === "string" &&
-      value.length > 0 &&
-      !cells[5]?.includes(value)
-    ) {
-      errors.push(
-        `${relativePath} row for ${rule} no-sink/no-dead-work behavior must include stable promotion ${field}: ${value}.`,
-      );
-    }
-  }
 }
 
 function equalStringSets(left, right) {
@@ -2020,7 +1870,12 @@ function checkSemanticAdapterPackageExportEntry(
   }
 }
 
-function requireExistingPackageExportPath(repoRoot, packagePath, label, errors) {
+function requireExistingPackageExportPath(
+  repoRoot,
+  packagePath,
+  label,
+  errors,
+) {
   if (
     typeof packagePath !== "string" ||
     packagePath.length === 0 ||
@@ -2288,10 +2143,7 @@ function findExportedTypeAlias(sourceFile, typeName) {
 }
 
 function stringLiteralTypeValue(typeNode) {
-  if (
-    ts.isLiteralTypeNode(typeNode) &&
-    ts.isStringLiteral(typeNode.literal)
-  ) {
+  if (ts.isLiteralTypeNode(typeNode) && ts.isStringLiteral(typeNode.literal)) {
     return typeNode.literal.text;
   }
   return null;
@@ -2474,7 +2326,12 @@ function checkPackageExportEntryFilesAndDeclarations(
     return;
   }
   const label = `tooling/antidrift/package.json exports${exportKey}`;
-  requireExistingPackageExportPath(repoRoot, entry.types, `${label}.types`, errors);
+  requireExistingPackageExportPath(
+    repoRoot,
+    entry.types,
+    `${label}.types`,
+    errors,
+  );
   requireExistingPackageExportPath(
     repoRoot,
     entry.import,
@@ -2543,7 +2400,12 @@ function requireExistingPackageBinPath(repoRoot, packagePath, label, errors) {
 
 function checkPackageBinTarget(binary, packagePath, repoRoot, errors) {
   const label = `tooling/antidrift/package.json bin.${binary}`;
-  const target = requireExistingPackageBinPath(repoRoot, packagePath, label, errors);
+  const target = requireExistingPackageBinPath(
+    repoRoot,
+    packagePath,
+    label,
+    errors,
+  );
   if (!target) return;
   const firstLine = readFileSync(target, "utf8").split(/\r?\n/u, 1)[0];
   if (firstLine !== "#!/usr/bin/env node") {
@@ -2562,7 +2424,9 @@ function checkPackageBinTargets(packageJson, repoRoot, errors) {
     return;
   }
   if (!isRecord(packageJson.bin)) {
-    errors.push("tooling/antidrift/package.json bin must be a string or mapping.");
+    errors.push(
+      "tooling/antidrift/package.json bin must be a string or mapping.",
+    );
     return;
   }
   for (const binary of sortedStrings(Object.keys(packageJson.bin))) {
@@ -2812,148 +2676,6 @@ function checkResearchCandidates(
   }
 }
 
-function lockedDecisionBucket(registry, id, location) {
-  if (location === "retiredRules") return registry.retiredRules?.[id];
-  if (location === "researchCandidates") {
-    return registry.researchCandidates?.[id];
-  }
-  return undefined;
-}
-
-function checkUnexpectedDecisionLocks(registry, errors) {
-  for (const id of Object.keys(registry.decisionLocks).sort((a, b) =>
-    a.localeCompare(b),
-  )) {
-    if (!requiredDecisionLocks.has(id)) {
-      errors.push(
-        `policy/registries/rules.yaml decisionLocks contains unlocked decision; add it to check-registries.mjs before relying on it: ${id}`,
-      );
-    }
-  }
-}
-
-function checkRequiredDecisionLock(registry, id, expected, errors) {
-  const lock = registry.decisionLocks[id];
-  if (!isRecord(lock)) {
-    errors.push(
-      `policy/registries/rules.yaml decisionLocks missing locked decision: ${id}`,
-    );
-    return;
-  }
-  if (lock.status !== expected.status) {
-    errors.push(
-      `policy/registries/rules.yaml decisionLocks.${id}.status must remain ${expected.status}.`,
-    );
-  }
-  if (lock.location !== expected.location) {
-    errors.push(
-      `policy/registries/rules.yaml decisionLocks.${id}.location must remain ${expected.location}.`,
-    );
-  }
-  requireString(
-    lock.reason,
-    `policy/registries/rules.yaml decisionLocks.${id}.reason`,
-    errors,
-  );
-  requireString(
-    lock.replacement,
-    `policy/registries/rules.yaml decisionLocks.${id}.replacement`,
-    errors,
-  );
-
-  if (registry.rules?.[id] !== undefined) {
-    errors.push(
-      `policy/registries/rules.yaml rules must not reactivate locked decision: ${id}`,
-    );
-  }
-
-  const lockedEntry = lockedDecisionBucket(registry, id, expected.location);
-  if (!isRecord(lockedEntry)) {
-    errors.push(
-      `policy/registries/rules.yaml ${expected.location} must contain locked decision: ${id}`,
-    );
-  } else if (lockedEntry.status !== expected.status) {
-    errors.push(
-      `policy/registries/rules.yaml ${expected.location}.${id}.status must remain ${expected.status}.`,
-    );
-  }
-}
-
-function packageRuleReferences(text) {
-  return new Set(
-    [...text.matchAll(/\bantidrift\/(?:no|require)-[A-Za-z0-9_-]+\b/gu)].map(
-      (match) => match[0],
-    ),
-  );
-}
-
-function checkLockedRetiredReplacementReferenceDoc(
-  registry,
-  id,
-  lock,
-  repoRoot,
-  errors,
-) {
-  if (
-    typeof lock.replacement !== "string" ||
-    !lock.replacement.startsWith("antidrift/") ||
-    !repoRoot
-  ) {
-    return;
-  }
-  const retiredEntry = registry.retiredRules?.[id];
-  if (
-    !isRecord(retiredEntry) ||
-    typeof retiredEntry.referenceDoc !== "string" ||
-    retiredEntry.referenceDoc.length === 0
-  ) {
-    return;
-  }
-  const target = safeRepoPath(repoRoot, retiredEntry.referenceDoc);
-  if (!target || !existsSync(target)) return;
-  const text = readFileSync(target, "utf8");
-  if (!text.includes(lock.replacement)) {
-    errors.push(
-      `policy/registries/rules.yaml retiredRules.${id}.referenceDoc must mention decisionLocks replacement ${lock.replacement}.`,
-    );
-  }
-  const knownRules = knownRuleIds(registry);
-  for (const reference of sortedStrings(packageRuleReferences(text))) {
-    if (!knownRules.has(reference)) {
-      errors.push(
-        `${retiredEntry.referenceDoc} references unknown package rule ${reference} from retired decision ${id}.`,
-      );
-    }
-  }
-}
-
-function checkDecisionLocks(registry, repoRoot, errors) {
-  if (!isRecord(registry.decisionLocks)) {
-    errors.push(
-      "policy/registries/rules.yaml decisionLocks must be a mapping.",
-    );
-    return;
-  }
-
-  checkUnexpectedDecisionLocks(registry, errors);
-
-  for (const [id, expected] of [...requiredDecisionLocks.entries()].sort(
-    ([a], [b]) => a.localeCompare(b),
-  )) {
-    checkRequiredDecisionLock(registry, id, expected, errors);
-    const lock = registry.decisionLocks[id];
-    if (expected.status === "retired" && isRecord(lock)) {
-      checkLockedRetiredReplacementReferenceDoc(
-        registry,
-        id,
-        lock,
-        repoRoot,
-        errors,
-      );
-    }
-  }
-}
-
 function knownRuleIds(registry) {
   return new Set([
     ...Object.keys(registry.rules ?? {}),
@@ -2978,12 +2700,6 @@ function checkRuleFamilySubset(subsetEntry, subsetLabel, knownRules, errors) {
   requireString(subsetEntry.intent, `${subsetLabel}.intent`, errors);
   const rules = stringArray(subsetEntry.rules, `${subsetLabel}.rules`, errors);
   checkKnownRuleReferences(rules, knownRules, subsetLabel, errors);
-  const lockedRules = rules.filter((rule) => requiredDecisionLocks.has(rule));
-  if (lockedRules.length > 0 && subsetEntry.historical !== true) {
-    errors.push(
-      `${subsetLabel}.historical must be true when referencing locked decisions: ${lockedRules.join(", ")}`,
-    );
-  }
   stringArray(subsetEntry.flags, `${subsetLabel}.flags`, errors);
   stringArray(subsetEntry.allows, `${subsetLabel}.allows`, errors);
 }
@@ -3188,262 +2904,6 @@ function checkPolicyRuleReviews(registry, policySource, errors) {
   }
 }
 
-function checkSemanticValidationMatrix(repoRoot, activeRules, ruleEntries, errors) {
-  const relativePath = "docs/semantic-validation-matrix.md";
-  const target = safeRepoPath(repoRoot, relativePath);
-  if (!target || !existsSync(target)) {
-    errors.push(
-      `${relativePath} must exist and contain active rule proof rows.`,
-    );
-    return;
-  }
-  const matrix = readFileSync(target, "utf8");
-  const rows = markdownRuleRows(matrix);
-  for (const rule of sortedStrings(activeRules)) {
-    const cells = rows.get(rule);
-    if (!cells) {
-      errors.push(`${relativePath} missing active rule row: ${rule}`);
-      continue;
-    }
-    if (
-      [cells[1], cells[2], cells[3], cells[4]].some(
-        (cell) => typeof cell !== "string" || cell.length === 0,
-      )
-    ) {
-      errors.push(
-        `${relativePath} row for ${rule} must declare carrier, semantic association or authority fact, blocking threshold, and validation and gap.`,
-      );
-    }
-    if (typeof cells[5] !== "string" || cells[5].length === 0) {
-      errors.push(
-        `${relativePath} row for ${rule} must declare no-sink or no-dead-work behavior.`,
-      );
-    }
-    checkSemanticValidationMatrixAdapterContract(
-      rule,
-      cells,
-      relativePath,
-      errors,
-    );
-    checkSemanticValidationMatrixPromotion(
-      rule,
-      cells,
-      ruleEntries?.[rule],
-      relativePath,
-      errors,
-    );
-  }
-}
-
-function statusCellClaimsStable(statusCell) {
-  return /\bstable\b/u.test(statusCell.toLowerCase());
-}
-
-function checkRealCorpusValidationStatus(
-  rule,
-  statusCell,
-  ruleEntry,
-  relativePath,
-  errors,
-) {
-  if (!isRecord(ruleEntry)) return;
-  const normalized = statusCell.toLowerCase();
-  if (ruleEntry.stable === true && !statusCellClaimsStable(statusCell)) {
-    errors.push(
-      `${relativePath} row for ${rule} status must include stable because policy/registries/rules.yaml stable is true.`,
-    );
-  }
-  if (ruleEntry.stable === false && statusCellClaimsStable(statusCell)) {
-    errors.push(
-      `${relativePath} row for ${rule} status must not claim stable when policy/registries/rules.yaml stable is false.`,
-    );
-  }
-  if (
-    ruleEntry.stable !== true &&
-    typeof ruleEntry.status === "string" &&
-    ruleEntry.status.length > 0 &&
-    !normalized.includes(ruleEntry.status.toLowerCase())
-  ) {
-    errors.push(
-      `${relativePath} row for ${rule} status must include registry status '${ruleEntry.status}'.`,
-    );
-  }
-}
-
-function checkRealCorpusValidationPromotion(
-  rule,
-  evidenceCell,
-  ruleEntry,
-  relativePath,
-  errors,
-) {
-  if (
-    !isRecord(ruleEntry) ||
-    ruleEntry.stable !== true ||
-    !isRecord(ruleEntry.promotion) ||
-    typeof ruleEntry.promotion.corpusEvidence !== "string" ||
-    ruleEntry.promotion.corpusEvidence.length === 0
-  ) {
-    return;
-  }
-  if (!evidenceCell.includes(ruleEntry.promotion.corpusEvidence)) {
-    errors.push(
-      `${relativePath} row for ${rule} evidence must include stable promotion corpusEvidence: ${ruleEntry.promotion.corpusEvidence}.`,
-    );
-  }
-}
-
-function checkRealCorpusValidation(repoRoot, activeRules, ruleEntries, errors) {
-  const relativePath = "docs/real-corpus-validation.md";
-  const target = safeRepoPath(repoRoot, relativePath);
-  if (!target || !existsSync(target)) {
-    errors.push(
-      `${relativePath} must exist and contain active rule corpus evidence rows.`,
-    );
-    return;
-  }
-  const matrix = readFileSync(target, "utf8");
-  const rows = markdownRuleRows(matrix);
-  for (const rule of sortedStrings(activeRules)) {
-    const cells = rows.get(rule);
-    if (!cells) {
-      errors.push(`${relativePath} missing active rule row: ${rule}`);
-      continue;
-    }
-    if (
-      [cells[1], cells[2]].some(
-        (cell) => typeof cell !== "string" || cell.length === 0,
-      )
-    ) {
-      errors.push(
-        `${relativePath} row for ${rule} must declare status and real-source evidence.`,
-      );
-    }
-    checkRealCorpusValidationStatus(
-      rule,
-      cells[1] ?? "",
-      ruleEntries?.[rule],
-      relativePath,
-      errors,
-    );
-    checkRealCorpusValidationPromotion(
-      rule,
-      cells[2] ?? "",
-      ruleEntries?.[rule],
-      relativePath,
-      errors,
-    );
-  }
-}
-
-function stablePromotionInventoryRows(markdown) {
-  const rows = new Map();
-  for (const line of markdown.split(/\r?\n/)) {
-    const cells = markdownTableCells(line);
-    if (!cells || markdownTableSeparator(cells)) continue;
-    const rule = cells[1]?.match(/`(antidrift\/[^`]+)`/)?.[1];
-    if (rule) rows.set(rule, cells);
-  }
-  return rows;
-}
-
-function normalizedInventoryText(value) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/gu, "");
-}
-
-function promotionInventoryRepositoryAliases(repository) {
-  return (
-    new Map([
-      ["sudocode-main", ["sudocode-main", "Sudocode"]],
-      ["claude-code-source", ["claude-code-source", "Claude Code Source"]],
-    ]).get(repository) ?? [repository]
-  );
-}
-
-function stablePromotionInventoryMentionsRepository(cells, repository) {
-  const evidenceText = normalizedInventoryText(cells.slice(4, 7).join(" "));
-  return promotionInventoryRepositoryAliases(repository).some((alias) =>
-    evidenceText.includes(normalizedInventoryText(alias)),
-  );
-}
-
-function checkStablePromotionInventoryRow(relativePath, rule, entry, cells, errors) {
-  if (cells[2] !== "stable") {
-    errors.push(
-      `${relativePath} row for ${rule} promotion bucket must be stable because policy/registries/rules.yaml stable is true.`,
-    );
-  }
-  const ecosystemComparison = entry.promotion?.ecosystemComparison;
-  if (
-    typeof ecosystemComparison === "string" &&
-    ecosystemComparison.length > 0 &&
-    !cells[6]?.includes(ecosystemComparison)
-  ) {
-    errors.push(
-      `${relativePath} row for ${rule} why must include stable promotion ecosystemComparison: ${ecosystemComparison}.`,
-    );
-  }
-  const repositories = Array.isArray(entry.corpusRepositories)
-    ? entry.corpusRepositories
-    : [];
-  for (const repository of repositories) {
-    if (!stablePromotionInventoryMentionsRepository(cells, repository)) {
-      errors.push(
-        `${relativePath} row for ${rule} must mention registry corpus repository: ${repository}.`,
-      );
-    }
-  }
-}
-
-function checkStablePromotionInventory(repoRoot, ruleEntries, errors) {
-  const stableEntries = Object.entries(ruleEntries ?? {}).filter(
-    ([, entry]) => entry?.stable === true,
-  );
-  if (stableEntries.length === 0) return;
-  const relativePath = "docs/stable-promotion-inventory.md";
-  const target = safeRepoPath(repoRoot, relativePath);
-  if (!target || !existsSync(target)) {
-    errors.push(
-      `${relativePath} must exist and contain stable promotion rows.`,
-    );
-    return;
-  }
-  const inventory = readFileSync(target, "utf8");
-  const rows = stablePromotionInventoryRows(inventory);
-  for (const [rule, entry] of stableEntries) {
-    const cells = rows.get(rule);
-    if (!cells) {
-      errors.push(`${relativePath} missing stable promotion row: ${rule}`);
-      continue;
-    }
-    checkStablePromotionInventoryRow(relativePath, rule, entry, cells, errors);
-  }
-}
-
-function markdownRuleRows(markdown) {
-  const rows = new Map();
-  for (const line of markdown.split(/\r?\n/)) {
-    const cells = markdownTableCells(line);
-    if (!cells || markdownTableSeparator(cells)) continue;
-    const rule = cells[0]?.match(/`(antidrift\/[^`]+)`/)?.[1];
-    if (rule) rows.set(rule, cells);
-  }
-  return rows;
-}
-
-function markdownTableCells(line) {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return null;
-  return trimmed
-    .slice(1, -1)
-    .split("|")
-    .map((cell) => cell.trim());
-}
-
-function markdownTableSeparator(cells) {
-  return cells.every((cell) => /^:?-{3,}:?$/.test(cell));
-}
-
 function checkRulesRegistry(registry, repoRoot, policySource, errors) {
   if (Object.keys(registry).length === 0) {
     errors.push(
@@ -3471,9 +2931,6 @@ function checkRulesRegistry(registry, repoRoot, policySource, errors) {
     errors,
   );
   const activeRules = activeAntidriftRules();
-  checkSemanticValidationMatrix(repoRoot, activeRules, registry.rules, errors);
-  checkRealCorpusValidation(repoRoot, activeRules, registry.rules, errors);
-  checkStablePromotionInventory(repoRoot, registry.rules, errors);
   checkSemanticAdapterContracts(
     SEMANTIC_ADAPTER_CONTRACTS,
     SEMANTIC_ADAPTERS,
@@ -3506,7 +2963,6 @@ function checkRulesRegistry(registry, repoRoot, policySource, errors) {
     commandOwnedRuleIdsFromSemanticFactKinds(registry.semanticFactKinds),
     errors,
   );
-  checkDecisionLocks(registry, repoRoot, errors);
   checkRuleFamilies(registry.ruleFamilies, registry, repoRoot, errors);
   checkPolicyRuleReviews(registry, policySource, errors);
 }

@@ -221,6 +221,8 @@ typedRuleTester.run(
       "type TriggerTitle = { title: string; subtitle?: string; args?: string[] };\nconst isTriggerTitle = (value: any): value is TriggerTitle => typeof value === 'object' && value !== null && 'title' in value;",
       "type OptionalDisplay = { titleClass?: string; subtitleClass?: string };\nconst isOptionalDisplay = (value: unknown): value is OptionalDisplay => typeof value === 'object' && value !== null;",
       "type DateMessage = { year: number; month: number; day: number };\nfunction isDateMessage(value: unknown): value is DateMessage { return typeof value === 'object' && value !== null && 'year' in value && 'month' in value && 'day' in value; }",
+      "import { z } from 'zod';\nconst UserSchema = z.object({ id: z.string(), email: z.string(), role: z.string() });\ntype User = z.infer<typeof UserSchema>;\nfunction isUser(value: unknown): value is User { return UserSchema.safeParse(value).success; }",
+      "function isStringArray(value: unknown): value is string[] { return Array.isArray(value) && value.every((item) => typeof item === 'string'); }",
     ],
     invalid: [
       {
@@ -229,6 +231,14 @@ typedRuleTester.run(
       },
       {
         code: "type User = { id: string; email: string };\nfunction isUser(value: unknown): value is User { return typeof value === 'object' && value !== null; }",
+        errors: 1,
+      },
+      {
+        code: "type User = { id: string; email: string; role: string; active?: boolean };\nfunction isUser(value: unknown): value is User { return typeof value === 'object' && value !== null && 'id' in value && 'email' in value; }",
+        errors: 1,
+      },
+      {
+        code: "type User = { id: string; email: string; role: string };\ndeclare function validateUser(value: unknown): boolean;\nfunction isUser(value: unknown): value is User { return validateUser(value); }",
         errors: 1,
       },
     ],
@@ -396,26 +406,88 @@ ruleTester.run(
   },
 );
 
+describe("deprecated design-system compatibility rules", () => {
+  it("keeps regex sampler rules exported as deprecated no-op stubs", () => {
+    expect(rule("no-raw-tailwind-color").meta.deprecated).toBe(true);
+    expect(rule("no-hover-translate-card").meta.deprecated).toBe(true);
+  });
+});
+
 ruleTester.run("no-raw-tailwind-color", rule("no-raw-tailwind-color"), {
-  valid: [fixture("programs/correct/semantic-tailwind-token.tsx")],
-  invalid: [
-    { ...fixture("programs/drift/raw-tailwind-color-class.tsx"), errors: 1 },
+  valid: [
+    fixture("programs/correct/semantic-tailwind-token.tsx"),
+    fixture("programs/drift/raw-tailwind-color-class.tsx"),
   ],
+  invalid: [],
 });
 
 ruleTester.run("no-hover-translate-card", rule("no-hover-translate-card"), {
-  valid: [fixture("programs/correct/hover-shadow-card.tsx")],
-  invalid: [
-    { ...fixture("programs/drift/hover-translate-card.tsx"), errors: 1 },
+  valid: [
+    fixture("programs/correct/hover-shadow-card.tsx"),
+    fixture("programs/drift/hover-translate-card.tsx"),
   ],
+  invalid: [],
 });
 
 ruleTester.run("no-raw-fetch-in-component", rule("no-raw-fetch-in-component"), {
-  valid: [fixture("programs/correct/raw-fetch-in-helper.ts")],
+  valid: [
+    fixture("programs/correct/raw-fetch-in-helper.ts"),
+    fixture("programs/drift/raw-fetch-in-component-module-helper.tsx"),
+    {
+      filename: "lowercase-utility.tsx",
+      code: `
+        async function loadUsers() {
+          return fetch("/api/users");
+        }
+
+        export function UsersView() {
+          return <div>Users</div>;
+        }
+
+        void loadUsers;
+      `,
+    },
+    {
+      filename: "pascalcase-non-component.ts",
+      code: `
+        async function UserLoader() {
+          return fetch("/api/users");
+        }
+
+        void UserLoader;
+      `,
+    },
+  ],
   invalid: [
     { ...fixture("programs/drift/raw-fetch-in-component.tsx"), errors: 1 },
     {
-      ...fixture("programs/drift/raw-fetch-in-component-module-helper.tsx"),
+      filename: "effect-fetch.tsx",
+      code: `
+        import { useEffect } from "react";
+
+        export function ImpersonationWarning() {
+          useEffect(() => {
+            async function exchangeCode() {
+              return fetch("/impersonation/exchange");
+            }
+
+            void exchangeCode();
+          }, []);
+
+          return <div>Impersonation</div>;
+        }
+      `,
+      errors: 1,
+    },
+    {
+      filename: "jsx-local-return-fetch.tsx",
+      code: `
+        export function UsersView() {
+          const view = <div>Users</div>;
+          fetch("/api/users");
+          return view;
+        }
+      `,
       errors: 1,
     },
   ],
@@ -430,6 +502,14 @@ ruleTester.run("no-sql-string-concat", rule("no-sql-string-concat"), {
   invalid: [
     { ...fixture("programs/drift/sql-template-interpolation.ts"), errors: 1 },
     { ...fixture("programs/drift/sql-string-concat.ts"), errors: 1 },
+    {
+      code: "function loadUser(id) { function sql(strings, ...values) { return String.raw({ raw: strings }, ...values); } return sql`SELECT * FROM users WHERE id = ${id}`; }\nvoid loadUser;",
+      errors: 1,
+    },
+    {
+      code: "const db = { sql(strings, ...values) { return String.raw({ raw: strings }, ...values); } };\nfunction loadUser(id) { return db.sql`SELECT * FROM users WHERE id = ${id}`; }\nvoid loadUser;",
+      errors: 1,
+    },
   ],
 });
 
@@ -521,10 +601,10 @@ ruleTester.run("require-authz-check", rule("require-authz-check"), {
 
 const acceptedPackageStructuralOptions = {
   packageTypeOwners: {
-    firebaseAuthUser: {
+    firebaseAuthUserInfo: {
       package: "@firebase/auth",
-      exportName: "User",
-      reason: "Firebase Auth User is the accepted auth user contract.",
+      exportName: "UserInfo",
+      reason: "Firebase Auth UserInfo is the accepted auth user info contract.",
     },
   },
 };
@@ -569,6 +649,21 @@ typedRuleTester.run(
       fixture("programs/drift/extends-and-redeclares.ts"),
       fixture("programs/drift/multi-file/drift-elsewhere.ts"),
       fixture("programs/edge/partial-subset.ts"),
+      {
+        ...fixture("programs/edge/partial-subset.ts"),
+        options: [acceptedPackageStructuralOptions],
+      },
+      {
+        code: `
+          export type ReleaseSummary = {
+            id: string;
+            appId: string;
+            version: string;
+            status: "draft" | "submitted" | "released";
+          };
+        `,
+        options: [generatedStructuralOptions],
+      },
       fixture("programs/drift/redeclares-optional.ts"),
     ],
     invalid: [
@@ -597,6 +692,17 @@ typedRuleTester.run(
       },
       {
         ...fixture("programs/correct/domain-project-form-draft.ts"),
+        options: [domainCanonicalOptions],
+      },
+      {
+        code: `
+          export type ProjectListItem = {
+            id: string;
+            slug: string;
+            name: string;
+            ownerId: string;
+          };
+        `,
         options: [domainCanonicalOptions],
       },
     ],
@@ -677,7 +783,7 @@ it("emits structural proposal facts for unaccepted installed-package matches", a
             label: expect.stringContaining("#"),
           }),
           structuralMatch: expect.objectContaining({
-            relation: "local-subset-of-owner",
+            relation: "exact-owner-copy",
           }),
           diagnostic: expect.objectContaining({
             emitted: false,
@@ -739,7 +845,7 @@ it("emits blocking structural facts from accepted package owners", async () => {
           authorityState: "accepted",
           localType: expect.objectContaining({ name: "UserInfo" }),
           ownerType: expect.objectContaining({
-            label: "@firebase/auth#User",
+            label: "@firebase/auth#UserInfo",
             authority: "installed-package",
           }),
           diagnostic: expect.objectContaining({
@@ -1010,6 +1116,116 @@ it("ignores local useState impostors for React-state facts", async () => {
   expect(sourceShard.facts).toHaveLength(0);
 });
 
+it("ignores imported useState when a local binding shadows it for React-state facts", async () => {
+  const lifecycle = await lintCoupledStateCodeWithFacts(`
+    import { useState } from "react";
+    declare function loadUsers(): Promise<string[]>;
+
+    function UsersPanel() {
+      function useState<T>(value: T): [T, (value: T) => void] {
+        return [value, () => undefined];
+      }
+      const [users, setUsers] = useState<string[]>([]);
+      const [pending, setPending] = useState(false);
+      const [failure, setFailure] = useState<Error | null>(null);
+
+      return async function load() {
+        setPending(true);
+        setFailure(null);
+        try {
+          const result = await loadUsers();
+          setUsers(result);
+        } catch (err) {
+          setFailure(err);
+        } finally {
+          setPending(false);
+        }
+      };
+    }
+
+    void UsersPanel;
+  `);
+  const sourceShard = await lintSourceShardWithFacts(`
+    import { useState } from "react";
+    declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
+    function ProfileCard() {
+      function useState<T>(value: T): [T, (value: T) => void] {
+        return [value, () => undefined];
+      }
+      const [id, setId] = useState("");
+      const [name, setName] = useState("");
+      return async function load() {
+        const profile = await fetchProfile();
+        setId(profile.id);
+        setName(profile.displayName);
+      };
+    }
+    void ProfileCard;
+  `);
+
+  expect(lifecycle.result.messages).toHaveLength(0);
+  expect(sourceShard.result.messages).toHaveLength(0);
+  expect(lifecycle.facts).toHaveLength(0);
+  expect(sourceShard.facts).toHaveLength(0);
+});
+
+it("ignores imported React objects when a local binding shadows them for React-state facts", async () => {
+  const lifecycle = await lintCoupledStateCodeWithFacts(`
+    import * as React from "react";
+    declare function loadUsers(): Promise<string[]>;
+
+    function UsersPanel() {
+      const React = {
+        useState<T>(value: T): [T, (value: T) => void] {
+          return [value, () => undefined];
+        },
+      };
+      const [users, setUsers] = React.useState<string[]>([]);
+      const [pending, setPending] = React.useState(false);
+      const [failure, setFailure] = React.useState<Error | null>(null);
+
+      return async function load() {
+        setPending(true);
+        setFailure(null);
+        try {
+          const result = await loadUsers();
+          setUsers(result);
+        } catch (err) {
+          setFailure(err);
+        } finally {
+          setPending(false);
+        }
+      };
+    }
+
+    void UsersPanel;
+  `);
+  const sourceShard = await lintSourceShardWithFacts(`
+    import React from "react";
+    declare function fetchProfile(): Promise<{ id: string; displayName: string }>;
+    function ProfileCard() {
+      const React = {
+        useState<T>(value: T): [T, (value: T) => void] {
+          return [value, () => undefined];
+        },
+      };
+      const [id, setId] = React.useState("");
+      const [name, setName] = React.useState("");
+      return async function load() {
+        const profile = await fetchProfile();
+        setId(profile.id);
+        setName(profile.displayName);
+      };
+    }
+    void ProfileCard;
+  `);
+
+  expect(lifecycle.result.messages).toHaveLength(0);
+  expect(sourceShard.result.messages).toHaveLength(0);
+  expect(lifecycle.facts).toHaveLength(0);
+  expect(sourceShard.facts).toHaveLength(0);
+});
+
 it("downgrades a request-guarded lifecycle to heuristic-inventory with no diagnostic", async () => {
   const { facts, result } = await lintWithCoupledStateFacts(
     "programs/correct/abort-guarded-fetch.ts",
@@ -1025,6 +1241,139 @@ it("downgrades a request-guarded lifecycle to heuristic-inventory with no diagno
         factKind: "broadSetterCoMutation",
         confidence: "heuristic-inventory",
         payload: expect.objectContaining({ requestGuard: true }),
+      }),
+    ]),
+  );
+});
+
+it("downgrades a lifecycle when the payload write is inside a positive abort-status guard", async () => {
+  const { facts, result } = await lintCoupledStateCodeWithFacts(`
+    import { useState } from "react";
+    declare function loadUsers(signal: AbortSignal): Promise<string[]>;
+
+    function UsersPanel() {
+      const [users, setUsers] = useState<string[]>([]);
+      const [pending, setPending] = useState(false);
+      const [failure, setFailure] = useState<Error | null>(null);
+
+      return async function load() {
+        const controller = new AbortController();
+        setPending(true);
+        setFailure(null);
+        try {
+          const result = await loadUsers(controller.signal);
+          if (!controller.signal.aborted) {
+            setUsers(result);
+          }
+        } catch (err) {
+          setFailure(err);
+        } finally {
+          setPending(false);
+        }
+      };
+    }
+
+    void UsersPanel;
+  `);
+
+  expect(result.messages).toHaveLength(0);
+  expect(facts.map((fact) => fact.factKind)).not.toContain(
+    "resourceLifecycleProof",
+  );
+  expect(facts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        factKind: "broadSetterCoMutation",
+        confidence: "heuristic-inventory",
+        payload: expect.objectContaining({ requestGuard: true }),
+      }),
+    ]),
+  );
+});
+
+it("does not downgrade lifecycle proof when the abort check follows the payload setter", async () => {
+  const { facts, result } = await lintCoupledStateCodeWithFacts(`
+    import { useState } from "react";
+    declare function loadUsers(signal: AbortSignal): Promise<string[]>;
+
+    function UsersPanel() {
+      const [users, setUsers] = useState<string[]>([]);
+      const [pending, setPending] = useState(false);
+      const [failure, setFailure] = useState<Error | null>(null);
+
+      return async function load() {
+        const controller = new AbortController();
+        setPending(true);
+        setFailure(null);
+        try {
+          const result = await loadUsers(controller.signal);
+          setUsers(result);
+          if (controller.signal.aborted) return;
+        } catch (err) {
+          setFailure(err);
+        } finally {
+          setPending(false);
+        }
+      };
+    }
+
+    void UsersPanel;
+  `);
+
+  expect(result.messages).toHaveLength(1);
+  expect(facts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        factKind: "resourceLifecycleProof",
+        confidence: "deterministic-enforcement",
+        payload: expect.objectContaining({
+          payloadCell: "setUsers",
+          requestGuard: false,
+        }),
+      }),
+    ]),
+  );
+});
+
+it("does not downgrade lifecycle proof for abort calls without an abort status gate", async () => {
+  const { facts, result } = await lintCoupledStateCodeWithFacts(`
+    import { useState } from "react";
+    declare function loadUsers(signal: AbortSignal): Promise<string[]>;
+
+    function UsersPanel() {
+      const [users, setUsers] = useState<string[]>([]);
+      const [pending, setPending] = useState(false);
+      const [failure, setFailure] = useState<Error | null>(null);
+
+      return async function load() {
+        const controller = new AbortController();
+        setPending(true);
+        setFailure(null);
+        try {
+          const result = await loadUsers(controller.signal);
+          controller.abort();
+          setUsers(result);
+        } catch (err) {
+          setFailure(err);
+        } finally {
+          setPending(false);
+        }
+      };
+    }
+
+    void UsersPanel;
+  `);
+
+  expect(result.messages).toHaveLength(1);
+  expect(facts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        factKind: "resourceLifecycleProof",
+        confidence: "deterministic-enforcement",
+        payload: expect.objectContaining({
+          payloadCell: "setUsers",
+          requestGuard: false,
+        }),
       }),
     ]),
   );
