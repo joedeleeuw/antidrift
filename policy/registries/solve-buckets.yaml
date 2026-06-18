@@ -87,7 +87,7 @@ rules:
   antidrift/no-raw-tailwind-color:                  { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "design-token-drift; local AST." }
   antidrift/no-defensive-shape-probing:             { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "broad-value-shape-probing; type-provenance is the right bucket, just not yet proven." }
   antidrift/no-underchecked-type-predicate:         { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "type-guard-laundering; TypeChecker predicate-coverage is the right bucket, not yet proven." }
-  antidrift/no-handrolled-resource-lifecycle-cells: { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "proof rewrite now catches 2 Chaski lifecycle diagnostics while keeping broad co-mutation inventory-only; still needs second-repo validation and review before default enablement." }
+  antidrift/no-handrolled-resource-lifecycle-cells: { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "fixed proof now catches Chaski/Sudocode/Cloudflare lifecycle diagnostics while keeping broad co-mutation inventory-only; still needs human review and clean-control pressure before default enablement." }
   antidrift/no-shattered-ingested-entity-state:     { current: semantic-ast, fit: inventory-only, target: semantic-ast,   note: "behavior detectable in semantic-ast; enforcement needs owner-config + agent-corpus evidence, not a new bucket." }
 
 # Behaviors the taxonomy reveals we do not have blocking coverage for yet. Some need a missing

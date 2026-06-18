@@ -10,10 +10,10 @@ Distilled, cited learnings from the 2026 antidrift research pass: the whitepaper
 
 Real catch blocks store a derived error code or message (`setErrorCode("DATA_INVALID")`, `setErrorCode(deriveCode(err))`), not the raw caught-error parameter. Real payload cells receive a member of the awaited object (`setData(resp.items)`), not the bare awaited value. The fixed `lifecycleProof` now accepts catch-scope error setters and first-level awaited source-member payload setters, while updater setters invalidate the proof to keep pagination clean.
 
-Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2-4; corroborated by both external reviewers (codex-out.md §2a; opencode-out.md §2a). Current fixed-proof measurement: 1,533 Chaski frontend files, 100 broadSetterCoMutation inventory facts, and 2 resourceLifecycleProof diagnostics.
+Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2-4; corroborated by both external reviewers (codex-out.md §2a; opencode-out.md §2a). Current fixed-proof measurement: 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; 230 broadSetterCoMutation inventory facts; and 9 resourceLifecycleProof diagnostics across Chaski, Sudocode, and Cloudflare Agents.
 
 Applies to:
-- `antidrift/no-handrolled-resource-lifecycle-cells` — **proof rewrite implemented, still default-off**. Next proof work is not another adapter rewrite; it is second-repo validation plus human review of the 2 Chaski positives and clean controls.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — **proof rewrite implemented, still default-off**. Next proof work is not another adapter rewrite; it is human review of the Chaski, Sudocode, and Cloudflare positives plus clean-control pressure.
 
 ---
 
@@ -58,7 +58,7 @@ Both React-state rules were shipped on synthetic RuleTester fixtures without mea
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §1 ("real-corpus-first, multi-repo baseline, synthetic tests are a wiring guard not evidence"). This lesson is explicit in the investigation as a committed decision (`064142a`).
 
 Applies to:
-- `antidrift/no-handrolled-resource-lifecycle-cells` — the rewrite is validated against Chaski and found 2 fixed-proof diagnostics, not 102. Promotion now requires ≥1 second repo per `promotionRequirements.stable` plus review of the Chaski positives.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — the rewrite is validated against Chaski, Sudocode, and Cloudflare and found 9 fixed-proof diagnostics, not a broad co-mutation flood. Promotion now requires review of the positives plus real clean controls, not synthetic fixtures.
 - `antidrift/no-shattered-ingested-entity-state` — the existing `nextAction` in `rules.yaml` mandates an agent-generated corpus before any enforcement tier rebuild.
 - All `under-proven` rules — the lesson is general: no rule moves from `under-proven` to `error` on synthetic fixtures alone.
 
@@ -173,6 +173,6 @@ The project's promotion requirements (`rules.yaml` promotionRequirements.stable)
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §4 ("Whether to enable the rule as blocking is a separate promotion decision requiring the must-catch/must-ignore set to hold cleanly across ≥2 repos"); `policy/registries/rules.yaml` promotionRequirements.stable block; `docs/rule-investigations/no-shattered-ingested-entity-state.md` §Validation Plan (multi-repo requirement).
 
 Applies to:
-- `antidrift/no-handrolled-resource-lifecycle-cells` — the proof rewrite (Learnings 1–3) is done but not sufficient for `error` severity. Promotion additionally requires the must-catch/must-ignore set to hold across ≥2 independent repos. The next slice is corpus validation, not another rewrite.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — the proof rewrite (Learnings 1–3) is done but not sufficient for `error` severity. Promotion additionally requires the must-catch/must-ignore set to survive human/adversarial review across independent repos. The next slice is review and clean-control pressure, not another rewrite.
 - `antidrift/no-shattered-ingested-entity-state` — re-promotion needs real owned-entity shatters across more than one repo. The current corpus (two repos, zero positives) is the evidence floor, not just a gap to paper over with agent-generated synthetic fixtures.
 - All `under-proven` rules — `minIndependentRepositories: 2` is a hard gate; no `under-proven` rule should move to `error` on evidence from a single codebase.

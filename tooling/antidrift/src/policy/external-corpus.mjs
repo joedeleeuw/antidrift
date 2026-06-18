@@ -98,6 +98,20 @@ const sudocodeCases = [
     paths: ["frontend/src/pages/IssueDetailPage.tsx"],
   },
   {
+    id: "sudocode-execution-view-cancel-resource-lifecycle",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "frontend",
+    paths: ["frontend/src/components/executions/ExecutionView.tsx"],
+    expectedFindings: [
+      {
+        path: "frontend/src/components/executions/ExecutionView.tsx",
+        line: 463,
+      },
+    ],
+  },
+  {
     id: "sudocode-workflows-route-json-parse-any-row",
     ruleId: "antidrift/no-unsafe-deserialize",
     kind: "drift",
@@ -718,6 +732,14 @@ const murderboxCases = [
     paths: ["apps/client/src/lib/theme.ts"],
   },
   {
+    id: "murderbox-auth-form-submit-lifecycle-clean",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "correct",
+    classification: "under-proven",
+    subproject: "client",
+    paths: ["apps/client/src/components/auth/auth-form.tsx"],
+  },
+  {
     id: "murderbox-chat-item-key-selector-wrapper",
     ruleId: "antidrift/no-trivial-selector-wrapper",
     kind: "drift",
@@ -811,6 +833,20 @@ const cloudflareAgentsCases = [
       {
         path: "examples/playground/src/demos/core/SqlDemo.tsx",
         line: 133,
+      },
+    ],
+  },
+  {
+    id: "cloudflare-worker-bundler-playground-resource-lifecycle",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "examples/worker-bundler-playground",
+    paths: ["examples/worker-bundler-playground/src/client.tsx"],
+    expectedFindings: [
+      {
+        path: "examples/worker-bundler-playground/src/client.tsx",
+        line: 76,
       },
     ],
   },

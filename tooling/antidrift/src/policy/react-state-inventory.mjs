@@ -116,7 +116,7 @@ export function classifyReactStateFact(fact) {
 
 function factEntry(fact) {
   const payload = fact.payload ?? {};
-  return {
+  const entry = {
     factKind: fact.factKind,
     bucket: classifyReactStateFact(fact),
     path: fact.filePath,
@@ -128,6 +128,12 @@ function factEntry(fact) {
     setterCount: payload.setterCount ?? 0,
     cells: payload.cells ?? {},
   };
+  if (fact.factKind === "resourceLifecycleProof") {
+    entry.boolCell = payload.boolCell ?? null;
+    entry.errorCell = payload.errorCell ?? null;
+    entry.payloadCell = payload.payloadCell ?? null;
+  }
+  return entry;
 }
 
 function increment(map, key) {

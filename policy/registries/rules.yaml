@@ -227,7 +227,7 @@ policyRuleReviews:
     antidriftRule: antidrift/no-handrolled-resource-lifecycle-cells
     coverage: "Implemented as a semantic React state graph rule: deterministic resource-lifecycle proof blocks, while broad multi-setter co-mutation emits inventory facts only."
     reason: Existing React ecosystem rules do not model coupled setter bindings as one implicit state-machine smell.
-    nextAction: Find real deterministic resource-lifecycle drift for the blocking branch; broad co-mutation is classified inventory and must not widen enforcement by itself.
+    nextAction: Review and classify the Chaski, Sudocode, and Cloudflare fixed-proof positives plus clean controls before any default enablement; broad co-mutation is classified inventory and must not widen enforcement by itself.
   react/no-shattered-ingested-entity-state:
     status: active-custom
     antidriftRule: antidrift/no-shattered-ingested-entity-state
@@ -630,10 +630,10 @@ rules:
     solveType: react-state-shape
     proofBuckets: [semantic-source-type-provenance]
     referenceDoc: docs/rule-roadmap.md
-    corpusRepositories: [chaski, sudocode-main]
+    corpusRepositories: [chaski, sudocode-main, cloudflare-agents, murderbox]
     concerns:
-      - "After the lifecycle proof rewrite, pnpm policy:inventory-react-state checked 1,533 Chaski frontend files, classified 100 broad co-mutation inventory facts, and emitted 2 blocking resourceLifecycleProof diagnostics."
-      - "The two Chaski diagnostics are src/frontend/crow-v2/app/(drawer)/reporting/action-items/index.tsx:78 and src/frontend/crow-v2/app/(drawer)/reporting/weekly-digest/index.tsx:87."
+      - "After the lifecycle proof rewrite, local fixed-proof scans checked 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; they classified 230 broad co-mutation inventory facts and emitted 9 resourceLifecycleProof diagnostics across Chaski, Sudocode, and Cloudflare Agents."
+      - "Pinned drift anchors include Chaski reporting screens, Sudocode execution handlers, and Cloudflare examples; pinned clean controls include Murderbox auth-form submit state plus Chaski synchronous/view-state controls."
       - Broad co-mutation is inventory only; blocking requires a transition that toggles a boolean lifecycle cell, writes a distinct error cell inside catch, and assigns a distinct payload cell from an awaited value or first-level awaited source member.
       - The status-triplet derivability branch belongs here as a redundant-constant-cell proof instead of remaining a standalone name-group rule.
     external:
@@ -649,7 +649,7 @@ rules:
       allows:
         - "setDataOne(left); setDataTwo(right);"
         - 'dispatch({ type: "loaded", data });'
-    nextAction: Validate the fixed proof across at least one additional independent React repo and review the two Chaski diagnostics plus pagination/request-guard clean controls before enabling the default-off rule.
+    nextAction: Human-review the multi-repo positives, add/remediate clean controls where review finds ordinary form or mutation state, and keep the default-off rule under-proven until promotion has zero known false positives.
   antidrift/no-shattered-ingested-entity-state:
     status: under-proven
     stable: false

@@ -236,9 +236,9 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Pattern: a reducer, a discriminated-union cell, or a resource hook.
 - Ecosystem: none models coupled setter bindings (net-antidrift).
 - Signal: source binding plus local transition/control-flow proof.
-- Evidence: current fixed-proof `pnpm policy:inventory-react-state` checked 1,533 Chaski frontend files, kept 100 broad co-mutation facts inventory-only, and emitted 2 blocking lifecycle diagnostics in Chaski reporting screens. The older seven-repo broad co-mutation scan is still useful false-positive pressure, but it predates the fixed lifecycle proof and no longer settles enforcement readiness.
+- Evidence: current fixed-proof scans checked 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; they kept 230 broad co-mutation facts inventory-only and emitted 9 lifecycle diagnostics across Chaski, Sudocode, and Cloudflare Agents. The older broad co-mutation scan is still useful false-positive pressure, but broad co-mutation never settles enforcement readiness.
 - False-positive concern: legitimate multi-cell form and view-state handlers dominate broad co-mutation, so broad co-mutation remains inventory only.
-- Blocker: validate the fixed lifecycle proof in a second independent React repo and review the 2 Chaski positives before stable promotion. Broad co-mutation alone must not block.
+- Blocker: review the fixed-proof positives across Chaski, Sudocode, and Cloudflare plus clean controls before stable promotion. Broad co-mutation alone must not block.
 
 ### `antidrift/no-async-array-method`
 
@@ -418,7 +418,7 @@ These are the live grill questions reduced to recommended outcomes. Each changes
 
 ## Next Slices
 
-1. Find real deterministic resource-lifecycle drift for `no-handrolled-resource-lifecycle-cells`; broad seven-repo co-mutation is classified inventory and the deterministic lifecycle branch is already the blocking core.
+1. Review and classify real deterministic resource-lifecycle positives for `no-handrolled-resource-lifecycle-cells`; broad co-mutation is classified inventory and the deterministic lifecycle branch is already the blocking core.
 2. Find independent generated-source replication and real accepted package-owner evidence for `no-structural-type-fork`; the unconfigured installed-package sweep is now analytics/inventory.
 3. Keep `no-defensive-shape-probing` as explicit default-off inventory; do not spend promotion work there unless new broad-value drift appears.
 4. Run adversarial review for `no-canonical-model-fork` against Chaski plus Sudocode evidence; keep `no-underchecked-type-predicate` default-off while seeking real required-field drift.

@@ -92,6 +92,16 @@ export function Users() {
       "synchronous-multi-cell-update": 1,
     });
     expect(result.diagnosticCount).toBe(1);
+    expect(result.facts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          factKind: "resourceLifecycleProof",
+          boolCell: "setPending",
+          errorCell: "setFailure",
+          payloadCell: "setUsers",
+        }),
+      ]),
+    );
   });
 
   it("classifies partial async resource updates separately from proven lifecycle drift", () => {
