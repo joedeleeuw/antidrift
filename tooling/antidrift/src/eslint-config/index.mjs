@@ -434,8 +434,6 @@ export function createConfig({
         "antidrift/no-handrolled-resource-lifecycle-cells": "off",
         "antidrift/no-shattered-ingested-entity-state": "off",
         "antidrift/require-effect-deps": "error",
-        "antidrift/no-raw-tailwind-color": "off",
-        "antidrift/no-hover-translate-card": "off",
         "antidrift/no-raw-fetch-in-component": "off",
         "antidrift/no-async-array-method": "off",
 
@@ -451,6 +449,11 @@ export function createConfig({
         "antidrift/no-unsafe-deserialize": "error",
 
         "antidrift/no-status-literal-in-type": "off",
+
+        // React/TanStack drift rules ported from getsentry/sentry. Default-off
+        // (opt-in) until local corpus inventory quantifies drift for stable promotion.
+        "antidrift/no-calling-components-as-functions": "off",
+        "antidrift/no-query-data-type-parameters": "off",
         ...(restrictedImportPatterns.length > 0
           ? {
               "no-restricted-imports": restrictedImportsRule(

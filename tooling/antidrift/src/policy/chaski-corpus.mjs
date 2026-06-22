@@ -40,8 +40,50 @@ const canonicalModelForkOptions = {
     },
   ],
 };
+const planStatusLiteralOptions = {
+  "antidrift/no-status-literal-in-type": [
+    {
+      statuses: {
+        PlanStatus: {
+          owner:
+            "src/frontend/portal/modules/Orchestration/plans/types/orchestration.ts",
+          values: [
+            "active",
+            "pending",
+            "draft",
+            "simulating",
+            "simulation_success",
+            "simulation_failed",
+            "simulation_warning",
+            "released_and_valid",
+            "released_and_invalid",
+            "past",
+            "archived",
+            "unknown",
+          ],
+        },
+      },
+    },
+  ],
+};
 
 export const defaultCases = [
+  {
+    id: "portal-types-reports-no-calling-components-clean",
+    ruleId: "antidrift/no-calling-components-as-functions",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    paths: ["src/frontend/portal/types/reports.ts"],
+  },
+  {
+    id: "portal-types-reports-no-query-data-type-parameters-clean",
+    ruleId: "antidrift/no-query-data-type-parameters",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    paths: ["src/frontend/portal/types/reports.ts"],
+  },
   {
     id: "portal-api-service-axios-error-appeasement-cast",
     ruleId: "antidrift/no-appeasement-cast",
@@ -473,32 +515,18 @@ export const defaultCases = [
     classification: "ready",
     subproject: "frontend",
     paths: ["src/frontend/portal/components/Tag.tsx"],
-    ruleOptions: {
-      "antidrift/no-status-literal-in-type": [
-        {
-          statuses: {
-            PlanStatus: {
-              owner:
-                "src/frontend/portal/modules/Orchestration/plans/types/orchestration.ts",
-              values: [
-                "active",
-                "pending",
-                "draft",
-                "simulating",
-                "simulation_success",
-                "simulation_failed",
-                "simulation_warning",
-                "released_and_valid",
-                "released_and_invalid",
-                "past",
-                "archived",
-                "unknown",
-              ],
-            },
-          },
-        },
-      ],
-    },
+    ruleOptions: planStatusLiteralOptions,
+  },
+  {
+    id: "monolith-line-item-status-prop-not-plan-status-clean",
+    ruleId: "antidrift/no-status-literal-in-type",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    paths: [
+      "src/frontend/monolithui/src/components/OrdersOpsV2/components/OrderDetailDrawer.tsx",
+    ],
+    ruleOptions: planStatusLiteralOptions,
   },
   {
     id: "portal-users-table-direct-posthog-import",
@@ -725,52 +753,6 @@ export const defaultCases = [
     typeAware: true,
     tsconfig: "src/frontend/monolithui/tsconfig.json",
     paths: ["src/frontend/monolithui/src/components/EditPOModal.tsx"],
-  },
-  {
-    id: "portal-inventory-raw-tailwind-color",
-    ruleId: "antidrift/no-raw-tailwind-color",
-    kind: "correct",
-    classification: "retired",
-    subproject: "frontend",
-    paths: [
-      "src/frontend/portal/modules/InventoryInMarket/InventoryInMarket.tsx",
-    ],
-  },
-  {
-    id: "monolith-products-no-raw-tailwind-color",
-    ruleId: "antidrift/no-raw-tailwind-color",
-    kind: "correct",
-    classification: "retired",
-    subproject: "frontend",
-    paths: ["src/frontend/monolithui/src/components/Products.tsx"],
-  },
-  {
-    id: "monolith-category-nav-hover-color-no-translate-clean",
-    ruleId: "antidrift/no-hover-translate-card",
-    kind: "correct",
-    classification: "retired",
-    subproject: "frontend",
-    paths: [
-      "src/frontend/monolithui/src/components/SolverConfig/CategoryNav.tsx",
-    ],
-  },
-  {
-    id: "monolith-find-my-rep-hover-scale-no-translate-clean",
-    ruleId: "antidrift/no-hover-translate-card",
-    kind: "correct",
-    classification: "retired",
-    subproject: "frontend",
-    paths: ["src/frontend/monolithui/src/components/FindMyRep.tsx"],
-  },
-  {
-    id: "portal-visualize-tabs-active-indicator-translate-clean",
-    ruleId: "antidrift/no-hover-translate-card",
-    kind: "correct",
-    classification: "retired",
-    subproject: "frontend",
-    paths: [
-      "src/frontend/portal/modules/visualize-impact/components/visualize-impact-tabs.tsx",
-    ],
   },
   {
     id: "portal-agent-table-nested-selector-wrapper",

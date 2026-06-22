@@ -91,15 +91,51 @@ ruleTester.run("no-async-array-method", rule("no-async-array-method"), {
   valid: [
     fixture("programs/correct/async-map-promise-all.ts"),
     fixture("programs/correct/async-map-delayed-promise-all.ts"),
+    {
+      ...fixture("programs/correct/async-map-promise-all.ts"),
+      options: [{ branches: ["requires-collection"] }],
+    },
+    {
+      ...fixture("programs/correct/async-map-delayed-promise-all.ts"),
+      options: [{ branches: ["requires-collection"] }],
+    },
+    {
+      code: "async function load(ids) { return ids.map(async (id) => fetch(id)); }",
+      options: [{ branches: ["requires-collection"] }],
+    },
+    {
+      code: "async function load(ids) { const pending = ids.map(async (id) => fetch(id)); return pending; }",
+      options: [{ branches: ["requires-collection"] }],
+    },
+    {
+      code: "const load = (ids) => ids.map(async (id) => fetch(id));",
+      options: [{ branches: ["requires-collection"] }],
+    },
+    {
+      code: "async function load(ids, ok) { return ok ? ids.map(async (id) => fetch(id)) : []; }",
+      options: [{ branches: ["requires-collection"] }],
+    },
+    fixture("programs/drift/async-map-without-promise-all.ts"),
     "items.map((i) => i + 1);",
     "async function f() { for (const i of items) { await work(i); } }",
   ],
   invalid: [
     {
-      ...fixture("programs/drift/async-map-without-promise-all.ts"),
+      code: "async function load(ids) { const pending = ids.map(async (id) => fetch(id)); return pending.length; }",
+      options: [{ branches: ["requires-collection"] }],
+      errors: 1,
+    },
+    {
+      code: "async function load(ids) { const pending = ids.map(async (id) => fetch(id)); return pending.length; }",
+      options: [{ branches: ["never-await", "requires-collection"] }],
       errors: 1,
     },
     { ...fixture("programs/drift/async-foreach-callback.ts"), errors: 1 },
+    {
+      ...fixture("programs/drift/async-foreach-callback.ts"),
+      options: [{ branches: ["requires-collection"] }],
+      errors: 1,
+    },
     { ...fixture("programs/drift/async-filter-callback.ts"), errors: 1 },
   ],
 });
@@ -140,6 +176,57 @@ ruleTester.run("require-effect-deps", rule("require-effect-deps"), {
     { ...fixture("programs/drift/effect-missing-deps.ts"), errors: 1 },
   ],
 });
+
+ruleTester.run(
+  "no-calling-components-as-functions",
+  rule("no-calling-components-as-functions"),
+  {
+    valid: [
+      "function lower() {} lower();",
+      "const BREAKPOINTS = () => {}; BREAKPOINTS();",
+      'import { Schema } from "effect"; Schema.Struct({ id: 1 });',
+      'import { Widget } from "./w"; const ref = Widget;',
+      "unknownThing({ a: 1 });",
+    ],
+    invalid: [
+      {
+        code: "function Widget() { return null; } Widget({ label: 'x' });",
+        output: "function Widget() { return null; } <Widget label={'x'} />;",
+        errors: 1,
+      },
+      {
+        code: 'import { Card } from "./c"; Card();',
+        output: 'import { Card } from "./c"; <Card />;',
+        errors: 1,
+      },
+      {
+        code: "const Box = () => null; Box({ a: 1 });",
+        output: "const Box = () => null; <Box a={1} />;",
+        errors: 1,
+      },
+    ],
+  },
+);
+
+ruleTester.run(
+  "no-query-data-type-parameters",
+  rule("no-query-data-type-parameters"),
+  {
+    valid: [
+      'queryClient.getQueryData(["k"]);',
+      'queryClient.setQueryData(["k"], 1);',
+      'other.getData<number>(["k"]);',
+      'getQueryData<number>(["k"]);',
+    ],
+    invalid: [
+      { code: 'queryClient.getQueryData<number>(["count"]);', errors: 1 },
+      {
+        code: 'client.setQueryData<{ a: number }>(["k"], { a: 1 });',
+        errors: 1,
+      },
+    ],
+  },
+);
 
 ruleTester.run(
   "no-trivial-selector-wrapper",
@@ -389,9 +476,17 @@ ruleTester.run(
   {
     valid: [
       fixture("programs/correct/named-structural-parameter-type.ts"),
-      "import type { ReactNode } from 'react';\nexport function Shell({ children }: { children: ReactNode }) { return children; }",
+      {
+        filename: "shell.tsx",
+        code: "import type { ReactNode } from 'react';\nexport function Shell({ children }: { children: ReactNode }) { return <div>{children}</div>; }",
+      },
+      {
+        filename: "component-map.tsx",
+        code: "import type { ReactNode } from 'react';\nexport const components = { Shell({ children }: { children: ReactNode }) { return <div>{children}</div>; } };",
+      },
       "type Props = { onConfirm: (date: { year: number; month: number; day: number }) => void }; void ({} as Props);",
       "const formatDate = (date: { year: number; month: number; day: number }) => String(date.year); void formatDate;",
+      "function local({ id }: { id: string }) { return id; } void local;",
     ],
     invalid: [
       {
@@ -402,32 +497,30 @@ ruleTester.run(
         code: "export const createApi = () => ({ saveUser: async (req: { id: string; email: string }) => req.email });",
         errors: 1,
       },
+      {
+        code: "export function LoadUser(input: { id: string }) { return input.id; }",
+        errors: 1,
+      },
+      {
+        code: "export function loadUser({ id }: { id: string }) { return id; }",
+        errors: 1,
+      },
+      {
+        code: "export class Api { saveUser(req: { id: string; email: string }) { return req.email; } }",
+        errors: 1,
+      },
+      {
+        code: "const api = { saveUser: async (req: { id: string; email: string }) => req.email };\nexport { api };",
+        errors: 1,
+      },
+      {
+        filename: "loader.tsx",
+        code: "export function loadUser(input: { id: string }) { const view = <div />; void view; return input.id; }",
+        errors: 1,
+      },
     ],
   },
 );
-
-describe("deprecated design-system compatibility rules", () => {
-  it("keeps regex sampler rules exported as deprecated no-op stubs", () => {
-    expect(rule("no-raw-tailwind-color").meta.deprecated).toBe(true);
-    expect(rule("no-hover-translate-card").meta.deprecated).toBe(true);
-  });
-});
-
-ruleTester.run("no-raw-tailwind-color", rule("no-raw-tailwind-color"), {
-  valid: [
-    fixture("programs/correct/semantic-tailwind-token.tsx"),
-    fixture("programs/drift/raw-tailwind-color-class.tsx"),
-  ],
-  invalid: [],
-});
-
-ruleTester.run("no-hover-translate-card", rule("no-hover-translate-card"), {
-  valid: [
-    fixture("programs/correct/hover-shadow-card.tsx"),
-    fixture("programs/drift/hover-translate-card.tsx"),
-  ],
-  invalid: [],
-});
 
 ruleTester.run("no-raw-fetch-in-component", rule("no-raw-fetch-in-component"), {
   valid: [
@@ -455,6 +548,57 @@ ruleTester.run("no-raw-fetch-in-component", rule("no-raw-fetch-in-component"), {
         }
 
         void UserLoader;
+      `,
+    },
+    {
+      filename: "component-imported-fetch.tsx",
+      code: `
+        import { fetch } from "./api-client";
+
+        export function UsersView() {
+          fetch("/api/users");
+          return <div>Users</div>;
+        }
+      `,
+    },
+    {
+      filename: "component-local-fetch.tsx",
+      code: `
+        export function UsersView() {
+          const fetch = (url: string) => apiClient(url);
+          fetch("/api/users");
+          return <div>Users</div>;
+        }
+      `,
+    },
+    {
+      filename: "component-local-window.tsx",
+      code: `
+        export function UsersView() {
+          const window = { fetch: (url: string) => apiClient(url) };
+          window.fetch("/api/users");
+          return <div>Users</div>;
+        }
+      `,
+    },
+    {
+      filename: "component-local-self.tsx",
+      code: `
+        export function UsersView() {
+          const self = { fetch: (url: string) => apiClient(url) };
+          self.fetch("/api/users");
+          return <div>Users</div>;
+        }
+      `,
+    },
+    {
+      filename: "component-local-global-this.tsx",
+      code: `
+        export function UsersView() {
+          const globalThis = { fetch: (url: string) => apiClient(url) };
+          globalThis.fetch("/api/users");
+          return <div>Users</div>;
+        }
       `,
     },
   ],
@@ -693,10 +837,26 @@ ruleTester.run("no-status-literal-in-type", rule("no-status-literal-in-type"), {
       filename: "/repo/apps/web/src/Badge.ts",
       options: [statusOptions],
     },
+    {
+      code: "type FeatureStatus = 'active' | 'disabled';",
+      filename: "/repo/apps/web/src/feature.ts",
+      options: [statusOptions],
+    },
+    {
+      code: "let status: 'active' | 'disabled'; void status;",
+      filename: "/repo/apps/web/src/status.ts",
+      options: [statusOptions],
+    },
   ],
   invalid: [
     {
       ...fixture("programs/drift/status-literal-type-fork.ts"),
+      options: [statusOptions],
+      errors: 2,
+    },
+    {
+      code: "type User = { status: 'active' | 'disabled' };",
+      filename: "/repo/apps/web/src/user-copy.ts",
       options: [statusOptions],
       errors: 2,
     },
@@ -747,20 +907,42 @@ typedRuleTester.run(
   },
 );
 
+const authzRuleOptions = [{ authzFunctions: ["authorize"] }];
+
 ruleTester.run("require-authz-check", rule("require-authz-check"), {
   valid: [
-    fixture("programs/correct/authz-before-params.ts"),
-    "function handler(req) { const body = req.body; return body; }",
-    // Bug regression: outer authorize should NOT suppress a violation in an inner callback that
-    // accesses params without its own authorize call. Before the fix, sawAuthz was set on ALL
-    // frames, so the inner callback got credit for the outer function's authorize call.
-    "function outer(req) { authorize(req.user); }",
+    {
+      ...fixture("programs/correct/authz-before-params.ts"),
+      options: authzRuleOptions,
+    },
+    {
+      code: "function handler(req) { const body = req.body; return body; }",
+      options: authzRuleOptions,
+    },
+    {
+      code: "function outer(req) { authorize(req.user); }",
+      options: authzRuleOptions,
+    },
   ],
   invalid: [
-    { ...fixture("programs/drift/params-without-authz.ts"), errors: 1 },
-    // Regression case: outer authorize must not suppress inner violation.
+    {
+      ...fixture("programs/drift/params-without-authz.ts"),
+      options: authzRuleOptions,
+      errors: 1,
+    },
     {
       ...fixture("programs/drift/nested-params-without-local-authz.ts"),
+      options: authzRuleOptions,
+      errors: 1,
+    },
+    {
+      code: `
+        function handler(req) {
+          authorize(req.user);
+          return req.params.projectId;
+        }
+      `,
+      options: [{ authzFunctions: ["approvedAuthorize"] }],
       errors: 1,
     },
   ],

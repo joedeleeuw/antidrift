@@ -1,4 +1,3 @@
-import { ESLintUtils } from "@typescript-eslint/utils";
 import ts from "typescript";
 
 import {
@@ -7,6 +6,8 @@ import {
   lifecycleProof,
   sourceShardProof,
 } from "./react-state-graph.js";
+import ruleNoCallingComponentsAsFunctions from "./rules/no-calling-components-as-functions.js";
+import ruleNoQueryDataTypeParameters from "./rules/no-query-data-type-parameters.js";
 import {
   emitSemanticFact,
   semanticFactSink,
@@ -16,11 +17,12 @@ import {
   findVariable,
   getDeclaredVariable,
   isDirectlyWrappedInPromiseCombinator,
+  isReturnedExpression,
   markAwaitedPendingMaps,
+  markReturnedPendingMaps,
   queuePendingAsyncMap,
 } from "../semantic-adapters/async-control-flow.mjs";
 import {
-  DEFAULT_AUTHZ_FUNCTIONS,
   createAuthBoundaryTracker,
 } from "../semantic-adapters/auth-boundary.mjs";
 import {
@@ -72,10 +74,6 @@ import {
   typeProps,
 } from "../semantic-adapters/type-owner.mjs";
 
-const createRule = ESLintUtils.RuleCreator(
-  (name) =>
-    `https://github.com/joedeleeuw/antidrift/tree/main/tooling/antidrift#${name}`,
-);
 const reactEffectHooks = new Set(["useEffect", "useLayoutEffect"]);
 const collectionMetadataMemberNames = new Set(["length", "size"]);
 const exportedLocalNamesByProgram = new WeakMap();
@@ -227,7 +225,7 @@ function enclosingObjectExported(memberNode) {
   if (objectNode.parent?.type === "ExportDefaultDeclaration") return true;
   return (
     objectNode.parent?.type === "VariableDeclarator" &&
-    objectNode.parent.parent?.parent?.type === "ExportNamedDeclaration"
+    isBoundary(objectNode.parent)
   );
 }
 
@@ -517,42 +515,12 @@ function isTrivialSelectorWrapper(fn) {
   );
 }
 
-function isReactComponentName(name) {
-  return /^[A-Z]/u.test(name);
-}
-
 function isFunctionLike(node) {
   return (
     node?.type === "FunctionDeclaration" ||
     node?.type === "FunctionExpression" ||
     node?.type === "ArrowFunctionExpression"
   );
-}
-
-function functionNodeName(fn) {
-  if (fn?.type === "FunctionDeclaration") return fn.id?.name ?? "";
-  if (
-    (fn?.type === "FunctionExpression" ||
-      fn?.type === "ArrowFunctionExpression") &&
-    fn.parent?.type === "VariableDeclarator" &&
-    fn.parent.id?.type === "Identifier"
-  ) {
-    return fn.parent.id.name;
-  }
-  if (
-    (fn?.type === "FunctionExpression" ||
-      fn?.type === "ArrowFunctionExpression") &&
-    fn.parent?.type === "Property"
-  ) {
-    const key = fn.parent.key;
-    if (key?.type === "Identifier" || key?.type === "PrivateIdentifier") {
-      return key.name;
-    }
-    if (key?.type === "Literal" && typeof key.value === "string") {
-      return key.value;
-    }
-  }
-  return "";
 }
 
 function functionForImplementationParameter(param) {
@@ -572,28 +540,56 @@ function isBoundaryObjectMethod(fn) {
   );
 }
 
-function isExportedLowercaseFunction(fn) {
-  const owner = fn?.type === "FunctionDeclaration" ? fn : fn?.parent;
-  const name = functionNodeName(fn);
+function collectJsxLocals(statement, jsxLocals) {
+  if (statement.type !== "VariableDeclaration") return;
+  for (const declaration of statement.declarations) {
+    if (
+      declaration.id?.type === "Identifier" &&
+      containsJsxNode(declaration.init)
+    ) {
+      jsxLocals.add(declaration.id.name);
+    }
+  }
+}
+
+function returnsJsxExpression(statement, jsxLocals) {
+  if (statement.type !== "ReturnStatement") return false;
+  if (containsJsxNode(statement.argument)) return true;
   return Boolean(
-    name && !isReactComponentName(name) && owner && isBoundary(owner),
+    statement.argument?.type === "Identifier" &&
+      jsxLocals.has(statement.argument.name),
   );
+}
+
+function blockReturnsJsx(body) {
+  const jsxLocals = new Set();
+  for (const statement of body.body) {
+    collectJsxLocals(statement, jsxLocals);
+    if (returnsJsxExpression(statement, jsxLocals)) return true;
+  }
+  return false;
+}
+
+function functionReturnsJsx(fn) {
+  if (fn?.body?.type !== "BlockStatement") return containsJsxNode(fn?.body);
+  return blockReturnsJsx(fn.body);
+}
+
+function isExportedFunctionBoundary(fn) {
+  const owner = functionBoundaryNode(fn);
+  return Boolean(owner && isBoundary(owner));
 }
 
 function inlineStructuralTypeAtBoundary(node) {
   const parent = node.parent;
   const param = parent?.parent;
-  if (parent?.type !== "TSTypeAnnotation" || param?.type !== "Identifier") {
-    return false;
-  }
+  if (parent?.type !== "TSTypeAnnotation" || !param) return false;
 
   const fn = functionForImplementationParameter(param);
   if (!fn) return false;
+  if (functionReturnsJsx(fn)) return false;
 
-  const name = functionNodeName(fn);
-  if (name && isReactComponentName(name)) return false;
-
-  return isBoundaryObjectMethod(fn) || isExportedLowercaseFunction(fn);
+  return isBoundaryObjectMethod(fn) || isExportedFunctionBoundary(fn);
 }
 
 // Visit free functions, arrow consts, and class methods/fields uniformly — agents hide the same
@@ -725,18 +721,24 @@ function ruleNoHandrolledResourceLifecycleCells() {
   };
 }
 
-function isGlobalFetchCall(callee) {
-  if (callee?.type === "Identifier") return callee.name === "fetch";
+function isUnshadowedGlobalName(sourceCode, identifier, name) {
+  if (identifier?.type !== "Identifier" || identifier.name !== name) return false;
+  const variable = findVariable(sourceCode, identifier);
+  return !variable || variable.defs.length === 0;
+}
+
+function isGlobalFetchCall(sourceCode, callee) {
+  if (callee?.type === "Identifier") {
+    return isUnshadowedGlobalName(sourceCode, callee, "fetch");
+  }
   if (callee?.type !== "MemberExpression" || callee.computed) return false;
-  const objectName =
-    callee.object?.type === "Identifier" ? callee.object.name : "";
   const propertyName =
     callee.property?.type === "Identifier" ? callee.property.name : "";
   return (
     propertyName === "fetch" &&
-    (objectName === "globalThis" ||
-      objectName === "window" ||
-      objectName === "self")
+    ["globalThis", "window", "self"].some((name) =>
+      isUnshadowedGlobalName(sourceCode, callee.object, name),
+    )
   );
 }
 
@@ -864,23 +866,6 @@ function ruleRequireEffectDeps() {
   };
 }
 
-function ruleDeprecatedNoop(name, description) {
-  return createRule({
-    name,
-    meta: {
-      type: "problem",
-      deprecated: true,
-      docs: { description },
-      messages: {},
-      schema: [],
-    },
-    defaultOptions: [],
-    create() {
-      return {};
-    },
-  });
-}
-
 function containsJsxNode(node) {
   if (!node || typeof node !== "object") return false;
   if (node.type === "JSXElement" || node.type === "JSXFragment") return true;
@@ -905,6 +890,7 @@ function ruleNoRawFetchInComponent() {
       schema: [],
     },
     create(context) {
+      const sourceCode = context.sourceCode ?? context.getSourceCode();
       const stack = [];
       function enterFunction(node) {
         stack.push({
@@ -959,7 +945,7 @@ function ruleNoRawFetchInComponent() {
           }
         },
         CallExpression(node) {
-          if (isGlobalFetchCall(node.callee) && stack.length > 0) {
+          if (isGlobalFetchCall(sourceCode, node.callee) && stack.length > 0) {
             const frame = stack[stack.length - 1];
             frame.fetches.push(node);
           }
@@ -973,6 +959,10 @@ function asyncMapMessage(method) {
   return `Wrap .${method}() with an async callback in Promise.all(...) (or Promise.allSettled) so the promises are awaited.`;
 }
 
+function enabledAsyncArrayBranches(option) {
+  return new Set(["never-await", ...(option?.branches ?? [])]);
+}
+
 function ruleNoAsyncArrayMethod() {
   return {
     meta: {
@@ -981,15 +971,32 @@ function ruleNoAsyncArrayMethod() {
         description:
           "Disallow async callbacks passed to array iteration methods that silently drop or mishandle the returned promises.",
       },
-      schema: [],
+      schema: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["branches"],
+          properties: {
+            branches: {
+              type: "array",
+              minItems: 1,
+              uniqueItems: true,
+              items: {
+                enum: ["never-await", "requires-collection"],
+              },
+            },
+          },
+        },
+      ],
     },
     create(context) {
       const sourceCode = context.sourceCode ?? context.getSourceCode();
       const pendingAsyncMaps = [];
+      const enabledBranches = enabledAsyncArrayBranches(context.options[0]);
       return {
         "Program:exit"() {
           for (const pending of pendingAsyncMaps) {
-            if (!pending.awaited) {
+            if (!pending.awaited && !pending.returned) {
               context.report({
                 node: pending.node,
                 message: asyncMapMessage(pending.method),
@@ -997,11 +1004,15 @@ function ruleNoAsyncArrayMethod() {
             }
           }
         },
+        ReturnStatement(node) {
+          markReturnedPendingMaps(sourceCode, node, pendingAsyncMaps);
+        },
         CallExpression(node) {
           markAwaitedPendingMaps(sourceCode, node, pendingAsyncMaps);
           const classification = asyncArrayCallbackClassification(node);
           if (!classification) return;
           const { callback, method } = classification;
+          if (!enabledBranches.has(classification.kind)) return;
           if (classification.kind === "never-await") {
             context.report({
               node: callback,
@@ -1011,6 +1022,7 @@ function ruleNoAsyncArrayMethod() {
           }
           if (classification.kind === "requires-collection") {
             if (isDirectlyWrappedInPromiseCombinator(node)) return;
+            if (isReturnedExpression(node)) return;
             if (
               queuePendingAsyncMap(
                 sourceCode,
@@ -2053,38 +2065,7 @@ function ruleNoSqlStringConcat() {
           : null;
         return Boolean(key && members?.has(key));
       }
-      function typeNames(type) {
-        return new Set(
-          [
-            checker.typeToString(type),
-            type.getSymbol()?.getName(),
-            type.aliasSymbol?.getName(),
-          ].filter(Boolean),
-        );
-      }
-      function collectTypeNames(type, names = new Set(), seen = new Set()) {
-        if (!type || seen.has(type)) return names;
-        seen.add(type);
-        for (const name of typeNames(type)) names.add(name);
-        if (type.isUnionOrIntersection?.()) {
-          for (const member of type.types ?? []) {
-            collectTypeNames(member, names, seen);
-          }
-        }
-        const apparent = checker.getApparentType(type);
-        if (apparent && apparent !== type) collectTypeNames(apparent, names, seen);
-        if (type.isClassOrInterface?.()) {
-          for (const base of checker.getBaseTypes(type) ?? []) {
-            collectTypeNames(base, names, seen);
-          }
-        }
-        return names;
-      }
       function typeMatchesTrustedMemberSpec(type, member, candidates) {
-        const names = collectTypeNames(type);
-        if (candidates.some(({ type: typeName }) => names.has(typeName))) {
-          return true;
-        }
         const property = checker.getPropertyOfType(type, member);
         for (const declaration of property?.declarations ?? []) {
           const owners = declarationOwnerNames(declaration);
@@ -2762,23 +2743,33 @@ function ruleRequireAuthzCheck() {
         {
           type: "object",
           properties: {
-            authzFunctions: { type: "array", items: { type: "string" } },
+            authzFunctions: {
+              type: "array",
+              items: { type: "string", minLength: 1 },
+              minItems: 1,
+              uniqueItems: true,
+            },
           },
+          required: ["authzFunctions"],
           additionalProperties: false,
         },
       ],
     },
     create(context) {
+      const options = context.options[0];
+      if (!options) {
+        throw new Error(
+          "antidrift/require-authz-check requires authzFunctions",
+        );
+      }
       const tracker = createAuthBoundaryTracker({
-        authzFunctions: context.options[0]?.authzFunctions ?? [
-          ...DEFAULT_AUTHZ_FUNCTIONS,
-        ],
+        authzFunctions: options.authzFunctions,
         onFrameExit(frame) {
           if (frame.paramsAccess && !frame.sawAuthz) {
             context.report({
               node: frame.paramsAccess,
               message:
-                "Handler reads request params without an authorization/ownership check. Call requireUser/authorize (boundaries registry).",
+                "Handler reads request params without a configured authorization/ownership check.",
             });
           }
         },
@@ -3466,14 +3457,6 @@ const rules = {
   "no-handrolled-resource-lifecycle-cells": ruleNoHandrolledResourceLifecycleCells(),
   "no-shattered-ingested-entity-state": ruleNoShatteredIngestedEntityState(),
   "require-effect-deps": ruleRequireEffectDeps(),
-  "no-raw-tailwind-color": ruleDeprecatedNoop(
-    "no-raw-tailwind-color",
-    "Deprecated compatibility stub for a retired regex Tailwind color sampler.",
-  ),
-  "no-hover-translate-card": ruleDeprecatedNoop(
-    "no-hover-translate-card",
-    "Deprecated compatibility stub for a retired hover translate class sampler.",
-  ),
   "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
   "no-async-array-method": ruleNoAsyncArrayMethod(),
   "no-sql-string-concat": ruleNoSqlStringConcat(),
@@ -3483,6 +3466,8 @@ const rules = {
   "no-canonical-model-fork": ruleNoCanonicalModelFork(),
   "no-redundant-zod-parse": ruleNoRedundantZodParse(),
   "no-status-literal-in-type": ruleNoStatusLiteralInType(),
+  "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
+  "no-query-data-type-parameters": ruleNoQueryDataTypeParameters(),
 };
 
 export default {
