@@ -4,6 +4,8 @@ dist
 coverage
 reports
 .tmp
+.sudocode/
+data/fullshards/
 .DS_Store
 .env
 .env.*
