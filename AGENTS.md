@@ -11,6 +11,8 @@ Run `pnpm policy:verify-session` before finishing substantial code work.
 - Do not edit generated policy artifacts directly.
 - Do not weaken lint/type/test/CI/Sonar/hook configuration unless the task includes `[policy-change]`.
 - Do not add type escape hatches, silent catches, focused tests, raw component fetches, or cross-layer imports.
+- Do not add compatibility barrels, re-export barrels, or import-preserving barrel files.
+- Do not add compatibility shims, legacy aliases, fallback wrappers, or backwards-compatible wrappers unless the task explicitly asks for a migration bridge and removal plan.
 
 ## Rule clusters
 

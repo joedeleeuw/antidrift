@@ -11,6 +11,9 @@ meta:
     - .github/copilot-instructions.md # Copilot consumes repository instructions.
     - .codex/hooks.json # Codex uses this for deterministic lifecycle enforcement.
     - .claude/settings.json # Claude uses this for deterministic lifecycle enforcement.
+  never:
+    - Do not add compatibility barrels, re-export barrels, or import-preserving barrel files.
+    - Do not add compatibility shims, legacy aliases, fallback wrappers, or backwards-compatible wrappers unless the task explicitly asks for a migration bridge and removal plan.
 
 clusters:
   - id: react-state-shape # Agents often create working UI with coupled state lifecycle hidden across many useState calls.

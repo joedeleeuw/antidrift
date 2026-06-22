@@ -14,9 +14,15 @@ async function write(path, content) {
 export function renderPolicyArtifacts(policy) {
   const clusterLines = policy.clusters.map((cluster) => `- **${cluster.id}** (${cluster.owner}): ${cluster.rules.map((rule) => rule.id).join(", ")}`).join("\n");
   const header = "This file is generated from `policy/agent-guardrails.yaml`. Do not edit it directly.";
+  const neverLines = [
+    "Do not edit generated policy artifacts directly.",
+    "Do not weaken lint/type/test/CI/Sonar/hook configuration unless the task includes `[policy-change]`.",
+    "Do not add type escape hatches, silent catches, focused tests, raw component fetches, or cross-layer imports.",
+    ...(Array.isArray(policy.meta?.never) ? policy.meta.never : []),
+  ].map((rule) => `- ${rule}`).join("\n");
 
   const artifacts = new Map();
-  artifacts.set("AGENTS.md", `# Repository Agent Instructions\n\n${header}\n\n## Required checks\n\nRun \`pnpm policy:verify-session\` before finishing substantial code work.\n\n## Never\n\n- Do not edit generated policy artifacts directly.\n- Do not weaken lint/type/test/CI/Sonar/hook configuration unless the task includes \`[policy-change]\`.\n- Do not add type escape hatches, silent catches, focused tests, raw component fetches, or cross-layer imports.\n\n## Rule clusters\n\n${clusterLines}\n`);
+  artifacts.set("AGENTS.md", `# Repository Agent Instructions\n\n${header}\n\n## Required checks\n\nRun \`pnpm policy:verify-session\` before finishing substantial code work.\n\n## Never\n\n${neverLines}\n\n## Rule clusters\n\n${clusterLines}\n`);
 
   artifacts.set("CLAUDE.md", `# Claude Project Instructions\n\n${header}\n\nTreat hooks and deterministic checks as authoritative. Fix code instead of weakening policy.\n\n## Stop condition\n\nRun \`pnpm policy:verify-session\` before stopping.\n\n## Rule clusters\n\n${clusterLines}\n`);
 
