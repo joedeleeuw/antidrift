@@ -109,5 +109,5 @@ Examples:
 ```txt
 antidrift/no-trivial-selector-wrapper
 antidrift/no-handrolled-resource-lifecycle-cells
-antidrift/no-raw-tailwind-color
+antidrift/no-raw-fetch-in-component
 ```

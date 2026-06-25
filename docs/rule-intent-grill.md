@@ -264,13 +264,13 @@ Better split:
 
 Recommended default:
 
-Keep custom because the configured ecosystem baseline deliberately disables the noisy `checksVoidReturn.arguments` path. Consider splitting the rule's maturity: never-await methods are deterministic; `map`/`flatMap` collection is a separate dataflow branch.
+Keep custom because the configured ecosystem baseline deliberately disables the noisy `checksVoidReturn.arguments` path. The rule now splits maturity in code: never-await methods are the default deterministic branch; `map`/`flatMap` collection is a separate explicit opt-in branch.
 
 First human grill question:
 
 Should `no-async-array-method` split promotion by branch: never-await methods can promote on deterministic evidence, while `map`/`flatMap` not-collected remains a separate evidence gate?
 
-Recommended answer: yes. They share syntax, but the job failures and proof burdens differ.
+Recommended answer: yes. Implemented: they share syntax, but the job failures and proof burdens differ.
 
 ### Authz Framework Scope
 
@@ -354,6 +354,6 @@ Ask these one at a time, and update this file as decisions crystallize:
 3. One-owner contracts: installed-package ownership now requires accepted `ownership.yaml` package-owner facts before blocking; projected boundary DTOs still need clean-pressure classification.
 4. SQL: should value interpolation and identifier interpolation have different severity when parser services are absent?
 5. Nullable tuples: is nullability the policy boundary, or any ambiguous positional tuple?
-6. Async arrays: should never-await methods and `map`/`flatMap` not-collected have separate promotion bars?
+6. Async arrays: implemented; never-await methods and `map`/`flatMap` not-collected have separate promotion bars.
 7. Authz: should route authz move from absence detection to typed policy-wrapper registration?
 8. Design-system class strings: should lint stay as the control, or should the theme/design system make bad utilities unconstructable?

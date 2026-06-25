@@ -2,11 +2,11 @@
 
 ## Current Rule
 
-`antidrift/no-appeasement-cast` is implemented and enabled. It is `ready`, but not `stable`.
+`antidrift/no-appeasement-cast` is implemented and exported, but default-off in the distributable config. It is `ready`, but not `stable`.
 
 The rule is type-aware. It reports a plain `as T` assertion when the source expression is `any` or `unknown` and the target is a named object contract with at least one resolved property.
 
-The rule deliberately excludes branded targets because the package-specific brand-cast rule is retired until real non-test forgery evidence exists. It also skips `as unknown as T` tunnels because maintained `@typescript-eslint/no-unsafe-type-assertion` owns the broad/double assertion surface. There is no explicit SDK/API allowlist: typed SDK conversions stay clean because the source is not `any` or `unknown`.
+The rule deliberately excludes branded targets because the package-specific brand-cast rule is retired until real non-test forgery evidence exists. It also skips `as unknown as T` tunnels because maintained `@typescript-eslint/no-unsafe-type-assertion` owns the broad/double assertion surface. There is no explicit SDK/API allowlist: typed SDK conversions stay clean only when the source type is not `any` or `unknown`.
 
 This is different from the retired `no-unsafe-cast-chain`, which only caught explicit cast tunnels such as `value as unknown as User`.
 
@@ -26,22 +26,22 @@ Run:
 pnpm policy:benchmark-unsafe-type-assertion
 ```
 
-The benchmark runs `@typescript-eslint/no-unsafe-type-assertion` beside `antidrift/no-appeasement-cast` over real Chaski, Codebase Atlas, and Sudocode TypeScript programs. The current live-corpus source-only run checked 2,411 files and produced:
+The benchmark runs `@typescript-eslint/no-unsafe-type-assertion` beside `antidrift/no-appeasement-cast` over real Chaski, Codebase Atlas, and Sudocode TypeScript programs. The current live-corpus source-only run checked 2,585 files, with 274 parser errors recorded separately, and produced:
 
 | Rule                                          | Findings |
 | --------------------------------------------- | -------: |
-| `antidrift/no-appeasement-cast`               |       85 |
-| `@typescript-eslint/no-unsafe-type-assertion` |    1,474 |
+| `antidrift/no-appeasement-cast`               |      101 |
+| `@typescript-eslint/no-unsafe-type-assertion` |    1,619 |
 
 Location comparison:
 
 | Result                                                              | Count |
 | ------------------------------------------------------------------- | ----: |
-| Locations reported by both upstream and `no-appeasement-cast`       |    85 |
-| Upstream-only locations                                             | 1,389 |
+| Locations reported by both upstream and `no-appeasement-cast`       |   100 |
+| Upstream-only locations                                             | 1,517 |
 | Antidrift-only locations                                            |     0 |
 
-Interpretation: upstream is a strict superset on the measured corpus, but too broad to replace the custom rule as the default guardrail. Keep the custom rule for the `any`/`unknown` source-boundary contract and use the upstream benchmark as the stricter maintained assertion surface.
+Interpretation: upstream is a strict superset on the measured corpus, but too broad to replace this custom rule as the targeted broad-input authority policy. Keep this rule default-off for the `any`/`unknown` source-type contract and use the upstream rule as the maintained broad assertion surface.
 
 ## Real Corpus Evidence
 
@@ -77,7 +77,7 @@ if (baseEmissive instanceof this.THREE.Color) {
 
 Chaski:
 
-- `/Users/sushi/code/chaski/src/frontend/portal/lib/firebase/server.ts` converts `currentUser.toJSON()` to Firebase `User`. This stays clean because the source is a typed SDK object conversion, not an `any` or `unknown` appeasement cast.
+- `/Users/sushi/code/chaski/src/frontend/portal/lib/firebase/server.ts` converts `currentUser.toJSON()` to Firebase `User`. This stays clean because the source is typed, not because the rule has an SDK/API allowlist.
 
 Codebase Atlas adjacent clean pressure:
 
@@ -156,6 +156,7 @@ can be type-checked.
 - SDK conversion methods may produce values whose public type is narrower than the method signature. These need real clean controls before tightening.
 - Test helpers and fixtures may intentionally cast broad values to create impossible states; those should be excluded by file scope or treated as lower-severity inventory, not used as production promotion evidence.
 - Named array aliases or collection contracts may resolve to non-empty object-like targets and need real-corpus classification before broad claims.
+- Angle-bracket assertions and source laundering through intermediate typed variables are known false negatives under the current single-expression proof.
 
 ## False-Negative Risks
 
@@ -165,9 +166,9 @@ can be type-checked.
 
 ## Promotion State
 
-This is the strongest current promotion candidate because it has real drift replication in Chaski, Codebase Atlas, and Sudocode, plus remediation-pattern evidence in bracket-prefixed Chaski and Codebase Atlas copies.
+This remains a strong promotion candidate because it has real drift replication in Chaski, Codebase Atlas, and Sudocode, plus remediation-pattern evidence in bracket-prefixed Chaski and Codebase Atlas copies.
 
-It is not stable yet. Current state: locally ready, remediation patterns proven.
+It is not stable yet. Current state: ready, default-off inventory, remediation patterns proven.
 
 Remaining gates:
 

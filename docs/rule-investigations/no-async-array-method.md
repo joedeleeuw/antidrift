@@ -2,9 +2,9 @@
 
 ## Definition
 
-Disallow async callbacks in array methods that do not await callback promises, and require async `.map` / `.flatMap` callbacks to be joined by a Promise combinator.
+Disallow async callbacks in array methods that do not await callback promises. The default branch covers never-await methods. The `.map` / `.flatMap` collection-flow branch is explicit opt-in because it carries a separate dataflow proof burden.
 
-This is a deterministic AST rule. The syntax is the bug: `.forEach`, `.filter`, `.some`, `.every`, `.find`, `.findIndex`, `.findLast`, `.findLastIndex`, and `.sort` never await an async callback. `.map` and `.flatMap` may be correct only when the returned promise list is awaited through `Promise.all`, `Promise.allSettled`, or `Promise.race`.
+This is a deterministic AST rule for the default branch: `.forEach`, `.filter`, `.some`, `.every`, `.find`, `.findIndex`, `.findLast`, `.findLastIndex`, and `.sort` never await an async callback. `.map` and `.flatMap` may be correct when the promise list is returned to the caller or passed to `Promise.all`, `Promise.allSettled`, or `Promise.race`, so that branch stays disabled unless the rule is explicitly configured with `branches: ["requires-collection"]`. That option is additive; never-await methods remain checked.
 
 ## Should Flag
 
@@ -22,6 +22,15 @@ return rows.length;
 ```
 
 Why: the array contains promises, but nothing joins or awaits them.
+
+This report requires explicit configuration:
+
+```js
+"antidrift/no-async-array-method": [
+  "error",
+  { branches: ["requires-collection"] },
+]
+```
 
 ## Should Not Flag
 
@@ -44,16 +53,22 @@ const saves = items.map(async (item) => save(item));
 await Promise.all(saves);
 ```
 
-Why: the rule tracks the local promise list and sees it awaited later.
+Why: the rule tracks the local promise list and sees it passed to a Promise combinator later.
+
+```ts
+return items.map(async (item) => save(item));
+```
+
+Why: the promise list is deliberately handed to the caller; caller-side awaiting is a separate contract.
 
 ## Ecosystem
 
-`@typescript-eslint/no-misused-promises` and `@typescript-eslint/no-floating-promises` partially overlap. `no-misused-promises` can cover async predicate callbacks and can catch `forEach(async ...)` when broad `checksVoidReturn.arguments` is enabled, but that broader option also reports legitimate Express-style async handlers in common projects. The remaining custom value is the array-method-only scope plus `.map` / `.flatMap` promise-list joining: unjoined async maps are not covered by the local ecosystem pair.
+`@typescript-eslint/no-misused-promises` and `@typescript-eslint/no-floating-promises` partially overlap. `no-misused-promises` can cover async predicate callbacks and can catch `forEach(async ...)` when broad `checksVoidReturn.arguments` is enabled, but that broader option also reports legitimate Express-style async handlers in common projects. `no-floating-promises` catches unhandled promise-valued expressions, not arrays of promises produced by `.map(async ...)`. The remaining custom value is the array-method-only never-await scope, with `.map` / `.flatMap` promise-list joining kept as an explicit opt-in branch.
 
 Closest online references checked:
 
-- `@typescript-eslint/no-misused-promises` documents `checksVoidReturn.arguments` and shows `forEach(async ...)` as an incorrect void-callback example, with `Promise.all([].map(async ...))` as the accepted shape.
-- `@typescript-eslint/strict-void-return` documents the broader "returned value in void context" family and points async-only misuse back to `no-misused-promises`.
+- `@typescript-eslint/no-misused-promises` documents `checksVoidReturn.arguments` as the argument-position void-return check.
+- `@typescript-eslint/no-floating-promises` documents promise-valued statements as its report surface; the TypeScript ESLint issue tracker records `.map(async)` returning `Array<Promise>` as outside that promise-valued expression model.
 - `eslint-plugin-no-async-array-methods` exists and directly bans async callbacks for array methods, but it is a small standalone plugin with weaker maintenance/support than the TypeScript ESLint stack.
 - ESLint core `no-await-in-loop` is adjacent but points the other direction: it encourages starting promises and joining them with `Promise.all`, not banning async array callbacks.
 
@@ -79,6 +94,8 @@ Broad inventory on 2026-06-04:
 
 ## Promotion State
 
-Status: `ready`, `stable: false`.
+Status: `ready`, `stable: false`, default-off inventory.
 
 The rule is clean across the broad inventory and has clear deterministic syntax, but stable promotion still needs either a second independent drift instance or an explicit exception to the usual multi-repository drift-replication gate.
+
+Known false negatives are intentionally local-scope boundaries for the opt-in collection branch: interprocedural promise collection handoff through helper functions, custom Promise combinators, promise collections not produced by a direct local `.map` / `.flatMap` call, and floated Promise combinator results are outside the current proof. Floated combinator results belong to `@typescript-eslint/no-floating-promises` or a separate config gate. The default branch is the never-await method set only; the `.map` / `.flatMap` collection-flow branch keeps its own evidence gate.

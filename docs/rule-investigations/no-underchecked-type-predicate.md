@@ -75,9 +75,9 @@ pnpm policy:inventory-underchecked-predicate
 
 Current result:
 
-- 1,321 type-aware files checked.
-- 63 type-predicate candidate files.
-- 111 type-predicate signatures.
+- 1,353 type-aware files checked.
+- 64 type-predicate candidate files.
+- 112 type-predicate signatures.
 - 0 parser errors.
 - 0 `antidrift/no-underchecked-type-predicate` findings.
 - 0 drift repositories.

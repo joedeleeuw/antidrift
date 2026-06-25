@@ -2,8 +2,8 @@
 
 ## Definition
 
-Disallow raw `fetch` calls inside a JSX-returning React component's lexical function frame.
-The modeled global forms are `fetch(...)`, `globalThis.fetch(...)`, `window.fetch(...)`, and `self.fetch(...)`.
+Disallow raw global `fetch` calls inside a JSX-returning React component's lexical function frame.
+The modeled global forms are unshadowed `fetch(...)`, `globalThis.fetch(...)`, `window.fetch(...)`, and `self.fetch(...)`.
 
 This is the current enforcement slice for the broader transport-boundary problem: UI should consume API clients, loaders, resource hooks, or query resources instead of owning HTTP transport directly.
 
@@ -66,7 +66,7 @@ Why: the component consumes a resource value instead of owning transport.
 
 ## Ecosystem
 
-`no-restricted-syntax` or `no-restricted-globals` can ban `fetch` in file globs, but that is a cruder replacement. Antidrift keeps the report tied to a JSX-returning React component lexical frame.
+`no-restricted-syntax` or `no-restricted-globals` can ban `fetch` in file globs, but that is a cruder replacement. `@eslint-react/web-api-no-leaked-fetch` covers effect fetches that lack `AbortController` cleanup, which is useful but different: abort-safe raw transport inside a component is still outside the intended API-client/resource boundary. Antidrift keeps the report tied to a JSX-returning React component lexical frame.
 
 The broader problem space is not "fetch in X"; it is raw transport ownership. A future rule may become registry-backed and cover `fetch`, `axios`, generated clients, SDK calls, and project-specific transport functions across configured UI boundaries. That should be a separate scope decision, not silently folded into this rule.
 
@@ -101,4 +101,4 @@ Status: `ready`, `stable: false`.
 Scope decision resolved on June 4, 2026: keep this as a narrow fetch-specific React boundary rule.
 The broader raw transport ownership problem belongs in a separate registry-backed rule if real non-fetch drift justifies it.
 
-The June 17, 2026 narrowing removed file-extension, PascalCase-name, and JSX-bearing-module heuristics. Re-promote only after re-inventorying the narrowed proof surface. Aliased or destructured fetch calls are not modeled until a real corpus program proves that shape matters.
+The June 17, 2026 narrowing removed file-extension, PascalCase-name, and JSX-bearing-module heuristics. The June 18, 2026 scope-binding cleanup stopped treating local or imported `fetch`/`window` lookalikes as browser globals. Re-promote only after re-inventorying the narrowed proof surface. Aliased or destructured fetch calls are not modeled until a real corpus program proves that shape matters.

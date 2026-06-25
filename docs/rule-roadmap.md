@@ -48,7 +48,7 @@ Every candidate must land in one proof bucket before implementation, or stay in 
 | Bucket                                         | Proof object                                                                                                                                                                   | Carrier                                                                                                                                                                         | Current rows                                                                                                                                                                                                                                                                                                           | Promotion rule                                                                                                                                                                                            |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **A. Local AST/source-shape proof**            | One file's syntax, import bindings, string literals, or lexical scope proves the construction                                                                                  | ESLint custom rule or maintained ESLint rule                                                                                                                                    | `antidrift/no-trivial-selector-wrapper`, `antidrift/require-effect-deps`, never-await branch of `antidrift/no-async-array-method`, `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-nullable-positional-tuple`, `antidrift/no-raw-fetch-in-component`, JSX class-string design rules                   | Can block when the construction is the violation. If source shape only names a suspect, demote to inventory or move to B/C/F.                                                                             |
-| **B. Semantic source/type/provenance proof**   | AST plus local dataflow, setter transition evidence, TypeChecker facts, schema provenance, SQL/context control flow, or validated broad-input flow proves the contract failure | Type-aware or semantic ESLint custom rule                                                                                                                                       | `antidrift/no-appeasement-cast`, `antidrift/no-unsafe-deserialize`, `antidrift/no-sql-string-concat`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-redundant-zod-parse`, blocking branches of `antidrift/no-handrolled-resource-lifecycle-cells`, map/flatMap branch of `antidrift/no-async-array-method` | Can block only after the semantic proof and fallback behavior are characterized against drift and clean controls.                                                                                         |
+| **B. Semantic source/type/provenance proof**   | AST plus local dataflow, setter transition evidence, TypeChecker facts, schema provenance, SQL/context control flow, or validated broad-input flow proves the contract failure | Type-aware or semantic ESLint custom rule                                                                                                                                       | `antidrift/no-appeasement-cast`, `antidrift/no-unsafe-deserialize`, `antidrift/no-sql-string-concat`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-redundant-zod-parse`, blocking branches of `antidrift/no-handrolled-resource-lifecycle-cells`, opt-in map/flatMap branch of `antidrift/no-async-array-method` | Can block only after the semantic proof and fallback behavior are characterized against drift and clean controls.                                                                                         |
 | **C. Authority-index ownership proof**         | Source shape plus accepted package, domain, generated, authz, or owner facts proves the code forked or bypassed an owner                                                       | Registry-backed ESLint rule or generated config                                                                                                                                 | `antidrift/no-structural-type-fork`, `antidrift/no-canonical-model-fork`, `antidrift/no-status-literal-in-type`, `antidrift/require-authz-check`, generated source-owner routing                                                                                                                                       | Registry absence means no blocking proof. These rules must fail closed to "not configured" or advisory, not infer owners from names alone.                                                                |
 | **D. Graph/config source proof**               | Import graph, file graph, configured path zones, package graph, or generated import restrictions prove the violation                                                           | Import/boundaries plugins, generated `no-restricted-imports`, package graph checks                                                                                              | `arch/no-cross-layer-import`, `arch/no-deep-import`, `arch/no-new-dependency-cycle`, `boundary/no-sdk-direct-use-outside-gateway`, `gen/require-import-from-generated`, mock-import candidates, barrel-file candidates                                                                                                 | Prefer maintained graph/config tools first; custom graph logic needs a measured gap and explicit project facts.                                                                                           |
 | **E. Ecosystem/toolchain-owned source policy** | A maintained tool already owns the source, test, React, security, style, or quality law                                                                                        | Existing ESLint plugin, TypeScript rule, Sonar, stylelint/native lint, secret scanner                                                                                           | `react/no-derived-state-effect`, Vitest integrity rules, disable-description policy, `errors/preserve-caught-error`, `perf/no-await-in-loop-with-io`, `sec/no-hardcoded-secret`, broad raw-color checks when a platform scanner owns them                                                                              | Custom code is a last resort after a measured false-negative gap against real code; otherwise the row stays ecosystem-covered or retired.                                                                 |
@@ -67,13 +67,15 @@ The decision flow is:
 | Classification                           | Rules                                                                                                                                                                                                                                                                                                                           |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Stable custom (4)                        | `no-redundant-zod-parse`, `no-trivial-selector-wrapper`, `no-unsafe-deserialize`, `require-effect-deps`                                                                                                                                                                                                                         |
-| Custom, needs real-corpus promotion (11) | `no-appeasement-cast`, `no-structural-type-fork`, `no-canonical-model-fork`, `no-handrolled-resource-lifecycle-cells`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type`, `require-authz-check`, `no-raw-fetch-in-component`, `no-sql-string-concat` |
+| Custom, needs real-corpus promotion (10) | `no-appeasement-cast`, `no-structural-type-fork`, `no-canonical-model-fork`, `no-handrolled-resource-lifecycle-cells`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type`, `require-authz-check`, `no-raw-fetch-in-component` |
+| False-positive-prone custom inventory (1) | `no-sql-string-concat` keeps the HogQL/template and raw table-name signal visible, but known SQL-builder clean-control false positives block promotion.                                                                                                                                                                      |
+| Fact-only shipped inventory (1)          | `no-shattered-ingested-entity-state` records source-member fan-out candidates and emits no diagnostic; rebuild enforcement only after multi-repo owned-entity shatter evidence exists.                                                                                                                                          |
 | Default-off / pending retirement (2)     | `no-defensive-shape-probing` (sunset condition below), `no-underchecked-type-predicate` (required-field drift search below)                                                                                                                                                                                                     |
-| Retired custom stubs                     | `no-raw-tailwind-color`, `no-hover-translate-card`                                                                                                                                                                                                                                                                              |
+| Removed retired custom rules             | `no-raw-tailwind-color`, `no-hover-translate-card`                                                                                                                                                                                                                                                                              |
 | Ecosystem-covered                        | See delegated surface table                                                                                                                                                                                                                                                                                                     |
 | Generated-config-covered                 | `boundary/no-sdk-direct-use-outside-gateway`, `gen/require-import-from-generated`                                                                                                                                                                                                                                               |
 | Hook/policy-script-covered               | `agent/*` (4 hooks), `policy/no-check-weakening-without-policy-task`, `sonar/import-custom-eslint-issues`, `rules/one-source-generates-agent-files`                                                                                                                                                                             |
-| Retire                                   | 11 locked retired rules; plus `no-defensive-shape-probing` at sunset if no distinct drift appears                                                                                                                                                                                                                               |
+| Retire                                   | 13 locked retired rules; plus `no-defensive-shape-probing` at sunset if no distinct drift appears                                                                                                                                                                                                                               |
 | Research only                            | `no-same-schema-recertification` plus the policy research/spec-only rows                                                                                                                                                                                                                                                        |
 
 ## Change, Repo, And Agent-Ops Roadmap
@@ -128,7 +130,7 @@ Only rules whose registry entries are `stable: true` are default-on in the distr
 - Pattern: route data through the data layer (query hooks, gateway/client module); components consume hooks.
 - Ecosystem: `no-restricted-syntax` could ban `fetch` per glob but cannot express component context; no maintained component-boundary rule exists.
 - Signal: import-scope plus AST (`fetch`, `globalThis.fetch`, `window.fetch`, `self.fetch`).
-- Evidence: drift in Chaski, Codebase Atlas, and Murderbox; clean controls include API modules and query-hook components.
+- Evidence: narrowed drift in Chaski and Codebase Atlas; clean controls include API modules, query-hook components, and Murderbox's raw-transport proxy/API boundaries.
 - False-positive concern: none known; aliased/destructured fetch is an unobserved scope boundary to monitor until real evidence appears. The separate raw-transport future rule now has its first complaint provenance ("why is there axios in the BFF", 2026-06-10 sweep).
 - Status: ready, default-off inventory until the narrowed same-frame JSX-return proof is re-inventoried across real repos.
 
@@ -157,9 +159,9 @@ Only rules whose registry entries are `stable: true` are default-on in the distr
 - Value: `JSON.parse` over `any`/`unknown` input lets raw external data enter typed code with no boundary; downstream code consumes unvalidated structure as if typed.
 - Problem kind: problem in itself at the parse boundary, proven by the input type — not by `req`/`ctx` name fingerprints (the retired symptom version).
 - Pattern: guard to string, parse, validate the output with the owning schema (parse-at-edge).
-- Ecosystem: `@typescript-eslint/no-unsafe-argument` catches some flows but is not parse-at-edge guidance (partial overlap).
+- Ecosystem: `@typescript-eslint/no-unsafe-argument` catches the current parse-input drift, but it is an unconfigurable any-argument-wide rule rather than a parse-boundary default.
 - Signal: TypeChecker plus local string-boundary control flow.
-- Evidence: Sudocode route drift and Opencode bench drift; clean storage/schema-piped parses across three repos.
+- Evidence: Sudocode route drift, Codebase Atlas EventSource drift, and Opencode resource env drift; clean storage/schema-piped parses across three repos.
 - False-positive concern: parse-output assertions (`JSON.parse(x) as T`) belong to `no-appeasement-cast`, not here; the Cloudflare checkout stays a non-evaluable known gap.
 
 ### `antidrift/require-effect-deps`
@@ -190,14 +192,14 @@ Implemented and enabled; each card names what still blocks stable promotion.
 
 ### `antidrift/no-sql-string-concat`
 
-- Value: SQL assembled by interpolation or concatenation reaches the database without a binding or escaping boundary — injection and quoting bugs. Measured SonarJS coverage misses every real case (0 vs 16 findings on 338 files; 0 vs 31 on the 24-repo fleet).
+- Value: SQL assembled by interpolation or concatenation reaches the database without a binding or escaping boundary — injection and quoting bugs. Measured SonarJS coverage still misses the custom signal (0 vs 145 findings on 370 benchmark files; 0 vs 486 findings on the 24-repo fleet after removing name-only member proof).
 - Problem kind: two branches with different proof burdens. Value interpolation is a problem in itself once SQL syntax context is proven. Identifier interpolation is an authority claim: clean only with allowlist, typed union, static map, anchored regex exit guard, or escaper proof — and imported-escaper/safe-member proof requires parser services.
 - Pattern: bound parameters for values; allowlists, escapers, or `sql.identifier(...)` for identifiers; parameterized tags.
 - Ecosystem: `sonarjs/sql-queries` is adjacent but missed every real finding; SQL-template plugins assume chosen tag conventions (partial overlap).
 - Signal: SQL-context AST plus scope-binding guard control flow plus TypeChecker escaper/member proof.
 - Evidence: production drift in Chaski (HogQL) and PowerSync service; lower-strength test/demo drift in Sudocode and Cloudflare; the 24-repo fleet still has SQL-builder/tagged-template clean-control gaps.
 - False-positive concern: without parser services, known-clean PowerSync escaper and member-builder controls degrade to conservative reports. `parserServiceDeltas` classifies those as inventory because the type-aware plans prove them clean and there are zero missing non-type-aware findings. Separately, unproven Cloudflare Durable Object SQL tags, Prisma, Kysely, Slonik, and aliased builders require import/declaration-source provenance before they can be clean.
-- Status: ready, default-off inventory. Keep the benchmark and source-fleet inventories as regression gates, but do not restore blocking severity until SQL tag/member APIs are proven without name trust.
+- Status: false-positive-prone, default-off inventory. Keep the benchmark and source-fleet inventories as regression gates, but do not restore blocking severity until SQL tag/member APIs are proven without name trust and known false positives are cleared.
 
 ### `antidrift/no-underchecked-type-predicate`
 
@@ -206,7 +208,7 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Pattern: check the asserted fields, discriminate an already-typed union, or delegate to the owning schema/validator.
 - Ecosystem: no type-aware rule validates predicate-body sufficiency (net-antidrift).
 - Signal: TypeChecker plus AST/control-flow checks.
-- Evidence: after required-property narrowing, `pnpm policy:inventory-underchecked-predicate` checks 1,321 type-aware files with 0 parser errors, 63 predicate candidate files, 111 predicate signatures, and 0 findings across Chaski BFF, Chaski monolith UI, Codebase Atlas, Sudocode CLI/frontend/server, and Opencode UI. The former Chaski `RetoolLineItemData` and Opencode `TriggerTitle` findings are optional-heavy clean controls under the current proof floor.
+- Evidence: after required-property narrowing, `pnpm policy:inventory-underchecked-predicate` checks 1,353 type-aware files with 0 parser errors, 64 predicate candidate files, 112 predicate signatures, and 0 findings across Chaski BFF, Chaski monolith UI, Codebase Atlas, Sudocode CLI/frontend/server, and Opencode UI. The former Chaski `RetoolLineItemData` and Opencode `TriggerTitle` findings are optional-heavy clean controls under the current proof floor.
 - False-positive concern: the verdict layer is heuristic — validator-looking helper names can produce false negatives; keep the blocking branch at the degenerate claim.
 - Blocker: default-off until a real broad-input predicate misses required asserted fields. Optional-field sufficiency remains inventory/research unless a stronger proof exists.
 
@@ -248,14 +250,14 @@ Implemented and enabled; each card names what still blocks stable promotion.
 ### `antidrift/no-async-array-method`
 
 - Value: async callbacks in never-await methods (`forEach`, `filter`, `some`) silently discard promises — work runs unawaited and errors vanish; `map`/`flatMap` is only safe when the promise list is collected.
-- Problem kind: split. The never-await branch is a problem in itself (the method discards returns by contract). The `map`/`flatMap`-not-collected branch carries a separate local dataflow burden.
+- Problem kind: split, now reflected in rule options. The default never-await branch is a problem in itself (the method discards returns by contract). The `map`/`flatMap`-not-collected branch carries a separate local dataflow burden and is explicit opt-in.
 - Pattern: `for...of` with `await`, or `Promise.all`/`allSettled` over `map`.
 - Ecosystem: `@typescript-eslint/no-misused-promises` with `checksVoidReturn.arguments` catches this but also reports real Express handlers, so the baseline deliberately disables that path (partial overlap, broader upstream).
 - Signal: AST.
 - Evidence: one real drift across 2,293 files (Sudocode test cleanup `forEach(async ...)`); broad clean controls.
-- False-positive concern: low; the open question is promotion policy, not signal quality.
+- False-positive concern: low for the default branch; the opt-in collection branch remains gated by local dataflow proof and separate evidence.
 - Status: ready, default-off inventory.
-- Blocker: decision 6 below — branch-split promotion.
+- Blocker: second independent never-await drift, or an explicit one-repo evidence exception. The collection-flow branch keeps a separate evidence gate.
 
 ### `antidrift/no-nullable-positional-tuple`
 
@@ -274,9 +276,9 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Value: anonymous object contracts at exported/boundary surfaces cannot be referenced, reused, or owned; every caller re-derives the shape.
 - Problem kind: problem in itself only at boundaries; local props and callbacks are excluded. This is boundary-shape hygiene, deliberately separate from the fork family.
 - Pattern: name the contract and export it beside the boundary.
-- Ecosystem: `no-restricted-syntax` can ban `TSTypeLiteral` but cannot express boundary narrowing (config-replacement candidate; keep custom while the exceptions matter).
-- Signal: AST.
-- Evidence: Chaski only — 24 findings across 4 files after narrowing.
+- Ecosystem: `no-restricted-syntax` can ban `TSTypeLiteral` but cannot express the current exported non-JSX, exported-class-method, and boundary-object narrowing without also reporting local UI props, callback payloads, and small internal shapes.
+- Signal: AST boundary context with JSX-return clean exclusion.
+- Evidence: Chaski only — the current corpus pins 15 findings in `src/frontend/bff/api/services/scenarios-service.ts` and clean controls for JSX-backed props plus callback payloads.
 - False-positive concern: local UI props and callback payload exclusions need more independent pressure.
 - Status: ready, default-off inventory.
 - Blocker: independent repo replication before blocking severity.
@@ -284,12 +286,12 @@ Implemented and enabled; each card names what still blocks stable promotion.
 ### `antidrift/no-status-literal-in-type`
 
 - Value: status unions redeclared away from the registry-configured owner fork the domain vocabulary one literal at a time.
-- Problem kind: authority claim via the domain registry, context-narrowed to status-shaped type positions.
+- Problem kind: authority claim via the domain registry, narrowed to exact or composed owner context (`RepProgressStatus` or `RepProgress.status`).
 - Pattern: import the owner's status type.
-- Ecosystem: generated `no-restricted-syntax` could match literals but cannot carry owner-file exceptions (config-replacement candidate).
-- Signal: registry plus AST context.
-- Evidence: Chaski orders-ops redeclaration; the owner file stays clean.
-- False-positive concern: generic UI variant unions that resemble domain statuses — already guarded by status-context narrowing after a real Portal false positive.
+- Ecosystem: generated `no-restricted-syntax` could match literals but cannot carry owner-file exceptions or owner/property composition proof cleanly.
+- Signal: registry plus AST owner-context proof.
+- Evidence: Chaski `RepProgress.status` redeclaration; the owner file stays clean, and generic UI variant/local status props with overlapping values stay clean.
+- False-positive concern: generic UI variant unions and unrelated local status props that resemble domain statuses must stay outside blocking proof.
 - Status: ready, default-off inventory.
 - Blocker: independent status-fork replication with configured domain facts.
 
@@ -299,32 +301,32 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Problem kind: absence detection — inherently fragile because middleware, higher-order handlers, and framework wrappers can legitimately own the check. The durable form is a positive construction pattern: handlers registered through a typed policy-bearing wrapper.
 - Pattern: handler-local authz-call inventory today; typed policy-wrapper registration or dataflow/dominance proof as the target pattern.
 - Ecosystem: no rule knows repo authz policy (net-antidrift); the calls that count are registry facts.
-- Signal: handler-local request-param shape plus configured callee names.
+- Signal: handler-local request-param shape plus explicit authz function config.
 - Evidence: Sudocode route drift (4 files); Chaski is non-applicable (tRPC boundaries) and stays a clean corpus for this shape.
 - False-positive concern: middleware-dominant apps would over-report — the rule stays default-off and must not widen until decision 7 lands.
 - Blocker: decision 7 below; scope frozen meanwhile.
 
 ### `antidrift/no-raw-tailwind-color`
 
-- Status: retired as a deprecated no-op compatibility stub.
+- Status: retired and removed from the shipped plugin surface.
 - Value: raw palette utilities (`text-red-500`) bypass semantic tokens, so design changes stop propagating and the UI drifts off-theme.
 - Problem kind: the class string is the policy surface (no intent inference needed) — but the failure may be owned by another layer: a theme that does not expose raw palette utilities makes the drift unconstructable.
 - Pattern: semantic token classes; preferably theme-level removal of the raw palette.
 - Ecosystem: Tailwind plugins validate utility correctness, not token governance (config-replacement candidate).
-- Signal: none in the shipped stub; the old class-string extractor was retired.
-- Evidence: historical Chaski inventory only; no blocking diagnostics remain.
+- Signal: none in the shipped package; the old class-token extractor was retired.
+- Evidence: historical Chaski inventory only; no shipped rule or blocking diagnostics remain.
 - False-positive concern: the old regex was a sampler unless tied to the project's actual token surface.
 - Reopen condition: explicit design-token authority plus real clean/drift corpus evidence.
 
 ### `antidrift/no-hover-translate-card`
 
-- Status: retired as a deprecated no-op compatibility stub.
+- Status: retired and removed from the shipped plugin surface.
 - Value: hover-translate on card-like pointer targets is a banned interaction pattern in the local design language.
 - Problem kind: the class string is the policy surface; same control-layer question as raw colors.
 - Pattern: hover elevation/color tokens instead of movement.
 - Ecosystem: no maintained rule owns this interaction policy, but the old custom sampler still did not prove card or pointer-target context.
-- Signal: none in the shipped stub; the old class-string extractor was retired.
-- Evidence: historical Sudocode/Chaski inventory only; no blocking diagnostics remain.
+- Signal: none in the shipped package; the old class-string extractor was retired.
+- Evidence: historical Sudocode/Chaski inventory only; no shipped rule or blocking diagnostics remain.
 - False-positive concern: the old class-string match did not prove card or pointer-target context.
 - Reopen condition: real interaction-target proof plus clean controls for non-card transforms.
 
@@ -343,8 +345,8 @@ Severity discipline applies: these must not block while under-proven.
 
 - Intended value: broad-value mini-parsers probing `any`/`unknown` member-by-member claim type authority through weak local probing instead of the owning schema/converter.
 - Problem kind: mostly owned by broader upstream rules on current evidence. The only real drift is `any`-typed and `@typescript-eslint/no-unsafe-member-access` reports its property reads in the same file; antidrift adds the callback-level grouping and replacement path, which has not yet proven distinct value. The predicate version of this failure is owned by `no-underchecked-type-predicate`.
-- Evidence: one Chaski drift; clean controls in four repos; `pnpm policy:inventory-defensive-shape` checked 1,648 type-aware files, 72 syntax candidates, and found no second drift with 0 parser errors.
-- Disposition: stays inventory/off. Sunset result is negative for second drift; retire and lock unless a new repo produces `unknown`-typed drift that upstream unsafe rules do not explain.
+- Evidence: one Chaski drift; clean controls in four repos; `pnpm policy:inventory-defensive-shape` checked 1,680 type-aware files, 72 syntax candidates, and found no second drift with 0 parser errors.
+- Disposition: stays inventory/off under sunset watch. Do not promote on current evidence. Retire and lock only after a fresh real-repo sweep shows the rule no longer produces useful grouped discovery beyond upstream unsafe rules; re-promotion would require a second real drift repository, preferably `unknown`-typed broad-value parsing that upstream unsafe rules do not already explain.
 
 ## Delegated Surface
 
@@ -423,7 +425,7 @@ These are the live grill questions reduced to recommended outcomes. Each changes
 3. **One-owner forks**: projected boundary DTOs at real translation boundaries are clean. Installed-package blocking requires accepted package-owner facts, ideally proposed from analytics such as existing imports, `Pick`/`Omit` derivations, SDK return provenance, or repeated structural forks. The unconfigured all-`node_modules` sweep stays inventory/discovery for finding owners worth accepting. Recommended: yes.
 4. **SQL severity split**: keep the rule off in the shipped config while remaining SQL-builder/tagged-template APIs are known gaps. Inventory still runs through benchmark and corpus tooling. Value interpolation remains the core signal, dynamic identifier interpolation downgrades to inventory when parser services are absent, and type-proof is never replaced with name exemptions.
 5. **Nullable tuples**: nullability stays the policy boundary. Recommended: yes (already the rule's shape).
-6. **Async arrays**: never-await methods may promote on deterministic evidence plus the one real drift; `map`/`flatMap`-not-collected keeps a separate evidence gate. Recommended: yes.
+6. **Async arrays**: branch split is implemented. Never-await methods may promote on deterministic evidence plus drift replication; `map`/`flatMap`-not-collected is explicit opt-in and keeps a separate evidence gate.
 7. **Authz**: move from absence detection toward typed policy-wrapper registration as the construction pattern; freeze the current Express-scope rule until then. Recommended: yes.
 8. **Design-system class strings**: the theme/design system making raw utilities unconstructable is the primary control; lint stays as an honestly-scoped backstop. Recommended: yes.
 

@@ -112,7 +112,7 @@ Basis: `docs/whitepaper-agent-code-drift-proofs.md` §2.4 (inter-procedural data
 Applies to:
 - `antidrift/no-sql-string-concat` — useful but no longer stable; solve-bucket target is `dataflow-taint`. Do not hand-roll SQL-builder ecosystems by tag name. The architecture review recommendation is to delegate escaper/reachability to CodeQL/Semgrep or prove SQL-builder APIs through import/declaration-source provenance while keeping antidrift as the policy/fact/governance layer.
 - `antidrift/no-unsafe-deserialize` — scoped parse-input rule: `fit: proven, target: semantic-ast` (solve-buckets.yaml). Broader interprocedural deserialization taint remains out of scope and belongs in delegated dataflow/taint research.
-- `antidrift/require-authz-check` — solve-buckets.yaml: `fit: under-proven, target: dataflow-taint`. Handler-local params plus configured callee names are inventory; blocking needs typed route construction or delegated dominance/taint proof.
+- `antidrift/require-authz-check` — solve-buckets.yaml: `fit: under-proven, target: dataflow-taint`. Handler-local params plus explicit authz function config are inventory; blocking needs typed route construction or delegated dominance/taint proof.
 - Gap `silent-fallback` (n=24, solve-buckets.yaml) — this is the clearest case for delegation; "does a caught error flow to a real sink or nowhere" is a taint query, not an AST shape.
 
 ---

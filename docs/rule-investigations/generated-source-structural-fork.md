@@ -24,15 +24,22 @@ Use TypeChecker plus generated and ownership registries:
 
 This is the implemented shape. The shared ESLint config passes `policy/registries/generated.yaml` and optional `policy/registries/ownership.yaml` into `antidrift/no-structural-type-fork`.
 
+## Decision
+
+Keep `antidrift/no-structural-type-fork` as ready, default-off inventory. The accepted-owner branch is real TypeChecker proof: diagnostics require an exact local object/interface copy of a configured generated-source or accepted package-owner export.
+
+Do not treat broad installed-package structural matches as blocking. They are discovery/proposal facts only when a semantic fact sink is configured. Do not promote the rule until real exact-copy drift appears under an accepted owner configuration.
+
 ## Known Risks
 
 - Small object shapes collide.
 - Boundary DTOs may intentionally mirror wire contracts.
 - Generated wrappers and accepted package owner declarations must be inside the active TypeScript Program or project references.
 - Package-owner enforcement is only as strong as the accepted owner fact; broad installed-package proposals are discovery, not blocking proof.
+- False negatives are intentional for unconfigured owners, owner types below the shared property threshold, non-exact forks, copied owner models with extra fields, and owner declarations outside the active TypeScript Program.
 
 ## Entry Conditions
 
 - Chaski BFF now supplies projection clean controls: `orders-ops-router.ts` declares `LineItemDetailRow` as a local subset of generated `LineItemDetail`, and `service-stop-router.ts` declares `LineItemCounts` as a local subset of generated `LineItemCountsByOrder`. Those are not exact owner copies and should stay clean.
 - Clean controls include generated imports, installed base-client aliases, local tuple aliases, projected DTOs, and `Omit<ViewState, "padding">` utility derivation.
-- Stable promotion still needs another independent repository, broad inventory classification when generated sources are configured, and real accepted package-owner evidence before package owners are added.
+- Stable promotion still needs real exact generated-source or accepted package-owner copy drift, another independent repository, broad inventory classification when generated sources are configured, and real accepted package-owner evidence before package owners are added.

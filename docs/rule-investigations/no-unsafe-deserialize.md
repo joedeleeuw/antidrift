@@ -64,7 +64,22 @@ Why: the parse consumes a typed string and immediately validates the resulting s
 
 ## Ecosystem
 
-`@typescript-eslint/no-unsafe-argument` partially overlaps because it can catch some `any` arguments passed to `JSON.parse`. It is broader than this rule and does not carry the parse-at-edge replacement guidance. Antidrift owns the specific JSON boundary rule.
+`@typescript-eslint/no-unsafe-argument` is a real superset signal for the current
+drift: when forced on against Sudocode, Codebase Atlas, and Opencode, it reports
+the same broad-input `JSON.parse` lines that Antidrift reports. That means this
+rule is not justified by unique detection.
+
+The remaining Antidrift utility is scope, severity, and guidance. The upstream
+rule is intentionally any-argument-wide, has no rule options, and the
+TypeScript-ESLint docs warn that it can be hard to enable in codebases with many
+existing unsafe areas. In this repository package slice, forcing
+`@typescript-eslint/no-unsafe-argument` over `tooling/antidrift/src` and
+`tooling/antidrift/test` produced 661 findings, while this rule stays limited to
+the JSON parse boundary.
+
+Keep this rule only as a narrow parse-at-edge gate. If a consumer already has
+`@typescript-eslint/no-unsafe-argument` cleanly enabled, this rule is redundant
+except for a more specific diagnostic message.
 
 ## Real-Corpus Evidence
 
@@ -72,8 +87,9 @@ Drift:
 
 - `/Users/sushi/code/sudocode-main/server/src/routes/workflows.ts` line 199 parses `row.source` where the checker type is `any`.
 - The same file also reports broad row parses at lines 201, 208, 793, 1010, 1012, 1019, and 1598.
-- `/Users/sushi/code/opencode/packages/console/app/src/routes/bench/index.tsx` line 19 parses `row.result` before asserting a local `BenchmarkResult`.
-- `/Users/sushi/code/opencode/packages/console/app/src/routes/bench/[id].tsx` line 85 parses `rows[0].result` before asserting the same benchmark result shape.
+- `/Users/sushi/code/codebase-atlas/src/routes/atlas.city3d.tsx` lines 449 and 482 parse `MessageEvent.data` from EventSource handlers without first proving it is a string.
+- `/Users/sushi/code/opencode/packages/console/resource/resource.cloudflare.ts` line 19 parses `env.SST_RESOURCE_App` without the string guard used by the adjacent resource branches.
+- Opencode benchmark route parses remain real parse-output contract debt, but they are not current-rule drift because the rule is scoped to the parse input. Those rows belong to `antidrift/no-appeasement-cast`.
 - Cloudflare Agents previously supplied drift in `examples/assistant/src/server.ts` and `experimental/gadgets-chat/src/client.tsx`, but the current checkout no longer evaluates those as blocking evidence: the assistant file changed substantially, and the Cloudflare tsconfigs extend `agents/tsconfig` without an install-resolvable package path in this external clone.
 - Nested parsed-subfield drift splits into two rule owners. If the nested parse argument is still checker-typed `any` or `unknown`, this rule owns it. If the outer parse is immediately asserted into a named contract and that assertion makes the nested field appear typed, the root violation is `antidrift/no-appeasement-cast`.
 - Additional Cloudflare Agents inventory found broad-message parses such as `openai-sdk/streaming-chat/src/client.tsx` line 49 (`item.arguments: any`). This is inventory evidence, not yet a separate gate case.
@@ -86,6 +102,7 @@ Clean:
 - `/Users/sushi/code/sudocode-main/server/src/workflow/base-workflow-engine.ts` parses typed string row fields.
 - `/Users/sushi/code/sudocode-main/server/src/routes/config.ts` parses file content strings.
 - `/Users/sushi/code/codebase-atlas/src/programs/persistenceCuration.ts` parses file contents into `unknown` and then validates with `parsePersistedProject`.
+- `/Users/sushi/code/opencode/packages/console/resource/resource.cloudflare.ts` lines 11 and 16 guard `env` values with `typeof value === "string"` before parsing; the unguarded `App` branch at line 19 remains the matching drift.
 - `/Users/sushi/code/cloudflare-agents/packages/voice/src/text-stream.ts` parses a decoded `json: string` line and returns `Record<string, unknown>`; this remains a useful clean-control shape, but the current external checkout is config-blocked for type-aware linting.
 - `/Users/sushi/code/cloudflare-agents/voice-providers/twilio/src/index.ts` guards `event.data` with `typeof event.data === "string"` and an early-return `typeof event.data !== "string"` guard before parsing WebSocket messages; this also remains useful but config-blocked in the current external checkout.
 
@@ -95,9 +112,9 @@ Split TypeChecker inventory on June 4, 2026:
 - Chaski portal: 6 JSON.parse files, 0 findings.
 - Chaski monolithui: 10 JSON.parse files, 0 findings in project-included files.
 - Chaski crow-v2: 4 JSON.parse files, 0 findings.
-- Codebase Atlas `src`: 6 JSON.parse files, 0 findings.
+- Codebase Atlas `src`: previously 6 JSON.parse files, 0 findings; current corpus adds EventSource parse-input drift in `src/routes/atlas.city3d.tsx`.
 - Sudocode server: 57 JSON.parse files, 8 findings, all in `server/src/routes/workflows.ts`.
-- opencode console app: 2 JSON.parse findings in benchmark routes.
+- Opencode console resource: 1 unguarded `env` parse-input finding plus adjacent guarded clean controls.
 - Cloudflare Agents focused corpus: now recorded as known-gap rather than blocking evidence because the external example checkout cannot currently resolve `agents/tsconfig` for type-aware linting.
 - Cloudflare Agents wider scan: at least 15 files reported before the scan stopped after enough dirty and clean candidates were collected.
 
@@ -109,9 +126,20 @@ Cloudflare WebSocket handlers proved the TypeChecker-only version was too blunt:
 
 Status: `ready`, `stable: true`.
 
-The rule is type-aware and has Sudocode plus opencode drift and multiple clean controls. The guarded-`any` concern is resolved, and the former nested parsed-subfield blocker is reclassified: input-side broad nested parses remain covered here, while output-side contract assertions belong to `antidrift/no-appeasement-cast`.
+The rule is type-aware and has Sudocode, Codebase Atlas, and Opencode drift plus
+multiple clean controls. The guarded-`any` concern is resolved, and the former
+nested parsed-subfield blocker is reclassified: input-side broad nested parses
+remain covered here, while output-side contract assertions belong to
+`antidrift/no-appeasement-cast`.
 
-Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-review-no-unsafe-deserialize-20260604-145356.md`). It agreed the ecosystem overlap is partial, the strongest signal is TypeChecker plus a narrow local string-boundary exemption, and the real-corpus evidence is strong enough for promotion review. It recommended holding stable promotion until the remaining production concern was closed: if parser services are unavailable, type-aware rules could fail open. That concern is now closed by a shared rule-level guard: fully type-aware rules report a configuration error when enabled without TypeScript parser services.
+The promotion argument is narrower after ecosystem recheck: this rule is a
+low-noise parse-boundary specialization, not unique detection. It should stay
+default-on only while the distributable config is unwilling to require the full
+`@typescript-eslint/no-unsafe-argument` migration. If the package later adopts
+that upstream rule broadly, this rule should be retired or demoted to a message
+specialization.
+
+Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-review-no-unsafe-deserialize-20260604-145356.md`). It agreed the strongest custom signal is TypeChecker plus a narrow local string-boundary exemption and recommended holding stable promotion until the remaining production concern was closed: if parser services are unavailable, type-aware rules could fail open. That concern is now closed by a shared rule-level guard: fully type-aware rules report a configuration error when enabled without TypeScript parser services. The current ecosystem re-audit is stricter than that review: upstream `@typescript-eslint/no-unsafe-argument` catches the present drift, so this rule's custom justification is lower-noise parse-boundary scope, not detection that ecosystem tools cannot express.
 
 Accepted stable limitations:
 
@@ -119,4 +147,6 @@ Accepted stable limitations:
 - Aliased or computed parse calls such as `const { parse } = JSON` and `JSON["parse"](value)` are not matched.
 - A local binding named `JSON` could be mistaken for the global JSON object.
 
-Next slice: monitor for real aliased `JSON.parse` calls or helper-based string guards before widening.
+Next slice: monitor whether enabling `@typescript-eslint/no-unsafe-argument` is
+practical for package consumers. Retire or demote this rule if ecosystem
+coverage becomes acceptable without producing unrelated any-argument inventory.

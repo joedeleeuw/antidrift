@@ -6,7 +6,7 @@
 
 The real-corpus-backed signal is the `Object.entries(...).map` extractor branch: broad object normalization that repeatedly inspects entry values instead of using an owned schema or converter.
 
-The rule now requires TypeScript parser services. It only reports when the `Object.entries` value binding is typed as `any`, `unknown`, or a type string containing `any`/`unknown`, and the callback body repeatedly probes object shape.
+The rule now requires TypeScript parser services. It only reports when the `Object.entries` value binding has actual TypeScript `any` or `unknown` flags, and the callback body repeatedly probes object shape.
 
 The disputed boolean-helper branch was removed from this rule. Real corpus review showed ordinary route/predicate helpers can look similar without being type laundering.
 
@@ -14,7 +14,7 @@ The disputed boolean-helper branch was removed from this rule. Real corpus revie
 
 Adjacent ecosystem rules:
 
-- `@typescript-eslint/no-unsafe-member-access`, `@typescript-eslint/no-unsafe-return`, and `@typescript-eslint/no-unsafe-assignment` catch many `any` leakage symptoms. `pnpm policy:inventory-defensive-shape` now makes that comparison reproducible over Chaski BFF, Chaski Portal, Codebase Atlas, Sudocode CLI/server, and Opencode console app. The current parser-clean report checks 1,648 type-aware files, records 72 `Object.entries` transform syntax candidates, finds 1 antidrift finding, 1,477 unsafe-member-access findings, 113 unsafe-return findings, and 963 unsafe-assignment findings. The Chaski drift is partially overlapped: antidrift reports the `Object.entries` callback at line 706, while upstream reports unsafe access in the same file.
+- `@typescript-eslint/no-unsafe-member-access`, `@typescript-eslint/no-unsafe-return`, and `@typescript-eslint/no-unsafe-assignment` catch many `any` leakage symptoms. `pnpm policy:inventory-defensive-shape` now makes that comparison reproducible over Chaski BFF, Chaski Portal, Codebase Atlas, Sudocode CLI/server, and Opencode console app. The current parser-clean report checks 1,680 type-aware files, records 72 `Object.entries` transform syntax candidates, finds 1 antidrift finding, 1,508 unsafe-member-access findings, 113 unsafe-return findings, and 977 unsafe-assignment findings. The Chaski drift is partially overlapped: antidrift reports the `Object.entries` callback at line 706, while upstream reports unsafe access in the same file.
 - `@typescript-eslint/no-unsafe-type-assertion` catches unsafe narrowing assertions, but does not catch broad-object probing or normalizer callbacks.
 - `@typescript-eslint/no-unnecessary-condition` catches impossible or redundant conditions once type information proves them unnecessary.
 - `@typescript-eslint/switch-exhaustiveness-check` covers discriminated-union exhaustiveness, not broad-object normalization.
@@ -59,7 +59,7 @@ This is a non-blocking inventory gate. It writes `reports/defensive-shape-invent
 
 Current result:
 
-- 1,648 type-aware files checked.
+- 1,680 type-aware files checked.
 - 72 `Object.entries` transform syntax candidates.
 - 0 parser errors.
 - 1 `antidrift/no-defensive-shape-probing` finding.
@@ -91,7 +91,7 @@ The 2026-06-15 reproducible sweep above supersedes this ad hoc sweep as the curr
 ## Known Risks
 
 - Narrowing drops true positives where a broad value has already been cast to a precise local type before the entries mapper.
-- `checker.typeToString(...)` is a coarse fallback for detecting `any`/`unknown` inside aliases.
+- Broad-value proof is intentionally fail-closed: the rule no longer regexes `checker.typeToString(...)` for `any`/`unknown` alias text.
 - Current real drift is `any`-typed and partially covered by upstream unsafe rules. A real `unknown`-typed broad-value mini-parser would better prove unique rule value.
 - The 2026-06-15 sunset sweep found no second independent real drift repository, only clean controls and syntax pressure.
 
