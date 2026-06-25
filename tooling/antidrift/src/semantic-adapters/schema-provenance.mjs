@@ -13,8 +13,23 @@ function isAnyOrUnknownType(type) {
   );
 }
 
-function typeStringIncludesAnyOrUnknown(checker, type) {
-  return /\b(?:any|unknown)\b/u.test(checker.typeToString(type));
+function typeContainsAnyOrUnknown(checker, type, seen = new Set()) {
+  if (!type || seen.has(type)) return false;
+  seen.add(type);
+  if (isAnyOrUnknownType(type)) return true;
+  for (const part of type.types ?? []) {
+    if (typeContainsAnyOrUnknown(checker, part, seen)) return true;
+  }
+  const stringIndexType = type.getStringIndexType?.();
+  if (typeContainsAnyOrUnknown(checker, stringIndexType, seen)) return true;
+  const numberIndexType = type.getNumberIndexType?.();
+  if (typeContainsAnyOrUnknown(checker, numberIndexType, seen)) return true;
+  for (const property of checker.getPropertiesOfType(type)) {
+    if (typeContainsAnyOrUnknown(checker, checker.getTypeOfSymbol(property), seen)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function isZodMethod(checker, tsNameNode) {
@@ -160,7 +175,7 @@ export function parsedCallResultMatchesSchemaOutput(
     argType &&
     !isAnyOrUnknownType(argType) &&
     !isAnyOrUnknownType(parseReturnType) &&
-    !typeStringIncludesAnyOrUnknown(checker, parseReturnType) &&
+    !typeContainsAnyOrUnknown(checker, parseReturnType) &&
     checker.isTypeAssignableTo(argType, parseReturnType) &&
     checker.isTypeAssignableTo(parseReturnType, argType),
   );

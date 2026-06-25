@@ -83,10 +83,10 @@ try {
       "  antidrift/no-async-array-method:\n" +
       "    status: ready\n" +
       "    stable: false\n" +
-      "    signal: AST plus local collection flow\n" +
+      "    signal: AST default branch plus opt-in local collection flow\n" +
       "    solveType: promise-control-flow\n" +
       "    proofBuckets: [local-ast-source-shape, semantic-source-type-provenance]\n" +
-      "    nextAction: Keep async collection proof explicit.\n" +
+      "    nextAction: Keep async collection proof explicit and opt-in.\n" +
       "  antidrift/no-handrolled-resource-lifecycle-cells:\n" +
       "    status: ready\n" +
       "    stable: false\n" +
@@ -231,6 +231,32 @@ try {
       "];\n",
   );
   file(
+    "eslint.async-array.config.mjs",
+    'import { createConfig } from "@joedeleeuw/antidrift/eslint-config";\n' +
+      "\n" +
+      "export default [\n" +
+      "  ...createConfig({ tsconfigRootDir: import.meta.dirname }),\n" +
+      "  {\n" +
+      "    rules: {\n" +
+      '      "antidrift/no-async-array-method": "error",\n' +
+      "    },\n" +
+      "  },\n" +
+      "];\n",
+  );
+  file(
+    "eslint.async-array-collection.config.mjs",
+    'import { createConfig } from "@joedeleeuw/antidrift/eslint-config";\n' +
+      "\n" +
+      "export default [\n" +
+      "  ...createConfig({ tsconfigRootDir: import.meta.dirname }),\n" +
+      "  {\n" +
+      "    rules: {\n" +
+      '      "antidrift/no-async-array-method": ["error", { branches: ["requires-collection"] }],\n' +
+      "    },\n" +
+      "  },\n" +
+      "];\n",
+  );
+  file(
     "packages/app/tsconfig.json",
     JSON.stringify(
       {
@@ -265,6 +291,32 @@ try {
       "  photoURL: string | null;\n  providerId: string;\n  phoneNumber: string | null;\n};\n",
   );
   file(
+    "packages/app/src/async-foreach-drift.ts",
+    "export function cleanup(items: Array<{ save(): Promise<void> }>) {\n" +
+      "  items.forEach(async (item) => {\n" +
+      "    await item.save();\n" +
+      "  });\n" +
+      "}\n",
+  );
+  file(
+    "packages/app/src/async-map-collection-drift.ts",
+    "export function countPending(items: Array<{ save(): Promise<void> }>) {\n" +
+      "  const pending = items.map(async (item) => {\n" +
+      "    await item.save();\n" +
+      "  });\n" +
+      "  return pending.length;\n" +
+      "}\n",
+  );
+  file(
+    "packages/app/src/async-map-return-clean.ts",
+    "export function pendingSaves(items: Array<{ save(): Promise<void> }>) {\n" +
+      "  const pending = items.map(async (item) => {\n" +
+      "    await item.save();\n" +
+      "  });\n" +
+      "  return pending;\n" +
+      "}\n",
+  );
+  file(
     "packages/app/src/brand.ts",
     'import { brand, type Brand, type Unbrand } from "@joedeleeuw/antidrift/brand";\n' +
       'const UserId = brand("UserId", (value): value is string => typeof value === "string" && value.startsWith("user_"));\n' +
@@ -286,8 +338,8 @@ try {
       'import { createConfig as createConfigFromSubpath, type AntidriftConfigOptions as SubpathConfigOptions } from "@joedeleeuw/antidrift/eslint-config";\n' +
       'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, loadRuleStatusRegistrySync, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, ruleStatusEntriesForKind, ruleStatusEntriesForProofBucket, ruleStatusEntriesForSemanticAdapter, ruleStatusEntriesForStatus, ruleStatusEntryForId, ruleStatusManifest, ruleStatusSemanticSummaries, ruleStatusSemanticSummaryForId, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession, type AgentGuardrailsPolicy as PolicySubpathPolicy, type RuleStatusManifest, type RuleStatusManifestEntry, type RuleStatusPromotion, type RuleStatusSemanticSummary, type SemanticFact, type SemanticFactKind, type SemanticFactKindContractEntry, type SqlParserServiceDeltaClassification } from "@joedeleeuw/antidrift/policy";\n' +
       'import { SEMANTIC_ADAPTERS, SEMANTIC_ADAPTER_CONTRACTS, SEMANTIC_ADAPTER_CONTRACT_LIST, SEMANTIC_ADAPTER_MANIFEST, asyncControlFlow as adapterAsyncControlFlow, authBoundary as adapterAuthBoundary, broadInput as adapterBroadInput, parseInput as adapterParseInput, reactState as adapterReactState, schemaProvenance as adapterSchemaProvenance, semanticAdapterContractsForFactAdapterId, semanticAdapterContractsForFactKind, semanticAdapterContractsForProofBucket, semanticAdapterContractsForRule, semanticAdapterManifestForAdapterId, semanticAdapterManifestForFactAdapterId, semanticAdapterManifestForFactKind, semanticAdapterManifestForProofBucket, semanticAdapterManifestForRule, sql as adapterSql, tupleShape as adapterTupleShape, typeOwner as adapterTypeOwner, type SemanticAdapterContract, type SemanticAdapterContractKey, type SemanticAdapterManifestEntry } from "@joedeleeuw/antidrift/semantic-adapters";\n' +
-      'import { DEFAULT_AUTHZ_FUNCTIONS, REQUEST_PARAM_ROOTS, callExpressionName, createAuthBoundaryTracker, isAuthzCall, isRequestParamsAccess, type AuthBoundaryFrame, type AuthBoundaryTracker } from "@joedeleeuw/antidrift/semantic-adapters/auth-boundary";\n' +
-      'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, markAwaitedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap, type AsyncArrayCallbackClassification, type PendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
+      'import { REQUEST_PARAM_ROOTS, callExpressionName, createAuthBoundaryTracker, isAuthzCall, isRequestParamsAccess, type AuthBoundaryFrame, type AuthBoundaryTracker } from "@joedeleeuw/antidrift/semantic-adapters/auth-boundary";\n' +
+      'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, isReturnedExpression, markAwaitedPendingMaps, markReturnedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap, type AsyncArrayCallbackClassification, type PendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
       'import { BROAD_INPUT_ARRAY_TRANSFORM_METHODS, assignmentTarget, callUsesPredicateParam, checkedTargetProperties, collectBindingIdentifiers, collectBindingNames, collectObjectPatternBindingNames, countShapeProbesIn, destructuredTargetPropertyAliases, directAliasName, functionParameterByName, hasBroadObjectEntriesValue, hasParamRoot, hasValidatorDelegation, isAppeasementCastSourceType, isAppeasementCastTargetType, isAppeasementContractCast, isBindingIdentifier, isBroadPredicateInputType, isBroadShapeProbeInputType, isNamedTypeReference, isNullishLiteral, isObjectEntriesCall, isPredicateObjectContract, isTypeofObjectProbe, memberExpressionPropertyName, memberExpressionRootName, objectEntriesCallbackProbe, objectEntriesValueBindings, objectHasOwnPropertyName, predicateValueNames, requiredTypeProps, staticPropertyName, typePredicateParts, unwrapExpression, walkNode, type ObjectEntriesCallbackProbe, type TypePredicateParts, type TypeScriptParserServices as BroadInputParserServices } from "@joedeleeuw/antidrift/semantic-adapters/broad-input";\n' +
       'import { conditionEnsuresString, hasLocalStringBoundary, isJsonParseCall, isUnsafeJsonParseInput, jsonParseArgument, type TypeScriptParserServices as ParseInputParserServices } from "@joedeleeuw/antidrift/semantic-adapters/parse-input";\n' +
       'import { classifyWriteValue, createReactStateTracker, frameStatePayload, lifecycleProof, type ReactStateFrame, type ReactStateFramePayload, type ReactStateLifecycleProof, type ReactStateWriteClass } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
@@ -305,7 +357,7 @@ try {
       'const options = { tsconfigRootDir: ".", semanticFacts: { sink: memorySink } } satisfies AntidriftConfigOptions;\n' +
       'const subpathOptions = { policyDir: "policy", semanticFacts: { sink: memorySink } } satisfies SubpathConfigOptions;\n' +
       'const branded = brand("UserId", (value): value is string => typeof value === "string");\n' +
-      "const authBoundaryTracker = createAuthBoundaryTracker({ onFrameExit(frame) { frame satisfies AuthBoundaryFrame; } });\n" +
+      'const authBoundaryTracker = createAuthBoundaryTracker({ authzFunctions: ["authorize"], onFrameExit(frame) { frame satisfies AuthBoundaryFrame; } });\n' +
       'const writeClass = classifyWriteValue({ type: "Literal", value: false }, { awaitedNames: new Set<string>(), catchParams: [] });\n' +
       "const reactSourceCode = { getScope: (_node: unknown) => ({ set: new Map<string, unknown>(), upper: null }), getDeclaredVariables: (_node: unknown) => [] };\n" +
       "const tracker = createReactStateTracker({ sourceCode: reactSourceCode, onFrameExit(frame) { frame satisfies ReactStateFrame; } });\n" +
@@ -338,7 +390,9 @@ try {
       'PROMISE_COMBINATOR_METHODS.has("all") satisfies boolean;\n' +
       'isPromiseCombinator({ type: "MemberExpression", object: { type: "Identifier", name: "Promise" }, property: { type: "Identifier", name: "all" } }) satisfies boolean;\n' +
       "isDirectlyWrappedInPromiseCombinator(asyncMapCall) satisfies boolean;\n" +
+      "isReturnedExpression(asyncMapCall) satisfies boolean;\n" +
       "markAwaitedPendingMaps satisfies (sourceCode: unknown, node: unknown, pendingAsyncMaps: PendingAsyncMap[]) => void;\n" +
+      "markReturnedPendingMaps satisfies (sourceCode: unknown, node: unknown, pendingAsyncMaps: PendingAsyncMap[]) => void;\n" +
       "promiseCombinatorVariables satisfies (sourceCode: unknown, node: unknown) => unknown[];\n" +
       "queuePendingAsyncMap satisfies (sourceCode: unknown, node: unknown, callback: unknown, method: string, pendingAsyncMaps: PendingAsyncMap[]) => boolean;\n" +
       "getDeclaredVariable satisfies (sourceCode: unknown, declarator: unknown) => unknown | null;\n" +
@@ -439,10 +493,9 @@ try {
       'semanticAdapterManifestForFactAdapterId("react-state") satisfies readonly SemanticAdapterManifestEntry[];\n' +
       'semanticAdapterManifestForFactKind("resourceLifecycleProof") satisfies readonly SemanticAdapterManifestEntry[];\n' +
       'semanticAdapterManifestForProofBucket("authority-index-ownership") satisfies readonly SemanticAdapterManifestEntry[];\n' +
-      "DEFAULT_AUTHZ_FUNCTIONS satisfies readonly string[];\n" +
       "REQUEST_PARAM_ROOTS satisfies readonly string[];\n" +
       'callExpressionName({ type: "Identifier", name: "authorize" }) satisfies string | null;\n' +
-      'isAuthzCall({ type: "Identifier", name: "authorize" }) satisfies boolean;\n' +
+      'isAuthzCall({ type: "Identifier", name: "authorize" }, ["authorize"]) satisfies boolean;\n' +
       'isRequestParamsAccess({ type: "MemberExpression", object: { type: "Identifier", name: "req" }, property: { type: "Identifier", name: "params" } }) satisfies boolean;\n' +
       "authBoundaryTracker satisfies AuthBoundaryTracker;\n" +
       'BROAD_INPUT_ARRAY_TRANSFORM_METHODS.has("map") satisfies boolean;\n' +
@@ -541,7 +594,6 @@ try {
       "void adapterSchemaProvenance;\n" +
       "void adapterSql;\n" +
       "void adapterTypeOwner;\n" +
-      "void DEFAULT_AUTHZ_FUNCTIONS;\n" +
       "void REQUEST_PARAM_ROOTS;\n" +
       "void callExpressionName;\n" +
       "void createAuthBoundaryTracker;\n" +
@@ -624,8 +676,8 @@ try {
       'import { createConfig as createConfigFromSubpath } from "@joedeleeuw/antidrift/eslint-config";\n' +
       'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, loadRuleStatusRegistrySync, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, ruleStatusEntriesForKind, ruleStatusEntriesForProofBucket, ruleStatusEntriesForSemanticAdapter, ruleStatusEntriesForStatus, ruleStatusEntryForId, ruleStatusManifest, ruleStatusSemanticSummaries, ruleStatusSemanticSummaryForId, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession } from "@joedeleeuw/antidrift/policy";\n' +
       'import { SEMANTIC_ADAPTERS, SEMANTIC_ADAPTER_CONTRACTS, SEMANTIC_ADAPTER_CONTRACT_LIST, SEMANTIC_ADAPTER_MANIFEST, asyncControlFlow as adapterAsyncControlFlow, authBoundary as adapterAuthBoundary, broadInput as adapterBroadInput, parseInput as adapterParseInput, reactState as adapterReactState, schemaProvenance as adapterSchemaProvenance, semanticAdapterContractsForFactAdapterId, semanticAdapterContractsForFactKind, semanticAdapterContractsForProofBucket, semanticAdapterContractsForRule, semanticAdapterManifestForAdapterId, semanticAdapterManifestForFactAdapterId, semanticAdapterManifestForFactKind, semanticAdapterManifestForProofBucket, semanticAdapterManifestForRule, sql as adapterSql, tupleShape as adapterTupleShape, typeOwner as adapterTypeOwner } from "@joedeleeuw/antidrift/semantic-adapters";\n' +
-      'import { DEFAULT_AUTHZ_FUNCTIONS, REQUEST_PARAM_ROOTS, callExpressionName, createAuthBoundaryTracker, isAuthzCall, isRequestParamsAccess } from "@joedeleeuw/antidrift/semantic-adapters/auth-boundary";\n' +
-      'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, markAwaitedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
+      'import { REQUEST_PARAM_ROOTS, callExpressionName, createAuthBoundaryTracker, isAuthzCall, isRequestParamsAccess } from "@joedeleeuw/antidrift/semantic-adapters/auth-boundary";\n' +
+      'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, isReturnedExpression, markAwaitedPendingMaps, markReturnedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
       'import { BROAD_INPUT_ARRAY_TRANSFORM_METHODS, assignmentTarget, callUsesPredicateParam, checkedTargetProperties, collectBindingIdentifiers, collectBindingNames, collectObjectPatternBindingNames, countShapeProbesIn, destructuredTargetPropertyAliases, directAliasName, functionParameterByName, hasBroadObjectEntriesValue, hasParamRoot, hasValidatorDelegation, isAppeasementCastSourceType, isAppeasementCastTargetType, isAppeasementContractCast, isBindingIdentifier, isBroadPredicateInputType, isBroadShapeProbeInputType, isNamedTypeReference, isNullishLiteral, isObjectEntriesCall, isPredicateObjectContract, isTypeofObjectProbe, memberExpressionPropertyName, memberExpressionRootName, objectEntriesCallbackProbe, objectEntriesValueBindings, objectHasOwnPropertyName, predicateValueNames, requiredTypeProps, staticPropertyName, typePredicateParts, unwrapExpression, walkNode } from "@joedeleeuw/antidrift/semantic-adapters/broad-input";\n' +
       'import { hasLocalStringBoundary, isJsonParseCall, jsonParseArgument } from "@joedeleeuw/antidrift/semantic-adapters/parse-input";\n' +
       'import { classifyWriteValue, createReactStateTracker, frameStatePayload, lifecycleProof } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
@@ -665,7 +717,6 @@ try {
       "  adapterSql,\n" +
       "  adapterTupleShape,\n" +
       "  adapterTypeOwner,\n" +
-      "  DEFAULT_AUTHZ_FUNCTIONS,\n" +
       "  REQUEST_PARAM_ROOTS,\n" +
       "  callExpressionName,\n" +
       "  createAuthBoundaryTracker,\n" +
@@ -680,7 +731,9 @@ try {
       "  getDeclaredVariable,\n" +
       "  isDirectlyWrappedInPromiseCombinator,\n" +
       "  isPromiseCombinator,\n" +
+      "  isReturnedExpression,\n" +
       "  markAwaitedPendingMaps,\n" +
+      "  markReturnedPendingMaps,\n" +
       "  promiseCombinatorVariables,\n" +
       "  queuePendingAsyncMap,\n" +
       "  BROAD_INPUT_ARRAY_TRANSFORM_METHODS,\n" +
@@ -862,6 +915,18 @@ try {
       '  throw new Error("Missing async-control-flow Promise combinator marking behavior");\n' +
       "}\n" +
       "\n" +
+      "runtimePendingAsyncMaps[0].returned = false;\n" +
+      'markReturnedPendingMaps(runtimeSourceCode, { type: "ReturnStatement", argument: { type: "Identifier", name: "mapped" } }, runtimePendingAsyncMaps);\n' +
+      "if (!runtimePendingAsyncMaps[0]?.returned) {\n" +
+      '  throw new Error("Missing async-control-flow returned collection marking behavior");\n' +
+      "}\n" +
+      "\n" +
+      'const runtimeReturnedExpression = { type: "CallExpression" };\n' +
+      'runtimeReturnedExpression.parent = { type: "ReturnStatement", argument: runtimeReturnedExpression };\n' +
+      'if (!isReturnedExpression(runtimeReturnedExpression) || isReturnedExpression({ parent: { type: "CallExpression" } })) {\n' +
+      '  throw new Error("Missing returned async expression adapter behavior");\n' +
+      "}\n" +
+      "\n" +
       "if (SEMANTIC_ADAPTERS.asyncControlFlow !== adapterAsyncControlFlow || SEMANTIC_ADAPTERS.authBoundary !== adapterAuthBoundary || SEMANTIC_ADAPTERS.broadInput !== adapterBroadInput || SEMANTIC_ADAPTERS.parseInput !== adapterParseInput || SEMANTIC_ADAPTERS.reactState !== adapterReactState || SEMANTIC_ADAPTERS.schemaProvenance !== adapterSchemaProvenance || SEMANTIC_ADAPTERS.sql !== adapterSql || SEMANTIC_ADAPTERS.tupleShape !== adapterTupleShape || SEMANTIC_ADAPTERS.typeOwner !== adapterTypeOwner) {\n" +
       '  throw new Error("Missing semantic-adapters aggregate registry behavior");\n' +
       "}\n" +
@@ -882,7 +947,7 @@ try {
       '  throw new Error("Missing semantic adapter contract lookup behavior");\n' +
       "}\n" +
       "\n" +
-      'if (!DEFAULT_AUTHZ_FUNCTIONS.includes("authorize") || !REQUEST_PARAM_ROOTS.includes("req") || callExpressionName({ type: "Identifier", name: "authorize" }) !== "authorize" || !isAuthzCall({ type: "Identifier", name: "authorize" }) || !isRequestParamsAccess({ type: "MemberExpression", object: { type: "Identifier", name: "req" }, property: { type: "Identifier", name: "params" } })) {\n' +
+      'if (!REQUEST_PARAM_ROOTS.includes("req") || callExpressionName({ type: "Identifier", name: "authorize" }) !== "authorize" || !isAuthzCall({ type: "Identifier", name: "authorize" }, ["authorize"]) || !isRequestParamsAccess({ type: "MemberExpression", object: { type: "Identifier", name: "req" }, property: { type: "Identifier", name: "params" } })) {\n' +
       '  throw new Error("Missing auth-boundary semantic adapter behavior");\n' +
       "}\n" +
       "\n" +
@@ -972,6 +1037,47 @@ try {
   if (packageCopyRules.includes(RULE)) {
     fail(
       `package-copy.ts (unaccepted package authority) must NOT report ${RULE}, got: ${JSON.stringify(packageCopyRules)}`,
+    );
+  }
+
+  const ASYNC_RULE = "antidrift/no-async-array-method";
+  const asyncDefaultConfig = "eslint.async-array.config.mjs";
+  const asyncCollectionConfig = "eslint.async-array-collection.config.mjs";
+  const asyncForEachRules = lint(
+    "packages/app/src/async-foreach-drift.ts",
+    asyncDefaultConfig,
+  ).flatMap((r) => r.messages.map((m) => m.ruleId));
+  const asyncMapDefaultRules = lint(
+    "packages/app/src/async-map-collection-drift.ts",
+    asyncDefaultConfig,
+  ).flatMap((r) => r.messages.map((m) => m.ruleId));
+  const asyncMapCollectionRules = lint(
+    "packages/app/src/async-map-collection-drift.ts",
+    asyncCollectionConfig,
+  ).flatMap((r) => r.messages.map((m) => m.ruleId));
+  const asyncMapReturnRules = lint(
+    "packages/app/src/async-map-return-clean.ts",
+    asyncCollectionConfig,
+  ).flatMap((r) => r.messages.map((m) => m.ruleId));
+
+  if (!asyncForEachRules.includes(ASYNC_RULE)) {
+    fail(
+      `explicit async-array config should report forEach drift, got: ${JSON.stringify(asyncForEachRules)}`,
+    );
+  }
+  if (asyncMapDefaultRules.includes(ASYNC_RULE)) {
+    fail(
+      `default async-array branch must not report map collection flow, got: ${JSON.stringify(asyncMapDefaultRules)}`,
+    );
+  }
+  if (!asyncMapCollectionRules.includes(ASYNC_RULE)) {
+    fail(
+      `opt-in async-array collection branch should report unjoined map flow, got: ${JSON.stringify(asyncMapCollectionRules)}`,
+    );
+  }
+  if (asyncMapReturnRules.includes(ASYNC_RULE)) {
+    fail(
+      `opt-in async-array collection branch must not report returned promise arrays, got: ${JSON.stringify(asyncMapReturnRules)}`,
     );
   }
 
@@ -1301,7 +1407,7 @@ try {
     `\n✓ tarball installs, type-checks, imports, and enforces in a consumer monorepo`,
   );
   console.log(
-    `  default config kept ${RULE} off; opt-in config fired on drift.ts, emitted a structuralMatch fact, and kept clean.ts/package-copy.ts clean; public exports and semantic adapters passed Bundler and NodeNext.`,
+    `  default config kept ${RULE} off; opt-in config fired on drift.ts, async-array shipped behavior matched default and opt-in branch expectations, emitted a structuralMatch fact, and kept clean.ts/package-copy.ts clean; public exports and semantic adapters passed Bundler and NodeNext.`,
   );
   rmSync(work, { recursive: true, force: true });
 } catch (error) {

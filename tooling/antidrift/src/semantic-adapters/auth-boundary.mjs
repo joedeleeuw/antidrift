@@ -1,14 +1,3 @@
-export const DEFAULT_AUTHZ_FUNCTIONS = Object.freeze([
-  "requireUser",
-  "authorize",
-  "requireTenant",
-  "can",
-  "assertCan",
-  "checkAccess",
-  "requireRole",
-  "ensureCan",
-]);
-
 export const REQUEST_PARAM_ROOTS = Object.freeze([
   "req",
   "request",
@@ -28,6 +17,17 @@ export function callExpressionName(callee) {
   return null;
 }
 
+function requireStringList(name, values) {
+  if (
+    !Array.isArray(values) ||
+    values.length === 0 ||
+    values.some((value) => typeof value !== "string" || value.length === 0)
+  ) {
+    throw new Error(`auth-boundary: ${name} must be a non-empty string array`);
+  }
+  return values;
+}
+
 export function isRequestParamsAccess(
   node,
   requestParamRoots = REQUEST_PARAM_ROOTS,
@@ -41,13 +41,17 @@ export function isRequestParamsAccess(
   );
 }
 
-export function isAuthzCall(callee, authzFunctions = DEFAULT_AUTHZ_FUNCTIONS) {
+export function isAuthzCall(callee, authzFunctions) {
+  const functions = requireStringList("authzFunctions", authzFunctions);
   const name = callExpressionName(callee);
-  return Boolean(name && new Set(authzFunctions).has(name));
+  return Boolean(name && new Set(functions).has(name));
 }
 
 export function createAuthBoundaryTracker(options = {}) {
-  const authzFunctions = options.authzFunctions ?? DEFAULT_AUTHZ_FUNCTIONS;
+  const authzFunctions = requireStringList(
+    "authzFunctions",
+    options.authzFunctions,
+  );
   const requestParamRoots = options.requestParamRoots ?? REQUEST_PARAM_ROOTS;
   const onFrameExit = options.onFrameExit ?? (() => {});
   const stack = [];

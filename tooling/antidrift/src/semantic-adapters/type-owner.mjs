@@ -19,10 +19,8 @@ export function normalizedContextName(value) {
 
 export function isStatusContextName(contextName, statusName) {
   const normalized = normalizedContextName(contextName);
-  if (!normalized) return false;
-  return (
-    normalized.includes("status") ||
-    normalized === normalizedContextName(statusName)
+  return Boolean(
+    normalized && normalized === normalizedContextName(statusName),
   );
 }
 
@@ -36,27 +34,48 @@ export function nodeKeyName(node) {
   return "";
 }
 
+function statusContextNodeName(node) {
+  if (node?.type === "TSTypeAliasDeclaration") return node.id?.name ?? "";
+  if (node?.type === "TSInterfaceDeclaration") return node.id?.name ?? "";
+  if (node?.type === "Identifier") return node.name;
+  if (node?.type === "VariableDeclarator" && node.id?.type === "Identifier") {
+    return node.id.name;
+  }
+  return null;
+}
+
+function statusPropertyContextMatches(node, statusName) {
+  const keyName = nodeKeyName(node?.key);
+  if (isStatusContextName(keyName, statusName)) return true;
+  const ownerName = enclosingTypeDeclarationName(node);
+  return (
+    Boolean(ownerName) &&
+    normalizedContextName(`${ownerName}${keyName}`) ===
+      normalizedContextName(statusName)
+  );
+}
+
 export function isStatusLiteralContext(node, statusName) {
   let cur = node?.parent;
   while (cur) {
-    if (cur.type === "TSTypeAliasDeclaration") {
-      return isStatusContextName(cur.id?.name, statusName);
-    }
-    if (cur.type === "TSInterfaceDeclaration") {
-      return isStatusContextName(cur.id?.name, statusName);
-    }
     if (cur.type === "TSPropertySignature") {
-      return isStatusContextName(nodeKeyName(cur.key), statusName);
+      return statusPropertyContextMatches(cur, statusName);
     }
-    if (cur.type === "Identifier") {
-      return isStatusContextName(cur.name, statusName);
-    }
-    if (cur.type === "VariableDeclarator" && cur.id?.type === "Identifier") {
-      return isStatusContextName(cur.id.name, statusName);
-    }
+    const contextName = statusContextNodeName(cur);
+    if (contextName !== null) return isStatusContextName(contextName, statusName);
     cur = cur.parent;
   }
   return false;
+}
+
+function enclosingTypeDeclarationName(node) {
+  let cur = node?.parent;
+  while (cur) {
+    if (cur.type === "TSTypeAliasDeclaration") return cur.id?.name ?? "";
+    if (cur.type === "TSInterfaceDeclaration") return cur.id?.name ?? "";
+    cur = cur.parent;
+  }
+  return "";
 }
 
 export function canonicalStatusLiteralOwner(node, statuses) {

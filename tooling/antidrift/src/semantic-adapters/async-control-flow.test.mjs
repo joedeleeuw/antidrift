@@ -7,7 +7,9 @@ import {
   asyncCallbackArgument,
   isDirectlyWrappedInPromiseCombinator,
   isPromiseCombinator,
+  isReturnedExpression,
   markAwaitedPendingMaps,
+  markReturnedPendingMaps,
   promiseCombinatorVariables,
   queuePendingAsyncMap,
 } from "./async-control-flow.mjs";
@@ -64,7 +66,13 @@ describe("async-control-flow array callback helpers", () => {
     expect(queuePendingAsyncMap(sourceCode, mapCall, callback, "map", pending))
       .toBe(true);
     expect(pending).toEqual([
-      { variable, node: callback, method: "map", awaited: false },
+      {
+        variable,
+        node: callback,
+        method: "map",
+        awaited: false,
+        returned: false,
+      },
     ]);
 
     const promiseAll = {
@@ -87,5 +95,66 @@ describe("async-control-flow array callback helpers", () => {
     const directPromiseAll = { ...promiseAll, arguments: [directMap] };
     directMap.parent = directPromiseAll;
     expect(isDirectlyWrappedInPromiseCombinator(directMap)).toBe(true);
+    expect(isReturnedExpression(directMap)).toBe(false);
+
+    const returnedMap = memberCall("map", callback);
+    returnedMap.parent = { type: "ReturnStatement", argument: returnedMap };
+    expect(isReturnedExpression(returnedMap)).toBe(true);
+
+    const conciseArrowMap = memberCall("map", callback);
+    conciseArrowMap.parent = {
+      type: "ArrowFunctionExpression",
+      body: conciseArrowMap,
+    };
+    expect(isReturnedExpression(conciseArrowMap)).toBe(true);
+
+    const conditionalMap = memberCall("map", callback);
+    const conditional = {
+      type: "ConditionalExpression",
+      consequent: conditionalMap,
+      alternate: { type: "ArrayExpression", elements: [] },
+    };
+    conditionalMap.parent = conditional;
+    conditional.parent = { type: "ReturnStatement", argument: conditional };
+    expect(isReturnedExpression(conditionalMap)).toBe(true);
+
+    const pendingForReturn = [
+      {
+        variable,
+        node: callback,
+        method: "map",
+        awaited: false,
+        returned: false,
+      },
+    ];
+    markReturnedPendingMaps(
+      sourceCode,
+      { type: "ReturnStatement", argument: { type: "Identifier", name: "mapped" } },
+      pendingForReturn,
+    );
+    expect(pendingForReturn[0].returned).toBe(true);
+
+    const pendingForLength = [
+      {
+        variable,
+        node: callback,
+        method: "map",
+        awaited: false,
+        returned: false,
+      },
+    ];
+    markReturnedPendingMaps(
+      sourceCode,
+      {
+        type: "ReturnStatement",
+        argument: {
+          type: "MemberExpression",
+          object: { type: "Identifier", name: "mapped" },
+          property: { type: "Identifier", name: "length" },
+        },
+      },
+      pendingForLength,
+    );
+    expect(pendingForLength[0].returned).toBe(false);
   });
 });

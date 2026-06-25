@@ -13,6 +13,7 @@ export interface PendingAsyncMap {
   node: unknown;
   method: string;
   awaited: boolean;
+  returned: boolean;
 }
 
 export const ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION: Set<string>;
@@ -49,6 +50,14 @@ export function markAwaitedPendingMaps(
 ): void;
 
 export function isDirectlyWrappedInPromiseCombinator(node: unknown): boolean;
+
+export function isReturnedExpression(node: unknown): boolean;
+
+export function markReturnedPendingMaps(
+  sourceCode: unknown,
+  node: unknown,
+  pendingAsyncMaps: PendingAsyncMap[],
+): void;
 
 export function queuePendingAsyncMap(
   sourceCode: unknown,

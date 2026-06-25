@@ -109,6 +109,31 @@ export function markAwaitedPendingMaps(sourceCode, node, pendingAsyncMaps) {
   }
 }
 
+function transparentReturnExpression(node, child) {
+  if (
+    node?.type === "ConditionalExpression" &&
+    (node.consequent === child || node.alternate === child)
+  ) {
+    return true;
+  }
+  if (
+    node?.type === "LogicalExpression" &&
+    (node.left === child || node.right === child)
+  ) {
+    return true;
+  }
+  if (node?.type === "SequenceExpression") {
+    return node.expressions?.at(-1) === child;
+  }
+  return (
+    (node?.type === "ChainExpression" ||
+      node?.type === "TSAsExpression" ||
+      node?.type === "TSTypeAssertion" ||
+      node?.type === "TSNonNullExpression") &&
+    node.expression === child
+  );
+}
+
 export function isDirectlyWrappedInPromiseCombinator(node) {
   const parent = node.parent;
   return (
@@ -116,6 +141,61 @@ export function isDirectlyWrappedInPromiseCombinator(node) {
     isPromiseCombinator(parent.callee) &&
     parent.arguments.includes(node)
   );
+}
+
+export function isReturnedExpression(node) {
+  let current = node;
+  let parent = current?.parent;
+  while (parent) {
+    if (parent.type === "ReturnStatement") return parent.argument === current;
+    if (parent.type === "ArrowFunctionExpression") return parent.body === current;
+    if (!transparentReturnExpression(parent, current)) return false;
+    current = parent;
+    parent = current.parent;
+  }
+  return false;
+}
+
+function returnedCollectionVariables(sourceCode, expression) {
+  if (!expression) return [];
+  if (expression.type === "Identifier") {
+    const variable = findVariable(sourceCode, expression);
+    return variable ? [variable] : [];
+  }
+  if (expression.type === "ConditionalExpression") {
+    return [
+      ...returnedCollectionVariables(sourceCode, expression.consequent),
+      ...returnedCollectionVariables(sourceCode, expression.alternate),
+    ];
+  }
+  if (expression.type === "LogicalExpression") {
+    return [
+      ...returnedCollectionVariables(sourceCode, expression.left),
+      ...returnedCollectionVariables(sourceCode, expression.right),
+    ];
+  }
+  if (expression.type === "SequenceExpression") {
+    return returnedCollectionVariables(sourceCode, expression.expressions?.at(-1));
+  }
+  if (
+    expression.type === "ChainExpression" ||
+    expression.type === "TSAsExpression" ||
+    expression.type === "TSTypeAssertion" ||
+    expression.type === "TSNonNullExpression"
+  ) {
+    return returnedCollectionVariables(sourceCode, expression.expression);
+  }
+  return [];
+}
+
+export function markReturnedPendingMaps(sourceCode, node, pendingAsyncMaps) {
+  const expression = node?.type === "ReturnStatement" ? node.argument : node;
+  const variables = returnedCollectionVariables(sourceCode, expression);
+  for (const variable of variables) {
+    for (const pending of pendingAsyncMaps) {
+      if (pending.variable === variable) pending.returned = true;
+    }
+  }
 }
 
 export function queuePendingAsyncMap(
@@ -129,6 +209,12 @@ export function queuePendingAsyncMap(
   if (parent?.type !== "VariableDeclarator") return false;
   const variable = getDeclaredVariable(sourceCode, parent);
   if (!variable) return false;
-  pendingAsyncMaps.push({ variable, node: callback, method, awaited: false });
+  pendingAsyncMaps.push({
+    variable,
+    node: callback,
+    method,
+    awaited: false,
+    returned: false,
+  });
   return true;
 }

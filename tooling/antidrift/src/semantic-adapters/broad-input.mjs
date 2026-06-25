@@ -259,21 +259,12 @@ function isAnyOrUnknownType(type) {
   );
 }
 
-function typeStringIncludesAnyOrUnknown(checker, type) {
-  return /\b(?:any|unknown)\b/u.test(checker.typeToString(type));
-}
-
-export function isBroadShapeProbeInputType(checker, type, seen = new Set()) {
+export function isBroadShapeProbeInputType(type, seen = new Set()) {
   if (!type || seen.has(type)) return false;
   seen.add(type);
-  if (
-    isAnyOrUnknownType(type) ||
-    typeStringIncludesAnyOrUnknown(checker, type)
-  ) {
-    return true;
-  }
+  if (isAnyOrUnknownType(type)) return true;
   return (type.types ?? []).some((part) =>
-    isBroadShapeProbeInputType(checker, part, seen),
+    isBroadShapeProbeInputType(part, seen),
   );
 }
 
@@ -281,7 +272,7 @@ export function hasBroadObjectEntriesValue(probe, services, checker) {
   return probe.valueBindings.some((binding) => {
     const tsNode = services.esTreeNodeToTSNodeMap.get(binding);
     return tsNode
-      ? isBroadShapeProbeInputType(checker, checker.getTypeAtLocation(tsNode))
+      ? isBroadShapeProbeInputType(checker.getTypeAtLocation(tsNode))
       : false;
   });
 }
@@ -305,12 +296,14 @@ export function functionParameterByName(fn, name) {
 
 export function isBroadPredicateInputType(checker, type) {
   if (isAnyOrUnknownType(type)) return true;
-  const typeName = checker.typeToString(type);
-  if (typeName === "object" || typeName === "{}") return true;
-  if (/^Record<\s*string\s*,\s*(?:unknown|any)\s*>$/u.test(typeName)) {
-    return true;
-  }
-  return typeName === "Object" && (type.getProperties?.() ?? []).length === 0;
+  const stringIndexType = type.getStringIndexType?.();
+  if (isAnyOrUnknownType(stringIndexType)) return true;
+  const numberIndexType = type.getNumberIndexType?.();
+  if (isAnyOrUnknownType(numberIndexType)) return true;
+  return (
+    (type.flags & TS_TYPE_FLAG_OBJECT) !== 0 &&
+    checker.getPropertiesOfType(type).length === 0
+  );
 }
 
 function isAntidriftBrandMarkerProperty(prop) {
@@ -381,8 +374,8 @@ export function requiredTypeProps(checker, type) {
   const props = new Set();
   for (const sym of checker.getPropertiesOfType(type)) {
     if ((sym.flags & ts.SymbolFlags.Optional) !== 0) continue;
-    const str = checker.typeToString(checker.getTypeOfSymbol(sym));
-    if (str.startsWith("(") || str.includes(" => ")) continue;
+    const propertyType = checker.getTypeOfSymbol(sym);
+    if ((propertyType.getCallSignatures?.() ?? []).length > 0) continue;
     props.add(sym.name);
   }
   return props;

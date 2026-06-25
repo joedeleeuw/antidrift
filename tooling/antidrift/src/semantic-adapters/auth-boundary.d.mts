@@ -9,12 +9,11 @@ export interface AuthBoundaryTracker {
 }
 
 export interface AuthBoundaryTrackerOptions {
-  authzFunctions?: readonly string[];
+  authzFunctions: readonly string[];
   requestParamRoots?: readonly string[];
   onFrameExit?: (frame: AuthBoundaryFrame) => void;
 }
 
-export const DEFAULT_AUTHZ_FUNCTIONS: readonly string[];
 export const REQUEST_PARAM_ROOTS: readonly string[];
 
 export function callExpressionName(callee: unknown): string | null;
@@ -26,9 +25,9 @@ export function isRequestParamsAccess(
 
 export function isAuthzCall(
   callee: unknown,
-  authzFunctions?: readonly string[],
+  authzFunctions: readonly string[],
 ): boolean;
 
 export function createAuthBoundaryTracker(
-  options?: AuthBoundaryTrackerOptions,
+  options: AuthBoundaryTrackerOptions,
 ): AuthBoundaryTracker;

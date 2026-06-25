@@ -60,9 +60,9 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     semanticFactAdapterIds: Object.freeze([]),
     semanticFactKinds: Object.freeze([]),
     associations: Object.freeze([
-      "route params to nearby configured authorization-call inventory",
+      "route params to nearby caller-configured authorization-call inventory",
     ]),
-    carrier: "handler-local request-param shape plus configured callee names",
+    carrier: "handler-local request-param shape plus explicit authz function config",
   }),
   broadInput: Object.freeze({
     id: "broad-input",
