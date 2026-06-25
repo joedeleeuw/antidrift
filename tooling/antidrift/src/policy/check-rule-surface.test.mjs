@@ -52,24 +52,24 @@ describe("checkRuleSurface", () => {
 
     expect(ok).toBe(true);
     expect(messages).toEqual([]);
-  });
+      });
 
   it("counts default external corpus cases as surface evidence", () => {
     const messages = [];
     const ok = checkRuleSurface({
       pluginRules: {
-        "require-authz-check": {},
+        "no-trivial-selector-wrapper": {},
       },
       configs: [
         {
           rules: {
-            "antidrift/require-authz-check": "error",
+            "antidrift/no-trivial-selector-wrapper": "error",
           },
         },
       ],
       ruleRegistry: {
         rules: {
-          "antidrift/require-authz-check": {
+          "antidrift/no-trivial-selector-wrapper": {
             status: "ready",
             signal: "AST plus registry authority facts",
           },

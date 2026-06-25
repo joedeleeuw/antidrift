@@ -19,11 +19,6 @@ describe("rule status manifest", () => {
         stable: { minIndependentRepositories: 2 },
       },
       rules: {
-        "antidrift/no-hover-translate-card": {
-          status: "retired",
-          replacement: "deprecated compatibility stub",
-          reason: "Regex class sampler is not semantic proof.",
-        },
         "antidrift/no-structural-type-fork": {
           status: "ready",
           stable: false,
@@ -43,6 +38,11 @@ describe("rule status manifest", () => {
         },
       },
       retiredRules: {
+        "antidrift/no-hover-translate-card": {
+          status: "retired",
+          replacement: "removed from shipped plugin surface",
+          reason: "Regex class sampler is not semantic proof.",
+        },
         "antidrift/no-status-triplet-state": {
           status: "retired",
           replacement: "antidrift/no-handrolled-resource-lifecycle-cells",
@@ -81,8 +81,8 @@ describe("rule status manifest", () => {
     expect(
       manifest.entries.map((entry) => `${entry.kind}:${entry.id}`),
     ).toEqual([
-      "retired:antidrift/no-hover-translate-card",
       "active:antidrift/no-structural-type-fork",
+      "retired:antidrift/no-hover-translate-card",
       "retired:antidrift/no-status-triplet-state",
       "research:ecosystem/import-cycle",
       "policy-review:agent/require-checks-before-stop",
@@ -104,7 +104,7 @@ describe("rule status manifest", () => {
     expect(ruleStatusEntriesForStatus("retired", manifest)).toEqual([
       expect.objectContaining({
         id: "antidrift/no-hover-translate-card",
-        replacement: "deprecated compatibility stub",
+        replacement: "removed from shipped plugin surface",
       }),
       expect.objectContaining({
         id: "antidrift/no-status-triplet-state",
@@ -130,7 +130,7 @@ describe("rule status manifest", () => {
           promotion: { proofBucket: "local-ast-source-shape" },
         },
         "antidrift/no-structural-type-fork": { status: "ready" },
-        "antidrift/no-hover-translate-card": {
+        "antidrift/no-inline-structural-type-at-use-site": {
           status: "ready",
           proofBuckets: ["local-ast-source-shape"],
         },
@@ -159,7 +159,7 @@ describe("rule status manifest", () => {
         (entry) => entry.id,
       ),
     ).toEqual([
-      "antidrift/no-hover-translate-card",
+      "antidrift/no-inline-structural-type-at-use-site",
       "antidrift/no-raw-fetch-in-component",
     ]);
     expect(
@@ -185,7 +185,7 @@ describe("rule status manifest", () => {
           status: "ready",
           promotion: { proofBucket: "authority-index-ownership" },
         },
-        "antidrift/no-hover-translate-card": {
+        "antidrift/no-inline-structural-type-at-use-site": {
           status: "ready",
           proofBuckets: ["local-ast-source-shape"],
         },
@@ -225,7 +225,7 @@ describe("rule status manifest", () => {
       ruleStatusSemanticSummaries(registry).map((summary) => summary.entry.id),
     ).toEqual([
       "antidrift/no-handrolled-resource-lifecycle-cells",
-      "antidrift/no-hover-translate-card",
+      "antidrift/no-inline-structural-type-at-use-site",
       "antidrift/no-raw-fetch-in-component",
       "antidrift/no-structural-type-fork",
     ]);

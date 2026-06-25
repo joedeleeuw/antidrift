@@ -47,9 +47,9 @@ export const SEMANTIC_FACT_KINDS = Object.freeze({
     confidence: Object.freeze(["heuristic-inventory"]),
     emission: Object.freeze(["inventory-only"]),
     association:
-      "React state cells to distinct members of one freshly awaited source object before accepted owned-entity proof is established.",
+      "React state cells to distinct members of one freshly awaited source object as fact-only inventory; no accepted owned-entity enforcement tier currently exists.",
     noSinkBehavior:
-      "No diagnostic is produced; semantic source-member shard candidates remain inventory-only until type-owner proof holds.",
+      "No diagnostic is produced. Without a semantic fact sink, the rule produces no externally visible output.",
     payloadFields: Object.freeze([
       "source",
       "members",

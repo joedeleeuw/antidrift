@@ -102,6 +102,13 @@ const sudocodeCanonicalModelForkOptions = {
     },
   ],
 };
+const sudocodeRequireAuthzCheckOptions = {
+  "antidrift/require-authz-check": [
+    {
+      authzFunctions: ["requireProject"],
+    },
+  ],
+};
 
 const sudocodeCases = [
   {
@@ -201,6 +208,34 @@ const sudocodeCases = [
       {
         path: "server/src/routes/workflows.ts",
         line: 199,
+      },
+      {
+        path: "server/src/routes/workflows.ts",
+        line: 201,
+      },
+      {
+        path: "server/src/routes/workflows.ts",
+        line: 208,
+      },
+      {
+        path: "server/src/routes/workflows.ts",
+        line: 793,
+      },
+      {
+        path: "server/src/routes/workflows.ts",
+        line: 1010,
+      },
+      {
+        path: "server/src/routes/workflows.ts",
+        line: 1012,
+      },
+      {
+        path: "server/src/routes/workflows.ts",
+        line: 1019,
+      },
+      {
+        path: "server/src/routes/workflows.ts",
+        line: 1598,
       },
     ],
   },
@@ -319,6 +354,7 @@ const sudocodeCases = [
     classification: "under-proven",
     subproject: "server",
     paths: ["server/src/routes/issues.ts"],
+    ruleOptions: sudocodeRequireAuthzCheckOptions,
     expectedFindings: [
       {
         path: "server/src/routes/issues.ts",
@@ -345,6 +381,7 @@ const sudocodeCases = [
     classification: "under-proven",
     subproject: "server",
     paths: ["server/src/routes/specs.ts"],
+    ruleOptions: sudocodeRequireAuthzCheckOptions,
     expectedFindings: [
       {
         path: "server/src/routes/specs.ts",
@@ -371,6 +408,7 @@ const sudocodeCases = [
     classification: "under-proven",
     subproject: "server",
     paths: ["server/src/routes/relationships.ts"],
+    ruleOptions: sudocodeRequireAuthzCheckOptions,
     expectedFindings: [
       {
         path: "server/src/routes/relationships.ts",
@@ -393,6 +431,7 @@ const sudocodeCases = [
     classification: "under-proven",
     subproject: "server",
     paths: ["server/src/routes/executions.ts"],
+    ruleOptions: sudocodeRequireAuthzCheckOptions,
     expectedFindings: [
       {
         path: "server/src/routes/executions.ts",
@@ -507,22 +546,7 @@ const sudocodeCases = [
     classification: "under-proven",
     subproject: "server",
     paths: ["server/src/routes/version.ts"],
-  },
-  {
-    id: "sudocode-chat-widget-hover-translate-fab",
-    ruleId: "antidrift/no-hover-translate-card",
-    kind: "correct",
-    classification: "retired",
-    subproject: "frontend",
-    paths: ["frontend/src/components/chat-widget/ChatWidgetFAB.tsx"],
-  },
-  {
-    id: "sudocode-ui-button-no-hover-translate-clean",
-    ruleId: "antidrift/no-hover-translate-card",
-    kind: "correct",
-    classification: "retired",
-    subproject: "frontend",
-    paths: ["frontend/src/components/ui/button.tsx"],
+    ruleOptions: sudocodeRequireAuthzCheckOptions,
   },
   {
     id: "sudocode-first-party-plugin-entries-clean",
@@ -622,6 +646,26 @@ const codebaseAtlasCases = [
     typeAware: true,
     tsconfig: "tsconfig.json",
     paths: ["src/programs/persistenceCuration.ts"],
+  },
+  {
+    id: "atlas-city3d-sse-event-data-json-parse",
+    ruleId: "antidrift/no-unsafe-deserialize",
+    kind: "drift",
+    classification: "ready",
+    subproject: "app",
+    typeAware: true,
+    tsconfig: "tsconfig.json",
+    paths: ["src/routes/atlas.city3d.tsx"],
+    expectedFindings: [
+      {
+        path: "src/routes/atlas.city3d.tsx",
+        line: 449,
+      },
+      {
+        path: "src/routes/atlas.city3d.tsx",
+        line: 482,
+      },
+    ],
   },
   {
     id: "atlas-city-route-component-fetch",
@@ -1125,6 +1169,32 @@ const opencodeCases = [
     paths: ["packages/console/app/src/routes/bench/[id].tsx"],
     reason:
       "Benchmark detail rows still cast JSON.parse output to BenchmarkResult, but the current no-unsafe-deserialize rule is scoped to any/unknown parse input. This is a parse-output contract gap, not a current-rule drift fixture.",
+  },
+  {
+    id: "opencode-resource-unguarded-env-json-parse",
+    ruleId: "antidrift/no-unsafe-deserialize",
+    kind: "drift",
+    classification: "ready",
+    subproject: "console-resource",
+    typeAware: true,
+    tsconfig: "packages/console/resource/tsconfig.json",
+    paths: ["packages/console/resource/resource.cloudflare.ts"],
+    expectedFindings: [
+      {
+        path: "packages/console/resource/resource.cloudflare.ts",
+        line: 19,
+      },
+    ],
+    unexpectedFindings: [
+      {
+        path: "packages/console/resource/resource.cloudflare.ts",
+        line: 11,
+      },
+      {
+        path: "packages/console/resource/resource.cloudflare.ts",
+        line: 16,
+      },
+    ],
   },
   {
     id: "opencode-zen-provider-payload-replacer-clean",

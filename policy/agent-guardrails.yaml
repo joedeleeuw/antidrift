@@ -171,7 +171,7 @@ clusters:
       - id: auth/require-authz-check # Reading request params without an ownership/authz call is a classic agent IDOR. Scoped to serverBoundaryGlobs.
         severity: blocker
         detector: requestParamsAccessWithoutAuthorize
-        message: Call requireUser/authorize before reading request params (boundaries registry requiredCalls).
+        message: Call the explicitly configured boundary authz function before reading request params.
 
   - id: error-handling # Agents keep the happy path moving by hiding failures.
     owner: reliability # Reliability owns error propagation and observability policy.
