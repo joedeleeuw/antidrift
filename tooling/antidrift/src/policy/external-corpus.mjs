@@ -22,6 +22,7 @@ const cloudflareAgentsRepoCandidates = [
 ].filter(Boolean);
 const claudeCodeSourceRepoCandidates = [
   process.env.CLAUDE_CODE_SOURCE_REPO,
+  "/Users/sushi/code/claude-code-src-code",
   "/Users/sushi/code/claude-code-source-code",
 ].filter(Boolean);
 const opencodeRepoCandidates = [

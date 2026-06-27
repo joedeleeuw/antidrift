@@ -1,6 +1,14 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+// The external corpus gate needs the full fleet of external repos cloned at
+// canonical refs, which only exists in CI (it runs `pnpm check`). Locally the
+// fleet is partial or sitting on working branches, so a --require run reports
+// false drift. Enforce it in CI; skip it in the local session gate.
+const externalCorpusStep = process.env.CI
+  ? [["pnpm", ["policy:validate-external-corpus"]]]
+  : [];
+
 const defaultCommands = [
   ["pnpm", ["policy:check-generated"]],
   ["pnpm", ["policy:check-registries"]],
@@ -8,7 +16,7 @@ const defaultCommands = [
   ["pnpm", ["policy:inventory-change-contract"]],
   ["pnpm", ["policy:inventory-diff-scoped-adapters"]],
   ["pnpm", ["policy:validate-corpus"]],
-  ["pnpm", ["policy:validate-external-corpus"]],
+  ...externalCorpusStep,
   ["pnpm", ["package:verify"]],
   ["pnpm", ["lint"]],
   ["pnpm", ["typecheck"]],
