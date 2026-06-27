@@ -197,7 +197,12 @@ const commands = {
     if (result.decision === "fail") process.exitCode = 1;
   },
   "external-corpus": async () => {
-    const result = await externalCorpus(parseExternalCorpusArgs(args));
+    const parsed = parseExternalCorpusArgs(args);
+    const result = await externalCorpus({
+      ...parsed,
+      output: parsed.output ?? "reports/external-corpus.json",
+      report: console.error,
+    });
     if (result.decision === "fail") process.exitCode = 1;
   },
   "no-appeasement-remediation-corpus": async () => {

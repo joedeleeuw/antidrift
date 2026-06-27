@@ -981,12 +981,22 @@ function parseArgs(argv) {
 }
 
 function findRepoRoot(repo, repoCandidates = defaultRepoCandidates) {
-  const candidates = repo ? [repo] : repoCandidates;
-  return (
-    candidates
-      .map((candidate) => resolve(candidate))
-      .find((candidate) => existsSync(candidate)) ?? null
-  );
+  return corpusRepoPresence({ repo, repoCandidates }).repoRoot;
+}
+
+export function corpusRepoPresence({
+  corpus = "corpus",
+  corpusLabel = corpus,
+  repoCandidates = defaultRepoCandidates,
+  repo = null,
+} = {}) {
+  const candidates = (repo ? [repo] : repoCandidates).filter(Boolean);
+  const resolvedCandidates = candidates.map((candidate) => resolve(candidate));
+  return {
+    corpus,
+    label: corpusLabel,
+    repoRoot: resolvedCandidates.find((candidate) => existsSync(candidate)) ?? null,
+  };
 }
 
 function relativeFile(repoRoot, filePath) {

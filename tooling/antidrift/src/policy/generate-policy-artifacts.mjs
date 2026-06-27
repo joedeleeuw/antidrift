@@ -45,7 +45,7 @@ export function renderPolicyArtifacts(policy) {
       { matcher: "Edit|Write|MultiEdit", hooks: [{ type: "command", command: "pnpm policy:check:changed" }] }
     ],
     Stop: [
-      { hooks: [{ type: "command", command: "pnpm policy:verify-session" }] }
+      { hooks: [{ type: "command", command: hookScript("verify-session-stop") }] }
     ]
   };
 

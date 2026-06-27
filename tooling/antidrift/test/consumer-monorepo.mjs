@@ -25,6 +25,16 @@ function run(cmd, args, cwd) {
   });
 }
 
+function runInherit(cmd, args, cwd) {
+  return execFileSync(cmd, args, {
+    cwd,
+    stdio: "inherit",
+    timeout: 300_000,
+    killSignal: "SIGKILL",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
 function runJson(cmd, args, cwd) {
   return JSON.parse(run(cmd, args, cwd));
 }
@@ -141,7 +151,7 @@ try {
           "typescript-eslint": "^8",
           "@typescript-eslint/parser": "^8",
           typescript: "^5",
-          firebase: "^11",
+          firebase: "workspace:*",
         },
       },
       null,
@@ -256,6 +266,36 @@ try {
       "  },\n" +
       "];\n",
   );
+  file(
+    "packages/firebase/package.json",
+    JSON.stringify(
+      {
+        name: "firebase",
+        version: "0.0.0",
+        type: "module",
+        exports: {
+          "./auth": {
+            types: "./auth.d.ts",
+            default: "./auth.js",
+          },
+        },
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  file(
+    "packages/firebase/auth.d.ts",
+    "export type User = {\n" +
+      "  uid: string;\n" +
+      "  email: string | null;\n" +
+      "  displayName: string | null;\n" +
+      "  photoURL: string | null;\n" +
+      "  providerId: string;\n" +
+      "  phoneNumber: string | null;\n" +
+      "};\n",
+  );
+  file("packages/firebase/auth.js", "export {};\n");
   file(
     "packages/app/tsconfig.json",
     JSON.stringify(
@@ -975,7 +1015,16 @@ try {
   );
 
   console.log("3/7  installing the tarball into the consumer ...");
-  run("pnpm", ["install", "--prefer-offline", "--config.confirmModulesPurge=false"], work);
+  runInherit(
+    "pnpm",
+    [
+      "install",
+      "--prefer-offline",
+      "--config.confirmModulesPurge=false",
+      "--ignore-scripts",
+    ],
+    work,
+  );
 
   console.log("4/7  linting consumer files through shipped and opt-in configs ...");
   const semanticFactFile = join(work, "semantic-facts.jsonl");

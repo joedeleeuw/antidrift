@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pnpm policy:verify-session"
+            "command": "node node_modules/@joedeleeuw/antidrift/src/policy/hooks/verify-session-stop.mjs"
           }
         ]
       }

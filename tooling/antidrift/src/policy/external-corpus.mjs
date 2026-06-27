@@ -1,8 +1,8 @@
-import { writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { runCorpusCases } from "./chaski-corpus.mjs";
+import { corpusRepoPresence, runCorpusCases } from "./chaski-corpus.mjs";
 
 const sudocodeRepoCandidates = [
   process.env.SUDOCODE_REPO,
@@ -659,11 +659,11 @@ const codebaseAtlasCases = [
     expectedFindings: [
       {
         path: "src/routes/atlas.city3d.tsx",
-        line: 449,
+        line: 486,
       },
       {
         path: "src/routes/atlas.city3d.tsx",
-        line: 482,
+        line: 544,
       },
     ],
   },
@@ -1439,9 +1439,22 @@ function externalReason({
   driftPassed,
   minRepositories,
   minDriftRepositories,
+  repositories = [],
 }) {
   if (decision === "skip") {
     return "No external corpus repositories were found. Pass --repo with --corpus or set a matching environment variable.";
+  }
+  if (failed) {
+    const failedRepositories = repositories.filter(
+      (result) => result.decision === "fail",
+    );
+    const firstFailure = failedRepositories[0];
+    const firstFailedCase = firstFailure?.cases?.find(
+      (testCase) => testCase.decision === "fail",
+    );
+    const detail = firstFailedCase?.reason ?? firstFailure?.reason;
+    const prefix = `${failedRepositories.length} external corpus ${failedRepositories.length === 1 ? "repository" : "repositories"} failed`;
+    return detail ? `${prefix}; ${firstFailure.corpus}: ${detail}` : `${prefix}.`;
   }
   if (!failed && driftPassed < minDriftRepositories) {
     return `Only ${driftPassed} external corpus repositories had passing drift cases; ${minDriftRepositories} required for this slice.`;
@@ -1471,10 +1484,79 @@ function runExternalCorpus(entry, sharedOptions) {
   });
 }
 
+function externalRepositoryPresence(entry, sharedOptions) {
+  return corpusRepoPresence({
+    corpus: entry.name,
+    corpusLabel: entry.label,
+    repoCandidates: entry.repoCandidates,
+    repo: sharedOptions.repo,
+  });
+}
+
+function missingRepositoryReason(label) {
+  return `${label} repo not found. Pass --repo or set the matching environment variable.`;
+}
+
+function skippedRepositorySummary(presence, slice, reason) {
+  return {
+    schemaVersion: 1,
+    corpus: presence.corpus,
+    slice,
+    ...(presence.repoRoot ? { repoRoot: presence.repoRoot } : {}),
+    decision: "skip",
+    reason: presence.repoRoot
+      ? reason
+      : missingRepositoryReason(presence.label),
+    cases: [],
+  };
+}
+
+function externalPreconditionFailure({
+  available,
+  minRepositories,
+  require,
+}) {
+  if (!require) return null;
+  if (available >= minRepositories) return null;
+  return `Only ${available} external corpus repositories are available; ${minRepositories} required by --require for this slice.`;
+}
+
+function failingCaseLines(repository) {
+  return (repository.cases ?? [])
+    .filter((testCase) => testCase.decision === "fail")
+    .map(
+      (testCase) =>
+        `  - ${testCase.id}: ${testCase.reason ?? "failed without a case reason"}`,
+    );
+}
+
+function conciseSummary(summary, output) {
+  const lines = [
+    `external-corpus ${summary.decision}: ${
+      summary.reason ?? "completed without a top-level reason"
+    }`,
+  ];
+  if (output) lines.push(`report: ${output}`);
+  for (const repository of summary.repositories.filter(
+    (result) => result.decision !== "pass",
+  )) {
+    lines.push(
+      `- ${repository.corpus}: ${repository.decision}${
+        repository.reason ? ` - ${repository.reason}` : ""
+      }`,
+      ...failingCaseLines(repository),
+    );
+  }
+  return lines.join("\n");
+}
+
 function emitSummary(summary, output, report) {
   const json = `${JSON.stringify(summary, null, 2)}\n`;
   if (output) {
-    writeFileSync(resolve(output), json, "utf8");
+    const target = resolve(output);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, json, "utf8");
+    report(conciseSummary(summary, output));
   } else {
     report(json.trimEnd());
   }
@@ -1492,13 +1574,39 @@ export async function externalCorpus(options = {}) {
   const corpora = selectedCorpora(corpus);
   if (corpus && corpora.length === 0) {
     const summary = unknownCorpusSummary(corpus, sharedOptions);
-    report(JSON.stringify(summary, null, 2));
+    emitSummary(summary, output, report);
     return summary;
   }
 
   const requireIndividualRepository = Boolean(
     sharedOptions.require && (corpus || sharedOptions.repo),
   );
+  const presence = corpora.map((entry) =>
+    externalRepositoryPresence(entry, sharedOptions),
+  );
+  const available = presence.filter((entry) => entry.repoRoot).length;
+  const preconditionFailure = externalPreconditionFailure({
+    available,
+    minRepositories,
+    require: sharedOptions.require,
+  });
+  if (preconditionFailure && !requireIndividualRepository) {
+    const summary = {
+      schemaVersion: 1,
+      corpus: "external",
+      slice: externalSlice(sharedOptions),
+      decision: "fail",
+      reason: preconditionFailure,
+      minRepositories,
+      minDriftRepositories,
+      driftRepositories: 0,
+      repositories: presence.map((entry) =>
+        skippedRepositorySummary(entry, externalSlice(sharedOptions), preconditionFailure),
+      ),
+    };
+    emitSummary(summary, output, report);
+    return summary;
+  }
   const repositories = await Promise.all(
     corpora.map((entry) =>
       runExternalCorpus(entry, {
@@ -1528,6 +1636,7 @@ export async function externalCorpus(options = {}) {
     driftPassed,
     minRepositories,
     minDriftRepositories,
+    repositories,
   });
   const summary = {
     schemaVersion: 1,
@@ -1545,7 +1654,12 @@ export async function externalCorpus(options = {}) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const result = await externalCorpus(parseArgs(process.argv.slice(2)));
+  const parsed = parseArgs(process.argv.slice(2));
+  const result = await externalCorpus({
+    ...parsed,
+    output: parsed.output ?? "reports/external-corpus.json",
+    report: console.error,
+  });
   if (result.decision === "fail") process.exitCode = 1;
 }
 

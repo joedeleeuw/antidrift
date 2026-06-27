@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -308,6 +308,24 @@ export interface OpenProjectInfo extends ProjectInfo {
 });
 
 describe("externalCorpus", () => {
+  it("fails required aggregate gates before corpus analysis when the threshold is unreachable", async () => {
+    const output = join(tempRepo(), "reports", "external-corpus.json");
+    const messages = [];
+    const result = await externalCorpus({
+      require: true,
+      minRepositories: 99,
+      output,
+      report: (message) => messages.push(message),
+    });
+
+    expect(result.decision).toBe("fail");
+    expect(result.reason).toContain("99 required");
+    expect(result.repositories.length).toBeGreaterThan(0);
+    expect(result.repositories.every((repository) => repository.cases.length === 0)).toBe(true);
+    expect(messages.join("\n")).toContain("external-corpus fail:");
+    expect(JSON.parse(readFileSync(output, "utf8")).decision).toBe("fail");
+  });
+
   it("fails a named required external repository when its checkout is missing", async () => {
     const result = await externalCorpus({
       corpus: "claude-code-source",
