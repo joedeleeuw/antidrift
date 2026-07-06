@@ -208,6 +208,159 @@ ruleTester.run(
   },
 );
 
+const duplicatedClassnameControls = {
+  attributes: ["class", "className"],
+  helpers: [],
+  minSharedRatio: 0.65,
+  minSharedTokens: 4,
+};
+
+ruleTester.run(
+  "no-duplicated-conditional-classnames",
+  rule("no-duplicated-conditional-classnames"),
+  {
+    valid: [
+      {
+        code: `
+          <Pressable
+            className={cn(
+              "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3",
+              sendDisabled ? "opacity-50" : "active:opacity-75",
+            )}
+          />;
+        `,
+        filename: "new-thread.tsx",
+      },
+      {
+        code: `
+          <Pressable
+            className={\`h-9 items-center justify-center rounded-lg border border-mb-border-strong bg-mb-surface px-3 active:opacity-75 \${runtimeStatus.isFetching ? "opacity-50" : ""}\`}
+          />;
+        `,
+        filename: "runtime-diagnostics.tsx",
+      },
+      {
+        code: `
+          <Pressable
+            className={
+              sendDisabled
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75"
+            }
+          />;
+        `,
+        filename: "new-thread.tsx",
+        options: [{ ...duplicatedClassnameControls, minSharedRatio: 0.95 }],
+      },
+      {
+        code: `
+          cx(
+            sendDisabled
+              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+          );
+        `,
+        filename: "new-thread.tsx",
+      },
+      {
+        code: `
+          cn(
+            sendDisabled
+              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+          );
+        `,
+        filename: "new-thread.tsx",
+      },
+    ],
+    invalid: [
+      {
+        code: `
+          <Pressable
+            className={
+              sendDisabled
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75"
+            }
+          />;
+        `,
+        filename: "new-thread.tsx",
+        errors: [{ messageId: "duplicatedConditionalClassnames" }],
+      },
+      {
+        code: `
+          <Pressable
+            className={cn(
+              sendDisabled
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+            )}
+          />;
+        `,
+        filename: "new-thread.tsx",
+        errors: [{ messageId: "duplicatedConditionalClassnames" }],
+      },
+      {
+        code: `
+          <Pressable
+            tw={
+              sendDisabled
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75"
+            }
+          />;
+        `,
+        filename: "new-thread.tsx",
+        options: [{ ...duplicatedClassnameControls, attributes: ["tw"] }],
+        errors: [{ messageId: "duplicatedConditionalClassnames" }],
+      },
+      {
+        code: `
+          cx(
+            sendDisabled
+              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+          );
+        `,
+        filename: "new-thread.tsx",
+        options: [{ ...duplicatedClassnameControls, helpers: ["cx"] }],
+        errors: [{ messageId: "duplicatedConditionalClassnames" }],
+      },
+    ],
+  },
+);
+
+it("fails loud on partial duplicated classname controls", async () => {
+  const eslint = new ESLint({
+    overrideConfigFile: true,
+    overrideConfig: [
+      {
+        files: ["**/*.tsx"],
+        languageOptions: {
+          parser: tsParser,
+          ecmaVersion: 2023,
+          sourceType: "module",
+          parserOptions: { ecmaFeatures: { jsx: true } },
+        },
+        plugins: { antidrift: plugin },
+        rules: {
+          "antidrift/no-duplicated-conditional-classnames": [
+            "error",
+            { minSharedRatio: 0.95 },
+          ],
+        },
+      },
+    ],
+  });
+
+  await expect(
+    eslint.lintText(
+      `<Pressable className={ok ? "a b c d e" : "a b c d f"} />;`,
+      { filePath: "component.tsx" },
+    ),
+  ).rejects.toThrow(/attributes/u);
+});
+
 ruleTester.run(
   "no-query-data-type-parameters",
   rule("no-query-data-type-parameters"),

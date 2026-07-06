@@ -1393,6 +1393,39 @@ rules:
         - "<Widget label={'x'} />"
         - "Schema.Struct({ id });"
     nextAction: "Keep default-off until a second repo provides quantified real drift; then run a corpus inventory and consider stable promotion."
+  antidrift/no-duplicated-conditional-classnames:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: AST class-token overlap in conditional string branches
+    solveType: conditional-classname-duplication
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-duplicated-conditional-classnames.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - The rule is a maintainability guard for conditional class strings, not a design-token authority rule. Keep it default-off until more real UI files classify clean and drift pressure.
+      - It compares static branch class tokens under configurable JSX class attributes. Standalone class helper calls are explicit opt-in controls rather than default name conventions.
+      - "Alert controls fail loudly: omitted options use the default shape, while provided option objects must include attributes, helpers, minSharedRatio, and minSharedTokens."
+    external:
+      state: net-antidrift
+      support: low
+      candidates:
+        [
+          "sonarjs/no-duplicated-branches",
+          "sonarjs/no-duplicate-string",
+          "eslint-plugin-tailwindcss",
+          "eslint-plugin-better-tailwindcss",
+        ]
+      decision: own-antidrift
+      whyThisState: "Maintained duplicate-branch and Tailwind rules cover identical branches or duplicate/contradicting classes inside one class string, but not high-overlap class-token duplication across both branches of a conditional expression."
+      whyNotOtherState: "Not ecosystem-covered because the maintained class plugins do not compare the two branch strings and suggest hoisting the shared base class list."
+    examples:
+      flags:
+        - 'className={disabled ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50" : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75"}'
+      allows:
+        - 'className={cn("w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3", disabled ? "opacity-50" : "active:opacity-75")}'
+        - 'className={`h-9 items-center justify-center rounded-lg border border-mb-border-strong bg-mb-surface px-3 active:opacity-75 ${fetching ? "opacity-50" : ""}`}'
+    nextAction: "Run the Murderbox client file as the first drift corpus case and inventory additional UI repos before considering default-on enforcement."
   antidrift/no-query-data-type-parameters:
     status: ready
     stable: false

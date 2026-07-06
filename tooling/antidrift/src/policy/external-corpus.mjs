@@ -895,6 +895,14 @@ const murderboxCases = [
     tsconfig: "apps/api/tsconfig.json",
     paths: ["apps/api/lib/server/workspace-projects.ts"],
   },
+  {
+    id: "murderbox-new-thread-send-button-conditional-classnames",
+    ruleId: "antidrift/no-duplicated-conditional-classnames",
+    kind: "drift",
+    classification: "ready",
+    subproject: "client",
+    paths: ["apps/client/app/new-thread.tsx"],
+  },
 ];
 
 const cloudflareAgentsCases = [

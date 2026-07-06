@@ -7,6 +7,7 @@ import {
   sourceShardProof,
 } from "./react-state-graph.js";
 import ruleNoCallingComponentsAsFunctions from "./rules/no-calling-components-as-functions.js";
+import ruleNoDuplicatedConditionalClassnames from "./rules/no-duplicated-conditional-classnames.js";
 import ruleNoQueryDataTypeParameters from "./rules/no-query-data-type-parameters.js";
 import {
   emitSemanticFact,
@@ -3467,6 +3468,8 @@ const rules = {
   "no-redundant-zod-parse": ruleNoRedundantZodParse(),
   "no-status-literal-in-type": ruleNoStatusLiteralInType(),
   "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
+  "no-duplicated-conditional-classnames":
+    ruleNoDuplicatedConditionalClassnames(),
   "no-query-data-type-parameters": ruleNoQueryDataTypeParameters(),
 };
 

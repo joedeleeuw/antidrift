@@ -453,6 +453,7 @@ export function createConfig({
         // React/TanStack drift rules ported from getsentry/sentry. Default-off
         // (opt-in) until local corpus inventory quantifies drift for stable promotion.
         "antidrift/no-calling-components-as-functions": "off",
+        "antidrift/no-duplicated-conditional-classnames": "off",
         "antidrift/no-query-data-type-parameters": "off",
         ...(restrictedImportPatterns.length > 0
           ? {
