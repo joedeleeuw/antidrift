@@ -58,20 +58,20 @@ describe("checkRuleSurface", () => {
     const messages = [];
     const ok = checkRuleSurface({
       pluginRules: {
-        "no-trivial-selector-wrapper": {},
+        "no-contract-appeasement-projection": {},
       },
       configs: [
         {
           rules: {
-            "antidrift/no-trivial-selector-wrapper": "error",
+            "antidrift/no-contract-appeasement-projection": "error",
           },
         },
       ],
       ruleRegistry: {
         rules: {
-          "antidrift/no-trivial-selector-wrapper": {
+          "antidrift/no-contract-appeasement-projection": {
             status: "ready",
-            signal: "AST plus registry authority facts",
+            signal: "TypeChecker",
           },
         },
       },

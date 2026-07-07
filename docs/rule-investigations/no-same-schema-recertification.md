@@ -108,13 +108,13 @@ Out of scope. Cross-source assembly, such as rebuilding exploration tiles from t
 
 ## Ecosystem Check
 
-No supported ESLint, `typescript-eslint`, SonarJS, or Zod-specific rule was found that covers this exact behavior.
+No supported ESLint, `typescript-eslint`, SonarQube, or Zod-specific rule was found that covers this exact behavior.
 
 Adjacent ecosystem coverage is not equivalent:
 
 - `@typescript-eslint/no-unsafe-return` and the other `no-unsafe-*` rules cover `any` leakage, not same-schema recertification of already typed values.
 - `@typescript-eslint/no-unnecessary-condition` can remove provably redundant checks, but it does not reason about Zod schema provenance or runtime refinements.
-- SonarJS maintainability rules cover immediate returns and duplicated code shapes, not schema-output roundtrips.
+- SonarQube maintainability rules cover immediate returns and duplicated code shapes, not schema-output roundtrips.
 - Zod's own docs define `.parse` as runtime validation that returns typed data and explicitly note runtime refinements that TypeScript cannot represent.
 
 The broader discourse supports the principle "parse at the boundary, then carry the proof in the type," but also warns against treating validation/parsing as magic. Runtime validation is still necessary at real boundaries and invariant checkpoints.

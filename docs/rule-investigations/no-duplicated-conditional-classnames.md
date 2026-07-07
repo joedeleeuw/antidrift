@@ -30,7 +30,7 @@ Use `minSharedTokens` and `minSharedRatio` to tune alert volume. Use `attributes
 
 ## Ecosystem
 
-`sonarjs/no-duplicated-branches` covers identical conditional branches. `sonarjs/no-duplicate-string` covers repeated whole string literals. Tailwind ESLint plugins catch duplicate or contradicting classes inside one class string. None of those rules compare the two class strings in a conditional and ask the author to hoist the shared class list.
+Generic duplicate-branch rules cover identical conditional branches, and duplicate-string rules cover repeated whole string literals. Tailwind ESLint plugins catch duplicate or contradicting classes inside one class string. None of those rules compare the two class strings in a conditional and ask the author to hoist the shared class list.
 
 ## Corpus
 

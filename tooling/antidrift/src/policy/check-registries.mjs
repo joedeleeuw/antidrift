@@ -1672,16 +1672,19 @@ function checkSemanticAdapterClaimedFactKinds(
 function checkSemanticAdapterContractEntry(
   key,
   contract,
-  activeRules,
-  ruleEntries,
-  semanticFactKinds,
-  seenIds,
-  seenSemanticFactAdapterIds,
-  seenSemanticFactKinds,
-  seenSubpaths,
-  label,
-  errors,
+  context,
 ) {
+  const {
+    activeRules,
+    ruleEntries,
+    semanticFactKinds,
+    seenIds,
+    seenSemanticFactAdapterIds,
+    seenSemanticFactKinds,
+    seenSubpaths,
+    label,
+    errors,
+  } = context;
   const contractLabel = `${label}.${key}`;
   if (!isRecord(contract)) {
     errors.push(`${contractLabel} must be a mapping.`);
@@ -1841,20 +1844,23 @@ export function checkSemanticAdapterContracts(
   const seenSemanticFactAdapterIds = new Map();
   const seenSemanticFactKinds = new Map();
   const seenSubpaths = new Map();
+  const context = {
+    activeRules,
+    ruleEntries,
+    semanticFactKinds,
+    seenIds,
+    seenSemanticFactAdapterIds,
+    seenSemanticFactKinds,
+    seenSubpaths,
+    label,
+    errors,
+  };
 
   for (const key of sortedStrings(contractKeys)) {
     checkSemanticAdapterContractEntry(
       key,
       contracts[key],
-      activeRules,
-      ruleEntries,
-      semanticFactKinds,
-      seenIds,
-      seenSemanticFactAdapterIds,
-      seenSemanticFactKinds,
-      seenSubpaths,
-      label,
-      errors,
+      context,
     );
   }
   checkStableSemanticAdapterRuleClaims(contracts, ruleEntries, label, errors);

@@ -11,8 +11,8 @@ Run `pnpm policy:verify-session` before stopping.
 ## Rule clusters
 
 - **react-state-shape** (frontend-platform): react/no-use-state-waterfall, react/no-handrolled-resource-lifecycle-cells, react/no-shattered-ingested-entity-state, react/no-status-triplet-state, react/no-derived-state-effect, react/no-effect-fetch-waterfall, react/require-effect-deps
-- **type-contract-shape** (types-platform): ts/no-trivial-selector-wrapper, ts/no-mechanical-get-x-from-y, ts/no-inline-structural-type-at-use-site, ts/no-nullable-positional-tuple, ts/no-underchecked-type-predicate
-- **abstraction-and-file-shape** (architecture): arch/no-one-use-helper, arch/max-function-lines, arch/max-component-lines, arch/no-high-touch-file-growth
+- **type-contract-shape** (types-platform): ts/no-contract-appeasement-projection, ts/no-mechanical-get-x-from-y, ts/no-inline-structural-type-at-use-site, ts/no-nullable-positional-tuple, ts/no-underchecked-type-predicate
+- **abstraction-and-file-shape** (architecture): arch/no-one-use-helper, arch/max-function-lines, arch/max-component-lines, react/max-component-props, arch/no-high-touch-file-growth
 - **semantic-architecture-drift** (architecture): arch/no-cross-layer-import, arch/no-deep-import, arch/no-new-dependency-cycle, arch/no-feature-scatter
 - **side-effects-and-boundaries** (platform): boundary/no-raw-fetch-in-component, boundary/no-sdk-direct-use-outside-gateway, boundary/no-env-access-in-client
 - **domain-model-drift** (domain-platform): domain/no-inline-domain-status, domain/no-canonical-model-fork
@@ -27,5 +27,5 @@ Run `pnpm policy:verify-session` before stopping.
 - **agent-ops** (developer-experience): agent/block-generated-policy-edits, agent/block-destructive-shell, agent/lint-after-edit, agent/require-checks-before-stop
 - **quality-gate-drift** (developer-experience): policy/no-check-weakening-without-policy-task, policy/no-inline-disable-without-ticket
 - **mcp-tooling-drift** (platform-security): mcp/no-unapproved-server, mcp/pin-server-version
-- **sonar-governance** (engineering-productivity): sonar/import-custom-eslint-issues, sonar/no-new-critical-issues, sonar/complexity-budget
+- **sonar-governance** (engineering-productivity): sonar/import-custom-eslint-issues, sonar/ai-code-governance-preset, sonar/no-new-critical-issues, sonar/complexity-budget
 - **agent-instructions** (developer-experience): rules/one-source-generates-agent-files, rules/no-vague-agent-rules

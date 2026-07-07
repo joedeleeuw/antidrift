@@ -30,7 +30,7 @@ export function renderPolicyArtifacts(policy) {
 
   artifacts.set(".cursor/rules/architecture.mdc", `---\ndescription: Enforce architecture boundaries and prevent semantic drift.\nglobs: ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx"]\nalwaysApply: true\n---\n\n${header}\n\nUse public package entrypoints and preserve architecture direction.\n`);
 
-  artifacts.set(".cursor/rules/react-state.mdc", `---\ndescription: Prevent React state-shape slop from agent-generated UI.\nglobs: ["apps/**/*.tsx", "packages/ui/**/*.tsx"]\nalwaysApply: true\n---\n\n${header}\n\nAvoid coupled useState waterfalls, status triplets, derived-state effects, and raw fetch calls in components.\n`);
+  artifacts.set(".cursor/rules/react-state.mdc", `---\ndescription: Prevent brittle React state shape in agent-generated UI.\nglobs: ["apps/**/*.tsx", "packages/ui/**/*.tsx"]\nalwaysApply: true\n---\n\n${header}\n\nAvoid coupled useState waterfalls, status triplets, derived-state effects, and raw fetch calls in components.\n`);
 
   artifacts.set(".cursor/rules/type-contracts.mdc", `---\ndescription: Prevent local TypeScript appeasement patterns.\nglobs: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"]\nalwaysApply: true\n---\n\n${header}\n\nDo not create typed selector wrappers, one-use aliases, inline structural contracts, or unsafe cast chains.\n`);
 

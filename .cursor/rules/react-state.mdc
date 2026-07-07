@@ -1,5 +1,5 @@
 ---
-description: Prevent React state-shape slop from agent-generated UI.
+description: Prevent brittle React state shape in agent-generated UI.
 globs: ["apps/**/*.tsx", "packages/ui/**/*.tsx"]
 alwaysApply: true
 ---

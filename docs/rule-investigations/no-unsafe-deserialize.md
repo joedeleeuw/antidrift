@@ -87,7 +87,7 @@ Drift:
 
 - `/Users/sushi/code/sudocode-main/server/src/routes/workflows.ts` line 199 parses `row.source` where the checker type is `any`.
 - The same file also reports broad row parses at lines 201, 208, 793, 1010, 1012, 1019, and 1598.
-- `/Users/sushi/code/codebase-atlas/src/routes/atlas.city3d.tsx` lines 449 and 482 parse `MessageEvent.data` from EventSource handlers without first proving it is a string.
+- Historical Codebase Atlas EventSource drift in `src/routes/atlas.city3d.tsx` was removed upstream; the current live external corpus keeps Codebase Atlas as clean pressure for this rule.
 - `/Users/sushi/code/opencode/packages/console/resource/resource.cloudflare.ts` line 19 parses `env.SST_RESOURCE_App` without the string guard used by the adjacent resource branches.
 - Opencode benchmark route parses remain real parse-output contract debt, but they are not current-rule drift because the rule is scoped to the parse input. Those rows belong to `antidrift/no-appeasement-cast`.
 - Cloudflare Agents previously supplied drift in `examples/assistant/src/server.ts` and `experimental/gadgets-chat/src/client.tsx`, but the current checkout no longer evaluates those as blocking evidence: the assistant file changed substantially, and the Cloudflare tsconfigs extend `agents/tsconfig` without an install-resolvable package path in this external clone.
@@ -112,7 +112,7 @@ Split TypeChecker inventory on June 4, 2026:
 - Chaski portal: 6 JSON.parse files, 0 findings.
 - Chaski monolithui: 10 JSON.parse files, 0 findings in project-included files.
 - Chaski crow-v2: 4 JSON.parse files, 0 findings.
-- Codebase Atlas `src`: previously 6 JSON.parse files, 0 findings; current corpus adds EventSource parse-input drift in `src/routes/atlas.city3d.tsx`.
+- Codebase Atlas `src`: previously 6 JSON.parse files, 0 findings; the deleted EventSource route is no longer live corpus drift.
 - Sudocode server: 57 JSON.parse files, 8 findings, all in `server/src/routes/workflows.ts`.
 - Opencode console resource: 1 unguarded `env` parse-input finding plus adjacent guarded clean controls.
 - Cloudflare Agents focused corpus: now recorded as known-gap rather than blocking evidence because the external example checkout cannot currently resolve `agents/tsconfig` for type-aware linting.

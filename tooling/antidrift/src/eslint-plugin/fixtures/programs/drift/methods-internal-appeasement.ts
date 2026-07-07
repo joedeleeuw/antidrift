@@ -1,6 +1,6 @@
 // Internal (non-exported) class — its methods are NOT a public boundary, so inference-appeasement
 // helpers should be flagged exactly as free functions are.
-// Expected — no-trivial-selector-wrapper: 3 (getItemsFromBag, pickItems, firstItem)
+// Expected — no-contract-appeasement-projection: 3 (getItemsFromBag, pickItems, firstItem)
 class ItemStore {
   #items: number[] = [];
   getItemsFromBag(bag: { items: number[] }): number[] { return bag.items; }   // trivial selector wrapper

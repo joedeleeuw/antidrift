@@ -14,7 +14,9 @@ New rules should start from `docs/build-patterns.md`: first define the simple co
 
 Use `docs/self-hosting-risks.md` when changing the rule package itself. The short version: code semantics live in ESLint rules, repository control-plane checks live in policy scripts, and agent lifecycle safety lives in hooks.
 
-Each candidate rule is judged on its own merits. Before implementing or keeping custom code, recover the original local complaint from the current session, handoff docs, reports, or available Codex memory and translate it into a concrete failure mode. Then compare the scoped behavior against maintained ESLint, `typescript-eslint`, React, import, SonarJS, Vitest, and Oxlint ecosystem coverage. A supported equivalent is an elimination candidate: prefer pulling in the external rule or generated core config. If the custom rule is broader, narrower, or only adjacent, document that delta with real drift and clean programs. If the "why" is still unclear, do not write code; collect at least three close ecosystem/readme/practitioner references and keep the item in research.
+Shell source guardrails are the one opt-in non-ESLint rule-pack surface. They live under `tooling/antidrift/ast-grep` and run through `antidrift shell`, so Bash syntax policy is not duplicated as an ESLint rule.
+
+Each candidate rule is judged on its own merits. Before implementing or keeping custom code, recover the original local complaint from the current session, handoff docs, reports, or available Codex memory and translate it into a concrete failure mode. Then compare the scoped behavior against maintained ESLint, `typescript-eslint`, React, import, Vitest, Oxlint, and SonarQube ecosystem coverage. A supported equivalent is an elimination candidate: prefer pulling in the external rule or generated core config. If the custom rule is broader, narrower, or only adjacent, document that delta with real drift and clean programs. If the "why" is still unclear, do not write code; collect at least three close ecosystem/readme/practitioner references and keep the item in research.
 
 ## Signal Ladder
 
@@ -55,7 +57,7 @@ These are valid only when the syntax or local binding is itself the violation:
 - `.only` and skipped tests
 - inline disables without a reason
 
-Silent catches, import cycles, and local disable justification are intentionally not custom rule scope in the current package; use maintained coverage such as `no-empty`, `no-console`, SonarJS catch rules, `import-x/no-cycle`, `@eslint-community/eslint-comments/require-description`, and `@typescript-eslint/ban-ts-comment`.
+Silent catches, import cycles, and local disable justification are intentionally not custom rule scope in the current package; use maintained coverage such as `no-empty`, `preserve-caught-error`, `no-console`, `import-x/no-cycle`, `@eslint-community/eslint-comments/require-description`, and `@typescript-eslint/ban-ts-comment`.
 
 ### Registry-backed rules
 
@@ -107,7 +109,7 @@ antidrift/<cluster>-<specific-smell>
 Examples:
 
 ```txt
-antidrift/no-trivial-selector-wrapper
+antidrift/no-contract-appeasement-projection
 antidrift/no-handrolled-resource-lifecycle-cells
 antidrift/no-raw-fetch-in-component
 ```

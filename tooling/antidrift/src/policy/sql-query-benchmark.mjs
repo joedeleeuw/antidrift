@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 
 import tsParser from "@typescript-eslint/parser";
 import { ESLint } from "eslint";
-import sonarjs from "eslint-plugin-sonarjs";
 
 import antidrift from "../eslint-plugin/index.js";
 
@@ -33,12 +32,8 @@ const powersyncServiceRepoCandidates = [
   "/Users/sushi/code/powersync-service",
 ].filter(Boolean);
 
-const benchmarkRuleIds = [
-  "antidrift/no-sql-string-concat",
-  "sonarjs/sql-queries",
-];
 const customRuleId = "antidrift/no-sql-string-concat";
-const upstreamRuleId = "sonarjs/sql-queries";
+const benchmarkRuleIds = [customRuleId];
 const powersyncSafeIdentifierOptions = {
   safeIdentifierMembers: [
     {
@@ -225,7 +220,6 @@ function eslintConfig(plan, repoRoot) {
       },
       plugins: {
         antidrift,
-        sonarjs,
       },
       rules: Object.fromEntries(
         benchmarkRuleIds.map((ruleId) => [
@@ -264,13 +258,8 @@ function countByRule(findings) {
 
 function compare(findings) {
   const custom = findings.filter((finding) => finding.ruleId === customRuleId);
-  const upstream = findings.filter((finding) => finding.ruleId === upstreamRuleId);
-  const customKeys = new Set(custom.map(locationKey));
-  const upstreamKeys = new Set(upstream.map(locationKey));
   return {
-    overlapLocations: [...customKeys].filter((key) => upstreamKeys.has(key)).length,
-    customOnly: custom.filter((finding) => !upstreamKeys.has(locationKey(finding))).length,
-    upstreamOnly: upstream.filter((finding) => !customKeys.has(locationKey(finding))).length,
+    customFindings: custom.length,
   };
 }
 

@@ -26,7 +26,13 @@ categories:
     summary: >-
       ESLint + scope/control-flow + TypeScript parser services. Per-file, mostly intra-procedural,
       snapshot-in-time. Our primary (and, today, almost only) static proof mechanism; nearly saturated.
-    subBuckets: [local-ast-source-shape, semantic-source-type-provenance, authority-index-ownership, graph-config-source]
+    subBuckets:
+      [
+        local-ast-source-shape,
+        semantic-source-type-provenance,
+        authority-index-ownership,
+        graph-config-source,
+      ]
   agent-ops:
     status: available
     summary: >-
@@ -69,34 +75,187 @@ categories:
 
 # Per-rule labeling. current is semantic-ast for every active rule today (we have no other static bucket).
 rules:
-  antidrift/require-authz-check:                    { current: semantic-ast, fit: under-proven,   target: dataflow-taint, note: "handler-local params plus explicit authz function config are inventory; authz dominance/reachability is a flow property, so blocking needs typed route construction or delegated taint/dominance proof." }
-  antidrift/no-sql-string-concat:                   { current: semantic-ast, fit: approximation,  target: dataflow-taint, note: "SQL injection is a taint property; the single-file escaper/reachability rule remains useful default-off inventory, but unresolved SQL-builder APIs need import/declaration-source provenance or delegated taint before blocking." }
-  antidrift/no-unsafe-deserialize:                  { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "scoped parse-input rule: TypeChecker proves broad any/unknown JSON.parse input and local control flow proves string-boundary clean cases. Broader deserialization taint remains out of scope." }
-  antidrift/no-canonical-model-fork:                { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "authority-index whole-program type resolution; correctly placed for DECLARED owners; default-off until boundary DTO clean pressure and adversarial review pass. (Discovering NEW duplicate owners needs dependency-graph — see gaps.net-new-bias.)" }
-  antidrift/no-structural-type-fork:                { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "authority-index; correctly placed for declared owners; default-off until independent generated-source and accepted package-owner evidence are proven." }
-  antidrift/no-status-literal-in-type:              { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "authority-index domain-vocabulary with exact/composed owner context; default-off until independent configured status drift replicates." }
-  antidrift/no-appeasement-cast:                    { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "type-escape-hatch; type-provenance; default-off while broad inventory is rerun after real consumer cleanup." }
-  antidrift/no-redundant-zod-parse:                 { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "validation-boundary; schema-provenance. Stable." }
-  antidrift/no-trivial-selector-wrapper:            { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "inference-appeasement; AST return-shape. Stable." }
-  antidrift/no-inline-structural-type-at-use-site:  { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "type-contract-shape; local AST proves the boundary shape, but evidence keeps it default-off until independent replication." }
-  antidrift/no-nullable-positional-tuple:           { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "type-contract-shape; AST + TypeChecker; default-off until a second real nullable tuple appears." }
-  antidrift/no-async-array-method:                  { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "promise-control-flow; default branch is deterministic never-await AST, while collection flow is explicit opt-in pending separate evidence." }
-  antidrift/require-effect-deps:                    { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "react-effect-lifecycle. Stable." }
-  antidrift/no-raw-fetch-in-component:              { current: semantic-ast, fit: proven,         target: semantic-ast,   note: "scope-bound global fetch in a JSX-returning lexical component frame is local AST/source-shape proof; default-off until narrowed re-inventory after removing file/PascalCase/module-helper heuristics." }
-  antidrift/no-defensive-shape-probing:             { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "broad-value-shape-probing; type-provenance is the right bucket, just not yet proven." }
-  antidrift/no-underchecked-type-predicate:         { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "type-guard-laundering; TypeChecker predicate-coverage is the right bucket, not yet proven." }
-  antidrift/no-handrolled-resource-lifecycle-cells: { current: semantic-ast, fit: under-proven,   target: semantic-ast,   note: "fixed proof now catches Chaski/Sudocode/Cloudflare lifecycle diagnostics while keeping broad co-mutation inventory-only; still needs human review and clean-control pressure before default enablement." }
-  antidrift/no-shattered-ingested-entity-state:     { current: semantic-ast, fit: inventory-only, target: semantic-ast,   note: "source-member fan-out is detectable with semantic AST provenance; enforcement needs owner-config + agent-corpus evidence, not a new bucket." }
+  antidrift/require-authz-check:
+    {
+      current: semantic-ast,
+      fit: under-proven,
+      target: dataflow-taint,
+      note: "handler-local params plus explicit authz function config are inventory; authz dominance/reachability is a flow property, so blocking needs typed route construction or delegated taint/dominance proof.",
+    }
+  antidrift/no-sql-string-concat:
+    {
+      current: semantic-ast,
+      fit: approximation,
+      target: dataflow-taint,
+      note: "SQL injection is a taint property; the single-file escaper/reachability rule remains useful default-off inventory, but unresolved SQL-builder APIs need import/declaration-source provenance or delegated taint before blocking.",
+    }
+  antidrift/no-unsafe-deserialize:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "scoped parse-input rule: TypeChecker proves broad any/unknown JSON.parse input and local control flow proves string-boundary clean cases. Broader deserialization taint remains out of scope.",
+    }
+  antidrift/no-canonical-model-fork:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "authority-index whole-program type resolution; correctly placed for DECLARED owners; default-off until boundary DTO clean pressure and adversarial review pass. (Discovering NEW duplicate owners needs dependency-graph — see gaps.net-new-bias.)",
+    }
+  antidrift/no-structural-type-fork:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "authority-index; correctly placed for declared owners; default-off until independent generated-source and accepted package-owner evidence are proven.",
+    }
+  antidrift/no-status-literal-in-type:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "authority-index domain-vocabulary with exact/composed owner context; default-off until independent configured status drift replicates.",
+    }
+  antidrift/no-appeasement-cast:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "type-escape-hatch; type-provenance; default-off while broad inventory is rerun after real consumer cleanup.",
+    }
+  antidrift/no-redundant-zod-parse:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "validation-boundary; schema-provenance. Stable.",
+    }
+  antidrift/no-contract-appeasement-projection:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "contract-appeasement projection; TypeChecker plus structural return-flow proof. Ready; widened branch needs real corpus before stable.",
+    }
+  antidrift/no-inline-structural-type-at-use-site:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "type-contract-shape; local AST proves the boundary shape, but evidence keeps it default-off until independent replication.",
+    }
+  antidrift/no-nullable-positional-tuple:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "type-contract-shape; AST + TypeChecker; default-off until a second real nullable tuple appears.",
+    }
+  antidrift/no-async-array-method:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "promise-control-flow; default branch is deterministic never-await AST, while collection flow is explicit opt-in pending separate evidence.",
+    }
+  antidrift/require-effect-deps:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "react-effect-lifecycle. Stable.",
+    }
+  antidrift/react-max-component-props:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "react-component-api-shape; TypeChecker counts locally-owned accepted props for JSX-returning components while external DOM/React props and whole-props pass-through wrappers stay clean. Enabled with max 12 pending corpus calibration.",
+    }
+  antidrift/no-raw-fetch-in-component:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "scope-bound global fetch in a JSX-returning lexical component frame is local AST/source-shape proof; default-off until narrowed re-inventory after removing file/PascalCase/module-helper heuristics.",
+    }
+  antidrift/no-defensive-shape-probing:
+    {
+      current: semantic-ast,
+      fit: under-proven,
+      target: semantic-ast,
+      note: "broad-value-shape-probing; type-provenance is the right bucket, just not yet proven.",
+    }
+  antidrift/no-underchecked-type-predicate:
+    {
+      current: semantic-ast,
+      fit: under-proven,
+      target: semantic-ast,
+      note: "type-guard-laundering; TypeChecker predicate-coverage is the right bucket, not yet proven.",
+    }
+  antidrift/no-handrolled-resource-lifecycle-cells:
+    {
+      current: semantic-ast,
+      fit: under-proven,
+      target: semantic-ast,
+      note: "fixed proof now catches Chaski/Sudocode/Cloudflare lifecycle diagnostics while keeping broad co-mutation inventory-only; still needs human review and clean-control pressure before default enablement.",
+    }
+  antidrift/no-shattered-ingested-entity-state:
+    {
+      current: semantic-ast,
+      fit: inventory-only,
+      target: semantic-ast,
+      note: "source-member fan-out is detectable with semantic AST provenance; enforcement needs owner-config + agent-corpus evidence, not a new bucket.",
+    }
 
 # Behaviors the taxonomy reveals we do not have blocking coverage for yet. Some need a missing
 # bucket; others, like diff-scope-creep, now have an inventory spine but still need promotion
 # evidence before enforcement. Measured n from the 2026-06-10 complaint sweep.
 gaps:
-  diff-scope-creep:        { needs: diff-relative,    measured: 60, note: "top measured behavior; snapshot lint structurally cannot see it. First bridge: change-contract conformance plus existing adapters diff-scoped." }
-  duplication:             { needs: clone-detection,  measured: 31, note: "top VALIDATED family; cross-file structural clone detection; Sonar CPD misses semantic forks." }
-  one-owner-fork:          { needs: clone-detection,  measured: 28, note: "near-duplicate of an existing owner across files." }
-  net-new-bias:            { needs: dependency-graph, measured: 25, note: "authority-index only enforces REGISTRY-DECLARED owners; it cannot catch the agent minting a NEW duplicate owner. Real fix: whole-repo owner-discovery/uniqueness (reflexion) pass." }
-  silent-fallback:         { needs: dataflow-taint,   measured: 24, note: "does a caught error flow to a real sink or nowhere — reachability, not an AST shape. Delegate flow to CodeQL/Semgrep." }
-  feature-scatter:         { needs: dependency-graph, measured: 13, note: "whole-repo architecture model (reflexion / fitness functions over history)." }
-  cross-layer-import:      { needs: dependency-graph,  note: "currently ecosystem-covered (import-x); a real module graph is the provable bucket." }
-  unearned-type-authority: { needs: type-prevention,   note: "detection (no-*-fork) works; prevention is adoption-gated — see categories.type-prevention." }
+  diff-scope-creep:
+    {
+      needs: diff-relative,
+      measured: 60,
+      note: "top measured behavior; snapshot lint structurally cannot see it. First bridge: change-contract conformance plus existing adapters diff-scoped.",
+    }
+  duplication:
+    {
+      needs: clone-detection,
+      measured: 31,
+      note: "top VALIDATED family; cross-file structural clone detection; Sonar CPD misses semantic forks.",
+    }
+  one-owner-fork:
+    {
+      needs: clone-detection,
+      measured: 28,
+      note: "near-duplicate of an existing owner across files.",
+    }
+  net-new-bias:
+    {
+      needs: dependency-graph,
+      measured: 25,
+      note: "authority-index only enforces REGISTRY-DECLARED owners; it cannot catch the agent minting a NEW duplicate owner. Real fix: whole-repo owner-discovery/uniqueness (reflexion) pass.",
+    }
+  silent-fallback:
+    {
+      needs: dataflow-taint,
+      measured: 24,
+      note: "does a caught error flow to a real sink or nowhere — reachability, not an AST shape. Delegate flow to CodeQL/Semgrep.",
+    }
+  feature-scatter:
+    {
+      needs: dependency-graph,
+      measured: 13,
+      note: "whole-repo architecture model (reflexion / fitness functions over history).",
+    }
+  cross-layer-import:
+    {
+      needs: dependency-graph,
+      note: "currently ecosystem-covered (import-x); a real module graph is the provable bucket.",
+    }
+  unearned-type-authority:
+    {
+      needs: type-prevention,
+      note: "detection (no-*-fork) works; prevention is adoption-gated — see categories.type-prevention.",
+    }

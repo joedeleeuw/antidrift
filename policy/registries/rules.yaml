@@ -134,17 +134,18 @@ ruleFamilies:
     description: Rules that decide whether local code has earned the type contract it claims, or should import, infer, validate, narrow, or derive from the owner instead.
     referenceDoc: docs/rule-family-type-contract-authority.md
     subsets:
-      selector-inference-appeasement:
-        intent: Prevent internal helpers from adding explicit return contracts to bare property access that TypeScript can infer directly.
+      contract-appeasement-projection:
+        intent: Prevent internal helpers from projecting one source value contract into another explicit return contract without construction or validation.
         rules:
-          - antidrift/no-trivial-selector-wrapper
+          - antidrift/no-contract-appeasement-projection
         flags:
           - "function fullExcerpt(file: ParsedFile): string { return file.source; }"
           - "const itemId = (item: Item): string => item.id;"
+          - 'function actionForEventKind(eventKind: EventKind): MemoryResult["action"] | undefined { if (eventKind === "recall") return eventKind; }'
         allows:
           - "function compactText(file: ParsedFile) { return file.source.trim(); }"
           - "export function selectSource(file: ParsedFile): string { return file.source; }"
-          - "/* eslint-disable-next-line antidrift/no-trivial-selector-wrapper -- external adapter type requires annotated callback */ const keyForExternalList = (item: ChatItem): string => item.id;"
+          - "const action = ActionSchema.parse(raw);"
       type-escape-casts:
         intent: Prevent casts from manufacturing named, narrowed, or branded contracts without a guard, parser, or brand constructor.
         rules:
@@ -257,16 +258,22 @@ policyRuleReviews:
     coverage: Implemented as an import-binding custom rule for effect hooks called without a dependency array.
     reason: react-hooks/exhaustive-deps validates an existing dependency array but intentionally does not report the missing-array case.
     nextAction: Stable; monitor intentional every-render disables with required descriptions.
-  ts/no-trivial-selector-wrapper:
+  react/max-component-props:
     status: active-custom
-    antidriftRule: antidrift/no-trivial-selector-wrapper
-    coverage: Implemented structurally for explicit-return helpers that only return a member of their own parameter.
-    reason: This is a net antidrift rule; no maintained rule targets inference appeasement selector wrappers.
-    nextAction: Stable; do not reintroduce getXFromY name fingerprints.
+    antidriftRule: antidrift/react-max-component-props
+    coverage: Implemented as a type-aware JSX-returning component API rule for locally-owned accepted props.
+    reason: React ecosystem rules cover JSX props per line, unused props, and parameter count, but not accepted prop-object cardinality.
+    nextAction: Keep enabled at max 12 while collecting real-corpus threshold evidence and clean controls for pass-through/design-system/form components.
+  ts/no-contract-appeasement-projection:
+    status: active-custom
+    antidriftRule: antidrift/no-contract-appeasement-projection
+    coverage: Implemented as a type-aware rule for explicit-return internal helpers that only project parameters, parameter members, destructured bindings, matching literal branches, or undefined fallback into the declared return contract.
+    reason: This is a net antidrift rule; no maintained rule targets typed contract projection helpers that locally appease a return shape without construction or validation.
+    nextAction: Keep the inherited selector-wrapper corpus and add real cross-contract projection corpus before stable promotion.
   ts/no-mechanical-get-x-from-y:
     status: merged
-    mergedInto: ts/no-trivial-selector-wrapper
-    coverage: Former name-shaped concern is subsumed by the structural selector-wrapper rule.
+    mergedInto: ts/no-contract-appeasement-projection
+    coverage: Former name-shaped concern is subsumed by the type-aware contract projection rule.
     reason: User-chosen names are too gameable when the AST return shape can carry the signal.
     nextAction: Keep as historical policy wording only; do not implement a name-regex rule.
   ts/no-inline-structural-type-at-use-site:
@@ -294,9 +301,9 @@ policyRuleReviews:
     nextAction: Keep out of blocking scope until real programs prove a deterministic rule with clean domain-helper controls.
   arch/max-function-lines:
     status: spec-only
-    coverage: Not enforced locally as a line-count rule.
-    reason: Function length is a blunt proxy for complexity and can duplicate Sonar trend governance without a clear construction pattern.
-    nextAction: Use Sonar complexity trends unless real corpus evidence justifies a narrower custom threshold.
+    coverage: Not enforced locally as a line-count rule; local complexity/depth/parameter budgets are available through the optional antidrift oxlint gate.
+    reason: Function length is a blunt proxy for complexity and can duplicate local ESLint complexity budgets and Sonar trend governance without a clear construction pattern.
+    nextAction: Keep raw line count out of custom rules unless real corpus evidence justifies a narrower component or function split pattern.
   arch/max-component-lines:
     status: spec-only
     coverage: Not enforced locally as a component line-count rule.
@@ -479,8 +486,8 @@ policyRuleReviews:
   sec/no-sql-string-concat:
     status: active-custom
     antidriftRule: antidrift/no-sql-string-concat
-    coverage: Implemented for SQL structure built through interpolation or concatenation, layered with sonarjs/sql-queries.
-    reason: The local SonarJS benchmark missed real HogQL/template interpolation cases that antidrift reports.
+    coverage: Implemented for SQL structure built through interpolation or concatenation.
+    reason: The rule owns scoped HogQL/template interpolation cases without bundling a broad SQL ESLint plugin.
     nextAction: Keep default-off inventory until the remaining Cloudflare package SQL-tag cases can run type-aware through their real package configuration, without a local tsconfig shim, then rerun source-fleet/adversarial review before stable promotion.
   sec/no-unsafe-deserialize:
     status: active-custom
@@ -540,6 +547,12 @@ policyRuleReviews:
     coverage: Covered by antidrift sonar conversion and sonar.externalIssuesReportPaths configuration.
     reason: Sonar issue import is report generation and scanner configuration, not a lint rule.
     nextAction: Keep reports/antidrift-sonar.json generation documented in sonar guidance.
+  sonar/ai-code-governance-preset:
+    status: delegated
+    replacement: sonar/antidrift-ai-code-governance.yaml
+    coverage: Delegated to SonarQube quality profiles, native Sonar rule keys, and quality gate metrics.
+    reason: Broad AI-assisted quality and reward-hacking symptoms such as complexity, duplication, weak coverage, generic test weakness, security hotspots, accessibility gaps, and portfolio maintainability are Sonar governance concerns rather than custom Antidrift ESLint rules.
+    nextAction: Keep the preset declarative with native Sonar keys and review Sonar way / Sonar agentic AI diffs before changing the base profile.
   sonar/no-new-critical-issues:
     status: delegated
     replacement: SonarQube quality gate
@@ -548,10 +561,10 @@ policyRuleReviews:
     nextAction: Configure the Sonar server gate for consuming projects.
   sonar/complexity-budget:
     status: delegated
-    replacement: SonarQube complexity metrics
-    coverage: Delegated to Sonar complexity and trend metrics.
-    reason: Complexity budgeting is portfolio/PR governance rather than custom local AST rule work.
-    nextAction: Keep Sonar guidance current and avoid duplicating it with blunt line-count custom rules.
+    replacement: SonarQube cognitive complexity and duplication metrics plus optional antidrift oxlint local metric gate
+    coverage: Sonar owns cognitive complexity, duplication, and trend/gate metrics; antidrift oxlint provides a packaged local cyclomatic-complexity, nesting-depth, and parameter-count gate when a project wires it explicitly.
+    reason: Complexity budgeting splits between fast local source pressure and portfolio/PR governance; neither needs custom Antidrift ESLint rule work.
+    nextAction: Keep Sonar guidance current and keep the optional local metric gate limited to complexity, depth, and parameter count.
   rules/one-source-generates-agent-files:
     status: policy-script
     replacement: pnpm policy:check-generated
@@ -846,6 +859,62 @@ rules:
       allows:
         - "type Point = [number, number];"
     nextAction: Keep default-off inventory while seeking another real nullable positional tuple and clean tuple-control replication before blocking promotion.
+  antidrift/react-max-component-props:
+    status: ready
+    stable: false
+    signal: TypeChecker plus JSX-return component proof
+    solveType: react-component-api-shape
+    proofBuckets: [semantic-source-type-provenance, local-ast-source-shape]
+    promotion:
+      proofBucket: semantic-source-type-provenance
+      association: TypeChecker-resolved first props parameter or React FC type argument to a JSX-returning React component's accepted API.
+      blockingThreshold: A JSX-returning component reports when locally-owned prop symbols exceed the configured max. The shared config sets max to 12.
+      ecosystemComparison: React JSX max-props-per-line rules cover call-site formatting, @eslint-react/no-unused-props covers unused prop definitions, ESLint max-params and Sonar S107 cover positional parameters, and Vue/Oxlint expose Vue max-props. No maintained React rule was found for accepted props per component.
+      corpusEvidence: Chaski MobileFlightTrackerMap reports 31 locally-owned accepted props under the max 12 threshold; regression fixtures cover referenced Props, destructured props, React FC annotations, memo wrappers, DOM prop inheritance, and pass-through wrappers.
+      realCorpusInventory: docs/rule-investigations/react-max-component-props.md and tooling/antidrift/src/policy/chaski-corpus.mjs record the first real drift anchor, rule shape, ecosystem search, and clean controls.
+      realCorpusInventoryRefs:
+        - docs/rule-investigations/react-max-component-props.md
+        - tooling/antidrift/src/policy/chaski-corpus.mjs
+      replicationsNotIntroducedForTest: false
+      knownFalsePositives: 0
+      knownFalseNegatives: Class components, PropTypes-only contracts, aliased component type names beyond FC/FunctionComponent, and some higher-order component factories are outside the first proof.
+      productionConcerns: Threshold needs real React corpus review, especially design-system, generated, schema/form, and pass-through component APIs.
+      noSinkBehavior: This rule emits no semantic facts; diagnostics depend on parser services, TypeChecker prop ownership, and JSX-return proof.
+      noDeadWorkBehavior: Non-component functions, inherited DOM/React props, and whole-props pass-through wrappers stay clean.
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: The component API TypeChecker proof currently lives inline in the ESLint rule; extract only if more React component API rules reuse the same ownership and JSX-return model.
+    referenceDoc: docs/rule-investigations/react-max-component-props.md
+    corpusRepositories: [chaski]
+    concerns:
+      - The rule is enabled in createConfig() because accepted prop count is a deterministic component API budget, not a separate scanner posture.
+      - It counts locally-owned prop symbols, so React/DOM library props inherited through ComponentProps or HTML attributes stay clean.
+      - Whole-props JSX spread wrappers stay clean to avoid reporting components that preserve another component's public API.
+      - Stable promotion needs more real corpus inventory for the max 12 threshold and clean-control review for generated, form/schema, and design-system components.
+    external:
+      state: net-antidrift
+      support: none
+      candidates:
+        [
+          "react/jsx-max-props-per-line",
+          "@stylistic/jsx-max-props-per-line",
+          "@eslint-react/no-unused-props",
+          "ESLint max-params",
+          "Sonar typescript:S107",
+          "vue/max-props",
+          "oxlint vue/max-props",
+        ]
+      decision: own-antidrift
+      whyThisState: "The maintained React rules found either format JSX attributes, find unused props, or count positional parameters rather than counting a component's accepted props object."
+      whyNotOtherState: "Not ecosystem-covered because exact max-props support was found for Vue, not React."
+    examples:
+      flags:
+        - "function Panel(props: PanelProps) { return <section />; } // when PanelProps has more than the configured max locally-owned props"
+      allows:
+        - "function load(input: LoaderInput) { return input.id; }"
+        - 'type ButtonProps = ComponentProps<"button"> & { tone?: Tone; size?: Size };'
+        - "function Wrapper(props: BaseProps) { return <Base {...props} />; }"
+    nextAction: Run real-corpus inventory for threshold calibration and revisit stable promotion after class/PropTypes/HOC false-negative decisions are explicit.
   antidrift/no-raw-fetch-in-component:
     status: ready
     stable: false
@@ -896,7 +965,7 @@ rules:
         - 'function Orders() { globalThis.fetch("/api/orders"); return <div />; }'
       allows:
         - 'async function loadOrders() { return fetch("/api/orders"); }'
-        - 'async function downloadQrCode(url) { return fetch(url); } function QrActionCard() { return <button />; }'
+        - "async function downloadQrCode(url) { return fetch(url); } function QrActionCard() { return <button />; }"
         - 'import { fetch } from "./api"; function Orders() { fetch("/api/orders"); return <div />; }'
         - "function Orders() { const { data } = useOrders(); return <div>{data.length}</div>; }"
     nextAction: Keep default-off inventory while re-inventorying real component fetch findings under the narrowed same-frame JSX-return proof before restoring blocking severity.
@@ -957,8 +1026,8 @@ rules:
       proofBucket: semantic-source-type-provenance
       association: SQL string fragments to bound values, identifier allowlists, escaping helpers, safe members, import-bound or declaration-source template builders, or unsafe interpolation.
       blockingThreshold: Unsafe value interpolation in SQL context reports; identifier interpolation reports only when the checker cannot prove a bound, allowlisted, escaped, static, configured-safe source, import-bound SQL builder tag, or declaration-source SQL builder member.
-      ecosystemComparison: SonarJS and SQL plugins cover nearby SQL construction, but measured benchmarks missed the real HogQL/template interpolation and identifier-proof surface.
-      corpusEvidence: The source-fleet SQL inventory checked 1,378 SQL-candidate files across 24 repos with 486 custom findings, 0 SonarJS findings, and 0 parser errors after name-only member proof was removed. External corpus still proves Opencode Drizzle tags, Cloudflare core Agent.sql, and PowerSync AbstractPostgresConnection.sql clean through import/declaration-source provenance; two Cloudflare package SQL-tag cases remain parked on external tsconfig/type-service availability, and the broad source fleet is now high-noise inventory until additional SQL-builder declaration proof is classified.
+      ecosystemComparison: SQL plugins cover nearby SQL construction, but no configured plugin is currently equivalent to the real HogQL/template interpolation and identifier-proof surface.
+      corpusEvidence: The source-fleet SQL inventory checked 1,378 SQL-candidate files across 24 repos with 486 custom findings and 0 parser errors after name-only member proof was removed. External corpus still proves Opencode Drizzle tags, Cloudflare core Agent.sql, and PowerSync AbstractPostgresConnection.sql clean through import/declaration-source provenance; two Cloudflare package SQL-tag cases remain parked on external tsconfig/type-service availability, and the broad source fleet is now high-noise inventory until additional SQL-builder declaration proof is classified.
       realCorpusInventory: docs/rule-investigations/no-sql-string-concat.md, reports/sql-query-benchmark.json, and reports/sql-broad-inventory-source-fleet.json record production drift, clean controls, and source-fleet coverage.
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-sql-string-concat.md
@@ -992,7 +1061,7 @@ rules:
       - "External corpus proves configured SQL-builder tags/members without trusting tag names: Opencode Drizzle imports from `drizzle-orm` and `drizzle-orm/sql/sql`, Cloudflare core `Agent.sql`, and PowerSync `AbstractPostgresConnection.sql` stay clean; local lookalike `sql`, `db.sql`, and `class Agent { sql() {} }` tags still report."
       - "The June 9 adversarial cleanup restored short-circuit safety checks and keeps numbered-placeholder proof limited to the real observed plus/multiply arithmetic shape; subtraction and arbitrary arithmetic are not accepted."
     concerns:
-      - The benchmark on 370 real files reports 145 antidrift findings and 0 `sonarjs/sql-queries` findings, so SonarJS is not a replacement for the current HogQL/template interpolation signal; most new findings are unclassified SQL-builder/tagged-template inventory after name-only member proof was removed.
+      - The benchmark on 370 real files reports 145 antidrift findings; most new findings are unclassified SQL-builder/tagged-template inventory after name-only member proof was removed.
       - Dynamic placeholder lists such as `ids.map(() => "?").join(",")`, and numbered Postgres placeholder fragments that interpolate only index plus/multiply arithmetic after `$`, are accepted clean because values remain bound parameters.
       - Locally built static SQL fragment arrays joined into SET/WHERE clauses are accepted clean; arbitrary dynamic SQL fragments still report.
       - SQL template tag names such as `sql`, `sqlQuery`, `sqlRun`, or arbitrary `.sql` members are not accepted clean by name; interpolated SQL templates must be proven safe through the rule's existing fragment, identifier, placeholder, escaper, import-bound builder, or TypeChecker member mechanisms.
@@ -1010,15 +1079,15 @@ rules:
       - The current concatenation branch does not cover SQL-builder `+=`; the benchmark sees 37 static builder appends and 8 dynamic builder append candidates. The dynamic candidates are currently classified clean, so do not widen builder-append linting until a real unsafe dynamic append appears.
       - The widened sentence-pattern trigger catches long unsafe Chaski templates at lines 626, 650, 1111, and 1367 that the old 200-character `SELECT ... FROM` window missed, while Cloudflare and Opencode SQL controls stay clean.
       - "The benchmark directly measures the non-type-aware boundary through `parserServiceDeltas`: without parser services, PowerSync `modules/module-mysql/src/replication/BinLogStream.ts:311`, `modules/module-postgres/src/replication/replication-utils.ts:290`, and `modules/module-postgres/src/replication/WalStream.ts:437` become conservative reports, with zero missing non-type-aware findings."
-      - "The reproducible source-fleet SQL inventory command checked 1,378 SQL-candidate files across 24 primary repos with 486 custom findings and 0 SonarJS findings after removing name-only SQL member proof; classify this high-noise inventory before any stable promotion claim."
+      - "The reproducible source-fleet SQL inventory command checked 1,378 SQL-candidate files across 24 primary repos with 486 custom findings after removing name-only SQL member proof; classify this high-noise inventory before any stable promotion claim."
       - SQL-looking payload text inside browser/test script templates is clean when the interpolation itself is not part of SQL syntax.
       - Figma JavaScript payload strings are clean when words like "select" and "from" appear outside SQL syntax; operator-position interpolation now requires nearby SQL statement context.
     external:
       state: partial-overlap
       support: medium
-      candidates: ["sonarjs/sql-queries", "sql/no-unsafe-query"]
+      candidates: ["sql/no-unsafe-query"]
       decision: own-antidrift
-      whyThisState: "Security plugins cover SQL construction in nearby ways, but the measured SonarJS benchmark did not report the real HogQL/template interpolation cases."
+      whyThisState: "Security plugins cover SQL construction in nearby ways, but no configured plugin is currently equivalent to the real HogQL/template interpolation cases."
       whyNotOtherState: "Not equivalent because the real HoGQL interpolation case was not covered by the checked ecosystem path."
     examples:
       flags:
@@ -1168,50 +1237,57 @@ rules:
       allows:
         - 'import type { ActionItem } from "@portal/types/reports";'
     nextAction: Keep default-off inventory; run fresh adversarial review and classify boundary DTO/view-model clean pressure before blocking promotion.
-  antidrift/no-trivial-selector-wrapper:
+  antidrift/no-contract-appeasement-projection:
     status: ready
-    stable: true
-    signal: AST structural return shape
-    solveType: inference-appeasement
+    stable: false
+    signal: TypeChecker plus structural return-flow proof
+    solveType: contract-appeasement-projection
+    proofBuckets: [semantic-source-type-provenance]
     promotion:
-      proofBucket: local-ast-source-shape
-      association: Explicitly annotated helper return types to direct property access on that helper's own parameter.
-      blockingThreshold: A wrapper reports only when the function body is just the selected property and the annotation restates what inference already knows.
-      ecosystemComparison: Explicit-return rules can remove annotations broadly, but they do not target inference-appeasing one-property wrappers.
-      corpusEvidence: Chaski, Codebase Atlas, and Murderbox provide trivial selector/key-wrapper drift and clean nontrivial helper controls.
-      realCorpusInventory: docs/rule-investigations/no-trivial-selector-wrapper.md and docs/stable-promotion-inventory.md record Chaski, Codebase Atlas, and Murderbox drift plus clean helper controls.
+      proofBucket: semantic-source-type-provenance
+      association: TypeChecker proves an internal explicit-return helper only forwards or filters source values from its parameters into a declared return contract without a constructor, parser, schema, validator, or exported adapter boundary.
+      blockingThreshold: A helper reports only when every meaningful return path is a parameter, parameter member, destructured parameter binding, matching guarded literal, or undefined fallback, and the type relation is either a cross-owner projection or an exact projected-type restatement.
+      ecosystemComparison: Explicit-return rules can remove annotations broadly, and unsafe assertion rules cover casts, but neither targets helper-level contract projection without `as`.
+      corpusEvidence: Chaski, Codebase Atlas, and Murderbox provide the selector-wrapper branch; the widened cross-contract projection branch is currently covered by regression fixtures and needs real-repo corpus evidence before stable promotion.
+      realCorpusInventory: docs/rule-investigations/no-contract-appeasement-projection.md records the widened rule shape, inherited selector-wrapper corpus, clean controls, and known false-negative gaps.
       realCorpusInventoryRefs:
-        - docs/rule-investigations/no-trivial-selector-wrapper.md
+        - docs/rule-investigations/no-contract-appeasement-projection.md
         - docs/stable-promotion-inventory.md
-      claudeAdvisoryReview: docs/rule-investigations/no-trivial-selector-wrapper.md records the stable scope and remaining callback-boundary monitoring decision.
+      claudeAdvisoryReview: docs/rule-investigations/no-contract-appeasement-projection.md records the inherited selector-wrapper scope and the widened cross-contract branch still needs review after real-corpus mining.
       claudeAdvisoryReviewRefs:
-        - docs/rule-investigations/no-trivial-selector-wrapper.md
-      replicationsNotIntroducedForTest: true
+        - docs/rule-investigations/no-contract-appeasement-projection.md
+      replicationsNotIntroducedForTest: false
       knownFalsePositives: 0
-      knownFalseNegatives: 0
+      knownFalseNegatives: Local variable indirection such as const items = bag.items; return items; is not modeled. Any call/new in the helper body is intentionally clean for parser/validator/constructor-backed conversion, but this also misses side-effect calls followed by a projection return.
       productionConcerns: none
-      noSinkBehavior: This rule emits no semantic facts; diagnostics are independent of sink availability.
-      noDeadWorkBehavior: Nontrivial computations and adapter callbacks without redundant explicit annotations stay clean.
-    referenceDoc: docs/rule-investigations/no-trivial-selector-wrapper.md
+      noSinkBehavior: This rule emits no semantic facts; diagnostics depend on parser services and TypeChecker source/target proof, not sink availability.
+      noDeadWorkBehavior: Nontrivial computations, exported/public adapter boundaries, parser-backed conversions, and real literal remappings stay clean.
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: The TypeChecker projection proof currently lives inline in the ESLint rule; extract it only after the cross-contract branch has real-corpus evidence.
+    referenceDoc: docs/rule-investigations/no-contract-appeasement-projection.md
     corpusRepositories: [chaski, codebase-atlas, murderbox]
     concerns:
-      - Adapter callbacks such as query selectors and key extractors can stay named and stable; the rule only requires dropping the explicit return annotation when the body already infers it.
-      - Do not add prop-name/use-site heuristics for `select`, `keyExtractor`, or `getRowId` unless future evidence shows an external API genuinely requires an annotated callback signature.
+      - The inherited selector-wrapper branch has real corpus coverage, but the widened cross-contract projection branch still needs real source findings outside reduced fixtures before stable promotion.
+      - Local variable indirection is a known false negative; future real corpus may justify tracking readonly locals derived from parameters.
+      - The first implementation treats any call/new expression in the helper body as construction or validation pressure and leaves it clean; future real corpus may justify a narrower parser/validator recognizer so unrelated side-effect calls do not mask projection returns.
+      - Literal-return projection is intentionally limited to literals that match an active source equality or switch case, so real remappings with different returned literals stay clean.
     external:
       state: net-antidrift
       support: none
       candidates: []
       decision: own-antidrift
-      whyThisState: "No supported rule was found for helpers that only return a member of their own parameter to appease inference."
-      whyNotOtherState: "Not covered by explicit-return rules because the actionable fix is to inline the property access, not only remove an annotation."
+      whyThisState: "No supported rule was found for internal helpers that project one typed value domain into another explicit return contract without a cast."
+      whyNotOtherState: "Not covered by explicit-return rules or unsafe-assertion rules because the violation has no `as` expression and the annotation can be locally intentional at exported boundaries."
     examples:
       flags:
         - "function pickItems(bag: Bag): Item[] { return bag.items; }"
-        - "function chatItemKey(item: ChatItem): string { return item.id; }"
+        - 'function actionForEventKind(eventKind: EventKind): MemoryResult["action"] | undefined { if (eventKind === "recall") return eventKind; }'
       allows:
         - "function totalItems(bag: Bag): number { return bag.items.length; }"
-        - "function chatItemKey(item: ChatItem) { return item.id; }"
-    nextAction: Stable; monitor for real APIs that require annotated adapter callback signatures.
+        - "export function actionForEventKind(eventKind: EventKind): MemoryResult['action'] | undefined { return eventKind === 'recall' ? eventKind : undefined; }"
+        - "function parseAction(raw: unknown): MemoryResult['action'] { return ActionSchema.parse(raw); }"
+    nextAction: Mine real Chaski, Codebase Atlas, Murderbox, and session-derived examples for cross-contract projections such as EventKind-to-result-action before restoring stable status.
   antidrift/no-underchecked-type-predicate:
     status: under-proven
     stable: false
@@ -1393,6 +1469,38 @@ rules:
         - "<Widget label={'x'} />"
         - "Schema.Struct({ id });"
     nextAction: "Keep default-off until a second repo provides quantified real drift; then run a corpus inventory and consider stable promotion."
+  antidrift/no-nonindependent-test-oracle:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: AST
+    solveType: test-quality-nonindependent-oracle
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/test-quality-taxonomy.md
+    corpusRepositories: [dotfiles, agent-guardrails-monorepo-template]
+    concerns:
+      - This rule subsumes the earlier bare membership assertion guard. Bare membership, key existence, dependency outcome flags, arranged-input echoes, arranged-length echoes, vacuous existence checks, and mock call-through echoes are branches of the same non-independent oracle smell.
+      - The rule is intentionally test-file scoped and AST/source-shape based. It proves the assertion restates arranged data or a dependency-level result, not that every replacement assertion is sufficient.
+      - Test helpers with assertion-shaped matcher names can be reported because the rule treats matcher chains in test files as assertion syntax.
+    external:
+      state: net-antidrift
+      support: low
+      candidates: ["ESLint no-restricted-syntax", "ast-grep"]
+      decision: own-antidrift
+      whyThisState: "Selector-based tools can match fragments of this shape, but the project needs one named guardrail that reasons across act bindings, arranged literals, assertion targets, and matcher variants."
+      whyNotOtherState: "Not ecosystem-covered because maintained test lint plugins do not classify arranged-input echo, dependency outcome flags, mock call-through, list membership, or object key existence as one low-value oracle family."
+    examples:
+      flags:
+        - 'assert.equal(items.some((item) => item.name === "node_repl"), false);'
+        - 'expect(names).toContain("executor");'
+        - "const parsed = schema.parse(fixture); expect(parsed).toEqual(fixture);"
+        - 'expect(schema.safeParse({ status: "bad" }).success).toBe(false);'
+        - "service.save(user); expect(repository.save).toHaveBeenCalledWith(user);"
+      allows:
+        - 'assert.deepEqual(runtimeConnections.map((server) => server.name), ["needle", "context7"]);'
+        - "expect(renderConfig(registry)).toEqual({ mcpServers: { executor: { url } } });"
+        - "trigger(); trigger(); expect(handler).toHaveBeenCalledTimes(1);"
+    nextAction: "Inventory existing guardrails and dotfiles findings, then split actionable replacements into behavioral/full-output assertions while tracking noisy branches before stable promotion."
   antidrift/no-duplicated-conditional-classnames:
     status: ready
     stable: false
@@ -1411,8 +1519,8 @@ rules:
       support: low
       candidates:
         [
-          "sonarjs/no-duplicated-branches",
-          "sonarjs/no-duplicate-string",
+          "duplicate-branch rules",
+          "duplicate-string rules",
           "eslint-plugin-tailwindcss",
           "eslint-plugin-better-tailwindcss",
         ]
@@ -1450,6 +1558,33 @@ rules:
       allows:
         - "queryClient.getQueryData(['count']);"
     nextAction: "Quantify chaski getQueryData/setQueryData drift in a corpus inventory, then consider stable promotion and default-on."
+  antidrift/no-silent-empty-detection-fallback:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: AST recovery/fallback source plus regex fallback candidate
+    solveType: detection-failure-sentinel
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-silent-empty-detection-fallback.md
+    corpusRepositories: [dotfiles]
+    concerns:
+      - The rule is intentionally name-scoped to identity, host, probe, and detection helpers; keep broad display/name utilities like identifier out of scope unless corpus evidence supports them.
+      - Empty strings can be valid UI text, so the rule does not apply to general formatting helpers.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "Generic no-empty/no-useless-catch rules do not model empty-string sentinels that silently erase identity or probe failures."
+      whyNotOtherState: "Not ecosystem-covered because maintained rules cannot distinguish a detection failure sentinel from an ordinary empty string without domain-specific helper naming."
+    examples:
+      flags:
+        - 'function deviceId() { try { return readMachineId(); } catch { return ""; } }'
+        - 'function macosPlatformUuid() { return output.match(/UUID/)?.[1] || ""; }'
+      allows:
+        - 'function formatLabel() { try { return readLabel(); } catch { return ""; } }'
+        - 'function deviceId() { const id = readMachineId(); if (!id) throw new Error("missing id"); return id; }'
+    nextAction: "Use dotfiles as the real clean corpus anchor and keep the rule opt-in until another repo supplies drift evidence."
 
 retiredRules:
   antidrift/no-cycle:
@@ -1467,7 +1602,7 @@ retiredRules:
     reason: Real Chaski code showed explicit private helper return types are often legitimate contracts.
   antidrift/no-silent-catch:
     status: retired
-    reason: Retired after utility review; ESLint no-empty, no-console, and SonarJS catch rules cover enough of the low-value surface, while the remaining console-only/comment-only custom behavior did not justify ownership.
+    reason: Retired after utility review; ESLint no-empty, preserve-caught-error, and no-console cover enough of the low-value surface, while the remaining console-only/comment-only custom behavior did not justify ownership.
   antidrift/no-thin-typed-factory-wrapper:
     status: retired
     reason: Read-only corpus review found no real non-test exact-forward internal drift, while broad typed-constructor wrappers and exported facades are clean controls with high false-positive risk.
@@ -1544,12 +1679,12 @@ researchCandidates:
     solveType: react-state-shape
     referenceDoc: docs/rule-equivalence-audit.md
     nextAction: Covered by eslint-plugin-react-hooks recommended-latest plus explicit react-hooks/no-deriving-state-in-effects in the shared ESLint config.
-  ecosystem/sonar-sql-queries:
-    status: ecosystem-covered
-    signal: maintained ESLint plugin
+  ecosystem/sql-query-plugins:
+    status: research
+    signal: maintained SQL lint plugin
     solveType: sql-injection-boundary
     referenceDoc: docs/rule-equivalence-audit.md
-    nextAction: Covered by sonarjs/sql-queries through sonarjs recommended config, but the local benchmark currently reports 0 SonarJS findings against 145 antidrift SQL findings. Keep antidrift/no-sql-string-concat as default-off inventory until the HogQL/template interpolation delta is proven redundant or the remaining SQL-builder proof is complete.
+    nextAction: Keep `antidrift/no-sql-string-concat` as default-off inventory until a maintained SQL lint plugin proves equivalent coverage for the HogQL/template interpolation delta or the remaining SQL-builder proof is complete.
   antidrift/no-same-schema-recertification:
     status: research
     signal: TypeChecker plus schema-output assignability and refinement-free override proof
