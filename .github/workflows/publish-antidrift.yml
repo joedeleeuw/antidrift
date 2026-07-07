@@ -1,0 +1,58 @@
+name: Publish Antidrift
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    if: startsWith(github.event.release.tag_name, 'antidrift-v')
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - run: npm install -g npm@latest
+      - run: node --version && npm --version && pnpm --version
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify release tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="$(node -p "require('./tooling/antidrift/package.json').version")"
+          EXPECTED_TAG="antidrift-v${VERSION}"
+          if [ "${RELEASE_TAG}" != "${EXPECTED_TAG}" ]; then
+            echo "release tag ${RELEASE_TAG} must match ${EXPECTED_TAG}" >&2
+            exit 1
+          fi
+
+      - run: pnpm policy:check-generated
+      - run: pnpm policy:check-registries
+      - run: pnpm policy:check-rule-surface
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm package:verify
+
+      - name: Pack package
+        run: pnpm --dir tooling/antidrift pack --pack-destination "$RUNNER_TEMP/antidrift-pack"
+
+      - name: Publish package
+        working-directory: tooling/antidrift
+        run: npm publish --access public

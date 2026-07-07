@@ -9,7 +9,6 @@ const blocked = [
   /git\s+reset\s+--hard/iu,
   /git\s+clean\s+-fdx/iu,
   /chmod\s+-R\s+777/iu,
-  // eslint-disable-next-line sonarjs/slow-regex -- reason: JSON-serialized shell payload, not user input; [^|] explicitly excludes the terminator so backtracking is bounded
   /curl\s+[^|]+\|\s*(?:bash|sh)/iu,
 ];
 

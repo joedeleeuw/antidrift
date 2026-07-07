@@ -34,6 +34,7 @@ import {
   noAppeasementRemediationCorpus,
   parseArgs as parseNoAppeasementRemediationArgs,
 } from "./no-appeasement-remediation-corpus.mjs";
+import { runOxlintComplexity } from "./oxlint-complexity.mjs";
 import {
   parseArgs as parseReactStateInventoryArgs,
   reactStateInventory,
@@ -46,6 +47,7 @@ import {
   parseArgs as parseSchemaRoundtripInventoryArgs,
   schemaRoundtripInventory,
 } from "./schema-roundtrip-inventory.mjs";
+import { shellGuardrails } from "./shell-guardrails.mjs";
 import {
   parseArgs as parseSqlBroadInventoryArgs,
   sqlBroadInventory,
@@ -232,7 +234,16 @@ const commands = {
   "change-contract-evidence": () => changeContractEvidenceCommand(args),
   "change-contract": () => changeContractCommand(args),
   "diff-scoped-adapters": () => diffScopedAdaptersCommand(args),
+  shell: () => {
+    process.exitCode = shellGuardrails({ argv: args });
+  },
   "verify-session": verifySession,
+  oxlint: () => {
+    process.exitCode = runOxlintComplexity({
+      argv: args,
+      exit: (code) => code,
+    });
+  },
   "semantic-manifest": () => {
     process.stdout.write(
       `${JSON.stringify(semanticManifestCommand(args), null, 2)}\n`,

@@ -1,0 +1,287 @@
+id: antidrift-ai-code-governance
+kind: sonarqube-preset
+source: delegated-tool
+tool: sonarqube
+intent: Catch broad AI-assisted code quality and reward-hacking symptoms through Sonar-owned rules and gates.
+profile:
+  base: Sonar way
+  languages:
+    - JavaScript
+    - TypeScript
+  purpose: What Sonar should report.
+  notes:
+    - Native Sonar rule keys stay authoritative; Antidrift only curates the posture.
+    - Antidrift custom rules are imported through sonar.externalIssuesReportPaths, not redefined in the Sonar profile.
+    - Review Sonar agentic AI profile diffs before switching bases because Sonar owns that profile content.
+rules:
+  - id: cognitive-complexity
+    sonarKeys:
+      - typescript:S3776
+      - javascript:S3776
+    category: complexity
+    severity: critical
+    params:
+      threshold: 15
+    reason: Agents can pass tests while producing branch-heavy code that is hard to review.
+  - id: nested-functions
+    sonarKeys:
+      - typescript:S2004
+      - javascript:S2004
+    category: complexity
+    severity: critical
+    params:
+      max: 4
+    reason: Nested callback stacks hide control flow and make agent edits harder to audit.
+  - id: too-many-parameters
+    sonarKeys:
+      - typescript:S107
+      - javascript:S107
+    category: interface-design
+    severity: major
+    params:
+      maximumFunctionParameters: 7
+    reason: Parameter sprawl is a common generated-code escape hatch instead of naming a boundary object.
+  - id: switch-case-sprawl
+    sonarKeys:
+      - typescript:S1479
+      - javascript:S1479
+    category: complexity
+    severity: major
+    params:
+      maximum: 30
+    reason: Oversized switch bodies are broad routing surfaces that should usually be decomposed or table-driven.
+  - id: nested-template-literals
+    sonarKeys:
+      - typescript:S4624
+      - javascript:S4624
+    category: readability
+    severity: major
+    reason: Nested interpolation hides string construction and is hard to review in generated code.
+  - id: duplicate-function-implementation
+    sonarKeys:
+      - typescript:S4144
+      - javascript:S4144
+    category: duplication
+    severity: major
+    reason: Agents often copy a nearby function and mutate names while preserving behavior.
+  - id: invariant-return
+    sonarKeys:
+      - typescript:S3516
+      - javascript:S3516
+    category: correctness
+    severity: major
+    reason: Plausible branchy code that always returns the same value is a typical low-signal generated artifact.
+  - id: repeated-branch-condition
+    sonarKeys:
+      - typescript:S1862
+      - javascript:S1862
+    category: control-flow-correctness
+    severity: critical
+    reason: Repeated conditions make branches look exhaustive while one path is unreachable or copied.
+  - id: duplicated-binary-expression-side
+    sonarKeys:
+      - typescript:S1764
+      - javascript:S1764
+    category: control-flow-correctness
+    severity: critical
+    reason: Identical operands usually mean a generated comparison copied the wrong variable.
+  - id: finally-jump-statement
+    sonarKeys:
+      - typescript:S1143
+      - javascript:S1143
+    category: control-flow-correctness
+    severity: critical
+    reason: Jump statements in finally blocks can erase the actual thrown or returned control flow.
+  - id: switch-fallthrough
+    sonarKeys:
+      - typescript:S128
+      - javascript:S128
+    category: control-flow-correctness
+    severity: critical
+    reason: Unmarked switch fallthrough is a common branch-copy error that makes generated routing look intentional.
+  - id: array-sort-without-compare
+    sonarKeys:
+      - typescript:S2871
+      - javascript:S2871
+    category: control-flow-correctness
+    severity: major
+    reason: Sorts without explicit comparators produce plausible but wrong ordering for non-string values.
+  - id: unsafe-promise-use
+    sonarKeys:
+      - typescript:S4123
+      - javascript:S4123
+      - typescript:S4822
+      - javascript:S4822
+      - typescript:S6544
+      - javascript:S6544
+    category: async-correctness
+    severity: critical
+    reason: Async reward-hacking often preserves happy-path tests while losing promise and rejection semantics.
+  - id: agentic-injection
+    sonarKeys:
+      - tssecurity:S8701
+      - jssecurity:S8701
+      - tssecurity:S8702
+      - jssecurity:S8702
+      - tssecurity:S8704
+      - jssecurity:S8704
+      - tssecurity:S8705
+      - jssecurity:S8705
+      - tssecurity:S8706
+      - jssecurity:S8706
+      - tssecurity:S8707
+      - jssecurity:S8707
+    category: security
+    severity: critical
+    reason: Agentic workflows need maintained injection detection rather than local string heuristics.
+  - id: classic-injection
+    sonarKeys:
+      - tssecurity:S2076
+      - jssecurity:S2076
+      - tssecurity:S3649
+      - jssecurity:S3649
+      - tssecurity:S5131
+      - jssecurity:S5131
+      - tssecurity:S5144
+      - jssecurity:S5144
+      - tssecurity:S5334
+      - jssecurity:S5334
+      - tssecurity:S6109
+      - jssecurity:S6109
+    category: security
+    severity: critical
+    reason: Injection and taint families belong to Sonar's maintained security engine.
+  - id: secrets-and-security-hotspots
+    sonarKeys:
+      - typescript:S6418
+      - javascript:S6418
+      - typescript:S2068
+      - javascript:S2068
+      - typescript:S2245
+      - javascript:S2245
+      - typescript:S2755
+      - javascript:S2755
+      - typescript:S3330
+      - javascript:S3330
+      - typescript:S4502
+      - javascript:S4502
+      - typescript:S4830
+      - javascript:S4830
+      - typescript:S5122
+      - javascript:S5122
+      - typescript:S5332
+      - javascript:S5332
+      - typescript:S5547
+      - javascript:S5547
+      - typescript:S5659
+      - javascript:S5659
+    category: security
+    severity: major
+    reason: Broad secrets, crypto, TLS, CORS, cookie, and JWT checks are maintained security hotspot coverage.
+  - id: test-integrity
+    sonarKeys:
+      - typescript:S1607
+      - javascript:S1607
+      - typescript:S2187
+      - javascript:S2187
+      - typescript:S2699
+      - javascript:S2699
+      - typescript:S2970
+      - javascript:S2970
+      - typescript:S5906
+      - javascript:S5906
+      - typescript:S5914
+      - javascript:S5914
+      - typescript:S5958
+      - javascript:S5958
+      - typescript:S5973
+      - javascript:S5973
+      - typescript:S6426
+      - javascript:S6426
+    category: test-integrity
+    severity: major
+    reason: Generated tests commonly pass without asserting meaningful behavior.
+  - id: accessibility-without-jsx-a11y
+    sonarKeys:
+      - typescript:S1082
+      - javascript:S1082
+      - typescript:S1090
+      - javascript:S1090
+      - typescript:S4084
+      - javascript:S4084
+      - typescript:S6793
+      - javascript:S6793
+      - typescript:S6807
+      - javascript:S6807
+      - typescript:S6821
+      - javascript:S6821
+      - typescript:S6822
+      - javascript:S6822
+      - typescript:S6841
+      - javascript:S6841
+      - typescript:S6844
+      - javascript:S6844
+      - typescript:S6853
+      - javascript:S6853
+    category: accessibility
+    severity: major
+    reason: UI agents routinely omit accessibility, and this repo does not ship local jsx-a11y coverage.
+  - id: typescript-hygiene
+    sonarKeys:
+      - typescript:S4325
+      - typescript:S4335
+      - typescript:S4621
+      - typescript:S4782
+      - typescript:S6564
+      - typescript:S6568
+      - typescript:S6571
+      - typescript:S6590
+    category: type-hygiene
+    severity: major
+    reason: Sonar owns generic TypeScript hygiene; Antidrift should only add repo-specific type authority rules.
+gate:
+  base: Sonar way for AI code
+  purpose: What should block merge.
+  failOn:
+    - metric: new_issues
+      op: gt
+      value: 0
+      reason: AI-assisted changes should not introduce untriaged native Sonar or imported Antidrift issues.
+    - metric: new_security_hotspots_reviewed
+      op: lt
+      value: 100
+      reason: Generated security-sensitive code requires human hotspot review.
+    - metric: new_coverage
+      op: lt
+      value: 80
+      reason: Coverage is gameable but low new-code coverage is still a strong reward-hacking signal.
+    - metric: new_duplicated_lines_density
+      op: gt
+      value: 3
+      reason: Agents over-copy local patterns; duplication must stay low on new code.
+    - metric: new_reliability_issue_severity
+      op: gt
+      value: 9
+      reason: New severe reliability findings should block generated changes.
+    - metric: new_security_issue_severity
+      op: gt
+      value: 9
+      reason: New severe security findings should block generated changes.
+    - metric: new_maintainability_issue_severity
+      op: gt
+      value: 14
+      reason: New high-maintainability findings are the Sonar-owned broad maintainability signal.
+boundary:
+  sonarOwns:
+    - broad complexity
+    - duplication
+    - coverage pressure
+    - generic security findings
+    - generic test integrity
+    - generic accessibility findings
+    - portfolio and PR gate metrics
+  antidriftOwns:
+    - repo-specific contract drift
+    - agent-specific type appeasement
+    - non-independent test oracle shapes not covered by Sonar
+    - generated policy artifact integrity

@@ -1,0 +1,15 @@
+{
+  "categories": {
+    "correctness": "off",
+    "suspicious": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off"
+  },
+  "rules": {
+    "complexity": ["error", { "max": 25, "variant": "modified" }],
+    "max-depth": ["error", 4],
+    "max-params": ["error", { "max": 7 }]
+  }
+}

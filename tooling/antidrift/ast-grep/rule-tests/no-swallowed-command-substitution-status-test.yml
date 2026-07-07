@@ -1,0 +1,47 @@
+id: no-swallowed-command-substitution-status
+valid:
+  - |
+    grep -q foo file || true
+  - |
+    docker rm old-container >/dev/null 2>&1 || true
+  - |
+    kill "$pid" 2>/dev/null || :
+  - |
+    if status="$(curl -sS -o /dev/null -w "%{http_code}" "$url")"; then
+      rc=0
+    else
+      rc=$?
+    fi
+  - |
+    if result="$(auth_post sign-in "$url")"; then
+      rc=0
+    else
+      rc=$?
+    fi
+  - |
+    status="$(cmd true)" || echo "failed"
+  - |
+    status="$(cmd || echo "failed")"
+invalid:
+  - |
+    status="$(curl -sS -o /dev/null -w "%{http_code}" "$url")" || true
+  - |
+    status="$(curl -sS -o /dev/null -w "%{http_code}" "$url" || true)"
+  - |
+    response_code="$(auth_post sign-in "$url")" || true
+  - |
+    response_code="$(auth_post sign-in "$url" || true)"
+  - |
+    body="$(curl --fail-with-body "$url")" || :
+  - |
+    body="$(curl --fail-with-body "$url" || :)"
+  - |
+    result=$(probe_service "$host") || true
+  - |
+    result=$(probe_service "$host" || true)
+  - |
+    value=`legacy_probe "$target"` || true
+  - |
+    local current_ips="$(tailscale ip -4 2>/dev/null)" || true
+  - |
+    export token="$(secret-resolve --service example --account default)" || true
