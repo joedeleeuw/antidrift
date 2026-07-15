@@ -41,14 +41,16 @@ This command is for non-Chaski fallback evidence when the primary corpus has onl
 Routine validation runs every available external corpus and skips if none exist, preserving template portability. For a promotion or slice-completion claim that needs broader evidence, require at least two external repositories:
 
 ```bash
-pnpm exec antidrift external-corpus --slice <slice-name> --min-repositories 2
+pnpm policy:validate-external-corpus:required
 ```
 
 If the claim specifically depends on replicated drift, require drift-bearing repositories instead of only clean/pass repositories:
 
 ```bash
-pnpm exec antidrift external-corpus --slice <slice-name> --min-drift-repositories 2
+pnpm exec antidrift external-corpus --slice <slice-name> --require --min-drift-repositories 2
 ```
+
+The current gate executes ESLint against source files, so executable external evidence must be available as source bytes: a local checkout, an explicit `--repo`, or a future sparse/materialized remote fetch. GitHub URLs, commit refs, and file hashes are useful provenance, but a hash alone cannot produce rule findings or type-aware parser services.
 
 ## Upstream Unsafe Assertion Benchmark
 
@@ -146,6 +148,6 @@ For each iteration:
 3. Add only real paths to `chaski-corpus` or `external-corpus`.
 4. If Chaski has only clean controls, use `external-corpus` for narrowly named fallback repo cases.
 5. For routine readiness, run `pnpm policy:validate-chaski` and, when fallback evidence is used, `pnpm policy:validate-external-corpus`.
-6. For a promotion or slice-completion claim that depends on external breadth, run `pnpm exec antidrift external-corpus --slice <slice-name> --min-repositories 2`.
-7. For a promotion claim that depends on replicated drift, run `pnpm exec antidrift external-corpus --slice <slice-name> --min-drift-repositories 2`.
+6. For a promotion or slice-completion claim that depends on external breadth, run `pnpm policy:validate-external-corpus:required`.
+7. For a promotion claim that depends on replicated drift, run `pnpm exec antidrift external-corpus --slice <slice-name> --require --min-drift-repositories 2`.
 8. Do not call the rule ready or stable from reduced programs or inline fixtures. Keep them only as local regression aids while real source behavior remains the promotion gate.
