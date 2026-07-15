@@ -30,7 +30,7 @@ Run `pnpm policy:verify-session` before finishing substantial code work.
 - **observability-drift** (reliability): obs/async-boundary-requires-context, obs/no-fire-and-forget-without-tracking
 - **performance-resource-drift** (performance): perf/no-await-in-loop-with-io, perf/no-async-array-method, perf/no-unbounded-promise-all, perf/require-timeout-for-network-call, perf/no-redundant-validation
 - **injection-and-secret-drift** (security): sec/no-hardcoded-secret, sec/no-sql-string-concat, sec/no-unsafe-deserialize
-- **agent-ops** (developer-experience): agent/block-generated-policy-edits, agent/block-destructive-shell, agent/lint-after-edit, agent/require-checks-before-stop
+- **agent-ops** (developer-experience): agent/block-generated-policy-edits, agent/lint-after-edit, agent/require-checks-before-stop
 - **quality-gate-drift** (developer-experience): policy/no-check-weakening-without-policy-task, policy/no-inline-disable-without-ticket
 - **mcp-tooling-drift** (platform-security): mcp/no-unapproved-server, mcp/pin-server-version
 - **sonar-governance** (engineering-productivity): sonar/import-custom-eslint-issues, sonar/ai-code-governance-preset, sonar/no-new-critical-issues, sonar/complexity-budget

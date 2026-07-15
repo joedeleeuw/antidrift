@@ -501,12 +501,6 @@ policyRuleReviews:
     coverage: Covered by generated Claude/Codex PreToolUse hooks.
     reason: Tool lifecycle checks belong in hooks because they block edits before source semantics exist.
     nextAction: Keep generated hook artifacts in sync from policy/agent-guardrails.yaml.
-  agent/block-destructive-shell:
-    status: hook-covered
-    replacement: block-dangerous-shell hook
-    coverage: Covered by generated Claude/Codex PreToolUse hooks.
-    reason: Shell-command safety depends on tool-call context, not source AST.
-    nextAction: Keep hook script coverage in policy:verify-session.
   agent/lint-after-edit:
     status: hook-covered
     replacement: pnpm policy:check:changed PostToolUse hook

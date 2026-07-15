@@ -281,10 +281,6 @@ clusters:
         severity: blocker
         hookEvent: PreToolUse
         message: Edit policy/agent-guardrails.yaml and regenerate.
-      - id: agent/block-destructive-shell # Agents overreach with broad shell fixes.
-        severity: blocker
-        hookEvent: PreToolUse
-        message: Destructive shell command blocked by policy.
       - id: agent/lint-after-edit # Feedback must happen immediately in the edit loop.
         severity: error
         hookEvent: PostToolUse

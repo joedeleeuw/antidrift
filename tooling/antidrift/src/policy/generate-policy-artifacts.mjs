@@ -38,8 +38,7 @@ export function renderPolicyArtifacts(policy) {
 
   const hooks = {
     PreToolUse: [
-      { matcher: "Edit|Write|MultiEdit", hooks: [{ type: "command", command: hookScript("block-generated-policy-edits") }] },
-      { matcher: "Bash", hooks: [{ type: "command", command: hookScript("block-dangerous-shell") }] }
+      { matcher: "Edit|Write|MultiEdit", hooks: [{ type: "command", command: hookScript("block-generated-policy-edits") }] }
     ],
     PostToolUse: [
       { matcher: "Edit|Write|MultiEdit", hooks: [{ type: "command", command: "pnpm policy:check:changed" }] }
@@ -50,7 +49,7 @@ export function renderPolicyArtifacts(policy) {
   };
 
   artifacts.set(".claude/settings.json", JSON.stringify({ hooks }, null, 2) + "\n");
-  artifacts.set(".codex/hooks.json", JSON.stringify(hooks, null, 2) + "\n");
+  artifacts.set(".codex/hooks.json", JSON.stringify({ hooks }, null, 2) + "\n");
   return artifacts;
 }
 

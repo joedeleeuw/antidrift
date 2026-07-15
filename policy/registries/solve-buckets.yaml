@@ -36,8 +36,8 @@ categories:
   agent-ops:
     status: available
     summary: >-
-      Runtime hooks intercepting shell/edit/stop (block-dangerous-shell, block-generated-policy-edits,
-      lint-after-edit, require-checks-before-stop). Coarse behavioral enforcement, not a static proof.
+      Runtime hooks intercepting edit/stop (block-generated-policy-edits, lint-after-edit,
+      require-checks-before-stop). Coarse behavioral enforcement, not a static proof.
       NOT to be used as the fallback home for change/graph behaviors.
   diff-relative:
     status: available

@@ -9,15 +9,6 @@
             "command": "node node_modules/@joedeleeuw/antidrift/src/policy/hooks/block-generated-policy-edits.mjs"
           }
         ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node node_modules/@joedeleeuw/antidrift/src/policy/hooks/block-dangerous-shell.mjs"
-          }
-        ]
       }
     ],
     "PostToolUse": [

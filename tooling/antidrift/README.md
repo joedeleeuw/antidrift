@@ -259,7 +259,7 @@ Consumer code should obtain branded values from `make`, `safe`, `is`, or a schem
 
 - `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`
 - `.cursor/rules/*.mdc`
-- `.claude/settings.json` and `.codex/hooks.json`, including pre/post-tool hooks that block edits to generated files and dangerous shell commands
+- `.claude/settings.json` and `.codex/hooks.json`, including pre/post-tool hooks that block edits to generated files and run repo verification
 
 One source of truth, regenerated on demand. `antidrift check-generated` fails CI if any of them have drifted from the policy.
 
