@@ -38,8 +38,20 @@ export { defensiveShapeInventory } from "./defensive-shape-inventory.mjs";
 export { repoCorpus } from "./repo-corpus.mjs";
 export { chaskiCorpus } from "./chaski-corpus.mjs";
 export { externalCorpus } from "./external-corpus.mjs";
+export {
+  defaultAstGrepBinary,
+  defaultAstGrepConfig,
+  parseShellGuardrailsArgs,
+  shellGuardrails,
+} from "./shell-guardrails.mjs";
 export { verifySession } from "./verify-session.mjs";
 export { eslintJsonToSonar } from "./eslint-json-to-sonar.mjs";
+export {
+  oxlintComplexityConfig,
+  oxlintComplexityIgnorePatterns,
+  parseOxlintComplexityArgs,
+  runOxlintComplexity,
+} from "./oxlint-complexity.mjs";
 export { unsafeTypeAssertionBenchmark } from "./unsafe-type-assertion-benchmark.mjs";
 export {
   classifySqlParserServiceDelta,

@@ -7,7 +7,10 @@ import {
   sourceShardProof,
 } from "./react-state-graph.js";
 import ruleNoCallingComponentsAsFunctions from "./rules/no-calling-components-as-functions.js";
+import ruleNoDuplicatedConditionalClassnames from "./rules/no-duplicated-conditional-classnames.js";
+import ruleNoNonindependentTestOracle from "./rules/no-nonindependent-test-oracle.js";
 import ruleNoQueryDataTypeParameters from "./rules/no-query-data-type-parameters.js";
+import ruleNoSilentEmptyDetectionFallback from "./rules/no-silent-empty-detection-fallback.js";
 import {
   emitSemanticFact,
   semanticFactSink,
@@ -22,9 +25,7 @@ import {
   markReturnedPendingMaps,
   queuePendingAsyncMap,
 } from "../semantic-adapters/async-control-flow.mjs";
-import {
-  createAuthBoundaryTracker,
-} from "../semantic-adapters/auth-boundary.mjs";
+import { createAuthBoundaryTracker } from "../semantic-adapters/auth-boundary.mjs";
 import {
   checkedTargetProperties,
   countShapeProbesIn,
@@ -75,6 +76,9 @@ import {
 } from "../semantic-adapters/type-owner.mjs";
 
 const reactEffectHooks = new Set(["useEffect", "useLayoutEffect"]);
+const reactComponentFactoryWrappers = new Set(["forwardRef", "memo"]);
+const reactComponentTypeNames = new Set(["FC", "FunctionComponent"]);
+const DEFAULT_REACT_COMPONENT_PROPS_MAX = 12;
 const collectionMetadataMemberNames = new Set(["length", "size"]);
 const exportedLocalNamesByProgram = new WeakMap();
 const structuralDerivationUtilities = new Set([
@@ -156,11 +160,17 @@ function exportedLocalNames(program) {
   if (cached) return cached;
   const names = new Set();
   for (const statement of program?.body ?? []) {
-    if (statement.type !== "ExportNamedDeclaration") continue;
-    for (const specifier of statement.specifiers ?? []) {
-      if (specifier.local?.type === "Identifier") {
-        names.add(specifier.local.name);
+    if (statement.type === "ExportNamedDeclaration") {
+      for (const specifier of statement.specifiers ?? []) {
+        if (specifier.local?.type === "Identifier") {
+          names.add(specifier.local.name);
+        }
       }
+    } else if (
+      statement.type === "ExportDefaultDeclaration" &&
+      statement.declaration?.type === "Identifier"
+    ) {
+      names.add(statement.declaration.name);
     }
   }
   exportedLocalNamesByProgram.set(program, names);
@@ -391,86 +401,13 @@ function unwrapExpression(expression) {
   return expression;
 }
 
-function isMemberExpression(expression) {
-  const unwrapped = unwrapExpression(expression);
-  return unwrapped?.type === "MemberExpression";
-}
-
-function isSingleReturnMemberExpression(fn) {
-  if (!fn?.body) return false;
-  if (isMemberExpression(fn.body)) return true;
-  if (fn.body.type !== "BlockStatement") return false;
-  const statements = fn.body.body;
-  return (
-    statements.length === 1 &&
-    statements[0]?.type === "ReturnStatement" &&
-    isMemberExpression(statements[0].argument)
-  );
-}
-
-function returnedExpression(fn) {
-  if (!fn?.body) return null;
-  if (fn.body.type !== "BlockStatement") return unwrapExpression(fn.body);
-  const statements = fn.body.body;
-  if (statements.length !== 1 || statements[0]?.type !== "ReturnStatement") {
-    return null;
-  }
-  return unwrapExpression(statements[0].argument);
-}
-
-function parameterName(param) {
-  if (param?.type === "Identifier") return param.name;
-  if (
-    param?.type === "AssignmentPattern" &&
-    param.left?.type === "Identifier"
-  ) {
-    return param.left.name;
-  }
-  if (param?.type === "RestElement" && param.argument?.type === "Identifier") {
-    return param.argument.name;
-  }
-  return null;
-}
-
 function assignmentTarget(node) {
   return node?.type === "AssignmentPattern" ? node.left : node;
-}
-
-function bindingIdentifierName(node) {
-  const target = assignmentTarget(node);
-  return target?.type === "Identifier" ? target.name : null;
 }
 
 function nestedObjectPattern(node) {
   const target = assignmentTarget(node);
   return target?.type === "ObjectPattern" ? target : null;
-}
-
-function collectObjectPatternBindingNames(pattern, names) {
-  for (const property of pattern.properties ?? []) {
-    const name =
-      property.type === "RestElement"
-        ? bindingIdentifierName(property.argument)
-        : bindingIdentifierName(property.value);
-    if (name) names.add(name);
-    const nested =
-      property.type === "Property" ? nestedObjectPattern(property.value) : null;
-    if (nested) collectObjectPatternBindingNames(nested, names);
-  }
-}
-
-function destructuredParameterBindingNames(fn) {
-  const names = new Set();
-  for (const param of fn.params ?? []) {
-    const pattern = nestedObjectPattern(param);
-    if (pattern) collectObjectPatternBindingNames(pattern, names);
-  }
-  return names;
-}
-
-function returnedIdentifierName(fn) {
-  const expression = returnedExpression(fn);
-  return expression?.type === "Identifier" ? expression.name : null;
 }
 
 function memberExpressionRootName(expression) {
@@ -491,27 +428,639 @@ function terminalMemberName(expression) {
   return unwrapped.property.name;
 }
 
-function returnsMemberOfOwnParameter(fn) {
-  const params = new Set(fn.params.map(parameterName).filter(Boolean));
-  const expression = returnedExpression(fn);
-  if (expression?.type !== "MemberExpression") return false;
-  const terminalName = terminalMemberName(expression);
+function typeNameText(typeName) {
+  if (typeName?.type === "Identifier") return typeName.name;
+  if (typeName?.type === "TSQualifiedName") {
+    return typeNameText(typeName.left) ?? typeName.right?.name ?? null;
+  }
+  return null;
+}
+
+function collectTypeOwnerNames(typeNode, names = new Set()) {
+  if (!typeNode) return names;
+  if (typeNode.type === "TSTypeReference") {
+    const name = typeNameText(typeNode.typeName);
+    if (name) names.add(name);
+    return names;
+  }
+  if (typeNode.type === "TSIndexedAccessType") {
+    collectTypeOwnerNames(typeNode.objectType, names);
+    return names;
+  }
+  if (
+    typeNode.type === "TSUnionType" ||
+    typeNode.type === "TSIntersectionType"
+  ) {
+    for (const part of typeNode.types ?? []) collectTypeOwnerNames(part, names);
+    return names;
+  }
+  if (typeNode.type === "TSArrayType") {
+    collectTypeOwnerNames(typeNode.elementType, names);
+    return names;
+  }
+  if (typeNode.type === "TSTypeOperator") {
+    collectTypeOwnerNames(typeNode.typeAnnotation, names);
+    return names;
+  }
+  if (typeNode.type === "TSParenthesizedType") {
+    collectTypeOwnerNames(typeNode.typeAnnotation, names);
+  }
+  return names;
+}
+
+function parameterTypeNode(param) {
+  const target = assignmentTarget(param);
+  return (
+    target?.typeAnnotation?.typeAnnotation ??
+    param?.typeAnnotation?.typeAnnotation ??
+    null
+  );
+}
+
+function tsTypeForNode(node, services, checker) {
+  const tsNode = node && services.esTreeNodeToTSNodeMap.get(node);
+  return tsNode ? checker.getTypeAtLocation(tsNode) : null;
+}
+
+function tsTypeFromTypeNode(typeNode, services, checker) {
+  const tsNode = typeNode && services.esTreeNodeToTSNodeMap.get(typeNode);
+  return tsNode && ts.isTypeNode(tsNode)
+    ? checker.getTypeFromTypeNode(tsNode)
+    : null;
+}
+
+function literalKey(value) {
+  return `${typeof value}:${String(value)}`;
+}
+
+function expressionLiteralKey(expression) {
+  const unwrapped = unwrapExpression(expression);
+  if (unwrapped?.type === "Literal") return literalKey(unwrapped.value);
+  if (
+    unwrapped?.type === "TemplateLiteral" &&
+    unwrapped.expressions.length === 0
+  ) {
+    return literalKey(unwrapped.quasis[0]?.value?.cooked ?? "");
+  }
+  return null;
+}
+
+function typeLiteralKeys(type, out = new Set()) {
+  if (!type) return out;
+  if (type.isUnion?.()) {
+    for (const part of type.types) typeLiteralKeys(part, out);
+    return out;
+  }
+  if (type.isStringLiteral?.()) {
+    out.add(literalKey(type.value));
+    return out;
+  }
+  if (type.isNumberLiteral?.()) {
+    out.add(literalKey(type.value));
+    return out;
+  }
+  const intrinsic = type.intrinsicName;
+  if (intrinsic === "true") out.add(literalKey(true));
+  if (intrinsic === "false") out.add(literalKey(false));
+  return out;
+}
+
+function collectObjectPatternBindings(
+  pattern,
+  bindings,
+  ownerNames,
+  services,
+  checker,
+) {
+  for (const property of pattern.properties ?? []) {
+    if (property.type === "RestElement") {
+      const target = assignmentTarget(property.argument);
+      if (target?.type === "Identifier") {
+        bindings.set(target.name, {
+          kind: "destructured",
+          type: tsTypeForNode(target, services, checker),
+          ownerNames,
+        });
+      }
+      continue;
+    }
+    const value = assignmentTarget(property.value);
+    if (value?.type === "Identifier") {
+      bindings.set(value.name, {
+        kind: "destructured",
+        type: tsTypeForNode(value, services, checker),
+        ownerNames,
+      });
+      continue;
+    }
+    const nested = nestedObjectPattern(property.value);
+    if (nested) {
+      collectObjectPatternBindings(
+        nested,
+        bindings,
+        ownerNames,
+        services,
+        checker,
+      );
+    }
+  }
+}
+
+function sourceBindingsForFunction(fn, services, checker) {
+  const bindings = new Map();
+  for (const param of fn.params ?? []) {
+    const target = assignmentTarget(param);
+    const ownerNames = collectTypeOwnerNames(parameterTypeNode(param));
+    if (target?.type === "Identifier") {
+      bindings.set(target.name, {
+        kind: "identity",
+        type: tsTypeForNode(target, services, checker),
+        ownerNames,
+      });
+      continue;
+    }
+    const pattern = nestedObjectPattern(param);
+    if (pattern) {
+      collectObjectPatternBindings(
+        pattern,
+        bindings,
+        ownerNames,
+        services,
+        checker,
+      );
+    }
+  }
+  return bindings;
+}
+
+function returnTypeForFunction(fn, services, checker) {
+  return tsTypeFromTypeNode(fn.returnType?.typeAnnotation, services, checker);
+}
+
+function returnOwnerNames(fn) {
+  return collectTypeOwnerNames(fn.returnType?.typeAnnotation);
+}
+
+function ownerNamesForBindings(bindings) {
+  const names = new Set();
+  for (const binding of bindings.values()) {
+    for (const name of binding.ownerNames ?? []) names.add(name);
+  }
+  return names;
+}
+
+function disjointNonemptySets(left, right) {
+  if (left.size === 0 || right.size === 0) return false;
+  for (const item of left) if (right.has(item)) return false;
+  return true;
+}
+
+function isUndefinedFallback(expression) {
+  const unwrapped = unwrapExpression(expression);
+  return (
+    !unwrapped ||
+    (unwrapped.type === "Identifier" && unwrapped.name === "undefined") ||
+    (unwrapped.type === "UnaryExpression" && unwrapped.operator === "void")
+  );
+}
+
+function projectionSourceForExpression(
+  expression,
+  bindings,
+  services,
+  checker,
+) {
+  const unwrapped = unwrapExpression(expression);
+  if (unwrapped?.type === "Identifier") {
+    const binding = bindings.get(unwrapped.name);
+    if (!binding) return null;
+    return {
+      kind: binding.kind,
+      type: tsTypeForNode(unwrapped, services, checker),
+    };
+  }
+  if (unwrapped?.type !== "MemberExpression") return null;
+  const terminalName = terminalMemberName(unwrapped);
   if (terminalName && collectionMetadataMemberNames.has(terminalName)) {
+    return null;
+  }
+  const rootName = memberExpressionRootName(unwrapped);
+  if (!rootName || !bindings.has(rootName)) return null;
+  return {
+    kind: "member",
+    type: tsTypeForNode(unwrapped, services, checker),
+  };
+}
+
+function sourceConstraintFromExpression(
+  expression,
+  bindings,
+  sourceCode,
+  services,
+  checker,
+) {
+  const source = projectionSourceForExpression(
+    expression,
+    bindings,
+    services,
+    checker,
+  );
+  if (!source) return null;
+  const typeKeys = typeLiteralKeys(source.type);
+  return {
+    key: sourceCode.getText(unwrapExpression(expression)),
+    typeKeys,
+  };
+}
+
+function equalityConstraints(test, bindings, sourceCode, services, checker) {
+  const unwrapped = unwrapExpression(test);
+  if (unwrapped?.type === "LogicalExpression" && unwrapped.operator === "||") {
+    return [
+      ...equalityConstraints(
+        unwrapped.left,
+        bindings,
+        sourceCode,
+        services,
+        checker,
+      ),
+      ...equalityConstraints(
+        unwrapped.right,
+        bindings,
+        sourceCode,
+        services,
+        checker,
+      ),
+    ];
+  }
+  if (
+    unwrapped?.type !== "BinaryExpression" ||
+    (unwrapped.operator !== "===" && unwrapped.operator !== "==")
+  ) {
+    return [];
+  }
+  const leftLiteral = expressionLiteralKey(unwrapped.left);
+  const rightLiteral = expressionLiteralKey(unwrapped.right);
+  const sourceExpression = leftLiteral ? unwrapped.right : unwrapped.left;
+  const literal = leftLiteral ?? rightLiteral;
+  if (!literal) return [];
+  const constraint = sourceConstraintFromExpression(
+    sourceExpression,
+    bindings,
+    sourceCode,
+    services,
+    checker,
+  );
+  if (!constraint || !constraint.typeKeys.has(literal)) return [];
+  return [{ key: constraint.key, literal }];
+}
+
+function addConstraint(constraints, constraint) {
+  if (!constraint) return constraints;
+  const next = new Map(constraints);
+  const values = new Set(next.get(constraint.key));
+  values.add(constraint.literal);
+  next.set(constraint.key, values);
+  return next;
+}
+
+function matchingLiteralProjection(literal, constraints) {
+  for (const values of constraints.values()) {
+    if (values.size === 1 && values.has(literal)) return true;
+  }
+  return false;
+}
+
+function sameType(checker, left, right) {
+  return Boolean(
+    left &&
+    right &&
+    checker.isTypeAssignableTo(left, right) &&
+    checker.isTypeAssignableTo(right, left),
+  );
+}
+
+function sameTypeIgnoringNullish(checker, left, right) {
+  return sameType(
+    checker,
+    left && checker.getNonNullableType(left),
+    right && checker.getNonNullableType(right),
+  );
+}
+
+function collectExpressionWithTestConstraints(
+  expression,
+  test,
+  constraints,
+  context,
+) {
+  const { records, bindings, sourceCode, services, checker } = context;
+  const nextConstraints = equalityConstraints(
+    test,
+    bindings,
+    sourceCode,
+    services,
+    checker,
+  );
+  const branches =
+    nextConstraints.length === 0
+      ? [constraints]
+      : nextConstraints.map((constraint) =>
+          addConstraint(constraints, constraint),
+        );
+  for (const branchConstraints of branches) {
+    collectReturnRecordsFromExpression(
+      expression,
+      branchConstraints,
+      records,
+      bindings,
+      sourceCode,
+      services,
+      checker,
+    );
+  }
+}
+
+function collectReturnRecordsFromExpression(
+  expression,
+  constraints,
+  records,
+  bindings,
+  sourceCode,
+  services,
+  checker,
+) {
+  const unwrapped = unwrapExpression(expression);
+  if (unwrapped?.type === "ConditionalExpression") {
+    collectExpressionWithTestConstraints(
+      unwrapped.consequent,
+      unwrapped.test,
+      constraints,
+      { records, bindings, sourceCode, services, checker },
+    );
+    collectReturnRecordsFromExpression(
+      unwrapped.alternate,
+      constraints,
+      records,
+      bindings,
+      sourceCode,
+      services,
+      checker,
+    );
+    return;
+  }
+  if (isUndefinedFallback(unwrapped)) {
+    records.push({ kind: "fallback" });
+    return;
+  }
+  const source = projectionSourceForExpression(
+    unwrapped,
+    bindings,
+    services,
+    checker,
+  );
+  if (source) {
+    records.push(source);
+    return;
+  }
+  const literal = expressionLiteralKey(unwrapped);
+  if (literal && matchingLiteralProjection(literal, constraints)) {
+    records.push({
+      kind: "literal",
+      type: tsTypeForNode(unwrapped, services, checker),
+    });
+    return;
+  }
+  records.push({ kind: "unsupported" });
+}
+
+function collectReturnRecordsFromStatements(
+  statements,
+  constraints,
+  records,
+  bindings,
+  sourceCode,
+  services,
+  checker,
+) {
+  for (const child of statements ?? []) {
+    collectReturnRecordsFromStatement(
+      child,
+      constraints,
+      records,
+      bindings,
+      sourceCode,
+      services,
+      checker,
+    );
+  }
+}
+
+function collectStatementWithTestConstraints(
+  statement,
+  test,
+  constraints,
+  context,
+) {
+  const { records, bindings, sourceCode, services, checker } = context;
+  const nextConstraints = equalityConstraints(
+    test,
+    bindings,
+    sourceCode,
+    services,
+    checker,
+  );
+  const branches =
+    nextConstraints.length === 0
+      ? [constraints]
+      : nextConstraints.map((constraint) =>
+          addConstraint(constraints, constraint),
+        );
+  for (const branchConstraints of branches) {
+    collectReturnRecordsFromStatement(
+      statement,
+      branchConstraints,
+      records,
+      bindings,
+      sourceCode,
+      services,
+      checker,
+    );
+  }
+}
+
+function collectSwitchReturnRecords(
+  statement,
+  constraints,
+  records,
+  bindings,
+  sourceCode,
+  services,
+  checker,
+) {
+  const discriminant = sourceConstraintFromExpression(
+    statement.discriminant,
+    bindings,
+    sourceCode,
+    services,
+    checker,
+  );
+  for (const switchCase of statement.cases ?? []) {
+    const literal = expressionLiteralKey(switchCase.test);
+    const nextConstraints =
+      discriminant && literal && discriminant.typeKeys.has(literal)
+        ? addConstraint(constraints, { key: discriminant.key, literal })
+        : constraints;
+    collectReturnRecordsFromStatements(
+      switchCase.consequent,
+      nextConstraints,
+      records,
+      bindings,
+      sourceCode,
+      services,
+      checker,
+    );
+  }
+}
+
+function collectReturnRecordsFromStatement(
+  statement,
+  constraints,
+  records,
+  bindings,
+  sourceCode,
+  services,
+  checker,
+) {
+  switch (statement.type) {
+    case "ReturnStatement":
+      collectReturnRecordsFromExpression(
+        statement.argument,
+        constraints,
+        records,
+        bindings,
+        sourceCode,
+        services,
+        checker,
+      );
+      return;
+    case "BlockStatement":
+      collectReturnRecordsFromStatements(
+        statement.body,
+        constraints,
+        records,
+        bindings,
+        sourceCode,
+        services,
+        checker,
+      );
+      return;
+    case "IfStatement":
+      collectStatementWithTestConstraints(
+        statement.consequent,
+        statement.test,
+        constraints,
+        { records, bindings, sourceCode, services, checker },
+      );
+      if (statement.alternate) {
+        collectReturnRecordsFromStatement(
+          statement.alternate,
+          constraints,
+          records,
+          bindings,
+          sourceCode,
+          services,
+          checker,
+        );
+      }
+      return;
+    case "SwitchStatement":
+      collectSwitchReturnRecords(
+        statement,
+        constraints,
+        records,
+        bindings,
+        sourceCode,
+        services,
+        checker,
+      );
+      return;
+    default:
+      records.push({ kind: "unsupported" });
+  }
+}
+
+function containsCallOrNew(node) {
+  if (!node || typeof node !== "object") return false;
+  if (node.type === "CallExpression" || node.type === "NewExpression") {
+    return true;
+  }
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "parent") continue;
+    if (Array.isArray(value)) {
+      if (value.some((child) => containsCallOrNew(child))) return true;
+      continue;
+    }
+    if (containsCallOrNew(value)) return true;
+  }
+  return false;
+}
+
+function returnProjectionRecords(fn, bindings, sourceCode, services, checker) {
+  const records = [];
+  if (fn.body?.type === "BlockStatement") {
+    for (const statement of fn.body.body) {
+      collectReturnRecordsFromStatement(
+        statement,
+        new Map(),
+        records,
+        bindings,
+        sourceCode,
+        services,
+        checker,
+      );
+    }
+  } else {
+    collectReturnRecordsFromExpression(
+      fn.body,
+      new Map(),
+      records,
+      bindings,
+      sourceCode,
+      services,
+      checker,
+    );
+  }
+  return records;
+}
+
+function contractProjectionProof(fn, sourceCode, services, checker) {
+  if (containsCallOrNew(fn.body)) return false;
+  const returnType = returnTypeForFunction(fn, services, checker);
+  if (!returnType) return false;
+  const bindings = sourceBindingsForFunction(fn, services, checker);
+  if (bindings.size === 0) return false;
+  const records = returnProjectionRecords(
+    fn,
+    bindings,
+    sourceCode,
+    services,
+    checker,
+  );
+  const meaningful = records.filter((record) => record.kind !== "fallback");
+  if (meaningful.length === 0) return false;
+  if (
+    meaningful.some((record) => record.kind === "unsupported" || !record.type)
+  ) {
     return false;
   }
-  const rootName = memberExpressionRootName(expression);
-  return Boolean(rootName && params.has(rootName));
-}
-
-function returnsDestructuredOwnParameterBinding(fn) {
-  const name = returnedIdentifierName(fn);
-  return Boolean(name && destructuredParameterBindingNames(fn).has(name));
-}
-
-function isTrivialSelectorWrapper(fn) {
-  return (
-    (isSingleReturnMemberExpression(fn) && returnsMemberOfOwnParameter(fn)) ||
-    returnsDestructuredOwnParameterBinding(fn)
+  const sourceOwners = ownerNamesForBindings(bindings);
+  const targetOwners = returnOwnerNames(fn);
+  if (disjointNonemptySets(sourceOwners, targetOwners)) return true;
+  return meaningful.every(
+    (record) =>
+      record.kind !== "identity" &&
+      sameTypeIgnoringNullish(checker, record.type, returnType),
   );
 }
 
@@ -557,7 +1106,7 @@ function returnsJsxExpression(statement, jsxLocals) {
   if (containsJsxNode(statement.argument)) return true;
   return Boolean(
     statement.argument?.type === "Identifier" &&
-      jsxLocals.has(statement.argument.name),
+    jsxLocals.has(statement.argument.name),
   );
 }
 
@@ -573,6 +1122,214 @@ function blockReturnsJsx(body) {
 function functionReturnsJsx(fn) {
   if (fn?.body?.type !== "BlockStatement") return containsJsxNode(fn?.body);
   return blockReturnsJsx(fn.body);
+}
+
+function staticPropertyName(node) {
+  if (!node) return "";
+  if (node.type === "Identifier" || node.type === "PrivateIdentifier") {
+    return node.name;
+  }
+  if (node.type === "Literal" && typeof node.value === "string") {
+    return node.value;
+  }
+  return "";
+}
+
+function callExpressionName(node) {
+  if (node?.type === "Identifier") return node.name;
+  if (node?.type !== "MemberExpression" || node.computed) return "";
+  return staticPropertyName(node.property);
+}
+
+function unwrapReactComponentFunction(node) {
+  let current = node;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (isFunctionLike(current)) return current;
+    if (current?.type !== "CallExpression") return null;
+    const name = callExpressionName(current.callee);
+    if (!reactComponentFactoryWrappers.has(name)) return null;
+    current = current.arguments[0];
+  }
+  return isFunctionLike(current) ? current : null;
+}
+
+function componentFunctionForNode(node) {
+  if (isFunctionLike(node)) return node;
+  if (node.type === "VariableDeclarator") {
+    return unwrapReactComponentFunction(node.init);
+  }
+  if (memberNodeTypes.has(node.type)) {
+    return unwrapReactComponentFunction(node.value);
+  }
+  return null;
+}
+
+function implementationParam(node) {
+  let current = node;
+  while (current?.type === "AssignmentPattern") current = current.left;
+  return current;
+}
+
+function objectPatternPropCount(node) {
+  if (node?.type !== "ObjectPattern") return 0;
+  return node.properties.filter((prop) => prop.type === "Property").length;
+}
+
+function sourceFileIsExternal(fileName) {
+  const normalized = fileName.replace(/\\/gu, "/");
+  return (
+    normalized.includes("/node_modules/") ||
+    normalized.includes("/node_modules/typescript/lib/")
+  );
+}
+
+function symbolHasProjectDeclaration(sym) {
+  const name = sym?.getName?.() ?? sym?.name ?? "";
+  if (!name || name.startsWith("__")) return false;
+  const declarations = sym.getDeclarations?.() ?? sym.declarations ?? [];
+  return declarations.some((declaration) => {
+    const fileName = declaration.getSourceFile?.()?.fileName;
+    return Boolean(fileName && !sourceFileIsExternal(fileName));
+  });
+}
+
+function localPropNamesForType(checker, type) {
+  if (!type) return new Set();
+  if (typeof type.isUnion === "function" && type.isUnion()) {
+    const largest = type.types
+      .map((part) => localPropNamesForType(checker, part))
+      .sort((left, right) => right.size - left.size)[0];
+    return largest ?? new Set();
+  }
+  const apparent = checker.getApparentType(type);
+  const names = new Set();
+  for (const sym of checker.getPropertiesOfType(apparent)) {
+    if (symbolHasProjectDeclaration(sym)) names.add(sym.getName());
+  }
+  return names;
+}
+
+function typedPropCountForParam(param, services, checker) {
+  const tsNode = services.esTreeNodeToTSNodeMap.get(param);
+  if (!tsNode) return 0;
+  return localPropNamesForType(checker, checker.getTypeAtLocation(tsNode)).size;
+}
+
+function typeNameParts(node) {
+  if (node?.type === "Identifier") return [node.name];
+  if (node?.type === "TSQualifiedName") {
+    return [...typeNameParts(node.left), node.right.name];
+  }
+  return [];
+}
+
+function reactComponentPropsTypeArgument(node) {
+  if (node?.type !== "TSTypeReference") return null;
+  const parts = typeNameParts(node.typeName);
+  const name = parts.at(-1);
+  if (!reactComponentTypeNames.has(name)) return null;
+  if (parts.length > 1 && parts[0] !== "React") return null;
+  return node.typeArguments?.params?.[0] ?? null;
+}
+
+function typedPropCountForReactTypeAnnotation(node, services, checker) {
+  const typeAnnotation = node.id?.typeAnnotation?.typeAnnotation;
+  const propsTypeNode = reactComponentPropsTypeArgument(typeAnnotation);
+  if (!propsTypeNode) return 0;
+  const tsNode = services.esTreeNodeToTSNodeMap.get(propsTypeNode);
+  if (!tsNode) return 0;
+  return localPropNamesForType(checker, checker.getTypeAtLocation(tsNode)).size;
+}
+
+function typedPropCountForCallableNode(node, services, checker) {
+  if (node.type !== "VariableDeclarator" || node.id?.type !== "Identifier") {
+    return 0;
+  }
+  const annotationCount = typedPropCountForReactTypeAnnotation(
+    node,
+    services,
+    checker,
+  );
+  if (annotationCount > 0) return annotationCount;
+  const tsNode = services.esTreeNodeToTSNodeMap.get(node.id);
+  if (!tsNode) return 0;
+  const type = checker.getTypeAtLocation(tsNode);
+  const [signature] = checker.getSignaturesOfType(type, ts.SignatureKind.Call);
+  const [param] = signature?.parameters ?? [];
+  if (!param) return 0;
+  const paramType = checker.getTypeOfSymbolAtLocation(param, tsNode);
+  return localPropNamesForType(checker, paramType).size;
+}
+
+function propSpreadNamesForParam(param) {
+  const names = new Set();
+  if (param?.type === "Identifier") {
+    names.add(param.name);
+    return names;
+  }
+  if (param?.type !== "ObjectPattern") return names;
+  for (const prop of param.properties) {
+    if (prop.type !== "RestElement") continue;
+    const argument = implementationParam(prop.argument);
+    if (argument?.type === "Identifier") names.add(argument.name);
+  }
+  return names;
+}
+
+function containsJsxSpreadOf(node, names) {
+  if (!node || typeof node !== "object" || names.size === 0) return false;
+  if (
+    node.type === "JSXSpreadAttribute" &&
+    node.argument?.type === "Identifier"
+  ) {
+    return names.has(node.argument.name);
+  }
+  if (isFunctionLike(node)) return false;
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "parent") continue;
+    if (
+      Array.isArray(value) &&
+      value.some((item) => containsJsxSpreadOf(item, names))
+    ) {
+      return true;
+    }
+    if (value?.type && containsJsxSpreadOf(value, names)) return true;
+  }
+  return false;
+}
+
+function forwardsPropsAsSpread(fn, param, max) {
+  const names = propSpreadNamesForParam(param);
+  if (!containsJsxSpreadOf(fn.body, names)) return false;
+  if (param?.type !== "ObjectPattern") return true;
+  return objectPatternPropCount(param) <= max;
+}
+
+function componentAcceptedPropCount(param, services, checker) {
+  const implementation = implementationParam(param);
+  return Math.max(
+    objectPatternPropCount(implementation),
+    typedPropCountForParam(implementation, services, checker),
+  );
+}
+
+function reportLargeComponentProps(node, context, services, checker, max) {
+  const fn = componentFunctionForNode(node);
+  if (!fn || !functionReturnsJsx(fn)) return;
+  const param = fn.params[0];
+  if (!param) return;
+  const implementation = implementationParam(param);
+  const count = Math.max(
+    componentAcceptedPropCount(implementation, services, checker),
+    typedPropCountForCallableNode(node, services, checker),
+  );
+  if (count <= max || forwardsPropsAsSpread(fn, implementation, max)) return;
+  context.report({
+    node: implementation,
+    message:
+      "React component accepts too many locally-owned props ({{count}} > {{max}}). Split cohesive props into an owned object, resource, or smaller component boundary.",
+    data: { count: String(count), max: String(max) },
+  });
 }
 
 function isExportedFunctionBoundary(fn) {
@@ -593,7 +1350,7 @@ function inlineStructuralTypeAtBoundary(node) {
 }
 
 // Visit free functions, arrow consts, and class methods/fields uniformly — agents hide the same
-// inference-appeasement patterns in any of these forms.
+// contract-appeasement patterns in any of these forms.
 const callableVisitors = (check) => ({
   FunctionDeclaration: check,
   VariableDeclarator: check,
@@ -602,32 +1359,73 @@ const callableVisitors = (check) => ({
   Property: check,
 });
 
-function checkTrivialSelectorWrapper(node, context) {
+function checkContractAppeasementProjection(node, context, services, checker) {
   if (isBoundary(node)) return;
   const fn = getFunctionNode(node);
   if (!fn || !hasExplicitReturnType(fn)) return;
-  if (isTrivialSelectorWrapper(fn)) {
+  if (contractProjectionProof(fn, context.sourceCode, services, checker)) {
     context.report({
       node,
       message:
-        "Do not create a typed selector wrapper that only returns a property of its own parameter. Use inference directly or move the contract to the owned boundary.",
+        "Do not project one owned value contract into another return contract just to satisfy a type. Use the source value directly, or construct/validate the target contract at its owning boundary.",
     });
   }
 }
 
-function ruleNoTrivialSelectorWrapper() {
+function ruleNoContractAppeasementProjection() {
   return {
     meta: {
       type: "problem",
       docs: {
         description:
-          "Disallow typed selector wrappers that only restate property access.",
+          "Disallow internal helpers that project source values into explicit return contracts without construction or validation.",
       },
       schema: [],
     },
     create(context) {
+      const services = requireTypeServices(context);
+      if (!services) {
+        return missingTypeServicesVisitors(
+          context,
+          "no-contract-appeasement-projection",
+        );
+      }
+      const checker = services.program.getTypeChecker();
       return callableVisitors((node) =>
-        checkTrivialSelectorWrapper(node, context),
+        checkContractAppeasementProjection(node, context, services, checker),
+      );
+    },
+  };
+}
+
+function ruleReactMaxComponentProps() {
+  return {
+    meta: {
+      type: "suggestion",
+      docs: {
+        description:
+          "Limit locally-owned props accepted by JSX-returning React components.",
+      },
+      schema: [
+        {
+          type: "object",
+          properties: { max: { type: "number", minimum: 1 } },
+          additionalProperties: false,
+        },
+      ],
+    },
+    create(context) {
+      const services = requireTypeServices(context);
+      if (!services) {
+        return missingTypeServicesVisitors(
+          context,
+          "react-max-component-props",
+        );
+      }
+      const checker = services.program.getTypeChecker();
+      const max = context.options[0]?.max ?? DEFAULT_REACT_COMPONENT_PROPS_MAX;
+      return callableVisitors((node) =>
+        reportLargeComponentProps(node, context, services, checker, max),
       );
     },
   };
@@ -722,7 +1520,9 @@ function ruleNoHandrolledResourceLifecycleCells() {
 }
 
 function isUnshadowedGlobalName(sourceCode, identifier, name) {
-  if (identifier?.type !== "Identifier" || identifier.name !== name) return false;
+  if (identifier?.type !== "Identifier" || identifier.name !== name) {
+    return false;
+  }
   const variable = findVariable(sourceCode, identifier);
   return !variable || variable.defs.length === 0;
 }
@@ -895,7 +1695,8 @@ function ruleNoRawFetchInComponent() {
       function enterFunction(node) {
         stack.push({
           returnsJsx:
-            node.type === "ArrowFunctionExpression" && containsJsxNode(node.body),
+            node.type === "ArrowFunctionExpression" &&
+            containsJsxNode(node.body),
           fetches: [],
           jsxLocals: new Set(),
         });
@@ -1391,32 +2192,28 @@ function isPostgresPlaceholderTemplate(node, indexName) {
   return true;
 }
 
-function isPlaceholderSqlFragmentMapJoin(node) {
-  if (node?.type !== "CallExpression") return false;
-  const join = node.callee;
+function memberCallObject(node, methodName) {
+  if (node?.type !== "CallExpression") return null;
+  const member = node.callee;
   if (
-    join?.type !== "MemberExpression" ||
-    join.computed ||
-    join.property?.type !== "Identifier" ||
-    join.property.name !== "join"
+    member?.type !== "MemberExpression" ||
+    member.computed ||
+    member.property?.type !== "Identifier" ||
+    member.property.name !== methodName
   ) {
-    return false;
+    return null;
   }
+  return member.object;
+}
+
+function isPlaceholderSqlFragmentMapJoin(node) {
+  const mapCall = memberCallObject(node, "join");
+  if (!mapCall) return false;
   const separator = node.arguments[0]
     ? staticStringValue(node.arguments[0])
     : ",";
   if (separator !== " OR " && separator !== " AND ") return false;
-  const mapCall = join.object;
-  if (mapCall?.type !== "CallExpression") return false;
-  const map = mapCall.callee;
-  if (
-    map?.type !== "MemberExpression" ||
-    map.computed ||
-    map.property?.type !== "Identifier" ||
-    map.property.name !== "map"
-  ) {
-    return false;
-  }
+  if (!memberCallObject(mapCall, "map")) return false;
   const callback = mapCall.arguments[0];
   if (
     callback?.type !== "ArrowFunctionExpression" &&
@@ -1430,6 +2227,68 @@ function isPlaceholderSqlFragmentMapJoin(node) {
     singleReturnExpression(callback),
     indexParam.name,
   );
+}
+
+function transparentRawSqlFragmentExpression(node) {
+  if (!node) return null;
+  if (
+    [
+      "TSAsExpression",
+      "TSTypeAssertion",
+      "TSNonNullExpression",
+      "ChainExpression",
+    ].includes(node.type)
+  ) {
+    return node.expression;
+  }
+  if (node.type === "UnaryExpression" || node.type === "AwaitExpression") {
+    return node.argument;
+  }
+  return null;
+}
+
+function unsafeTrustedRawSqlCallChildren(node) {
+  return [
+    node.callee,
+    ...node.arguments.map((argument) =>
+      argument?.type === "SpreadElement" ? argument.argument : argument,
+    ),
+  ];
+}
+
+function unsafeTrustedRawSqlMemberChildren(node) {
+  return node.computed ? [node.object, node.property] : [node.object];
+}
+
+function unsafeTrustedRawSqlPropertyChildren(property) {
+  if (property.type === "SpreadElement") return [property.argument];
+  return property.computed ? [property.key, property.value] : [property.value];
+}
+
+function unsafeTrustedRawSqlChildren(node) {
+  switch (node?.type) {
+    case "ConditionalExpression":
+      return [node.test, node.consequent, node.alternate];
+    case "LogicalExpression":
+    case "BinaryExpression":
+      return [node.left, node.right];
+    case "SequenceExpression":
+      return node.expressions;
+    case "CallExpression":
+      return unsafeTrustedRawSqlCallChildren(node);
+    case "MemberExpression":
+      return unsafeTrustedRawSqlMemberChildren(node);
+    case "ArrayExpression":
+      return node.elements;
+    case "ObjectExpression":
+      return node.properties.flatMap(unsafeTrustedRawSqlPropertyChildren);
+    case "TaggedTemplateExpression":
+      return [node.tag, node.quasi];
+    case "TemplateLiteral":
+      return node.expressions;
+    default:
+      return [];
+  }
 }
 
 function isEmptyArrayExpression(node) {
@@ -2151,89 +3010,22 @@ function ruleNoSqlStringConcat() {
           isTrustedMemberTemplateTag(callee.object)
         );
       }
-      function isUnsafeTrustedRawSqlFragment(node) {
-        if (
-          node?.type === "TSAsExpression" ||
-          node?.type === "TSTypeAssertion" ||
-          node?.type === "TSNonNullExpression" ||
-          node?.type === "ChainExpression"
-        ) {
-          return isUnsafeTrustedRawSqlFragment(node.expression);
-        }
-        if (
+      function isUnsafeTrustedRawSqlBuilderCall(node) {
+        return (
           (isTrustedImportedBuilderMemberCall(node, "raw") ||
             isTrustedMemberBuilderMemberCall(node, "raw")) &&
-          node.arguments.some((argument) => staticStringValue(argument) === null)
-        ) {
-          return true;
-        }
-        if (node?.type === "ConditionalExpression") {
-          return (
-            isUnsafeTrustedRawSqlFragment(node.test) ||
-            isUnsafeTrustedRawSqlFragment(node.consequent) ||
-            isUnsafeTrustedRawSqlFragment(node.alternate)
-          );
-        }
-        if (
-          node?.type === "LogicalExpression" ||
-          node?.type === "BinaryExpression"
-        ) {
-          return (
-            isUnsafeTrustedRawSqlFragment(node.left) ||
-            isUnsafeTrustedRawSqlFragment(node.right)
-          );
-        }
-        if (node?.type === "SequenceExpression") {
-          return node.expressions.some(isUnsafeTrustedRawSqlFragment);
-        }
-        if (
-          node?.type === "UnaryExpression" ||
-          node?.type === "AwaitExpression"
-        ) {
-          return isUnsafeTrustedRawSqlFragment(node.argument);
-        }
-        if (node?.type === "CallExpression") {
-          return (
-            isUnsafeTrustedRawSqlFragment(node.callee) ||
-            node.arguments.some((argument) => {
-              if (argument?.type === "SpreadElement") {
-                return isUnsafeTrustedRawSqlFragment(argument.argument);
-              }
-              return isUnsafeTrustedRawSqlFragment(argument);
-            })
-          );
-        }
-        if (node?.type === "MemberExpression") {
-          return (
-            isUnsafeTrustedRawSqlFragment(node.object) ||
-            (node.computed && isUnsafeTrustedRawSqlFragment(node.property))
-          );
-        }
-        if (node?.type === "ArrayExpression") {
-          return node.elements.some(isUnsafeTrustedRawSqlFragment);
-        }
-        if (node?.type === "ObjectExpression") {
-          return node.properties.some((property) => {
-            if (property.type === "SpreadElement") {
-              return isUnsafeTrustedRawSqlFragment(property.argument);
-            }
-            return (
-              (property.computed &&
-                isUnsafeTrustedRawSqlFragment(property.key)) ||
-              isUnsafeTrustedRawSqlFragment(property.value)
-            );
-          });
-        }
-        if (node?.type === "TaggedTemplateExpression") {
-          return (
-            isUnsafeTrustedRawSqlFragment(node.tag) ||
-            isUnsafeTrustedRawSqlFragment(node.quasi)
-          );
-        }
-        if (node?.type === "TemplateLiteral") {
-          return node.expressions.some(isUnsafeTrustedRawSqlFragment);
-        }
-        return false;
+          node.arguments.some(
+            (argument) => staticStringValue(argument) === null,
+          )
+        );
+      }
+      function isUnsafeTrustedRawSqlFragment(node) {
+        const transparent = transparentRawSqlFragmentExpression(node);
+        if (transparent) return isUnsafeTrustedRawSqlFragment(transparent);
+        if (isUnsafeTrustedRawSqlBuilderCall(node)) return true;
+        return unsafeTrustedRawSqlChildren(node).some(
+          isUnsafeTrustedRawSqlFragment,
+        );
       }
       function reportUnsafeTrustedRawSqlFragments(node) {
         let reported = false;
@@ -3231,13 +4023,18 @@ function ruleNoUndercheckedTypePredicate() {
         if (!isBroadPredicateInputType(checker, paramType)) return;
 
         const targetType = checker.getTypeFromTypeNode(tsTargetTypeNode);
-        if (checker.isArrayType(targetType) || checker.isTupleType(targetType)) {
+        if (
+          checker.isArrayType(targetType) ||
+          checker.isTupleType(targetType)
+        ) {
           return;
         }
         if (!isPredicateObjectContract(targetType)) return;
         const targetProps = requiredTypeProps(checker, targetType);
         if (targetProps.size === 0) return;
-        if (hasValidatorDelegation(fn.body, parts.paramName, services, checker)) {
+        if (
+          hasValidatorDelegation(fn.body, parts.paramName, services, checker)
+        ) {
           return;
         }
 
@@ -3447,14 +4244,16 @@ function ruleNoRedundantZodParse() {
 }
 
 const rules = {
-  "no-trivial-selector-wrapper": ruleNoTrivialSelectorWrapper(),
+  "react-max-component-props": ruleReactMaxComponentProps(),
+  "no-contract-appeasement-projection": ruleNoContractAppeasementProjection(),
   "no-inline-structural-type-at-use-site":
     ruleNoInlineStructuralTypeAtUseSite(),
   "no-appeasement-cast": ruleNoAppeasementCast(),
   "no-nullable-positional-tuple": ruleNoNullablePositionalTuple(),
   "no-underchecked-type-predicate": ruleNoUndercheckedTypePredicate(),
   "no-defensive-shape-probing": ruleNoDefensiveShapeProbing(),
-  "no-handrolled-resource-lifecycle-cells": ruleNoHandrolledResourceLifecycleCells(),
+  "no-handrolled-resource-lifecycle-cells":
+    ruleNoHandrolledResourceLifecycleCells(),
   "no-shattered-ingested-entity-state": ruleNoShatteredIngestedEntityState(),
   "require-effect-deps": ruleRequireEffectDeps(),
   "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
@@ -3467,7 +4266,11 @@ const rules = {
   "no-redundant-zod-parse": ruleNoRedundantZodParse(),
   "no-status-literal-in-type": ruleNoStatusLiteralInType(),
   "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
+  "no-duplicated-conditional-classnames":
+    ruleNoDuplicatedConditionalClassnames(),
+  "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
   "no-query-data-type-parameters": ruleNoQueryDataTypeParameters(),
+  "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
 };
 
 export default {

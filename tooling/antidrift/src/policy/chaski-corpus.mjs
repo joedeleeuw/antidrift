@@ -129,6 +129,24 @@ export const defaultCases = [
     paths: ["src/frontend/monolithui/src/lib/crowdiesApi.ts"],
   },
   {
+    id: "monolith-mobile-flight-tracker-large-prop-api",
+    ruleId: "antidrift/react-max-component-props",
+    kind: "drift",
+    classification: "ready",
+    subproject: "frontend",
+    typeAware: true,
+    tsconfig: "src/frontend/monolithui/tsconfig.json",
+    paths: [
+      "src/frontend/monolithui/src/components/FlightTrackerMap/MobileFlightTrackerMap.tsx",
+    ],
+    expectedFindings: [
+      {
+        path: "src/frontend/monolithui/src/components/FlightTrackerMap/MobileFlightTrackerMap.tsx",
+        line: 415,
+      },
+    ],
+  },
+  {
     id: "portal-impersonation-warning-raw-fetch-effect",
     ruleId: "antidrift/no-raw-fetch-in-component",
     kind: "drift",
@@ -756,10 +774,12 @@ export const defaultCases = [
   },
   {
     id: "portal-agent-table-nested-selector-wrapper",
-    ruleId: "antidrift/no-trivial-selector-wrapper",
+    ruleId: "antidrift/no-contract-appeasement-projection",
     kind: "drift",
     classification: "ready",
     subproject: "frontend",
+    typeAware: true,
+    tsconfig: "src/frontend/portal/tsconfig.json",
     paths: [
       "src/frontend/portal/modules/scenarios/agent-configuration/components/table/use-agent-table-data.ts",
     ],
@@ -772,10 +792,12 @@ export const defaultCases = [
   },
   {
     id: "portal-service-time-nested-selector-wrapper",
-    ruleId: "antidrift/no-trivial-selector-wrapper",
+    ruleId: "antidrift/no-contract-appeasement-projection",
     kind: "drift",
     classification: "ready",
     subproject: "frontend",
+    typeAware: true,
+    tsconfig: "src/frontend/portal/tsconfig.json",
     paths: [
       "src/frontend/portal/modules/scenarios/service-time-influence/components/table/service-time-influence-table.tsx",
     ],
@@ -788,18 +810,21 @@ export const defaultCases = [
   },
   {
     id: "bff-header-helper-selector-clean",
-    ruleId: "antidrift/no-trivial-selector-wrapper",
+    ruleId: "antidrift/no-contract-appeasement-projection",
     kind: "correct",
     classification: "ready",
     subproject: "bff",
+    typeAware: true,
     paths: ["src/frontend/bff/api/services/helpers.ts"],
   },
   {
     id: "portal-account-formatters-selector-clean",
-    ruleId: "antidrift/no-trivial-selector-wrapper",
+    ruleId: "antidrift/no-contract-appeasement-projection",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
+    typeAware: true,
+    tsconfig: "src/frontend/portal/tsconfig.json",
     paths: ["src/frontend/portal/modules/Accounts/formatters.ts"],
   },
   {
@@ -995,7 +1020,8 @@ export function corpusRepoPresence({
   return {
     corpus,
     label: corpusLabel,
-    repoRoot: resolvedCandidates.find((candidate) => existsSync(candidate)) ?? null,
+    repoRoot:
+      resolvedCandidates.find((candidate) => existsSync(candidate)) ?? null,
   };
 }
 

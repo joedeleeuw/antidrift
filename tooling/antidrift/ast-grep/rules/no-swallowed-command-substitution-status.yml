@@ -1,0 +1,66 @@
+id: no-swallowed-command-substitution-status
+language: Bash
+severity: error
+message: Do not discard a command substitution exit status after capturing its output. Preserve the status with an if assignment.
+metadata:
+  antidrift:
+    structuralProofKinds:
+      - list
+      - variable_assignment
+      - declaration_command
+      - command_substitution
+      - command
+      - command_name
+    regexPolicy:
+      allowedNodeKinds:
+        - command_name
+      reason: Regex is limited to the fallback command name; the captured assignment, command substitution, and OR-list are matched structurally.
+rule:
+  any:
+    - all:
+        - kind: list
+        - has:
+            any:
+              - all:
+                  - kind: variable_assignment
+                  - has:
+                      kind: command_substitution
+                      stopBy: end
+              - all:
+                  - kind: declaration_command
+                  - has:
+                      kind: command_substitution
+                      stopBy: end
+            stopBy: end
+        - has:
+            all:
+              - kind: command
+              - has:
+                  kind: command_name
+                  regex: '^(true|:)$'
+                  stopBy: end
+              - not:
+                  inside:
+                    kind: command_substitution
+                    stopBy: end
+            stopBy: end
+    - all:
+        - any:
+            - kind: variable_assignment
+            - kind: declaration_command
+        - has:
+            all:
+              - kind: command_substitution
+              - has:
+                  all:
+                    - kind: list
+                    - has:
+                        all:
+                          - kind: command
+                          - has:
+                              kind: command_name
+                              regex: '^(true|:)$'
+                              stopBy: end
+                        stopBy: end
+                  stopBy: end
+            stopBy: end

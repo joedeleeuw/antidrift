@@ -1,6 +1,6 @@
 # Lint Rule Parity
 
-This ledger tracks the old Oxlint baseline rule-by-rule now that ESLint is the only lint engine. A rule can leave this table only when the replacement is enforced in `tooling/antidrift/src/eslint-config/index.mjs` or the gap is explicitly accepted here.
+This ledger tracks the old broad Oxlint baseline rule-by-rule now that ESLint is the semantic lint engine. A rule can leave this table only when the replacement is enforced in `tooling/antidrift/src/eslint-config/index.mjs` or the gap is explicitly accepted here. The packaged `antidrift oxlint` command is a separate complexity/depth/params gate, not a return to broad Oxlint rule parity.
 
 | Former Oxlint rule                               | ESLint replacement                                                                        | Status                                                               |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |

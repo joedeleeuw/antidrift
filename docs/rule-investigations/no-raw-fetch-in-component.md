@@ -49,7 +49,9 @@ async function downloadQrCode(url: string) {
 }
 
 export function QrActionCard() {
-  return <button onClick={() => void downloadQrCode("/qr.png")}>Download</button>;
+  return (
+    <button onClick={() => void downloadQrCode("/qr.png")}>Download</button>
+  );
 }
 ```
 
@@ -75,7 +77,7 @@ The broader problem space is not "fetch in X"; it is raw transport ownership. A 
 Drift:
 
 - `/Users/sushi/code/chaski/src/frontend/portal/components/ImpersonationWarning.tsx` line 85 exchanges an impersonation code with raw fetch inside a component effect.
-- `/Users/sushi/code/codebase-atlas/src/routes/atlas.city.tsx` lines 50 and 76 fetch generated scene/audio JSON inside route component effects.
+- Historical Codebase Atlas route drift in `src/routes/atlas.city.tsx` was removed upstream; it is no longer part of the live external corpus.
 
 Clean:
 
@@ -89,7 +91,7 @@ Clean:
 Pre-narrowing broad inventory on June 4, 2026:
 
 - Chaski frontend: 1,577 checked files, 2 findings before module-scope helper fetches were removed from the blocking proof.
-- Codebase Atlas `src`: 152 checked files, 2 findings.
+- Codebase Atlas `src`: historical route drift was removed upstream; keep the current checkout as clean pressure for this rule.
 - Sudocode frontend: 233 checked files, 0 findings.
 - Murderbox client after `globalThis.fetch` hardening: 184 checked files, 7 findings before the June 17 narrowing.
 - Taskme `src`: 8 checked files, 0 findings.

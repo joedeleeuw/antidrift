@@ -22,11 +22,16 @@ const cloudflareAgentsRepoCandidates = [
 ].filter(Boolean);
 const claudeCodeSourceRepoCandidates = [
   process.env.CLAUDE_CODE_SOURCE_REPO,
+  "/Users/sushi/code/claude-code-src-code",
   "/Users/sushi/code/claude-code-source-code",
 ].filter(Boolean);
 const opencodeRepoCandidates = [
   process.env.OPENCODE_REPO,
   "/Users/sushi/code/opencode",
+].filter(Boolean);
+const dotfilesRepoCandidates = [
+  process.env.DOTFILES_REPO,
+  "/Users/sushi/code/dotfiles",
 ].filter(Boolean);
 const powersyncServiceRepoCandidates = [
   process.env.POWERSYNC_SERVICE_REPO,
@@ -648,57 +653,21 @@ const codebaseAtlasCases = [
     paths: ["src/programs/persistenceCuration.ts"],
   },
   {
-    id: "atlas-city3d-sse-event-data-json-parse",
-    ruleId: "antidrift/no-unsafe-deserialize",
-    kind: "drift",
-    classification: "ready",
-    subproject: "app",
-    typeAware: true,
-    tsconfig: "tsconfig.json",
-    paths: ["src/routes/atlas.city3d.tsx"],
-    expectedFindings: [
-      {
-        path: "src/routes/atlas.city3d.tsx",
-        line: 486,
-      },
-      {
-        path: "src/routes/atlas.city3d.tsx",
-        line: 544,
-      },
-    ],
-  },
-  {
-    id: "atlas-city-route-component-fetch",
-    ruleId: "antidrift/no-raw-fetch-in-component",
-    kind: "drift",
-    classification: "ready",
-    subproject: "app",
-    paths: ["src/routes/atlas.city.tsx"],
-    expectedFindings: [
-      {
-        path: "src/routes/atlas.city.tsx",
-        line: 50,
-      },
-      {
-        path: "src/routes/atlas.city.tsx",
-        line: 76,
-      },
-    ],
-  },
-  {
     id: "atlas-game-state-shell-effect-deps-clean",
     ruleId: "antidrift/require-effect-deps",
     kind: "correct",
     classification: "ready",
     subproject: "app",
-    paths: ["src/components/AtlasGameStateShell.tsx"],
+    paths: ["src/components/changeWorld/ChangeWorldScene.tsx"],
   },
   {
     id: "atlas-real-program-parser-full-excerpt-selector-wrapper",
-    ruleId: "antidrift/no-trivial-selector-wrapper",
+    ruleId: "antidrift/no-contract-appeasement-projection",
     kind: "drift",
     classification: "ready",
     subproject: "app",
+    typeAware: true,
+    tsconfig: "tsconfig.json",
     paths: ["src/parsing/treeSitterRealProgramParser.ts"],
     expectedFindings: [
       {
@@ -736,22 +705,6 @@ const codebaseAtlasCases = [
     typeAware: true,
     tsconfig: "tsconfig.json",
     paths: ["src/test/invariantService.test.ts"],
-  },
-  {
-    id: "atlas-needle-renderer-userdata-color-appeasement-cast",
-    ruleId: "antidrift/no-appeasement-cast",
-    kind: "drift",
-    classification: "ready",
-    subproject: "app",
-    typeAware: true,
-    tsconfig: "tsconfig.json",
-    paths: ["src/needle/AtlasNeedleRenderer.ts"],
-    expectedFindings: [
-      {
-        path: "src/needle/AtlasNeedleRenderer.ts",
-        line: 205,
-      },
-    ],
   },
   {
     id: "atlas-terrain-layout-anchor-appeasement-cast",
@@ -807,7 +760,7 @@ const codebaseAtlasCases = [
     subproject: "app",
     typeAware: true,
     tsconfig: "tsconfig.json",
-    paths: ["src/needle/AtlasNeedleRenderer.ts"],
+    paths: ["src/needle/world/diagnosticLens.ts"],
   },
   {
     id: "atlas-language-counts-entries-clean",
@@ -856,15 +809,17 @@ const murderboxCases = [
   },
   {
     id: "murderbox-chat-item-key-selector-wrapper",
-    ruleId: "antidrift/no-trivial-selector-wrapper",
+    ruleId: "antidrift/no-contract-appeasement-projection",
     kind: "drift",
     classification: "ready",
     subproject: "client",
+    typeAware: true,
+    tsconfig: "apps/client/tsconfig.json",
     paths: ["apps/client/src/components/chat/message-list.tsx"],
     expectedFindings: [
       {
         path: "apps/client/src/components/chat/message-list.tsx",
-        line: 192,
+        line: 193,
       },
     ],
   },
@@ -893,6 +848,14 @@ const murderboxCases = [
     typeAware: true,
     tsconfig: "apps/api/tsconfig.json",
     paths: ["apps/api/lib/server/workspace-projects.ts"],
+  },
+  {
+    id: "murderbox-new-thread-conditional-classnames-clean",
+    ruleId: "antidrift/no-duplicated-conditional-classnames",
+    kind: "correct",
+    classification: "ready",
+    subproject: "client",
+    paths: ["apps/client/src/screens/agent-bridge/new-thread.tsx"],
   },
 ];
 
@@ -1220,6 +1183,25 @@ const opencodeCases = [
   },
 ];
 
+const dotfilesCases = [
+  {
+    id: "dotfiles-agent-trace-device-id-no-empty-sentinel",
+    ruleId: "antidrift/no-silent-empty-detection-fallback",
+    kind: "correct",
+    classification: "ready",
+    subproject: "agent-trace",
+    paths: ["config/opencode/plugins/sleepernet-agent-traces.js"],
+  },
+  {
+    id: "dotfiles-agent-config-no-nonindependent-test-oracle",
+    ruleId: "antidrift/no-nonindependent-test-oracle",
+    kind: "drift",
+    classification: "ready",
+    subproject: "agent-config",
+    paths: ["tools/agent-config/test/registry.test.ts"],
+  },
+];
+
 const powersyncServiceCases = [
   {
     id: "powersync-mysql-raw-source-table-name",
@@ -1311,6 +1293,12 @@ const externalCorpora = [
     label: "opencode",
     repoCandidates: opencodeRepoCandidates,
     cases: opencodeCases,
+  },
+  {
+    name: "dotfiles",
+    label: "dotfiles",
+    repoCandidates: dotfilesRepoCandidates,
+    cases: dotfilesCases,
   },
   {
     name: "powersync-service",
@@ -1454,7 +1442,9 @@ function externalReason({
     );
     const detail = firstFailedCase?.reason ?? firstFailure?.reason;
     const prefix = `${failedRepositories.length} external corpus ${failedRepositories.length === 1 ? "repository" : "repositories"} failed`;
-    return detail ? `${prefix}; ${firstFailure.corpus}: ${detail}` : `${prefix}.`;
+    return detail
+      ? `${prefix}; ${firstFailure.corpus}: ${detail}`
+      : `${prefix}.`;
   }
   if (!failed && driftPassed < minDriftRepositories) {
     return `Only ${driftPassed} external corpus repositories had passing drift cases; ${minDriftRepositories} required for this slice.`;
@@ -1511,11 +1501,7 @@ function skippedRepositorySummary(presence, slice, reason) {
   };
 }
 
-function externalPreconditionFailure({
-  available,
-  minRepositories,
-  require,
-}) {
+function externalPreconditionFailure({ available, minRepositories, require }) {
   if (!require) return null;
   if (available >= minRepositories) return null;
   return `Only ${available} external corpus repositories are available; ${minRepositories} required by --require for this slice.`;
@@ -1601,7 +1587,11 @@ export async function externalCorpus(options = {}) {
       minDriftRepositories,
       driftRepositories: 0,
       repositories: presence.map((entry) =>
-        skippedRepositorySummary(entry, externalSlice(sharedOptions), preconditionFailure),
+        skippedRepositorySummary(
+          entry,
+          externalSlice(sharedOptions),
+          preconditionFailure,
+        ),
       ),
     };
     emitSummary(summary, output, report);
@@ -1671,4 +1661,5 @@ export {
   murderboxCases,
   cloudflareAgentsCases,
   claudeCodeSourceCases,
+  dotfilesCases,
 };

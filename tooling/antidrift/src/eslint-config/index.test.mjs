@@ -38,8 +38,6 @@ describe("createConfig", () => {
       createConfig({ tsconfigRootDir: process.cwd() }),
     );
 
-    expect(severity(rules["sonarjs/sql-queries"])).toBe("error");
-
     expect(severity(rules["react-hooks/set-state-in-effect"])).toBe("error");
     expect(severity(rules["react-hooks/set-state-in-render"])).toBe("error");
     expect(severity(rules["react-hooks/immutability"])).toBe("error");
@@ -65,6 +63,13 @@ describe("createConfig", () => {
     expect(severity(rules["@typescript-eslint/no-unsafe-type-assertion"])).toBe(
       "error",
     );
+    expect(severity(rules["@typescript-eslint/no-base-to-string"])).toBe(
+      "error",
+    );
+    expect(severity(rules["@typescript-eslint/no-deprecated"])).toBe("error");
+    expect(severity(rules["@typescript-eslint/restrict-plus-operands"])).toBe(
+      "error",
+    );
     expect(
       severity(rules["@typescript-eslint/no-import-type-side-effects"]),
     ).toBe("error");
@@ -86,6 +91,9 @@ describe("createConfig", () => {
     expect(severity(rules["react/no-is-mounted"])).toBe("error");
     expect(severity(rules["react/no-unescaped-entities"])).toBe("error");
     expect(severity(rules["react/jsx-sort-props"])).toBe("error");
+    expect(severity(rules["antidrift/react-max-component-props"])).toBe(
+      "error",
+    );
     expect(severity(rules["unicorn/catch-error-name"])).toBe("error");
     expect(severity(rules["unicorn/consistent-function-scoping"])).toBe(
       "error",
@@ -94,7 +102,6 @@ describe("createConfig", () => {
     expect(severity(rules["unicorn/no-new-buffer"])).toBe("error");
     expect(severity(rules["unicorn/no-unnecessary-polyfills"])).toBe("error");
     expect(severity(rules["unicorn/prefer-regexp-test"])).toBe("error");
-    expect(severity(rules["sonarjs/no-unsafe-unzip"])).toBe("error");
     expect(severity(rules["no-multiple-empty-lines"])).toBe("error");
     expect(severity(rules["sort-imports"])).toBe("error");
     expect(

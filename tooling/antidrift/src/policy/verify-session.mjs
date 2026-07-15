@@ -1,6 +1,13 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+// The external corpus gate runs only when explicitly available in the current
+// environment. Locally the fleet is partial or sitting on working branches, so
+// session hooks skip it unless CI is exercising the portable default check.
+const externalCorpusStep = process.env.CI
+  ? [["pnpm", ["policy:validate-external-corpus"]]]
+  : [];
+
 const defaultCommands = [
   ["pnpm", ["policy:check-generated"]],
   ["pnpm", ["policy:check-registries"]],
@@ -8,7 +15,7 @@ const defaultCommands = [
   ["pnpm", ["policy:inventory-change-contract"]],
   ["pnpm", ["policy:inventory-diff-scoped-adapters"]],
   ["pnpm", ["policy:validate-corpus"]],
-  ["pnpm", ["policy:validate-external-corpus"]],
+  ...externalCorpusStep,
   ["pnpm", ["package:verify"]],
   ["pnpm", ["lint"]],
   ["pnpm", ["typecheck"]],

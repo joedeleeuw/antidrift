@@ -81,7 +81,7 @@ Clean:
 - `/Users/sushi/code/chaski/src/frontend/portal/lib/hooks/useDebounce.ts`
 - `/Users/sushi/code/chaski/src/frontend/portal/modules/scenarios/hooks/use-sticky-column-offsets.ts`
 - `/Users/sushi/code/sudocode-main/frontend/src/pages/IssueDetailPage.tsx`
-- `/Users/sushi/code/codebase-atlas/src/components/AtlasGameStateShell.tsx`
+- `/Users/sushi/code/codebase-atlas/src/components/changeWorld/ChangeWorldScene.tsx`
 - `/Users/sushi/code/murderbox/apps/client/src/lib/theme.ts`
 
 ## Promotion State

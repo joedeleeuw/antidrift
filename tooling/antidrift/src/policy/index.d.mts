@@ -30,6 +30,21 @@ export interface AntidriftRegistries {
 export type PolicyArtifacts = Map<string, string>;
 export type PolicyCommandOptions = Record<string, unknown>;
 
+export interface ShellGuardrailsArgs {
+  astGrepBinary: string;
+  config: string;
+  cwd: string;
+  mode: "scan" | "test";
+  passthrough: string[];
+  help: boolean;
+}
+
+export interface OxlintComplexityArgs {
+  targets: string[];
+  passthrough: string[];
+  help: boolean;
+}
+
 export type SemanticFactConfidence =
   | "deterministic-enforcement"
   | "deterministic-inventory"
@@ -310,6 +325,20 @@ export function chaskiCorpus(options?: PolicyCommandOptions): Promise<unknown>;
 export function externalCorpus(
   options?: PolicyCommandOptions,
 ): Promise<unknown>;
+export function defaultAstGrepBinary(): string;
+export function defaultAstGrepConfig(): string;
+export function parseShellGuardrailsArgs(argv?: string[]): ShellGuardrailsArgs;
+export function shellGuardrails(options?: PolicyCommandOptions): number;
+export const oxlintComplexityConfig: string;
+export const oxlintComplexityIgnorePatterns: readonly string[];
+export function parseOxlintComplexityArgs(
+  argv: string[],
+  options?: {
+    cwd?: string;
+    exists?: (path: string) => boolean;
+  },
+): OxlintComplexityArgs;
+export function runOxlintComplexity(options?: PolicyCommandOptions): number;
 export function verifySession(options?: PolicyCommandOptions): unknown;
 export function eslintJsonToSonar(
   inputPath?: string,

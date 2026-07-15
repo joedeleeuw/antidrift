@@ -3,6 +3,13 @@ packages:
   - packages/*
   - tooling/*
 
+allowBuilds:
+  '@firebase/util': true
+  esbuild: true
+  protobufjs: true
+  simple-git-hooks: true
+  unrs-resolver: true
+
 # pnpm catalogs centralize tool and library versions for the whole workspace.
 # Use `catalog:<name>` in private package.json files so agents do not invent per-package
 # versions. Published packages must use concrete ranges because npm does not understand
@@ -35,7 +42,6 @@ catalogs:
     eslint-plugin-no-only-tests: ^3.3.0
     eslint-plugin-react: ^7.37.5
     eslint-plugin-react-hooks: ^7.1.1
-    eslint-plugin-sonarjs: ^4.0.3
     eslint-plugin-unicorn: ^64.0.0
     globals: ^15.14.0
     prettier: ^3.4.2

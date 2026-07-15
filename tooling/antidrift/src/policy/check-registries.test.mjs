@@ -227,7 +227,7 @@ const lockedEcosystemCandidates = [
   "ecosystem/gateway-restricted-imports",
   "ecosystem/vitest-test-integrity",
   "ecosystem/react-hooks-compiler",
-  "ecosystem/sonar-sql-queries",
+  "ecosystem/sql-query-plugins",
 ];
 
 function lockedRuleSections(root) {
@@ -1403,14 +1403,14 @@ rules:
     writeFileSync(
       existing,
       text.replace(
-        `  antidrift/no-trivial-selector-wrapper:
+        `  antidrift/no-contract-appeasement-projection:
     status: ready
     stable: false
     signal: test-signal
     solveType: test-solve
     proofBuckets: [local-ast-source-shape]
 `,
-        `  antidrift/no-trivial-selector-wrapper:
+        `  antidrift/no-contract-appeasement-projection:
     status: ready
     stable: false
     signal: test-signal
@@ -1428,7 +1428,7 @@ rules:
       }),
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-trivial-selector-wrapper.semanticAdapterStatus is required when non-local proof buckets are not claimed by a shipped semantic adapter.",
+      "policy/registries/rules.yaml rules.antidrift/no-contract-appeasement-projection.semanticAdapterStatus is required when non-local proof buckets are not claimed by a shipped semantic adapter.",
     );
   });
 

@@ -3,10 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.0.0",
+  "packageManager": "pnpm@11.9.0",
   "engines": {
     "node": ">=22.0.0",
-    "pnpm": ">=10.0.0"
+    "pnpm": ">=11.0.0"
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
@@ -23,7 +23,8 @@
     "policy:check-registries": "antidrift check-registries",
     "policy:check-rule-surface": "antidrift check-rule-surface",
     "policy:validate-corpus": "antidrift repo-corpus --slice validation-gate",
-    "policy:validate-external-corpus": "antidrift external-corpus --slice external-local --require --min-repositories 2",
+    "policy:validate-external-corpus": "antidrift external-corpus --slice external-local --min-repositories 2",
+    "policy:validate-external-corpus:required": "antidrift external-corpus --slice external-local --require --min-repositories 2",
     "policy:validate-appeasement-remediation": "antidrift no-appeasement-remediation-corpus --slice no-appeasement-remediation-copy",
     "policy:benchmark-unsafe-type-assertion": "NODE_OPTIONS=--max-old-space-size=8192 antidrift benchmark-unsafe-type-assertion --slice upstream-delta --output reports/unsafe-type-assertion-benchmark.json",
     "policy:benchmark-sql-queries": "antidrift benchmark-sql-queries --slice upstream-delta --output reports/sql-query-benchmark.json",

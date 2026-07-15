@@ -22,26 +22,28 @@ Real project files prove rule behavior. Reduced fixture programs and the legacy 
 
 ## Current Batch Slices
 
-### S1: Retire Oxlint And Keep One Lint Engine
+### S1: Ship Local Complexity Gate Without Splitting Semantic Lint
 
-Purpose: remove the second active lint engine and keep one public lint path: ESLint plus `typescript-eslint`.
+Purpose: keep ESLint plus `typescript-eslint` as the semantic rule engine, while shipping one narrow oxlint-backed gate for local complexity, nesting depth, and parameter count.
 
 Owned files:
 
-- `.oxlintrc.json`
 - `package.json`
 - `pnpm-workspace.yaml`
 - `pnpm-lock.yaml`
 - `tooling/antidrift/package.json`
-- `tooling/antidrift/src/eslint-config/index.mjs`
-- `tooling/antidrift/src/oxlint-config/index.mjs`
+- `tooling/antidrift/src/policy/cli.mjs`
+- `tooling/antidrift/src/policy/oxlint-complexity.config.json`
+- `tooling/antidrift/src/policy/oxlint-complexity.mjs`
+- `tooling/antidrift/test/consumer-monorepo.mjs`
 - `docs/lint-rule-parity.md`
 
 Acceptance:
 
-- No active `oxlint`, `.oxlintrc`, `oxlint-config`, or `jsPlugins` wiring remains.
-- Former Oxlint baseline rules are either enforced by ESLint or recorded in `docs/lint-rule-parity.md`.
-- `pnpm lint` runs ESLint as the only lint command.
+- `antidrift oxlint` is part of the published package and resolves the bundled `oxlint` dependency/config from the installed package.
+- The bundled oxlint config disables broad categories and enables only `complexity`, `max-depth`, and `max-params`.
+- Projects wire `antidrift oxlint` explicitly when they want the local metric gate; `createConfig` does not run it.
+- No `eslint-plugin-oxlint`, custom oxlint JavaScript plugins, or repo-level `.oxlintrc` semantic-rule path is introduced.
 
 ### S2: Add Policy Control-Plane Checks
 
@@ -71,7 +73,7 @@ Acceptance:
 
 ### S3: Harden The Existing Type-Contract Rules
 
-Purpose: close the class/object method gaps and remove the selector-wrapper name fingerprint.
+Purpose: close the class/object method gaps, remove the selector-wrapper name fingerprint, and fold selector wrappers into the broader contract-projection rule.
 
 Owned files:
 
@@ -81,10 +83,10 @@ Owned files:
 
 Acceptance:
 
-- `no-trivial-selector-wrapper` is structural: it catches `pickItems(bag) { return bag.items; }` without relying on `getXFromY`.
-- `no-trivial-selector-wrapper` visits class methods, class fields, and object methods.
+- `no-contract-appeasement-projection` catches `pickItems(bag) { return bag.items; }` without relying on `getXFromY`.
+- `no-contract-appeasement-projection` visits class methods, class fields, and object methods.
 - Public methods on exported classes, exported objects, and objects returned from exported factories are treated as boundaries.
-- Real repo corpus passes without weakening `no-trivial-selector-wrapper`; the former private-helper return-type rule is retired because real corpus evidence showed it was not a deterministic signal.
+- Real repo corpus passes without weakening the inherited selector-wrapper branch; the former private-helper return-type rule is retired because real corpus evidence showed it was not a deterministic signal.
 
 ### S4: Add Brand And Cast-Appeasement Vertical
 

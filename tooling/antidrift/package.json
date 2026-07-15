@@ -1,6 +1,6 @@
 {
   "name": "@joedeleeuw/antidrift",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "type": "module",
   "license": "MIT",
   "description": "Deterministic lint + policy guardrails against code and AI-agent drift: a custom ESLint plugin, shareable ESLint config, and a policy generator for agent instruction files and hooks.",
@@ -24,7 +24,8 @@
   "homepage": "https://github.com/joedeleeuw/antidrift#readme",
   "bugs": "https://github.com/joedeleeuw/antidrift/issues",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "types": "./src/index.d.mts",
   "engines": {
@@ -96,6 +97,7 @@
     "antidrift": "src/policy/cli.mjs"
   },
   "files": [
+    "ast-grep",
     "src",
     "!src/**/*.test.*",
     "!src/**/fixtures/**"
@@ -110,9 +112,9 @@
     "eslint-plugin-no-only-tests": "^3.3.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-sonarjs": "^4.0.3",
     "eslint-plugin-unicorn": "^64.0.0",
     "globals": "^15.14.0",
+    "oxlint": "^1.72.0",
     "yaml": "^2.6.1"
   },
   "peerDependencies": {

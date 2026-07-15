@@ -6,7 +6,7 @@ Regular linters check syntax and a handful of correctness rules. They don't noti
 
 antidrift writes those patterns down as deterministic rules so the machine catches them instead of you.
 
-The custom rule engine is ESLint plus `typescript-eslint`. That is intentional: the core rules need TypeScript's `Program` and `TypeChecker`, not just a parsed AST. Baseline lint coverage and bespoke semantic rules both live in the ESLint layer.
+The custom rule engine is ESLint plus `typescript-eslint`. That is intentional: the core rules need TypeScript's `Program` and `TypeChecker`, not just a parsed AST. Baseline lint coverage and bespoke semantic rules live in the ESLint layer exposed by `createConfig`.
 
 The positive pattern behind the rules is one owner per concept: domain owns business vocabulary, contracts own wire schemas, API boundaries validate and authorize, gateways own SDKs, and UI consumes resource/result unions instead of local duplicate shapes.
 
@@ -32,7 +32,7 @@ import { createConfig } from "@joedeleeuw/antidrift/eslint-config";
 export default createConfig({ tsconfigRootDir: import.meta.dirname });
 ```
 
-That gives you the type-aware base (typescript-eslint, sonarjs, architecture boundaries, react-hooks) plus every antidrift rule. It also includes the general monorepo hygiene layer: import grouping and spacing, sorted named imports, top-level `import type` declarations, package dependency checks, promise-misuse and unnecessary-condition checks, type-union/intersection sorting, React component/key conventions, JSX prop ordering, duplicate-import protection, import-cycle detection, and single-blank-line formatting. If you keep a `policy/` directory with registries, `createConfig` reads them and wires up the domain-specific rules on its own.
+That gives you the type-aware base (typescript-eslint, architecture boundaries, react-hooks) plus every antidrift rule. It also includes the general monorepo hygiene layer: import grouping and spacing, sorted named imports, top-level `import type` declarations, package dependency checks, promise-misuse and unnecessary-condition checks, type-union/intersection sorting, React component/key conventions, JSX prop ordering, duplicate-import protection, import-cycle detection, and single-blank-line formatting. If you keep a `policy/` directory with registries, `createConfig` reads them and wires up the domain-specific rules on its own.
 
 If you wire `@joedeleeuw/antidrift/eslint-plugin` by hand instead of using `createConfig`, configure `@typescript-eslint/parser` with parser services (`projectService` or `project`). Fully type-aware antidrift rules report a configuration error when enabled without those services so missing type information cannot silently weaken the rule set. Hybrid rules such as `antidrift/no-sql-string-concat` still run their AST and local-flow proof without parser services, but imported escaper, configured safe-member, and configured declaration-source safe-template-member proofs are parser-service-only and are classified by the SQL benchmark.
 
@@ -64,6 +64,7 @@ If you use the generated hooks/instructions, add the scripts they call to your r
   "scripts": {
     "policy:generate": "antidrift generate",
     "policy:check-generated": "antidrift check-generated",
+    "guardrails:shell": "antidrift shell",
     "policy:check:changed": "antidrift check-changed",
     "policy:verify-session": "antidrift verify-session"
   }
@@ -75,6 +76,8 @@ For self-hosted rule packages, these additional checks keep the control plane ho
 ```sh
 npx antidrift check-registries
 npx antidrift check-rule-surface
+npx antidrift shell
+npx antidrift shell test
 npx antidrift semantic-manifest
 npx antidrift rule-status
 pnpm package:verify
@@ -94,13 +97,15 @@ npx antidrift repo-corpus --slice current-work --rules import-x/no-cycle
 ```
 
 The first two validate registry-backed rule facts and verify every custom rule exported by the plugin is configured and covered by `RuleTester`.
+`shell` runs the packaged ast-grep shell guardrails against the current project. It is opt-in source lint for shell scripts, not an ESLint rule and not an automatic hook installer. `antidrift shell test` validates the packaged ast-grep rule tests.
 `semantic-manifest` prints the composed semantic adapter/fact contract registry as JSON, so downstream tools can discover proof buckets, owned associations, and emitted fact kinds without importing source internals. Use `--adapter`, `--rule`, `--proof-bucket`, `--fact-adapter`, or `--fact-kind` to print a filtered adapter slice.
 `rule-status` prints a normalized view of `policy/registries/rules.yaml`, including active, retired, research, and policy-review rows, so experimental rules can ship with explicit maturity and delegation metadata. Use `--kind`, `--status`, `--semantic-adapter`, or `--proof-bucket` to print a filtered manifest. Add `--semantic-summary` to print joined summaries for the filtered rows. Proof-bucket filtering includes both semantic-adapter contracts and registry `promotion.proofBucket` rows. The policy subpath exposes the same helpers plus joined rule semantic summaries for downstream tooling.
-`package:verify` packs the npm tarball, installs it in a throwaway consumer workspace, type-checks every public export under Bundler and NodeNext resolution, imports every runtime export, runs ESLint through the shipped config, proves `SEMANTIC_FACT_KINDS` and the public semantic adapters are available to consumer tooling, proves the CLI exposes the composed semantic manifest and normalized rule-status registry, and proves a configured semantic fact sink receives a generated-source `structuralMatch` fact.
+`oxlint` is an optional direct CLI for the packaged local complexity budget. It uses the bundled config from this package, disables nested project oxlint config, ignores generated/test/declaration paths, and enforces only `complexity`, `max-depth`, and `max-params` when a project explicitly wires it.
+`package:verify` packs the npm tarball, installs it in a throwaway consumer workspace, type-checks every public export under Bundler and NodeNext resolution, imports every runtime export, runs ESLint through the shipped config, proves the packaged oxlint policy exports are available, proves `SEMANTIC_FACT_KINDS` and the public semantic adapters are available to consumer tooling, proves the CLI exposes the composed semantic manifest and normalized rule-status registry, and proves a configured semantic fact sink receives a generated-source `structuralMatch` fact.
 `check-rule-surface` is only meaningful in this source repository layout; installed consumers can use `verify-session`, `check-generated`, and normal ESLint runs without carrying antidrift's own rule tests.
 `policy:validate-corpus` lints the maintained project inventory with every custom rule, while `repo-corpus` can narrow the evidence to the rules changed in a slice.
 `policy:validate-chaski` is an optional local corpus gate: it runs explicit assertions against real Chaski frontend/BFF files when `CHASKI_REPO` or `/Users/sushi/code/chaski` is available, and skips otherwise so consumers do not need the private corpus.
-`policy:benchmark-sql-queries` compares `antidrift/no-sql-string-concat` with `sonarjs/sql-queries` on real SQL programs and emits `parserServiceDeltas`: extra-only non-type-aware identifier reports are inventory, while missing non-type-aware findings or parser errors block promotion.
+`policy:benchmark-sql-queries` runs `antidrift/no-sql-string-concat` on real SQL programs and emits `parserServiceDeltas`: extra-only non-type-aware identifier reports are inventory, while missing non-type-aware findings or parser errors block promotion.
 `policy:inventory-change-contract` runs the inventory-only change-contract spine. Missing contracts exit 0, invalid contracts fail loudly, and present contracts compare merge-base change surfaces against declared paths, dependencies, exports, and optional module graph radius (`--tsconfig` is required when graph entrypoints are declared).
 `policy:validate-change-contract-evidence` replays the documented change-contract MVP gold true-positive and true-negative commits against local `sudocode-main` and `chaski` clones. It fails loudly when a required repo or SHA is unavailable, writes `reports/change-contract-evidence.json`, and is a source-repo evidence gate rather than a consumer requirement.
 `policy:inventory-diff-scoped-adapters` runs existing ESLint adapters against changed JS/TS files and filters diagnostics plus semantic facts to changed patch hunks. It is an inventory proof filter over the diff, not a blocking gate.
@@ -109,6 +114,27 @@ The first two validate registry-backed rule facts and verify every custom rule e
 `policy:inventory-react-state` is a non-blocking semantic fact inventory for React state co-mutation. It classifies broad setter co-mutation separately from `no-handrolled-resource-lifecycle-cells` diagnostics so broad inventory cannot become accidental enforcement. Pass `--repo` and `--targets "src/**/*.{ts,tsx}"` to scan a specific checkout; target splitting preserves brace globs.
 `policy:inventory-schema-roundtrip` is a non-blocking research inventory for same-schema `.parse({ ...typedState })` shapes; it classifies real anchors instead of failing the build.
 `policy:inventory-underchecked-predicate` is a non-blocking search inventory for `no-underchecked-type-predicate`. It counts type-predicate syntax pressure separately from broad-input contract-laundering diagnostics and records adjacent TypeScript ESLint unsafe-rule overlap.
+
+## Publishing
+
+The normal release path is `.github/workflows/publish-antidrift.yml` using npm Trusted Publishing. Configure the package on npmjs.com after the package exists:
+
+- Publisher: GitHub Actions
+- Organization or user: `joedeleeuw`
+- Repository: `antidrift`
+- Workflow filename: `publish-antidrift.yml` (filename only, not `.github/workflows/publish-antidrift.yml`)
+- Environment name: `npm-publish`
+- Allowed action: `npm publish`
+
+Release flow:
+
+1. Bump `tooling/antidrift/package.json` to the version being released.
+2. Publish a GitHub release tagged `antidrift-v<version>`.
+3. The workflow verifies the tag matches the package version, runs the package checks, packs the tarball, and publishes from `tooling/antidrift`.
+
+The workflow uses OIDC trusted publishing rather than a long-lived `NPM_TOKEN`. npm generates provenance automatically for trusted publishes from a public GitHub-hosted workflow.
+
+For the initial publication, if `npm view @joedeleeuw/antidrift` still returns 404 and npmjs.com does not expose package settings yet, do one interactive owner publish from `tooling/antidrift` after `pnpm package:verify`, then immediately configure the Trusted Publisher above and restrict token-based publishing in npm package settings.
 
 ## What's in the box
 
@@ -129,7 +155,7 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/semantic-adapters/sql` — SQL context, identifier-token, safe-member, and import/declaration-source safe-template-tag classifiers shared by `no-sql-string-concat`
 - `@joedeleeuw/antidrift/semantic-adapters/tuple-shape` — tuple nullish-slot classifiers shared by `no-nullable-positional-tuple`
 - `@joedeleeuw/antidrift/semantic-adapters/type-owner` — TypeChecker-backed owner candidate collectors for generated, domain, and installed-package structural authority
-- `antidrift` — the CLI binary for generate/check/report commands, plus `semantic-manifest` and `rule-status` for machine-readable metadata
+- `antidrift` — the CLI binary for generate/check/report commands, opt-in `shell` guardrails, plus `semantic-manifest` and `rule-status` for machine-readable metadata
 
 ## The rule worth installing this for
 
@@ -152,7 +178,8 @@ Generated-source and first-party domain owners come from policy registries. Inst
 The scoped rules that motivated this package go after the usual agent tells:
 
 - `require-effect-deps` — a `useEffect` with no dependency array runs on every render, and `exhaustive-deps` won't say a word about it
-- `no-trivial-selector-wrapper` — local selector helpers that paper over inference instead of using the existing value
+- `react-max-component-props` — JSX-returning React components with too many locally-owned accepted props
+- `no-contract-appeasement-projection` — internal helpers that project one owned value contract into another explicit return contract without construction or validation
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning
 - `no-appeasement-cast` — `any` / `unknown` casts that paper over missing validation
 - `no-underchecked-type-predicate` — default-off inventory for broad-input type predicates that assert object contracts without checking required asserted fields
@@ -165,6 +192,46 @@ The scoped rules that motivated this package go after the usual agent tells:
 Other existing baseline rules may still ship in the config, but they are not the current roadmap.
 
 Run `eslint` and read the messages. Each rule says what to do instead.
+
+## Shell guardrails
+
+`antidrift shell` runs Antidrift's packaged ast-grep rule pack against the current project. Install `ast-grep` with your OS/toolchain package manager and keep it on `PATH`, or pass `AST_GREP_BIN` / `--ast-grep-bin` when your environment pins binaries elsewhere:
+
+```sh
+npx antidrift shell
+```
+
+The first packaged shell rule is `no-swallowed-command-substitution-status`. It flags captured command output whose producing command status is erased:
+
+```sh
+status="$(curl -sS "$url")" || true
+status="$(curl -sS "$url" || true)"
+```
+
+Preserve the exit status explicitly instead:
+
+```sh
+if status="$(curl -sS "$url")"; then
+  rc=0
+else
+  rc=$?
+fi
+```
+
+Projects can wire this into their own hook runner or CI:
+
+```json
+{
+  "scripts": {
+    "guardrails:shell": "antidrift shell"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm guardrails:shell"
+  }
+}
+```
+
+The package does not auto-install hooks. For pre-commit users, call the same command from a local hook entry.
 
 ## Brand values
 
@@ -192,7 +259,7 @@ Consumer code should obtain branded values from `make`, `safe`, `is`, or a schem
 
 - `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`
 - `.cursor/rules/*.mdc`
-- `.claude/settings.json` and `.codex/hooks.json`, including pre/post-tool hooks that block edits to generated files and dangerous shell commands
+- `.claude/settings.json` and `.codex/hooks.json`, including pre/post-tool hooks that block edits to generated files and run repo verification
 
 One source of truth, regenerated on demand. `antidrift check-generated` fails CI if any of them have drifted from the policy.
 

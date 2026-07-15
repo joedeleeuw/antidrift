@@ -144,7 +144,7 @@ Why: the SQL-looking text is sample payload data; the interpolation is not part 
 
 ## Ecosystem
 
-`sonarjs/sql-queries` is active as adjacent maintained coverage, but Sonar documents that rule as a security-sensitive formatted-query hotspot, not SQL injection detection. The local benchmark currently reports 0 SonarJS findings against this rule's 145 custom findings, so it is not a replacement for the HogQL/template interpolation signal. Most non-anchor findings are high-noise SQL-builder/tagged-template inventory after removing name-only member proof.
+SQL-template plugins remain adjacent maintained coverage, but they generally assume chosen tag/query conventions. They are not a replacement for the HogQL/template interpolation signal. Most non-anchor findings are high-noise SQL-builder/tagged-template inventory after removing name-only member proof.
 
 SQL tag ecosystems are relevant clean controls, not drift. Prisma documents `$queryRaw` and `$executeRaw` as tagged templates that parameterize values, while warning that identifiers such as table names and column names cannot be passed through placeholders. Drizzle documents its `sql` template as parameterized and identifier-aware through table/column objects and helpers such as `sql.identifier(...)`. That matches this rule's target shape, but the current implementation no longer treats tag names as proof. A clean path for these APIs must be symbol/type-backed or delegated to a SQL-aware dataflow tool.
 
@@ -187,7 +187,6 @@ Current benchmark result after placeholder-list, numbered Postgres placeholder-f
 - 370 checked files.
 - 0 parser errors.
 - 145 `antidrift/no-sql-string-concat` findings.
-- 0 `sonarjs/sql-queries` findings.
 - PowerSync service contributes one raw-table finding and zero findings for imported escaper, configured escaped-identifier, numbered-placeholder, and `AbstractPostgresConnection.sql` clean controls under type-aware plans.
 
 Earlier widened local scan, superseded by the finite source-fleet gate:
@@ -197,7 +196,7 @@ Earlier widened local scan, superseded by the finite source-fleet gate:
 - Sudocode's typed `ORDER BY ${sortBy} ${order}` service code now stays clean, as does the matching integration helper.
 - External corpus still proves configured Drizzle imports, Cloudflare core `Agent.sql`, and PowerSync `AbstractPostgresConnection.sql` clean through import or declaration-source provenance. Broad source-fleet scans no longer trust name lookalikes, so unclassified SQL-builder/tagged-template findings stay visible as inventory until each builder has equivalent proof.
 - The named Sudocode/Cloudflare findings are classified: dynamic `Object.keys(updates)` update helpers and the playground table-name query are drift; browser/test payload SQL-looking strings and constructor-validated namespace table identifiers are clean. Many other findings are duplicate Chaski-derived local roots or unclassified builder inventory, so they do not provide independent stable-promotion replication.
-- The scan is now reproducible through `pnpm policy:inventory-sql-broad`. The finite source-fleet gate is `pnpm policy:inventory-sql-source-fleet`: 24 primary source repos, excluding worktrees, remediation copies, baseline copies, scratch folders, and generated artifacts. The current source-fleet run checked 1,378 SQL-candidate files, reported 486 custom findings, reported 0 SonarJS findings, and had 0 parser errors after name-only SQL member proof was removed.
+- The scan is now reproducible through `pnpm policy:inventory-sql-broad`. The finite source-fleet gate is `pnpm policy:inventory-sql-source-fleet`: 24 primary source repos, excluding worktrees, remediation copies, baseline copies, scratch folders, and generated artifacts. The current source-fleet run checked 1,378 SQL-candidate files, reported 486 custom findings, and had 0 parser errors after name-only SQL member proof was removed.
 - The source-fleet run confirmed the parser-services boundary: escaped identifier controls such as `table.escapedIdentifier` and `escapeMysqlTableName(table)` report unless the inventory has TypeScript parser services to resolve the getter/helper proof. It also classified and fixed the PowerSync Postgres storage false positive by proving the dynamic fragment interpolates only generated `$<number>` placeholders while all values remain bound in `params`.
 - The widened source-fleet run also found and fixed one non-SQL false positive in `figma-console-mcp`: a Figma JavaScript payload string containing `COMPONENT_SET` and `const config = ${...}`. Operator-position interpolation now requires nearby SQL statement context, so ordinary code payloads with words like "select" and "from" do not become SQL sinks.
 
@@ -220,8 +219,8 @@ Accepted inventory evidence:
 
 - Chaski and PowerSync service provide independent production drift.
 - Chaski, Codebase Atlas, Sudocode, Cloudflare, Opencode, and PowerSync service supply clean and pressure controls for placeholder lists, static SQL fragments, SQL tag ecosystems, ORM-owned SQL composition, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, local and imported quote escapers, finite static object fragments, numbered placeholder fragments, configured SQL builder tags/members, and bound values.
-- `pnpm policy:benchmark-sql-queries` currently checks 370 files, reports 145 custom findings, 0 SonarJS findings, and 0 parser errors. The tagged-template inventory is high-noise classification work, not an allowlist.
-- `pnpm policy:inventory-sql-source-fleet` currently checks 1,378 SQL-candidate files across 24 primary source repos, reports 486 custom findings, 0 SonarJS findings, and 0 parser errors after name-only SQL member proof was removed.
+- `pnpm policy:benchmark-sql-queries` currently checks 370 files, reports 145 custom findings, and 0 parser errors. The tagged-template inventory is high-noise classification work, not an allowlist.
+- `pnpm policy:inventory-sql-source-fleet` currently checks 1,378 SQL-candidate files across 24 primary source repos, reports 486 custom findings, and 0 parser errors after name-only SQL member proof was removed.
 - `pnpm policy:validate-external-corpus` now proves the configured Drizzle, Cloudflare core Agent, and PowerSync SQL-builder clean controls; it is still not a stable-promotion proof while Cloudflare Voice and AI Chat member proofs are blocked by external tsconfig resolution.
 - The June 9 adversarial cleanup keeps the placeholder proof limited to `+` and `*` index arithmetic and restores short-circuit safety checks.
 

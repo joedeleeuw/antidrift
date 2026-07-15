@@ -51,14 +51,14 @@ clusters:
   - id: type-contract-shape # Agents appease TypeScript locally unless type ownership is enforced.
     owner: types-platform # The type platform owner controls when explicit contracts belong at boundaries.
     rules:
-      - id: ts/no-trivial-selector-wrapper # Blocks getPointFromBag-style wrappers that only restate property access.
+      - id: ts/no-contract-appeasement-projection # Blocks internal helpers that project one contract into another explicit return type.
         severity: error
-        detector: singlePropertyReturnWithExplicitReturnType
-        message: Use inference directly or move the contract to the owning boundary.
-      - id: ts/no-mechanical-get-x-from-y # Merged into structural selector-wrapper detection; names alone are not proof.
+        detector: typeAwareContractProjectionWithExplicitReturnType
+        message: Use the source value directly, or construct/validate the target contract at the owning boundary.
+      - id: ts/no-mechanical-get-x-from-y # Merged into type-aware contract projection detection; names alone are not proof.
         severity: off
-        detector: mergedInto:ts/no-trivial-selector-wrapper
-        message: Do not use helper names as proof; use the structural selector-wrapper rule.
+        detector: mergedInto:ts/no-contract-appeasement-projection
+        message: Do not use helper names as proof; use the type-aware contract projection rule.
       - id: ts/no-inline-structural-type-at-use-site # Use-site structural contracts fork domain ownership.
         severity: error
         detector: inlineObjectTypeInParameterOrVariable
@@ -87,6 +87,10 @@ clusters:
         severity: error
         detector: reactComponentLinesGt:180
         message: Split container, view, and state/resource boundaries.
+      - id: react/max-component-props # Large prop bags make component API combinations hard to reason about.
+        severity: error
+        detector: locallyOwnedReactComponentPropsGt:12
+        message: Split or group component props into an owned object, resource, or smaller component boundary.
       - id: arch/no-high-touch-file-growth # Agents append to central files because they are visible.
         severity: error
         detector: fileFanInGte:20,addedLinesGte:25
@@ -277,10 +281,6 @@ clusters:
         severity: blocker
         hookEvent: PreToolUse
         message: Edit policy/agent-guardrails.yaml and regenerate.
-      - id: agent/block-destructive-shell # Agents overreach with broad shell fixes.
-        severity: blocker
-        hookEvent: PreToolUse
-        message: Destructive shell command blocked by policy.
       - id: agent/lint-after-edit # Feedback must happen immediately in the edit loop.
         severity: error
         hookEvent: PostToolUse
@@ -322,6 +322,10 @@ clusters:
         severity: error
         detector: missingExternalIssueReport
         message: Import policy reports into Sonar.
+      - id: sonar/ai-code-governance-preset # Broad AI-assisted quality and reward-hacking symptoms belong in the Sonar profile/gate preset.
+        severity: error
+        detector: delegated:sonar/antidrift-ai-code-governance.yaml
+        message: Apply the Antidrift Sonar AI code governance preset instead of reimplementing broad Sonar rules locally.
       - id: sonar/no-new-critical-issues # New generated code must not add critical reliability/security debt.
         severity: error
         detector: sonarQualityGateNewCriticalIssues

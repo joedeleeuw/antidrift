@@ -19,14 +19,14 @@ These rules are already in the package and are part of the core project thesis:
 - `no-structural-type-fork`: type-aware fork detection, hardened through alias, optional-property, `z.infer`, and branded-type edge probing.
 - `require-effect-deps`: closes the gap where `react-hooks/exhaustive-deps` does not flag a missing dependency-array argument.
 - `no-redundant-zod-parse`: provenance rule for repeated parsing of the same value by the same schema.
-- `no-trivial-selector-wrapper`: method/class-field coverage is closed. The former `no-explicit-return-type-private-helper` rule is retired because real corpus evidence showed private return annotations are not a deterministic smell.
+- `no-contract-appeasement-projection`: subsumes the old selector-wrapper branch with TypeChecker-backed source/return ownership proof. The former `no-explicit-return-type-private-helper` rule is retired because real corpus evidence showed private return annotations are not a deterministic smell.
 
 ## Chosen Next Scope
 
 These were the next project scope because they are the project, not because a broad policy table mentioned them. The active parts are implemented in the current batch:
 
 - `no-appeasement-cast`: block `any`/`unknown as NamedObject` source-boundary appeasement casts. Double-cast tunnels are delegated to `@typescript-eslint/no-unsafe-type-assertion`.
-- `no-trivial-selector-wrapper` structural rewrite: no `getXFromY` name fingerprint.
+- `no-contract-appeasement-projection`: no `getXFromY` name fingerprint; selector wrappers are now one branch of the broader contract-projection rule.
 - `no-handrolled-resource-lifecycle-cells`: behavior-based React state graph rule for hand-rolled async resource lifecycle machines; broad multi-setter co-mutation is inventory only and classified with `pnpm policy:inventory-react-state`.
 - `no-unsafe-deserialize`: use an `any`/`unknown` type signal instead of a `req`/`ctx` name fingerprint.
 - `no-defensive-shape-probing`: provisional only where real corpus evidence shows deterministic broad-value mini-parsing; do not expand to general boolean predicates.
@@ -50,7 +50,7 @@ Completed no-regret cleanup:
 
 Completed in this batch:
 
-- `no-trivial-selector-wrapper`: replace the `get|select|extract...From...` name gate with structural detection of a wrapper that returns a member access rooted in one of its own parameters. **Implemented in this batch.**
+- `no-contract-appeasement-projection`: replace the `get|select|extract...From...` name gate with TypeChecker-backed detection of internal helpers that project source values into explicit return contracts. **Implemented in this batch.**
 - `no-status-triplet-state`: retired after the behavior-based lifecycle proof moved into `no-handrolled-resource-lifecycle-cells`.
 - `no-unsafe-cast-chain`: retired in favor of `@typescript-eslint/no-unsafe-type-assertion`; `no-appeasement-cast` covers plain `any`/`unknown as NamedObject`.
 - `no-unsafe-deserialize`: type-aware `any`/`unknown` argument signal, not request-root names.

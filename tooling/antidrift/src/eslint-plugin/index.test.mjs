@@ -66,8 +66,10 @@ const typedRuleTester = new RuleTester({
 const typeServiceMessage = /requires TypeScript parser services/u;
 const rule = (name) => plugin.rules[name];
 const typeServiceGuardedRules = [
+  "react-max-component-props",
   "no-appeasement-cast",
   "no-canonical-model-fork",
+  "no-contract-appeasement-projection",
   "no-defensive-shape-probing",
   "no-redundant-zod-parse",
   "no-structural-type-fork",
@@ -86,6 +88,144 @@ for (const guardedRule of typeServiceGuardedRules) {
     ],
   });
 }
+
+typedRuleTester.run(
+  "react-max-component-props",
+  rule("react-max-component-props"),
+  {
+    valid: [
+      {
+        code: `
+          interface PanelProps {
+            title: string;
+            subtitle: string;
+            disabled?: boolean;
+          }
+
+          export function Panel(props: PanelProps) {
+            return <section>{props.title}</section>;
+          }
+        `,
+        options: [{ max: 3 }],
+      },
+      {
+        code: `
+          interface LoaderInput {
+            a: string;
+            b: string;
+            c: string;
+            d: string;
+            e: string;
+          }
+
+          export function load(input: LoaderInput) {
+            return input.a;
+          }
+        `,
+        options: [{ max: 3 }],
+      },
+      {
+        code: `
+          import type { ComponentProps } from "react";
+
+          type ButtonProps = ComponentProps<"button"> & {
+            tone?: "primary" | "secondary";
+            size?: "sm" | "lg";
+          };
+
+          export function Button(props: ButtonProps) {
+            return <button {...props} />;
+          }
+        `,
+        options: [{ max: 2 }],
+      },
+      {
+        code: `
+          type BaseProps = {
+            one: string;
+            two: string;
+            three: string;
+            four: string;
+          };
+
+          const Base = (_props: BaseProps) => null;
+
+          export function Wrapper(props: BaseProps) {
+            return <Base {...props} />;
+          }
+        `,
+        options: [{ max: 3 }],
+      },
+    ],
+    invalid: [
+      {
+        code: `
+          interface PanelProps {
+            title: string;
+            subtitle: string;
+            status: string;
+            count: number;
+          }
+
+          export function Panel(props: PanelProps) {
+            return <section>{props.title}</section>;
+          }
+        `,
+        options: [{ max: 3 }],
+        errors: [{ message: /too many locally-owned props \(4 > 3\)/u }],
+      },
+      {
+        code: `
+          type PanelProps = {
+            title: string;
+            subtitle: string;
+            status: string;
+            count: number;
+            onSelect(): void;
+          };
+
+          export const Panel = ({ title }: PanelProps) => <section>{title}</section>;
+        `,
+        options: [{ max: 4 }],
+        errors: [{ message: /too many locally-owned props \(5 > 4\)/u }],
+      },
+      {
+        code: `
+          import type { FC } from "react";
+
+          type PanelProps = {
+            title: string;
+            subtitle: string;
+            status: string;
+            count: number;
+          };
+
+          export const Panel: FC<PanelProps> = (props) => <section>{props.title}</section>;
+        `,
+        options: [{ max: 3 }],
+        errors: [{ message: /too many locally-owned props \(4 > 3\)/u }],
+      },
+      {
+        code: `
+          import { memo } from "react";
+
+          type PanelProps = {
+            title: string;
+            subtitle: string;
+            status: string;
+            count: number;
+          };
+
+          export const Panel = memo(function Panel(props: PanelProps) {
+            return <section>{props.title}</section>;
+          });
+        `,
+        options: [{ max: 3 }],
+        errors: [{ message: /too many locally-owned props \(4 > 3\)/u }],
+      },
+    ],
+  },
+);
 
 ruleTester.run("no-async-array-method", rule("no-async-array-method"), {
   valid: [
@@ -208,6 +348,384 @@ ruleTester.run(
   },
 );
 
+const duplicatedClassnameControls = {
+  attributes: ["class", "className"],
+  helpers: [],
+  minSharedRatio: 0.65,
+  minSharedTokens: 4,
+};
+
+ruleTester.run(
+  "no-duplicated-conditional-classnames",
+  rule("no-duplicated-conditional-classnames"),
+  {
+    valid: [
+      {
+        code: `
+          <Pressable
+            className={cn(
+              "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3",
+              sendDisabled ? "opacity-50" : "active:opacity-75",
+            )}
+          />;
+        `,
+        filename: "new-thread.tsx",
+      },
+      {
+        code: `
+          <Pressable
+            className={\`h-9 items-center justify-center rounded-lg border border-mb-border-strong bg-mb-surface px-3 active:opacity-75 \${runtimeStatus.isFetching ? "opacity-50" : ""}\`}
+          />;
+        `,
+        filename: "runtime-diagnostics.tsx",
+      },
+      {
+        code: `
+          <Pressable
+            className={
+              sendDisabled
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75"
+            }
+          />;
+        `,
+        filename: "new-thread.tsx",
+        options: [{ ...duplicatedClassnameControls, minSharedRatio: 0.95 }],
+      },
+      {
+        code: `
+          cx(
+            sendDisabled
+              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+          );
+        `,
+        filename: "new-thread.tsx",
+      },
+      {
+        code: `
+          cn(
+            sendDisabled
+              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+          );
+        `,
+        filename: "new-thread.tsx",
+      },
+    ],
+    invalid: [
+      {
+        code: `
+          <Pressable
+            className={
+              sendDisabled
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75"
+            }
+          />;
+        `,
+        filename: "new-thread.tsx",
+        errors: [{ messageId: "duplicatedConditionalClassnames" }],
+      },
+      {
+        code: `
+          <Pressable
+            className={cn(
+              sendDisabled
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+            )}
+          />;
+        `,
+        filename: "new-thread.tsx",
+        errors: [{ messageId: "duplicatedConditionalClassnames" }],
+      },
+      {
+        code: `
+          <Pressable
+            tw={
+              sendDisabled
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75"
+            }
+          />;
+        `,
+        filename: "new-thread.tsx",
+        options: [{ ...duplicatedClassnameControls, attributes: ["tw"] }],
+        errors: [{ messageId: "duplicatedConditionalClassnames" }],
+      },
+      {
+        code: `
+          cx(
+            sendDisabled
+              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
+              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+          );
+        `,
+        filename: "new-thread.tsx",
+        options: [{ ...duplicatedClassnameControls, helpers: ["cx"] }],
+        errors: [{ messageId: "duplicatedConditionalClassnames" }],
+      },
+    ],
+  },
+);
+
+it("fails loud on partial duplicated classname controls", async () => {
+  const eslint = new ESLint({
+    overrideConfigFile: true,
+    overrideConfig: [
+      {
+        files: ["**/*.tsx"],
+        languageOptions: {
+          parser: tsParser,
+          ecmaVersion: 2023,
+          sourceType: "module",
+          parserOptions: { ecmaFeatures: { jsx: true } },
+        },
+        plugins: { antidrift: plugin },
+        rules: {
+          "antidrift/no-duplicated-conditional-classnames": [
+            "error",
+            { minSharedRatio: 0.95 },
+          ],
+        },
+      },
+    ],
+  });
+
+  await expect(
+    eslint.lintText(
+      `<Pressable className={ok ? "a b c d e" : "a b c d f"} />;`,
+      { filePath: "component.tsx" },
+    ),
+  ).rejects.toThrow(/attributes/u);
+});
+
+ruleTester.run(
+  "no-nonindependent-test-oracle",
+  rule("no-nonindependent-test-oracle"),
+  {
+    valid: [
+      {
+        code: 'assert.deepEqual(renderConfig(registry), { mcpServers: { executor: { url: "http://executor" } } });',
+        filename: "registry.test.ts",
+      },
+      {
+        code: 'expect(screen.getByRole("button", { name: "Save" })).toBeVisible();',
+        filename: "ui.test.tsx",
+      },
+      {
+        code: 'expect(result).toHaveProperty("summary", "2 items");',
+        filename: "registry.test.ts",
+      },
+      {
+        code: 'function hasExecutor(names) { return names.includes("executor"); }',
+        filename: "registry.ts",
+      },
+      {
+        code: 'names.not.toContain("node_repl");',
+        filename: "registry.test.ts",
+      },
+      {
+        code: `
+          it("finds the needle connection", () => {
+            const needle = connections.find((server) => server.name === "needle");
+            expect(needle).toBeDefined();
+            expect(needle.transport).toBe("stdio");
+          });
+        `,
+        filename: "registry.test.ts",
+      },
+      {
+        code: `
+          it("debounces the handler", () => {
+            trigger();
+            trigger();
+            expect(handler).toHaveBeenCalledTimes(1);
+          });
+        `,
+        filename: "debounce.test.ts",
+      },
+      {
+        code: `
+          it("round-trips through serialize", () => {
+            expect(deserialize(serialize(payload))).toEqual(payload);
+          });
+        `,
+        filename: "codec.test.ts",
+      },
+    ],
+    invalid: [
+      {
+        code: 'assert.equal(names.includes("node_repl"), false);',
+        filename: "registry.test.ts",
+        errors: 1,
+      },
+      {
+        code: 'assert.deepStrictEqual(names.includes("node_repl"), false);',
+        filename: "registry.test.ts",
+        errors: 1,
+      },
+      {
+        code: 'assert.ok(!("node_repl" in config.mcp_servers));',
+        filename: "registry.test.ts",
+        errors: 1,
+      },
+      {
+        code: 'assert.equal(registry.mcpServers.some((server) => server.name === "node_repl"), false);',
+        filename: "registry.test.ts",
+        errors: 1,
+      },
+      {
+        code: "expect(frames.some((frame) => frame.proof.proven)).toBe(true);",
+        filename: "react-state-graph.test.mjs",
+        errors: 1,
+      },
+      {
+        code: "expect(frames.some((frame) => frame.proof.proven)).toStrictEqual(true);",
+        filename: "react-state-graph.test.mjs",
+        errors: 1,
+      },
+      {
+        code: 'expect(names).not.toContain("node_repl");',
+        filename: "registry.test.ts",
+        errors: 1,
+      },
+      {
+        code: 'expect(config.mcp_servers).toHaveProperty("executor");',
+        filename: "registry.test.ts",
+        errors: 1,
+      },
+      {
+        code: 'assert.equal(Object.hasOwn(renderConfig(registry).mcpServers, "expo"), false);',
+        filename: "registry.test.ts",
+        errors: [{ messageId: "noBareMembership" }],
+      },
+      {
+        code: `
+          const codexThreadSummary = { status: "running", source: { kind: "provider-thread" } };
+          it("parses canonical agent thread summaries", () => {
+            const parsed = agentThreadSummarySchema.parse(codexThreadSummary);
+            expect(parsed.status).toBe("running");
+            expect(parsed.source.kind).toBe("provider-thread");
+          });
+        `,
+        filename: "thread.test.ts",
+        errors: [{ messageId: "inputEcho" }, { messageId: "inputEcho" }],
+      },
+      {
+        code: `
+          const codexThreadSummary = { status: "running" };
+          it("rejects malformed agent thread summaries loudly", () => {
+            expect(schema.safeParse({ ...codexThreadSummary, status: "streaming" }).success).toBe(false);
+            expect(schema.safeParse({ ...codexThreadSummary, extra: true }).success).toBe(false);
+          });
+        `,
+        filename: "thread.test.ts",
+        errors: [{ messageId: "outcomeEcho" }, { messageId: "outcomeEcho" }],
+      },
+      {
+        code: `
+          const fixture = { status: "running" };
+          it("proves a transform beside the echo", () => {
+            const parsed = schema.parse(fixture);
+            expect(parsed).toEqual(fixture);
+            expect(renderSummary(parsed)).toBe("running thread");
+          });
+        `,
+        filename: "thread.test.ts",
+        errors: [{ messageId: "inputEcho" }],
+      },
+      {
+        code: `
+          const fixture = { status: "running" };
+          it("rejects malformed payloads with issue detail", () => {
+            const result = schema.safeParse(fixture);
+            expect(result.success).toBe(false);
+            expect(result.error.issues[0].path).toEqual(["status"]);
+          });
+        `,
+        filename: "thread.test.ts",
+        errors: [{ messageId: "outcomeEcho" }],
+      },
+      {
+        code: `
+          it("echoes the parse result", () => {
+            const parsed = schema.parse(fixture);
+            expect(parsed).toEqual(fixture);
+          });
+        `,
+        filename: "thread.test.ts",
+        errors: [{ messageId: "inputEcho" }],
+      },
+      {
+        code: `
+          it("echoes one field back", () => {
+            const parsed = schema.parse(fixture);
+            expect(parsed.status).toBe(fixture.status);
+          });
+        `,
+        filename: "thread.test.ts",
+        errors: [{ messageId: "inputEcho" }],
+      },
+      {
+        code: `
+          it("parses thread list responses", () => {
+            const parsed = listSchema.parse({ items: [codexThreadSummary, claudeThreadSummary], hasMore: true, limit: 2 });
+            expect(parsed.items).toHaveLength(2);
+            expect(listSchema.safeParse({ items: [codexThreadSummary], hasMore: "yes" }).success).toBe(false);
+          });
+        `,
+        filename: "thread.test.ts",
+        errors: [{ messageId: "lengthEcho" }, { messageId: "outcomeEcho" }],
+      },
+      {
+        code: `
+          const registryInput = { agentSurfaces: [{ kind: "a" }, { kind: "b" }, { kind: "c" }] };
+          it("projects surface kinds", () => {
+            const registry = parseRegistry(registryInput);
+            expect(registry.agentSurfaces.length).toBe(3);
+            expect(registry.agentSurfaces.map((surface) => surface.kind)).toEqual(["a", "b", "c"]);
+          });
+        `,
+        filename: "registry.test.ts",
+        errors: [{ messageId: "lengthEcho" }],
+      },
+      {
+        code: `
+          it("checks runtime servers", () => {
+            const connections = toRuntimeConnections(registry);
+            expect(connections.map((server) => server.name)).toEqual(["needle", "context7"]);
+            expect(names).toContain("executor");
+          });
+        `,
+        filename: "registry.test.ts",
+        errors: [{ messageId: "noBareMembership" }],
+      },
+      {
+        code: `
+          it("saves through the repository", () => {
+            service.save(user);
+            expect(repository.save).toHaveBeenCalledWith(user);
+          });
+        `,
+        filename: "service.test.ts",
+        errors: [{ messageId: "mockCallEcho" }],
+      },
+      {
+        code: `
+          it("has config", () => {
+            const config = { retries: 3 };
+            expect(config).toBeDefined();
+          });
+        `,
+        filename: "config.test.ts",
+        errors: [{ messageId: "existenceEcho" }],
+      },
+    ],
+  },
+);
+
 ruleTester.run(
   "no-query-data-type-parameters",
   rule("no-query-data-type-parameters"),
@@ -229,11 +747,81 @@ ruleTester.run(
 );
 
 ruleTester.run(
-  "no-trivial-selector-wrapper",
-  rule("no-trivial-selector-wrapper"),
+  "no-silent-empty-detection-fallback",
+  rule("no-silent-empty-detection-fallback"),
+  {
+    valid: [
+      "function formatLabel() { try { return readLabel(); } catch { return ''; } }",
+      "function macosPlatformUuid() { const match = output.match(/UUID/); if (!match) throw new Error('missing UUID'); return match[1]; }",
+      "const resolveHost = () => null;",
+      "const deviceId = () => process.env.AGENT_TRACE_DEVICE_ID ?? readMachineId();",
+      "function getDisplayName() { return ''; }",
+      "function isValid() { return ''; }",
+    ],
+    invalid: [
+      {
+        code: `function macosPlatformUuid() {
+          if (process.platform !== "darwin") return "";
+          try {
+            const output = execFileSync("/usr/sbin/ioreg", ["-rd1", "-c", "IOPlatformExpertDevice"], { encoding: "utf8" });
+            return output.match(/"IOPlatformUUID" = "([^"]+)"/)?.[1] || "";
+          } catch {
+            return "";
+          }
+        }`,
+        errors: [
+          {
+            message:
+              "Do not return an empty string from macosPlatformUuid (source: ast-failure-branch). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
+          },
+          {
+            message:
+              "Do not return an empty string from macosPlatformUuid (source: ast-logical-fallback). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
+          },
+          {
+            message:
+              "Do not return an empty string from macosPlatformUuid (source: ast-catch-recovery). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
+          },
+        ],
+      },
+      {
+        code: "const deviceId = () => process.env.AGENT_TRACE_DEVICE_ID ?? '';",
+        errors: [
+          {
+            message:
+              "Do not return an empty string from deviceId (source: ast-logical-fallback). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
+          },
+        ],
+      },
+      {
+        code: "const detector = { lookupHost() { return ok ? host : ''; } };",
+        errors: [
+          {
+            message:
+              "Do not return an empty string from lookupHost (source: ast-conditional-fallback). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
+          },
+        ],
+      },
+      {
+        code: "function traceDevice() { return (readMachineId() || '') as string; }",
+        errors: [
+          {
+            message:
+              "Do not return an empty string from traceDevice (source: ast-logical-fallback). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
+          },
+        ],
+      },
+    ],
+  },
+);
+
+typedRuleTester.run(
+  "no-contract-appeasement-projection",
+  rule("no-contract-appeasement-projection"),
   {
     valid: [
       fixture("programs/correct/exported-function-selector-boundary.ts"),
+      fixture("programs/correct/contract-projection-boundaries.ts"),
       fixture("programs/correct/selector-computation.ts"),
       fixture("programs/correct/inferred-selector-wrapper.ts"),
       fixture("programs/correct/selector-returns-foreign-object.ts"),
@@ -248,6 +836,10 @@ ruleTester.run(
     ],
     invalid: [
       { ...fixture("programs/drift/typed-selector-wrapper.ts"), errors: 1 },
+      {
+        ...fixture("programs/drift/contract-appeasement-projection.ts"),
+        errors: 3,
+      },
       {
         ...fixture("programs/drift/typed-selector-arrow-wrapper.ts"),
         errors: 1,
@@ -646,9 +1238,7 @@ ruleTester.run("no-sql-string-concat", rule("no-sql-string-concat"), {
       code: 'import { sql as drizzleSql } from "drizzle-orm/sql/sql";\ndeclare const id: string;\nconst rows = drizzleSql`SELECT * FROM users WHERE id = ${id}`;\nvoid rows;',
       options: [
         {
-          safeTemplateTags: [
-            { module: "drizzle-orm/sql/sql", export: "sql" },
-          ],
+          safeTemplateTags: [{ module: "drizzle-orm/sql/sql", export: "sql" }],
         },
       ],
     },

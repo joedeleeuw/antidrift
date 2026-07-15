@@ -3,12 +3,12 @@ import { resolve } from "node:path";
 import js from "@eslint/js";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import vitest from "@vitest/eslint-plugin";
+import { defineConfig } from "eslint/config";
 import boundaries from "eslint-plugin-boundaries";
 import importX from "eslint-plugin-import-x";
 import noOnlyTests from "eslint-plugin-no-only-tests";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
-import sonarjs from "eslint-plugin-sonarjs";
 import unicorn from "eslint-plugin-unicorn";
 import globals from "globals";
 import tseslint from "typescript-eslint";
@@ -73,7 +73,7 @@ export function createConfig({
     ...generatedPatterns,
     ...gatewayImportPatterns(registries),
   ];
-  return tseslint.config(
+  return defineConfig(
     {
       ignores: [
         "**/node_modules/**",
@@ -90,7 +90,6 @@ export function createConfig({
     },
     js.configs.recommended,
     ...tseslint.configs.recommendedTypeChecked,
-    sonarjs.configs.recommended,
     reactHooks.configs.flat["recommended-latest"],
     {
       files: ["**/*.{ts,tsx,js,mjs,cjs}"],
@@ -175,10 +174,13 @@ export function createConfig({
         "@typescript-eslint/no-unsafe-member-access": "error",
         "@typescript-eslint/no-unsafe-return": "error",
         "@typescript-eslint/no-unsafe-type-assertion": "error",
+        "@typescript-eslint/no-base-to-string": "error",
+        "@typescript-eslint/no-deprecated": "error",
         "@typescript-eslint/no-misused-promises": [
           "error",
           { checksVoidReturn: { arguments: false, attributes: false } },
         ],
+        "@typescript-eslint/restrict-plus-operands": "error",
         "@typescript-eslint/consistent-type-imports": [
           "error",
           { prefer: "type-imports", fixStyle: "separate-type-imports" },
@@ -217,6 +219,7 @@ export function createConfig({
         "react/jsx-no-target-blank": "error",
         "react/jsx-no-duplicate-props": "error",
         "react/jsx-no-script-url": "error",
+        "react/jsx-no-constructed-context-values": "error",
         "react/no-danger-with-children": "error",
         "react/no-unknown-property": "error",
         "react/no-children-prop": "error",
@@ -233,6 +236,7 @@ export function createConfig({
             unnamedComponents: ["arrow-function", "function-expression"],
           },
         ],
+        "react/hook-use-state": "error",
         "react/jsx-pascal-case": "error",
         "react/display-name": "error",
         "react/no-access-state-in-setstate": "error",
@@ -341,12 +345,6 @@ export function createConfig({
         "unicorn/require-post-message-target-origin": "error",
         "unicorn/text-encoding-identifier-case": "error",
         "unicorn/throw-new-error": "error",
-        "sonarjs/deprecation": "error",
-        "sonarjs/no-built-in-override": "error",
-        "sonarjs/no-incorrect-string-concat": "error",
-        "sonarjs/no-reference-error": "error",
-        "sonarjs/no-undefined-assignment": "error",
-        "sonarjs/no-unsafe-unzip": "error",
         curly: ["error", "multi-line"],
 
         // Architecture boundaries prevent semantic drift across layers.
@@ -425,7 +423,7 @@ export function createConfig({
         ],
 
         // AI-specific custom rules from the local plugin.
-        "antidrift/no-trivial-selector-wrapper": "error",
+        "antidrift/no-contract-appeasement-projection": "error",
         "antidrift/no-inline-structural-type-at-use-site": "off",
         "antidrift/no-appeasement-cast": "off",
         "antidrift/no-nullable-positional-tuple": "off",
@@ -434,6 +432,7 @@ export function createConfig({
         "antidrift/no-handrolled-resource-lifecycle-cells": "off",
         "antidrift/no-shattered-ingested-entity-state": "off",
         "antidrift/require-effect-deps": "error",
+        "antidrift/react-max-component-props": ["error", { max: 12 }],
         "antidrift/no-raw-fetch-in-component": "off",
         "antidrift/no-async-array-method": "off",
 
@@ -453,7 +452,10 @@ export function createConfig({
         // React/TanStack drift rules ported from getsentry/sentry. Default-off
         // (opt-in) until local corpus inventory quantifies drift for stable promotion.
         "antidrift/no-calling-components-as-functions": "off",
+        "antidrift/no-duplicated-conditional-classnames": "off",
+        "antidrift/no-nonindependent-test-oracle": "off",
         "antidrift/no-query-data-type-parameters": "off",
+        "antidrift/no-silent-empty-detection-fallback": "off",
         ...(restrictedImportPatterns.length > 0
           ? {
               "no-restricted-imports": restrictedImportsRule(
@@ -514,13 +516,11 @@ export function createConfig({
         "@typescript-eslint/no-unsafe-call": "off",
         "@typescript-eslint/no-unsafe-argument": "off",
         "@typescript-eslint/restrict-template-expressions": "off",
-        "sonarjs/no-os-command-from-path": "off",
       },
     },
     {
       files: ["eslint.config.mjs"],
       rules: {
-        "sonarjs/deprecation": "off",
         "@typescript-eslint/no-unsafe-assignment": "off",
       },
     },

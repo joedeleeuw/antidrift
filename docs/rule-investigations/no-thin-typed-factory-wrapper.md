@@ -65,7 +65,7 @@ Adjacent rules are not enough:
 - ESLint `no-useless-return` only removes redundant `return;` statements with no value; returning a call is explicitly allowed by that rule.
 - `@typescript-eslint/no-unsafe-return` catches returning `any`/`any[]`/`Promise<any>`, not redundant delegation from a typed callee.
 - `@typescript-eslint/explicit-function-return-type` enforces the opposite style policy. Its docs explicitly note that inferred return types are often enough, but it does not decide when an annotation is unearned.
-- SonarJS has nearby maintainability rules such as `prefer-immediate-return`, but those target local variables that are immediately returned, not typed factory wrappers.
+- SonarQube has nearby maintainability rules such as immediate-return checks, but those target local variables that are immediately returned, not typed factory wrappers.
 - TypeScript's own inference already determines function return types from `return` statements, which is the language behavior this candidate would lean on.
 
 The implementation host, if this is ever promoted, should be `typescript-eslint` custom rules with parser services. `typescript-eslint` documents typed linting as the path for rules that need TypeScript's type checking APIs, and this candidate depends on symbol identity and assignability.
@@ -77,7 +77,6 @@ Sources checked:
 - https://typescript-eslint.io/rules/explicit-function-return-type/
 - https://typescript-eslint.io/getting-started/typed-linting
 - https://typescript-eslint.io/developers/custom-rules/
-- https://github.com/SonarSource/eslint-plugin-sonarjs
 - https://www.typescriptlang.org/docs/handbook/type-inference.html
 
 ## Test Matrix
@@ -161,7 +160,7 @@ Stack-ranked:
 
 Likely escape shapes:
 
-- Add a temporary variable and return it. SonarJS `prefer-immediate-return` may catch some of these, but it is not equivalent.
+- Add a temporary variable and return it. SonarQube immediate-return checks may catch some of these, but they are not equivalent.
 - Add a no-op transform, such as spreading the result or forwarding `...args`.
 - Reorder through an object `{ path, title, visible }`.
 - Export the wrapper to hit the boundary exemption.
@@ -205,9 +204,9 @@ No implementation slice remains active. The only narrow version that survived th
 
 Before implementing, verify the accepted drift is not already covered by:
 
-- `antidrift/no-trivial-selector-wrapper`
+- `antidrift/no-contract-appeasement-projection`
 - `antidrift/no-redundant-zod-parse`
 - `antidrift/no-appeasement-cast`
 - `antidrift/no-underchecked-type-predicate`
 - `@typescript-eslint/no-unsafe-return`
-- SonarJS immediate-return/no-identical implementation rules
+- SonarQube immediate-return/no-identical implementation rules
