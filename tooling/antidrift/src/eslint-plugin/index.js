@@ -8,6 +8,7 @@ import {
 } from "./react-state-graph.js";
 import ruleNoCallingComponentsAsFunctions from "./rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "./rules/no-duplicated-conditional-classnames.js";
+import ruleNoDuplicatedObjectFieldBlocks from "./rules/no-duplicated-object-field-blocks.js";
 import ruleNoNonindependentTestOracle from "./rules/no-nonindependent-test-oracle.js";
 import ruleNoQueryDataTypeParameters from "./rules/no-query-data-type-parameters.js";
 import ruleNoSilentEmptyDetectionFallback from "./rules/no-silent-empty-detection-fallback.js";
@@ -4268,6 +4269,7 @@ const rules = {
   "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
   "no-duplicated-conditional-classnames":
     ruleNoDuplicatedConditionalClassnames(),
+  "no-duplicated-object-field-blocks": ruleNoDuplicatedObjectFieldBlocks(),
   "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
   "no-query-data-type-parameters": ruleNoQueryDataTypeParameters(),
   "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),

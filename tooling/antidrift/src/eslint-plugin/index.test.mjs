@@ -502,6 +502,202 @@ it("fails loud on partial duplicated classname controls", async () => {
 });
 
 ruleTester.run(
+  "no-duplicated-object-field-blocks",
+  rule("no-duplicated-object-field-blocks"),
+  {
+    valid: [
+      {
+        code: `
+          const transcriptItemFields = {
+            item_id: z.string(),
+            content_index: z.number(),
+          };
+
+          z.discriminatedUnion("type", [
+            z.object({
+              type: z.literal("conversation.item.input_audio_transcription.completed"),
+              ...transcriptItemFields,
+              transcript: z.string(),
+            }).passthrough(),
+            z.object({
+              type: z.literal("response.output_audio_transcript.delta"),
+              ...transcriptItemFields,
+              delta: z.string(),
+            }).passthrough(),
+            z.object({
+              type: z.literal("response.output_audio_transcript.done"),
+              ...transcriptItemFields,
+              transcript: z.string(),
+            }).passthrough(),
+          ]);
+        `,
+      },
+      {
+        code: `
+          z.object({ type: z.literal("created"), id: z.string(), at: z.number() });
+          z.object({ type: z.literal("updated"), id: z.string(), at: z.number() });
+        `,
+      },
+      {
+        code: `
+          z.object({ id: z.string(), content_index: z.number() });
+          z.object({ id: z.number(), content_index: z.string() });
+          z.object({ id: z.boolean(), content_index: z.bigint() });
+        `,
+      },
+      {
+        code: `
+          interface TranscriptItemFields {
+            itemId: string;
+            contentIndex: number;
+          }
+
+          interface TranscriptDelta extends TranscriptItemFields {
+            kind: "delta";
+            delta: string;
+          }
+
+          type TranscriptDone = TranscriptItemFields & {
+            kind: "done";
+            transcript: string;
+          };
+        `,
+      },
+      {
+        code: `
+          const first = { id: parseId(), contentIndex: parseIndex(), label: "first" };
+          const second = { id: parseId(), contentIndex: parseIndex(), label: "second" };
+          const third = { id: parseId(), contentIndex: parseIndex(), label: "third" };
+        `,
+      },
+    ],
+    invalid: [
+      {
+        code: `
+          z.discriminatedUnion("type", [
+            z.object({
+              type: z.literal("conversation.item.input_audio_transcription.completed"),
+              item_id: z.string(),
+              content_index: z.number(),
+              transcript: z.string(),
+            }).passthrough(),
+            z.object({
+              type: z.literal("response.output_audio_transcript.delta"),
+              response_id: z.string(),
+              item_id: z.string(),
+              content_index: z.number(),
+              delta: z.string(),
+            }).passthrough(),
+            z.object({
+              type: z.literal("response.output_audio_transcript.done"),
+              response_id: z.string(),
+              item_id: z.string(),
+              content_index: z.number(),
+              transcript: z.string(),
+            }).passthrough(),
+          ]);
+        `,
+        errors: [
+          {
+            messageId: "duplicatedObjectFieldBlocks",
+            data: {
+              shapes: "3",
+              count: "2",
+              fields: "content_index, item_id",
+            },
+          },
+        ],
+      },
+      {
+        code: `
+          z.object({ kind: z.literal("left"), id: z.string(), at: z.number(), source: z.string() });
+          z.object({ kind: z.literal("right"), id: z.string(), at: z.number(), source: z.string() });
+        `,
+        errors: [
+          {
+            messageId: "duplicatedObjectFieldBlocks",
+            data: { shapes: "2", count: "3", fields: "at, id, source" },
+          },
+        ],
+      },
+      {
+        code: `
+          type Created = { kind: "created"; id: string; contentIndex: number };
+          type Updated = { kind: "updated"; id: string; contentIndex: number };
+          type Deleted = { kind: "deleted"; id: string; contentIndex: number };
+        `,
+        errors: [
+          {
+            messageId: "duplicatedObjectFieldBlocks",
+            data: {
+              shapes: "3",
+              count: "2",
+              fields: "contentIndex, id",
+            },
+          },
+        ],
+      },
+      {
+        code: `
+          z.object({ kind: z.literal("a"), id: z.string(), at: z.number(), tenant: z.string(), source: z.string(), region: z.string(), locale: z.string() });
+          z.object({ kind: z.literal("b"), id: z.string(), at: z.number(), tenant: z.string(), source: z.string(), region: z.string(), locale: z.string() });
+          z.object({ kind: z.literal("c"), id: z.string(), at: z.number() });
+        `,
+        errors: [
+          {
+            messageId: "duplicatedObjectFieldBlocks",
+            data: { shapes: "3", count: "2", fields: "at, id" },
+          },
+        ],
+      },
+      {
+        code: `
+          z.object({ kind: z.literal("a"), id: z.string(), at: z.number(), tenant: z.string(), source: z.string(), region: z.string(), locale: z.string(), zone: z.string() });
+          z.object({ kind: z.literal("b"), id: z.string(), at: z.number(), tenant: z.string(), source: z.string(), region: z.string(), locale: z.string(), zone: z.string() });
+          z.object({ kind: z.literal("c"), id: z.string(), at: z.number() });
+        `,
+        errors: [
+          {
+            messageId: "duplicatedObjectFieldBlocks",
+            data: { shapes: "3", count: "2", fields: "at, id" },
+          },
+        ],
+      },
+    ],
+  },
+);
+
+it("fails loud on partial duplicated object field block controls", async () => {
+  const eslint = new ESLint({
+    overrideConfigFile: true,
+    overrideConfig: [
+      {
+        files: ["**/*.ts"],
+        languageOptions: {
+          parser: tsParser,
+          ecmaVersion: 2023,
+          sourceType: "module",
+        },
+        plugins: { antidrift: plugin },
+        rules: {
+          "antidrift/no-duplicated-object-field-blocks": [
+            "error",
+            { minSharedFields: 2, minShapes: 2 },
+          ],
+        },
+      },
+    ],
+  });
+
+  await expect(
+    eslint.lintText(
+      `type A = { id: string; at: number }; type B = { id: string; at: number };`,
+      { filePath: "types.ts" },
+    ),
+  ).rejects.toThrow(/minRedundantDeclarations/u);
+});
+
+ruleTester.run(
   "no-nonindependent-test-oracle",
   rule("no-nonindependent-test-oracle"),
   {
