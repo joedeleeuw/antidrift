@@ -857,6 +857,14 @@ const murderboxCases = [
     subproject: "client",
     paths: ["apps/client/src/screens/agent-bridge/new-thread.tsx"],
   },
+  {
+    id: "murderbox-voice-session-object-field-blocks-clean",
+    ruleId: "antidrift/no-duplicated-object-field-blocks",
+    kind: "correct",
+    classification: "ready",
+    subproject: "client",
+    paths: ["apps/client/src/lib/voice-openai-session.native.ts"],
+  },
 ];
 
 const cloudflareAgentsCases = [

@@ -8,6 +8,7 @@ This template intentionally excludes the later package-publication surface gap w
 
 - pnpm workspace catalogs for consistent dependency versions.
 - ESLint for baseline JavaScript/TypeScript feedback and custom policy rules for project-specific agent failure modes.
+- A default-off `no-duplicated-object-field-blocks` rule for repeated Zod and TypeScript shape fields that should be hoisted into a shared shape.
 - Declarative source of truth in `policy/agent-guardrails.yaml`.
 - Positive build recipes in `docs/build-patterns.md` so agents import or derive concepts instead of duplicating them.
 - Feature planning template in `docs/feature-slice-template.md`.
