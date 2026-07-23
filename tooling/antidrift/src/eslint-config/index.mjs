@@ -273,6 +273,14 @@ export function createConfig({
           "error",
           { terms: ["@nocommit", "FIXME"], location: "anywhere" },
         ],
+        "no-restricted-syntax": [
+          "error",
+          {
+            selector: "ConditionalExpression:has(> ConditionalExpression)",
+            message:
+              "Do not nest ternary expressions. Tip: do not merely move this logic into a function; nested conditional state selection often signals that data is being determined or controlled in the wrong part of the program.",
+          },
+        ],
         "unicorn/no-abusive-eslint-disable": "error",
         "@eslint-community/eslint-comments/require-description": "error",
         "@eslint-community/eslint-comments/disable-enable-pair": "error",

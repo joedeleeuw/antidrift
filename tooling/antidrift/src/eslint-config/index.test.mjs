@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { Linter } from "eslint";
 import { describe, expect, it } from "vitest";
 
 import { createConfig } from "./index.mjs";
@@ -121,6 +122,40 @@ describe("createConfig", () => {
     expect(severity(rules["import-x/no-self-import"])).toBe("error");
     expect(severity(rules["import-x/no-useless-path-segments"])).toBe("error");
     expect(severity(rules["import-x/order"])).toBe("error");
+  });
+
+  it("rejects nested ternaries with an architectural tip", () => {
+    const rules = collectRules(
+      createConfig({ tsconfigRootDir: process.cwd() }),
+    );
+    const linter = new Linter();
+    const config = {
+      languageOptions: { ecmaVersion: "latest" },
+      rules: { "no-restricted-syntax": rules["no-restricted-syntax"] },
+    };
+
+    expect(
+      linter.verify("const value = ready ? active : idle;", config),
+    ).toEqual([]);
+    expect(
+      linter.verify(
+        `const blockedReason =
+  actionState.kind === "stop"
+    ? actionState.keyboard.kind === "blocked"
+      ? actionState.keyboard.reason
+      : null
+    : actionState.enabled
+      ? null
+      : actionState.reason;`,
+        config,
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        ruleId: "no-restricted-syntax",
+        message:
+          "Do not nest ternary expressions. Tip: do not merely move this logic into a function; nested conditional state selection often signals that data is being determined or controlled in the wrong part of the program.",
+      }),
+    ]);
   });
 
   it("wires semantic fact settings through the public config API", () => {
