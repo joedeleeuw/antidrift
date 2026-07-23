@@ -461,6 +461,7 @@ export function createConfig({
         // (opt-in) until local corpus inventory quantifies drift for stable promotion.
         "antidrift/no-calling-components-as-functions": "off",
         "antidrift/no-duplicated-conditional-classnames": "off",
+        "antidrift/no-duplicated-object-field-blocks": "off",
         "antidrift/no-nonindependent-test-oracle": "off",
         "antidrift/no-query-data-type-parameters": "off",
         "antidrift/no-silent-empty-detection-fallback": "off",

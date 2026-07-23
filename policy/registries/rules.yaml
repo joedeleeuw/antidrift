@@ -1528,6 +1528,34 @@ rules:
         - 'className={cn("w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3", disabled ? "opacity-50" : "active:opacity-75")}'
         - 'className={`h-9 items-center justify-center rounded-lg border border-mb-border-strong bg-mb-surface px-3 active:opacity-75 ${fetching ? "opacity-50" : ""}`}'
     nextAction: "Run the Murderbox client file as the first drift corpus case and inventory additional UI repos before considering default-on enforcement."
+  antidrift/no-duplicated-object-field-blocks:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: AST co-occurrence of identical name-and-source-type field blocks across Zod or TypeScript object shapes
+    solveType: duplicated-object-field-block
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-duplicated-object-field-blocks.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - The rule targets repeated schema and type declaration fields, not ordinary runtime object literals, where repeated keys frequently represent unrelated data rather than a shared contract.
+      - Field identity includes normalized source text as well as the field name, so semantically equivalent types written through different aliases remain distinct without TypeScript services.
+      - "Alert controls fail loudly: omitted options use the default shape, while provided option objects must include minSharedFields, minShapes, and minRedundantDeclarations."
+    external:
+      state: net-antidrift
+      support: low
+      candidates:
+        ["ESLint no-dupe-keys", "SonarQube copy-paste detection", "duplicate-code scanners"]
+      decision: own-antidrift
+      whyThisState: "Maintained duplicate-key rules inspect collisions inside one object, while copy-paste scanners use larger token or line blocks; neither models matching field name/type pairs spread across several sibling Zod or TypeScript shapes."
+      whyNotOtherState: "Not ecosystem-covered because generic duplication tools do not provide this small, shape-aware signal or the corresponding spread/extends refactoring guidance."
+    examples:
+      flags:
+        - 'z.object({ type: z.literal("a"), item_id: z.string(), content_index: z.number() }); z.object({ type: z.literal("b"), item_id: z.string(), content_index: z.number() }); z.object({ type: z.literal("c"), item_id: z.string(), content_index: z.number() });'
+      allows:
+        - 'const itemFields = { item_id: z.string(), content_index: z.number() }; z.object({ type: z.literal("a"), ...itemFields }); z.object({ type: z.literal("b"), ...itemFields });'
+        - 'interface ItemFields { itemId: string; contentIndex: number } interface Delta extends ItemFields { type: "delta"; delta: string }'
+    nextAction: "Inventory additional schema-heavy repositories for false-positive pressure before considering stable promotion or default-on enforcement."
   antidrift/no-query-data-type-parameters:
     status: ready
     stable: false
