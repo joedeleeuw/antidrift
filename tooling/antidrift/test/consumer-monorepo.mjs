@@ -128,8 +128,8 @@ try {
       "    status: ecosystem-covered\n" +
       "    signal: import-graph\n" +
       "    solveType: semantic-architecture-drift\n" +
-      "    replacement: import-x/no-cycle\n" +
-      "    reason: Covered by shared ESLint config.\n" +
+      "    replacement: import/no-cycle\n" +
+      "    reason: Covered by shared Oxlint config.\n" +
       "policyRuleReviews:\n" +
       "  agent/require-checks-before-stop:\n" +
       "    status: active-custom\n" +
@@ -150,6 +150,8 @@ try {
           eslint: "^9",
           "typescript-eslint": "^8",
           "@typescript-eslint/parser": "^8",
+          oxlint: "^1.75.0",
+          "oxlint-tsgolint": "^7.0.2001",
           typescript: "^5",
           firebase: "workspace:*",
         },
@@ -241,30 +243,32 @@ try {
       "];\n",
   );
   file(
-    "eslint.async-array.config.mjs",
-    'import { createConfig } from "@joedeleeuw/antidrift/eslint-config";\n' +
+    "oxlint.async-array.config.mjs",
+    'import { createOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
       "\n" +
-      "export default [\n" +
-      "  ...createConfig({ tsconfigRootDir: import.meta.dirname }),\n" +
-      "  {\n" +
-      "    rules: {\n" +
-      '      "antidrift/no-async-array-method": "error",\n' +
-      "    },\n" +
+      "const config = createOxlintConfig({ repoRoot: import.meta.dirname });\n" +
+      "\n" +
+      "export default {\n" +
+      "  ...config,\n" +
+      "  rules: {\n" +
+      "    ...config.rules,\n" +
+      '    "antidrift/no-async-array-method": "error",\n' +
       "  },\n" +
-      "];\n",
+      "};\n",
   );
   file(
-    "eslint.async-array-collection.config.mjs",
-    'import { createConfig } from "@joedeleeuw/antidrift/eslint-config";\n' +
+    "oxlint.async-array-collection.config.mjs",
+    'import { createOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
       "\n" +
-      "export default [\n" +
-      "  ...createConfig({ tsconfigRootDir: import.meta.dirname }),\n" +
-      "  {\n" +
-      "    rules: {\n" +
-      '      "antidrift/no-async-array-method": ["error", { branches: ["requires-collection"] }],\n' +
-      "    },\n" +
+      "const config = createOxlintConfig({ repoRoot: import.meta.dirname });\n" +
+      "\n" +
+      "export default {\n" +
+      "  ...config,\n" +
+      "  rules: {\n" +
+      "    ...config.rules,\n" +
+      '    "antidrift/no-async-array-method": ["error", { branches: ["requires-collection"] }],\n' +
       "  },\n" +
-      "];\n",
+      "};\n",
   );
   file(
     "packages/firebase/package.json",
@@ -372,11 +376,13 @@ try {
     "packages/app/src/exports.ts",
     'import type { ESLint, Linter } from "eslint";\n' +
       'import type * as ts from "typescript";\n' +
-      'import { createConfig, eslintPlugin, loadPolicy, loadRegistriesSync, renderPolicyArtifacts, type AgentGuardrailsPolicy, type AntidriftConfigOptions, type AntidriftRegistries, type PolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
+      'import { createConfig, createOxlintConfig, eslintPlugin, loadPolicy, loadRegistriesSync, oxlintPlugin, renderPolicyArtifacts, type AgentGuardrailsPolicy, type AntidriftConfigOptions, type AntidriftOxlintConfigOptions, type AntidriftRegistries, type PolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
       'import { brand, type Brand, type BrandKit, type BrandSafeResult, type Unbrand } from "@joedeleeuw/antidrift/brand";\n' +
       'import plugin from "@joedeleeuw/antidrift/eslint-plugin";\n' +
       'import { createConfig as createConfigFromSubpath, type AntidriftConfigOptions as SubpathConfigOptions } from "@joedeleeuw/antidrift/eslint-config";\n' +
-      'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, loadRuleStatusRegistrySync, oxlintComplexityConfig, oxlintComplexityIgnorePatterns, parseOxlintComplexityArgs, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, ruleStatusEntriesForKind, ruleStatusEntriesForProofBucket, ruleStatusEntriesForSemanticAdapter, ruleStatusEntriesForStatus, ruleStatusEntryForId, ruleStatusManifest, ruleStatusSemanticSummaries, ruleStatusSemanticSummaryForId, runOxlintComplexity, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession, type AgentGuardrailsPolicy as PolicySubpathPolicy, type OxlintComplexityArgs, type RuleStatusManifest, type RuleStatusManifestEntry, type RuleStatusPromotion, type RuleStatusSemanticSummary, type SemanticFact, type SemanticFactKind, type SemanticFactKindContractEntry, type SqlParserServiceDeltaClassification } from "@joedeleeuw/antidrift/policy";\n' +
+      'import { createOxlintConfig as createOxlintConfigFromSubpath, type AntidriftOxlintConfigOptions as OxlintSubpathConfigOptions } from "@joedeleeuw/antidrift/oxlint-config";\n' +
+      'import oxlintPluginFromSubpath from "@joedeleeuw/antidrift/oxlint-plugin";\n' +
+      'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, loadRuleStatusRegistrySync, parseOxlintArgs, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, ruleStatusEntriesForKind, ruleStatusEntriesForProofBucket, ruleStatusEntriesForSemanticAdapter, ruleStatusEntriesForStatus, ruleStatusEntryForId, ruleStatusManifest, ruleStatusSemanticSummaries, ruleStatusSemanticSummaryForId, runOxlint, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession, type AgentGuardrailsPolicy as PolicySubpathPolicy, type OxlintArgs, type RuleStatusManifest, type RuleStatusManifestEntry, type RuleStatusPromotion, type RuleStatusSemanticSummary, type SemanticFact, type SemanticFactKind, type SemanticFactKindContractEntry, type SqlParserServiceDeltaClassification } from "@joedeleeuw/antidrift/policy";\n' +
       'import { SEMANTIC_ADAPTERS, SEMANTIC_ADAPTER_CONTRACTS, SEMANTIC_ADAPTER_CONTRACT_LIST, SEMANTIC_ADAPTER_MANIFEST, asyncControlFlow as adapterAsyncControlFlow, authBoundary as adapterAuthBoundary, broadInput as adapterBroadInput, parseInput as adapterParseInput, reactState as adapterReactState, schemaProvenance as adapterSchemaProvenance, semanticAdapterContractsForFactAdapterId, semanticAdapterContractsForFactKind, semanticAdapterContractsForProofBucket, semanticAdapterContractsForRule, semanticAdapterManifestForAdapterId, semanticAdapterManifestForFactAdapterId, semanticAdapterManifestForFactKind, semanticAdapterManifestForProofBucket, semanticAdapterManifestForRule, sql as adapterSql, tupleShape as adapterTupleShape, typeOwner as adapterTypeOwner, type SemanticAdapterContract, type SemanticAdapterContractKey, type SemanticAdapterManifestEntry } from "@joedeleeuw/antidrift/semantic-adapters";\n' +
       'import { REQUEST_PARAM_ROOTS, callExpressionName, createAuthBoundaryTracker, isAuthzCall, isRequestParamsAccess, type AuthBoundaryFrame, type AuthBoundaryTracker } from "@joedeleeuw/antidrift/semantic-adapters/auth-boundary";\n' +
       'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, isReturnedExpression, markAwaitedPendingMaps, markReturnedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap, type AsyncArrayCallbackClassification, type PendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
@@ -395,8 +401,9 @@ try {
       "const memorySink = createMemoryFactSink();\n" +
       "const jsonlSink = createJsonlFactSink(() => {});\n" +
       'const options = { tsconfigRootDir: ".", semanticFacts: { sink: memorySink } } satisfies AntidriftConfigOptions;\n' +
-      'const subpathOptions = { policyDir: "policy", semanticFacts: { sink: memorySink } } satisfies SubpathConfigOptions;\n' +
-      'const oxlintArgs = parseOxlintComplexityArgs([], { cwd: ".", exists: () => false }) satisfies OxlintComplexityArgs;\n' +
+      "const subpathOptions = { semanticFacts: { sink: memorySink } } satisfies SubpathConfigOptions;\n" +
+      'const oxlintOptions = { repoRoot: ".", policyDir: "policy" } satisfies AntidriftOxlintConfigOptions & OxlintSubpathConfigOptions;\n' +
+      'const oxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false }) satisfies OxlintArgs;\n' +
       'const branded = brand("UserId", (value): value is string => typeof value === "string");\n' +
       'const authBoundaryTracker = createAuthBoundaryTracker({ authzFunctions: ["authorize"], onFrameExit(frame) { frame satisfies AuthBoundaryFrame; } });\n' +
       'const writeClass = classifyWriteValue({ type: "Literal", value: false }, { awaitedNames: new Set<string>(), catchParams: [] });\n' +
@@ -451,6 +458,10 @@ try {
       "void tupleParserServices;\n" +
       "createConfig(options) satisfies Linter.Config[];\n" +
       "createConfigFromSubpath(subpathOptions) satisfies Linter.Config[];\n" +
+      "createOxlintConfig(oxlintOptions);\n" +
+      "createOxlintConfigFromSubpath(oxlintOptions);\n" +
+      "oxlintPlugin satisfies ESLint.Plugin;\n" +
+      "oxlintPluginFromSubpath satisfies ESLint.Plugin;\n" +
       "eslintPlugin satisfies ESLint.Plugin;\n" +
       "plugin satisfies ESLint.Plugin;\n" +
       "artifacts satisfies PolicyArtifacts;\n" +
@@ -614,10 +625,8 @@ try {
       "semanticFactToJsonLine(semantic) satisfies string;\n" +
       "memorySink.facts satisfies SemanticFact[];\n" +
       "jsonlSink.emit(semantic);\n" +
-      "oxlintComplexityConfig satisfies string;\n" +
-      "oxlintComplexityIgnorePatterns satisfies readonly string[];\n" +
       "oxlintArgs.targets satisfies string[];\n" +
-      "runOxlintComplexity satisfies (options?: Record<string, unknown>) => number;\n" +
+      "runOxlint satisfies (options?: Record<string, unknown>) => number;\n" +
       'branded satisfies BrandKit<string, "UserId">;\n' +
       'branded.make("user_123") satisfies Brand<string, "UserId">;\n' +
       'branded.safe("user_123") satisfies BrandSafeResult<string, "UserId">;\n' +
@@ -715,12 +724,14 @@ try {
   );
   file(
     "packages/app/src/runtime.mjs",
-    'import { createConfig, eslintPlugin, loadPolicy, loadRegistriesSync, renderPolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
+    'import { createConfig, createOxlintConfig, eslintPlugin, loadPolicy, loadRegistriesSync, oxlintPlugin, renderPolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
       'import packageMetadata from "@joedeleeuw/antidrift/package.json" with { type: "json" };\n' +
       'import { brand } from "@joedeleeuw/antidrift/brand";\n' +
       'import plugin from "@joedeleeuw/antidrift/eslint-plugin";\n' +
       'import { createConfig as createConfigFromSubpath } from "@joedeleeuw/antidrift/eslint-config";\n' +
-      'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, loadRuleStatusRegistrySync, oxlintComplexityConfig, oxlintComplexityIgnorePatterns, parseOxlintComplexityArgs, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, ruleStatusEntriesForKind, ruleStatusEntriesForProofBucket, ruleStatusEntriesForSemanticAdapter, ruleStatusEntriesForStatus, ruleStatusEntryForId, ruleStatusManifest, ruleStatusSemanticSummaries, ruleStatusSemanticSummaryForId, runOxlintComplexity, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession } from "@joedeleeuw/antidrift/policy";\n' +
+      'import { createOxlintConfig as createOxlintConfigFromSubpath } from "@joedeleeuw/antidrift/oxlint-config";\n' +
+      'import oxlintPluginFromSubpath from "@joedeleeuw/antidrift/oxlint-plugin";\n' +
+      'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, loadRuleStatusRegistrySync, parseOxlintArgs, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, ruleStatusEntriesForKind, ruleStatusEntriesForProofBucket, ruleStatusEntriesForSemanticAdapter, ruleStatusEntriesForStatus, ruleStatusEntryForId, ruleStatusManifest, ruleStatusSemanticSummaries, ruleStatusSemanticSummaryForId, runOxlint, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession } from "@joedeleeuw/antidrift/policy";\n' +
       'import { SEMANTIC_ADAPTERS, SEMANTIC_ADAPTER_CONTRACTS, SEMANTIC_ADAPTER_CONTRACT_LIST, SEMANTIC_ADAPTER_MANIFEST, asyncControlFlow as adapterAsyncControlFlow, authBoundary as adapterAuthBoundary, broadInput as adapterBroadInput, parseInput as adapterParseInput, reactState as adapterReactState, schemaProvenance as adapterSchemaProvenance, semanticAdapterContractsForFactAdapterId, semanticAdapterContractsForFactKind, semanticAdapterContractsForProofBucket, semanticAdapterContractsForRule, semanticAdapterManifestForAdapterId, semanticAdapterManifestForFactAdapterId, semanticAdapterManifestForFactKind, semanticAdapterManifestForProofBucket, semanticAdapterManifestForRule, sql as adapterSql, tupleShape as adapterTupleShape, typeOwner as adapterTypeOwner } from "@joedeleeuw/antidrift/semantic-adapters";\n' +
       'import { REQUEST_PARAM_ROOTS, callExpressionName, createAuthBoundaryTracker, isAuthzCall, isRequestParamsAccess } from "@joedeleeuw/antidrift/semantic-adapters/auth-boundary";\n' +
       'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, isReturnedExpression, markAwaitedPendingMaps, markReturnedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
@@ -734,7 +745,11 @@ try {
       "\n" +
       "const exportsToCheck = {\n" +
       "  createConfig,\n" +
+      "  createOxlintConfig,\n" +
+      "  createOxlintConfigFromSubpath,\n" +
       "  eslintPlugin,\n" +
+      "  oxlintPlugin,\n" +
+      "  oxlintPluginFromSubpath,\n" +
       "  loadPolicy,\n" +
       "  loadRegistriesSync,\n" +
       "  renderPolicyArtifacts,\n" +
@@ -869,9 +884,7 @@ try {
       "  loadPolicyFromPolicy,\n" +
       "  loadRegistriesFromPolicy,\n" +
       "  loadRuleStatusRegistrySync,\n" +
-      "  oxlintComplexityConfig,\n" +
-      "  oxlintComplexityIgnorePatterns,\n" +
-      "  parseOxlintComplexityArgs,\n" +
+      "  parseOxlintArgs,\n" +
       "  renderPolicyArtifactsFromPolicy,\n" +
       "  reactStateInventory,\n" +
       "  repoCorpus,\n" +
@@ -901,7 +914,7 @@ try {
       "  createMemoryFactSink,\n" +
       "  semanticFact,\n" +
       "  semanticFactToJsonLine,\n" +
-      "  runOxlintComplexity,\n" +
+      "  runOxlint,\n" +
       "  verifySession,\n" +
       "};\n" +
       "\n" +
@@ -917,9 +930,15 @@ try {
       '  throw new Error("ESLint plugin metadata must match the packed package version");\n' +
       "}\n" +
       "\n" +
-      'const runtimeOxlintArgs = parseOxlintComplexityArgs([], { cwd: ".", exists: () => false });\n' +
-      'if (runtimeOxlintArgs.targets.join(",") !== "." || !oxlintComplexityConfig.endsWith("oxlint-complexity.config.json") || !oxlintComplexityIgnorePatterns.includes("**/node_modules/**")) {\n' +
-      '  throw new Error("Missing oxlint complexity policy export behavior");\n' +
+      "const eslintRuleNames = new Set(Object.keys(eslintPlugin.rules));\n" +
+      "const oxlintRuleNames = new Set(Object.keys(oxlintPlugin.rules));\n" +
+      "if (eslintRuleNames.size !== 11 || oxlintRuleNames.size !== 14 || [...eslintRuleNames].some((rule) => oxlintRuleNames.has(rule))) {\n" +
+      '  throw new Error("Custom rules must have exactly one runtime export owner");\n' +
+      "}\n" +
+      "\n" +
+      'const runtimeOxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false });\n' +
+      'if (runtimeOxlintArgs.targets.join(",") !== ".") {\n' +
+      '  throw new Error("Missing oxlint policy export behavior");\n' +
       "}\n" +
       "\n" +
       'if (!SEMANTIC_FACT_KINDS.structuralMatch.payloadFields.includes("ownerType")) {\n' +
@@ -1071,6 +1090,43 @@ try {
     }
   }
 
+  function lintOxlint(relFile, config) {
+    try {
+      return runJson(
+        "pnpm",
+        [
+          "exec",
+          "oxlint",
+          relFile,
+          "--format",
+          "json",
+          "--config",
+          config,
+          "--tsconfig",
+          "tsconfig.bundler.json",
+        ],
+        work,
+      );
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "stdout" in error &&
+        typeof error.stdout === "string"
+      ) {
+        return JSON.parse(error.stdout);
+      }
+      throw error;
+    }
+  }
+
+  function oxlintRuleIds(output) {
+    return (output.diagnostics ?? []).map(({ code }) => {
+      const match = /^([^()]+)\(([^()]+)\)$/u.exec(code ?? "");
+      return match ? `${match[1]}/${match[2]}` : code;
+    });
+  }
+
   const RULE = "antidrift/no-structural-type-fork";
   const defaultCleanRules = lint("packages/app/src/clean.ts").flatMap((r) =>
     r.messages.map((m) => m.ruleId),
@@ -1121,24 +1177,29 @@ try {
   }
 
   const ASYNC_RULE = "antidrift/no-async-array-method";
-  const asyncDefaultConfig = "eslint.async-array.config.mjs";
-  const asyncCollectionConfig = "eslint.async-array-collection.config.mjs";
-  const asyncForEachRules = lint(
-    "packages/app/src/async-foreach-drift.ts",
-    asyncDefaultConfig,
-  ).flatMap((r) => r.messages.map((m) => m.ruleId));
-  const asyncMapDefaultRules = lint(
-    "packages/app/src/async-map-collection-drift.ts",
-    asyncDefaultConfig,
-  ).flatMap((r) => r.messages.map((m) => m.ruleId));
-  const asyncMapCollectionRules = lint(
-    "packages/app/src/async-map-collection-drift.ts",
-    asyncCollectionConfig,
-  ).flatMap((r) => r.messages.map((m) => m.ruleId));
-  const asyncMapReturnRules = lint(
-    "packages/app/src/async-map-return-clean.ts",
-    asyncCollectionConfig,
-  ).flatMap((r) => r.messages.map((m) => m.ruleId));
+  const asyncDefaultConfig = "oxlint.async-array.config.mjs";
+  const asyncCollectionConfig = "oxlint.async-array-collection.config.mjs";
+  const asyncForEachRules = oxlintRuleIds(
+    lintOxlint("packages/app/src/async-foreach-drift.ts", asyncDefaultConfig),
+  );
+  const asyncMapDefaultRules = oxlintRuleIds(
+    lintOxlint(
+      "packages/app/src/async-map-collection-drift.ts",
+      asyncDefaultConfig,
+    ),
+  );
+  const asyncMapCollectionRules = oxlintRuleIds(
+    lintOxlint(
+      "packages/app/src/async-map-collection-drift.ts",
+      asyncCollectionConfig,
+    ),
+  );
+  const asyncMapReturnRules = oxlintRuleIds(
+    lintOxlint(
+      "packages/app/src/async-map-return-clean.ts",
+      asyncCollectionConfig,
+    ),
+  );
 
   if (!asyncForEachRules.includes(ASYNC_RULE)) {
     fail(

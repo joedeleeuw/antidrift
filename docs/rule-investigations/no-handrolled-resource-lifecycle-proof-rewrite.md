@@ -1,7 +1,7 @@
 # Proposal: rewrite the lifecycle-rule proof + direction for the React-state rules
 
 Status: implemented proof rewrite; still under-proven and default-off. Target rule: `antidrift/no-handrolled-resource-lifecycle-cells`.
-Adapter: `react-state` (`tooling/antidrift/src/eslint-plugin/react-state-graph.js`).
+Adapter: `react-state` (`tooling/antidrift/src/semantic-adapters/react-state-graph.js`).
 
 ## 1. Context — what we measured and learned
 

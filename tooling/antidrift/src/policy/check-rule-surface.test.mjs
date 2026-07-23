@@ -23,9 +23,15 @@ describe("checkRuleSurface", () => {
     });
 
     expect(ok).toBe(false);
-    expect(messages.join("\n")).toContain("configured but not exported: antidrift/gamma");
-    expect(messages.join("\n")).toContain("exported but not configured: antidrift/beta");
-    expect(messages.join("\n")).toContain("exported but not covered by corpus evidence: antidrift/beta");
+    expect(messages.join("\n")).toContain(
+      "configured but not exported: antidrift/gamma",
+    );
+    expect(messages.join("\n")).toContain(
+      "exported but not configured: antidrift/beta",
+    );
+    expect(messages.join("\n")).toContain(
+      "exported but not covered by corpus evidence: antidrift/beta",
+    );
   });
 
   it("does not promote RuleTester source shape to a required surface", () => {
@@ -52,7 +58,71 @@ describe("checkRuleSurface", () => {
 
     expect(ok).toBe(true);
     expect(messages).toEqual([]);
-      });
+  });
+
+  it("rejects custom rules enabled by more than one runtime", () => {
+    const messages = [];
+    const ok = checkRuleSurface({
+      pluginRules: {
+        alpha: {},
+      },
+      configs: [
+        {
+          rules: {
+            "antidrift/alpha": "error",
+          },
+        },
+      ],
+      runtimeConfigs: {
+        eslint: [{ rules: { "antidrift/alpha": "error" } }],
+        oxlint: [{ rules: { "antidrift/alpha": "error" } }],
+      },
+      corpusCases: [{ ruleId: "antidrift/alpha" }],
+      ruleRegistry: {
+        rules: {
+          "antidrift/alpha": { status: "ready", signal: "AST" },
+        },
+      },
+      report: (message) => messages.push(message),
+    });
+
+    expect(ok).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "enabled by multiple runtimes: antidrift/alpha (eslint, oxlint)",
+    );
+  });
+
+  it("rejects custom rules exported by more than one runtime", () => {
+    const messages = [];
+    const ok = checkRuleSurface({
+      pluginRules: {
+        alpha: {},
+      },
+      runtimePluginRules: {
+        eslint: { alpha: {} },
+        oxlint: { alpha: {} },
+      },
+      configs: [
+        {
+          rules: {
+            "antidrift/alpha": "error",
+          },
+        },
+      ],
+      corpusCases: [{ ruleId: "antidrift/alpha" }],
+      ruleRegistry: {
+        rules: {
+          "antidrift/alpha": { status: "ready", signal: "AST" },
+        },
+      },
+      report: (message) => messages.push(message),
+    });
+
+    expect(ok).toBe(false);
+    expect(messages.join("\n")).toContain(
+      "exported by multiple runtimes: antidrift/alpha (eslint, oxlint)",
+    );
+  });
 
   it("counts default external corpus cases as surface evidence", () => {
     const messages = [];
@@ -119,9 +189,15 @@ describe("checkRuleSurface", () => {
     });
 
     expect(ok).toBe(false);
-    expect(messages.join("\n")).toContain("blocking despite registry status under-proven: antidrift/alpha");
-    expect(messages.join("\n")).toContain("blocking despite registry status retired: antidrift/retired");
-    expect(messages.join("\n")).toContain("blocking despite heuristic signal heuristic: antidrift/beta");
+    expect(messages.join("\n")).toContain(
+      "blocking despite registry status under-proven: antidrift/alpha",
+    );
+    expect(messages.join("\n")).toContain(
+      "blocking despite registry status retired: antidrift/retired",
+    );
+    expect(messages.join("\n")).toContain(
+      "blocking despite heuristic signal heuristic: antidrift/beta",
+    );
     expect(messages.join("\n")).not.toContain("antidrift/stable");
   });
 
@@ -197,7 +273,9 @@ describe("checkRuleSurface", () => {
     });
 
     expect(ok).toBe(false);
-    expect(messages.join("\n")).toContain("Custom rule exported but not configured: antidrift/alpha");
+    expect(messages.join("\n")).toContain(
+      "Custom rule exported but not configured: antidrift/alpha",
+    );
   });
 
   it("throws when the self-hosted registry is missing", () => {

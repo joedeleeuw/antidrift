@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import YAML from "yaml";
 
-import plugin from "../eslint-plugin/index.js";
+import eslintPlugin from "../eslint-plugin/index.js";
+import oxlintPlugin from "../oxlint-plugin/index.js";
 import {
   SEMANTIC_ADAPTERS,
   SEMANTIC_ADAPTER_CONTRACTS,
@@ -1016,7 +1017,9 @@ function checkStableRuleRequirements(
 
 function activeAntidriftRules() {
   return new Set(
-    Object.keys(plugin.rules ?? {}).map((rule) => `antidrift/${rule}`),
+    [...Object.keys(eslintPlugin.rules), ...Object.keys(oxlintPlugin.rules)].map(
+      (rule) => `antidrift/${rule}`,
+    ),
   );
 }
 
@@ -1024,6 +1027,24 @@ function factKindLiteralsIn(source) {
   return [...source.matchAll(/\bfactKind:\s*["']([^"']+)["']/gu)].map(
     (match) => match[1],
   );
+}
+
+function addFactKindsFromDirectory(
+  kinds,
+  repoRoot,
+  relativeDir,
+  extension,
+) {
+  const directory = safeRepoPath(repoRoot, relativeDir);
+  if (!directory || !existsSync(directory)) return;
+  for (const file of readdirSync(directory)) {
+    if (!file.endsWith(extension) || file.includes(".test.")) continue;
+    for (const kind of factKindLiteralsIn(
+      readFileSync(join(directory, file), "utf8"),
+    )) {
+      kinds.add(kind);
+    }
+  }
 }
 
 function emittedSemanticFactKinds(repoRoot) {
@@ -1037,19 +1058,12 @@ function emittedSemanticFactKinds(repoRoot) {
       kinds.add(kind);
     }
   }
-  const changeScopeDir = safeRepoPath(
-    repoRoot,
-    "tooling/antidrift/src/change-scope",
-  );
-  if (changeScopeDir && existsSync(changeScopeDir)) {
-    for (const file of readdirSync(changeScopeDir)) {
-      if (!file.endsWith(".mjs") || file.endsWith(".test.mjs")) continue;
-      for (const kind of factKindLiteralsIn(
-        readFileSync(join(changeScopeDir, file), "utf8"),
-      )) {
-        kinds.add(kind);
-      }
-    }
+  for (const [relativeDir, extension] of [
+    ["tooling/antidrift/src/oxlint-plugin/rules", ".js"],
+    ["tooling/antidrift/src/semantic-adapters", ".mjs"],
+    ["tooling/antidrift/src/change-scope", ".mjs"],
+  ]) {
+    addFactKindsFromDirectory(kinds, repoRoot, relativeDir, extension);
   }
   return kinds;
 }
@@ -1669,11 +1683,7 @@ function checkSemanticAdapterClaimedFactKinds(
   }
 }
 
-function checkSemanticAdapterContractEntry(
-  key,
-  contract,
-  context,
-) {
+function checkSemanticAdapterContractEntry(key, contract, context) {
   const {
     activeRules,
     ruleEntries,
@@ -1857,11 +1867,7 @@ export function checkSemanticAdapterContracts(
   };
 
   for (const key of sortedStrings(contractKeys)) {
-    checkSemanticAdapterContractEntry(
-      key,
-      contracts[key],
-      context,
-    );
+    checkSemanticAdapterContractEntry(key, contracts[key], context);
   }
   checkStableSemanticAdapterRuleClaims(contracts, ruleEntries, label, errors);
 }

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Turn repeated agent review failures into deterministic repository feedback. Agents should receive immediate local failures from ESLint custom rules, the packaged oxlint complexity gate, TypeScript, tests, hooks, and Sonar external issue reports.
+Turn repeated agent review failures into deterministic repository feedback. Agents should receive immediate local failures from Oxlint native and type-aware rules, custom rules, TypeScript, tests, hooks, and Sonar external issue reports.
 
 ## Operating rules for future agents
 
@@ -16,9 +16,11 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 
 - `policy/agent-guardrails.yaml` is the editable source of truth.
 - `tooling/antidrift` is the `@joedeleeuw/antidrift` package; `antidrift generate` (src/policy/) produces agent instruction files and hook configs.
-- `tooling/antidrift/src/eslint-plugin` contains custom AST and type-aware semantic rules that normal linters do not know.
-- `eslint.config.mjs` consumes `@joedeleeuw/antidrift/eslint-config` (TypeScript, React hooks, boundaries, and the custom plugin).
-- `antidrift oxlint` runs the packaged local cyclomatic-complexity, nesting-depth, and parameter-count gate.
+- `tooling/antidrift/src/oxlint-config` owns native rules, stable type-aware rules, architecture policy, complexity budgets, and syntax-only custom rules.
+- `tooling/antidrift/src/oxlint-plugin` contains syntax-only custom rules supported by Oxlint.
+- `tooling/antidrift/src/eslint-plugin` retains custom rules requiring TypeScript `Program` or `TypeChecker` data.
+- The root ESLint config consumes the four-rule `@joedeleeuw/antidrift/eslint-config` TypeChecker pass.
+- `antidrift oxlint` runs the repository Oxlint configuration.
 - `sonar-project.properties` imports generated external issues and LCOV coverage.
 - `.claude/settings.json` and `.codex/hooks.json` enforce policy during agent tool use.
 - `docs/build-patterns.md` is the positive construction guide. Use it before inventing a new domain, contract, API, UI resource, or gateway shape.
@@ -36,18 +38,18 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 ## Evidence anchors
 
 - pnpm catalogs live in `pnpm-workspace.yaml` and support named catalogs.
-- ESLint plus `typescript-eslint` is the canonical custom-rule engine because the original scope needs TypeScript `Program` and `TypeChecker` access. `antidrift oxlint` is a constrained metric gate, not a second semantic rule host.
-- Retired-engine baseline coverage is tracked rule-by-rule in `docs/lint-rule-parity.md`; do not remove coverage without recording the replacement or accepted gap.
+- Oxlint is the primary lint engine. ESLint remains only for custom rules that need TypeScript `Program` or `TypeChecker` access unavailable to Oxlint JavaScript plugins.
+- Runtime ownership is tracked in `docs/lint-rule-parity.md`; do not move or remove coverage without recording the new owner or accepted gap.
 - Source provenance for rules, rulesets, tools, and borrowed references is tracked in `docs/source-ledger.md`; update it when adding or replacing enforcement.
 - Non-TypeScript language checks generally belong to native tools in consuming repos, optionally coordinated by a repo-local orchestrator such as Trunk. The narrow exception is the opt-in packaged shell ast-grep rule pack behind `antidrift shell`; do not widen Antidrift into a broader multi-engine lint runner without a future `[policy-change]`.
 - Rule readiness is tracked in `policy/registries/rules.yaml`; do not call a rule stable until it has multiple independent real-repo replications that were not created for the rule, zero known false positives, zero known false negatives, no production concerns, and a grounded Claude Opus 4.8 advisory review.
 - One owner per concept is the primary anti-duplication rule: import or derive from the owner instead of retyping local copies.
-- `policy:check-registries` protects registry-backed rule facts; `policy:check-rule-surface` protects custom rule export/config/test alignment.
+- `policy:check-registries` protects registry-backed rule facts; `policy:check-rule-surface` protects custom rule export, runtime ownership, severity, and corpus alignment.
 - `policy:validate-chaski` is the optional local real-corpus gate. It asserts rule behavior against explicit Chaski frontend/BFF files when `CHASKI_REPO` or `/Users/sushi/code/chaski` exists and skips otherwise.
 - `policy:validate-external-corpus` is the required fallback real-corpus gate for non-Chaski repos when Chaski has only clean controls for an implemented rule. It asserts the configured local external repos and fails unless at least two external repositories pass. Current discovery covers Sudocode, Codebase Atlas, Murderbox, Cloudflare Agents, Claude Code Source, Opencode, and PowerSync Service through their matching environment variables or `/Users/sushi/code/<repo>` paths; explicitly selecting a corpus with `--corpus` and `--require` makes that named checkout mandatory. For promotion/slice-completion breadth, run `antidrift external-corpus --min-repositories 2`.
 - SonarQube should ingest custom ESLint/generic external issues instead of owning bespoke TypeScript rules directly.
 - Claude Code and Codex hooks are the deterministic lifecycle layer for PreToolUse, PostToolUse, and Stop checks.
-- Nx boundaries and `eslint-plugin-boundaries` are the architecture-boundary layer; this template uses `eslint-plugin-boundaries` by default to keep the sample repo lightweight.
+- Oxlint hosts `eslint-plugin-boundaries` as the architecture-boundary layer.
 
 ## First agent task after unzip
 

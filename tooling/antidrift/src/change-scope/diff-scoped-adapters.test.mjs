@@ -11,7 +11,7 @@ import { diffScopedAdapters, parseArgs } from "./diff-scoped-adapters.mjs";
 const BASE = "HEAD~1";
 const HEAD = "HEAD";
 const PLUGIN_URL = pathToFileURL(
-  resolve("tooling/antidrift/src/eslint-plugin/index.js"),
+  resolve("tooling/antidrift/src/oxlint-plugin/index.js"),
 ).href;
 
 let dir;
@@ -101,7 +101,7 @@ afterAll(() => {
 });
 
 describe("diffScopedAdapters", () => {
-  it("keeps only ESLint findings on changed hunk lines", async () => {
+  it("keeps only lint findings on changed hunk lines", async () => {
     const summary = await diffScopedAdapters({
       base: BASE,
       head: HEAD,

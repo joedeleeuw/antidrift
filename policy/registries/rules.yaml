@@ -243,10 +243,10 @@ policyRuleReviews:
     nextAction: Keep the locked retired custom decision in place; use no-handrolled-resource-lifecycle-cells for semantic AST lifecycle proof.
   react/no-derived-state-effect:
     status: ecosystem-covered
-    replacement: react-hooks/no-deriving-state-in-effects
-    coverage: Covered by eslint-plugin-react-hooks recommended-latest plus an explicit rule enablement.
-    reason: React owns this effect anti-pattern directly; custom code would duplicate maintained compiler-era linting.
-    nextAction: Keep the maintained React Hooks rule enabled.
+    replacement: react/react-compiler
+    coverage: Covered by Oxlint's React Compiler rule through its EffectDerivationsOfState diagnostic.
+    reason: The native compiler analysis reports values derived from props or state inside effects; custom code would duplicate that proof.
+    nextAction: Keep the native React Compiler rule enabled and retain the behavioral probe in migration evidence.
   react/no-effect-fetch-waterfall:
     status: research
     coverage: Partially pressured by antidrift/no-raw-fetch-in-component, but no separate waterfall rule exists.
@@ -301,8 +301,8 @@ policyRuleReviews:
     nextAction: Keep out of blocking scope until real programs prove a deterministic rule with clean domain-helper controls.
   arch/max-function-lines:
     status: spec-only
-    coverage: Not enforced locally as a line-count rule; local complexity/depth/parameter budgets are available through the optional antidrift oxlint gate.
-    reason: Function length is a blunt proxy for complexity and can duplicate local ESLint complexity budgets and Sonar trend governance without a clear construction pattern.
+    coverage: Not enforced locally as a line-count rule; the shared Oxlint config enforces complexity, depth, and parameter budgets.
+    reason: Function length is a blunt proxy for complexity and can duplicate Oxlint budgets and Sonar trend governance without a clear construction pattern.
     nextAction: Keep raw line count out of custom rules unless real corpus evidence justifies a narrower component or function split pattern.
   arch/max-component-lines:
     status: spec-only
@@ -317,20 +317,20 @@ policyRuleReviews:
   arch/no-cross-layer-import:
     status: ecosystem-covered
     replacement: boundaries/element-types
-    coverage: Covered by eslint-plugin-boundaries with configured layer import directions.
-    reason: The maintained boundaries plugin already owns this import-graph check.
+    coverage: Covered by eslint-plugin-boundaries through Oxlint's JavaScript plugin host with configured layer import directions.
+    reason: The maintained boundaries rule already owns this import-graph check.
     nextAction: Keep layer facts in architecture registry/config.
   arch/no-deep-import:
     status: ecosystem-covered
     replacement: boundaries/no-private
-    coverage: Covered by eslint-plugin-boundaries private import checks.
+    coverage: Covered by eslint-plugin-boundaries through Oxlint's JavaScript plugin host.
     reason: Maintained boundary rules are a better fit than custom path parsing.
     nextAction: Keep public/private entrypoint facts aligned with architecture policy.
   arch/no-new-dependency-cycle:
     status: ecosystem-covered
-    replacement: import-x/no-cycle
-    coverage: Covered by import-x/no-cycle in the shared ESLint config.
-    reason: Custom cycle traversal was retired; maintained import graph coverage is the correct owner.
+    replacement: import/no-cycle
+    coverage: Covered by Oxlint's native import/no-cycle rule.
+    reason: Custom cycle traversal was retired; Oxlint's maintained import graph is the correct owner.
     nextAction: Keep the locked retired custom no-cycle decision in place.
   arch/no-feature-scatter:
     status: spec-only
@@ -346,7 +346,7 @@ policyRuleReviews:
   boundary/no-sdk-direct-use-outside-gateway:
     status: generated-config
     replacement: no-restricted-imports from policy/registries/gateways.yaml
-    coverage: Covered by generated core ESLint restrictions with wrapper-file overrides.
+    coverage: Covered by generated Oxlint core restrictions with wrapper-file overrides.
     reason: Registry-backed import restriction is simpler and more idiomatic than a custom SDK rule.
     nextAction: Keep gateway imports in the gateways registry.
   boundary/no-env-access-in-client:
@@ -370,7 +370,7 @@ policyRuleReviews:
     status: generated-config
     replacement: no-restricted-imports from policy/registries/generated.yaml
     coverage: Covered when generatedSources declare bannedDirectImports and wrappers.
-    reason: Import routing is a registry-to-core-ESLint concern, not a custom AST rule.
+    reason: Import routing is a registry-to-Oxlint-core concern, not a custom AST rule.
     nextAction: Keep generated.yaml current when codegen is added.
   gen/no-structural-type-fork:
     status: active-custom
@@ -397,7 +397,7 @@ policyRuleReviews:
   errors/preserve-caught-error:
     status: ecosystem-covered
     replacement: preserve-caught-error
-    coverage: Covered by the maintained ESLint rule enabled in the shared config.
+    coverage: Covered by Oxlint's native preserve-caught-error rule.
     reason: Preserving caught error cause is ecosystem-covered; custom silent-catch work was retired.
     nextAction: Keep the maintained rule enabled.
   errors/no-fallback-to-empty:
@@ -407,22 +407,22 @@ policyRuleReviews:
     nextAction: Create a real-program matrix before implementation.
   test/no-only-or-skip:
     status: ecosystem-covered
-    replacement: no-only-tests/no-only-tests plus @vitest/eslint-plugin no-disabled-tests
-    coverage: Covered by framework-agnostic focused-test linting plus Vitest disabled-test rules.
-    reason: Maintained test plugins own this surface.
-    nextAction: Keep Vitest plugin enabled; add Jest parity only if a repo adopts Jest.
+    replacement: vitest/no-focused-tests plus vitest/no-disabled-tests
+    coverage: Covered by Oxlint's native Vitest rules for the declared test-file scope.
+    reason: Oxlint's maintained Vitest plugin owns this surface.
+    nextAction: Keep the native Vitest rules enabled; add Jest parity only if a repo adopts Jest.
   test/no-conditional-expect:
     status: ecosystem-covered
-    replacement: vitest/no-conditional-in-test
+    replacement: vitest/no-conditional-expect
     coverage: Covered for the declared Vitest scope.
-    reason: Vitest plugin already reports conditional test assertions and control flow.
-    nextAction: Keep Vitest plugin enabled.
+    reason: Oxlint's native Vitest plugin reports conditional assertions without banning ordinary test control flow.
+    nextAction: Keep the native Vitest rule enabled.
   test/no-test-without-assertion:
     status: ecosystem-covered
-    replacement: vitest/expect-expect from @vitest/eslint-plugin recommended config
-    coverage: Covered for the declared Vitest scope through the recommended plugin rules.
-    reason: Maintained test plugins are preferable to custom assertion counting.
-    nextAction: Keep Vitest recommended rules enabled.
+    replacement: vitest/expect-expect
+    coverage: Covered for the declared Vitest scope by Oxlint's native rule.
+    reason: The maintained native rule is preferable to custom assertion counting.
+    nextAction: Keep vitest/expect-expect enabled.
   ui/no-raw-tailwind-color:
     status: retired
     replacement: none
@@ -452,8 +452,8 @@ policyRuleReviews:
     nextAction: Evaluate maintained promise rules and local tracking conventions before custom scope.
   perf/no-await-in-loop-with-io:
     status: ecosystem-covered
-    replacement: ESLint no-await-in-loop
-    coverage: Covered by the broad core ESLint no-await-in-loop baseline.
+    replacement: Oxlint no-await-in-loop
+    coverage: Covered by Oxlint's broad native no-await-in-loop baseline.
     reason: IO-specific narrowing is not implemented; the active guard is the maintained broad rule.
     nextAction: Only add IO-function narrowing if broad-rule findings prove too noisy in real code.
   perf/no-async-array-method:
@@ -521,8 +521,8 @@ policyRuleReviews:
     nextAction: Extend protected-file coverage only when new control-plane files are added.
   policy/no-inline-disable-without-ticket:
     status: ecosystem-covered
-    replacement: "@eslint-community/eslint-comments/require-description plus @typescript-eslint/ban-ts-comment"
-    coverage: Covered by maintained directive-description and TypeScript suppression rules.
+    replacement: "eslint-comments/require-description plus typescript/ban-ts-comment"
+    coverage: Covered by an Oxlint-hosted directive-description rule and Oxlint's TypeScript suppression rule.
     reason: Ticket-string matching was retired; descriptions are the maintainable ecosystem path.
     nextAction: Keep the locked retired custom decision in place.
   mcp/no-unapproved-server:
@@ -1545,7 +1545,11 @@ rules:
       state: net-antidrift
       support: low
       candidates:
-        ["ESLint no-dupe-keys", "SonarQube copy-paste detection", "duplicate-code scanners"]
+        [
+          "ESLint no-dupe-keys",
+          "SonarQube copy-paste detection",
+          "duplicate-code scanners",
+        ]
       decision: own-antidrift
       whyThisState: "Maintained duplicate-key rules inspect collisions inside one object, while copy-paste scanners use larger token or line blocks; neither models matching field name/type pairs spread across several sibling Zod or TypeScript shapes."
       whyNotOtherState: "Not ecosystem-covered because generic duplication tools do not provide this small, shape-aware signal or the corresponding spread/extends refactoring guidance."
@@ -1611,20 +1615,20 @@ rules:
 retiredRules:
   antidrift/no-cycle:
     status: retired
-    reason: Replaced by maintained import graph coverage through import-x/no-cycle.
+    reason: Replaced by Oxlint's native import/no-cycle rule.
     referenceDoc: docs/rule-investigations/no-cycle.md
   antidrift/no-inline-disable-without-ticket:
     status: retired
-    reason: Replaced by maintained ESLint directive description coverage through @eslint-community/eslint-comments/require-description plus @typescript-eslint/ban-ts-comment for TypeScript directives.
+    reason: Replaced by Oxlint-hosted eslint-comments/require-description plus native typescript/ban-ts-comment.
   antidrift/no-sdk-direct-use:
     status: retired
-    reason: Replaced by generated ESLint core no-restricted-imports rules with wrapper-file overrides from policy/registries/gateways.yaml.
+    reason: Replaced by generated Oxlint core no-restricted-imports rules with wrapper-file overrides from policy/registries/gateways.yaml.
   antidrift/no-explicit-return-type-private-helper:
     status: retired
     reason: Real Chaski code showed explicit private helper return types are often legitimate contracts.
   antidrift/no-silent-catch:
     status: retired
-    reason: Retired after utility review; ESLint no-empty, preserve-caught-error, and no-console cover enough of the low-value surface, while the remaining console-only/comment-only custom behavior did not justify ownership.
+    reason: Retired after utility review; Oxlint no-empty, preserve-caught-error, and no-console cover enough of the low-value surface, while the remaining console-only/comment-only custom behavior did not justify ownership.
   antidrift/no-thin-typed-factory-wrapper:
     status: retired
     reason: Read-only corpus review found no real non-test exact-forward internal drift, while broad typed-constructor wrappers and exported facades are clean controls with high false-positive risk.
@@ -1676,31 +1680,31 @@ researchCandidates:
     signal: import-graph
     solveType: architecture-cycle
     referenceDoc: docs/rule-investigations/no-cycle.md
-    nextAction: Covered by import-x/no-cycle in the shared ESLint config; keep custom graph traversal retired.
+    nextAction: Covered by Oxlint import/no-cycle; keep custom graph traversal retired.
   ecosystem/disable-comment-description:
     status: ecosystem-covered
     signal: source-comment
     solveType: policy-suppression
     referenceDoc: docs/rule-equivalence-audit.md
-    nextAction: Covered by @eslint-community/eslint-comments/require-description and @typescript-eslint/ban-ts-comment in the shared ESLint config.
+    nextAction: Covered by Oxlint-hosted eslint-comments/require-description and native typescript/ban-ts-comment.
   ecosystem/gateway-restricted-imports:
     status: ecosystem-covered
-    signal: registry plus core ESLint config
+    signal: registry plus Oxlint core config
     solveType: gateway-boundary
     referenceDoc: docs/rule-equivalence-audit.md
-    nextAction: Covered by generated no-restricted-imports patterns and wrapper-file overrides in the shared ESLint config.
+    nextAction: Covered by generated no-restricted-imports patterns and wrapper-file overrides in the shared Oxlint config.
   ecosystem/vitest-test-integrity:
     status: ecosystem-covered
-    signal: maintained ESLint plugin
+    signal: Oxlint native Vitest plugin
     solveType: test-integrity
     referenceDoc: docs/rule-equivalence-audit.md
-    nextAction: Covered by @vitest/eslint-plugin in the shared ESLint config for focused tests, disabled tests, conditional expects/tests, standalone expects, and missing assertion checks.
+    nextAction: Covered by Oxlint's native Vitest rules for focused tests, disabled tests, conditional expects/tests, standalone expects, and missing assertion checks.
   ecosystem/react-hooks-compiler:
     status: ecosystem-covered
-    signal: maintained ESLint plugin
+    signal: Oxlint native React Compiler plugin
     solveType: react-state-shape
     referenceDoc: docs/rule-equivalence-audit.md
-    nextAction: Covered by eslint-plugin-react-hooks recommended-latest plus explicit react-hooks/no-deriving-state-in-effects in the shared ESLint config.
+    nextAction: Covered by react/react-compiler, react/rules-of-hooks, and react/exhaustive-deps in the shared Oxlint config.
   ecosystem/sql-query-plugins:
     status: research
     signal: maintained SQL lint plugin

@@ -658,7 +658,7 @@ const codebaseAtlasCases = [
     kind: "correct",
     classification: "ready",
     subproject: "app",
-    paths: ["src/components/changeWorld/ChangeWorldScene.tsx"],
+    paths: ["src/components/AtlasGameStateShell.tsx"],
   },
   {
     id: "atlas-real-program-parser-full-excerpt-selector-wrapper",
@@ -672,7 +672,7 @@ const codebaseAtlasCases = [
     expectedFindings: [
       {
         path: "src/parsing/treeSitterRealProgramParser.ts",
-        line: 917,
+        line: 916,
       },
     ],
   },
@@ -718,7 +718,7 @@ const codebaseAtlasCases = [
     expectedFindings: [
       {
         path: "src/programs/persistenceCuration.ts",
-        line: 1293,
+        line: 1269,
       },
     ],
   },
@@ -760,7 +760,7 @@ const codebaseAtlasCases = [
     subproject: "app",
     typeAware: true,
     tsconfig: "tsconfig.json",
-    paths: ["src/needle/world/diagnosticLens.ts"],
+    paths: ["src/needle/AtlasNeedleRenderer.ts"],
   },
   {
     id: "atlas-language-counts-entries-clean",
@@ -800,28 +800,12 @@ const murderboxCases = [
     paths: ["apps/client/src/lib/theme.ts"],
   },
   {
-    id: "murderbox-auth-form-submit-lifecycle-clean",
+    id: "murderbox-auth-flow-lifecycle-clean",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
     classification: "under-proven",
     subproject: "client",
-    paths: ["apps/client/src/components/auth/auth-form.tsx"],
-  },
-  {
-    id: "murderbox-chat-item-key-selector-wrapper",
-    ruleId: "antidrift/no-contract-appeasement-projection",
-    kind: "drift",
-    classification: "ready",
-    subproject: "client",
-    typeAware: true,
-    tsconfig: "apps/client/tsconfig.json",
-    paths: ["apps/client/src/components/chat/message-list.tsx"],
-    expectedFindings: [
-      {
-        path: "apps/client/src/components/chat/message-list.tsx",
-        line: 193,
-      },
-    ],
+    paths: ["apps/client/src/components/auth/use-auth-flow.ts"],
   },
   {
     id: "murderbox-machine-setup-route-redundant-response-parse",
@@ -835,7 +819,7 @@ const murderboxCases = [
     expectedFindings: [
       {
         path: "apps/api/app/api/machines/setup/route.ts",
-        line: 27,
+        line: 29,
       },
     ],
   },
@@ -850,12 +834,18 @@ const murderboxCases = [
     paths: ["apps/api/lib/server/workspace-projects.ts"],
   },
   {
-    id: "murderbox-new-thread-conditional-classnames-clean",
+    id: "murderbox-live-turn-duplicated-conditional-classnames",
     ruleId: "antidrift/no-duplicated-conditional-classnames",
-    kind: "correct",
+    kind: "drift",
     classification: "ready",
     subproject: "client",
-    paths: ["apps/client/src/screens/agent-bridge/new-thread.tsx"],
+    paths: ["apps/client/src/components/thread/live-turn.tsx"],
+    expectedFindings: [
+      {
+        path: "apps/client/src/components/thread/live-turn.tsx",
+        line: 180,
+      },
+    ],
   },
   {
     id: "murderbox-voice-session-object-field-blocks-clean",

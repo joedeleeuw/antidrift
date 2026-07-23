@@ -2,17 +2,17 @@
 
 ## Engine decision
 
-Use ESLint plus `typescript-eslint` as the canonical host for antidrift custom rules. The original rule scope includes semantic checks that need TypeScript's `Program` and `TypeChecker`: installed package type forks, registry-backed generated-source and first-party model forks, alias/import identity, Zod provenance, inferred return types, and assignability.
+Use Oxlint for baseline and type-aware ecosystem rules. Use its JavaScript plugin API for custom rules whose proof is available from AST, scope, or control-flow data. Keep a custom rule in ESLint only when it needs TypeScript's `Program` or `TypeChecker`, such as installed package type forks, registry-backed generated-source and first-party model forks, alias/import identity, Zod provenance, inferred return types, or assignability.
 
 Use `docs/semantic-drift-goal.md` as the north-star requirement for new or migrated rules. A rule should recover a semantic association, authority fact, deterministic source construction, or repo/session proof surface; if it cannot, keep it in inventory, research, delegation, or retirement. Use `docs/semantic-validation-matrix.md` to decide the rule's carrier, blocking threshold, and validation evidence before implementation or promotion.
 
-Keep baseline coverage in ESLint and track any missing replacement rule in `docs/lint-rule-parity.md`.
+Keep baseline coverage in Oxlint and track ownership, replacement, or an accepted gap in `docs/lint-rule-parity.md`.
 
-Record source provenance in `docs/source-ledger.md` whenever you add, remove, or replace a rule, ruleset, tool, or borrowed repo reference. The ledger should say whether the source is local custom code, a maintained ecosystem rule, generated ESLint config, a delegated tool such as Sonar, or consumer-only tooling such as Trunk.
+Record source provenance in `docs/source-ledger.md` whenever you add, remove, or replace a rule, ruleset, tool, or borrowed repo reference. The ledger should say whether the source is local custom code, a maintained ecosystem rule, generated Oxlint config, a delegated tool such as Sonar, or consumer-only tooling such as Trunk.
 
 New rules should start from `docs/build-patterns.md`: first define the simple construction pattern, then add a rule only when the violation can be detected without relying on reviewer interpretation.
 
-Use `docs/self-hosting-risks.md` when changing the rule package itself. The short version: code semantics live in ESLint rules, repository control-plane checks live in policy scripts, and agent lifecycle safety lives in hooks.
+Use `docs/self-hosting-risks.md` when changing the rule package itself. The short version: native and supported type-aware semantics live in Oxlint, custom TypeChecker semantics live in the reduced ESLint pass, repository control-plane checks live in policy scripts, and agent lifecycle safety lives in hooks.
 
 Shell source guardrails are the one opt-in non-ESLint rule-pack surface. They live under `tooling/antidrift/ast-grep` and run through `antidrift shell`, so Bash syntax policy is not duplicated as an ESLint rule.
 
@@ -57,7 +57,7 @@ These are valid only when the syntax or local binding is itself the violation:
 - `.only` and skipped tests
 - inline disables without a reason
 
-Silent catches, import cycles, and local disable justification are intentionally not custom rule scope in the current package; use maintained coverage such as `no-empty`, `preserve-caught-error`, `no-console`, `import-x/no-cycle`, `@eslint-community/eslint-comments/require-description`, and `@typescript-eslint/ban-ts-comment`.
+Silent catches, import cycles, and local disable justification are intentionally not custom rule scope in the current package; use Oxlint coverage such as `no-empty`, `preserve-caught-error`, `no-console`, `import/no-cycle`, Oxlint-hosted `eslint-comments/require-description`, and native `typescript/ban-ts-comment`.
 
 ### Registry-backed rules
 
@@ -93,9 +93,9 @@ These should start as warnings:
 - Add or update the rule row in `policy/registries/rules.yaml` whenever a rule is added, retired, narrowed, reclassified, or considered for stable promotion.
 - Add or update the corresponding provenance row in `docs/source-ledger.md` whenever a rule, ruleset, tool, or borrowed reference changes.
 - Do not mark `stable: true` in the rule registry until multiple independent real repositories replicate the behavior, with zero known false positives, zero known false negatives, no productionization concerns, and a grounded Claude Opus 4.8 advisory review.
-- Track any deleted or replaced lint rule in `docs/lint-rule-parity.md` with an explicit replacement or accepted gap.
+- Track any moved, deleted, or replaced lint rule in `docs/lint-rule-parity.md` with one enforcement owner, an explicit replacement, or an accepted gap.
 - Update `docs/policy-coverage.md` whenever a policy rule moves between spec-only, delegated, partial, and enforced.
-- Keep plugin exports, active config, and RuleTester coverage aligned; `pnpm policy:check-rule-surface` fails when they drift.
+- Keep plugin exports, runtime ownership, severity, and corpus coverage aligned; `pnpm policy:check-rule-surface` fails when they drift.
 - Keep registry-backed options valid; `pnpm policy:check-registries` fails when owner or wrapper paths are stale.
 - Emit machine-readable reports for Sonar import.
 - Do not rely on prompt instructions for a rule that can be enforced mechanically.

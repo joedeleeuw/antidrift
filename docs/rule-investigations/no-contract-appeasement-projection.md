@@ -76,7 +76,8 @@ Inherited selector-wrapper drift:
 - Chaski `src/frontend/portal/modules/scenarios/agent-configuration/components/table/use-agent-table-data.ts` line 15.
 - Chaski `src/frontend/portal/modules/scenarios/service-time-influence/components/table/service-time-influence-table.tsx` line 39.
 - Codebase Atlas `src/parsing/treeSitterRealProgramParser.ts` line 916 defines `fullExcerpt(file: ParsedFile): string { return file.source }`.
-- Murderbox `apps/client/src/components/chat/message-list.tsx` line 193 defines `chatItemKey(item: ChatItem): string { return item.id; }`.
+
+Murderbox's former `chatItemKey(item: ChatItem): string` drift was remediated in commit `d02b615e` by inlining the key extractor. A current scan of its 341 client TypeScript files reports no findings, so that stale corpus case was deleted rather than relabeled.
 
 Inherited selector-wrapper clean controls:
 

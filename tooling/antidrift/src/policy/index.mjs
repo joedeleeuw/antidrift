@@ -46,12 +46,7 @@ export {
 } from "./shell-guardrails.mjs";
 export { verifySession } from "./verify-session.mjs";
 export { eslintJsonToSonar } from "./eslint-json-to-sonar.mjs";
-export {
-  oxlintComplexityConfig,
-  oxlintComplexityIgnorePatterns,
-  parseOxlintComplexityArgs,
-  runOxlintComplexity,
-} from "./oxlint-complexity.mjs";
+export { parseOxlintArgs, runOxlint } from "./oxlint.mjs";
 export { unsafeTypeAssertionBenchmark } from "./unsafe-type-assertion-benchmark.mjs";
 export {
   classifySqlParserServiceDelta,

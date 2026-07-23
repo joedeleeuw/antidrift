@@ -2,14 +2,15 @@
 
 This roadmap is limited to the lint stack, the custom rules already hardened, and the specific next rules/utilities that motivated this project. Do not use this file to add unrelated policy families.
 
-For policy coverage status, see `docs/policy-coverage.md`. For the synthesized current gap surface, see `docs/gap-inventory.md`. For retired-engine parity, see `docs/lint-rule-parity.md`. For the per-rule classification and keep/delegate/retire decision layer, see `docs/rule-roadmap.md`.
+For policy coverage status, see `docs/policy-coverage.md`. For the synthesized current gap surface, see `docs/gap-inventory.md`. For runtime ownership and parity, see `docs/lint-rule-parity.md`. For the per-rule classification and keep/delegate/retire decision layer, see `docs/rule-roadmap.md`.
 
 ## Current Scope
 
-- Single lint engine: ESLint plus `typescript-eslint`.
-- Oxlint is retired; active references should not return.
-- Custom rule surface: the implemented `antidrift/*` rules exported by `tooling/antidrift/src/eslint-plugin/index.js`; `policy:check-rule-surface` keeps exports, config, and RuleTester or real-corpus coverage aligned.
-- Third-party support rules: the explicit rules configured in `tooling/antidrift/src/eslint-config/index.mjs`.
+- Primary lint engine: Oxlint, including stable type-aware rules through `oxlint-tsgolint`.
+- Syntax-only custom rules run through the Oxlint JavaScript plugin API.
+- Custom rules that require TypeScript `Program` or `TypeChecker` data remain in the reduced ESLint pass until Oxlint exposes equivalent custom-rule primitives.
+- Custom rule surface: the implemented `antidrift/*` rules exported by the ESLint and Oxlint plugins; `policy:check-rule-surface` keeps exports, runtime ownership, configuration, and corpus evidence aligned.
+- Third-party support rules: Oxlint native plugins and the explicit rules configured in `tooling/antidrift/src/oxlint-config/index.mjs`.
 - Type-contract authority is the registered rule family for the type-system work. See `docs/rule-family-type-contract-authority.md` for subsets, examples, non-goals, and research boundaries.
 
 ## Built And Hardened Scope
@@ -34,7 +35,7 @@ These were the next project scope because they are the project, not because a br
 - `no-underchecked-type-predicate`: default-off inventory for broad-input type predicates that claim object contracts without checking required asserted fields or delegating to a validator.
 - `no-canonical-model-fork`: registry-backed structural detection for first-party canonical model redeclarations.
 - Brand kit: `Brand<T, Name>` plus `brand() -> { make, safe, is }`. The separate `no-cast-to-branded` custom rule is retired until real non-test brand-forgery evidence appears.
-- `import-x/no-cycle`: circular-dependency detection through maintained ecosystem import-graph coverage.
+- `import/no-cycle`: circular-dependency detection through Oxlint's native import graph.
 
 ## Work Order
 
@@ -58,14 +59,14 @@ Completed in this batch:
 - `no-nullable-positional-tuple`: narrow deterministic syntax rule for multi-slot nullable tuples; ordinary non-null tuples and hook-style tuples with one nullable value slot stay clean.
 - `no-underchecked-type-predicate`: TypeChecker-backed v1 for broad-input object predicates; discriminant guards over typed unions and schema delegation stay clean, and blocking stays off until required-field drift appears.
 - `no-canonical-model-fork`: TypeChecker-backed v1 for configured first-party model owners; real Chaski report-model forks flag while the owner and a different weekly digest report model stay clean.
-- `no-cycle`: retired custom relative graph traversal in favor of `import-x/no-cycle`.
+- `no-cycle`: retired custom relative graph traversal in favor of `import/no-cycle`.
 - Brand kit: branded values should cross the brand validation boundary. The custom brand-cast lint rule is retired until real adoption and forgery evidence justify reopening it.
 
 ### 3. Preserve The Rule Control Plane
 
 These checks support existing rules; they are not new product scope.
 
-- `policy:check-rule-surface`: custom rules must stay exported, configured, and covered by `RuleTester`.
+- `policy:check-rule-surface`: custom rules must stay exported, configured in one runtime, and covered by corpus evidence.
 - `policy:check-registries`: registry-backed rule facts must point at real owners/wrappers and match exported domain literals where configured.
 - `policy:check-generated`: generated agent files must match the policy source without mutating the working tree during the check.
 
@@ -91,7 +92,7 @@ Each future progress slice must clear these gates before it is considered done:
 3. **Signal gate**: the slice declares its strongest required signal: TypeChecker, registry facts, scope/binding, deterministic AST shape, or import graph. If it relies on AST shape as a proxy for intent, stop.
 4. **Real-corpus gate**: assert at least one real drift path and one real clean path for the changed rule, preferably in Chaski. If Chaski has only clean controls, use a narrowly accepted fallback repo and document the fallback in `docs/real-corpus-validation.md`.
 5. **Inventory gate**: run `pnpm policy:validate-corpus` for the full custom-rule inventory, and run the changed rules against the real repository corpus (`apps`, `packages`, and `tooling`) with `pnpm policy:repo-corpus -- --slice <slice-name> --rules antidrift/<rule-name>`. For React state broad co-mutation, run `pnpm policy:inventory-react-state`; those facts are classification evidence, not diagnostics.
-6. **Rule surface gate**: any custom rule is exported, configured, and covered by RuleTester or a real corpus case; `pnpm policy:check-rule-surface` must pass.
+6. **Rule surface gate**: any custom rule is exported, configured in one runtime, and covered by a real corpus case; `pnpm policy:check-rule-surface` must pass.
 7. **Self-host gate**: `pnpm check` must pass against this repository. If a rule flags antidrift itself, either fix the repo pattern or narrow the rule with real corpus evidence.
 8. **Package gate**: when exports, package shape, or shipped config change, `pnpm test:integration` must pass against the packed tarball consumer.
 9. **Session gate**: `pnpm policy:verify-session` is the final local stop condition.
@@ -104,5 +105,5 @@ Subagents should be assigned against these gates: one agent can implement a narr
 
 - Work from the built/hardened rules and chosen next scope, not aspirational cluster names.
 - Prefer TypeChecker, registry, and scope signals over AST shape. Use AST shape only when the syntax is itself the violation.
-- Keep hooks for lifecycle/tool safety, policy scripts for control-plane integrity, and ESLint rules for source-code semantics.
+- Keep hooks for lifecycle/tool safety, policy scripts for control-plane integrity, Oxlint for native/type-aware baseline semantics, and the reduced ESLint pass for custom TypeChecker semantics.
 - Every nontrivial custom-rule change needs real-corpus drift and clean evidence before promotion.

@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -5,10 +6,19 @@ import { fileURLToPath } from "node:url";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import tsParser from "@typescript-eslint/parser";
 import { ESLint } from "eslint";
-import importX from "eslint-plugin-import-x";
 import ts from "typescript";
 
-import plugin from "../eslint-plugin/index.js";
+import eslintPlugin from "../eslint-plugin/index.js";
+import oxlintPlugin from "../oxlint-plugin/index.js";
+import { resolveOxlintBinary } from "./oxlint.mjs";
+
+const plugin = {
+  meta: eslintPlugin.meta,
+  rules: {
+    ...eslintPlugin.rules,
+    ...oxlintPlugin.rules,
+  },
+};
 
 const defaultRepoCandidates = [
   process.env.CHASKI_REPO,
@@ -170,29 +180,37 @@ export const defaultCases = [
   },
   {
     id: "bff-scenario-planner-navigation-cycle",
-    ruleId: "import-x/no-cycle",
+    ruleId: "import/no-cycle",
+    runtime: "oxlint",
     kind: "drift",
     classification: "ready",
     subproject: "bff",
     paths: [
       "src/frontend/bff/api/features/scenario-planner/core/navigation.ts",
     ],
-    ruleOptions: { "import-x/no-cycle": [{ ignoreExternal: true }] },
     expectedFindings: [
       {
         path: "src/frontend/bff/api/features/scenario-planner/core/navigation.ts",
-        line: 6,
+        line: 10,
+      },
+      {
+        path: "src/frontend/bff/api/features/scenario-planner/core/navigation.ts",
+        line: 11,
+      },
+      {
+        path: "src/frontend/bff/api/features/scenario-planner/core/navigation.ts",
+        line: 16,
       },
     ],
   },
   {
     id: "monolith-crowdies-api-no-relative-cycle",
-    ruleId: "import-x/no-cycle",
+    ruleId: "import/no-cycle",
+    runtime: "oxlint",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
     paths: ["src/frontend/monolithui/src/lib/crowdiesApi.ts"],
-    ruleOptions: { "import-x/no-cycle": [{ ignoreExternal: true }] },
   },
   {
     id: "bff-google-maps-delayed-promise-all",
@@ -1152,7 +1170,7 @@ function evaluateCase(
   if (infrastructureFindings.length > 0) {
     return {
       decision: "fail",
-      reason: `ESLint could not evaluate ${corpusLabel} source: ${infrastructureFindings[0].message}`,
+      reason: `Lint runtime could not evaluate ${corpusLabel} source: ${infrastructureFindings[0].message}`,
     };
   }
 
@@ -1174,6 +1192,65 @@ function evaluateCase(
       reason: null,
     }
   );
+}
+
+function oxlintRuleId(code) {
+  const match = /^([^()]+)\(([^()]+)\)$/u.exec(code ?? "");
+  return match ? `${match[1]}/${match[2]}` : code;
+}
+
+function oxlintFinding(repoRoot, diagnostic) {
+  const span = diagnostic.labels?.[0]?.span ?? {};
+  return {
+    path: relativeFile(repoRoot, resolve(repoRoot, diagnostic.filename)),
+    ruleId: oxlintRuleId(diagnostic.code),
+    line: span.line,
+    column: span.column,
+    message: diagnostic.message,
+  };
+}
+
+function lintOxlintCase(repoRoot, testCase) {
+  const args = [
+    resolveOxlintBinary(),
+    "--disable-nested-config",
+    "--import-plugin",
+    "-A",
+    "all",
+    "-D",
+    testCase.ruleId,
+    "--format",
+    "json",
+  ];
+  const tsconfig =
+    testCase.tsconfig ?? defaultTypeAwareProjects[testCase.subproject];
+  if (tsconfig) {
+    args.push("--tsconfig", resolve(repoRoot, tsconfig));
+  }
+  args.push(...testCase.paths.map((path) => resolve(repoRoot, path)));
+  const result = spawnSync(process.execPath, args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  if (result.error) {
+    return [{ ruleId: null, message: result.error.message }];
+  }
+  try {
+    const output = JSON.parse(result.stdout);
+    return (output.diagnostics ?? [])
+      .map((diagnostic) => oxlintFinding(repoRoot, diagnostic))
+      .filter((finding) => finding.ruleId === testCase.ruleId);
+  } catch {
+    return [
+      {
+        ruleId: null,
+        message:
+          result.stderr.trim() ||
+          result.stdout.trim() ||
+          `Oxlint exited with status ${result.status}.`,
+      },
+    ];
+  }
 }
 
 async function lintCase(repoRoot, testCase, corpusLabel) {
@@ -1201,6 +1278,22 @@ async function lintCase(repoRoot, testCase, corpusLabel) {
     };
   }
 
+  if (testCase.runtime === "oxlint") {
+    const findings = lintOxlintCase(repoRoot, testCase);
+    return {
+      id: testCase.id,
+      ruleId: testCase.ruleId,
+      runtime: testCase.runtime,
+      kind: testCase.kind,
+      classification: testCase.classification,
+      subproject: testCase.subproject,
+      paths: testCase.paths,
+      findings,
+      missingFiles,
+      ...evaluateCase(testCase, findings, missingFiles, corpusLabel),
+    };
+  }
+
   const eslint = new ESLint({
     cwd: repoRoot,
     overrideConfigFile: true,
@@ -1222,33 +1315,6 @@ async function lintCase(repoRoot, testCase, corpusLabel) {
         plugins: {
           antidrift: plugin,
           "@eslint-community/eslint-comments": eslintComments,
-          "import-x": importX,
-        },
-        settings: {
-          "import-x/extensions": [
-            ".ts",
-            ".tsx",
-            ".mts",
-            ".cts",
-            ".js",
-            ".jsx",
-            ".mjs",
-            ".cjs",
-          ],
-          "import-x/resolver": {
-            node: {
-              extensions: [
-                ".ts",
-                ".tsx",
-                ".mts",
-                ".cts",
-                ".js",
-                ".jsx",
-                ".mjs",
-                ".cjs",
-              ],
-            },
-          },
         },
         rules: { [testCase.ruleId]: ruleValueFor(testCase) },
       },

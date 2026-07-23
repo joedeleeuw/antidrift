@@ -28,7 +28,7 @@ One protocol, two products. Mining work history recovers (1) lint/policy rule ca
 3. **Chronicle, if enabled** — discovery only; confirm details in the source system.
 4. **Repo evidence**: `docs/handoff.md`, `reports/`, `docs/rule-investigations/`, the registries.
 5. **Real corpora** under `/Users/sushi/code` (Chaski, Codebase Atlas, Sudocode, ...) to confirm the complaint exists in real code, not just in conversation.
-6. **Existing surface, before creating anything**: active and retired rule-status rows in `policy/registries/rules.yaml`, the shared ESLint config, hooks, policy scripts, and existing skills/automations. Reuse or extend; retired decisions do not reopen via mining.
+6. **Existing surface, before creating anything**: active and retired rule-status rows in `policy/registries/rules.yaml`, the shared Oxlint config, the reduced TypeChecker ESLint pass, hooks, policy scripts, and existing skills/automations. Reuse or extend; retired decisions do not reopen via mining.
 
 ## Search Probes
 
@@ -50,16 +50,16 @@ Classify the proof surface before choosing a product form. The truth artifact is
 
 | Truth artifact                     | Owner layer                        | Candidate form                                                                                  |
 | ---------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `source AST`                       | deterministic lint                 | custom ESLint rule, ecosystem rule wiring, or generated config                                  |
-| `source+TypeChecker`               | semantic lint                      | type-aware rule research or existing type-aware ecosystem rule                                  |
-| `source+registry`                  | semantic lint / policy registry    | registry-backed rule, generated config, or policy script                                        |
+| `source AST`                       | deterministic lint                 | Oxlint JavaScript plugin rule, native ecosystem rule, or generated config                       |
+| `source+TypeChecker`               | typed lint                         | Oxlint type-aware rule or reduced ESLint TypeChecker rule                                       |
+| `source+registry`                  | lint / policy registry             | registry-backed Oxlint or TypeChecker rule, generated config, or policy script                  |
 | `class-string+theme`               | design-system control              | ecosystem/config first; custom class-string rule only after residual gap proof                  |
 | `diff+task+graph`                  | change-relative / repo-graph proof | policy script, diff-relative inventory, repo-graph signal, workflow automation, or hook adapter |
 | `transcript+commands+verification` | agent-ops telemetry                | hook, telemetry, workflow automation, or skill                                                  |
 | `runtime/device`                   | runtime validation                 | smoke test, e2e check, workflow automation, or skill                                            |
 | `none`                             | advisory                           | skip, docs, skill, or human review guidance                                                     |
 
-Hard invariant: plain ESLint-rule form is legal only for `source AST`. A rule implemented in the ESLint runtime can still belong to `semantic lint` when it needs TypeChecker, registry, class-token, or theme context. Anything whose proof surface includes diff scope, task intent, repo graph, transcript text, command history, verification output, runtime state, or device behavior is barred from lint-rule form.
+Hard invariant: source lint is legal only when source, type, scope, control-flow, or declared registry facts can prove the finding. AST, scope, and local-control-flow custom rules default to Oxlint's JavaScript plugin host. ESLint is reserved for custom rules that require `Program` or `TypeChecker` data unavailable to that host. Anything whose proof surface includes diff scope, task intent, repo graph, transcript text, command history, verification output, runtime state, or device behavior is barred from lint-rule form.
 
 Seed classifier rows:
 
@@ -68,7 +68,7 @@ Seed classifier rows:
 | Diff-scope creep                  | Frustration pass 2026-06-10: "why are you changing so much fucking code dude"; "dude the diff is like 200 lines"; "why do we need"         | `diff+task+graph`                  | change-relative proof                      | Policy-script or diff-relative inventory research          | Changed-line/task-scope baseline and clean controls   | form-bucket    |
 | Skip-verification before done     | Exhaustive sweep 2026-06-10 grouped `skip-verification` under agent-behavior complaints                                                    | `transcript+commands+verification` | agent-ops telemetry                        | Hook, telemetry, or skill                                  | Quote-backed windows plus command/verification traces | needs-evidence |
 | Net-new bias as behavior          | First harvest 2026-06-10: "We should use `SettingsService` instead since it's already imported"; "we should have helpers for this already" | `diff+task+graph`                  | repo-graph proof, change-relative backstop | Owner-index, repo-graph, or diff-relative inventory signal | Existing-owner discovery baseline against repo graph  | form-bucket    |
-| `catch` returning `[]` or `{}`    | Deep harvest 2026-06-10: "why are we setting a fallback?"                                                                                  | `source AST`                       | deterministic lint                         | Custom ESLint research row                                 | Real-program drift/control matrix                     | form-bucket    |
+| `catch` returning `[]` or `{}`    | Deep harvest 2026-06-10: "why are we setting a fallback?"                                                                                  | `source AST`                       | deterministic lint                         | Custom Oxlint research row                                 | Real-program drift/control matrix                     | form-bucket    |
 | Domain literals outside the owner | Deep harvest 2026-06-10: "we should not hardcode the `868862LN86` prefix"                                                                  | `source+registry`                  | semantic lint / domain registry            | Registry-backed semantic lint                              | Declared literal owners plus drift/control pair       | form-bucket    |
 | Zod schema fork                   | Deep harvest 2026-06-10: "row-level zod schemas instead of reusing posthog-schema.ts"                                                      | `source+TypeChecker`               | semantic lint / type contracts             | Type-aware semantic lint                                   | Second real fork and clean projection controls        | form-bucket    |
 | Barrel files                      | Frustration pass 2026-06-10: "fucking barrel files"                                                                                        | `source AST`                       | deterministic lint                         | Ecosystem rule wiring benchmark                            | Real-corpus plugin benchmark                          | form-bucket    |
@@ -78,7 +78,7 @@ Rows graduate out of this intake table when they become active rules, roadmap re
 
 ## Smallest Appropriate Form
 
-- **Rule products**: derived from the truth artifact gate: custom ESLint rule, semantic lint, ecosystem rule wiring, generated config, hook, policy script, inventory-only signal, research row, or skip — the same buckets as `docs/rule-roadmap.md`.
+- **Rule products**: derived from the truth artifact gate: custom lint rule in its owned runtime, type-aware lint, ecosystem rule wiring, generated config, hook, policy script, inventory-only signal, research row, or skip — the same buckets as `docs/rule-roadmap.md`.
 - **Workflow products**: skill, custom subagent, automation, extend-existing, or skip.
 
 ## Output Contract
@@ -103,7 +103,7 @@ Bounded grep passes over `~/.claude/projects` and `~/.codex/sessions` (May–Jun
 | "setstate removal, why, what we should..." follow-up work                                                                               | `murderbox-apps-client-app/1461e3a8`                         | React state cohesion family                      | Origin evidence for the confirmed coupled-setters fold.                                                              |
 | "ESLint rules for agent-authored TypeScript"; Steve Kinney Enterprise UI ESLint notes; typed rules via `getParserServices`/TypeChecker  | `-private-tmp/43d76a3e`                                      | Project origin                                   | The research session that seeded antidrift; keep as provenance.                                                      |
 | "we should use existing design system elements right? i.e not carving out disparate UI"                                                 | Codex `2026/05/19` rollout (nidus)                           | Net-new bias, design-system dimension            | Origin evidence; supports the decision 8 control-layer framing.                                                      |
-| "we should not make 'Oxlint JS plugin only' the core strategy."                                                                         | Codex `2026/05/31` and `2026/06/04` rollouts                 | Engine decision                                  | Provenance for the ESLint-only decision; already executed and locked in the handoff.                                 |
+| "we should not make 'Oxlint JS plugin only' the core strategy."                                                                         | Codex `2026/05/31` and `2026/06/04` rollouts                 | Historical engine decision                       | Superseded by Oxlint 1.75 stable type-aware linting; TypeChecker-only custom rules still remain in ESLint.           |
 
 Skipped this pass: ghostty "we should never get these" (domain-specific invariant, not lint scope); hardcoded `/tmp` path complaint (`chaski-sibling/9952828e`, single occurrence, ecosystem/Sonar overlap unchecked); Zod `.coerce`/`.transform()`/`z.string().datetime()` guidance (construction-pattern docs, not rules).
 
@@ -121,7 +121,7 @@ Four parallel readers covered the Codex Memories layer in full (35 summaries plu
 | "duplicate typedef instead of importing"                                                                             | 2+                                        | One-owner fork family.                                                                      |
 | New `ChaskiButtonColor` palette instead of the shared system; hardcoded colors vs tokens across web, RN, and Flutter | 2+ in three ecosystems                    | Design-token family and the decision 8 control-layer call.                                  |
 | "error state active outside useEffect"; "loading state still active when data already loaded"                        | 2+                                        | The confirmed coupled-setters derivability fold — these are the field failures it prevents. |
-| "keep adding helper functions when typed payloads already have all fields"                                           | 2+                                        | `no-contract-appeasement-projection`; selector wrappers are the inherited corpus branch.     |
+| "keep adding helper functions when typed payloads already have all fields"                                           | 2+                                        | `no-contract-appeasement-projection`; selector wrappers are the inherited corpus branch.    |
 | Duplicate component trees under `modules/scenarios` and `modules/scenarios/wizard`                                   | 1                                         | `arch/no-feature-scatter` stays spec-only, with provenance.                                 |
 | Hardcoded credentials path                                                                                           | 2+                                        | `sec/no-hardcoded-secret` stays delegated to scanners.                                      |
 | Cross-file duplicate logic ("performance discount amount in 3 locations", "consolidate into a utility")              | Many, three stores                        | Sonar-delegated duplication detection; not custom AST scope.                                |

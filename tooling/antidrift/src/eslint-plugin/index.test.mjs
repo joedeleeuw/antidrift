@@ -8,7 +8,8 @@ import { ESLint } from "eslint";
 import { afterAll, describe, expect, it } from "vitest";
 import YAML from "yaml";
 
-import plugin from "./index.js";
+import oxlintPlugin from "../oxlint-plugin/index.js";
+import eslintPlugin from "./index.js";
 
 RuleTester.afterAll = afterAll;
 RuleTester.describe = describe;
@@ -20,6 +21,13 @@ const repoRoot = resolve(__dirname, "../../../..");
 const semanticFactKinds = YAML.parse(
   readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8"),
 ).semanticFactKinds;
+const plugin = {
+  meta: eslintPlugin.meta,
+  rules: {
+    ...eslintPlugin.rules,
+    ...oxlintPlugin.rules,
+  },
+};
 
 function fixture(relativePath) {
   const fullPath = resolve(fixturesDir, relativePath);

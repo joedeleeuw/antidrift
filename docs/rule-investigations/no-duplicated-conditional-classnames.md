@@ -12,7 +12,7 @@ For static string branches, it splits on whitespace, compares unique class token
 
 ## Controls
 
-The alert surface is configurable through ESLint rule options. Omit the options object to use the defaults, or provide the complete shape below. Partial or malformed option objects fail loudly through the rule schema and runtime validation.
+The alert surface is configurable through rule options in the Oxlint JavaScript plugin. Omit the options object to use the defaults, or provide the complete shape below. Partial or malformed option objects fail loudly through the rule schema and runtime validation.
 
 ```js
 "antidrift/no-duplicated-conditional-classnames": [
@@ -34,6 +34,6 @@ Generic duplicate-branch rules cover identical conditional branches, and duplica
 
 ## Corpus
 
-The first drift case is the Murderbox client send button className branch where both branches share the same eight base classes and differ only by `opacity-50` versus `active:opacity-75`.
+Murderbox's current `apps/client/src/components/thread/live-turn.tsx` reports at line 180, where both branches repeat five button-layout classes and differ only by interaction state. The earlier client send-button case remains the original evidence.
 
 Keep the rule default-off until more real UI files are classified for clean pressure and false positives.

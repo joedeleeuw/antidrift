@@ -34,7 +34,7 @@ import {
   noAppeasementRemediationCorpus,
   parseArgs as parseNoAppeasementRemediationArgs,
 } from "./no-appeasement-remediation-corpus.mjs";
-import { runOxlintComplexity } from "./oxlint-complexity.mjs";
+import { runOxlint } from "./oxlint.mjs";
 import {
   parseArgs as parseReactStateInventoryArgs,
   reactStateInventory,
@@ -239,7 +239,7 @@ const commands = {
   },
   "verify-session": verifySession,
   oxlint: () => {
-    process.exitCode = runOxlintComplexity({
+    process.exitCode = runOxlint({
       argv: args,
       exit: (code) => code,
     });

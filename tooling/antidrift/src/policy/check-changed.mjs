@@ -3,17 +3,30 @@ import { fileURLToPath } from "node:url";
 
 import { protectedPolicyFiles } from "./lib/generated-targets.mjs";
 import { changedFiles } from "./lib/git.mjs";
+import { runOxlint } from "./oxlint.mjs";
 
 export function checkChanged() {
   const changed = changedFiles();
-  const codeFiles = changed.filter((file) => /\.(js|mjs|cjs|ts|tsx)$/u.test(file));
-  const protectedChanged = changed.filter((file) => protectedPolicyFiles.includes(file));
+  const codeFiles = changed.filter((file) =>
+    /\.(js|mjs|cjs|ts|tsx)$/u.test(file),
+  );
+  const protectedChanged = changed.filter((file) =>
+    protectedPolicyFiles.includes(file),
+  );
   const policyChanged = changed.includes("policy/agent-guardrails.yaml");
 
-  if (protectedChanged.length > 0 && !policyChanged && !process.env.POLICY_CHANGE) {
-    console.error("Protected policy/config files changed without policy source update:");
+  if (
+    protectedChanged.length > 0 &&
+    !policyChanged &&
+    !process.env.POLICY_CHANGE
+  ) {
+    console.error(
+      "Protected policy/config files changed without policy source update:",
+    );
     for (const file of protectedChanged) console.error(`- ${file}`);
-    console.error("Edit policy/agent-guardrails.yaml and run pnpm policy:generate, or set POLICY_CHANGE=1 for an explicit policy task.");
+    console.error(
+      "Edit policy/agent-guardrails.yaml and run pnpm policy:generate, or set POLICY_CHANGE=1 for an explicit policy task.",
+    );
     process.exit(1);
   }
 
@@ -22,8 +35,18 @@ export function checkChanged() {
     return;
   }
 
-  const result = spawnSync("pnpm", ["exec", "eslint", ...codeFiles, "--max-warnings", "0"], { stdio: "inherit" });
-  if (result.status !== 0) process.exit(result.status ?? 1);
+  const oxlintStatus = runOxlint({
+    argv: codeFiles,
+    exit: (status) => status,
+  });
+  if (oxlintStatus !== 0) process.exit(oxlintStatus);
+
+  const eslintResult = spawnSync(
+    "pnpm",
+    ["exec", "eslint", ...codeFiles, "--max-warnings", "0"],
+    { stdio: "inherit" },
+  );
+  if (eslintResult.status !== 0) process.exit(eslintResult.status ?? 1);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

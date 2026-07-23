@@ -32,10 +32,10 @@ Use this prompt shape for one rule or one tightly related rule family. For a new
 You are an advisory reviewer only, not the source of truth. Read the repository code before answering. Do not edit files.
 
 Project goal:
-- antidrift is an ESLint plus typescript-eslint custom-rule package.
+- antidrift uses Oxlint for native and supported type-aware rules, its JavaScript plugin API for syntax-only custom rules, and a reduced ESLint pass for custom TypeChecker rules.
 - Prefer TypeChecker, registry, scope/binding, and deterministic source signals.
 - Use AST shape only when the syntax itself is the violation.
-- Do not suggest Oxlint, Semgrep, CodeQL, or another lint engine for this package.
+- Do not suggest a second implementation of a rule already owned by Oxlint or the reduced ESLint pass.
 - Real source programs are the validation surface. Fixtures and reduced programs are regression aids only.
 - Stable promotion requires multiple independent repository replications that were not created to satisfy the rule, zero known false positives, zero known false negatives, and no unresolved production concerns.
 

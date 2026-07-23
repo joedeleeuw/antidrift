@@ -9,8 +9,16 @@ import {
   checkSemanticAdapterContracts,
 } from "./check-registries.mjs";
 import { SEMANTIC_FACT_KINDS } from "./lib/semantic-facts.mjs";
-import plugin from "../eslint-plugin/index.js";
+import eslintPlugin from "../eslint-plugin/index.js";
+import oxlintPlugin from "../oxlint-plugin/index.js";
 import { SEMANTIC_ADAPTER_CONTRACTS } from "../semantic-adapters/index.mjs";
+
+const plugin = {
+  rules: {
+    ...eslintPlugin.rules,
+    ...oxlintPlugin.rules,
+  },
+};
 
 function workspace() {
   const root = mkdtempSync(join(tmpdir(), "antidrift-registries-"));
@@ -976,11 +984,11 @@ ruleFamilies:
   it("requires emitted semantic fact kinds to be registered", () => {
     const root = workspace();
     writeValidRulesRegistry(root);
-    mkdirSync(join(root, "tooling/antidrift/src/eslint-plugin"), {
+    mkdirSync(join(root, "tooling/antidrift/src/oxlint-plugin/rules"), {
       recursive: true,
     });
     writeFileSync(
-      join(root, "tooling/antidrift/src/eslint-plugin/index.js"),
+      join(root, "tooling/antidrift/src/oxlint-plugin/rules/example.js"),
       'emitSemanticFact(context, node, { factKind: "missingFact" });\n',
     );
     const messages = [];

@@ -35,11 +35,11 @@ The benchmark runs `@typescript-eslint/no-unsafe-type-assertion` beside `antidri
 
 Location comparison:
 
-| Result                                                              | Count |
-| ------------------------------------------------------------------- | ----: |
-| Locations reported by both upstream and `no-appeasement-cast`       |   100 |
-| Upstream-only locations                                             | 1,517 |
-| Antidrift-only locations                                            |     0 |
+| Result                                                        | Count |
+| ------------------------------------------------------------- | ----: |
+| Locations reported by both upstream and `no-appeasement-cast` |   100 |
+| Upstream-only locations                                       | 1,517 |
+| Antidrift-only locations                                      |     0 |
 
 Interpretation: upstream is a strict superset on the measured corpus, but too broad to replace this custom rule as the targeted broad-input authority policy. Keep this rule default-off for the `any`/`unknown` source-type contract and use the upstream rule as the maintained broad assertion surface.
 
@@ -62,7 +62,7 @@ if (axios.isAxiosError(err)) {
 Codebase Atlas:
 
 - `/Users/sushi/code/codebase-atlas/src/needle/AtlasNeedleRenderer.ts` line 205 casts `mesh.userData.baseEmissive` to `ThreeColor`.
-- `/Users/sushi/code/codebase-atlas/src/programs/persistenceCuration.ts` line 1293 casts broad input to `TerrainLayoutAnchor` before checking fields.
+- `/Users/sushi/code/codebase-atlas/src/programs/persistenceCuration.ts` line 1269 casts broad input to `TerrainLayoutAnchor` before checking fields.
 
 Expected repair:
 

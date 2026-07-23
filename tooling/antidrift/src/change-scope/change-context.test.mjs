@@ -159,7 +159,7 @@ describe("change-context", () => {
     badGit(["commit", "-q", "-m", "bad"]);
     expect(() =>
       collectChangeSurface({ base: BASE, head: HEAD, cwd: bad }),
-    ).toThrow();
+    ).toThrow(/JSON/u);
     rmSync(bad, { recursive: true, force: true });
   });
 

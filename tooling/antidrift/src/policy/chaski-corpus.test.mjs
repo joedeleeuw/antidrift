@@ -282,7 +282,7 @@ export interface OpenProjectInfo extends ProjectInfo {
     expect(result.cases[0]?.findings).toHaveLength(1);
   });
 
-  it("fails when ESLint cannot parse a corpus source file", async () => {
+  it("fails when the lint runtime cannot parse a corpus source file", async () => {
     const root = tempRepo();
     writeProgram(root, "src/broken.ts", "const = ;\n");
 
@@ -303,7 +303,9 @@ export interface OpenProjectInfo extends ProjectInfo {
 
     expect(result.decision).toBe("fail");
     expect(result.cases[0]?.findings[0]?.ruleId).toBeNull();
-    expect(result.cases[0]?.reason).toContain("ESLint could not evaluate");
+    expect(result.cases[0]?.reason).toContain(
+      "Lint runtime could not evaluate",
+    );
   });
 });
 
@@ -321,7 +323,9 @@ describe("externalCorpus", () => {
     expect(result.decision).toBe("fail");
     expect(result.reason).toContain("99 required");
     expect(result.repositories.length).toBeGreaterThan(0);
-    expect(result.repositories.every((repository) => repository.cases.length === 0)).toBe(true);
+    expect(
+      result.repositories.every((repository) => repository.cases.length === 0),
+    ).toBe(true);
     expect(messages.join("\n")).toContain("external-corpus fail:");
     expect(JSON.parse(readFileSync(output, "utf8")).decision).toBe("fail");
   });

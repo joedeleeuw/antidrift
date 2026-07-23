@@ -1,33 +1,22 @@
 import ts from "typescript";
 
 import {
-  createReactStateTracker,
-  frameStatePayload,
-  lifecycleProof,
-  sourceShardProof,
-} from "./react-state-graph.js";
-import ruleNoCallingComponentsAsFunctions from "./rules/no-calling-components-as-functions.js";
-import ruleNoDuplicatedConditionalClassnames from "./rules/no-duplicated-conditional-classnames.js";
-import ruleNoDuplicatedObjectFieldBlocks from "./rules/no-duplicated-object-field-blocks.js";
-import ruleNoNonindependentTestOracle from "./rules/no-nonindependent-test-oracle.js";
-import ruleNoQueryDataTypeParameters from "./rules/no-query-data-type-parameters.js";
-import ruleNoSilentEmptyDetectionFallback from "./rules/no-silent-empty-detection-fallback.js";
+  functionReturnsJsx,
+  getFunctionNode,
+  isBoundary,
+  isFunctionLike,
+  memberNodeTypes,
+  unwrapExpression,
+} from "../semantic-adapters/local-ast-rules.mjs";
 import packageMetadata from "../../package.json" with { type: "json" };
 import {
   emitSemanticFact,
   semanticFactSink,
 } from "../policy/lib/semantic-facts.mjs";
 import {
-  asyncArrayCallbackClassification,
   findVariable,
   getDeclaredVariable,
-  isDirectlyWrappedInPromiseCombinator,
-  isReturnedExpression,
-  markAwaitedPendingMaps,
-  markReturnedPendingMaps,
-  queuePendingAsyncMap,
 } from "../semantic-adapters/async-control-flow.mjs";
-import { createAuthBoundaryTracker } from "../semantic-adapters/auth-boundary.mjs";
 import {
   checkedTargetProperties,
   countShapeProbesIn,
@@ -65,7 +54,6 @@ import {
 import { hasNullablePositionalTuple } from "../semantic-adapters/tuple-shape.mjs";
 import {
   MIN_PROPS,
-  canonicalStatusLiteralOwner,
   collectAcceptedPackageCanonicalTypes,
   collectCanonicalTypes,
   collectDomainCanonicalTypes,
@@ -77,24 +65,16 @@ import {
   typeProps,
 } from "../semantic-adapters/type-owner.mjs";
 
-const reactEffectHooks = new Set(["useEffect", "useLayoutEffect"]);
 const reactComponentFactoryWrappers = new Set(["forwardRef", "memo"]);
 const reactComponentTypeNames = new Set(["FC", "FunctionComponent"]);
 const DEFAULT_REACT_COMPONENT_PROPS_MAX = 12;
 const collectionMetadataMemberNames = new Set(["length", "size"]);
-const exportedLocalNamesByProgram = new WeakMap();
 const structuralDerivationUtilities = new Set([
   "Omit",
   "Partial",
   "Pick",
   "Readonly",
   "Required",
-]);
-
-const memberNodeTypes = new Set([
-  "MethodDefinition",
-  "PropertyDefinition",
-  "Property",
 ]);
 
 function missingTypeServicesVisitors(context, ruleName) {
@@ -114,293 +94,8 @@ function requireTypeServices(context) {
   return null;
 }
 
-function getFunctionName(node) {
-  if (node.type === "FunctionDeclaration") return node.id?.name ?? "";
-  if (
-    node.type === "FunctionExpression" ||
-    node.type === "ArrowFunctionExpression"
-  ) {
-    return node.id?.name ?? "";
-  }
-  if (node.type === "VariableDeclarator" && node.id?.type === "Identifier") {
-    return node.id.name;
-  }
-  if (memberNodeTypes.has(node.type)) {
-    const key = node.key;
-    if (key?.type === "Identifier" || key?.type === "PrivateIdentifier") {
-      return key.name;
-    }
-    if (key?.type === "Literal" && typeof key.value === "string") {
-      return key.value;
-    }
-  }
-  return "";
-}
-
-function declarationName(node) {
-  if (node.type === "VariableDeclarator" && node.id?.type === "Identifier") {
-    return node.id.name;
-  }
-  if (
-    (node.type === "FunctionDeclaration" || node.type === "ClassDeclaration") &&
-    node.id?.type === "Identifier"
-  ) {
-    return node.id.name;
-  }
-  return getFunctionName(node);
-}
-
-function programNode(node) {
-  let cur = node;
-  while (cur?.parent) cur = cur.parent;
-  return cur?.type === "Program" ? cur : null;
-}
-
-function exportedLocalNames(program) {
-  if (!program) return new Set();
-  const cached = exportedLocalNamesByProgram.get(program);
-  if (cached) return cached;
-  const names = new Set();
-  for (const statement of program?.body ?? []) {
-    if (statement.type === "ExportNamedDeclaration") {
-      for (const specifier of statement.specifiers ?? []) {
-        if (specifier.local?.type === "Identifier") {
-          names.add(specifier.local.name);
-        }
-      }
-    } else if (
-      statement.type === "ExportDefaultDeclaration" &&
-      statement.declaration?.type === "Identifier"
-    ) {
-      names.add(statement.declaration.name);
-    }
-  }
-  exportedLocalNamesByProgram.set(program, names);
-  return names;
-}
-
-function isExported(node) {
-  if (
-    node.parent?.type === "ExportNamedDeclaration" ||
-    node.parent?.type === "ExportDefaultDeclaration"
-  ) {
-    return true;
-  }
-  const name = declarationName(node);
-  return Boolean(name && exportedLocalNames(programNode(node)).has(name));
-}
-
-function getFunctionNode(node) {
-  if (
-    node.type === "FunctionDeclaration" ||
-    node.type === "FunctionExpression" ||
-    node.type === "ArrowFunctionExpression"
-  ) {
-    return node;
-  }
-  if (node.type === "VariableDeclarator") return node.init;
-  // Class methods/fields and object members hold the function in `value`; ignore non-function fields.
-  if (memberNodeTypes.has(node.type)) {
-    const value = node.value;
-    return value?.type === "FunctionExpression" ||
-      value?.type === "ArrowFunctionExpression"
-      ? value
-      : null;
-  }
-  return null;
-}
-
-function enclosingClassExported(memberNode) {
-  const classNode = memberNode.parent?.parent; // member → ClassBody → Class
-  if (
-    classNode?.type !== "ClassDeclaration" &&
-    classNode?.type !== "ClassExpression"
-  ) {
-    return false;
-  }
-  if (
-    classNode.parent?.type === "ExportNamedDeclaration" ||
-    classNode.parent?.type === "ExportDefaultDeclaration"
-  ) {
-    return true;
-  }
-  // export const X = class { ... }
-  return (
-    classNode.parent?.type === "VariableDeclarator" &&
-    classNode.parent.parent?.parent?.type === "ExportNamedDeclaration"
-  );
-}
-
-function enclosingObjectExported(memberNode) {
-  const objectNode = memberNode.parent;
-  if (objectNode?.type !== "ObjectExpression") return false;
-  if (objectNode.parent?.type === "ExportDefaultDeclaration") return true;
-  return (
-    objectNode.parent?.type === "VariableDeclarator" &&
-    isBoundary(objectNode.parent)
-  );
-}
-
-function enclosingReturnedObjectFromBoundary(memberNode) {
-  const objectNode = memberNode.parent;
-  if (objectNode?.type !== "ObjectExpression") return false;
-  if (
-    objectNode.parent?.type === "ArrowFunctionExpression" &&
-    objectNode.parent.body === objectNode
-  ) {
-    const arrowParent = objectNode.parent.parent;
-    if (arrowParent?.type === "VariableDeclarator") {
-      return isBoundary(arrowParent);
-    }
-    return isBoundary(objectNode.parent);
-  }
-  if (objectNode.parent?.type !== "ReturnStatement") return false;
-  let cur = objectNode.parent.parent;
-  while (cur) {
-    if (cur.type === "FunctionDeclaration") return isBoundary(cur);
-    if (
-      (cur.type === "FunctionExpression" ||
-        cur.type === "ArrowFunctionExpression") &&
-      cur.parent?.type === "VariableDeclarator"
-    ) {
-      return isBoundary(cur.parent);
-    }
-    if (memberNodeTypes.has(cur.type)) return isBoundary(cur);
-    cur = cur.parent;
-  }
-  return false;
-}
-
-function functionBoundaryNode(fn) {
-  if (fn?.type === "FunctionDeclaration") return fn;
-  if (
-    (fn?.type === "FunctionExpression" ||
-      fn?.type === "ArrowFunctionExpression") &&
-    fn.parent?.type === "VariableDeclarator"
-  ) {
-    return fn.parent;
-  }
-  if (fn && memberNodeTypes.has(fn.parent?.type)) return fn.parent;
-  return fn;
-}
-
-function enclosingFunction(node) {
-  let cur = node.parent;
-  while (cur) {
-    if (
-      cur.type === "FunctionDeclaration" ||
-      cur.type === "FunctionExpression" ||
-      cur.type === "ArrowFunctionExpression"
-    ) {
-      return cur;
-    }
-    cur = cur.parent;
-  }
-  return null;
-}
-
-function objectExpressionExposesIdentifier(objectNode, name) {
-  return (
-    objectNode?.type === "ObjectExpression" &&
-    objectNode.properties.some((property) => {
-      if (property.type !== "Property") return false;
-      if (
-        property.value?.type === "Identifier" &&
-        property.value.name === name
-      ) {
-        return true;
-      }
-      return (
-        property.shorthand &&
-        property.key?.type === "Identifier" &&
-        property.key.name === name
-      );
-    })
-  );
-}
-
-function returnedObjectExposesIdentifier(fn, name) {
-  if (fn?.body?.type === "ObjectExpression") {
-    return objectExpressionExposesIdentifier(fn.body, name);
-  }
-  if (fn?.body?.type !== "BlockStatement") return false;
-  return fn.body.body.some(
-    (statement) =>
-      statement.type === "ReturnStatement" &&
-      objectExpressionExposesIdentifier(
-        unwrapExpression(statement.argument),
-        name,
-      ),
-  );
-}
-
-function callableReturnedFromBoundaryFactory(node) {
-  const name = node.id?.type === "Identifier" ? node.id.name : null;
-  if (!name) return false;
-  const fn = getFunctionNode(node);
-  if (!fn) return false;
-  const owner = enclosingFunction(node);
-  if (!owner || !isBoundary(functionBoundaryNode(owner))) return false;
-  return returnedObjectExposesIdentifier(owner, name);
-}
-
-// A definition is a "boundary" (public contract, exempt from inference-appeasement rules) when it is
-// an exported function/const, or a public method of an exported class. Private/protected/# members,
-// and any member of a non-exported class, are internal. Getters/setters/constructors are never
-// appeasement helpers. Abstract and interface signatures are different node types and never visited.
-function isBoundary(node) {
-  if (!memberNodeTypes.has(node.type)) {
-    if (isExported(node)) return true;
-    if (
-      (node.type === "VariableDeclarator" ||
-        node.type === "FunctionDeclaration") &&
-      callableReturnedFromBoundaryFactory(node)
-    ) {
-      return true;
-    }
-    return (
-      node.type === "VariableDeclarator" &&
-      node.parent?.parent?.type === "ExportNamedDeclaration"
-    );
-  }
-  if (
-    node.kind === "get" ||
-    node.kind === "set" ||
-    node.kind === "constructor"
-  ) {
-    return true;
-  }
-  if (node.type === "Property") {
-    return (
-      enclosingObjectExported(node) || enclosingReturnedObjectFromBoundary(node)
-    );
-  }
-  if (
-    node.key?.type === "PrivateIdentifier" ||
-    node.accessibility === "private" ||
-    node.accessibility === "protected"
-  ) {
-    return false;
-  }
-  return enclosingClassExported(node);
-}
-
 function hasExplicitReturnType(fn) {
   return Boolean(fn?.returnType);
-}
-
-function unwrapExpression(expression) {
-  if (expression?.type === "ChainExpression") return expression.expression;
-  if (expression?.type === "TSAsExpression") {
-    return unwrapExpression(expression.expression);
-  }
-  if (expression?.type === "TSNonNullExpression") {
-    return unwrapExpression(expression.expression);
-  }
-  if (expression?.type === "TSSatisfiesExpression") {
-    return unwrapExpression(expression.expression);
-  }
-  return expression;
 }
 
 function assignmentTarget(node) {
@@ -1066,66 +761,6 @@ function contractProjectionProof(fn, sourceCode, services, checker) {
   );
 }
 
-function isFunctionLike(node) {
-  return (
-    node?.type === "FunctionDeclaration" ||
-    node?.type === "FunctionExpression" ||
-    node?.type === "ArrowFunctionExpression"
-  );
-}
-
-function functionForImplementationParameter(param) {
-  const maybeFunction = param?.parent;
-  return isFunctionLike(maybeFunction) && maybeFunction.body
-    ? maybeFunction
-    : null;
-}
-
-function isBoundaryObjectMethod(fn) {
-  const property = fn?.parent;
-  return (
-    property?.type === "Property" &&
-    property.value === fn &&
-    (enclosingObjectExported(property) ||
-      enclosingReturnedObjectFromBoundary(property))
-  );
-}
-
-function collectJsxLocals(statement, jsxLocals) {
-  if (statement.type !== "VariableDeclaration") return;
-  for (const declaration of statement.declarations) {
-    if (
-      declaration.id?.type === "Identifier" &&
-      containsJsxNode(declaration.init)
-    ) {
-      jsxLocals.add(declaration.id.name);
-    }
-  }
-}
-
-function returnsJsxExpression(statement, jsxLocals) {
-  if (statement.type !== "ReturnStatement") return false;
-  if (containsJsxNode(statement.argument)) return true;
-  return Boolean(
-    statement.argument?.type === "Identifier" &&
-    jsxLocals.has(statement.argument.name),
-  );
-}
-
-function blockReturnsJsx(body) {
-  const jsxLocals = new Set();
-  for (const statement of body.body) {
-    collectJsxLocals(statement, jsxLocals);
-    if (returnsJsxExpression(statement, jsxLocals)) return true;
-  }
-  return false;
-}
-
-function functionReturnsJsx(fn) {
-  if (fn?.body?.type !== "BlockStatement") return containsJsxNode(fn?.body);
-  return blockReturnsJsx(fn.body);
-}
-
 function staticPropertyName(node) {
   if (!node) return "";
   if (node.type === "Identifier" || node.type === "PrivateIdentifier") {
@@ -1334,23 +969,6 @@ function reportLargeComponentProps(node, context, services, checker, max) {
   });
 }
 
-function isExportedFunctionBoundary(fn) {
-  const owner = functionBoundaryNode(fn);
-  return Boolean(owner && isBoundary(owner));
-}
-
-function inlineStructuralTypeAtBoundary(node) {
-  const parent = node.parent;
-  const param = parent?.parent;
-  if (parent?.type !== "TSTypeAnnotation" || !param) return false;
-
-  const fn = functionForImplementationParameter(param);
-  if (!fn) return false;
-  if (functionReturnsJsx(fn)) return false;
-
-  return isBoundaryObjectMethod(fn) || isExportedFunctionBoundary(fn);
-}
-
 // Visit free functions, arrow consts, and class methods/fields uniformly — agents hide the same
 // contract-appeasement patterns in any of these forms.
 const callableVisitors = (check) => ({
@@ -1433,421 +1051,11 @@ function ruleReactMaxComponentProps() {
   };
 }
 
-function ruleNoInlineStructuralTypeAtUseSite() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description: "Disallow inline object type literals at use sites.",
-      },
-      schema: [],
-    },
-    create(context) {
-      return {
-        TSTypeLiteral(node) {
-          if (inlineStructuralTypeAtBoundary(node)) {
-            context.report({
-              node,
-              message:
-                "Do not define structural contracts at use sites. Import or create the owned named type.",
-            });
-          }
-        },
-      };
-    },
-  };
-}
-
-function ruleNoHandrolledResourceLifecycleCells() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description:
-          "Disallow hand-rolled resource-lifecycle state machines: an async transition that toggles a boolean lifecycle cell, resets and assigns an error cell, and assigns an awaited resource cell. Broad multi-setter co-mutation is inventory only, never blocking.",
-      },
-      schema: [
-        {
-          type: "object",
-          properties: { threshold: { type: "number" } },
-          additionalProperties: false,
-        },
-      ],
-    },
-    create(context) {
-      const threshold = context.options[0]?.threshold ?? 3;
-      const tracker = createReactStateTracker({
-        context,
-        onFrameExit(frame) {
-          const proof = frame.isTransition
-            ? lifecycleProof(frame)
-            : { proven: false };
-          if (proof.proven && !frame.requestGuard) {
-            emitSemanticFact(context, frame.node, {
-              factKind: "resourceLifecycleProof",
-              ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
-              adapterId: "react-state",
-              confidence: "deterministic-enforcement",
-              provenance: ["AST", "scope-binding", "control-flow"],
-              payload: {
-                boolCell: proof.boolCell,
-                errorCell: proof.errorCell,
-                payloadCell: proof.payloadCell,
-                ...frameStatePayload(frame),
-              },
-            });
-            context.report({
-              node: frame.node,
-              message:
-                "This async transition hand-rolls a resource lifecycle: a constant lifecycle cell is toggled around the request while sibling cells receive the resource value and caught error. Model one resource/reducer value instead of coupled setters.",
-            });
-            return;
-          }
-          // Broad co-mutation is name-agnostic but unproven: inventory only, never blocking.
-          if (frame.called.size >= threshold) {
-            emitSemanticFact(context, frame.node, {
-              factKind: "broadSetterCoMutation",
-              ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
-              adapterId: "react-state",
-              confidence: "heuristic-inventory",
-              provenance: ["AST", "scope-binding"],
-              payload: frameStatePayload(frame),
-            });
-          }
-        },
-      });
-      return tracker.visitors;
-    },
-  };
-}
-
-function isUnshadowedGlobalName(sourceCode, identifier, name) {
-  if (identifier?.type !== "Identifier" || identifier.name !== name) {
-    return false;
-  }
-  const variable = findVariable(sourceCode, identifier);
-  return !variable || variable.defs.length === 0;
-}
-
-function isGlobalFetchCall(sourceCode, callee) {
-  if (callee?.type === "Identifier") {
-    return isUnshadowedGlobalName(sourceCode, callee, "fetch");
-  }
-  if (callee?.type !== "MemberExpression" || callee.computed) return false;
-  const propertyName =
-    callee.property?.type === "Identifier" ? callee.property.name : "";
-  return (
-    propertyName === "fetch" &&
-    ["globalThis", "window", "self"].some((name) =>
-      isUnshadowedGlobalName(sourceCode, callee.object, name),
-    )
-  );
-}
-
-function sourceShardPayload(proof) {
-  return {
-    source: proof.source,
-    members: proof.entries.map(({ setter, cell, property }) => ({
-      setter,
-      cell,
-      property,
-    })),
-    editableCells: proof.editableCells,
-    transition: Boolean(proof.transition),
-    requestGuard: Boolean(proof.requestGuard),
-  };
-}
-
 // Inventory-only: the React-state shard detector records semantic source-member
 // fan-out (>=2 distinct members of one freshly awaited source written into >=2 sibling
 // cells, after excluding controlled-input draft cells) as a candidate fact. It never
 // reports — the type-owner enforcement tier was removed after multi-repo scans found the
 // owned-entity shatter does not occur in human-written code; revisit with an agent corpus.
-function ruleNoShatteredIngestedEntityState() {
-  return {
-    meta: {
-      type: "suggestion",
-      docs: {
-        description:
-          "Record (inventory-only) React transitions that split one freshly ingested source object into sibling state cells.",
-      },
-      schema: [
-        {
-          type: "object",
-          properties: {
-            threshold: { type: "number" },
-          },
-          additionalProperties: false,
-        },
-      ],
-    },
-    create(context) {
-      const options = context.options[0] ?? {};
-      const threshold = options.threshold ?? 2;
-      const tracker = createReactStateTracker({
-        context,
-        onFrameExit(frame) {
-          // Only the component frame declares useState cells; a nested async
-          // transition frame has no setters and bubbles its transitions (and the
-          // controlled/event-edited exclusions) up to this frame, which is the one
-          // evaluated. Dropping this guard would double-evaluate without exclusions.
-          if (frame.setters.size === 0) return;
-          const proof = sourceShardProof(frame, { threshold });
-          if (!proof.proven) return;
-          emitSemanticFact(context, proof.node ?? frame.node, {
-            factKind: "sourceMemberStateShardCandidate",
-            ruleId: "antidrift/no-shattered-ingested-entity-state",
-            adapterId: "react-state",
-            confidence: "heuristic-inventory",
-            provenance: ["AST", "scope-binding", "control-flow"],
-            payload: sourceShardPayload(proof),
-          });
-        },
-      });
-      return tracker.visitors;
-    },
-  };
-}
-
-function ruleRequireEffectDeps() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description:
-          "Require a dependency array for React effect hooks. A missing array runs the effect on every render — usually an agent oversight, and one exhaustive-deps does not flag (it only validates an array that already exists).",
-      },
-      schema: [],
-    },
-    create(context) {
-      // Local names that resolve to a React effect hook: imported/aliased bare names, plus default
-      // and namespace import names accessed as `React.useEffect`. Only react imports are tracked.
-      const directNames = new Set();
-      const namespaceNames = new Set();
-      return {
-        ImportDeclaration(node) {
-          if (node.source.value !== "react") return;
-          for (const spec of node.specifiers) {
-            if (
-              spec.type === "ImportSpecifier" &&
-              reactEffectHooks.has(spec.imported.name)
-            ) {
-              directNames.add(spec.local.name);
-            } else if (
-              spec.type === "ImportDefaultSpecifier" ||
-              spec.type === "ImportNamespaceSpecifier"
-            ) {
-              namespaceNames.add(spec.local.name);
-            }
-          }
-        },
-        CallExpression(node) {
-          const callee = node.callee;
-          let hookName = null;
-          if (callee.type === "Identifier" && directNames.has(callee.name)) {
-            hookName = callee.name;
-          } else if (
-            callee.type === "MemberExpression" &&
-            !callee.computed &&
-            callee.object.type === "Identifier" &&
-            callee.property.type === "Identifier" &&
-            namespaceNames.has(callee.object.name) &&
-            reactEffectHooks.has(callee.property.name)
-          ) {
-            hookName = callee.property.name;
-          }
-          if (hookName && node.arguments.length < 2) {
-            context.report({
-              node,
-              message: `${hookName} must be called with a dependency array. Without it the effect runs on every render — pass [] or the real dependencies.`,
-            });
-          }
-        },
-      };
-    },
-  };
-}
-
-function containsJsxNode(node) {
-  if (!node || typeof node !== "object") return false;
-  if (node.type === "JSXElement" || node.type === "JSXFragment") return true;
-  if (isFunctionLike(node)) return false;
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "parent") continue;
-    if (Array.isArray(value) && value.some((item) => containsJsxNode(item))) {
-      return true;
-    }
-    if (value?.type && containsJsxNode(value)) return true;
-  }
-  return false;
-}
-
-function ruleNoRawFetchInComponent() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description: "Disallow raw fetch calls inside React components.",
-      },
-      schema: [],
-    },
-    create(context) {
-      const sourceCode = context.sourceCode ?? context.getSourceCode();
-      const stack = [];
-      function enterFunction(node) {
-        stack.push({
-          returnsJsx:
-            node.type === "ArrowFunctionExpression" &&
-            containsJsxNode(node.body),
-          fetches: [],
-          jsxLocals: new Set(),
-        });
-      }
-      function exitFunction() {
-        const frame = stack.pop();
-        if (!frame) return;
-        if (!frame.returnsJsx) {
-          stack[stack.length - 1]?.fetches.push(...frame.fetches);
-          return;
-        }
-        for (const node of frame.fetches) {
-          context.report({
-            node,
-            message:
-              "Do not call raw fetch inside React components. Use an API client, loader, or query resource.",
-          });
-        }
-      }
-
-      return {
-        FunctionDeclaration: enterFunction,
-        "FunctionDeclaration:exit": exitFunction,
-        FunctionExpression: enterFunction,
-        "FunctionExpression:exit": exitFunction,
-        ArrowFunctionExpression: enterFunction,
-        "ArrowFunctionExpression:exit": exitFunction,
-        VariableDeclarator(node) {
-          const frame = stack[stack.length - 1];
-          if (
-            frame &&
-            node.id?.type === "Identifier" &&
-            containsJsxNode(node.init)
-          ) {
-            frame.jsxLocals.add(node.id.name);
-          }
-        },
-        ReturnStatement(node) {
-          if (stack.length === 0) return;
-          const frame = stack[stack.length - 1];
-          if (
-            containsJsxNode(node.argument) ||
-            (node.argument?.type === "Identifier" &&
-              frame.jsxLocals.has(node.argument.name))
-          ) {
-            frame.returnsJsx = true;
-          }
-        },
-        CallExpression(node) {
-          if (isGlobalFetchCall(sourceCode, node.callee) && stack.length > 0) {
-            const frame = stack[stack.length - 1];
-            frame.fetches.push(node);
-          }
-        },
-      };
-    },
-  };
-}
-
-function asyncMapMessage(method) {
-  return `Wrap .${method}() with an async callback in Promise.all(...) (or Promise.allSettled) so the promises are awaited.`;
-}
-
-function enabledAsyncArrayBranches(option) {
-  return new Set(["never-await", ...(option?.branches ?? [])]);
-}
-
-function ruleNoAsyncArrayMethod() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description:
-          "Disallow async callbacks passed to array iteration methods that silently drop or mishandle the returned promises.",
-      },
-      schema: [
-        {
-          type: "object",
-          additionalProperties: false,
-          required: ["branches"],
-          properties: {
-            branches: {
-              type: "array",
-              minItems: 1,
-              uniqueItems: true,
-              items: {
-                enum: ["never-await", "requires-collection"],
-              },
-            },
-          },
-        },
-      ],
-    },
-    create(context) {
-      const sourceCode = context.sourceCode ?? context.getSourceCode();
-      const pendingAsyncMaps = [];
-      const enabledBranches = enabledAsyncArrayBranches(context.options[0]);
-      return {
-        "Program:exit"() {
-          for (const pending of pendingAsyncMaps) {
-            if (!pending.awaited && !pending.returned) {
-              context.report({
-                node: pending.node,
-                message: asyncMapMessage(pending.method),
-              });
-            }
-          }
-        },
-        ReturnStatement(node) {
-          markReturnedPendingMaps(sourceCode, node, pendingAsyncMaps);
-        },
-        CallExpression(node) {
-          markAwaitedPendingMaps(sourceCode, node, pendingAsyncMaps);
-          const classification = asyncArrayCallbackClassification(node);
-          if (!classification) return;
-          const { callback, method } = classification;
-          if (!enabledBranches.has(classification.kind)) return;
-          if (classification.kind === "never-await") {
-            context.report({
-              node: callback,
-              message: `.${method}() does not await its callback, so an async callback here runs unhandled. Use a for...of loop.`,
-            });
-            return;
-          }
-          if (classification.kind === "requires-collection") {
-            if (isDirectlyWrappedInPromiseCombinator(node)) return;
-            if (isReturnedExpression(node)) return;
-            if (
-              queuePendingAsyncMap(
-                sourceCode,
-                node,
-                callback,
-                method,
-                pendingAsyncMaps,
-              )
-            ) {
-              return;
-            }
-            context.report({
-              node: callback,
-              message: asyncMapMessage(method),
-            });
-          }
-        },
-      };
-    },
-  };
-}
-
 const sqlPattern =
   /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
 const sqlSentencePattern =
@@ -3525,54 +2733,6 @@ function ruleNoUnsafeDeserialize() {
   };
 }
 
-function ruleRequireAuthzCheck() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description:
-          "Require an authorization/ownership check when a handler reads request params.",
-      },
-      schema: [
-        {
-          type: "object",
-          properties: {
-            authzFunctions: {
-              type: "array",
-              items: { type: "string", minLength: 1 },
-              minItems: 1,
-              uniqueItems: true,
-            },
-          },
-          required: ["authzFunctions"],
-          additionalProperties: false,
-        },
-      ],
-    },
-    create(context) {
-      const options = context.options[0];
-      if (!options) {
-        throw new Error(
-          "antidrift/require-authz-check requires authzFunctions",
-        );
-      }
-      const tracker = createAuthBoundaryTracker({
-        authzFunctions: options.authzFunctions,
-        onFrameExit(frame) {
-          if (frame.paramsAccess && !frame.sawAuthz) {
-            context.report({
-              node: frame.paramsAccess,
-              message:
-                "Handler reads request params without a configured authorization/ownership check.",
-            });
-          }
-        },
-      });
-      return tracker.visitors;
-    },
-  };
-}
-
 function isExactStructuralFork(local, canonical) {
   if (local.size !== canonical.size) return false;
   for (const [name, typeStr] of local) {
@@ -4112,45 +3272,6 @@ function ruleNoDefensiveShapeProbing() {
   };
 }
 
-function fileMatchesPath(filename, filePath) {
-  return filename.replace(/\\/gu, "/").endsWith(filePath.replace(/\\/gu, "/"));
-}
-
-function ruleNoStatusLiteralInType() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description:
-          "Disallow re-declaring canonical domain status values as type literals outside the owning module (domain registry).",
-      },
-      schema: [
-        {
-          type: "object",
-          properties: { statuses: { type: "object" } },
-          additionalProperties: false,
-        },
-      ],
-    },
-    create(context) {
-      const statuses = context.options[0]?.statuses ?? {};
-      if (Object.keys(statuses).length === 0) return {};
-      const filename = context.filename ?? context.getFilename();
-      return {
-        TSLiteralType(node) {
-          const owner = canonicalStatusLiteralOwner(node, statuses);
-          if (!owner) return;
-          if (fileMatchesPath(filename, owner.owner)) return;
-          context.report({
-            node,
-            message: `String literal '${owner.value}' duplicates a canonical status from ${owner.owner}. Import the type instead.`,
-          });
-        },
-      };
-    },
-  };
-}
-
 function ruleNoRedundantZodParse() {
   return {
     meta: {
@@ -4248,32 +3369,15 @@ function ruleNoRedundantZodParse() {
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
   "no-contract-appeasement-projection": ruleNoContractAppeasementProjection(),
-  "no-inline-structural-type-at-use-site":
-    ruleNoInlineStructuralTypeAtUseSite(),
   "no-appeasement-cast": ruleNoAppeasementCast(),
   "no-nullable-positional-tuple": ruleNoNullablePositionalTuple(),
   "no-underchecked-type-predicate": ruleNoUndercheckedTypePredicate(),
   "no-defensive-shape-probing": ruleNoDefensiveShapeProbing(),
-  "no-handrolled-resource-lifecycle-cells":
-    ruleNoHandrolledResourceLifecycleCells(),
-  "no-shattered-ingested-entity-state": ruleNoShatteredIngestedEntityState(),
-  "require-effect-deps": ruleRequireEffectDeps(),
-  "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
-  "no-async-array-method": ruleNoAsyncArrayMethod(),
   "no-sql-string-concat": ruleNoSqlStringConcat(),
   "no-unsafe-deserialize": ruleNoUnsafeDeserialize(),
-  "require-authz-check": ruleRequireAuthzCheck(),
   "no-structural-type-fork": ruleNoStructuralTypeFork(),
   "no-canonical-model-fork": ruleNoCanonicalModelFork(),
   "no-redundant-zod-parse": ruleNoRedundantZodParse(),
-  "no-status-literal-in-type": ruleNoStatusLiteralInType(),
-  "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
-  "no-duplicated-conditional-classnames":
-    ruleNoDuplicatedConditionalClassnames(),
-  "no-duplicated-object-field-blocks": ruleNoDuplicatedObjectFieldBlocks(),
-  "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
-  "no-query-data-type-parameters": ruleNoQueryDataTypeParameters(),
-  "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
 };
 
 export default {

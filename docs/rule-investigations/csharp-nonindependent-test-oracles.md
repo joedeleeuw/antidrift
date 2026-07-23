@@ -11,8 +11,8 @@ facts supplied by that same construction. It does not exercise validation, seria
 reducer, a boundary, or another project-owned behavior.
 
 No maintained C# analyzer found in this investigation detects that value-provenance relationship.
-The Antidrift package is an ESLint and TypeScript semantic tool with one narrow shell ast-grep
-exception. Its source ledger assigns other languages to native consumer tooling. Adding a Roslyn
+The Antidrift package is an Oxlint-first TypeScript policy tool with one reduced ESLint TypeChecker
+pass and one narrow shell ast-grep exception. Its source ledger assigns other languages to native consumer tooling. Adding a Roslyn
 package or a general multi-language runner would be a new product surface, not a port of the
 existing rule.
 
@@ -208,9 +208,9 @@ Official sources checked:
 
 ## Why Antidrift Does Not Implement This Now
 
-The current custom rule engine is ESLint plus `typescript-eslint`; its semantic adapters depend on
-TypeScript `Program` and `TypeChecker`. The package's only non-ESLint source-lint exception is an
-opt-in shell ast-grep pack. `docs/source-ledger.md` assigns other non-TypeScript language linting to
+The current lint stack is Oxlint plus a reduced ESLint pass whose semantic adapters depend on
+TypeScript `Program` and `TypeChecker`. The package's only non-JavaScript source-lint exception is
+an opt-in shell ast-grep pack. `docs/source-ledger.md` assigns other non-TypeScript language linting to
 native tools in consuming repositories and warns against broadening the package into a
 multi-language runner without explicit policy scope.
 
