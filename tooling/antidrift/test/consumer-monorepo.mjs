@@ -716,6 +716,7 @@ try {
   file(
     "packages/app/src/runtime.mjs",
     'import { createConfig, eslintPlugin, loadPolicy, loadRegistriesSync, renderPolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
+      'import packageMetadata from "@joedeleeuw/antidrift/package.json" with { type: "json" };\n' +
       'import { brand } from "@joedeleeuw/antidrift/brand";\n' +
       'import plugin from "@joedeleeuw/antidrift/eslint-plugin";\n' +
       'import { createConfig as createConfigFromSubpath } from "@joedeleeuw/antidrift/eslint-config";\n' +
@@ -910,6 +911,10 @@ try {
       '  if (typeof value !== "function" && typeof value !== "object" && typeof value !== "number" && typeof value !== "string") {\n' +
       "    throw new Error(`Missing runtime export: ${name}`);\n" +
       "  }\n" +
+      "}\n" +
+      "\n" +
+      "if (plugin.meta?.version !== packageMetadata.version || eslintPlugin.meta?.version !== packageMetadata.version) {\n" +
+      '  throw new Error("ESLint plugin metadata must match the packed package version");\n' +
       "}\n" +
       "\n" +
       'const runtimeOxlintArgs = parseOxlintComplexityArgs([], { cwd: ".", exists: () => false });\n' +

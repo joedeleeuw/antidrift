@@ -12,6 +12,7 @@ import ruleNoDuplicatedObjectFieldBlocks from "./rules/no-duplicated-object-fiel
 import ruleNoNonindependentTestOracle from "./rules/no-nonindependent-test-oracle.js";
 import ruleNoQueryDataTypeParameters from "./rules/no-query-data-type-parameters.js";
 import ruleNoSilentEmptyDetectionFallback from "./rules/no-silent-empty-detection-fallback.js";
+import packageMetadata from "../../package.json" with { type: "json" };
 import {
   emitSemanticFact,
   semanticFactSink,
@@ -4276,6 +4277,9 @@ const rules = {
 };
 
 export default {
-  meta: { name: "@joedeleeuw/antidrift/eslint-plugin", version: "0.2.0" },
+  meta: {
+    name: "@joedeleeuw/antidrift/eslint-plugin",
+    version: packageMetadata.version,
+  },
   rules,
 };

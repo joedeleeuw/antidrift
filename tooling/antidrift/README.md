@@ -16,7 +16,7 @@ The positive pattern behind the rules is one owner per concept: domain owns busi
 pnpm add -D @joedeleeuw/antidrift eslint typescript typescript-eslint @typescript-eslint/parser
 ```
 
-ESLint, TypeScript, typescript-eslint, and the parser are peer dependencies, so you bring your own versions: ESLint 9+, TypeScript 5+, typescript-eslint 8+.
+ESLint, TypeScript, typescript-eslint, and the parser are peer dependencies, so you bring your own versions: ESLint 9.38+ or 10.x, TypeScript 5+, typescript-eslint 8+.
 
 ## Stability
 
@@ -141,6 +141,7 @@ For the initial publication, if `npm view @joedeleeuw/antidrift` still returns 4
 Public entry points, one package:
 
 - `@joedeleeuw/antidrift` — package primitives: `createConfig`, `eslintPlugin`, policy rendering, and registry loading
+- `@joedeleeuw/antidrift/package.json` — package metadata for consumer tooling
 - `@joedeleeuw/antidrift/brand` — `Brand<T, Name>`, `Unbrand<T>`, and `brand(name, check)`
 - `@joedeleeuw/antidrift/eslint-config` — the `createConfig` factory above
 - `@joedeleeuw/antidrift/eslint-plugin` — the raw plugin, if you'd rather wire rules by hand
@@ -265,10 +266,10 @@ One source of truth, regenerated on demand. `antidrift check-generated` fails CI
 
 ## Requirements
 
-Node 22+, ESLint 9+ (flat config), TypeScript 5+, typescript-eslint 8+, and `@typescript-eslint/parser` 8+.
+Node 22+, ESLint 9.38+ or 10.x (flat config), TypeScript 5+, typescript-eslint 8+, and `@typescript-eslint/parser` 8+.
 
 ## Status
 
-This is 0.2.0, and I'll be honest about what that means. The rules have local regression tests and a real-corpus validation ledger, but some package-surface rules remain under-proven until they have source-code evidence outside reduced examples. Pin the version.
+This is an early 0.x release, and I'll be honest about what that means. The rules have local regression tests and a real-corpus validation ledger, but some package-surface rules remain under-proven until they have source-code evidence outside reduced examples. Pin the version.
 
 MIT.
