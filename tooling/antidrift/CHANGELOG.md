@@ -1,5 +1,15 @@
 # changelog
 
+## 0.5.0
+
+- add focused Oxlint governance for registry ownership, anti-suppression, Effect dependencies, and a 1,500-line module limit
+- export frozen complexity thresholds for explicit consumer scoping while keeping the strict repository baseline local
+- move syntax-only Antidrift rules to Oxlint and retain TypeChecker-dependent rules in ESLint
+- scan the repository root by default and exclude generated code only through exact registry declarations
+- support TypeScript 6 object flags without consumer patches
+- make the packed TypeScript 6 consumer and public package surface part of the blocking check
+- split oversized plugin, registry, corpus, and consumer-test modules without compatibility facades
+
 ## 0.4.0
 
 - add `no-duplicated-object-field-blocks` — flags copy-pasted zod/typescript field blocks
