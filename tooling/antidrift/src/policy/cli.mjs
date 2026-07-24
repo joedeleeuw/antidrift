@@ -19,7 +19,7 @@ import { eslintJsonToSonar } from "./eslint-json-to-sonar.mjs";
 import {
   externalCorpus,
   parseArgs as parseExternalCorpusArgs,
-} from "./external-corpus.mjs";
+} from "./external-corpus/runner.mjs";
 import { generate } from "./generate-policy-artifacts.mjs";
 import {
   loadRuleStatusRegistrySync,

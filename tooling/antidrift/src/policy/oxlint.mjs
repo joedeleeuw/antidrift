@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 
@@ -14,17 +13,11 @@ export function resolveOxlintBinary() {
   return resolve(dirname(packageJsonPath), packageJson.bin.oxlint);
 }
 
-function defaultTargets(cwd, exists = existsSync) {
-  const candidates = ["apps", "packages", "tooling", "src"].filter((target) =>
-    exists(resolve(cwd, target)),
-  );
-  return candidates.length > 0 ? candidates : ["."];
+function defaultTargets() {
+  return ["."];
 }
 
-export function parseOxlintArgs(
-  argv,
-  { cwd = process.cwd(), exists = existsSync } = {},
-) {
+export function parseOxlintArgs(argv, _options = {}) {
   const targets = [];
   const passthrough = [];
   let help = false;
@@ -63,7 +56,7 @@ export function parseOxlintArgs(
   return {
     help,
     passthrough,
-    targets: targets.length > 0 ? targets : defaultTargets(cwd, exists),
+    targets: targets.length > 0 ? targets : defaultTargets(),
   };
 }
 

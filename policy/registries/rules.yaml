@@ -309,6 +309,12 @@ policyRuleReviews:
     coverage: Not enforced locally as a component line-count rule.
     reason: Component size needs container/view/resource context; raw line count would encourage arbitrary extraction.
     nextAction: Revisit only after React state/resource rules expose a repeatable component split pattern.
+  arch/max-module-lines:
+    status: ecosystem-covered
+    replacement: Oxlint max-lines
+    coverage: The shared Oxlint config blocks JavaScript and TypeScript modules over 1,500 lines and counts blank and comment lines.
+    reason: Oxlint provides exact maintained local enforcement, so Antidrift owns the configuration and policy mapping rather than a custom rule implementation.
+    nextAction: Exclude only generated roots declared by generatedSources and split oversized modules by real responsibility.
   arch/no-high-touch-file-growth:
     status: spec-only
     coverage: Not enforced locally.

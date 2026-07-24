@@ -97,6 +97,10 @@ clusters:
         severity: error
         detector: reactComponentLinesGt:180
         message: Split container, view, and state/resource boundaries.
+      - id: arch/max-module-lines # Oversized modules accumulate unrelated responsibilities and defeat local ownership.
+        severity: error
+        detector: oxlint:max-lines,max:1500,skipBlankLines:false,skipComments:false
+        message: Split modules over 1,500 lines by owned responsibility.
       - id: react/max-component-props # Large prop bags make component API combinations hard to reason about.
         severity: error
         detector: locallyOwnedReactComponentPropsGt:12

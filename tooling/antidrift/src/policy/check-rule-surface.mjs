@@ -5,10 +5,10 @@ import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 
 import { defaultCases as chaskiCorpusCases } from "./chaski-corpus.mjs";
-import { defaultCases as externalCorpusCases } from "./external-corpus.mjs";
+import { defaultCases as externalCorpusCases } from "./external-corpus/cases.mjs";
 import { createConfig } from "../eslint-config/index.mjs";
 import eslintPlugin from "../eslint-plugin/index.js";
-import { createOxlintConfig } from "../oxlint-config/index.mjs";
+import { createGovernanceOxlintConfig } from "../oxlint-config/index.mjs";
 import oxlintPlugin from "../oxlint-plugin/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -193,7 +193,7 @@ export function checkRuleSurface({
   };
   pluginRules ??= Object.assign({}, ...Object.values(runtimePluginRules));
   if (configs === null) {
-    const oxlintConfigs = [createOxlintConfig({ repoRoot })];
+    const oxlintConfigs = [createGovernanceOxlintConfig({ repoRoot })];
     const eslintConfigs = createConfig({ tsconfigRootDir: repoRoot });
     configs = [...oxlintConfigs, ...eslintConfigs];
     runtimeConfigs ??= {

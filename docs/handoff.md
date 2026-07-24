@@ -16,7 +16,8 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 
 - `policy/agent-guardrails.yaml` is the editable source of truth.
 - `tooling/antidrift` is the `@joedeleeuw/antidrift` package; `antidrift generate` (src/policy/) produces agent instruction files and hook configs.
-- `tooling/antidrift/src/oxlint-config` owns native rules, stable type-aware rules, architecture policy, complexity budgets, and syntax-only custom rules.
+- `tooling/antidrift/src/oxlint-config` owns focused registry, suppression, module-size, and syntax-rule governance plus the immutable complexity fragment.
+- `oxlint.config.mts` owns this repository's generic native, type-aware, architecture, and scoped complexity policy.
 - `tooling/antidrift/src/oxlint-plugin` contains syntax-only custom rules supported by Oxlint.
 - `tooling/antidrift/src/eslint-plugin` retains custom rules requiring TypeScript `Program` or `TypeChecker` data.
 - The root ESLint config consumes the four-rule `@joedeleeuw/antidrift/eslint-config` TypeChecker pass.

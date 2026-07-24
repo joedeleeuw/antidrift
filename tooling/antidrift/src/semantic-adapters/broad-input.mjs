@@ -5,7 +5,7 @@ import { isZodMethod } from "./schema-provenance.mjs";
 
 const TS_TYPE_FLAG_ANY = 1;
 const TS_TYPE_FLAG_UNKNOWN = 2;
-const TS_TYPE_FLAG_OBJECT = 1 << 19;
+const TS_TYPE_FLAG_OBJECT = ts.TypeFlags.Object;
 const antidriftBrandMarkerName = "__antidriftBrand";
 const ZOD_VALIDATOR_METHODS = new Set(["parse", "parseAsync", "safeParse"]);
 

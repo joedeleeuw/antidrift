@@ -1,19 +1,28 @@
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { parseOxlintArgs, runOxlint } from "./oxlint.mjs";
 
 describe("oxlint wrapper", () => {
-  it("defaults to source directories that exist", () => {
-    const parsed = parseOxlintArgs([], {
-      cwd: "/repo",
-      exists: (path) => path === "/repo/apps" || path === "/repo/packages",
-    });
+  it("defaults to the repository root", () => {
+    const repository = mkdtempSync(join(tmpdir(), "antidrift-oxlint-"));
 
-    expect(parsed).toEqual({
-      help: false,
-      passthrough: [],
-      targets: ["apps", "packages"],
-    });
+    try {
+      mkdirSync(join(repository, "apps"));
+      mkdirSync(join(repository, "packages"));
+      expect(parseOxlintArgs([], { cwd: repository }).targets).toEqual(["."]);
+    } finally {
+      rmSync(repository, { recursive: true, force: true });
+    }
+  });
+
+  it("uses explicit targets instead of the repository root", () => {
+    expect(parseOxlintArgs(["src", "tests"], { cwd: "/repo" }).targets).toEqual(
+      ["src", "tests"],
+    );
   });
 
   it("passes options and targets to oxlint", () => {

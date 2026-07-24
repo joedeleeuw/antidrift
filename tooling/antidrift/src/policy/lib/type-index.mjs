@@ -1,8 +1,10 @@
+import ts from "typescript";
+
 // Minimum property count for a type to be considered a meaningful structural match.
 // Below this, overlap is likely coincidental (id/name/email appear everywhere).
 export const MIN_PROPS = 4;
 
-const TS_TYPE_FLAG_OBJECT = 1 << 19; // ts.TypeFlags.Object
+const TS_TYPE_FLAG_OBJECT = ts.TypeFlags.Object;
 
 // Only single object/interface types are structural candidates. Unions (including string-literal
 // unions like `"a" | "b"`) and intersections are excluded — a string-literal union exposes String's

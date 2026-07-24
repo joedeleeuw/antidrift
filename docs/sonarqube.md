@@ -81,6 +81,7 @@ Small additive gap matrix:
 | ---------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | React correctness            | Oxlint React and React Compiler plugins    | Do not add native Sonar React rules while local Oxlint owns the equivalent check.                                                       | None recorded; `S6441` overlaps React nested-component checks. |
 | Local complexity budget      | `antidrift oxlint`                         | Keep native Sonar cognitive complexity and duplication metrics active; they are not duplicates of local cyclomatic/depth/params checks. | Exact Sonar S3776 behavior is server-side only.                |
+| Module size                  | Oxlint `max-lines`                         | Exclude `S104` as an exact local duplicate; Sonar still owns portfolio metrics and server-side quality gates.                           | None for JavaScript and TypeScript modules.                    |
 | Accessibility                | None; `jsx-a11y` is not shipped.           | Keep native Sonar accessibility keys through `accessibility-without-jsx-a11y`.                                                          | Maintained UI accessibility scanning.                          |
 | Antidrift-specific contracts | `antidrift/*` imported as external issues. | Report imported findings, but do not rebrand native Sonar rules.                                                                        | Repo-specific and agent-specific semantics.                    |
 
@@ -88,6 +89,7 @@ Native Sonar rules intentionally excluded as exact local duplicates:
 
 | Sonar rule                                                                              | Local owner                                   |
 | --------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `S104` Files should not have too many lines of code                                      | Oxlint `max-lines`                            |
 | `S6477` JSX list components should have a key property                                  | `react/jsx-key`                               |
 | `S6478` React components should not be nested                                           | `react/no-unstable-nested-components`         |
 | `S6479` JSX list components should not use array indexes as key                         | `react/no-array-index-key`                    |
@@ -110,7 +112,7 @@ Sonar's docs say quality profiles define which language rules are active, and So
 
 As of 2026-07-06, Sonar's public `next.sonarqube.com` instance exposes built-in `Sonar agentic AI` JavaScript/TypeScript profiles. Their active `brain-overload` rule set matched `Sonar way` for JavaScript and TypeScript: `S3776`, `S4624`, `S2004`, `S107`, and `S1479`. Keep `Sonar way` as the profile base and review profile diffs before switching, because Sonar owns that content.
 
-As of 2026-07-07, the preset includes 56 additional warning candidates whose signal does not have an exact enabled non-Sonar owner in the shipped Antidrift config, and records 13 exact local duplicates under `excludedAsLocalDuplicates` in the YAML.
+As of 2026-07-23, the preset includes 56 additional warning candidates whose signal does not have an exact enabled non-Sonar owner in the shipped Antidrift config, and records 14 exact local duplicates under `excludedAsLocalDuplicates` in the YAML. Oxlint blocks oversized modules locally; Sonar retains portfolio analysis and server-owned quality gates without duplicating `S104`.
 
 Useful references:
 

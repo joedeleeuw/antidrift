@@ -1,19 +1,19 @@
 # antidrift
 
-A shareable Oxlint config and plugin, a four-rule ESLint TypeChecker pass, and a policy generator. It exists to catch the specific ways a codebase rots when an agent is the one writing it.
+A focused Oxlint governance config and plugin, a four-rule ESLint TypeChecker pass, and a policy generator. It exists to catch the specific ways a codebase rots when an agent is the one writing it.
 
 Regular linters check syntax and a handful of correctness rules. They don't notice when an agent redeclares a type that already ships with `firebase`, wires up a `useEffect` with no dependency array, or quietly swallows an error to turn a red test green. Those edits compile. They pass review when the reviewer is skimming. Then they drift. You end up with three slightly different `User` types, four copies of the same fetch logic, and a component that re-renders on every keystroke.
 
 antidrift writes those patterns down as deterministic rules so the machine catches them instead of you.
 
-Oxlint owns the native baseline, supported type-aware `typescript-eslint` rules, architecture checks, and syntax-only custom rules. ESLint owns only the custom rules that need TypeScript's `Program` and `TypeChecker`. No custom rule ID is exported by both plugins.
+Oxlint owns syntax-only custom rules and shared governance. ESLint owns only the custom rules that need TypeScript's `Program` and `TypeChecker`. Generic TypeScript, React, Vitest, Unicorn, import-style, and repository-boundary policy belongs to each consumer. No custom rule ID is exported by both plugins.
 
 The positive pattern behind the rules is one owner per concept: domain owns business vocabulary, contracts own wire schemas, API boundaries validate and authorize, gateways own SDKs, and UI consumes resource/result unions instead of local duplicate shapes.
 
 ## Install
 
 ```sh
-pnpm add -D @joedeleeuw/antidrift oxlint oxlint-tsgolint eslint typescript typescript-eslint @typescript-eslint/parser
+pnpm add -D @joedeleeuw/antidrift oxlint eslint typescript typescript-eslint @typescript-eslint/parser
 ```
 
 Oxlint 1.75+ and `oxlint-tsgolint` 7 are required for the stable type-aware pass. That pass uses TypeScript 7 semantics and requires a TypeScript 7-compatible `tsconfig`; it does not use the workspace's installed TypeScript package. ESLint 9.38+ or 10.x, TypeScript 5+, typescript-eslint 8+, and `@typescript-eslint/parser` remain required for the custom TypeChecker-rule pass.
@@ -27,9 +27,26 @@ Experimental inventory commands, semantic fact payloads, registry metadata, and 
 Create the root Oxlint config:
 
 ```ts
-import { createOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";
+import {
+  antidriftComplexityRules,
+  createGovernanceOxlintConfig,
+} from "@joedeleeuw/antidrift/oxlint-config";
 
-export default createOxlintConfig({ repoRoot: import.meta.dirname });
+const governance = createGovernanceOxlintConfig({
+  repoRoot: import.meta.dirname,
+});
+
+export default {
+  ...governance,
+  overrides: [
+    ...(governance.overrides ?? []),
+    {
+      files: ["src/**/*.{ts,tsx}"],
+      excludeFiles: ["**/*.{test,spec}.{ts,tsx}"],
+      rules: antidriftComplexityRules,
+    },
+  ],
+};
 ```
 
 Keep the ESLint config as the reduced TypeChecker pass:
@@ -40,9 +57,11 @@ import { createConfig } from "@joedeleeuw/antidrift/eslint-config";
 export default createConfig({ tsconfigRootDir: import.meta.dirname });
 ```
 
-`createOxlintConfig` enables Oxlint's native correctness rules, stable type-aware linting, React Compiler checks, import and boundary rules, registry-generated import restrictions, complexity budgets, and `antidrift/require-effect-deps`. Other syntax, scope, and local-control-flow Antidrift rules are registered there as default-off inventory. `createConfig` enables only four active custom rules that need TypeScript parser services and preserves seven typed or hybrid rules as default-off inventory. None are retired by this runtime migration.
+`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, anti-suppression rules, a global 1,500-line module ceiling, and `antidrift/require-effect-deps`. Other syntax, scope, and local-control-flow Antidrift rules are registered there as default-off inventory. It deliberately does not choose a generic correctness, TypeScript, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Consumers can apply the frozen `antidriftComplexityRules` fragment to deliberate production-code scopes. `createConfig` enables only four active custom rules that need TypeScript parser services and preserves seven typed or hybrid rules as default-off inventory. None are retired by this runtime migration.
 
-The shared config enables `options.typeAware` but not `options.typeCheck`. Oxlint therefore runs type-aware rules through `oxlint-tsgolint`, while the repository's existing TypeScript compiler remains the owner of compiler diagnostics through `pnpm typecheck`.
+Oxlint excludes generated output only when its exact file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Generated-looking names are ordinary linted code unless the registry owns them.
+
+The governance config does not enable `options.typeAware` or `options.typeCheck`. A consumer that selects Oxlint's type-aware TypeScript rules must enable `options.typeAware`, install `oxlint-tsgolint`, and scope those rules to TypeScript files. The repository's TypeScript compiler remains the owner of compiler diagnostics through its typecheck command.
 
 If you wire `@joedeleeuw/antidrift/eslint-plugin` by hand instead of using `createConfig`, configure `@typescript-eslint/parser` with parser services (`projectService` or `project`). Fully type-aware antidrift rules report a configuration error when enabled without those services so missing type information cannot silently weaken the rule set. Hybrid rules such as `antidrift/no-sql-string-concat` still run their AST and local-flow proof without parser services, but imported escaper, configured safe-member, and configured declaration-source safe-template-member proofs are parser-service-only and are classified by the SQL benchmark.
 
@@ -110,7 +129,7 @@ The first two validate registry-backed rule facts and verify every custom rule i
 `shell` runs the packaged ast-grep shell guardrails against the current project. It is opt-in source lint for shell scripts, not an ESLint rule and not an automatic hook installer. `antidrift shell test` validates the packaged ast-grep rule tests.
 `semantic-manifest` prints the composed semantic adapter/fact contract registry as JSON, so downstream tools can discover proof buckets, owned associations, and emitted fact kinds without importing source internals. Use `--adapter`, `--rule`, `--proof-bucket`, `--fact-adapter`, or `--fact-kind` to print a filtered adapter slice.
 `rule-status` prints a normalized view of `policy/registries/rules.yaml`, including active, retired, research, and policy-review rows, so experimental rules can ship with explicit maturity and delegation metadata. Use `--kind`, `--status`, `--semantic-adapter`, or `--proof-bucket` to print a filtered manifest. Add `--semantic-summary` to print joined summaries for the filtered rows. Proof-bucket filtering includes both semantic-adapter contracts and registry `promotion.proofBucket` rows. The policy subpath exposes the same helpers plus joined rule semantic summaries for downstream tooling.
-`oxlint` runs the repository's root Oxlint config through the packaged binary. It is the primary native and type-aware lint pass, including the local complexity budget and syntax-only Antidrift plugin.
+`oxlint` runs the repository's root Oxlint config through the packaged binary. The repository root composes governance with its own native and type-aware lint choices, local complexity scope, and boundary graph.
 `package:verify` packs the npm tarball, installs it in a throwaway consumer workspace, type-checks every public export under Bundler and NodeNext resolution, imports every runtime export, runs the shipped lint configs, proves `SEMANTIC_FACT_KINDS` and the public semantic adapters are available to consumer tooling, proves the CLI exposes the composed semantic manifest and normalized rule-status registry, and proves a configured semantic fact sink receives a generated-source `structuralMatch` fact.
 `check-rule-surface` is only meaningful in this source repository layout; installed consumers can use `verify-session`, `check-generated`, and the normal Oxlint and reduced ESLint passes without carrying Antidrift's own rule tests.
 `policy:validate-corpus` exercises the remaining ESLint-owned rules against the maintained project inventory; the normal Oxlint pass covers Oxlint-owned rules. `repo-corpus` can narrow ESLint evidence to the rules changed in a slice, while the Chaski corpus executes native Oxlint cases directly where ownership moved.
@@ -150,12 +169,12 @@ For the initial publication, if `npm view @joedeleeuw/antidrift` still returns 4
 
 Public entry points, one package:
 
-- `@joedeleeuw/antidrift` — package primitives: `createOxlintConfig`, `oxlintPlugin`, the reduced `createConfig`/`eslintPlugin` TypeChecker pass, policy rendering, and registry loading
+- `@joedeleeuw/antidrift` — package primitives: `createGovernanceOxlintConfig`, `antidriftComplexityRules`, `oxlintPlugin`, the reduced `createConfig`/`eslintPlugin` TypeChecker pass, policy rendering, and registry loading
 - `@joedeleeuw/antidrift/package.json` — package metadata for consumer tooling
 - `@joedeleeuw/antidrift/brand` — `Brand<T, Name>`, `Unbrand<T>`, and `brand(name, check)`
 - `@joedeleeuw/antidrift/eslint-config` — the `createConfig` factory above
 - `@joedeleeuw/antidrift/eslint-plugin` — the 11-rule TypeChecker plugin, if you'd rather wire those rules by hand
-- `@joedeleeuw/antidrift/oxlint-config` — the primary native and type-aware lint config factory
+- `@joedeleeuw/antidrift/oxlint-config` — focused governance plus the immutable opt-in complexity fragment
 - `@joedeleeuw/antidrift/oxlint-plugin` — syntax-only custom rules supported by Oxlint's JavaScript plugin API
 - `@joedeleeuw/antidrift/policy` — policy check APIs, rule-status registry helpers, semantic fact sinks, and shipped `SEMANTIC_FACT_KINDS` contracts for advanced tooling
 - `@joedeleeuw/antidrift/semantic-adapters` — aggregate semantic adapter registry and contracts for tooling that wants the full shared proof surface

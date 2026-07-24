@@ -20,7 +20,7 @@ selection:
   duplicatePolicy: Exclude native Sonar rules whose signal is already owned by enabled ESLint, typescript-eslint, React, React Hooks, Vitest, Unicorn, or Antidrift rules.
   counts:
     warningRulesAdded: 56
-    exactLocalDuplicatesExcluded: 13
+    exactLocalDuplicatesExcluded: 14
 rules:
   - id: cognitive-complexity
     sonarKeys:
@@ -402,6 +402,9 @@ rules:
     localOverlap: ESLint no-throw-literal is available but not enabled in the shipped config.
     reason: Throwing literals loses stack and error-shape semantics in generated error paths.
 excludedAsLocalDuplicates:
+  - rule: S104
+    sonarName: Files should not have too many lines of code
+    localOwner: Oxlint max-lines
   - rule: S6477
     sonarName: JSX list components should have a key property
     localOwner: react/jsx-key

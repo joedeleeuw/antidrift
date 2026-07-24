@@ -37,7 +37,7 @@ export { declarationCloneInventory } from "./declaration-clone-inventory.mjs";
 export { defensiveShapeInventory } from "./defensive-shape-inventory.mjs";
 export { repoCorpus } from "./repo-corpus.mjs";
 export { chaskiCorpus } from "./chaski-corpus.mjs";
-export { externalCorpus } from "./external-corpus.mjs";
+export { externalCorpus } from "./external-corpus/runner.mjs";
 export {
   defaultAstGrepBinary,
   defaultAstGrepConfig,

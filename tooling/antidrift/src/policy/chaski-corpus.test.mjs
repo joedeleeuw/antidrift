@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { chaskiCorpus } from "./chaski-corpus.mjs";
-import { externalCorpus } from "./external-corpus.mjs";
+import { externalCorpus } from "./external-corpus/runner.mjs";
 
 function tempRepo() {
   return mkdtempSync(join(tmpdir(), "antidrift-chaski-corpus-"));

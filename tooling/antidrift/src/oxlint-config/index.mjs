@@ -1,21 +1,12 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import { defineConfig } from "oxlint";
 
 import { loadRegistriesSync } from "../policy/lib/registries.mjs";
 
-const packageRequire = createRequire(fileURLToPath(import.meta.url));
-
-const nativePlugins = [
-  "eslint",
-  "import",
-  "oxc",
-  "react",
-  "typescript",
-  "unicorn",
-];
+const packageRequire = createRequire(import.meta.url);
 
 const javascriptPlugins = [
   {
@@ -25,16 +16,40 @@ const javascriptPlugins = [
     ),
   },
   {
-    name: "boundaries",
-    specifier: packageRequire.resolve("eslint-plugin-boundaries"),
-  },
-  {
     name: "eslint-comments",
     specifier: packageRequire.resolve(
       "@eslint-community/eslint-plugin-eslint-comments",
     ),
   },
 ];
+
+const disabledAntidriftRules = {
+  "antidrift/no-async-array-method": "off",
+  "antidrift/no-calling-components-as-functions": "off",
+  "antidrift/no-duplicated-conditional-classnames": "off",
+  "antidrift/no-duplicated-object-field-blocks": "off",
+  "antidrift/no-handrolled-resource-lifecycle-cells": "off",
+  "antidrift/no-inline-structural-type-at-use-site": "off",
+  "antidrift/no-nonindependent-test-oracle": "off",
+  "antidrift/no-query-data-type-parameters": "off",
+  "antidrift/no-raw-fetch-in-component": "off",
+  "antidrift/no-shattered-ingested-entity-state": "off",
+  "antidrift/no-silent-empty-detection-fallback": "off",
+  "antidrift/no-status-literal-in-type": "off",
+  "antidrift/require-authz-check": "off",
+};
+
+const modifiedComplexityOptions = Object.freeze({
+  max: 25,
+  variant: "modified",
+});
+const maxParametersOptions = Object.freeze({ max: 7 });
+
+export const antidriftComplexityRules = Object.freeze({
+  complexity: Object.freeze(["error", modifiedComplexityOptions]),
+  "max-depth": Object.freeze(["error", 4]),
+  "max-params": Object.freeze(["error", maxParametersOptions]),
+});
 
 function generatedImportPatterns(registries) {
   return Object.values(registries.generated?.generatedSources ?? {}).flatMap(
@@ -43,6 +58,57 @@ function generatedImportPatterns(registries) {
       message = "Import from the approved generated-type wrapper.",
     }) => bannedDirectImports.map((group) => ({ group: [group], message })),
   );
+}
+
+function generatedRegistryPath(repoRoot, name, generated) {
+  const label = `policy/registries/generated.yaml generatedSources.${name}.generated`;
+  if (typeof generated !== "string" || generated.length === 0) {
+    throw new TypeError(`${label} must be a non-empty string.`);
+  }
+  const normalized = generated.replaceAll("\\", "/");
+  if (/[!*?{}()[\]]/u.test(normalized)) {
+    throw new TypeError(
+      `${label} must be an exact repo path without glob metacharacters.`,
+    );
+  }
+  if (isAbsolute(normalized) || /^[A-Za-z]:\//u.test(normalized)) {
+    throw new TypeError(
+      `${label} must be a relative repo path below the repository root.`,
+    );
+  }
+  const root = resolve(repoRoot);
+  const target = resolve(root, normalized);
+  const repoRelative = relative(root, target);
+  if (
+    repoRelative.length === 0 ||
+    repoRelative === ".." ||
+    repoRelative.startsWith(`..${sep}`) ||
+    isAbsolute(repoRelative)
+  ) {
+    throw new TypeError(
+      `${label} must be a relative repo path below the repository root.`,
+    );
+  }
+  return repoRelative.split(sep).join("/");
+}
+
+function generatedIgnorePatterns(registries, repoRoot) {
+  const patterns = new Set();
+
+  for (const [name, entry] of Object.entries(
+    registries.generated?.generatedSources ?? {},
+  )) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new TypeError(
+        `policy/registries/generated.yaml generatedSources.${name} must be a mapping.`,
+      );
+    }
+    const pattern = generatedRegistryPath(repoRoot, name, entry.generated);
+    patterns.add(pattern);
+    patterns.add(`${pattern}/**`);
+  }
+
+  return [...patterns];
 }
 
 function gatewayImportPatterns(registries) {
@@ -73,11 +139,12 @@ function gatewayWrapperOverrides(registries, generatedPatterns) {
     }));
 }
 
-export function createOxlintConfig({
+export function createGovernanceOxlintConfig({
   repoRoot = process.cwd(),
   policyDir = "policy",
 } = {}) {
   const registries = loadRegistriesSync(resolve(repoRoot, policyDir));
+  const generatedIgnores = generatedIgnorePatterns(registries, repoRoot);
   const generatedPatterns = generatedImportPatterns(registries);
   const restrictedImportPatterns = [
     ...generatedPatterns,
@@ -86,19 +153,20 @@ export function createOxlintConfig({
 
   return defineConfig({
     categories: {
-      correctness: "error",
-    },
-    env: {
-      browser: true,
-      node: true,
+      correctness: "off",
+      nursery: "off",
+      pedantic: "off",
+      perf: "off",
+      restriction: "off",
+      style: "off",
+      suspicious: "off",
     },
     ignorePatterns: [
       "**/node_modules/**",
       "**/dist/**",
       "**/coverage/**",
       "reports/**",
-      "docs/examples/**",
-      "**/fixtures/**",
+      ...generatedIgnores,
       "**/*.d.ts",
       "**/*.d.mts",
       "**/*.d.cts",
@@ -108,148 +176,9 @@ export function createOxlintConfig({
     options: {
       denyWarnings: true,
       reportUnusedDisableDirectives: "error",
-      typeAware: true,
     },
-    plugins: nativePlugins,
-    settings: {
-      "boundaries/elements": [
-        { type: "app", pattern: "apps/*/src/**" },
-        { type: "ui", pattern: "packages/ui/src/**" },
-        { type: "domain", pattern: "packages/domain/src/**" },
-        { type: "contracts", pattern: "packages/contracts/src/**" },
-        { type: "api", pattern: "packages/api/src/**" },
-        { type: "gateways", pattern: "packages/gateways/src/**" },
-        { type: "tooling", pattern: "tooling/**" },
-      ],
-    },
+    plugins: ["eslint"],
     rules: {
-      "typescript/no-explicit-any": "error",
-      "typescript/no-empty-object-type": "error",
-      "typescript/no-extra-non-null-assertion": "error",
-      "typescript/no-non-null-assertion": "error",
-      "typescript/no-non-null-asserted-optional-chain": "error",
-      "typescript/no-unsafe-function-type": "error",
-      "typescript/no-wrapper-object-types": "error",
-      "typescript/no-unsafe-assignment": "error",
-      "typescript/no-unsafe-argument": "error",
-      "typescript/no-unsafe-call": "error",
-      "typescript/no-unsafe-enum-comparison": "error",
-      "typescript/no-unsafe-member-access": "error",
-      "typescript/no-unsafe-return": "error",
-      "typescript/no-unsafe-type-assertion": "error",
-      "typescript/no-base-to-string": "error",
-      "typescript/no-deprecated": "error",
-      "typescript/no-namespace": "error",
-      "typescript/no-require-imports": "error",
-      "typescript/no-misused-promises": [
-        "error",
-        { checksVoidReturn: { arguments: false, attributes: false } },
-      ],
-      "typescript/restrict-plus-operands": "error",
-      "typescript/consistent-type-imports": [
-        "error",
-        { prefer: "type-imports", fixStyle: "separate-type-imports" },
-      ],
-      "typescript/no-import-type-side-effects": "error",
-      "typescript/no-unnecessary-type-assertion": "error",
-      "typescript/no-unnecessary-type-constraint": "error",
-      "typescript/no-unnecessary-template-expression": "error",
-      "typescript/no-unnecessary-type-arguments": "error",
-      "typescript/no-useless-empty-export": "error",
-      "typescript/prefer-find": "error",
-      "typescript/prefer-function-type": "error",
-      "typescript/prefer-includes": "error",
-      "typescript/prefer-reduce-type-parameter": "error",
-      "typescript/prefer-promise-reject-errors": "error",
-      "typescript/only-throw-error": "error",
-      "typescript/require-await": "error",
-      "typescript/ban-ts-comment": [
-        "error",
-        { "ts-expect-error": "allow-with-description" },
-      ],
-      "no-unused-vars": [
-        "error",
-        {
-          argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_",
-          caughtErrorsIgnorePattern: "^_",
-        },
-      ],
-      "react/react-compiler": "error",
-      "react/rules-of-hooks": "error",
-      "react/exhaustive-deps": "error",
-      "react/button-has-type": "error",
-      "react/checked-requires-onchange-or-readonly": "error",
-      "react/iframe-missing-sandbox": "error",
-      "react/jsx-key": "error",
-      "react/jsx-no-target-blank": "error",
-      "react/jsx-no-duplicate-props": "error",
-      "react/jsx-no-script-url": "error",
-      "react/jsx-no-constructed-context-values": "error",
-      "react/no-danger-with-children": "error",
-      "react/no-unknown-property": "error",
-      "react/no-children-prop": "error",
-      "react/jsx-no-undef": "error",
-      "react/jsx-no-comment-textnodes": "error",
-      "preserve-caught-error": "error",
-      "no-console": "error",
-      "no-debugger": "error",
-      "no-array-constructor": "error",
-      "no-case-declarations": "error",
-      "no-empty": "error",
-      "no-fallthrough": "error",
-      "no-promise-executor-return": "error",
-      "no-prototype-builtins": "error",
-      "no-unexpected-multiline": "error",
-      "no-unreachable-loop": "error",
-      "no-var": "error",
-      "prefer-const": "error",
-      "prefer-rest-params": "error",
-      "prefer-spread": "error",
-      "no-warning-comments": [
-        "error",
-        { terms: ["@nocommit", "FIXME"], location: "anywhere" },
-      ],
-      "no-nested-ternary": "error",
-      "unicorn/no-abusive-eslint-disable": "error",
-      "unicorn/no-await-in-promise-methods": "error",
-      "unicorn/no-invalid-fetch-options": "error",
-      "unicorn/no-single-promise-in-promise-methods": "error",
-      "unicorn/no-useless-promise-resolve-reject": "error",
-      "unicorn/prefer-node-protocol": "error",
-      "unicorn/require-post-message-target-origin": "error",
-      curly: ["error", "multi-line"],
-      complexity: ["error", { max: 25, variant: "modified" }],
-      "max-depth": ["error", 4],
-      "max-params": ["error", { max: 7 }],
-      "boundaries/element-types": [
-        "error",
-        {
-          default: "disallow",
-          rules: [
-            { from: "app", allow: ["ui", "domain", "contracts"] },
-            { from: "ui", allow: ["domain"] },
-            { from: "domain", allow: [] },
-            { from: "contracts", allow: ["domain"] },
-            { from: "api", allow: ["domain", "contracts", "gateways"] },
-            { from: "gateways", allow: ["domain", "contracts"] },
-            { from: "tooling", allow: ["tooling"] },
-          ],
-        },
-      ],
-      "boundaries/no-private": "error",
-      "import/no-cycle": ["error", { ignoreExternal: true }],
-      "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
-      "import/first": "error",
-      "import/newline-after-import": ["error", { count: 1 }],
-      "import/no-duplicates": "error",
-      "import/no-absolute-path": "error",
-      "import/no-amd": "error",
-      "import/no-empty-named-blocks": "error",
-      "import/no-mutable-exports": "error",
-      "import/no-named-default": "error",
-      "import/no-self-import": "error",
-      "import/no-webpack-loader-syntax": "error",
       "eslint-comments/require-description": "error",
       "eslint-comments/disable-enable-pair": "error",
       "eslint-comments/no-duplicate-disable": "error",
@@ -257,19 +186,15 @@ export function createOxlintConfig({
       "eslint-comments/no-unused-disable": "error",
       "eslint-comments/no-unused-enable": "error",
       "antidrift/require-effect-deps": "error",
-      "antidrift/no-async-array-method": "off",
-      "antidrift/no-calling-components-as-functions": "off",
-      "antidrift/no-duplicated-conditional-classnames": "off",
-      "antidrift/no-duplicated-object-field-blocks": "off",
-      "antidrift/no-handrolled-resource-lifecycle-cells": "off",
-      "antidrift/no-inline-structural-type-at-use-site": "off",
-      "antidrift/no-nonindependent-test-oracle": "off",
-      "antidrift/no-query-data-type-parameters": "off",
-      "antidrift/no-raw-fetch-in-component": "off",
-      "antidrift/no-shattered-ingested-entity-state": "off",
-      "antidrift/no-silent-empty-detection-fallback": "off",
-      "antidrift/no-status-literal-in-type": "off",
-      "antidrift/require-authz-check": "off",
+      ...disabledAntidriftRules,
+      "max-lines": [
+        "error",
+        {
+          max: 1500,
+          skipBlankLines: false,
+          skipComments: false,
+        },
+      ],
       ...(restrictedImportPatterns.length > 0
         ? {
             "no-restricted-imports": restrictedImportsRule(
@@ -277,47 +202,9 @@ export function createOxlintConfig({
             ),
           }
         : {}),
-      "no-await-in-loop": "error",
     },
-    overrides: [
-      {
-        files: ["**/*.{ts,tsx}"],
-        rules: {
-          "typescript/no-unnecessary-condition": [
-            "error",
-            { allowConstantLoopConditions: true },
-          ],
-        },
-      },
-      {
-        files: ["**/*.{test,spec}.{ts,tsx,js,jsx,mjs,cjs,mts,cts}"],
-        plugins: [...nativePlugins, "vitest"],
-        rules: {
-          "typescript/no-non-null-assertion": "off",
-          "vitest/expect-expect": "error",
-          "vitest/no-conditional-expect": "error",
-          "vitest/no-focused-tests": "error",
-          "vitest/no-disabled-tests": "error",
-          "vitest/no-standalone-expect": "error",
-          "vitest/no-test-prefixes": "error",
-          "vitest/require-to-throw-message": "error",
-        },
-      },
-      {
-        files: ["tooling/**"],
-        rules: {
-          "no-console": "off",
-          "typescript/no-unsafe-assignment": "off",
-          "typescript/no-unsafe-member-access": "off",
-          "typescript/no-unsafe-return": "off",
-          "typescript/no-unsafe-call": "off",
-          "typescript/no-unsafe-argument": "off",
-          "typescript/restrict-template-expressions": "off",
-        },
-      },
-      ...gatewayWrapperOverrides(registries, generatedPatterns),
-    ],
+    overrides: gatewayWrapperOverrides(registries, generatedPatterns),
   });
 }
 
-export default createOxlintConfig;
+export default createGovernanceOxlintConfig;
