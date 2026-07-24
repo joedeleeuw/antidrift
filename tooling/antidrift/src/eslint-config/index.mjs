@@ -1,9 +1,21 @@
+import { resolve } from "node:path";
+
 import parser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
 
 import aiPolicy from "../eslint-plugin/index.js";
+import { loadRegistriesSync } from "../policy/lib/registries.mjs";
 
-export function createConfig({ tsconfigRootDir, semanticFacts } = {}) {
+export function createConfig({
+  tsconfigRootDir = process.cwd(),
+  policyDir = "policy",
+  semanticFacts,
+} = {}) {
+  const registries = loadRegistriesSync(resolve(tsconfigRootDir, policyDir));
+  const generatedSources = registries.generated?.generatedSources ?? {};
+  const packageTypeOwners = registries.ownership?.packageTypeOwners ?? {};
+  const canonicalEntities = registries.domain?.canonicalEntities ?? {};
+
   return defineConfig(
     {
       ignores: [
@@ -48,11 +60,17 @@ export function createConfig({ tsconfigRootDir, semanticFacts } = {}) {
         "antidrift/no-unsafe-deserialize": "error",
         "antidrift/no-appeasement-cast": "error",
         "antidrift/no-nullable-positional-tuple": "error",
-        "antidrift/no-underchecked-type-predicate": "error",
-        "antidrift/no-defensive-shape-probing": "error",
-        "antidrift/no-structural-type-fork": "error",
-        "antidrift/no-canonical-model-fork": "error",
-        "antidrift/no-sql-string-concat": "error",
+        "antidrift/no-underchecked-type-predicate": "off",
+        "antidrift/no-defensive-shape-probing": "off",
+        "antidrift/no-structural-type-fork": [
+          "error",
+          { generatedSources, packageTypeOwners },
+        ],
+        "antidrift/no-canonical-model-fork": [
+          "error",
+          { canonicalEntities },
+        ],
+        "antidrift/no-sql-string-concat": "off",
       },
     },
   );

@@ -11,6 +11,7 @@ export type SemanticFactSetting =
 
 export interface AntidriftConfigOptions {
   tsconfigRootDir?: string;
+  policyDir?: string;
   semanticFacts?: SemanticFactSetting;
 }
 

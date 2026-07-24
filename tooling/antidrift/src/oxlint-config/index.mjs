@@ -186,6 +186,7 @@ export function createGovernanceOxlintConfig({
       "eslint-comments/no-unused-disable": "error",
       "eslint-comments/no-unused-enable": "error",
       "antidrift/require-effect-deps": "error",
+      "antidrift/no-static-property-loop": "error",
       ...disabledAntidriftRules,
       "max-lines": [
         "error",

@@ -2,7 +2,7 @@
 
 ## Current Rule
 
-`antidrift/no-appeasement-cast` is implemented and exported, but default-off in the distributable config. It is `ready`, but not `stable`.
+`antidrift/no-appeasement-cast` is implemented, exported, and default-on in the distributable TypeChecker config. It is `ready`, but not `stable`.
 
 The rule is type-aware. It reports a plain `as T` assertion when the source expression is `any` or `unknown` and the target is a named object contract with at least one resolved property.
 
@@ -41,7 +41,7 @@ Location comparison:
 | Upstream-only locations                                       | 1,517 |
 | Antidrift-only locations                                      |     0 |
 
-Interpretation: upstream is a strict superset on the measured corpus, but too broad to replace this custom rule as the targeted broad-input authority policy. Keep this rule default-off for the `any`/`unknown` source-type contract and use the upstream rule as the maintained broad assertion surface.
+Interpretation: upstream is a strict superset on the measured corpus, but too broad to replace this custom rule as the targeted broad-input authority policy. Keep this rule default-on for the narrow `any`/`unknown` source-type contract and use the upstream rule as the maintained broad assertion benchmark.
 
 ## Real Corpus Evidence
 
@@ -168,7 +168,7 @@ can be type-checked.
 
 This remains a strong promotion candidate because it has real drift replication in Chaski, Codebase Atlas, and Sudocode, plus remediation-pattern evidence in bracket-prefixed Chaski and Codebase Atlas copies.
 
-It is not stable yet. Current state: ready, default-off inventory, remediation patterns proven.
+It is not stable yet. Current state: ready, default-on, remediation patterns proven.
 
 Remaining gates:
 

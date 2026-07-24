@@ -67,7 +67,7 @@ The decision flow is:
 | Classification                            | Rules                                                                                                                                                                                                                                                                                                                                                                       |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Stable custom (3)                         | `no-redundant-zod-parse`, `no-unsafe-deserialize`, `require-effect-deps`                                                                                                                                                                                                                                                                                                    |
-| Custom, needs real-corpus promotion (12)  | `no-contract-appeasement-projection`, `react-max-component-props`, `no-appeasement-cast`, `no-structural-type-fork`, `no-canonical-model-fork`, `no-handrolled-resource-lifecycle-cells`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type`, `require-authz-check`, `no-raw-fetch-in-component` |
+| Custom, needs real-corpus promotion (13)  | `no-contract-appeasement-projection`, `react-max-component-props`, `no-appeasement-cast`, `no-structural-type-fork`, `no-canonical-model-fork`, `no-handrolled-resource-lifecycle-cells`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type`, `require-authz-check`, `no-raw-fetch-in-component`, `no-static-property-loop` |
 | False-positive-prone custom inventory (1) | `no-sql-string-concat` keeps the HogQL/template and raw table-name signal visible, but known SQL-builder clean-control false positives block promotion.                                                                                                                                                                                                                     |
 | Fact-only shipped inventory (1)           | `no-shattered-ingested-entity-state` records source-member fan-out candidates and emits no diagnostic; rebuild enforcement only after multi-repo owned-entity shatter evidence exists.                                                                                                                                                                                      |
 | Default-off / pending retirement (2)      | `no-defensive-shape-probing` (sunset condition below), `no-underchecked-type-predicate` (required-field drift search below)                                                                                                                                                                                                                                                 |
@@ -198,8 +198,8 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: TypeChecker.
 - Evidence: drift in Chaski, Codebase Atlas, and Sudocode; copy-backed repairs prove the replacement patterns; production BFF clean (0 findings/112 files).
 - False-positive concern: typed-source conversions stay clean by design; test-file casts report but do not count toward promotion.
-- Status: ready, default-off inventory.
-- Blocker: rerun broad inventory after real consumer cleanup; no further copy-only remediation.
+- Status: ready, default-on, stable false.
+- Stable blocker: rerun broad inventory after real consumer cleanup; no further copy-only remediation.
 
 ### `antidrift/no-sql-string-concat`
 
@@ -232,8 +232,8 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: TypeChecker structural comparison plus authority-index facts.
 - Evidence: two generated-source forks in Chaski BFF (123 files); 0 findings across 804 Portal files with installed-only sources; fixture coverage proves accepted package owners from `ownership.yaml` report while unaccepted package matches stay inventory-only.
 - False-positive concern: projected boundary DTOs with four or more identical owner fields may be legitimate translation contracts; the installed-package mode is the weak-authority branch.
-- Status: ready, default-off inventory.
-- Blocker: blocking promotion needs independent generated-source replication and real accepted package-owner evidence before any package owner is added to `ownership.yaml`; the unconfigured all-`node_modules` sweep stays inventory/discovery.
+- Status: ready, default-on for configured generated and accepted package owners, stable false.
+- Stable blocker: independent generated-source replication and real accepted package-owner evidence before any package owner is added to `ownership.yaml`; the unconfigured all-`node_modules` sweep stays inventory/discovery.
 
 ### `antidrift/no-canonical-model-fork`
 
@@ -244,8 +244,8 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: TypeChecker plus domain registry.
 - Evidence: three redeclarations in one Chaski report-types file; Sudocode `frontend/src/types/project.ts` redeclares server-owned `ProjectInfo`; owner files and a different weekly-digest model stay clean.
 - False-positive concern: boundary DTOs and view models legitimately overlap; the four-property threshold keeps small shapes out.
-- Status: ready, default-off inventory.
-- Blocker: fresh adversarial review and broader boundary DTO/view-model clean pressure before blocking promotion.
+- Status: ready, default-on for configured canonical owners, stable false.
+- Stable blocker: fresh adversarial review and broader boundary DTO/view-model clean pressure.
 
 ### `antidrift/no-handrolled-resource-lifecycle-cells`
 
@@ -279,8 +279,8 @@ Implemented and enabled; each card names what still blocks stable promotion.
 - Signal: deterministic AST; alias/generic-chain nullability needs parser services.
 - Evidence: exactly 1 finding across 1,533 Chaski frontend files — precise and low-yield.
 - False-positive concern: hook-style tuples with one nullable slot stay clean; imported owner range aliases are out of scope. Low frequency lowers priority, not validity.
-- Status: ready, default-off inventory.
-- Blocker: a second real nullable tuple plus clean tuple controls.
+- Status: ready, default-on, stable false.
+- Stable blocker: a second real nullable tuple plus clean tuple controls.
 
 ### `antidrift/no-inline-structural-type-at-use-site`
 

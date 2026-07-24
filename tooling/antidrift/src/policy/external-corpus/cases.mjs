@@ -1,3 +1,9 @@
+import { fileURLToPath } from "node:url";
+
+const antidriftRepoCandidates = [
+  process.env.ANTIDRIFT_REPO,
+  fileURLToPath(new URL("../../../../../", import.meta.url)),
+].filter(Boolean);
 const sudocodeRepoCandidates = [
   process.env.SUDOCODE_REPO,
   "/Users/sushi/code/sudocode-main",
@@ -1249,7 +1255,32 @@ export const powersyncServiceCases = [
   },
 ];
 
+export const antidriftCases = [
+  {
+    id: "antidrift-eslint-config-static-property-loop",
+    ruleId: "antidrift/no-static-property-loop",
+    kind: "drift",
+    classification: "ready",
+    subproject: "tooling",
+    paths: [
+      "tooling/antidrift/src/eslint-plugin/fixtures/programs/drift/test/static-property-loop.js",
+    ],
+    expectedFindings: [
+      {
+        path: "tooling/antidrift/src/eslint-plugin/fixtures/programs/drift/test/static-property-loop.js",
+        line: 7,
+      },
+    ],
+  },
+];
+
 export const externalCorpora = [
+  {
+    name: "antidrift",
+    label: "Antidrift",
+    repoCandidates: antidriftRepoCandidates,
+    cases: antidriftCases,
+  },
   {
     name: "sudocode-main",
     label: "Sudocode",

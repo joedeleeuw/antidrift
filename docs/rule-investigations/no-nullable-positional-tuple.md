@@ -57,9 +57,9 @@ The latest documented broad Chaski frontend inventory recorded one finding acros
 
 ## Decision
 
-Keep `antidrift/no-nullable-positional-tuple` as ready, default-off inventory. The detector is real local AST/source-shape proof, with TypeChecker alias resolution when parser services exist, and it is not replaced by a maintained ecosystem rule.
+Keep `antidrift/no-nullable-positional-tuple` ready and default-on while `stable` remains false. The detector is real local AST/source-shape proof, with TypeChecker alias resolution when parser services exist, and it is not replaced by a maintained ecosystem rule.
 
-Do not promote it to blocking yet. The evidence is precise but Chaski-only and low-yield: one real tuple across 1,533 frontend files.
+The evidence is precise but Chaski-only and low-yield: one real tuple across 1,533 frontend files. A second real tuple plus clean controls still gates stable promotion.
 
 ## Boundaries
 

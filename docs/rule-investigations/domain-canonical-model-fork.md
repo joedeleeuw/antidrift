@@ -63,9 +63,9 @@ That fails because only Sudocode currently has matching external canonical-model
 
 ## Decision
 
-Keep `antidrift/no-canonical-model-fork` as ready, default-off inventory. The implementation is real TypeChecker-backed semantic proof and is not covered by maintained ecosystem rules, but it is not ready for default-on blocking.
+Keep `antidrift/no-canonical-model-fork` ready and default-on for configured canonical owners while `stable` remains false. The implementation is real TypeChecker-backed semantic proof and is not covered by maintained ecosystem rules.
 
-The blocker is not fake semantics. The blocker is policy classification: exact-overlap boundary DTOs, view models, and wire contracts can be legitimate, and the current corpus has not classified enough real clean pressure there.
+The remaining stable-promotion blocker is policy classification: exact-overlap boundary DTOs, view models, and wire contracts can be legitimate, and the current corpus has not classified enough real clean pressure there.
 
 ## Known Risks
 

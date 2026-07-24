@@ -20,7 +20,7 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - `oxlint.config.mts` owns this repository's generic native, type-aware, architecture, and scoped complexity policy.
 - `tooling/antidrift/src/oxlint-plugin` contains syntax-only custom rules supported by Oxlint.
 - `tooling/antidrift/src/eslint-plugin` retains custom rules requiring TypeScript `Program` or `TypeChecker` data.
-- The root ESLint config consumes the four-rule `@joedeleeuw/antidrift/eslint-config` TypeChecker pass.
+- The root ESLint config consumes the eight-rule `@joedeleeuw/antidrift/eslint-config` TypeChecker pass.
 - `antidrift oxlint` runs the repository Oxlint configuration.
 - `sonar-project.properties` imports generated external issues and LCOV coverage.
 - `.claude/settings.json` and `.codex/hooks.json` enforce policy during agent tool use.
@@ -47,7 +47,7 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - One owner per concept is the primary anti-duplication rule: import or derive from the owner instead of retyping local copies.
 - `policy:check-registries` protects registry-backed rule facts; `policy:check-rule-surface` protects custom rule export, runtime ownership, severity, and corpus alignment.
 - `policy:validate-chaski` is the optional local real-corpus gate. It asserts rule behavior against explicit Chaski frontend/BFF files when `CHASKI_REPO` or `/Users/sushi/code/chaski` exists and skips otherwise.
-- `policy:validate-external-corpus` is the required fallback real-corpus gate for non-Chaski repos when Chaski has only clean controls for an implemented rule. It asserts the configured local external repos and fails unless at least two external repositories pass. Current discovery covers Sudocode, Codebase Atlas, Murderbox, Cloudflare Agents, Claude Code Source, Opencode, and PowerSync Service through their matching environment variables or `/Users/sushi/code/<repo>` paths; explicitly selecting a corpus with `--corpus` and `--require` makes that named checkout mandatory. For promotion/slice-completion breadth, run `antidrift external-corpus --min-repositories 2`.
+- `policy:validate-external-corpus` is the required fallback real-corpus gate for non-Chaski repos when Chaski has only clean controls for an implemented rule. It asserts the configured local repositories and fails unless at least two repositories pass. Current discovery covers the Antidrift source repository, Sudocode, Codebase Atlas, Murderbox, Cloudflare Agents, Claude Code Source, Opencode, and PowerSync Service; explicitly selecting a corpus with `--corpus` and `--require` makes that named checkout mandatory. For promotion/slice-completion breadth, run `antidrift external-corpus --min-repositories 2`.
 - SonarQube should ingest custom ESLint/generic external issues instead of owning bespoke TypeScript rules directly.
 - Claude Code and Codex hooks are the deterministic lifecycle layer for PreToolUse, PostToolUse, and Stop checks.
 - Oxlint hosts `eslint-plugin-boundaries` as the architecture-boundary layer.

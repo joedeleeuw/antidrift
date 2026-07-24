@@ -7,8 +7,6 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import pluginDefinition from "./index.js";
-
 const require = createRequire(import.meta.url);
 const oxlintPackage = require.resolve("oxlint/package.json");
 const oxlintBinary = resolve(
@@ -17,10 +15,14 @@ const oxlintBinary = resolve(
 );
 const plugin = fileURLToPath(new URL("./index.js", import.meta.url));
 
-function lint(source, rules = { "antidrift/require-effect-deps": "error" }) {
+function lint(
+  source,
+  rules = { "antidrift/require-effect-deps": "error" },
+  filename = "component.tsx",
+) {
   const directory = mkdtempSync(join(tmpdir(), "antidrift-oxlint-plugin-"));
   const config = join(directory, ".oxlintrc.json");
-  const target = join(directory, "component.tsx");
+  const target = join(directory, filename);
   writeFileSync(
     config,
     JSON.stringify({
@@ -43,13 +45,6 @@ function lint(source, rules = { "antidrift/require-effect-deps": "error" }) {
 }
 
 describe("Oxlint plugin", () => {
-  it("exports runnable rule objects", () => {
-    expect(Object.keys(pluginDefinition.rules)).toHaveLength(14);
-    for (const rule of Object.values(pluginDefinition.rules)) {
-      expect(rule.create).toBeTypeOf("function");
-    }
-  });
-
   it("reports a React effect without dependencies", () => {
     const result = lint(
       'import { useEffect } from "react";\nuseEffect(() => {});\n',
@@ -78,6 +73,26 @@ describe("Oxlint plugin", () => {
     expect(result.status).toBe(1);
     expect(`${result.stdout}${result.stderr}`).toContain(
       "antidrift(no-raw-fetch-in-component)",
+    );
+  });
+
+  it("rejects a static property-loop test", () => {
+    const result = lint(
+      `
+        it("repeats config properties", () => {
+          const rules = createConfig();
+          for (const ruleId of ["first", "second"]) {
+            expect(rules[ruleId]).toBe("error");
+          }
+        });
+      `,
+      { "antidrift/no-static-property-loop": "error" },
+      "config.test.ts",
+    );
+
+    expect(result.status).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toContain(
+      "antidrift(no-static-property-loop)",
     );
   });
 });

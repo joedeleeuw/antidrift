@@ -705,6 +705,52 @@ ruleTester.run(
   },
 );
 
+ruleTester.run("no-static-property-loop", rule("no-static-property-loop"), {
+  valid: [
+    {
+      code: `
+        it("checks table-driven behavior", () => {
+          for (const { input, expected } of cases) {
+            expect(parse(input)).toEqual(expected);
+          }
+        });
+      `,
+      filename: "parser.test.ts",
+    },
+    {
+      code: `
+        it("checks a runtime-derived invariant", () => {
+          const permissions = permissionsFor(role);
+          for (const action of requiredActions) {
+            expect(permissions[action]).toBe(true);
+          }
+        });
+      `,
+      filename: "permissions.test.ts",
+    },
+  ],
+  invalid: [
+    {
+      code: `
+        function severity(ruleValue) {
+          return Array.isArray(ruleValue) ? ruleValue[0] : ruleValue;
+        }
+        it("enables every custom TypeChecker rule", () => {
+          const rules = collectRules(createConfig());
+          for (const ruleId of [
+            "antidrift/no-appeasement-cast",
+            "antidrift/no-canonical-model-fork",
+          ]) {
+            expect(severity(rules[ruleId])).toBe("error");
+          }
+        });
+      `,
+      filename: "eslint-config/index.test.mjs",
+      errors: [{ messageId: "staticPropertyEcho" }],
+    },
+  ],
+});
+
 ruleTester.run(
   "no-query-data-type-parameters",
   rule("no-query-data-type-parameters"),

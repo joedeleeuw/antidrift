@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  SEMANTIC_ADAPTER_MANIFEST,
   semanticAdapterManifestForAdapterId,
   semanticAdapterManifestForFactAdapterId,
   semanticAdapterManifestForFactKind,
@@ -11,7 +10,6 @@ import {
 
 describe("semantic adapter manifest", () => {
   it("composes adapter contracts with their owned semantic fact contracts", () => {
-    expect(SEMANTIC_ADAPTER_MANIFEST).toHaveLength(9);
     expect(
       semanticAdapterManifestForAdapterId("async-control-flow")?.rules,
     ).toContain("antidrift/no-async-array-method");

@@ -101,14 +101,14 @@ rules:
       current: semantic-ast,
       fit: proven,
       target: semantic-ast,
-      note: "authority-index whole-program type resolution; correctly placed for DECLARED owners; default-off until boundary DTO clean pressure and adversarial review pass. (Discovering NEW duplicate owners needs dependency-graph — see gaps.net-new-bias.)",
+      note: "authority-index whole-program type resolution; default-on only for DECLARED owners, with boundary DTO clean pressure and adversarial review still required for stable promotion. (Discovering NEW duplicate owners needs dependency-graph — see gaps.net-new-bias.)",
     }
   antidrift/no-structural-type-fork:
     {
       current: semantic-ast,
       fit: proven,
       target: semantic-ast,
-      note: "authority-index; correctly placed for declared owners; default-off until independent generated-source and accepted package-owner evidence are proven.",
+      note: "authority-index; default-on for declared generated and accepted package owners, while stable promotion still requires independent generated-source and accepted package-owner evidence.",
     }
   antidrift/no-status-literal-in-type:
     {
@@ -122,7 +122,7 @@ rules:
       current: semantic-ast,
       fit: proven,
       target: semantic-ast,
-      note: "type-escape-hatch; type-provenance; default-off while broad inventory is rerun after real consumer cleanup.",
+      note: "type-escape-hatch; type-provenance; default-on for the narrow broad-input authority proof while broad inventory after real consumer cleanup still gates stable promotion.",
     }
   antidrift/no-redundant-zod-parse:
     {
@@ -150,7 +150,7 @@ rules:
       current: semantic-ast,
       fit: proven,
       target: semantic-ast,
-      note: "type-contract-shape; AST + TypeChecker; default-off until a second real nullable tuple appears.",
+      note: "type-contract-shape; AST + TypeChecker; default-on as a narrow construction rule while a second real nullable tuple still gates stable promotion.",
     }
   antidrift/no-async-array-method:
     {

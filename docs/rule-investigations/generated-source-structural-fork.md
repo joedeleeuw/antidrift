@@ -22,13 +22,13 @@ Use TypeChecker plus generated and ownership registries:
 4. Allow anchored derivations such as imports, aliases, `Pick`, `Omit`, and sanctioned boundary DTOs.
 5. Report hand-written exact structural copies that should import or derive from the accepted owner.
 
-This is the implemented shape. Consumers that opt into the default-off rule pass generated and ownership registry facts to `antidrift/no-structural-type-fork`.
+This is the implemented shape. The distributable TypeChecker config loads generated and ownership registry facts for `antidrift/no-structural-type-fork`.
 
 ## Decision
 
-Keep `antidrift/no-structural-type-fork` as ready, default-off inventory. The accepted-owner branch is real TypeChecker proof: diagnostics require an exact local object/interface copy of a configured generated-source or accepted package-owner export.
+Keep `antidrift/no-structural-type-fork` ready and default-on for configured generated sources and accepted package owners while `stable` remains false. The accepted-owner branch is real TypeChecker proof: diagnostics require an exact local object/interface copy of a configured generated-source or accepted package-owner export.
 
-Do not treat broad installed-package structural matches as blocking. They are discovery/proposal facts only when a semantic fact sink is configured. Do not promote the rule until real exact-copy drift appears under an accepted owner configuration.
+Do not treat broad installed-package structural matches as blocking. They are discovery/proposal facts only when a semantic fact sink is configured. Independent replication and real accepted-owner evidence still gate stable promotion.
 
 ## Known Risks
 

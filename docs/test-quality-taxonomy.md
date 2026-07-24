@@ -1,6 +1,6 @@
 # Test Quality Taxonomy
 
-This document classifies the low-value tests agents tend to write. It is an
+This document classifies low-value tests. It is an
 inventory and planning surface, not a blanket enforcement spec. A candidate only
 becomes a blocking rule when the proof object shows the test is vacuous, not just
 small, simple, or focused.
@@ -18,6 +18,7 @@ registry instead of the project behavior that regressed.
 | `test/require-regression-provenance` | A "regression" test only corrects a hand-written payload typo; it does not preserve the bug boundary or prove the previous failure. | Repo/session/corpus provenance plus semantic AST inventory. | `test-regression-provenance` | Inline invalid fixture is edited until parse passes, then the test asserts success. | Test names or metadata link to a bug, real request, captured fixture, production payload, or corpus case; assertion checks reject/normalize/route behavior that would have failed. | Corpus of post-review tests with no external sample, issue link, snapshot source, or boundary assertion; clean controls with captured fixtures. |
 | `test/no-self-fulfilling-mock-contract` | The test mocks the same contract the implementation consumes, so test and code can drift together. | Semantic AST plus import/graph provenance; often advisory first. | `test-mock-contract-provenance` | Mock service returns the exact DTO shape imported from the implementation module, then the test asserts the component renders that same mocked field. | Contract test runs through the public adapter, gateway, schema parser, MSW/captured HTTP fixture, or a separately owned test builder. | Real mocks that duplicate production contracts and missed a drift; clean controls for public-boundary mocks and generated builders. |
 | `test/no-registry-restatement` | The test hand-copies a registry or manifest and compares exact lists, creating a second registry. | Local AST/source-shape plus registry-source facts. | `test-registry-contract-parity` | `expect(manifest.map(x => x.id)).toEqual(["a", "b", "c"])` where the list is already owned by `rules.yaml`. | Assert invariants through public registry APIs: lookup works, required entry exists, filters compose, generated artifacts match the source registry. | Self-hosting examples where adding a valid registry row fails a stale hand-copied list; clean package smoke tests that consume the shipped CLI/API. |
+| `test/no-static-property-loop` | The test enumerates hardcoded property keys and asserts the same literal value from one precomputed object for every key, restating declarative shape instead of executing behavior. | Local AST proof over the literal key loop, indexed property read, optional transparent projection, and invariant expected literal. | `test-static-shape-echo` | `for (const key of ["a", "b"]) expect(config[key]).toBe("error")` | Table-driven cases that supply distinct inputs and expected outputs and execute the subject per case; tool execution against valid and invalid programs; generated artifact or public CLI contract verification. | `bd8d433` `tooling/antidrift/src/eslint-config/index.test.mjs:26` is the first real drift source. Existing consumer-package lint execution is the replacement evidence. |
 | `test/no-vacuous-wrapper-smoke` | The test calls a thin wrapper with all dependencies mocked and only proves the wrapper calls the mock. | Semantic AST plus call graph; weaker without effect/output assertions. | `test-wrapper-smoke` | Mock `fetchUser`, call `loadUser`, assert `fetchUser` was called once, with no output/error/cache assertion. | Wrapper has policy behavior: auth headers, retries, timeout, normalization, error mapping, cache keys, tracing, or schema validation. | Real tests that survived broken wrapper behavior; clean controls for wrappers with observable policy. |
 | `test/no-uninterpreted-snapshot` | A large snapshot or inline object is treated as proof without naming the behavioral contract. | AST/source-shape inventory; blocking proof is hard. | `test-snapshot-semantics` | `expect(rendered).toMatchSnapshot()` as the only assertion for a complex branch. | Snapshots for stable render output paired with semantic assertions, visual baselines, or generated artifacts whose source is explicit. | Review corpus showing snapshots masking behavior drift; clean controls for small golden artifacts and paired semantic assertions. |
 
@@ -27,6 +28,7 @@ Some categories can become deterministic rules:
 
 - `test/no-source-shape-guard`: source file read plus textual assertion on production source is a strong local AST proof.
 - `test/no-registry-restatement`: exact-list assertions against data already owned by a registry are detectable when the registry source is known.
+- `test/no-static-property-loop`: a literal key loop whose assertion only reads one precomputed object by the loop key and compares every entry with one invariant literal is a deterministic local source-shape proof. A table-driven behavior test remains clean when it invokes the subject with per-case inputs.
 - Narrow branches of `test/no-library-echo-parse`: inline literal, local schema parse, and only success/equality assertions are detectable. Blocking should exclude transforms, defaults, refinements, coercions, brands, reject cases, and captured external samples.
 
 Other categories are mostly inventory until they gain provenance:
@@ -47,6 +49,7 @@ Each candidate should keep real examples in this shape before implementation:
 | `test/no-library-echo-parse` | `repo/path/user-schema.test.ts` | clean | Schema has `.transform` and assertion checks transformed output. | No report. | Keep. |
 | `test/require-regression-provenance` | `repo/path/route.test.ts` | drift | Test name says regression but fixture has no external source and assertion only checks happy-path parse. | Inventory until provenance policy exists. | Store captured sample or assert the boundary behavior that failed. |
 | `test/no-registry-restatement` | `repo/path/manifest.test.ts` | clean | Test invokes public CLI and checks lookup/filter invariants. | No report. | Keep invariant assertions; avoid hand-copied full lists. |
+| `test/no-static-property-loop` | `agent-guardrails-monorepo-template/tooling/antidrift/src/eslint-config/index.test.mjs` | drift | Commit `bd8d433` loops over hardcoded rule IDs and checks only that every static config entry has severity `error`. | Report through `antidrift/no-static-property-loop`. | Run ESLint through the exported config against real violating and clean programs. |
 
 ## Validation Requirements
 
@@ -55,5 +58,5 @@ Before any category moves from taxonomy to active custom rule:
 1. Record at least one real drift example and one real clean counterexample.
 2. Name the smallest proof object: source shape, semantic schema provenance, registry ownership, graph/import fact, or corpus provenance.
 3. Define the no-report cases first, especially schema transforms, captured external fixtures, generated artifacts, and public package smoke tests.
-4. Prefer ecosystem rules for generic test integrity (`.only`, skipped tests, conditional assertions, missing assertions). Keep Antidrift focused on agent-specific vacuity and provenance failures.
+4. Prefer ecosystem rules for generic test integrity (`.only`, skipped tests, conditional assertions, missing assertions). Keep Antidrift focused on vacuity and provenance failures.
 5. Keep fixture strings as regression locks only after the real examples are recorded.

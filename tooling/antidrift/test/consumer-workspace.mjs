@@ -167,22 +167,15 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "});\n",
   );
   file(
-    "eslint.structural.config.mjs",
-    'import { appendFileSync } from "node:fs";\n' +
-      'import { createConfig } from "@joedeleeuw/antidrift/eslint-config";\n' +
-      'import { createJsonlFactSink } from "@joedeleeuw/antidrift/policy";\n' +
-      "\n" +
-      'const factFile = new URL("./semantic-facts.jsonl", import.meta.url);\n' +
-      "const sink = createJsonlFactSink((line) => appendFileSync(factFile, line));\n" +
+    "eslint.inventory.config.mjs",
+    'import { createConfig } from "@joedeleeuw/antidrift/eslint-config";\n' +
       "\n" +
       "export default [\n" +
       "  ...createConfig({\n" +
       "    tsconfigRootDir: import.meta.dirname,\n" +
-      "    semanticFacts: { repoRoot: import.meta.dirname, sink },\n" +
       "  }),\n" +
       "  {\n" +
       "    rules: {\n" +
-      '      "antidrift/no-structural-type-fork": ["error", { generatedSources: { appGenerated: { generated: "packages/app/src/generated" } }, packageTypeOwners: {} }],\n' +
       '      "antidrift/no-underchecked-type-predicate": "error",\n' +
       "    },\n" +
       "  },\n" +
@@ -944,8 +937,8 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "\n" +
       "const eslintRuleNames = new Set(Object.keys(eslintPlugin.rules));\n" +
       "const oxlintRuleNames = new Set(Object.keys(oxlintPlugin.rules));\n" +
-      "if (eslintRuleNames.size !== 11 || oxlintRuleNames.size !== 14 || [...eslintRuleNames].some((rule) => oxlintRuleNames.has(rule))) {\n" +
-      '  throw new Error("Custom rules must have exactly one runtime export owner");\n' +
+      "if ([...eslintRuleNames].some((rule) => oxlintRuleNames.has(rule))) {\n" +
+      '  throw new Error("Custom rule is exported by both runtime plugins");\n' +
       "}\n" +
       "\n" +
       'const runtimeOxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false });\n' +
@@ -970,7 +963,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       '  throw new Error("Missing rule status registry behavior");\n' +
       "}\n" +
       "\n" +
-      'if (ruleStatusSemanticSummaryForId("antidrift/no-async-array-method", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "async-control-flow" || ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "react-state" || ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", runtimeRuleStatus)?.semanticFactContracts.map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" || ruleStatusSemanticSummaryForId("antidrift/no-raw-fetch-in-component", runtimeRuleStatus)?.proofBuckets.join(",") !== "local-ast-source-shape" || ruleStatusSemanticSummaryForId("antidrift/no-nullable-positional-tuple", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "tuple-shape" || ruleStatusSemanticSummaries(runtimeRuleStatus).length !== 8) {\n' +
+      'if (ruleStatusSemanticSummaryForId("antidrift/no-async-array-method", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "async-control-flow" || ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "react-state" || ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", runtimeRuleStatus)?.semanticFactContracts.map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" || ruleStatusSemanticSummaryForId("antidrift/no-raw-fetch-in-component", runtimeRuleStatus)?.proofBuckets.join(",") !== "local-ast-source-shape" || ruleStatusSemanticSummaryForId("antidrift/no-nullable-positional-tuple", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "tuple-shape") {\n' +
       '  throw new Error("Missing joined rule semantic summary behavior");\n' +
       "}\n" +
       "\n" +
@@ -1021,11 +1014,11 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       '  throw new Error("Missing semantic-adapters aggregate registry behavior");\n' +
       "}\n" +
       "\n" +
-      'if (SEMANTIC_ADAPTER_CONTRACT_LIST.length !== 9 || !SEMANTIC_ADAPTER_CONTRACTS.asyncControlFlow.rules.includes("antidrift/no-async-array-method") || SEMANTIC_ADAPTER_CONTRACTS.parseInput.subpath !== "@joedeleeuw/antidrift/semantic-adapters/parse-input" || !SEMANTIC_ADAPTER_CONTRACTS.parseInput.rules.includes("antidrift/no-unsafe-deserialize") || !SEMANTIC_ADAPTER_CONTRACTS.broadInput.rules.includes("antidrift/no-appeasement-cast") || SEMANTIC_ADAPTER_CONTRACTS.sql.subpath !== "@joedeleeuw/antidrift/semantic-adapters/sql" || !SEMANTIC_ADAPTER_CONTRACTS.sql.proofBuckets.includes("semantic-source-type-provenance") || !SEMANTIC_ADAPTER_CONTRACTS.reactState.semanticFactAdapterIds.includes("react-state") || !SEMANTIC_ADAPTER_CONTRACTS.reactState.semanticFactKinds.includes("resourceLifecycleProof") || !SEMANTIC_ADAPTER_CONTRACTS.tupleShape.rules.includes("antidrift/no-nullable-positional-tuple") || !SEMANTIC_ADAPTER_CONTRACTS.typeOwner.semanticFactAdapterIds.includes("typescript-eslint/type-owner") || !SEMANTIC_ADAPTER_CONTRACTS.typeOwner.semanticFactKinds.includes("structuralMatch") || !SEMANTIC_ADAPTER_CONTRACTS.typeOwner.rules.includes("antidrift/no-structural-type-fork") || !SEMANTIC_ADAPTER_CONTRACTS.typeOwner.rules.includes("antidrift/no-status-literal-in-type") || !SEMANTIC_ADAPTER_CONTRACTS.reactState.associations.some((association) => association.includes("lifecycle"))) {\n' +
+      'if (!SEMANTIC_ADAPTER_CONTRACTS.asyncControlFlow.rules.includes("antidrift/no-async-array-method") || SEMANTIC_ADAPTER_CONTRACTS.parseInput.subpath !== "@joedeleeuw/antidrift/semantic-adapters/parse-input" || !SEMANTIC_ADAPTER_CONTRACTS.parseInput.rules.includes("antidrift/no-unsafe-deserialize") || !SEMANTIC_ADAPTER_CONTRACTS.broadInput.rules.includes("antidrift/no-appeasement-cast") || SEMANTIC_ADAPTER_CONTRACTS.sql.subpath !== "@joedeleeuw/antidrift/semantic-adapters/sql" || !SEMANTIC_ADAPTER_CONTRACTS.sql.proofBuckets.includes("semantic-source-type-provenance") || !SEMANTIC_ADAPTER_CONTRACTS.reactState.semanticFactAdapterIds.includes("react-state") || !SEMANTIC_ADAPTER_CONTRACTS.reactState.semanticFactKinds.includes("resourceLifecycleProof") || !SEMANTIC_ADAPTER_CONTRACTS.tupleShape.rules.includes("antidrift/no-nullable-positional-tuple") || !SEMANTIC_ADAPTER_CONTRACTS.typeOwner.semanticFactAdapterIds.includes("typescript-eslint/type-owner") || !SEMANTIC_ADAPTER_CONTRACTS.typeOwner.semanticFactKinds.includes("structuralMatch") || !SEMANTIC_ADAPTER_CONTRACTS.typeOwner.rules.includes("antidrift/no-structural-type-fork") || !SEMANTIC_ADAPTER_CONTRACTS.typeOwner.rules.includes("antidrift/no-status-literal-in-type") || !SEMANTIC_ADAPTER_CONTRACTS.reactState.associations.some((association) => association.includes("lifecycle"))) {\n' +
       '  throw new Error("Missing semantic adapter contract metadata");\n' +
       "}\n" +
       "\n" +
-      'if (SEMANTIC_ADAPTER_MANIFEST.length !== 9 || semanticAdapterManifestForAdapterId("async-control-flow")?.rules[0] !== "antidrift/no-async-array-method" || semanticAdapterManifestForAdapterId("parse-input")?.rules[0] !== "antidrift/no-unsafe-deserialize" || semanticAdapterManifestForAdapterId("react-state")?.semanticFactContracts.map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" || semanticAdapterManifestForAdapterId("tuple-shape")?.rules[0] !== "antidrift/no-nullable-positional-tuple" || semanticAdapterManifestForAdapterId("not-real") !== null) {\n' +
+      'if (semanticAdapterManifestForAdapterId("async-control-flow")?.rules[0] !== "antidrift/no-async-array-method" || semanticAdapterManifestForAdapterId("parse-input")?.rules[0] !== "antidrift/no-unsafe-deserialize" || semanticAdapterManifestForAdapterId("react-state")?.semanticFactContracts.map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" || semanticAdapterManifestForAdapterId("tuple-shape")?.rules[0] !== "antidrift/no-nullable-positional-tuple" || semanticAdapterManifestForAdapterId("not-real") !== null) {\n' +
       '  throw new Error("Missing semantic adapter manifest behavior");\n' +
       "}\n" +
       "\n" +

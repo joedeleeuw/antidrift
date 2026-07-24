@@ -581,7 +581,6 @@ rules:
   antidrift/no-appeasement-cast:
     status: ready
     stable: false
-    defaultOff: true
     signal: TypeChecker
     solveType: type-escape-hatch
     proofBuckets: [semantic-source-type-provenance]
@@ -818,7 +817,6 @@ rules:
   antidrift/no-nullable-positional-tuple:
     status: ready
     stable: false
-    defaultOff: true
     signal: deterministic AST
     solveType: type-contract-shape
     proofBuckets: [local-ast-source-shape, semantic-source-type-provenance]
@@ -1149,7 +1147,6 @@ rules:
   antidrift/no-structural-type-fork:
     status: ready
     stable: false
-    defaultOff: true
     signal: TypeChecker structural comparison plus authority-index facts
     solveType: type-fork
     proofBuckets: [authority-index-ownership]
@@ -1194,7 +1191,6 @@ rules:
   antidrift/no-canonical-model-fork:
     status: ready
     stable: false
-    defaultOff: true
     signal: TypeChecker plus domain registry
     solveType: domain-model-drift
     proofBuckets: [authority-index-ownership]
@@ -1501,6 +1497,32 @@ rules:
         - "expect(renderConfig(registry)).toEqual({ mcpServers: { executor: { url } } });"
         - "trigger(); trigger(); expect(handler).toHaveBeenCalledTimes(1);"
     nextAction: "Inventory existing guardrails and dotfiles findings, then split actionable replacements into behavioral/full-output assertions while tracking noisy branches before stable promotion."
+  antidrift/no-static-property-loop:
+    status: ready
+    stable: false
+    signal: AST
+    solveType: test-quality-static-property-restatement
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/test-quality-taxonomy.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - Commit bd8d433 in this repository is the first real source. The detector requires an inline literal key list, an invariant literal expectation, and a computed read from one precomputed const binding.
+      - Transparent local projections are limited to direct property reads and an Array.isArray conditional so the committed severity helper is covered without treating arbitrary transforms as restatements.
+      - Table-driven behavior and runtime-derived key collections remain clean because they execute the subject per case or derive the key set outside the literal loop.
+    external:
+      state: net-antidrift
+      support: low
+      candidates: ["ESLint no-restricted-syntax", "ast-grep"]
+      decision: own-antidrift
+      whyThisState: "Selector-based tools can match literal for-of loops, but the useful proof also follows the loop key through an indexed read and a narrow transparent local projection."
+      whyNotOtherState: "Not ecosystem-covered because maintained test lint plugins do not distinguish static config-shape restatement from table-driven behavior."
+    examples:
+      flags:
+        - 'for (const key of ["a", "b"]) expect(config[key]).toBe("error");'
+      allows:
+        - "for (const { input, expected } of cases) expect(parse(input)).toEqual(expected);"
+        - "for (const action of requiredActions) expect(permissions[action]).toBe(true);"
+    nextAction: "Keep the default-on proof narrow and validate new findings against real behavior tests before expanding matcher or projection support."
   antidrift/no-duplicated-conditional-classnames:
     status: ready
     stable: false

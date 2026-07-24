@@ -1,6 +1,6 @@
 # antidrift
 
-A focused Oxlint governance config and plugin, a four-rule ESLint TypeChecker pass, and a policy generator. It exists to catch the specific ways a codebase rots when an agent is the one writing it.
+A focused Oxlint governance config and plugin, an eight-rule ESLint TypeChecker pass, and a policy generator. It exists to catch the specific ways a codebase rots when an agent is the one writing it.
 
 Regular linters check syntax and a handful of correctness rules. They don't notice when an agent redeclares a type that already ships with `firebase`, wires up a `useEffect` with no dependency array, or quietly swallows an error to turn a red test green. Those edits compile. They pass review when the reviewer is skimming. Then they drift. You end up with three slightly different `User` types, four copies of the same fetch logic, and a component that re-renders on every keystroke.
 
@@ -57,7 +57,7 @@ import { createConfig } from "@joedeleeuw/antidrift/eslint-config";
 export default createConfig({ tsconfigRootDir: import.meta.dirname });
 ```
 
-`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, anti-suppression rules, a global 1,500-line module ceiling, and `antidrift/require-effect-deps`. Other syntax, scope, and local-control-flow Antidrift rules are registered there as default-off inventory. It deliberately does not choose a generic correctness, TypeScript, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Consumers can apply the frozen `antidriftComplexityRules` fragment to deliberate production-code scopes. `createConfig` enables only four active custom rules that need TypeScript parser services and preserves seven typed or hybrid rules as default-off inventory. None are retired by this runtime migration.
+`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, anti-suppression rules, a global 1,500-line module ceiling, `antidrift/require-effect-deps`, and `antidrift/no-static-property-loop`. Other syntax, scope, and local-control-flow Antidrift rules are registered there as default-off inventory. It deliberately does not choose a generic correctness, TypeScript, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Consumers can apply the frozen `antidriftComplexityRules` fragment to deliberate production-code scopes. `createConfig` enables eight custom rules that need TypeScript parser services and keeps `no-defensive-shape-probing`, `no-sql-string-concat`, and `no-underchecked-type-predicate` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
 Oxlint excludes generated output only when its exact file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Generated-looking names are ordinary linted code unless the registry owns them.
 
@@ -210,6 +210,7 @@ Generated-source and first-party domain owners come from policy registries. Inst
 The scoped rules that motivated this package go after the usual agent tells:
 
 - `require-effect-deps` — a `useEffect` with no dependency array runs on every render, and `exhaustive-deps` won't say a word about it
+- `no-static-property-loop` — tests that loop over hardcoded keys only to restate one precomputed object's static values
 - `react-max-component-props` — JSX-returning React components with too many locally-owned accepted props
 - `no-contract-appeasement-projection` — internal helpers that project one owned value contract into another explicit return contract without construction or validation
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning

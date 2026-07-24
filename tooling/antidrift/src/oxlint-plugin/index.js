@@ -3,6 +3,7 @@ import ruleNoCallingComponentsAsFunctions from "./rules/no-calling-components-as
 import ruleNoDuplicatedConditionalClassnames from "./rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "./rules/no-duplicated-object-field-blocks.js";
 import ruleNoNonindependentTestOracle from "./rules/no-nonindependent-test-oracle.js";
+import ruleNoStaticPropertyLoop from "./rules/no-static-property-loop.js";
 import {
   ruleNoAsyncArrayMethod,
   ruleNoHandrolledResourceLifecycleCells,
@@ -31,6 +32,7 @@ const rules = {
   "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
   "no-shattered-ingested-entity-state": ruleNoShatteredIngestedEntityState(),
   "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
+  "no-static-property-loop": ruleNoStaticPropertyLoop(),
   "no-status-literal-in-type": ruleNoStatusLiteralInType(),
   "require-authz-check": ruleRequireAuthzCheck(),
   "require-effect-deps": ruleRequireEffectDeps,

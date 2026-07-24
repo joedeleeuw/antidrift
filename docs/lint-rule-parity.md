@@ -24,8 +24,12 @@ The reduced ESLint pass currently enables:
 - `antidrift/react-max-component-props`
 - `antidrift/no-redundant-zod-parse`
 - `antidrift/no-unsafe-deserialize`
+- `antidrift/no-appeasement-cast`
+- `antidrift/no-canonical-model-fork`
+- `antidrift/no-nullable-positional-tuple`
+- `antidrift/no-structural-type-fork`
 
-The Oxlint plugin enables `antidrift/require-effect-deps`. It also preserves these rules as default-off inventory:
+The structural and canonical rules receive generated, accepted package-owner, and domain-owner facts from the consumer policy registries. The Oxlint plugin enables `antidrift/require-effect-deps` and `antidrift/no-static-property-loop`. It also preserves these rules as default-off inventory:
 
 - `antidrift/no-async-array-method`
 - `antidrift/no-calling-components-as-functions`
@@ -43,12 +47,8 @@ The Oxlint plugin enables `antidrift/require-effect-deps`. It also preserves the
 
 The ESLint pass preserves these TypeChecker-dependent or hybrid rules as default-off inventory:
 
-- `antidrift/no-appeasement-cast`
-- `antidrift/no-canonical-model-fork`
 - `antidrift/no-defensive-shape-probing`
-- `antidrift/no-nullable-positional-tuple`
 - `antidrift/no-sql-string-concat`
-- `antidrift/no-structural-type-fork`
 - `antidrift/no-underchecked-type-predicate`
 
 No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. The ESLint and Oxlint plugin exports are disjoint: there is no compatibility export of Oxlint-owned rules through ESLint. `policy:check-rule-surface` fails if a custom rule is exported or enabled by both runtimes.

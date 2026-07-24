@@ -232,41 +232,20 @@ try {
       `default config must accept clean.ts without ${RULE}, got: ${JSON.stringify(defaultCleanRules)}`,
     );
   }
-  if (defaultDriftRules.includes(RULE)) {
+  if (!defaultDriftRules.includes(RULE)) {
     fail(
-      `default config must keep ${RULE} off, got: ${JSON.stringify(defaultDriftRules)}`,
+      `default config must load generated owner facts and report ${RULE}, got: ${JSON.stringify(defaultDriftRules)}`,
     );
   }
 
-  rmSync(semanticFactFile, { force: true });
-  const structuralConfig = "eslint.structural.config.mjs";
-  const driftRules = lint(
-    "packages/app/src/drift.ts",
-    structuralConfig,
-  ).flatMap((r) => r.messages.map((m) => m.ruleId));
-  const cleanRules = lint(
-    "packages/app/src/clean.ts",
-    structuralConfig,
-  ).flatMap((r) => r.messages.map((m) => m.ruleId));
   const packageCopyRules = lint(
     "packages/app/src/package-copy.ts",
-    structuralConfig,
   ).flatMap((r) => r.messages.map((m) => m.ruleId));
   const undercheckedPredicateRules = lint(
     "packages/app/src/underchecked-predicate.ts",
-    structuralConfig,
+    "eslint.inventory.config.mjs",
   ).flatMap((r) => r.messages.map((m) => m.ruleId));
 
-  if (!driftRules.includes(RULE)) {
-    fail(
-      `opt-in config drift.ts should have reported ${RULE}, got: ${JSON.stringify(driftRules)}`,
-    );
-  }
-  if (cleanRules.includes(RULE)) {
-    fail(
-      `clean.ts (legitimate firebase import) must NOT report ${RULE}, got: ${JSON.stringify(cleanRules)}`,
-    );
-  }
   if (packageCopyRules.includes(RULE)) {
     fail(
       `package-copy.ts (unaccepted package authority) must NOT report ${RULE}, got: ${JSON.stringify(packageCopyRules)}`,
@@ -343,7 +322,7 @@ try {
 
   if (!generatedStructuralFact) {
     fail(
-      `opt-in config drift.ts should have emitted a generated-source structuralMatch fact, got: ${JSON.stringify(semanticFacts)}`,
+      `default config drift.ts should have emitted a generated-source structuralMatch fact, got: ${JSON.stringify(semanticFacts)}`,
     );
   }
 
@@ -654,7 +633,7 @@ try {
     `\n✓ tarball installs, type-checks, imports, and enforces in a consumer monorepo`,
   );
   console.log(
-    `  focused governance rejected oversized root, Convex, script, fixture, test, and undeclared generated-looking modules while ignoring registry-declared generated code, declarations, and raw JSON; consumer precedence disabled max-lines, ${RULE} stayed off by default, opt-in config fired on drift.ts, TypeScript 6 broad-input predicates were checked, async-array shipped behavior matched default and opt-in branch expectations, emitted a structuralMatch fact, and kept clean.ts/package-copy.ts clean; public exports and semantic adapters passed Bundler and NodeNext.`,
+    `  focused governance rejected oversized root, Convex, script, fixture, test, and undeclared generated-looking modules while ignoring registry-declared generated code, declarations, and raw JSON; consumer precedence disabled max-lines, the default typed config loaded registry owners and fired ${RULE} on drift.ts, the inventory config checked a TypeScript 6 broad-input predicate, async-array shipped behavior matched default and opt-in branch expectations, a structuralMatch fact was emitted, and clean.ts/package-copy.ts stayed clean; public exports and semantic adapters passed Bundler and NodeNext.`,
   );
   rmSync(work, { recursive: true, force: true });
 } catch (error) {
