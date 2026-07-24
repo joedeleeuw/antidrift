@@ -23,22 +23,26 @@ function collectSettings(configs) {
 }
 
 describe("createConfig", () => {
-  it("enables only the active custom TypeChecker rules", () => {
+  it("enables every custom TypeChecker rule", () => {
     const rules = collectRules(
       createConfig({ tsconfigRootDir: process.cwd() }),
     );
 
-    expect(
-      severity(rules["antidrift/no-contract-appeasement-projection"]),
-    ).toBe("error");
-    expect(severity(rules["antidrift/react-max-component-props"])).toBe(
-      "error",
-    );
-    expect(severity(rules["antidrift/no-redundant-zod-parse"])).toBe("error");
-    expect(severity(rules["antidrift/no-unsafe-deserialize"])).toBe("error");
-    expect(rules["antidrift/no-structural-type-fork"]).toBe("off");
-    expect(rules["antidrift/require-effect-deps"]).toBeUndefined();
-    expect(rules["react/rules-of-hooks"]).toBeUndefined();
+    for (const ruleId of [
+      "antidrift/no-appeasement-cast",
+      "antidrift/no-canonical-model-fork",
+      "antidrift/no-contract-appeasement-projection",
+      "antidrift/no-defensive-shape-probing",
+      "antidrift/no-nullable-positional-tuple",
+      "antidrift/no-redundant-zod-parse",
+      "antidrift/no-sql-string-concat",
+      "antidrift/no-structural-type-fork",
+      "antidrift/no-underchecked-type-predicate",
+      "antidrift/no-unsafe-deserialize",
+      "antidrift/react-max-component-props",
+    ]) {
+      expect(severity(rules[ruleId])).toBe("error");
+    }
   });
 
   it("wires semantic fact settings through the public config API", () => {
