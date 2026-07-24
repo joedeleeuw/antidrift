@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import tsParser from "@typescript-eslint/parser";
 import { ESLint } from "eslint";
 
-import plugin from "../eslint-plugin/index.js";
+import plugin from "../oxlint-plugin/index.js";
 
 const defaultRepoCandidates = [
   process.env.CHASKI_REPO,

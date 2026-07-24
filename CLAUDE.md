@@ -12,7 +12,7 @@ Run `pnpm policy:verify-session` before stopping.
 
 - **react-state-shape** (frontend-platform): react/no-use-state-waterfall, react/no-handrolled-resource-lifecycle-cells, react/no-shattered-ingested-entity-state, react/no-status-triplet-state, react/no-derived-state-effect, react/no-effect-fetch-waterfall, react/require-effect-deps
 - **type-contract-shape** (types-platform): ts/no-contract-appeasement-projection, ts/no-mechanical-get-x-from-y, ts/no-inline-structural-type-at-use-site, ts/no-nullable-positional-tuple, ts/no-underchecked-type-predicate
-- **abstraction-and-file-shape** (architecture): arch/no-one-use-helper, arch/max-function-lines, arch/max-component-lines, react/max-component-props, arch/no-high-touch-file-growth
+- **abstraction-and-file-shape** (architecture): arch/no-one-use-helper, arch/max-function-lines, arch/max-component-lines, arch/max-module-lines, react/max-component-props, arch/no-high-touch-file-growth
 - **semantic-architecture-drift** (architecture): arch/no-cross-layer-import, arch/no-deep-import, arch/no-new-dependency-cycle, arch/no-feature-scatter
 - **side-effects-and-boundaries** (platform): boundary/no-raw-fetch-in-component, boundary/no-sdk-direct-use-outside-gateway, boundary/no-env-access-in-client
 - **domain-model-drift** (domain-platform): domain/no-inline-domain-status, domain/no-canonical-model-fork

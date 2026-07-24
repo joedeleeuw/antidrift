@@ -4,4 +4,4 @@ export {
   frameStatePayload,
   lifecycleProof,
   sourceShardProof,
-} from "../eslint-plugin/react-state-graph.js";
+} from "./react-state-graph.js";

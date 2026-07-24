@@ -292,7 +292,7 @@ function contract({
   allowedRuntimeDependencies = [],
   allowedDevDependencies = [],
   allowedExports = [],
-  refactor = undefined,
+  refactor,
 }) {
   return {
     schemaVersion: 1,

@@ -98,11 +98,11 @@ function targetMatches(relativePath, target) {
   }
   if (normalizedTarget.endsWith("/**/*.ts")) {
     const prefix = normalizedTarget.slice(0, -"**/*.ts".length);
-    return relativePath.startsWith(prefix) && /\.ts$/u.test(relativePath);
+    return relativePath.startsWith(prefix) && relativePath.endsWith(".ts");
   }
   if (normalizedTarget.endsWith("/**/*.tsx")) {
     const prefix = normalizedTarget.slice(0, -"**/*.tsx".length);
-    return relativePath.startsWith(prefix) && /\.tsx$/u.test(relativePath);
+    return relativePath.startsWith(prefix) && relativePath.endsWith(".tsx");
   }
   return false;
 }

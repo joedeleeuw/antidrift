@@ -1,13 +1,14 @@
 {
   "name": "@joedeleeuw/antidrift",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "license": "MIT",
-  "description": "Deterministic lint + policy guardrails against code and AI-agent drift: a custom ESLint plugin, shareable ESLint config, and a policy generator for agent instruction files and hooks.",
+  "description": "Deterministic Oxlint and TypeScript-aware policy guardrails against code and AI-agent drift.",
   "keywords": [
     "eslint",
     "eslint-plugin",
     "eslint-config",
+    "oxlint",
     "lint",
     "guardrails",
     "ai",
@@ -29,13 +30,14 @@
   },
   "types": "./src/index.d.mts",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "exports": {
     ".": {
       "types": "./src/index.d.mts",
       "import": "./src/index.mjs"
     },
+    "./package.json": "./package.json",
     "./brand": {
       "types": "./src/brand/index.d.mts",
       "import": "./src/brand/index.mjs"
@@ -47,6 +49,14 @@
     "./eslint-config": {
       "types": "./src/eslint-config/index.d.mts",
       "import": "./src/eslint-config/index.mjs"
+    },
+    "./oxlint-config": {
+      "types": "./src/oxlint-config/index.d.mts",
+      "import": "./src/oxlint-config/index.mjs"
+    },
+    "./oxlint-plugin": {
+      "types": "./src/oxlint-plugin/index.d.ts",
+      "import": "./src/oxlint-plugin/index.js"
     },
     "./policy": {
       "types": "./src/policy/index.d.mts",
@@ -104,22 +114,12 @@
   ],
   "dependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
-    "@eslint/js": "^9.17.0",
-    "@typescript-eslint/utils": "^8.60.1",
-    "@vitest/eslint-plugin": "^1.6.19",
-    "eslint-plugin-boundaries": "^5.0.1",
-    "eslint-plugin-import-x": "^4.16.2",
-    "eslint-plugin-no-only-tests": "^3.3.0",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-unicorn": "^64.0.0",
-    "globals": "^15.14.0",
-    "oxlint": "^1.72.0",
+    "oxlint": "^1.75.0",
     "yaml": "^2.6.1"
   },
   "peerDependencies": {
     "@typescript-eslint/parser": ">=8",
-    "eslint": ">=9",
+    "eslint": ">=9.38.0 <11",
     "typescript": ">=5",
     "typescript-eslint": ">=8"
   },

@@ -7,7 +7,7 @@ This template intentionally excludes the later package-publication surface gap w
 ## What is included
 
 - pnpm workspace catalogs for consistent dependency versions.
-- ESLint for baseline JavaScript/TypeScript feedback and custom policy rules for project-specific agent failure modes.
+- Oxlint for native and type-aware JavaScript/TypeScript feedback, plus a reduced ESLint pass for custom TypeChecker-backed policy rules.
 - A default-off `no-duplicated-object-field-blocks` rule for repeated Zod and TypeScript shape fields that should be hoisted into a shared shape.
 - Declarative source of truth in `policy/agent-guardrails.yaml`.
 - Positive build recipes in `docs/build-patterns.md` so agents import or derive concepts instead of duplicating them.
@@ -27,7 +27,7 @@ packages/contracts               Shared Zod contracts and typed API payloads
 packages/api                     Server route/action boundary examples
 packages/ui                      Design-system components and semantic tokens
 packages/gateways                Approved SDK/client integration boundary examples
-tooling/antidrift            @joedeleeuw/antidrift: plugin, eslint config, policy CLI + hooks (subpath exports)
+tooling/antidrift                @joedeleeuw/antidrift: Oxlint/ESLint configs, plugins, policy CLI, and hooks
 policy/                          Source-of-truth policy and registries
 docs/                            Handoff, agreed scope, rule authoring, Sonar guidance
 ```
@@ -44,7 +44,7 @@ pnpm check
 ## Daily commands
 
 ```bash
-pnpm lint              # ESLint baseline + custom policy
+pnpm lint              # Oxlint baseline, custom syntax policy, then custom typed ESLint rules
 pnpm typecheck         # TypeScript project references
 pnpm test              # Vitest
 pnpm policy:generate   # regenerate AGENTS/CLAUDE/Cursor/Codex/Copilot policy artifacts
@@ -52,9 +52,9 @@ pnpm policy:check-registries
 pnpm policy:check-rule-surface
 pnpm policy:validate-corpus
 pnpm policy:validate-chaski # optional local real-corpus gate when CHASKI_REPO is available
-pnpm policy:repo-corpus -- --slice current-work --rules import-x/no-cycle
+pnpm policy:repo-corpus -- --slice current-work --rules import/no-cycle
 pnpm policy:verify-session
-pnpm sonar:prepare     # create generic Sonar external issue report from ESLint JSON
+pnpm sonar:prepare     # create Sonar external issues for the custom typed ESLint remainder
 ```
 
 ## Design principle

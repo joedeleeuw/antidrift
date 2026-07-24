@@ -63,7 +63,7 @@ The shared config already enforces disable descriptions through `@eslint-communi
 
 ## Ecosystem
 
-- `eslint-plugin-react-hooks` is the well-supported baseline and is already wired through `recommended-latest`. It owns dependency-array correctness and React Compiler diagnostics, including `set-state-in-effect`.
+- Oxlint's native React plugin owns `react/exhaustive-deps`, rules-of-hooks, and React Compiler diagnostics. The custom rule remains narrower: it requires the dependency-array argument that exhaustive-deps assumes already exists.
 - `eslint-plugin-use-effect-no-deps` overlaps with this rule's exact missing-array shape, but it is a small single-purpose package and is not a strong replacement for owning the rule in antidrift.
 - `@eslint-react/eslint-plugin` / `eslint-plugin-react-hooks-extra` provide adjacent effect rules such as `no-direct-set-state-in-use-effect`, plus web API leak rules. Those are useful adjacent coverage, not a replacement for requiring a dependency-array argument.
 - `eslint-plugin-react-you-might-not-need-an-effect` targets unnecessary effects. That is adjacent design feedback, not the missing-array contract.
@@ -81,7 +81,7 @@ Clean:
 - `/Users/sushi/code/chaski/src/frontend/portal/lib/hooks/useDebounce.ts`
 - `/Users/sushi/code/chaski/src/frontend/portal/modules/scenarios/hooks/use-sticky-column-offsets.ts`
 - `/Users/sushi/code/sudocode-main/frontend/src/pages/IssueDetailPage.tsx`
-- `/Users/sushi/code/codebase-atlas/src/components/changeWorld/ChangeWorldScene.tsx`
+- `/Users/sushi/code/codebase-atlas/src/components/AtlasGameStateShell.tsx`
 - `/Users/sushi/code/murderbox/apps/client/src/lib/theme.ts`
 
 ## Promotion State

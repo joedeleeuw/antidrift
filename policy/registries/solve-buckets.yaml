@@ -252,7 +252,7 @@ gaps:
   cross-layer-import:
     {
       needs: dependency-graph,
-      note: "currently ecosystem-covered (import-x); a real module graph is the provable bucket.",
+      note: "currently ecosystem-covered by Oxlint-hosted boundaries; a real module graph is the provable bucket.",
     }
   unearned-type-authority:
     {

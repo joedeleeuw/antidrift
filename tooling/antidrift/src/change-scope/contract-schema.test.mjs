@@ -24,6 +24,16 @@ function rawContract(overrides = {}) {
   };
 }
 
+function captureContractValidationError(raw) {
+  try {
+    validateContract(raw);
+  } catch (error) {
+    if (error instanceof ContractValidationError) return error;
+    throw error;
+  }
+  throw new Error("Expected validateContract to throw ContractValidationError");
+}
+
 describe("parseContract", () => {
   it("parses and normalizes a valid YAML contract", () => {
     const contract = parseContract(
@@ -209,16 +219,13 @@ describe("validateContract", () => {
   });
 
   it("collects multiple problems in one error", () => {
-    try {
-      validateContract({
-        schemaVersion: 2,
-        contractId: "",
-        scope: { allowedPaths: [] },
-      });
-      expect.unreachable("should have thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(ContractValidationError);
-      expect(error.problems.length).toBeGreaterThanOrEqual(3);
-    }
+    const error = captureContractValidationError({
+      schemaVersion: 2,
+      contractId: "",
+      scope: { allowedPaths: [] },
+    });
+
+    expect(error).toBeInstanceOf(ContractValidationError);
+    expect(error.problems.length).toBeGreaterThanOrEqual(3);
   });
 });

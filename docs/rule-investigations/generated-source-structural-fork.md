@@ -10,7 +10,7 @@ Implemented as registry-backed modes of `antidrift/no-structural-type-fork`, not
 
 ## Ecosystem Check
 
-No generic ESLint rule can know which generated source is canonical for a repository. Existing import restrictions can block direct generated imports, but they do not catch hand-written local structural copies of generated types.
+No generic ecosystem rule can know which generated source is canonical for a repository. Existing import restrictions can block direct generated imports, but they do not catch hand-written local structural copies of generated types.
 
 ## Potential Custom Solve
 
@@ -22,7 +22,7 @@ Use TypeChecker plus generated and ownership registries:
 4. Allow anchored derivations such as imports, aliases, `Pick`, `Omit`, and sanctioned boundary DTOs.
 5. Report hand-written exact structural copies that should import or derive from the accepted owner.
 
-This is the implemented shape. The shared ESLint config passes `policy/registries/generated.yaml` and optional `policy/registries/ownership.yaml` into `antidrift/no-structural-type-fork`.
+This is the implemented shape. Consumers that opt into the default-off rule pass generated and ownership registry facts to `antidrift/no-structural-type-fork`.
 
 ## Decision
 

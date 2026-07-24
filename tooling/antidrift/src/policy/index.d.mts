@@ -39,7 +39,7 @@ export interface ShellGuardrailsArgs {
   help: boolean;
 }
 
-export interface OxlintComplexityArgs {
+export interface OxlintArgs {
   targets: string[];
   passthrough: string[];
   help: boolean;
@@ -329,16 +329,14 @@ export function defaultAstGrepBinary(): string;
 export function defaultAstGrepConfig(): string;
 export function parseShellGuardrailsArgs(argv?: string[]): ShellGuardrailsArgs;
 export function shellGuardrails(options?: PolicyCommandOptions): number;
-export const oxlintComplexityConfig: string;
-export const oxlintComplexityIgnorePatterns: readonly string[];
-export function parseOxlintComplexityArgs(
+export function parseOxlintArgs(
   argv: string[],
   options?: {
     cwd?: string;
     exists?: (path: string) => boolean;
   },
-): OxlintComplexityArgs;
-export function runOxlintComplexity(options?: PolicyCommandOptions): number;
+): OxlintArgs;
+export function runOxlint(options?: PolicyCommandOptions): number;
 export function verifySession(options?: PolicyCommandOptions): unknown;
 export function eslintJsonToSonar(
   inputPath?: string,

@@ -1,5 +1,10 @@
 {
-  "files": [],
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "files": ["oxlint.config.mts"],
   "references": [
     { "path": "./packages/domain" },
     { "path": "./packages/contracts" },

@@ -5,11 +5,17 @@ import { fileURLToPath } from "node:url";
 import { ESLint } from "eslint";
 import YAML from "yaml";
 
-import plugin from "../eslint-plugin/index.js";
+import eslintPlugin from "../eslint-plugin/index.js";
 
 const defaultTargets = ["apps", "packages", "tooling"];
-const defaultRules = Object.keys(plugin.rules).map((name) => `antidrift/${name}`).sort((a, b) => a.localeCompare(b));
-const ignoredPolicy = ["**/fixtures/**", "**/dist/**", "**/*.d.ts", "**/*.d.mts", "**/*.d.cts"];
+const defaultRules = eslintCorpusRuleIds();
+const ignoredPolicy = [
+  "**/fixtures/**",
+  "**/dist/**",
+  "**/*.d.ts",
+  "**/*.d.mts",
+  "**/*.d.cts",
+];
 const coreRuleIds = new Set(["no-restricted-imports"]);
 const blockingDisallowedStatuses = new Set([
   "false-positive-prone",
@@ -18,8 +24,19 @@ const blockingDisallowedStatuses = new Set([
   "under-proven",
 ]);
 
+export function eslintCorpusRuleIds({
+  eslintRules = eslintPlugin.rules,
+} = {}) {
+  return Object.keys(eslintRules ?? {})
+    .map((name) => `antidrift/${name}`)
+    .sort((a, b) => a.localeCompare(b));
+}
+
 function parseCsv(value) {
-  return value.split(",").map((item) => item.trim()).filter(Boolean);
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizeRuleId(rule) {
@@ -29,7 +46,12 @@ function normalizeRuleId(rule) {
 }
 
 function parseArgs(argv) {
-  const out = { targets: defaultTargets, rules: defaultRules, slice: "repo-corpus", output: null };
+  const out = {
+    targets: defaultTargets,
+    rules: defaultRules,
+    slice: "repo-corpus",
+    output: null,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     const next = argv[i + 1];
@@ -62,13 +84,20 @@ function topOf(repoRoot, filePath) {
 }
 
 function emptyRows(rules) {
-  return new Map(rules.map((ruleId) => [ruleId, { ruleId, severity: "off", activeFiles: 0, errors: 0, warnings: 0 }]));
+  return new Map(
+    rules.map((ruleId) => [
+      ruleId,
+      { ruleId, severity: "off", activeFiles: 0, errors: 0, warnings: 0 },
+    ]),
+  );
 }
 
 function markActive(row, severity) {
   if (severity === "off") return;
   row.activeFiles += 1;
-  if (row.severity === "off" || row.severity === "warn") row.severity = severity;
+  if (row.severity === "off" || row.severity === "warn") {
+    row.severity = severity;
+  }
 }
 
 function markFinding(row, message) {
@@ -79,7 +108,11 @@ function markFinding(row, message) {
 
 function readRuleRegistry(repoRoot) {
   try {
-    return YAML.parse(readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8")) ?? {};
+    return (
+      YAML.parse(
+        readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8"),
+      ) ?? {}
+    );
   } catch (error) {
     if (error.code === "ENOENT") return {};
     throw error;
@@ -89,7 +122,11 @@ function readRuleRegistry(repoRoot) {
 function isHeuristicSignal(signal) {
   if (typeof signal !== "string") return false;
   const normalized = signal.toLowerCase();
-  return normalized.includes("heuristic") || normalized.includes("token-overlap") || normalized.includes("configurable name groups");
+  return (
+    normalized.includes("heuristic") ||
+    normalized.includes("token-overlap") ||
+    normalized.includes("configurable name groups")
+  );
 }
 
 export function allowedInactiveRulesFromRegistry(ruleRegistry) {
@@ -106,17 +143,25 @@ export function allowedInactiveRulesFromRegistry(ruleRegistry) {
   return out;
 }
 
-export function repoCorpusDecision({ findings, inactiveRules, allowedInactiveRules }) {
-  const unexpectedInactiveRules = inactiveRules.filter((ruleId) => !allowedInactiveRules.has(ruleId));
+export function repoCorpusDecision({
+  findings,
+  inactiveRules,
+  allowedInactiveRules,
+}) {
+  const unexpectedInactiveRules = inactiveRules.filter(
+    (ruleId) => !allowedInactiveRules.has(ruleId),
+  );
   if (findings.some((finding) => finding.severity === "error")) return "fail";
   return unexpectedInactiveRules.length > 0 ? "fail" : "pass";
 }
 
 async function configsForResults(eslint, results) {
-  return Promise.all(results.map(async (result) => ({
-    result,
-    config: await eslint.calculateConfigForFile(result.filePath),
-  })));
+  return Promise.all(
+    results.map(async (result) => ({
+      result,
+      config: await eslint.calculateConfigForFile(result.filePath),
+    })),
+  );
 }
 
 async function ruleRows(eslint, results, rules) {
@@ -162,13 +207,25 @@ export async function repoCorpus({
         line: message.line,
         column: message.column,
         message: message.message,
-      }))
+      })),
   );
-  const inactiveRules = ruleReports.filter((rule) => rule.activeFiles === 0).map((rule) => rule.ruleId);
-  const allowedInactiveRules = allowedInactiveRulesFromRegistry(readRuleRegistry(repoRoot));
-  const allowedInactiveRuleIds = inactiveRules.filter((ruleId) => allowedInactiveRules.has(ruleId));
-  const unexpectedInactiveRules = inactiveRules.filter((ruleId) => !allowedInactiveRules.has(ruleId));
-  const decision = repoCorpusDecision({ findings, inactiveRules, allowedInactiveRules });
+  const inactiveRules = ruleReports
+    .filter((rule) => rule.activeFiles === 0)
+    .map((rule) => rule.ruleId);
+  const allowedInactiveRules = allowedInactiveRulesFromRegistry(
+    readRuleRegistry(repoRoot),
+  );
+  const allowedInactiveRuleIds = inactiveRules.filter((ruleId) =>
+    allowedInactiveRules.has(ruleId),
+  );
+  const unexpectedInactiveRules = inactiveRules.filter(
+    (ruleId) => !allowedInactiveRules.has(ruleId),
+  );
+  const decision = repoCorpusDecision({
+    findings,
+    inactiveRules,
+    allowedInactiveRules,
+  });
   const command = `antidrift repo-corpus --targets ${targets.join(",")} --rules ${rules.join(",")}`;
   const summary = {
     schemaVersion: 1,

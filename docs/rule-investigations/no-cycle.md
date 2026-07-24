@@ -2,7 +2,7 @@
 
 ## Current State
 
-`antidrift/no-cycle` is retired. Import-cycle enforcement now uses `import-x/no-cycle` in the single ESLint config path.
+`antidrift/no-cycle` is retired. Import-cycle enforcement now uses Oxlint's native `import/no-cycle` rule.
 
 The retired custom implementation was intentionally small, but it had known limits:
 
@@ -29,11 +29,11 @@ Claude Opus 4.8 read the implementation and agreed this problem is ecosystem-cov
 reports/claude-rule-review-no-cycle-20260602-024727.md
 ```
 
-The review recommended retiring the custom rule in favor of ecosystem import-graph coverage unless package constraints require a lightweight relative-only fallback. The custom rule was retired and replaced with `import-x/no-cycle`.
+The review recommended retiring the custom rule in favor of maintained import-graph coverage. The custom rule was retired and replaced with Oxlint's native implementation.
 
 ## Potential Directions
 
-1. **Current path**: use `import-x/no-cycle` with node resolver extensions for TypeScript and JavaScript source.
+1. **Current path**: use Oxlint `import/no-cycle` with the project TypeScript configuration.
 2. **Fallback only**: reintroduce custom cycle detection only if package constraints or real project evidence show the maintained plugin cannot be used.
 3. **Avoid hardening custom traversal**: alias/workspace resolution, graph caching, and duplicate suppression recreate ecosystem import-graph tooling.
 

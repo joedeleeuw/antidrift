@@ -1,48 +1,23 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-export const oxlintComplexityConfig = fileURLToPath(
-  new URL("./oxlint-complexity.config.json", import.meta.url),
-);
-
-export const oxlintComplexityIgnorePatterns = [
-  "**/node_modules/**",
-  "**/dist/**",
-  "**/coverage/**",
-  "reports/**",
-  "**/fixtures/**",
-  "**/*.test.*",
-  "**/*.spec.*",
-  "**/*.d.ts",
-  "**/*.d.mts",
-  "**/*.d.cts",
-];
 
 const defaultStdout = { write: (value) => process.stdout.write(value) };
 const defaultStderr = { write: (value) => process.stderr.write(value) };
 const defaultExit = (status) => process.exit(status);
 
-function oxlintBinary() {
+export function resolveOxlintBinary() {
   const require = createRequire(import.meta.url);
   const packageJsonPath = require.resolve("oxlint/package.json");
   const packageJson = require(packageJsonPath);
   return resolve(dirname(packageJsonPath), packageJson.bin.oxlint);
 }
 
-function defaultTargets(cwd, exists = existsSync) {
-  const candidates = ["apps", "packages", "tooling", "src"].filter((target) =>
-    exists(resolve(cwd, target)),
-  );
-  return candidates.length > 0 ? candidates : ["."];
+function defaultTargets() {
+  return ["."];
 }
 
-export function parseOxlintComplexityArgs(
-  argv,
-  { cwd = process.cwd(), exists = existsSync } = {},
-) {
+export function parseOxlintArgs(argv, _options = {}) {
   const targets = [];
   const passthrough = [];
   let help = false;
@@ -61,6 +36,8 @@ export function parseOxlintComplexityArgs(
       const next = argv[index + 1];
       if (
         [
+          "--config",
+          "-c",
           "--format",
           "-f",
           "--threads",
@@ -79,11 +56,11 @@ export function parseOxlintComplexityArgs(
   return {
     help,
     passthrough,
-    targets: targets.length > 0 ? targets : defaultTargets(cwd, exists),
+    targets: targets.length > 0 ? targets : defaultTargets(),
   };
 }
 
-export function runOxlintComplexity({
+export function runOxlint({
   argv = [],
   cwd = process.cwd(),
   spawn = spawnSync,
@@ -91,26 +68,20 @@ export function runOxlintComplexity({
   stderr = defaultStderr,
   exit = defaultExit,
 } = {}) {
-  const parsed = parseOxlintComplexityArgs(argv, { cwd });
+  const parsed = parseOxlintArgs(argv, { cwd });
   if (parsed.help) {
     stdout.write(
       [
         "Usage: antidrift oxlint [paths...] [-- oxlint-options...]",
         "",
-        "Runs the bundled oxlint complexity gate with Antidrift thresholds.",
+        "Runs the repository Oxlint gate, including native type-aware rules and Antidrift JS rules.",
       ].join("\n") + "\n",
     );
     return exit(0);
   }
   const args = [
-    oxlintBinary(),
-    "--config",
-    oxlintComplexityConfig,
+    resolveOxlintBinary(),
     "--disable-nested-config",
-    ...oxlintComplexityIgnorePatterns.flatMap((pattern) => [
-      "--ignore-pattern",
-      pattern,
-    ]),
     ...parsed.passthrough,
     ...parsed.targets,
   ];

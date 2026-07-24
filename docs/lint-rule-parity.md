@@ -1,38 +1,63 @@
-# Lint Rule Parity
+# Lint Ownership and Parity
 
-This ledger tracks the old broad Oxlint baseline rule-by-rule now that ESLint is the semantic lint engine. A rule can leave this table only when the replacement is enforced in `tooling/antidrift/src/eslint-config/index.mjs` or the gap is explicitly accepted here. The packaged `antidrift oxlint` command is a separate complexity/depth/params gate, not a return to broad Oxlint rule parity.
+Each rule has one enforcement owner. Runtime migration must remove the old owner instead of running equivalent rules twice.
 
-| Former Oxlint rule                               | ESLint replacement                                                                        | Status                                                               |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `typescript/no-explicit-any`                     | `@typescript-eslint/no-explicit-any`                                                      | Covered                                                              |
-| `typescript/no-empty-object-type`                | `@typescript-eslint/no-empty-object-type`                                                 | Covered                                                              |
-| `typescript/no-extra-non-null-assertion`         | `@typescript-eslint/no-extra-non-null-assertion`                                          | Covered                                                              |
-| `typescript/no-non-null-asserted-optional-chain` | `@typescript-eslint/no-non-null-asserted-optional-chain`                                  | Covered                                                              |
-| `typescript/no-unsafe-function-type`             | `@typescript-eslint/no-unsafe-function-type`                                              | Covered                                                              |
-| `typescript/no-wrapper-object-types`             | `@typescript-eslint/no-wrapper-object-types`                                              | Covered                                                              |
-| `typescript/no-misused-new`                      | `@typescript-eslint/no-misused-new`                                                       | Covered                                                              |
-| `typescript/no-unsafe-declaration-merging`       | `@typescript-eslint/no-unsafe-declaration-merging`                                        | Covered                                                              |
-| `typescript/no-duplicate-enum-values`            | `@typescript-eslint/no-duplicate-enum-values`                                             | Covered                                                              |
-| `typescript/prefer-as-const`                     | `@typescript-eslint/prefer-as-const`                                                      | Covered                                                              |
-| `no-console`                                     | `no-console`                                                                              | Covered; disabled for tooling                                        |
-| `no-debugger`                                    | `no-debugger`                                                                             | Covered                                                              |
-| `no-array-constructor`                           | `no-array-constructor`                                                                    | Covered                                                              |
-| `no-warning-comments`                            | `no-warning-comments` with `@nocommit` and `FIXME`                                        | Covered                                                              |
-| `vitest/no-focused-tests`                        | `no-only-tests/no-only-tests` plus `vitest/no-focused-tests` from `@vitest/eslint-plugin` | Covered for `.only` across test frameworks and Vitest-specific tests |
-| `vitest/no-disabled-tests`                       | `vitest/no-disabled-tests` from `@vitest/eslint-plugin`                                   | Covered                                                              |
-| `vitest/no-conditional-expect`                   | `vitest/no-conditional-expect` from `@vitest/eslint-plugin`                               | Covered                                                              |
-| `vitest/expect-expect`                           | `vitest/expect-expect` from `@vitest/eslint-plugin`                                       | Covered                                                              |
-| `react/jsx-key`                                  | `react/jsx-key` from `eslint-plugin-react`                                                | Covered                                                              |
-| `react/jsx-no-target-blank`                      | `react/jsx-no-target-blank` from `eslint-plugin-react`                                    | Covered                                                              |
-| `react/jsx-no-duplicate-props`                   | `react/jsx-no-duplicate-props` from `eslint-plugin-react`                                 | Covered                                                              |
-| `react/no-danger-with-children`                  | `react/no-danger-with-children` from `eslint-plugin-react`                                | Covered                                                              |
-| `react/no-unknown-property`                      | `react/no-unknown-property` from `eslint-plugin-react`                                    | Covered                                                              |
-| `react/no-children-prop`                         | `react/no-children-prop` from `eslint-plugin-react`                                       | Covered                                                              |
-| `react/jsx-no-undef`                             | `react/jsx-no-undef` from `eslint-plugin-react`                                           | Covered                                                              |
-| `react/jsx-no-comment-textnodes`                 | `react/jsx-no-comment-textnodes` from `eslint-plugin-react`                               | Covered                                                              |
-| `unicorn/no-abusive-eslint-disable`              | `unicorn/no-abusive-eslint-disable` from `eslint-plugin-unicorn`                          | Covered                                                              |
-| `unicorn/prefer-node-protocol`                   | `unicorn/prefer-node-protocol` from `eslint-plugin-unicorn`                               | Covered                                                              |
-| `unicorn/prefer-structured-clone`                | `unicorn/prefer-structured-clone` from `eslint-plugin-unicorn`                            | Covered                                                              |
-| `curly`                                          | `curly` with `multi-line`                                                                 | Covered                                                              |
+| Surface                                                                   | Owner                                 | Configuration                                   |
+| ------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------- |
+| JavaScript and TypeScript correctness                                     | Oxlint native rules                   | `tooling/antidrift/src/oxlint-config/index.mjs` |
+| Supported type-aware `typescript-eslint` rules                            | `oxlint-tsgolint`                     | `options.typeAware` in the Oxlint config        |
+| Shared registry, suppression, and module-size governance                  | Oxlint plus the Antidrift plugin      | `tooling/antidrift/src/oxlint-config/index.mjs` |
+| React, import, Vitest, Unicorn, complexity, and repository-boundary rules | Oxlint native and JavaScript plugins  | `oxlint.config.mts`                             |
+| Architecture boundaries and disable-comment policy                        | Oxlint JavaScript plugins             | `tooling/antidrift/src/oxlint-config/index.mjs` |
+| Syntax, scope, and local-control-flow custom rules                        | `@joedeleeuw/antidrift/oxlint-plugin` | Shared Oxlint config                            |
+| Custom rules requiring TypeScript `Program` or `TypeChecker`              | Reduced ESLint pass                   | `tooling/antidrift/src/eslint-config/index.mjs` |
+| Compiler diagnostics                                                      | TypeScript project build              | `pnpm typecheck`                                |
+| Portfolio analysis and quality gates                                      | SonarQube                             | Sonar project configuration                     |
 
-No accepted gaps are currently recorded.
+`oxlint-tsgolint` 7 builds its own TypeScript 7 program, so the root `tsconfig` must be TypeScript 7-compatible even while `pnpm typecheck` uses the workspace's installed TypeScript 5.9 compiler. `options.typeCheck` remains disabled until the project compiler itself moves; this migration changes lint ownership, not compiler ownership.
+
+Generated code is excluded only when its file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Names such as `generated`, `_generated`, `*.gen.ts`, and `*.generated.ts` do not bypass lint on their own.
+
+The reduced ESLint pass currently enables:
+
+- `antidrift/no-contract-appeasement-projection`
+- `antidrift/react-max-component-props`
+- `antidrift/no-redundant-zod-parse`
+- `antidrift/no-unsafe-deserialize`
+
+The Oxlint plugin enables `antidrift/require-effect-deps`. It also preserves these rules as default-off inventory:
+
+- `antidrift/no-async-array-method`
+- `antidrift/no-calling-components-as-functions`
+- `antidrift/no-duplicated-conditional-classnames`
+- `antidrift/no-duplicated-object-field-blocks`
+- `antidrift/no-handrolled-resource-lifecycle-cells`
+- `antidrift/no-inline-structural-type-at-use-site`
+- `antidrift/no-nonindependent-test-oracle`
+- `antidrift/no-query-data-type-parameters`
+- `antidrift/no-raw-fetch-in-component`
+- `antidrift/no-shattered-ingested-entity-state`
+- `antidrift/no-silent-empty-detection-fallback`
+- `antidrift/no-status-literal-in-type`
+- `antidrift/require-authz-check`
+
+The ESLint pass preserves these TypeChecker-dependent or hybrid rules as default-off inventory:
+
+- `antidrift/no-appeasement-cast`
+- `antidrift/no-canonical-model-fork`
+- `antidrift/no-defensive-shape-probing`
+- `antidrift/no-nullable-positional-tuple`
+- `antidrift/no-sql-string-concat`
+- `antidrift/no-structural-type-fork`
+- `antidrift/no-underchecked-type-predicate`
+
+No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. The ESLint and Oxlint plugin exports are disjoint: there is no compatibility export of Oxlint-owned rules through ESLint. `policy:check-rule-surface` fails if a custom rule is exported or enabled by both runtimes.
+
+Intentional baseline removals:
+
+- Deprecated formatting rules such as `no-multiple-empty-lines` are delegated to the formatter.
+- Import and JSX sorting conventions are formatter concerns, not lint correctness.
+- Legacy React class-component rules are not copied into the new config.
+- Rules without a native equivalent are retained only when they express current policy; they are not kept merely for historical parity.
+
+Oxlint JavaScript plugins do not currently receive TypeChecker data. Upstream tracks the direct type-information bridge in [oxc#19596](https://github.com/oxc-project/oxc/issues/19596) and the empty `parserServices` behavior in [oxc#19962](https://github.com/oxc-project/oxc/issues/19962); neither has a direct implementation pull request. Draft [oxc#24262](https://github.com/oxc-project/oxc/pull/24262) forwards services from explicitly configured custom parsers, but it is aimed at non-native syntax and explicitly leaves typechecking and type-aware framework linting to the [language-plugin RFC](https://github.com/oxc-project/oxc/discussions/21936). Running every ordinary TypeScript file through that cold custom-parser path would work against Oxlint's native direction and is not this repository's migration target. `tsgolint` also closed [PR #836](https://github.com/oxc-project/tsgolint/pull/836) because custom rules outside the `typescript-eslint` set are not currently accepted. If a supported typed custom-plugin bridge lands, move a custom typed rule only after behavioral parity is proven, then delete its ESLint ownership in the same change.

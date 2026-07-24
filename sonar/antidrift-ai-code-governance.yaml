@@ -13,6 +13,14 @@ profile:
     - Native Sonar rule keys stay authoritative; Antidrift only curates the posture.
     - Antidrift custom rules are imported through sonar.externalIssuesReportPaths, not redefined in the Sonar profile.
     - Review Sonar agentic AI profile diffs before switching bases because Sonar owns that profile content.
+selection:
+  researchedAt: 2026-07-07
+  source: Sonar public rule API and the shipped Antidrift ESLint config.
+  warnPolicy: Include native Sonar JavaScript, TypeScript, and security rules when the local non-Sonar config has no exact enabled owner.
+  duplicatePolicy: Exclude native Sonar rules whose signal is already owned by enabled ESLint, typescript-eslint, React, React Hooks, Vitest, Unicorn, or Antidrift rules.
+  counts:
+    warningRulesAdded: 56
+    exactLocalDuplicatesExcluded: 14
 rules:
   - id: cognitive-complexity
     sonarKeys:
@@ -239,6 +247,203 @@ rules:
     category: type-hygiene
     severity: major
     reason: Sonar owns generic TypeScript hygiene; Antidrift should only add repo-specific type authority rules.
+  - id: regex-safety-and-correctness
+    sonarKeys:
+      - typescript:S5852
+      - javascript:S5852
+      - typescript:S8786
+      - javascript:S8786
+      - tssecurity:S2631
+      - jssecurity:S2631
+      - typescript:S5843
+      - javascript:S5843
+      - typescript:S5850
+      - javascript:S5850
+      - typescript:S6323
+      - javascript:S6323
+      - typescript:S6328
+      - javascript:S6328
+      - typescript:S5868
+      - javascript:S5868
+    category: regex-correctness
+    severity: critical
+    localOverlap: Partial overlap with unicorn/better-regex; no exact local ReDoS, replacement-group, or Unicode-regex semantic owner.
+    reason: Generated validation and parsing code often hides fragile regexes; Sonar owns maintained regex safety and semantic correctness checks.
+  - id: react-runtime-correctness-additive
+    sonarKeys:
+      - typescript:S6486
+      - javascript:S6486
+      - typescript:S6439
+      - javascript:S6439
+    category: react-correctness
+    severity: major
+    localOverlap: React rules already own JSX keys, nested components, array-index keys, context value identity, JSX comments, and unknown properties; these two checks remain additive.
+    reason: Keep native React runtime checks that are not already covered by the shipped React ESLint rules.
+  - id: accessibility-expanded
+    sonarKeys:
+      - typescript:S6825
+      - javascript:S6825
+      - typescript:S6851
+      - javascript:S6851
+      - typescript:S6852
+      - javascript:S6852
+      - typescript:S6811
+      - javascript:S6811
+      - typescript:S6819
+      - javascript:S6819
+      - typescript:S6823
+      - javascript:S6823
+      - typescript:S6824
+      - javascript:S6824
+      - typescript:S6840
+      - javascript:S6840
+      - typescript:S6842
+      - javascript:S6842
+      - typescript:S6843
+      - javascript:S6843
+      - typescript:S6845
+      - javascript:S6845
+      - typescript:S6846
+      - javascript:S6846
+      - typescript:S6847
+      - javascript:S6847
+      - typescript:S6848
+      - javascript:S6848
+      - typescript:S6850
+      - javascript:S6850
+      - typescript:S5257
+      - javascript:S5257
+      - typescript:S5264
+      - javascript:S5264
+    category: accessibility
+    severity: major
+    localOverlap: None; this package does not ship jsx-a11y.
+    reason: Accessibility omissions are common in generated UI and should be visible through maintained scanner coverage.
+  - id: generated-logic-correctness-additive
+    sonarKeys:
+      - typescript:S1871
+      - javascript:S1871
+      - typescript:S2259
+      - javascript:S2259
+      - typescript:S1121
+      - javascript:S1121
+      - typescript:S1854
+      - javascript:S1854
+      - typescript:S4030
+      - javascript:S4030
+      - typescript:S2201
+      - javascript:S2201
+      - typescript:S3981
+      - javascript:S3981
+      - typescript:S4143
+      - javascript:S4143
+      - typescript:S3796
+      - javascript:S3796
+      - typescript:S1994
+      - javascript:S1994
+    category: control-flow-correctness
+    severity: major
+    localOverlap: Partial compiler, ESLint, and Unicorn overlap, but no exact enabled owner for these branch, assignment, collection, callback, and loop checks.
+    reason: These are high-signal generated-code bugs that are plausible in review and often not covered by local unit tests.
+  - id: security-taint-and-runtime-expanded
+    sonarKeys:
+      - typescript:S6437
+      - javascript:S6437
+      - typescript:S2077
+      - javascript:S2077
+      - tssecurity:S2078
+      - jssecurity:S2078
+      - tssecurity:S2083
+      - jssecurity:S2083
+      - tssecurity:S2091
+      - jssecurity:S2091
+      - tssecurity:S5147
+      - jssecurity:S5147
+      - tssecurity:S5496
+      - jssecurity:S5496
+      - tssecurity:S5335
+      - jssecurity:S5335
+      - tssecurity:S4684
+      - jssecurity:S4684
+      - typescript:S2598
+      - javascript:S2598
+      - typescript:S2819
+      - javascript:S2819
+      - typescript:S4790
+      - javascript:S4790
+      - typescript:S4423
+      - javascript:S4423
+      - typescript:S5542
+      - javascript:S5542
+      - typescript:S5443
+      - javascript:S5443
+      - typescript:S2612
+      - javascript:S2612
+    category: security
+    severity: critical
+    localOverlap: Partial overlap for SQL string construction and postMessage target origins; Sonar owns broader taint, crypto, upload, filesystem, and runtime security detection.
+    reason: Security-sensitive generated code needs maintained scanner coverage rather than local syntax-only approximations.
+  - id: test-integrity-additive
+    sonarKeys:
+      - typescript:S3415
+      - javascript:S3415
+      - typescript:S5845
+      - javascript:S5845
+    category: test-integrity
+    severity: major
+    localOverlap: Vitest rules own standalone assertions and basic test validity; these assertion-order and incompatible-type assertion checks are additive.
+    reason: Agent-written tests can assert the wrong thing while still passing; keep semantic assertion sanity visible.
+  - id: literal-throw-error-handling
+    sonarKeys:
+      - typescript:S3696
+      - javascript:S3696
+    category: error-handling
+    severity: major
+    localOverlap: ESLint no-throw-literal is available but not enabled in the shipped config.
+    reason: Throwing literals loses stack and error-shape semantics in generated error paths.
+excludedAsLocalDuplicates:
+  - rule: S104
+    sonarName: Files should not have too many lines of code
+    localOwner: Oxlint max-lines
+  - rule: S6477
+    sonarName: JSX list components should have a key property
+    localOwner: react/jsx-key
+  - rule: S6478
+    sonarName: React components should not be nested
+    localOwner: react/no-unstable-nested-components
+  - rule: S6479
+    sonarName: JSX list components should not use array indexes as key
+    localOwner: react/no-array-index-key
+  - rule: S6481
+    sonarName: React Context Provider values should have stable identities
+    localOwner: react/jsx-no-constructed-context-values
+  - rule: S6438
+    sonarName: Comments inside JSX expressions should be enclosed in curly braces
+    localOwner: react/jsx-no-comment-textnodes
+  - rule: S6747
+    sonarName: JSX elements should not use unknown properties and attributes
+    localOwner: react/no-unknown-property
+  - rule: S2589
+    sonarName: Boolean expressions should not be gratuitous
+    localOwner: "@typescript-eslint/no-unnecessary-condition"
+  - rule: S1763
+    sonarName: All code should be reachable
+    localOwner: no-unreachable
+  - rule: S905
+    sonarName: Non-empty statements should change control flow or have at least one side-effect
+    localOwner: "@typescript-eslint/no-unused-expressions"
+  - rule: S1534
+    sonarName: Member names should not be duplicated within a class or object literal
+    localOwner: no-dupe-keys and no-dupe-class-members
+  - rule: S8784
+    sonarName: Assertions should be placed inside test cases or hooks
+    localOwner: vitest/no-standalone-expect
+  - rule: S2486
+    sonarName: Exceptions should not be ignored
+    localOwner: no-empty and preserve-caught-error
+  - rule: S2737
+    sonarName: catch clauses should do more than rethrow
+    localOwner: no-useless-catch
 gate:
   base: Sonar way for AI code
   purpose: What should block merge.

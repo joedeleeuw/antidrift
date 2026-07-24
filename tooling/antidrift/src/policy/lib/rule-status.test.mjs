@@ -55,8 +55,8 @@ describe("rule status manifest", () => {
           signal: "import-graph",
           solveType: "semantic-architecture-drift",
           referenceDoc: "docs/rule-status-registry.md",
-          replacement: "import-x/no-cycle",
-          reason: "Covered by the shared ESLint config.",
+          replacement: "import/no-cycle",
+          reason: "Covered by the shared Oxlint config.",
         },
       },
       policyRuleReviews: {

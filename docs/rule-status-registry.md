@@ -20,13 +20,13 @@ external:
 
 The two `why*` fields are deliberately required. They are the escape hatch against cognitive drift: a rule cannot simply claim "ecosystem overlap" without explaining why that state is correct and why the closest alternative state is wrong.
 
-`docs/rule-equivalence-audit.md` is the companion ownership audit. It tracks whether a custom rule should be retired in favor of a maintained ESLint, `typescript-eslint`, plugin, or generated core-config replacement.
+`docs/rule-equivalence-audit.md` is the companion ownership audit. It tracks whether a custom rule should be retired in favor of a maintained Oxlint, `typescript-eslint`, plugin, or generated core-config replacement.
 
 `docs/rule-intent-grill.md` is the human-intent clarification layer. Use it when a rule is disputed, symptomatic, or likely made of multiple problems. It records the grill questions, recommended defaults, and local Claude advisory outputs used to decide whether the rule should become ecosystem-covered, sharper custom code, inventory-only/off, or retired.
 
 `policy/registries/rules.yaml` also registers rule families. The current type-contract family is documented in `docs/rule-family-type-contract-authority.md`; it groups the cast, parse, predicate, selector, duplication, and typed-delegation subsets so future work can draw scope boundaries before adding rules.
 
-The `policyRuleReviews` section closes the broader policy surface. Every rule ID named in `policy/agent-guardrails.yaml` must have a row there, even when it is not a custom ESLint rule. `pnpm policy:check-registries` fails when a policy ID is missing, when the registry invents an extra policy review, or when an `active-custom` review points at a non-active `antidrift/*` rule.
+The `policyRuleReviews` section closes the broader policy surface. Every rule ID named in `policy/agent-guardrails.yaml` must have a row there, even when it is not a custom lint rule. `pnpm policy:check-registries` fails when a policy ID is missing, when the registry invents an extra policy review, or when an `active-custom` review points at a non-active `antidrift/*` rule. Runtime ownership changes are explicit `[policy-change]` work.
 
 Each rule is judged on its own merits through a senior JavaScript/TypeScript tooling lens. If an ecosystem rule covers the same behavior, the custom rule becomes an elimination candidate. If a signal is too broad or symptomatic, the next action is to reformulate the failure mode until the rule has a narrow construction pattern. If a rule's value is unclear, first recover the original local complaint from the current session, handoff docs, reports, or available Codex memory; then test that complaint against real code and ecosystem rules. If the value still cannot be stated clearly, do not implement it; collect at least three close ecosystem/readme references or practitioner writeups and keep the candidate in `research` until the "why" is defensible.
 
@@ -36,7 +36,7 @@ This file is the readable index. Update the YAML registry first, then keep this 
 
 | Status                 | Meaning                                                                                                                                |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `ready`                | Implemented, enabled, and backed by at least one real drift and clean assertion under the current local gate.                          |
+| `ready`                | Implemented and backed by at least one real drift and clean assertion; runtime enablement remains a separate ownership decision.       |
 | `under-proven`         | Implemented, but missing enough real drift or clean evidence to trust promotion.                                                       |
 | `false-positive-prone` | Implemented, but real corpus evidence or review found an overbroad branch or unstable signal.                                          |
 | `ecosystem-covered`    | Existing ecosystem rule or plugin covers the behavior well enough; do not implement a custom antidrift rule unless a real gap remains. |
@@ -47,16 +47,16 @@ This file is the readable index. Update the YAML registry first, then keep this 
 
 ## Policy Rule Review States
 
-`policyRuleReviews` answers a different question than the active custom-rule table: "what is the disposition of every rule ID in the generated policy scope?" The current policy source declares 61 rule IDs.
+`policyRuleReviews` answers a different question than the active custom-rule table: "what is the disposition of every rule ID in the generated policy scope?" The current policy source declares 62 rule IDs.
 
 | Review status       | Count | Meaning                                                                                                   |
 | ------------------- | ----: | --------------------------------------------------------------------------------------------------------- |
-| `active-custom`     |    16 | Implemented by an active `antidrift/*` rule, including ready or under-proven default-off inventory rules. |
-| `ecosystem-covered` |    10 | Covered by maintained ESLint, `typescript-eslint`, React, Vitest, SonarQube, or imports rules.            |
-| `generated-config`  |     2 | Covered by registry-generated core ESLint configuration.                                                  |
-| `hook-covered`      |     4 | Covered by generated agent lifecycle hooks.                                                               |
+| `active-custom`     |    17 | Implemented by an active `antidrift/*` rule, including ready or under-proven default-off inventory rules. |
+| `ecosystem-covered` |    10 | Covered by maintained Oxlint, `typescript-eslint`, React, Vitest, SonarQube, or import rules.             |
+| `generated-config`  |     2 | Covered by registry-generated Oxlint configuration.                                                       |
+| `hook-covered`      |     3 | Covered by generated agent lifecycle hooks.                                                               |
 | `policy-script`     |     3 | Covered by an antidrift policy command or report generator.                                               |
-| `delegated`         |     2 | Delegated to SonarQube or another external gate.                                                          |
+| `delegated`         |     3 | Delegated to SonarQube or another external gate.                                                          |
 | `merged`            |     1 | Merged into another reviewed policy rule.                                                                 |
 | `research`          |    10 | Reviewed as plausible, but not implemented until real evidence and ecosystem checks exist.                |
 | `spec-only`         |    10 | Documented policy with no deterministic enforcement in the current package scope.                         |
@@ -74,7 +74,7 @@ Rule-family subsets may reference a retired decision only as historical evidence
 
 Current locked decisions include:
 
-- retired custom rules: `antidrift/no-cycle`, `antidrift/no-inline-disable-without-ticket`, `antidrift/no-sdk-direct-use`, `antidrift/no-explicit-return-type-private-helper`, `antidrift/no-silent-catch`, `antidrift/no-thin-typed-factory-wrapper`, `antidrift/no-obvious-comment`, `antidrift/no-role-literal-in-type`, `antidrift/no-cast-to-branded`, `antidrift/no-unsafe-cast-chain`, and `antidrift/no-status-triplet-state`
+- retired custom rules: `antidrift/no-cast-to-branded`, `antidrift/no-cycle`, `antidrift/no-explicit-return-type-private-helper`, `antidrift/no-hover-translate-card`, `antidrift/no-inline-disable-without-ticket`, `antidrift/no-obvious-comment`, `antidrift/no-raw-tailwind-color`, `antidrift/no-role-literal-in-type`, `antidrift/no-sdk-direct-use`, `antidrift/no-silent-catch`, `antidrift/no-status-triplet-state`, `antidrift/no-thin-typed-factory-wrapper`, and `antidrift/no-unsafe-cast-chain`
 - ecosystem-covered candidates: discriminated-union exhaustiveness, import cycles, disable-comment descriptions, gateway restricted imports, Vitest test integrity, and React Hooks compiler coverage
 
 ## Severity Discipline
@@ -87,14 +87,20 @@ Current default-off custom rules:
 
 - `antidrift/no-appeasement-cast`: narrow broad-input cast authority remains valuable, but it is not default-on while real consumer cleanup and broad inventory are pending; `@typescript-eslint/no-unsafe-type-assertion` remains the maintained broad assertion gate.
 - `antidrift/no-async-array-method`: deterministic array-method misuse stays visible, but only one real drift repo is pinned; the default branch is never-await only, while map/flatMap collection-flow is explicit opt-in.
+- `antidrift/no-calling-components-as-functions`: direct component invocation remains default-off until independent real drift and framework-wrapper clean controls justify promotion.
 - `antidrift/no-canonical-model-fork`: first-party model fork detection has Chaski plus Sudocode evidence, but boundary DTO/view-model clean pressure and adversarial review are still blocking promotion.
 - `antidrift/no-defensive-shape-probing`: broad-value mini-parser inventory signal; `pnpm policy:inventory-defensive-shape` checked 1,680 type-aware files with 0 parser errors and found no second drift source, so it stays default-off unless new evidence appears.
+- `antidrift/no-duplicated-conditional-classnames`: class-token overlap remains inventory until project styling authority and multi-repo false-positive pressure are explicit.
+- `antidrift/no-duplicated-object-field-blocks`: repeated shape fields remain inventory until independent drift proves extraction value beyond coincidental overlap.
 - `antidrift/no-handrolled-resource-lifecycle-cells`: fixed lifecycle proof has Chaski, Sudocode, and Cloudflare diagnostics, while broad co-mutation remains inventory-only; review positives and clean controls before enabling.
 - `antidrift/no-inline-structural-type-at-use-site`: exported non-JSX, exported-class-method, and boundary-object inline object contracts are still Chaski-only drift with JSX-backed props and callback payload clean-pressure; keep default-off until independent repo replication exists.
+- `antidrift/no-nonindependent-test-oracle`: the C#-inspired test-oracle signal remains inventory while language and assertion-framework scope are evaluated.
 - `antidrift/no-nullable-positional-tuple`: the AST smell is narrow and precise, but current evidence is one Chaski-only tuple, so it stays default-off until another real tuple plus clean controls replicate.
+- `antidrift/no-query-data-type-parameters`: query type-parameter ownership remains inventory until real consumer drift and maintained query-library overlap are measured.
 - `antidrift/no-raw-fetch-in-component`: component-boundary fetch detection is narrowed to JSX-returning lexical frames and scope-bound browser globals, but it needs a fresh narrowed multi-repo re-inventory before restoring blocking severity.
 - `antidrift/require-authz-check`: handler-local request-param checks are inventory only until typed policy-wrapper route registration or dataflow/dominance proof replaces absence-of-call detection.
 - `antidrift/no-shattered-ingested-entity-state`: source-object fan-out is retained as fact-only inventory; it emits no diagnostic and must not gain a blocking sink until real owned-entity shatter evidence appears across multiple repos with envelope, pagination, and view-state clean controls.
+- `antidrift/no-silent-empty-detection-fallback`: detection helpers returning empty-string sentinels remain opt-in until another repo replicates the failure mode.
 - `antidrift/no-sql-string-concat`: SQL interpolation inventory remains useful, but SQL-builder/tagged-template clean controls still have known gaps; it stays default-off until remaining member proof, source-fleet rerun, and adversarial review support blocking severity.
 - `antidrift/no-status-literal-in-type`: domain status literal fork detection is Chaski-only and now requires exact/composed owner context, so it stays default-off until another configured status-owner repo replicates drift.
 - `antidrift/no-structural-type-fork`: generated/package structural fork detection stays opt-in inventory until independent generated-source replication and accepted package-owner evidence prove a distributable blocking branch.
@@ -102,16 +108,16 @@ Current default-off custom rules:
 
 ## External Ownership States
 
-These states answer whether `antidrift` should own code for the rule or defer to a maintained ESLint ecosystem rule/config.
+These states answer whether `antidrift` should own code for the rule or defer to a maintained Oxlint or ecosystem rule/config.
 
-| External state       | Meaning                                                                                           | Example decision                                                                |
-| -------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `equivalent`         | A maintained ecosystem rule covers the same behavior and ambition.                                | Use upstream and retire custom code.                                            |
-| `broader-upstream`   | A maintained rule catches the target but also reports a materially larger policy surface.         | Keep custom, or stage upstream separately after inventory.                      |
-| `narrower-upstream`  | A maintained rule catches a subset but misses the local ambition.                                 | Use both only if the messages remain distinct.                                  |
-| `partial-overlap`    | Existing rules cover nearby behavior but not the exact failure mode.                              | Keep custom and document the gap.                                               |
-| `config-replacement` | Core ESLint config could express the behavior, often through generated selectors or restrictions. | Prefer config when it stays readable; keep code when context/exceptions matter. |
-| `net-antidrift`      | No supported equivalent was found for the scoped behavior.                                        | Own custom only with real corpus evidence.                                      |
+| External state       | Meaning                                                                                   | Example decision                                                                |
+| -------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `equivalent`         | A maintained ecosystem rule covers the same behavior and ambition.                        | Use upstream and retire custom code.                                            |
+| `broader-upstream`   | A maintained rule catches the target but also reports a materially larger policy surface. | Keep custom, or stage upstream separately after inventory.                      |
+| `narrower-upstream`  | A maintained rule catches a subset but misses the local ambition.                         | Use both only if the messages remain distinct.                                  |
+| `partial-overlap`    | Existing rules cover nearby behavior but not the exact failure mode.                      | Keep custom and document the gap.                                               |
+| `config-replacement` | Oxlint core config could express the behavior, often through generated restrictions.      | Prefer config when it stays readable; keep code when context/exceptions matter. |
+| `net-antidrift`      | No supported equivalent was found for the scoped behavior.                                | Own custom only with real corpus evidence.                                      |
 
 `support` records how much confidence we have in the external candidate itself: `none`, `low`, `medium`, or `high`. Support is not equivalence. A highly supported rule can still be the wrong replacement if its scope is broader, narrower, or aimed at a different failure mode.
 
@@ -171,22 +177,22 @@ Start investigation before code:
 
 ## Research Candidates
 
-| Candidate                                      |              Status | Signal                                                                          | Entry condition                                                                                                                                    |
-| ---------------------------------------------- | ------------------: | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ecosystem/discriminated-union-exhaustiveness` | `ecosystem-covered` | TypeChecker                                                                     | Prefer `@typescript-eslint/switch-exhaustiveness-check` and related type-aware rules before custom work.                                           |
-| `ecosystem/import-cycle`                       | `ecosystem-covered` | import-graph                                                                    | Covered by `import-x/no-cycle` in the shared ESLint config; keep custom graph traversal retired.                                                   |
-| `ecosystem/disable-comment-description`        | `ecosystem-covered` | source-comment                                                                  | Covered by `@eslint-community/eslint-comments/require-description` and `@typescript-eslint/ban-ts-comment` in the shared ESLint config.            |
-| `ecosystem/gateway-restricted-imports`         | `ecosystem-covered` | registry plus core ESLint config                                                | Covered by generated `no-restricted-imports` patterns and wrapper-file overrides in the shared ESLint config.                                      |
-| `ecosystem/vitest-test-integrity`              | `ecosystem-covered` | maintained ESLint plugin                                                        | Covered by `@vitest/eslint-plugin` for focused tests, disabled tests, conditional expects/tests, standalone expects, and missing assertion checks. |
-| `ecosystem/react-hooks-compiler`               | `ecosystem-covered` | maintained ESLint plugin                                                        | Covered by `eslint-plugin-react-hooks` recommended-latest plus explicit `react-hooks/no-deriving-state-in-effects`.                                |
-| `ecosystem/sql-query-plugins`                  |          `research` | maintained SQL lint plugin                                                      | Keep `antidrift/no-sql-string-concat` as default-off inventory until a maintained SQL lint plugin proves equivalent coverage.                      |
-| `antidrift/no-same-schema-recertification`     |          `research` | TypeChecker plus schema-output assignability and refinement-free override proof | Do not implement; classify Codebase Atlas roundtrip parse anchors first, then drop unless a second repo proves remediated value.                   |
+| Candidate                                      |              Status | Signal                                                                          | Entry condition                                                                                                                  |
+| ---------------------------------------------- | ------------------: | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `ecosystem/discriminated-union-exhaustiveness` | `ecosystem-covered` | TypeChecker                                                                     | Prefer `@typescript-eslint/switch-exhaustiveness-check` and related type-aware rules before custom work.                         |
+| `ecosystem/import-cycle`                       | `ecosystem-covered` | import-graph                                                                    | Covered by Oxlint's `import/no-cycle`; keep custom graph traversal retired.                                                      |
+| `ecosystem/disable-comment-description`        | `ecosystem-covered` | source-comment                                                                  | Covered by Oxlint-hosted `eslint-comments/require-description` and native `typescript/ban-ts-comment`.                           |
+| `ecosystem/gateway-restricted-imports`         | `ecosystem-covered` | registry plus Oxlint core config                                                | Covered by generated `no-restricted-imports` patterns and wrapper-file overrides in the shared Oxlint config.                    |
+| `ecosystem/vitest-test-integrity`              | `ecosystem-covered` | Oxlint native Vitest plugin                                                     | Covered by native focused, disabled, and conditional test rules.                                                                 |
+| `ecosystem/react-hooks-compiler`               | `ecosystem-covered` | Oxlint native React and React Compiler plugins                                  | Covered by `react/rules-of-hooks`, `react/exhaustive-deps`, and `react/react-compiler`.                                          |
+| `ecosystem/sql-query-plugins`                  |          `research` | maintained SQL lint plugin                                                      | Keep `antidrift/no-sql-string-concat` as default-off inventory until a maintained SQL lint plugin proves equivalent coverage.    |
+| `antidrift/no-same-schema-recertification`     |          `research` | TypeChecker plus schema-output assignability and refinement-free override proof | Do not implement; classify Codebase Atlas roundtrip parse anchors first, then drop unless a second repo proves remediated value. |
 
 ## Retired Rules
 
 | Rule                                               | Reason                                                                                                                                                                                             |
 | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `antidrift/no-cycle`                               | Replaced by maintained import graph coverage through `import-x/no-cycle`.                                                                                                                          |
+| `antidrift/no-cycle`                               | Replaced by Oxlint's native `import/no-cycle`.                                                                                                                                                     |
 | `antidrift/no-inline-disable-without-ticket`       | Replaced by maintained ESLint directive description coverage through `@eslint-community/eslint-comments/require-description` plus `@typescript-eslint/ban-ts-comment`.                             |
 | `antidrift/no-sdk-direct-use`                      | Replaced by generated ESLint core `no-restricted-imports` rules with wrapper-file overrides from `policy/registries/gateways.yaml`.                                                                |
 | `antidrift/no-explicit-return-type-private-helper` | Real Chaski code showed explicit private helper return types are often legitimate contracts.                                                                                                       |

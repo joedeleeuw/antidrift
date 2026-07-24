@@ -4,6 +4,16 @@ meta:
   defaultSeverity: error # Agents treat warnings as optional; policy violations should fail locally and in CI.
   maxWarnings: 0 # Warning debt becomes normalized agent output, so warning budgets default to zero.
   generatedFilesAreReadOnly: true # Agents must edit this source file instead of generated policy artifacts.
+  lintOwnership:
+    nativeAndTypeAwareBaseline: oxlint
+    typeAwareProvider: oxlint-tsgolint
+    customSyntax: oxlint-js-plugin
+    customTypeChecker: eslint
+    customRuleRetirement: explicit-review-only
+    duplicateEnforcement: forbidden
+    sarifOwner: oxlint
+    minimumNode: "22.18"
+    protectedLintConfig: oxlint.config.mts
   generatedTargets: # These files are regenerated from this source to prevent tool-specific drift.
     - AGENTS.md # Codex and other agents consume this as repo-local guidance.
     - CLAUDE.md # Claude consumes this as persistent project context.
@@ -87,6 +97,10 @@ clusters:
         severity: error
         detector: reactComponentLinesGt:180
         message: Split container, view, and state/resource boundaries.
+      - id: arch/max-module-lines # Oversized modules accumulate unrelated responsibilities and defeat local ownership.
+        severity: error
+        detector: oxlint:max-lines,max:1500,skipBlankLines:false,skipComments:false
+        message: Split modules over 1,500 lines by owned responsibility.
       - id: react/max-component-props # Large prop bags make component API combinations hard to reason about.
         severity: error
         detector: locallyOwnedReactComponentPropsGt:12
@@ -147,7 +161,7 @@ clusters:
         detector: newTypeSimilarToCanonicalModel
         message: Extend or import the canonical model.
 
-  - id: generated-type-drift # Agents hand-write types that already exist as generated output (Prisma, GraphQL codegen, OpenAPI, Protobuf). No published ESLint rule covers this — it is a genuine tooling gap.
+  - id: generated-type-drift # Agents hand-write types that already exist as generated output (Prisma, GraphQL codegen, OpenAPI, Protobuf). No supported ecosystem rule covers this project-owned authority check.
     owner: types-platform # Type platform owns codegen conventions and the generated registry.
     registry: policy/registries/generated.yaml # Canonical generated sources, their wrappers, and banned direct imports.
     rules:
@@ -296,7 +310,7 @@ clusters:
       - id: policy/no-check-weakening-without-policy-task # Lint/type/test/CI/Sonar thresholds are protected files.
         severity: blocker
         detector: protectedConfigChangedWithoutPolicyTag
-        message: Add [policy-change] and update source-of-truth policy.
+        message: Add [policy-change], update the source-of-truth policy, and maintain one enforcement owner per rule.
       - id: policy/no-inline-disable-without-ticket # Disables require traceable intent.
         severity: error
         detector: disableCommentWithoutTicketOrReason
