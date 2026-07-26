@@ -1537,7 +1537,7 @@ rules:
     referenceDoc: docs/test-quality-taxonomy.md
     corpusRepositories: [dotfiles, agent-guardrails-monorepo-template]
     concerns:
-      - This rule subsumes the earlier bare membership assertion guard. Bare membership, key existence, dependency outcome flags, arranged-input echoes, arranged-length echoes, vacuous existence checks, and mock call-through echoes are branches of the same non-independent oracle smell.
+      - This rule subsumes the earlier bare membership assertion guard. Bare membership, key existence, dependency outcome flags and error shapes, arranged-input echoes, arranged-length echoes, vacuous existence checks, and mock call-through echoes are branches of the same non-independent oracle smell.
       - The rule is intentionally test-file scoped and AST/source-shape based. It proves the assertion restates arranged data or a dependency-level result, not that every replacement assertion is sufficient.
       - Test helpers with assertion-shaped matcher names can be reported because the rule treats matcher chains in test files as assertion syntax.
     external:
@@ -1553,10 +1553,14 @@ rules:
         - 'expect(names).toContain("executor");'
         - "const parsed = schema.parse(fixture); expect(parsed).toEqual(fixture);"
         - 'expect(schema.safeParse({ status: "bad" }).success).toBe(false);'
+        - 'const result = schema.safeParse(arrangedBad); expect(result.error.issues[0].message).toBe("authored message");'
+        - 'expect(() => schema.parse(arrangedBad)).toThrow("invalid input");'
         - "service.save(user); expect(repository.save).toHaveBeenCalledWith(user);"
       allows:
         - 'assert.deepEqual(runtimeConnections.map((server) => server.name), ["needle", "context7"]);'
         - "expect(renderConfig(registry)).toEqual({ mcpServers: { executor: { url } } });"
+        - "expect(schema.parse(valid).activation).toEqual(validActivation);"
+        - 'expect(renderActivation(schema.parse(valid))).toBe("activation enabled");'
         - "trigger(); trigger(); expect(handler).toHaveBeenCalledTimes(1);"
     nextAction: "Inventory existing guardrails and dotfiles findings, then split actionable replacements into behavioral/full-output assertions while tracking noisy branches before stable promotion."
   antidrift/no-static-property-loop:

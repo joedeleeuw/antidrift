@@ -486,6 +486,12 @@ ruleTester.run(
   {
     valid: [
       {
+        ...fixture(
+          "programs/correct/nonindependent-test-oracle-independent.ts",
+        ),
+        filename: "nonindependent-test-oracle-independent.test.ts",
+      },
+      {
         code: 'assert.deepEqual(renderConfig(registry), { mcpServers: { executor: { url: "http://executor" } } });',
         filename: "registry.test.ts",
       },
@@ -535,6 +541,20 @@ ruleTester.run(
       },
     ],
     invalid: [
+      {
+        ...fixture(
+          "programs/drift/nonindependent-test-oracle-error-shape.ts",
+        ),
+        filename: "nonindependent-test-oracle-error-shape.test.ts",
+        errors: [
+          { messageId: "errorShapeEcho" },
+          { messageId: "errorShapeEcho" },
+          { messageId: "errorShapeEcho" },
+          { messageId: "errorShapeEcho" },
+          { messageId: "errorShapeEcho" },
+          { messageId: "errorShapeEcho" },
+        ],
+      },
       {
         code: 'assert.equal(names.includes("node_repl"), false);',
         filename: "registry.test.ts",
@@ -625,7 +645,7 @@ ruleTester.run(
           });
         `,
         filename: "thread.test.ts",
-        errors: [{ messageId: "outcomeEcho" }],
+        errors: [{ messageId: "outcomeEcho" }, { messageId: "errorShapeEcho" }],
       },
       {
         code: `
