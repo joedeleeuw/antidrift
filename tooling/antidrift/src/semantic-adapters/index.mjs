@@ -127,11 +127,16 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     rules: Object.freeze([
       "antidrift/no-redundant-zod-parse",
       "antidrift/no-parse-as-cast",
+      "antidrift/no-identity-schema-transform",
     ]),
     proofBuckets: Object.freeze(["semantic-source-type-provenance"]),
-    semanticFactAdapterIds: Object.freeze([]),
-    semanticFactKinds: Object.freeze([]),
+    semanticFactAdapterIds: Object.freeze([
+      "typescript-eslint/schema-provenance",
+    ]),
+    semanticFactKinds: Object.freeze(["identitySchemaTransform"]),
     associations: Object.freeze([
+      "Zod transform callback to closed schema input shape",
+      "identity object reconstruction to transform diagnostic",
       "parsed value to schema provenance",
       "call result to schema output type",
       "Values already proven as a Zod schema output to later parse calls on the same schema.",

@@ -956,6 +956,10 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       '  throw new Error("Missing structuralMatch semantic fact contract");\n' +
       "}\n" +
       "\n" +
+      'if (SEMANTIC_FACT_KINDS.identitySchemaTransform.adapterId !== "typescript-eslint/schema-provenance" || !SEMANTIC_FACT_KINDS.identitySchemaTransform.payloadFields.includes("transform")) {\n' +
+      '  throw new Error("Missing identitySchemaTransform semantic fact contract");\n' +
+      "}\n" +
+      "\n" +
       'if (!SEMANTIC_FACT_KINDS.structuralMatch.association.includes("owner types") || !SEMANTIC_FACT_KINDS.structuralMatch.noSinkBehavior.includes("proposal")) {\n' +
       '  throw new Error("Missing semantic fact association metadata");\n' +
       "}\n" +
@@ -973,7 +977,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       '  throw new Error("Missing joined rule semantic summary behavior");\n' +
       "}\n" +
       "\n" +
-      'if (semanticFactKindContractsForEmission("inventory-only").map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,sourceMemberStateShardCandidate,changeContractConformance" || semanticFactKindContractsForEmission("blocking-diagnostic").length !== 2 || semanticFactKindContractsForConfidence("deterministic-enforcement").length !== 2 || semanticFactKindContractsForEmission("not-real").length !== 0) {\n' +
+      'if (semanticFactKindContractsForEmission("inventory-only").map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,sourceMemberStateShardCandidate,changeContractConformance" || semanticFactKindContractsForEmission("blocking-diagnostic").length !== 3 || semanticFactKindContractsForConfidence("deterministic-enforcement").length !== 3 || semanticFactKindContractsForEmission("not-real").length !== 0) {\n' +
       '  throw new Error("Missing semantic fact contract emission/confidence lookup behavior");\n' +
       "}\n" +
       "\n" +

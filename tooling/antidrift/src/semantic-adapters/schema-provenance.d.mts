@@ -21,8 +21,15 @@ export interface ZodParseCallParts {
   returnsSchemaOutput: boolean;
 }
 
+export interface ZodTransformCallParts {
+  callee: unknown;
+  tsCall: ts.CallExpression;
+  callback: unknown;
+}
+
 export const ZOD_PARSE_METHODS: ReadonlySet<ZodParseMethod>;
 export const ZOD_VALIDATION_METHODS: ReadonlySet<ZodValidationMethod>;
+export const ZOD_TRANSFORM_METHOD: "transform";
 export const ZOD_THROW_ASSERTION_MATCHERS: ReadonlySet<
   "toThrow" | "toThrowError"
 >;
@@ -50,6 +57,18 @@ export function zodParseCallParts(
   checker: ts.TypeChecker,
   methods?: ReadonlySet<string>,
 ): ZodParseCallParts | null;
+
+export function zodTransformCallParts(
+  node: unknown,
+  services: TypeScriptParserServices,
+  checker: ts.TypeChecker,
+): ZodTransformCallParts | null;
+
+export function closedZodTransformInputKeys(
+  receiver: unknown,
+  services: TypeScriptParserServices,
+  checker: ts.TypeChecker,
+): ReadonlySet<string> | null;
 
 export function isAwaitedCallInitializer(node: unknown): boolean;
 

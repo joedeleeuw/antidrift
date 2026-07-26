@@ -1,5 +1,9 @@
 # changelog
 
+## Unreleased
+
+- add default-off `no-identity-schema-transform` with Zod ownership, closed-shape proof, clean decoder controls, and semantic facts
+
 ## 0.7.0
 
 Upgrading from 0.6.0 adds the TypeScript baseline to the governance Oxlint

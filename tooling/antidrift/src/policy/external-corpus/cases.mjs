@@ -870,6 +870,16 @@ export const murderboxCases = [
     paths: ["apps/api/lib/server/workspace-projects.ts"],
   },
   {
+    id: "murderbox-conversation-index-decoder-clean",
+    ruleId: "antidrift/no-identity-schema-transform",
+    kind: "correct",
+    classification: "ready",
+    subproject: "client",
+    typeAware: true,
+    tsconfig: "apps/client/tsconfig.json",
+    paths: ["apps/client/src/lib/conversation-index.ts"],
+  },
+  {
     id: "murderbox-live-turn-duplicated-conditional-classnames",
     ruleId: "antidrift/no-duplicated-conditional-classnames",
     kind: "drift",

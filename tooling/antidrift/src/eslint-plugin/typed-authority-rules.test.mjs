@@ -15,6 +15,7 @@ const typeServiceGuardedRules = [
   "no-canonical-model-fork",
   "no-contract-appeasement-projection",
   "no-defensive-shape-probing",
+  "no-identity-schema-transform",
   "no-redundant-zod-parse",
   "no-parse-as-cast",
   "no-appeasement-erasure",
@@ -662,6 +663,62 @@ typedRuleTester.run(
       },
       // Erasure re-established through a curried Effect Schema decoder
       { ...fixture("programs/drift/effect-decode-erasure.ts"), errors: 1 },
+    ],
+  },
+);
+
+typedRuleTester.run(
+  "no-identity-schema-transform",
+  rule("no-identity-schema-transform"),
+  {
+    valid: [
+      fixture(
+        "programs/correct/identity-schema-transform-trust-boundary-decoder.ts",
+      ),
+      fixture("programs/correct/identity-schema-transform-drops-key.ts"),
+      fixture("programs/correct/identity-schema-transform-adds-key.ts"),
+      fixture("programs/correct/identity-schema-transform-renames-key.ts"),
+      fixture(
+        "programs/correct/identity-schema-transform-non-object-output.ts",
+      ),
+      fixture(
+        "programs/correct/identity-schema-transform-non-zod-receiver.ts",
+      ),
+      fixture("programs/correct/identity-schema-transform-array-map.ts"),
+      fixture(
+        "programs/correct/identity-schema-transform-unresolved-input-shape.ts",
+      ),
+      fixture("programs/correct/identity-schema-transform-outside-proof.ts"),
+      fixture("programs/correct/identity-schema-transform-readonly.ts"),
+      fixture("programs/correct/identity-schema-transform-async.ts"),
+    ],
+    invalid: [
+      {
+        ...fixture(
+          "programs/drift/identity-schema-transform-reconstruction.ts",
+        ),
+        errors: [{ messageId: "identitySchemaTransform" }],
+      },
+      {
+        ...fixture("programs/drift/identity-schema-transform-destructured.ts"),
+        errors: [{ messageId: "identitySchemaTransform" }],
+      },
+      {
+        ...fixture("programs/drift/identity-schema-transform-block-return.ts"),
+        errors: [{ messageId: "identitySchemaTransform" }],
+      },
+      {
+        ...fixture(
+          "programs/drift/identity-schema-transform-function-expression.ts",
+        ),
+        errors: [{ messageId: "identitySchemaTransform" }],
+      },
+      {
+        ...fixture(
+          "programs/drift/identity-schema-transform-reordered-keys.ts",
+        ),
+        errors: [{ messageId: "identitySchemaTransform" }],
+      },
     ],
   },
 );

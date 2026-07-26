@@ -232,6 +232,7 @@ export interface SemanticFactKindContractEntry extends SemanticFactKindContract 
 
 export type SemanticFactKind =
   | "broadSetterCoMutation"
+  | "identitySchemaTransform"
   | "resourceLifecycleProof"
   | "sourceMemberStateShardCandidate"
   | "structuralMatch"

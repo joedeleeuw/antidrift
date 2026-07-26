@@ -57,7 +57,7 @@ import { createConfig } from "@joedeleeuw/antidrift/eslint-config";
 export default createConfig({ tsconfigRootDir: import.meta.dirname });
 ```
 
-`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, anti-suppression rules, a global 1,500-line module ceiling, `antidrift/require-effect-deps`, and `antidrift/no-static-property-loop`. Other syntax, scope, and local-control-flow Antidrift rules are registered there as default-off inventory. It deliberately does not choose a generic correctness, TypeScript, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Consumers can apply the frozen `antidriftComplexityRules` fragment to deliberate production-code scopes. `createConfig` enables eight custom rules that need TypeScript parser services and keeps `no-defensive-shape-probing`, `no-sql-string-concat`, and `no-underchecked-type-predicate` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
+`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, anti-suppression rules, a global 1,500-line module ceiling, `antidrift/require-effect-deps`, and `antidrift/no-static-property-loop`. Other syntax, scope, and local-control-flow Antidrift rules are registered there as default-off inventory. It deliberately does not choose a generic correctness, TypeScript, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Consumers can apply the frozen `antidriftComplexityRules` fragment to deliberate production-code scopes. `createConfig` enables eight custom rules that need TypeScript parser services and keeps `no-defensive-shape-probing`, `no-identity-schema-transform`, `no-sql-string-concat`, and `no-underchecked-type-predicate` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
 Oxlint excludes generated output only when its exact file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Generated-looking names are ordinary linted code unless the registry owns them.
 
@@ -173,7 +173,7 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/package.json` — package metadata for consumer tooling
 - `@joedeleeuw/antidrift/brand` — `Brand<T, Name>`, `Unbrand<T>`, and `brand(name, check)`
 - `@joedeleeuw/antidrift/eslint-config` — the `createConfig` factory above
-- `@joedeleeuw/antidrift/eslint-plugin` — the 11-rule TypeChecker plugin, if you'd rather wire those rules by hand
+- `@joedeleeuw/antidrift/eslint-plugin` — the 12-rule TypeChecker plugin, if you'd rather wire those rules by hand
 - `@joedeleeuw/antidrift/oxlint-config` — focused governance plus the immutable opt-in complexity fragment
 - `@joedeleeuw/antidrift/oxlint-plugin` — syntax-only custom rules supported by Oxlint's JavaScript plugin API
 - `@joedeleeuw/antidrift/policy` — policy check APIs, rule-status registry helpers, semantic fact sinks, and shipped `SEMANTIC_FACT_KINDS` contracts for advanced tooling
@@ -183,7 +183,7 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/semantic-adapters/broad-input` — broad `Object.entries` mini-parser classifiers shared by `no-defensive-shape-probing`
 - `@joedeleeuw/antidrift/semantic-adapters/parse-input` — JSON.parse input provenance and local string-boundary proof shared by `no-unsafe-deserialize`
 - `@joedeleeuw/antidrift/semantic-adapters/react-state` — React state graph adapter primitives for tooling that needs the same lifecycle proof used by `no-handrolled-resource-lifecycle-cells`
-- `@joedeleeuw/antidrift/semantic-adapters/schema-provenance` — Zod parse/provenance helpers shared by `no-redundant-zod-parse`
+- `@joedeleeuw/antidrift/semantic-adapters/schema-provenance` — Zod transform and parse/provenance helpers shared by `no-identity-schema-transform` and `no-redundant-zod-parse`
 - `@joedeleeuw/antidrift/semantic-adapters/sql` — SQL context, identifier-token, safe-member, and import/declaration-source safe-template-tag classifiers shared by `no-sql-string-concat`
 - `@joedeleeuw/antidrift/semantic-adapters/tuple-shape` — tuple nullish-slot classifiers shared by `no-nullable-positional-tuple`
 - `@joedeleeuw/antidrift/semantic-adapters/type-owner` — TypeChecker-backed owner candidate collectors for generated, domain, and installed-package structural authority
@@ -220,6 +220,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-handrolled-resource-lifecycle-cells` — behavior-based detection for hand-rolled async resource lifecycle state machines, with broad multi-setter co-mutation emitted as inventory only
 - `no-unsafe-deserialize` — `JSON.parse` of `any` / `unknown` instead of parsing at a schema boundary
 - `no-defensive-shape-probing` — deterministic broad-value extractor cases backed by real corpus evidence, not ordinary boolean predicates
+- `no-identity-schema-transform` — default-off TypeChecker proof for Zod transforms that reconstruct every input field unchanged
 - `import/no-cycle` — import cycles caught by Oxlint's native import graph
 
 Other existing baseline rules may still ship in the config, but they are not the current roadmap.

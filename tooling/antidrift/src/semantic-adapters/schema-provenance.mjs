@@ -13,6 +13,7 @@ export const ZOD_VALIDATION_METHODS = new Set([
   "safeParse",
   "safeParseAsync",
 ]);
+export const ZOD_TRANSFORM_METHOD = "transform";
 export const ZOD_THROW_ASSERTION_MATCHERS = new Set([
   "toThrow",
   "toThrowError",
@@ -242,6 +243,53 @@ export function zodParseCallParts(
     method: callee.property.name,
     returnsSchemaOutput: ZOD_PARSE_METHODS.has(callee.property.name),
   };
+}
+
+export function zodTransformCallParts(node, services, checker) {
+  if (node?.type !== "CallExpression") return null;
+  const callee = node.callee;
+  if (
+    callee.type !== "MemberExpression" ||
+    callee.computed ||
+    callee.property.type !== "Identifier" ||
+    callee.property.name !== ZOD_TRANSFORM_METHOD
+  ) {
+    return null;
+  }
+  const callback = node.arguments[0];
+  if (
+    node.arguments.length !== 1 ||
+    (callback?.type !== "ArrowFunctionExpression" &&
+      callback?.type !== "FunctionExpression")
+  ) {
+    return null;
+  }
+  const tsCall = services.esTreeNodeToTSNodeMap.get(node);
+  if (!isZodMethod(checker, tsCall?.expression?.name)) return null;
+  return { callee, tsCall, callback };
+}
+
+export function closedZodTransformInputKeys(receiver, services, checker) {
+  const tsReceiver = services.esTreeNodeToTSNodeMap.get(receiver);
+  if (!tsReceiver) return null;
+  const receiverType = checker.getTypeAtLocation(tsReceiver);
+  if (receiverType.getSymbol()?.getName() !== "ZodObject") return null;
+  const outputSymbol = checker.getPropertyOfType(receiverType, "_output");
+  if (!outputSymbol) return null;
+  const inputType = checker.getTypeOfSymbolAtLocation(outputSymbol, tsReceiver);
+  if ((inputType.flags & ts.TypeFlags.Object) === 0) return null;
+  if (
+    checker.getIndexTypeOfType(inputType, ts.IndexKind.String) ||
+    checker.getIndexTypeOfType(inputType, ts.IndexKind.Number)
+  ) {
+    return null;
+  }
+  return new Set(
+    checker
+      .getPropertiesOfType(inputType)
+      .map((property) => property.getName())
+      .sort((left, right) => left.localeCompare(right)),
+  );
 }
 
 export function isAwaitedCallInitializer(node) {

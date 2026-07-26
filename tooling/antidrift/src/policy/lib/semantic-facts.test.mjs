@@ -22,6 +22,7 @@ describe("semantic facts", () => {
     ).toEqual([
       "broadSetterCoMutation",
       "changeContractConformance",
+      "identitySchemaTransform",
       "resourceLifecycleProof",
       "sourceMemberStateShardCandidate",
       "structuralMatch",
@@ -51,6 +52,7 @@ describe("semantic facts", () => {
     ).toEqual([
       "broadSetterCoMutation",
       "changeContractConformance",
+      "identitySchemaTransform",
       "resourceLifecycleProof",
       "sourceMemberStateShardCandidate",
       "structuralMatch",
@@ -69,6 +71,11 @@ describe("semantic facts", () => {
         "antidrift/no-handrolled-resource-lifecycle-cells",
       ).map((entry) => entry.factKind),
     ).toEqual(["broadSetterCoMutation", "resourceLifecycleProof"]);
+    expect(
+      semanticFactKindContractsForRule(
+        "antidrift/no-identity-schema-transform",
+      ).map((entry) => entry.factKind),
+    ).toEqual(["identitySchemaTransform"]);
     expect(semanticFactKindContractsForAdapterId("not-real")).toEqual([]);
   });
 
@@ -87,6 +94,7 @@ describe("semantic facts", () => {
         (entry) => entry.factKind,
       ),
     ).toEqual([
+      "identitySchemaTransform",
       "resourceLifecycleProof",
       "structuralMatch",
     ]);
@@ -95,6 +103,7 @@ describe("semantic facts", () => {
         (entry) => entry.factKind,
       ),
     ).toEqual([
+      "identitySchemaTransform",
       "resourceLifecycleProof",
       "structuralMatch",
     ]);
