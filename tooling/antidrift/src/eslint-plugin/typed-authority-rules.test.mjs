@@ -579,6 +579,8 @@ typedRuleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
     fixture("programs/correct/zod-different-schema-reparse.ts"),
     // Double JSON.parse — not Zod, must stay silent (confirms the zod guard)
     fixture("programs/correct/zod-non-zod-parse.ts"),
+    // External framework call results are legitimate boundary parses
+    fixture("programs/correct/zod-external-call-boundary.ts"),
     // Typed param re-parse — no local provenance, so Rule A correctly abstains (Rule C's case)
     fixture("programs/drift/zod-reparse-typed-value.ts"),
   ],
@@ -592,5 +594,12 @@ typedRuleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
     },
     // Re-parse of a service/helper result already typed as the schema output
     { ...fixture("programs/drift/zod-reparse-service-result.ts"), errors: 1 },
+    // Re-parse of an Array.find result already typed as the schema output
+    { ...fixture("programs/drift/zod-reparse-array-find.ts"), errors: 1 },
+    // Re-parse of assigned and inline synchronous local helper results
+    {
+      ...fixture("programs/drift/zod-reparse-sync-helper-result.ts"),
+      errors: 2,
+    },
   ],
 });

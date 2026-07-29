@@ -1,5 +1,6 @@
+import ts from "typescript";
+
 import {
-  isAwaitedCallInitializer,
   isCallResultExpression,
   isThrowAssertionCallbackParse,
   isZodParseExpression,
@@ -11,6 +12,55 @@ import {
   missingTypeServicesVisitors,
   requireTypeServices,
 } from "./type-services.js";
+
+const standardCollectionOwners = new Set(["Array", "ReadonlyArray"]);
+
+function normalizedSourceFileName(declaration) {
+  return declaration.getSourceFile().fileName.replace(/\\/gu, "/");
+}
+
+function isStandardCollectionMemberDeclaration(declaration) {
+  const fileName = normalizedSourceFileName(declaration);
+  return Boolean(
+    fileName.includes("/typescript/lib/lib.") &&
+    fileName.endsWith(".d.ts") &&
+    ts.isMethodSignature(declaration) &&
+    ts.isInterfaceDeclaration(declaration.parent) &&
+    standardCollectionOwners.has(declaration.parent.name.text),
+  );
+}
+
+function isRepoLocalDeclaration(declaration) {
+  return !normalizedSourceFileName(declaration).includes("/node_modules/");
+}
+
+function resolvedCalleeSymbol(checker, tsCall) {
+  const callee = tsCall.expression;
+  const symbolNode = ts.isPropertyAccessExpression(callee)
+    ? callee.name
+    : callee;
+  const symbol = checker.getSymbolAtLocation(symbolNode);
+  return symbol && symbol.flags & ts.SymbolFlags.Alias
+    ? checker.getAliasedSymbol(symbol)
+    : symbol;
+}
+
+function hasRedundantParseOrigin(node, services, checker) {
+  if (!isCallResultExpression(node)) {
+    return false;
+  }
+  const call = node.type === "AwaitExpression" ? node.argument : node;
+  const tsCall = services.esTreeNodeToTSNodeMap.get(call);
+  if (!tsCall || !ts.isCallExpression(tsCall)) {
+    return false;
+  }
+  const symbol = resolvedCalleeSymbol(checker, tsCall);
+  return (symbol?.declarations ?? []).some(
+    (declaration) =>
+      isStandardCollectionMemberDeclaration(declaration) ||
+      isRepoLocalDeclaration(declaration),
+  );
+}
 
 export function ruleNoRedundantZodParse() {
   return {
@@ -39,7 +89,7 @@ export function ruleNoRedundantZodParse() {
         VariableDeclarator(node) {
           if (
             node.id.type !== "Identifier" ||
-            !isAwaitedCallInitializer(node.init)
+            !hasRedundantParseOrigin(node.init, services, checker)
           ) {
             return;
           }
@@ -90,6 +140,7 @@ export function ruleNoRedundantZodParse() {
           }
           if (
             isCallResultExpression(arg) &&
+            hasRedundantParseOrigin(arg, services, checker) &&
             !isZodParseExpression(arg, services, checker) &&
             parsedCallResultMatchesSchemaOutput(checker, services, tsCall, arg)
           ) {
