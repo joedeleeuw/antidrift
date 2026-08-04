@@ -62,6 +62,8 @@ export function createConfig({
         "antidrift/no-nullable-positional-tuple": "error",
         "antidrift/no-underchecked-type-predicate": "off",
         "antidrift/no-defensive-shape-probing": "off",
+        "antidrift/no-parse-as-cast": "warn",
+        "antidrift/no-appeasement-erasure": "warn",
         "antidrift/no-structural-type-fork": [
           "error",
           { generatedSources, packageTypeOwners },

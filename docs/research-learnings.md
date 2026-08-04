@@ -176,3 +176,23 @@ Applies to:
 - `antidrift/no-handrolled-resource-lifecycle-cells` — the proof rewrite (Learnings 1–3) is done but not sufficient for `error` severity. Promotion additionally requires the must-catch/must-ignore set to survive human/adversarial review across independent repos. The next slice is review and clean-control pressure, not another rewrite.
 - `antidrift/no-shattered-ingested-entity-state` — re-promotion needs real owned-entity shatters across more than one repo. The current corpus (two repos, zero positives) is the evidence floor, not just a gap to paper over with agent-generated synthetic fixtures.
 - All `under-proven` rules — `minIndependentRepositories: 2` is a hard gate; no `under-proven` rule should move to `error` on evidence from a single codebase.
+
+---
+
+**15. Contract-drift rules must stay library-specific; widen detection surfaces, never loosen proof**
+
+The contract family (`no-appeasement-cast`, `no-redundant-zod-parse`, `no-parse-as-cast`, `no-appeasement-erasure`, `no-query-data-type-parameters`) polices one act — establishing a type contract the compiler did not derive — spelled at least five ways: `as` cast, generic type argument, declared annotation, erase-then-reassert, and validation through a library the rule does not model. It is tempting to consolidate these into one general rule. Do not.
+
+Two axes come apart, and conflating them is the recurring failure mode:
+
+- **Detection surface** (how the act is spelled) is undergeneralized and cheap to widen. `no-appeasement-erasure` covers both the annotation and `as unknown` forms behind one proof.
+- **Proof** (what evidence justifies calling the contract unearned) is correctly strict, and every regression has come from loosening it.
+
+The proof does not factor across libraries. Effect Schema needs `Schema.Schema.Type<typeof S>` resolution, curried decode call shapes, and its own filter semantics; `sql<T>` needs co-location of an asserted generic with a corrective cast, an unrelated proof. Only `as unknown as T` genuinely shares the declared-vs-inferred proof. Two of five surfaces share evidence — that is not a family with one spine.
+
+Basis: every false positive found during the 2026-08-03 sweep came from missing library or value semantics, never from a missing surface — `z.string().min(1)` parsed on a `string` parameter (Codebase Atlas `persistenceCuration.ts:1073`), a `z.input` parameter (`extractSemanticFacts.ts:56`), a `{} as unknown` generic-default sentinel (Cloudflare Agents `index.ts:963`), and a `let` traversal cursor (Executor `openapi-utils.ts:42`). The first `no-parse-as-cast` implementation keyed on structural type identity and produced three false positives in four Codebase Atlas findings; the fix was a narrower proof (schema-derivation provenance), not a narrower surface. `docs/rule-investigations/no-thin-typed-factory-wrapper.md` is retired for the same reason at larger scale.
+
+Applies to:
+- Coverage gaps are closed by adding specific rules, not by generalizing existing ones. An Effect rule should know Effect as precisely as `no-redundant-zod-parse` knows Zod.
+- Escape-hatch displacement is real and argues for coverage, not looseness: Murderbox desktop carries 2 `as unknown` casts against 12 annotation erasures, so a cast-scoped rule reports zero on a codebase with the defect twelve times over.
+- The only legitimate sharing is mechanism — checker queries, symbol resolution, alias tracing in `semantic-adapters/schema-provenance.mjs`. That is deduplication, not generalization.

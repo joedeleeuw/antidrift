@@ -687,6 +687,42 @@ export const codebaseAtlasCases = [
     paths: ["src/services/generatedStateIntegrityService.ts"],
   },
   {
+    // Refinement-carrying schema: PersistedAtlasProjectIdSchema is z.string().min(1)
+    // and the parameter is a plain string, so the parse is a real runtime check.
+    id: "atlas-refinement-schema-parse-clean",
+    ruleId: "antidrift/no-parse-as-cast",
+    kind: "correct",
+    classification: "under-proven",
+    subproject: "app",
+    typeAware: true,
+    paths: ["src/programs/persistenceCuration.ts"],
+  },
+  {
+    // z.input parameter: the declared contract is pre-validation, so parsing it
+    // is the boundary rather than a cast.
+    id: "atlas-schema-input-contract-parse-clean",
+    ruleId: "antidrift/no-parse-as-cast",
+    kind: "correct",
+    classification: "under-proven",
+    subproject: "app",
+    typeAware: true,
+    paths: ["src/programs/repo-ingestion/extractSemanticFacts.ts"],
+  },
+  {
+    // 34 Codebase Atlas files declare `: unknown`; none erase a known type and
+    // then re-establish a contract from it. These two are the densest.
+    id: "atlas-unknown-boundary-not-erasure-clean",
+    ruleId: "antidrift/no-appeasement-erasure",
+    kind: "correct",
+    classification: "under-proven",
+    subproject: "app",
+    typeAware: true,
+    paths: [
+      "src/programs/persistenceCuration.ts",
+      "src/parsing/treeSitterRealProgramParser.ts",
+    ],
+  },
+  {
     id: "atlas-schema-contract-test-assertion-clean",
     ruleId: "antidrift/no-redundant-zod-parse",
     kind: "correct",

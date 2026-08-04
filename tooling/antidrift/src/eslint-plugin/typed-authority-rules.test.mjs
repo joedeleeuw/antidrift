@@ -16,6 +16,8 @@ const typeServiceGuardedRules = [
   "no-contract-appeasement-projection",
   "no-defensive-shape-probing",
   "no-redundant-zod-parse",
+  "no-parse-as-cast",
+  "no-appeasement-erasure",
   "no-structural-type-fork",
   "no-underchecked-type-predicate",
   "no-unsafe-deserialize",
@@ -603,3 +605,53 @@ typedRuleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
     },
   ],
 });
+
+// ─── no-parse-as-cast fixture suite ───────────────────────────────────────────
+// Declared-contract based: fires when a parameter is already typed as the schema
+// output, so the parse coerces rather than validates. Complements
+// no-redundant-zod-parse, which needs local parse provenance this case never has.
+typedRuleTester.run("no-parse-as-cast", rule("no-parse-as-cast"), {
+  valid: [
+    // unknown/any parameters are real boundaries — the parse earns the contract
+    fixture("programs/correct/parse-as-cast-boundary-inputs.ts"),
+    // Call results, not parameters — no-redundant-zod-parse owns that provenance
+    fixture("programs/drift/zod-reparse-sync-helper-result.ts"),
+    // External SDK result boundary must stay clean
+    fixture("programs/correct/zod-external-call-boundary.ts"),
+  ],
+  invalid: [
+    // Parameter declared as the schema output and parsed with that schema
+    { ...fixture("programs/drift/zod-reparse-typed-value.ts"), errors: 1 },
+    // Real shape from the murderbox desktop IPC bridge: schema reached through a
+    // contract object, parameter typed as z.infer of that same schema
+    {
+      ...fixture("programs/drift/parse-as-cast-contract-schema.ts"),
+      errors: 1,
+    },
+  ],
+});
+
+// ─── no-appeasement-erasure fixture suite ─────────────────────────────────────
+// Fires when a known type is widened to unknown and a contract is then
+// re-established from it by a parse or a named cast. Widening an any-returning
+// source, or widening with no downstream contract, stays clean.
+typedRuleTester.run(
+  "no-appeasement-erasure",
+  rule("no-appeasement-erasure"),
+  {
+    valid: [
+      fixture("programs/correct/appeasement-erasure-real-boundaries.ts"),
+      // unknown/any parameters are real boundaries, not erasures
+      fixture("programs/correct/parse-as-cast-boundary-inputs.ts"),
+      // External SDK result parsed directly — no erased binding involved
+      fixture("programs/correct/zod-external-call-boundary.ts"),
+    ],
+    invalid: [
+      // Erased-then-parsed and erased-then-cast, the two IPC edge shapes
+      {
+        ...fixture("programs/drift/appeasement-erasure-ipc-result.ts"),
+        errors: 2,
+      },
+    ],
+  },
+);

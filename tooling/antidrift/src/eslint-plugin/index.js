@@ -11,6 +11,8 @@ import { ruleNoUnsafeDeserialize } from "./rules/no-unsafe-deserialize.js";
 import { ruleNoStructuralTypeFork } from "./rules/no-structural-type-fork.js";
 import { ruleNoCanonicalModelFork } from "./rules/no-canonical-model-fork.js";
 import { ruleNoRedundantZodParse } from "./rules/no-redundant-zod-parse.js";
+import { ruleNoParseAsCast } from "./rules/no-parse-as-cast.js";
+import { ruleNoAppeasementErasure } from "./rules/no-appeasement-erasure.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
@@ -24,6 +26,8 @@ const rules = {
   "no-structural-type-fork": ruleNoStructuralTypeFork(),
   "no-canonical-model-fork": ruleNoCanonicalModelFork(),
   "no-redundant-zod-parse": ruleNoRedundantZodParse(),
+  "no-parse-as-cast": ruleNoParseAsCast(),
+  "no-appeasement-erasure": ruleNoAppeasementErasure(),
 };
 
 export default {

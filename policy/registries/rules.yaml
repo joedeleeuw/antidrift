@@ -1012,6 +1012,72 @@ rules:
         - "const row = RowSchema.parse(raw);"
         - "expect(() => RowSchema.parse(typedFixture)).not.toThrow();"
     nextAction: Stable; monitor for first-boundary schema pipelines that need additional clean exclusions.
+  antidrift/no-parse-as-cast:
+    status: ready
+    stable: false
+    proofBuckets: [semantic-source-type-provenance]
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: The schema-derivation trace lives inline in the ESLint rule; extract into semantic-adapters/schema-provenance.mjs once a second rule needs it, which the unknown-erasure candidate would.
+    referenceDoc: docs/rule-investigations/no-parse-as-cast.md
+    signal: TypeChecker plus schema-derivation provenance from the parameter's declared type alias
+    solveType: validation-boundary-drift
+    corpusRepositories: [murderbox, codebase-atlas]
+    concerns:
+      - "Structural type identity was rejected as the signal: a first pass keyed on mutual assignability produced three false positives in Codebase Atlas because Zod refinements (.min, .int, .strict) and z.input contracts are invisible to TypeScript. The shipped rule requires the parameter type to be a z.infer/z.output alias of the same schema symbol."
+      - "The Codebase Atlas class (validateSpine/markGeneratedStateManifestValidated: a parameter typed as the schema output, immediately parsed, with *Input naming that says the authors meant it defensively) is accepted as drift, not defensive practice. The remedy is to type the parameter as the unvalidated input so the parse is honest. Decision recorded 2026-08-03."
+      - "Test contract oracles are not yet exempted. sceneContractOracle.test.ts:53 re-parses a typed value to assert an adapter emits schema-valid output; the throw-assertion-callback exemption does not cover a bare parse in a test body."
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported rule resolves a parameter's declared type back to the Zod schema it was derived from; @typescript-eslint/no-unnecessary-type-assertion covers redundant assertions, not parses that re-establish a contract the caller already satisfied."
+      whyNotOtherState: "Not ecosystem-covered because the check needs schema-derivation provenance across module boundaries, which no generic type-safety rule models."
+    examples:
+      flags:
+        - "type User = z.infer<typeof UserSchema>; function save(user: User) { return UserSchema.parse(user); }"
+      allows:
+        - "function save(user: unknown) { return UserSchema.parse(user); }"
+        - "type AstFactsInput = z.input<typeof AstFactsSchema>; function run(facts: AstFactsInput) { return AstFactsSchema.parse(facts); }"
+        - "function validateProjectId(id: string) { return z.string().min(1).parse(id); }"
+    nextAction: "Enabled at warn severity on 2026-08-03 by owner decision, ahead of the stable gate and with one known false positive outstanding (sceneContractOracle.test.ts:53, a test contract oracle). Warn keeps that false positive a nuisance rather than a broken consumer build. Closing the test-context exemption is the immediate next step; the promotion block for stable: true follows. Corpus is 11 positives across Murderbox desktop and Codebase Atlas."
+  antidrift/no-appeasement-erasure:
+    status: ready
+    stable: false
+    proofBuckets: [semantic-source-type-provenance]
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: Declared-vs-inferred type comparison and reference-consumer scanning live inline; extract alongside the schema-derivation trace once a third rule in this family needs either.
+    referenceDoc: docs/rule-investigations/no-appeasement-erasure.md
+    signal: TypeChecker comparison of a declared unknown against the initializer's inferred type, plus scope-resolved evidence that a contract is re-established from the erased binding
+    solveType: validation-boundary-drift
+    corpusRepositories: [murderbox, cloudflare-agents, codebase-atlas]
+    concerns:
+      - "This is the upstream gate for the rest of the contract family. In Murderbox desktop apps/desktop, no-redundant-zod-parse, no-appeasement-cast, no-contract-appeasement-projection, no-unsafe-deserialize, and no-defensive-shape-probing all report zero across 38 files while bridge.ts alone holds 21 parse calls; the erased bindings declare unknown, so no type comparison can fire. How many of those rules regain reach after remediation is expected but not yet measured."
+      - "Scope is erasure plus re-establishment (Zod parse or a named-type cast). Bare widening with no downstream contract stays clean because widening to force later narrowing is legitimate. Passing an erased binding to a parameter with a named contract is a known false negative, not yet implemented."
+      - "The 12 Murderbox positives include erasures of `boolean` (bridge.ts:151) and `string | null` (bridge.ts:100), which is why this reads as a uniform edge reflex rather than deliberate defensive validation of complex payloads."
+      - "Cast-shaped escape hatches are rare in the anchor repo (2 `as unknown`, 0 `as any` across src), so the annotation form carries the evidence. The `as unknown` branch is fixture-backed but has no real-corpus anchor yet."
+      - "Only const bindings are reported. A reassigned binding is a traversal cursor rather than a boundary value; the one Executor positive (packages/plugins/openapi/src/sdk/openapi-utils.ts:42) was a `let` walking an untyped OpenAPI document with a guarded Record cast, and narrowing to const removed it."
+      - "Empty object and array literal initializers are excluded. The one Cloudflare Agents positive (packages/agents/src/index.ts:963, `const DEFAULT_STATE = {} as unknown`) is a sentinel placeholder for a generic State default, compared by identity and cast per-use; an empty literal carries no contract, so widening it discards nothing."
+      - "Zero findings in a repository is not yet evidence of clean code. Executor, PowerSync Service, and Agent Browser were swept and returned zero, but they carry 5, 1, and 0 zod-importing files respectively, so the parse branch cannot fire there by construction and they are excluded from corpusRepositories. Only Cloudflare Agents (76 zod-importing files, 371 candidates, 0 findings) and Codebase Atlas (17 zod files, 34 candidates, 0 findings) are real clean controls."
+      - "Effect Schema is an unmatched parallel idiom. Executor contains 168 Schema.decode/decodeUnknown call sites against 649 Effect files; the same erasure defect expressed through Effect's decoders is structurally invisible to this rule. Adding a decode branch is the largest known coverage gap."
+      - "The `as unknown as T` double cast is the other unmatched laundering idiom: 53 sites in Executor alone, reported by no rule in this family. Erasure and re-establishment happen in one expression, so neither this rule's declared-binding check nor no-appeasement-cast sees it."
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "No supported rule compares a declared unknown against the checker's inferred type for the initializer. @typescript-eslint/no-unsafe-assignment and no-unsafe-argument police any flowing outward; this is a known type being widened inward on purpose."
+      whyNotOtherState: "Not partial-overlap because no-appeasement-cast owns the unknown-to-contract direction and cannot see the step that manufactured the unknown."
+    examples:
+      flags:
+        - "const result: unknown = auth.getAuthSnapshot(); return resultSchema.parse(result);"
+        - "const result = getSnapshot() as unknown; return result as AuthSnapshot;"
+      allows:
+        - "const raw: unknown = JSON.parse(text); return schema.parse(raw);"
+        - "const value: unknown = buildProbe(); return typeof value === 'object';"
+    nextAction: "Enabled at warn severity on 2026-08-03 by owner decision: zero known false positives across 405 candidate files in two independent zod-bearing repositories, with the gap being a second repository carrying positives rather than any correctness doubt. Warn keeps it visible on new code without blocking builds. Escalation to error needs the post-remediation family measurement plus that second positive-bearing repository."
   antidrift/no-sql-string-concat:
     status: false-positive-prone
     stable: false
