@@ -1,5 +1,30 @@
 # changelog
 
+## 0.6.0
+
+Upgrading from 0.5.0 turns on four rules that previously shipped disabled, so
+expect new errors on first run.
+
+Enforcement changes:
+
+- enable `antidrift/no-appeasement-cast`, `antidrift/no-nullable-positional-tuple`, `antidrift/no-structural-type-fork`, and `antidrift/no-canonical-model-fork` at error severity; all four shipped `off` in 0.5.0
+- `createConfig` now loads the `policy/` registries itself and accepts a `policyDir` option, so `no-structural-type-fork` and `no-canonical-model-fork` receive generated sources, package type owners, and canonical entities without the consumer wiring them by hand
+
+New rules:
+
+- add `antidrift/no-parse-as-cast` at warn severity: reports parsing a parameter whose declared type is `z.infer` of the same schema, where the parse coerces a contract the caller already satisfied instead of validating an untrusted value
+- add `antidrift/no-appeasement-erasure` at warn severity: reports widening a known type to `unknown` and then re-establishing a contract from it by parse or named cast
+- add `antidrift/no-static-property-loop` to the Oxlint plugin: a literal-key loop that asserts one precomputed object's invariant property values restates declarative shape instead of executing behaviour
+
+Rule coverage:
+
+- extend `antidrift/no-redundant-zod-parse` to synchronous call results, qualified by callee origin so repo-local and `Array`/`ReadonlyArray` members report while external SDK and framework boundaries stay clean
+- recognise `safeParse` and `safeParseAsync` across all three Zod rules, closing an escape hatch where switching method silently exited every one of them
+
+Fixes:
+
+- fix `block-generated-policy-edits` matching the whole hook payload, which blocked any edit whose file content merely mentioned a protected filename; it now compares the edit target path
+
 ## 0.5.0
 
 - add focused Oxlint governance for registry ownership, anti-suppression, Effect dependencies, and a 1,500-line module limit
