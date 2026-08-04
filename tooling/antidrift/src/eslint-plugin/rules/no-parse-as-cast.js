@@ -2,6 +2,7 @@ import ts from "typescript";
 
 import {
   isThrowAssertionCallbackParse,
+  ZOD_VALIDATION_METHODS,
   zodParseCallParts,
 } from "../../semantic-adapters/schema-provenance.mjs";
 import {
@@ -107,7 +108,12 @@ export function ruleNoParseAsCast() {
       const checker = services.program.getTypeChecker();
       return {
         CallExpression(node) {
-          const parts = zodParseCallParts(node, services, checker);
+          const parts = zodParseCallParts(
+            node,
+            services,
+            checker,
+            ZOD_VALIDATION_METHODS,
+          );
           if (!parts || isThrowAssertionCallbackParse(node)) {
             return;
           }

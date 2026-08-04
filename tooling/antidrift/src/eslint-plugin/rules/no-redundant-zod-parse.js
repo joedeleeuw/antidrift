@@ -6,6 +6,7 @@ import {
   isZodParseExpression,
   parsedCallResultMatchesSchemaOutput,
   recordParsedConst,
+  ZOD_VALIDATION_METHODS,
   zodParseCallParts,
 } from "../../semantic-adapters/schema-provenance.mjs";
 import {
@@ -99,11 +100,16 @@ export function ruleNoRedundantZodParse() {
           }
         },
         CallExpression(node) {
-          const parts = zodParseCallParts(node, services, checker);
+          const parts = zodParseCallParts(
+            node,
+            services,
+            checker,
+            ZOD_VALIDATION_METHODS,
+          );
           if (!parts) {
             return;
           }
-          const { callee, tsCall, arg } = parts;
+          const { callee, tsCall, arg, returnsSchemaOutput } = parts;
           const schemaSym =
             callee.object.type === "Identifier"
               ? symbolOf(callee.object)
@@ -122,6 +128,11 @@ export function ruleNoRedundantZodParse() {
               message:
                 "Redundant Zod parse: this value was already validated by the same schema. Validate once at the boundary and pass the parsed value inward instead of re-parsing.",
             });
+            return;
+          }
+          // The branches below compare the call's return type against the argument, which only
+          // holds when the call yields the schema output. Safe variants return a wrapper.
+          if (!returnsSchemaOutput) {
             return;
           }
           // Service-to-boundary re-parse: a called helper/service already returned the schema's

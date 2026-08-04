@@ -6,13 +6,23 @@ export type TypeScriptParserServices = {
   };
 };
 
+export type ZodParseMethod = "parse" | "parseAsync";
+export type ZodValidationMethod =
+  | ZodParseMethod
+  | "safeParse"
+  | "safeParseAsync";
+
 export interface ZodParseCallParts {
   callee: unknown;
   tsCall: ts.CallExpression;
   arg: unknown;
+  method: ZodValidationMethod;
+  /** False for the safe variants, whose result is a wrapper rather than the schema output. */
+  returnsSchemaOutput: boolean;
 }
 
-export const ZOD_PARSE_METHODS: ReadonlySet<"parse" | "parseAsync">;
+export const ZOD_PARSE_METHODS: ReadonlySet<ZodParseMethod>;
+export const ZOD_VALIDATION_METHODS: ReadonlySet<ZodValidationMethod>;
 export const ZOD_THROW_ASSERTION_MATCHERS: ReadonlySet<
   "toThrow" | "toThrowError"
 >;
@@ -28,6 +38,7 @@ export function zodParseCallParts(
   node: unknown,
   services: TypeScriptParserServices,
   checker: ts.TypeChecker,
+  methods?: ReadonlySet<string>,
 ): ZodParseCallParts | null;
 
 export function isAwaitedCallInitializer(node: unknown): boolean;

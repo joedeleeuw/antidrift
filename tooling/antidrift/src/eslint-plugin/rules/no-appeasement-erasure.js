@@ -1,4 +1,5 @@
 import {
+  ZOD_VALIDATION_METHODS,
   zodParseCallParts,
 } from "../../semantic-adapters/schema-provenance.mjs";
 import {
@@ -53,7 +54,9 @@ function isParseArgument(identifier, services, checker) {
   if (call?.type !== "CallExpression" || call.arguments[0] !== identifier) {
     return false;
   }
-  return Boolean(zodParseCallParts(call, services, checker));
+  return Boolean(
+    zodParseCallParts(call, services, checker, ZOD_VALIDATION_METHODS),
+  );
 }
 
 function isNamedContractCast(identifier) {

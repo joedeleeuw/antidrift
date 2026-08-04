@@ -19,3 +19,9 @@ export function readAuthStateViaCast() {
   const result = getAuthSnapshot() as unknown;
   return result as AuthSnapshot;
 }
+
+// The safe variant launders exactly the same way.
+export function readAuthStateSafely() {
+  const result: unknown = getAuthSnapshot();
+  return authSnapshotSchema.safeParse(result);
+}

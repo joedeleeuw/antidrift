@@ -1,7 +1,16 @@
 const TS_TYPE_FLAG_ANY = 1;
 const TS_TYPE_FLAG_UNKNOWN = 2;
 
+// Methods whose call result IS the schema output, so return-type comparison is valid.
 export const ZOD_PARSE_METHODS = new Set(["parse", "parseAsync"]);
+// Every method that performs validation. The safe variants return a
+// SafeParseReturnType wrapper rather than the schema output, so callers that
+// compare the call's return type must stay on ZOD_PARSE_METHODS.
+export const ZOD_VALIDATION_METHODS = new Set([
+  ...ZOD_PARSE_METHODS,
+  "safeParse",
+  "safeParseAsync",
+]);
 export const ZOD_THROW_ASSERTION_MATCHERS = new Set([
   "toThrow",
   "toThrowError",
@@ -123,20 +132,31 @@ export function isThrowAssertionCallbackParse(node) {
   );
 }
 
-export function zodParseCallParts(node, services, checker) {
+export function zodParseCallParts(
+  node,
+  services,
+  checker,
+  methods = ZOD_PARSE_METHODS,
+) {
   if (node?.type !== "CallExpression") return null;
   const callee = node.callee;
   if (callee.type !== "MemberExpression" || callee.computed) return null;
   if (
     callee.property.type !== "Identifier" ||
-    !ZOD_PARSE_METHODS.has(callee.property.name)
+    !methods.has(callee.property.name)
   ) {
     return null;
   }
   if (node.arguments.length === 0) return null;
   const tsCall = services.esTreeNodeToTSNodeMap.get(node);
   if (!isZodMethod(checker, tsCall?.expression?.name)) return null;
-  return { callee, tsCall, arg: node.arguments[0] };
+  return {
+    callee,
+    tsCall,
+    arg: node.arguments[0],
+    method: callee.property.name,
+    returnsSchemaOutput: ZOD_PARSE_METHODS.has(callee.property.name),
+  };
 }
 
 export function isAwaitedCallInitializer(node) {

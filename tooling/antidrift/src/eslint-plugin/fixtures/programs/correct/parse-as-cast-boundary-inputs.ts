@@ -28,6 +28,11 @@ export function parseAnyBoundary(payload: any) {
   return authSnapshotSchema.parse(payload);
 }
 
+// The safe variant at a real boundary is equally clean.
+export function safeParseUnknownBoundary(payload: unknown) {
+  return authSnapshotSchema.safeParse(payload);
+}
+
 export function narrowRicherInput(user: InputUser) {
   return storedUserSchema.parse(user);
 }

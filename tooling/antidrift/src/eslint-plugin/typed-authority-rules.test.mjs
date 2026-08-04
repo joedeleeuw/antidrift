@@ -603,6 +603,8 @@ typedRuleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
       ...fixture("programs/drift/zod-reparse-sync-helper-result.ts"),
       errors: 2,
     },
+    // safeParse of a value this schema already validated
+    { ...fixture("programs/drift/zod-safe-parse-variants.ts"), errors: 1 },
   ],
 });
 
@@ -628,6 +630,8 @@ typedRuleTester.run("no-parse-as-cast", rule("no-parse-as-cast"), {
       ...fixture("programs/drift/parse-as-cast-contract-schema.ts"),
       errors: 1,
     },
+    // safeParse is the same coercion with a different error model
+    { ...fixture("programs/drift/zod-safe-parse-variants.ts"), errors: 1 },
   ],
 });
 
@@ -650,7 +654,7 @@ typedRuleTester.run(
       // Erased-then-parsed and erased-then-cast, the two IPC edge shapes
       {
         ...fixture("programs/drift/appeasement-erasure-ipc-result.ts"),
-        errors: 2,
+        errors: 3,
       },
     ],
   },
