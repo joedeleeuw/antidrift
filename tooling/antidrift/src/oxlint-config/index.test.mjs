@@ -14,7 +14,7 @@ function severity(ruleValue) {
 }
 
 describe("createGovernanceOxlintConfig", () => {
-  it("owns focused governance without a generic lint baseline", () => {
+  it("owns governance plus the TypeScript baseline, without style baselines", () => {
     const config = createGovernanceOxlintConfig({
       repoRoot: process.cwd(),
     });
@@ -45,7 +45,10 @@ describe("createGovernanceOxlintConfig", () => {
     expect(config.rules["max-depth"]).toBeUndefined();
     expect(config.rules["max-params"]).toBeUndefined();
     expect(config.rules["react/react-compiler"]).toBeUndefined();
-    expect(config.rules["typescript/no-misused-promises"]).toBeUndefined();
+    expect(severity(config.rules["typescript/no-explicit-any"])).toBe("error");
+    expect(
+      severity(config.rules["typescript/no-misused-promises"]),
+    ).toBe("error");
     expect(config.rules["vitest/no-focused-tests"]).toBeUndefined();
     expect(config.rules["unicorn/no-abusive-eslint-disable"]).toBeUndefined();
     expect(config.rules["import/no-cycle"]).toBeUndefined();

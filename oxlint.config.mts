@@ -2,6 +2,8 @@ import { createRequire } from "node:module";
 
 import {
   antidriftComplexityRules,
+  antidriftTypescriptSyntaxRules,
+  antidriftTypescriptTypeAwareRules,
   createGovernanceOxlintConfig,
 } from "@joedeleeuw/antidrift/oxlint-config";
 import { defineConfig } from "oxlint";
@@ -24,54 +26,8 @@ const complexityRules = {
   ],
 } satisfies DummyRuleMap;
 const typescriptRules = {
-  "typescript/no-explicit-any": "error",
-  "typescript/no-empty-object-type": "error",
-  "typescript/no-extra-non-null-assertion": "error",
-  "typescript/no-non-null-assertion": "error",
-  "typescript/no-non-null-asserted-optional-chain": "error",
-  "typescript/no-unsafe-function-type": "error",
-  "typescript/no-wrapper-object-types": "error",
-  "typescript/no-unsafe-assignment": "error",
-  "typescript/no-unsafe-argument": "error",
-  "typescript/no-unsafe-call": "error",
-  "typescript/no-unsafe-enum-comparison": "error",
-  "typescript/no-unsafe-member-access": "error",
-  "typescript/no-unsafe-return": "error",
-  "typescript/no-unsafe-type-assertion": "error",
-  "typescript/no-base-to-string": "error",
-  "typescript/no-deprecated": "error",
-  "typescript/no-namespace": "error",
-  "typescript/no-require-imports": "error",
-  "typescript/no-misused-promises": [
-    "error",
-    { checksVoidReturn: { arguments: false, attributes: false } },
-  ],
-  "typescript/restrict-plus-operands": "error",
-  "typescript/consistent-type-imports": [
-    "error",
-    { prefer: "type-imports", fixStyle: "separate-type-imports" },
-  ],
-  "typescript/no-import-type-side-effects": "error",
-  "typescript/no-unnecessary-type-assertion": "error",
-  "typescript/no-unnecessary-type-constraint": "error",
-  "typescript/no-unnecessary-template-expression": "error",
-  "typescript/no-unnecessary-type-arguments": "error",
-  "typescript/no-useless-empty-export": "error",
-  "typescript/prefer-find": "error",
-  "typescript/prefer-function-type": "error",
-  "typescript/prefer-includes": "error",
-  "typescript/prefer-reduce-type-parameter": "error",
-  "typescript/prefer-promise-reject-errors": "error",
-  "typescript/only-throw-error": "error",
-  "typescript/require-await": "error",
-  "typescript/ban-ts-comment": [
-    "error",
-    { "ts-expect-error": "allow-with-description" },
-  ],
-  "typescript/no-unnecessary-condition": [
-    "error",
-    { allowConstantLoopConditions: true },
-  ],
+  ...antidriftTypescriptSyntaxRules,
+  ...antidriftTypescriptTypeAwareRules,
 } satisfies DummyRuleMap;
 const vitestRules = {
   "vitest/expect-expect": "error",
