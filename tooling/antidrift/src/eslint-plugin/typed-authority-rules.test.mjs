@@ -620,6 +620,8 @@ typedRuleTester.run("no-parse-as-cast", rule("no-parse-as-cast"), {
     fixture("programs/drift/zod-reparse-sync-helper-result.ts"),
     // External SDK result boundary must stay clean
     fixture("programs/correct/zod-external-call-boundary.ts"),
+    // Test-context exemption: a schema-conformance oracle under a test/ path
+    fixture("programs/correct/test/zod-contract-oracle.ts"),
   ],
   invalid: [
     // Parameter declared as the schema output and parsed with that schema
@@ -645,6 +647,8 @@ typedRuleTester.run(
   {
     valid: [
       fixture("programs/correct/appeasement-erasure-real-boundaries.ts"),
+      // Effect decode of a genuine unknown boundary stays clean
+      fixture("programs/correct/effect-decode-boundaries.ts"),
       // unknown/any parameters are real boundaries, not erasures
       fixture("programs/correct/parse-as-cast-boundary-inputs.ts"),
       // External SDK result parsed directly — no erased binding involved
@@ -656,6 +660,8 @@ typedRuleTester.run(
         ...fixture("programs/drift/appeasement-erasure-ipc-result.ts"),
         errors: 3,
       },
+      // Erasure re-established through a curried Effect Schema decoder
+      { ...fixture("programs/drift/effect-decode-erasure.ts"), errors: 1 },
     ],
   },
 );

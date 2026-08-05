@@ -1,3 +1,4 @@
+import { isEffectDecodeApplication } from "../../semantic-adapters/effect-schema.mjs";
 import {
   ZOD_VALIDATION_METHODS,
   zodParseCallParts,
@@ -54,8 +55,10 @@ function isParseArgument(identifier, services, checker) {
   if (call?.type !== "CallExpression" || call.arguments[0] !== identifier) {
     return false;
   }
-  return Boolean(
-    zodParseCallParts(call, services, checker, ZOD_VALIDATION_METHODS),
+  return (
+    Boolean(
+      zodParseCallParts(call, services, checker, ZOD_VALIDATION_METHODS),
+    ) || isEffectDecodeApplication(call, services, checker)
   );
 }
 

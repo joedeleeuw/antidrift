@@ -34,6 +34,16 @@ export function isZodMethod(
 
 export function isThrowAssertionCallbackParse(node: unknown): boolean;
 
+export function parsedSchemaSymbol(
+  checker: ts.TypeChecker,
+  tsCall: ts.CallExpression,
+): ts.Symbol | undefined;
+
+export function declaredSchemaSymbolOfParameter(
+  checker: ts.TypeChecker,
+  tsArg: ts.Node,
+): ts.Symbol | undefined;
+
 export function zodParseCallParts(
   node: unknown,
   services: TypeScriptParserServices,

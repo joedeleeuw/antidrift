@@ -1016,9 +1016,6 @@ rules:
     status: ready
     stable: false
     proofBuckets: [semantic-source-type-provenance]
-    semanticAdapterStatus:
-      status: inline-pending
-      reason: The schema-derivation trace lives inline in the ESLint rule; extract into semantic-adapters/schema-provenance.mjs once a second rule needs it, which the unknown-erasure candidate would.
     referenceDoc: docs/rule-investigations/no-parse-as-cast.md
     signal: TypeChecker plus schema-derivation provenance from the parameter's declared type alias
     solveType: validation-boundary-drift
@@ -1041,27 +1038,27 @@ rules:
         - "function save(user: unknown) { return UserSchema.parse(user); }"
         - "type AstFactsInput = z.input<typeof AstFactsSchema>; function run(facts: AstFactsInput) { return AstFactsSchema.parse(facts); }"
         - "function validateProjectId(id: string) { return z.string().min(1).parse(id); }"
-    nextAction: "Enabled at warn severity on 2026-08-03 by owner decision, ahead of the stable gate and with one known false positive outstanding (sceneContractOracle.test.ts:53, a test contract oracle). Warn keeps that false positive a nuisance rather than a broken consumer build. Closing the test-context exemption is the immediate next step; the promotion block for stable: true follows. Corpus is 11 positives across Murderbox desktop and Codebase Atlas."
+    nextAction: "Test-context exemption landed 2026-08-03: files matching the taxonomy test pattern are skipped, closing the sceneContractOracle.test.ts false positive; known false positives now zero. Next: promotion block for stable: true. Corpus is 10 positives across Murderbox desktop (6) and Codebase Atlas (4 accepted-drift), zero known FPs."
   antidrift/no-appeasement-erasure:
     status: ready
     stable: false
     proofBuckets: [semantic-source-type-provenance]
     semanticAdapterStatus:
       status: inline-pending
-      reason: Declared-vs-inferred type comparison and reference-consumer scanning live inline; extract alongside the schema-derivation trace once a third rule in this family needs either.
+      reason: Declared-vs-inferred type comparison and reference-consumer scanning live inline with one consumer. The schema-derivation trace was extracted to semantic-adapters/schema-provenance.mjs on 2026-08-03; extract these too when a second rule needs them.
     referenceDoc: docs/rule-investigations/no-appeasement-erasure.md
     signal: TypeChecker comparison of a declared unknown against the initializer's inferred type, plus scope-resolved evidence that a contract is re-established from the erased binding
     solveType: validation-boundary-drift
-    corpusRepositories: [murderbox, cloudflare-agents, codebase-atlas]
+    corpusRepositories: [murderbox, cloudflare-agents, codebase-atlas, executor]
     concerns:
-      - "This is the upstream gate for the rest of the contract family. In Murderbox desktop apps/desktop, no-redundant-zod-parse, no-appeasement-cast, no-contract-appeasement-projection, no-unsafe-deserialize, and no-defensive-shape-probing all report zero across 38 files while bridge.ts alone holds 21 parse calls; the erased bindings declare unknown, so no type comparison can fire. How many of those rules regain reach after remediation is expected but not yet measured."
+      - "This is the upstream gate for the rest of the contract family. In Murderbox desktop apps/desktop, no-redundant-zod-parse, no-appeasement-cast, no-contract-appeasement-projection, no-unsafe-deserialize, and no-defensive-shape-probing all report zero across 38 files while bridge.ts alone holds 21 parse calls; the erased bindings declare unknown, so no type comparison can fire. Measured 2026-08-03 on branch desktop-erasure-remediation: removing the twelve annotations took no-redundant-zod-parse from 0 to 8 findings (six bridge.ts, two machine-workflows.ts) with no rule changes; the other four rules stayed at zero, so the erasures were masking redundant parses specifically."
       - "Scope is erasure plus re-establishment (Zod parse or a named-type cast). Bare widening with no downstream contract stays clean because widening to force later narrowing is legitimate. Passing an erased binding to a parameter with a named contract is a known false negative, not yet implemented."
       - "The 12 Murderbox positives include erasures of `boolean` (bridge.ts:151) and `string | null` (bridge.ts:100), which is why this reads as a uniform edge reflex rather than deliberate defensive validation of complex payloads."
       - "Cast-shaped escape hatches are rare in the anchor repo (2 `as unknown`, 0 `as any` across src), so the annotation form carries the evidence. The `as unknown` branch is fixture-backed but has no real-corpus anchor yet."
       - "Only const bindings are reported. A reassigned binding is a traversal cursor rather than a boundary value; the one Executor positive (packages/plugins/openapi/src/sdk/openapi-utils.ts:42) was a `let` walking an untyped OpenAPI document with a guarded Record cast, and narrowing to const removed it."
       - "Empty object and array literal initializers are excluded. The one Cloudflare Agents positive (packages/agents/src/index.ts:963, `const DEFAULT_STATE = {} as unknown`) is a sentinel placeholder for a generic State default, compared by identity and cast per-use; an empty literal carries no contract, so widening it discards nothing."
       - "Zero findings in a repository is not yet evidence of clean code. Executor, PowerSync Service, and Agent Browser were swept and returned zero, but they carry 5, 1, and 0 zod-importing files respectively, so the parse branch cannot fire there by construction and they are excluded from corpusRepositories. Only Cloudflare Agents (76 zod-importing files, 371 candidates, 0 findings) and Codebase Atlas (17 zod files, 34 candidates, 0 findings) are real clean controls."
-      - "Effect Schema is an unmatched parallel idiom. Executor contains 168 Schema.decode/decodeUnknown call sites against 649 Effect files; the same erasure defect expressed through Effect's decoders is structurally invisible to this rule. Adding a decode branch is the largest known coverage gap."
+      - "Effect Schema decode branch landed 2026-08-03: curried Schema.decode*/decodeUnknown* applications resolved to the effect package now count as contract re-establishment. Executor re-swept with the branch active: 0 findings across 342 candidate files and 168 decode sites, so its zero is now evidence rather than blindness, and executor rejoins corpusRepositories as a clean control. Pre-built decoder bindings (const dec = Schema.decodeUnknownSync(S); dec(value)) are a recorded false-negative slice, unimplemented until a real anchor appears."
       - "The `as unknown as T` double cast is unmatched by this rule family but is not unmatched overall: typescript/no-unsafe-type-assertion reports it, and is enabled at error in oxlint.config.mts. The 53 Executor and 89 Cloudflare Agents sites are unreported in those repositories because they do not run this configuration, not because the stack lacks a rule. Do not build a custom double-cast rule; delegate."
     external:
       state: net-antidrift

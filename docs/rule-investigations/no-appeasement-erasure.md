@@ -1,6 +1,6 @@
 # no-appeasement-erasure Investigation
 
-Status: `under-proven`, default-off.
+Status: `ready`, shipped at warn severity (2026-08-03 owner decision). Promotion to error tracks the gate below.
 
 ## Problem Statement
 
@@ -40,7 +40,7 @@ Run against Murderbox desktop (`apps/desktop`, worktree branch `chore/conversati
 
 `bridge.ts` alone holds 21 parse calls and `preload.ts` holds 18, yet five rules report nothing. The reason is mechanical: every masked site declares `unknown`, and each of those rules needs a type comparison that `unknown` defeats. The erasures are not one more smell alongside the others — they are why the others are silent.
 
-How many of those rules regain reach after remediation is expected, not measured. That measurement is the next action.
+Measured on 2026-08-03 (branch `desktop-erasure-remediation`): after removing the twelve `: unknown` annotations, `antidrift/no-redundant-zod-parse` went from **0 to 8 findings** — six in `bridge.ts`, two in `machine-workflows.ts` — with no rule changes on either side. The other four rules stayed at zero, which is honest: the erasures were masking redundant parses specifically, not those rules' defects. The gate claim is now counted, not expected: one erasure pattern was hiding eight findings from an already-shipped stable rule.
 
 ## Escape-Hatch Displacement
 
@@ -73,13 +73,15 @@ Zero-finding repositories, after the two narrowings below. The zod column is wha
 
 Chaski and LibreChat were skipped: no installed `node_modules`, so type-aware linting could not run.
 
+Secondary validation (2026-08-03, first 60 non-test files of `packages/agents/src`): Cloudflare Agents' zero is **displacement, not cleanliness**. The same files report 18 `no-appeasement-cast`, 1 `no-contract-appeasement-projection`, and 1 `no-unsafe-deserialize` findings, plus 89 `as unknown as` double casts counted earlier. The codebase expresses unearned contracts through casts rather than erased annotations, so it is a genuine clean control for THIS rule's idiom while carrying the defect class through the neighbor idiom — the escape-hatch displacement pattern, observed from the other side.
+
 Only the first two are evidence. Executor, PowerSync Service, and Agent Browser were counted as clean controls in an earlier pass and should not have been — a zero from a repository with five zod files says nothing about a zod-scoped rule.
 
 ## Unmatched Idioms
 
 Executor is the useful negative result, for the opposite reason to the one first recorded. It contains **168 Effect `Schema.decode`/`decodeUnknown` call sites** and **53 `as unknown as T` double casts**. Both are laundering surfaces this rule cannot see:
 
-- **Effect Schema.** `Schema.decodeUnknownSync(X)(value)` is the structural twin of `X.parse(value)`. An Effect codebase can carry the identical defect and report zero forever. This is the largest known coverage gap, and it means the corpus cannot be widened by adding Effect-based repositories until a decode branch exists.
+- **Effect Schema.** Closed 2026-08-03: curried `Schema.decode*`/`decodeUnknown*` applications resolved to the `effect` package now count as re-establishment. Executor re-swept clean (0/342) with the branch active. Pre-built decoder bindings (`const dec = Schema.decodeUnknownSync(S); dec(value)`) remain a recorded false-negative slice.
 - **`as unknown as T`.** Erasure and re-establishment collapse into one expression, so there is no declared binding for this rule to inspect and no `unknown`-typed operand for `no-appeasement-cast` to catch. It falls between the two antidrift rules — but not outside the stack. See below.
 
 ## Ecosystem Overlap
@@ -139,5 +141,5 @@ Known false negative: an erased binding passed to a parameter with a named contr
 1. A second repository supplies real positives. Six repositories have been swept; only Murderbox desktop has any. The corpus is also the wrong flavor — it is almost entirely first-party, which cannot separate one team's habit from an idiom the ecosystem produces. Widen to large, actively maintained, widely depended-on OSS TypeScript repositories that use Zod and contain deliberate `unknown`-narrowing helpers (`isRecord`, `isPlainObject`, `asRecord`).
 2. Each zero-finding repository is secondary-validated: run the full family plus a survey of `as unknown as T` double casts and guard-helper idioms. A zero that coexists with visible laundering through an unmatched idiom is a missing branch, not a clean control.
 3. The post-remediation family measurement is recorded, converting the gate claim from expected to counted.
-4. A real remediation lands in Murderbox and demonstrably improves the code.
+4. DONE 2026-08-03: branch desktop-erasure-remediation, commits ba30be1f + 07c2cea0. Twelve erasures removed, then the twenty runtime validations they masked or accompanied (8 redundant re-parses, 6 parse-as-cast parameters, 6 IPC result re-parses). Desktop lint green at --max-warnings=0 on antidrift 0.6.0; all 183 tests pass unchanged. Boundary parses of unknown[] IPC input retained.
 5. Known false positives stay at zero under the chosen scope.
