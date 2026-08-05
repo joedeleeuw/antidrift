@@ -1,5 +1,15 @@
 # changelog
 
+## 0.7.0
+
+Upgrading from 0.6.0 adds the TypeScript baseline to the governance Oxlint
+config, so expect new findings on first run.
+
+- ship the ~36-rule `typescript/*` baseline in `createGovernanceOxlintConfig`: 15 syntax rules always, 21 type-aware rules when `oxlint-tsgolint` is installed; `typescriptBaselineTier()` reports which tier resolved, and both halves are exported as frozen constants
+- add an Effect Schema branch to `antidrift/no-appeasement-erasure`: curried `Schema.decode*`/`decodeUnknown*` applications count as contract re-establishment
+- exempt test files from `antidrift/no-parse-as-cast`; a bare parse of a typed value in a test is a schema-conformance oracle
+- extract the schema-derivation trace into `semantic-adapters/schema-provenance`, shared by `no-redundant-zod-parse` and `no-parse-as-cast`
+
 ## 0.6.0
 
 Upgrading from 0.5.0 turns on four rules that previously shipped disabled, so
