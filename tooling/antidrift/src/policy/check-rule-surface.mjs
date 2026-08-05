@@ -64,20 +64,6 @@ function collectDuplicateRuntimeOwners(runtimeConfigs) {
     .map(([ruleName, runtimes]) => ({ ruleName, runtimes }));
 }
 
-function collectDuplicateRuntimeExports(runtimePluginRules) {
-  const owners = new Map();
-  for (const [runtime, rules] of Object.entries(runtimePluginRules ?? {})) {
-    for (const ruleName of Object.keys(rules ?? {})) {
-      const existing = owners.get(ruleName) ?? [];
-      existing.push(runtime);
-      owners.set(ruleName, existing);
-    }
-  }
-  return [...owners]
-    .filter(([, runtimes]) => runtimes.length > 1)
-    .map(([ruleName, runtimes]) => ({ ruleName, runtimes }));
-}
-
 function collectCorpusCoveredRules(cases) {
   const out = new Set();
   for (const testCase of cases ?? []) {
@@ -167,16 +153,6 @@ function reportDuplicateRuntimeOwners(items, report) {
   }
 }
 
-function reportDuplicateRuntimeExports(items, report) {
-  for (const { ruleName, runtimes } of [...items].sort((left, right) =>
-    left.ruleName.localeCompare(right.ruleName),
-  )) {
-    report(
-      `Custom rule exported by multiple runtimes: antidrift/${ruleName} (${runtimes.sort().join(", ")})`,
-    );
-  }
-}
-
 export function checkRuleSurface({
   repoRoot = defaultRepoRoot,
   pluginRules = null,
@@ -223,8 +199,6 @@ export function checkRuleSurface({
     ruleRegistry,
   );
   const duplicateRuntimeOwners = collectDuplicateRuntimeOwners(runtimeConfigs);
-  const duplicateRuntimeExports =
-    collectDuplicateRuntimeExports(runtimePluginRules);
 
   reportSorted(
     configuredButNotExported,
@@ -243,15 +217,13 @@ export function checkRuleSurface({
   );
   reportSortedViolations(blockingMaturityViolations, report);
   reportDuplicateRuntimeOwners(duplicateRuntimeOwners, report);
-  reportDuplicateRuntimeExports(duplicateRuntimeExports, report);
 
   return (
     configuredButNotExported.size +
       exportedButNotConfigured.size +
       exportedButNotCorpusCovered.size +
       blockingMaturityViolations.length +
-      duplicateRuntimeOwners.length +
-      duplicateRuntimeExports.length ===
+      duplicateRuntimeOwners.length ===
     0
   );
 }

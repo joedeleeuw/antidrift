@@ -92,7 +92,7 @@ describe("checkRuleSurface", () => {
     );
   });
 
-  it("rejects custom rules exported by more than one runtime", () => {
+  it("allows dual export when only one runtime enables the rule", () => {
     const messages = [];
     const ok = checkRuleSurface({
       pluginRules: {
@@ -109,6 +109,10 @@ describe("checkRuleSurface", () => {
           },
         },
       ],
+      runtimeConfigs: {
+        oxlint: [{ rules: { "antidrift/alpha": "error" } }],
+        eslint: [{ rules: { "antidrift/alpha": "off" } }],
+      },
       corpusCases: [{ ruleId: "antidrift/alpha" }],
       ruleRegistry: {
         rules: {
@@ -118,10 +122,8 @@ describe("checkRuleSurface", () => {
       report: (message) => messages.push(message),
     });
 
-    expect(ok).toBe(false);
-    expect(messages.join("\n")).toContain(
-      "exported by multiple runtimes: antidrift/alpha (eslint, oxlint)",
-    );
+    expect(messages).toEqual([]);
+    expect(ok).toBe(true);
   });
 
   it("counts default external corpus cases as surface evidence", () => {
