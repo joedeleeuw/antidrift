@@ -349,6 +349,12 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "}\n",
   );
   file(
+    "packages/app/src/restricted-syntax-drift.ts",
+    "export enum Color {\n  Red,\n  Blue,\n}\n\n" +
+      "declare function forwardRef(render: () => null): unknown;\n" +
+      "export const Panel = forwardRef(() => null);\n",
+  );
+  file(
     "packages/app/src/async-map-return-clean.ts",
     "export function pendingSaves(items: Array<{ save(): Promise<void> }>) {\n" +
       "  const pending = items.map(async (item) => {\n" +

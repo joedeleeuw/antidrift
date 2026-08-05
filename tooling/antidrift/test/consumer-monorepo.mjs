@@ -238,6 +238,33 @@ try {
     );
   }
 
+  const restrictedSyntaxMessages = lint(
+    "packages/app/src/restricted-syntax-drift.ts",
+  ).flatMap((r) =>
+    r.messages
+      .filter((m) => m.ruleId === "no-restricted-syntax")
+      .map((m) => m.message),
+  );
+  const declaresEnum = restrictedSyntaxMessages.some((m) =>
+    m.includes("Do not declare enums"),
+  );
+  const usesForwardRef = restrictedSyntaxMessages.some((m) =>
+    m.includes("forwardRef is deprecated"),
+  );
+  if (!declaresEnum || !usesForwardRef) {
+    fail(
+      `default config must report the enum declaration and the forwardRef call, got: ${JSON.stringify(restrictedSyntaxMessages)}`,
+    );
+  }
+  if (
+    defaultCleanRules.includes("no-restricted-syntax") ||
+    restrictedSyntaxMessages.length !== 2
+  ) {
+    fail(
+      `no-restricted-syntax must fire exactly twice on the probe and stay off clean.ts, got: ${JSON.stringify({ clean: defaultCleanRules, probe: restrictedSyntaxMessages })}`,
+    );
+  }
+
   const packageCopyRules = lint(
     "packages/app/src/package-copy.ts",
   ).flatMap((r) => r.messages.map((m) => m.ruleId));

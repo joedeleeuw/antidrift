@@ -490,11 +490,12 @@ policyRuleReviews:
     reason: Secret detection should be delegated to a maintained scanner; custom AST variable-name heuristics are not acceptable.
     nextAction: Wire a maintained secret scanner before claiming enforcement.
   sec/no-sql-string-concat:
-    status: active-custom
+    status: ecosystem-covered
+    replacement: sql-template/no-unsafe-query
     antidriftRule: antidrift/no-sql-string-concat
-    coverage: Implemented for SQL structure built through interpolation or concatenation.
-    reason: The rule owns scoped HogQL/template interpolation cases without bundling a broad SQL ESLint plugin.
-    nextAction: Keep default-off inventory until the remaining Cloudflare package SQL-tag cases can run type-aware through their real package configuration, without a local tsconfig shim, then rerun source-fleet/adversarial review before stable promotion.
+    coverage: Everyday surface delegated to eslint-plugin-sql-template; cross-function taint delegated to CodeQL/Semgrep per Learning 9.
+    reason: The custom rule's text-shape detection flags parameterized tagged templates, the ecosystem's dominant safe idiom — measured at 71 false positives in one Cloudflare Agents file. Trust-the-tag delegation is established practice; deliberate tag-name evasion is taint territory, not lint territory.
+    nextAction: Adopt eslint-plugin-sql-template in the shared config and remove antidrift/no-sql-string-concat from the configured surface. Reopen only with evidence of real tag-name evasion, at which point the differentiated upgrade is tag-body proof.
   sec/no-unsafe-deserialize:
     status: active-custom
     antidriftRule: antidrift/no-unsafe-deserialize
@@ -739,9 +740,8 @@ rules:
         - "<input value={name} onChange={(event) => setName(event.currentTarget.value)} />"
     nextAction: Mine an agent-generated corpus (plus additional real React repos) for genuine owned-entity shatters; only with several cross-repo positives and envelope/pagination/view-state clean controls should the enforcement tier be rebuilt. Until then this stays inventory-only.
   antidrift/no-defensive-shape-probing:
-    status: under-proven
+    status: ready
     stable: false
-    defaultOff: true
     signal: TypeChecker plus AST shape
     solveType: broad-value-shape-probing
     proofBuckets: [semantic-source-type-provenance]
@@ -1062,14 +1062,14 @@ rules:
       - "Empty object and array literal initializers are excluded. The one Cloudflare Agents positive (packages/agents/src/index.ts:963, `const DEFAULT_STATE = {} as unknown`) is a sentinel placeholder for a generic State default, compared by identity and cast per-use; an empty literal carries no contract, so widening it discards nothing."
       - "Zero findings in a repository is not yet evidence of clean code. Executor, PowerSync Service, and Agent Browser were swept and returned zero, but they carry 5, 1, and 0 zod-importing files respectively, so the parse branch cannot fire there by construction and they are excluded from corpusRepositories. Only Cloudflare Agents (76 zod-importing files, 371 candidates, 0 findings) and Codebase Atlas (17 zod files, 34 candidates, 0 findings) are real clean controls."
       - "Effect Schema is an unmatched parallel idiom. Executor contains 168 Schema.decode/decodeUnknown call sites against 649 Effect files; the same erasure defect expressed through Effect's decoders is structurally invisible to this rule. Adding a decode branch is the largest known coverage gap."
-      - "The `as unknown as T` double cast is the other unmatched laundering idiom: 53 sites in Executor alone, reported by no rule in this family. Erasure and re-establishment happen in one expression, so neither this rule's declared-binding check nor no-appeasement-cast sees it."
+      - "The `as unknown as T` double cast is unmatched by this rule family but is not unmatched overall: typescript/no-unsafe-type-assertion reports it, and is enabled at error in oxlint.config.mts. The 53 Executor and 89 Cloudflare Agents sites are unreported in those repositories because they do not run this configuration, not because the stack lacks a rule. Do not build a custom double-cast rule; delegate."
     external:
       state: net-antidrift
       support: none
       candidates: []
       decision: own-antidrift
-      whyThisState: "No supported rule compares a declared unknown against the checker's inferred type for the initializer. @typescript-eslint/no-unsafe-assignment and no-unsafe-argument police any flowing outward; this is a known type being widened inward on purpose."
-      whyNotOtherState: "Not partial-overlap because no-appeasement-cast owns the unknown-to-contract direction and cannot see the step that manufactured the unknown."
+      whyThisState: "Partial overlap, split by branch. The parse branch is net-antidrift: no supported rule compares a declared unknown against the checker's inferred type for the initializer and then asks whether a schema re-establishes the contract. @typescript-eslint/no-unsafe-assignment and no-unsafe-argument police any flowing outward, which is the opposite direction."
+      whyNotOtherState: "Not net-antidrift overall, because the named-cast branch is ecosystem-covered wherever typescript/no-unsafe-type-assertion is enabled. That rule reports `const result: unknown = getSnapshot(); result as Snapshot` and the `value as unknown as T` double cast, while correctly ignoring the pure widening `value as unknown`. It does not report the parse branch. Verified 2026-08-03. Scope caveat: that rule is enabled in this repository's own oxlint.config.mts and is NOT part of the shipped oxlint-config, which exports only antidriftComplexityRules and createGovernanceOxlintConfig. Consumers therefore do not inherit it, so the cast branch is load-bearing for them and only redundant here."
     examples:
       flags:
         - "const result: unknown = auth.getAuthSnapshot(); return resultSchema.parse(result);"
@@ -1079,7 +1079,7 @@ rules:
         - "const value: unknown = buildProbe(); return typeof value === 'object';"
     nextAction: "Enabled at warn severity on 2026-08-03 by owner decision: zero known false positives across 405 candidate files in two independent zod-bearing repositories, with the gap being a second repository carrying positives rather than any correctness doubt. Warn keeps it visible on new code without blocking builds. Escalation to error needs the post-remediation family measurement plus that second positive-bearing repository."
   antidrift/no-sql-string-concat:
-    status: false-positive-prone
+    status: ecosystem-covered
     stable: false
     defaultOff: true
     referenceDoc: docs/rule-investigations/no-sql-string-concat.md
@@ -1351,9 +1351,8 @@ rules:
         - "function parseAction(raw: unknown): MemoryResult['action'] { return ActionSchema.parse(raw); }"
     nextAction: Mine real Chaski, Codebase Atlas, Murderbox, and session-derived examples for cross-contract projections such as EventKind-to-result-action before restoring stable status.
   antidrift/no-underchecked-type-predicate:
-    status: under-proven
+    status: ready
     stable: false
-    defaultOff: true
     signal: TypeChecker plus AST/control-flow checks
     solveType: type-guard-laundering
     proofBuckets: [semantic-source-type-provenance]

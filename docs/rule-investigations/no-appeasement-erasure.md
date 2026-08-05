@@ -80,7 +80,24 @@ Only the first two are evidence. Executor, PowerSync Service, and Agent Browser 
 Executor is the useful negative result, for the opposite reason to the one first recorded. It contains **168 Effect `Schema.decode`/`decodeUnknown` call sites** and **53 `as unknown as T` double casts**. Both are laundering surfaces this rule cannot see:
 
 - **Effect Schema.** `Schema.decodeUnknownSync(X)(value)` is the structural twin of `X.parse(value)`. An Effect codebase can carry the identical defect and report zero forever. This is the largest known coverage gap, and it means the corpus cannot be widened by adding Effect-based repositories until a decode branch exists.
-- **`as unknown as T`.** Erasure and re-establishment collapse into one expression, so there is no declared binding for this rule to inspect and no `unknown`-typed operand for `no-appeasement-cast` to catch. It falls between the two rules.
+- **`as unknown as T`.** Erasure and re-establishment collapse into one expression, so there is no declared binding for this rule to inspect and no `unknown`-typed operand for `no-appeasement-cast` to catch. It falls between the two antidrift rules — but not outside the stack. See below.
+
+## Ecosystem Overlap
+
+`typescript/no-unsafe-type-assertion` is enabled at error in `oxlint.config.mts` and covers more of this ground than the original entry claimed. Verified 2026-08-03 against a probe:
+
+| Shape | `no-unsafe-type-assertion` | this rule |
+| --- | --- | --- |
+| `const result: unknown = getSnapshot(); result as Snapshot` | reports | reports |
+| `value as unknown as T` | reports | does not see it |
+| `value as unknown` (pure widening) | correctly silent | correctly silent |
+| `const result: unknown = getSnapshot(); schema.parse(result)` | silent | **reports** |
+
+Two conclusions. The **parse branch is the unique contribution** — no ecosystem rule asks whether a schema re-establishes a contract from an erased binding, and that branch is where all 12 Murderbox positives live. The **named-cast branch is ecosystem-covered** wherever `no-unsafe-type-assertion` is enabled; it is retained for consumers who do not enable it, but earns no independent value otherwise.
+
+A custom `as unknown as T` rule should not be built. The 53 Executor and 89 Cloudflare Agents double casts are unreported in those repositories because they do not run this configuration, not because the stack lacks a rule.
+
+**Scope caveat.** `no-unsafe-type-assertion` lives in this repository's own `oxlint.config.mts`, not in the shipped `oxlint-config`, which exports only `antidriftComplexityRules` and `createGovernanceOxlintConfig`. Keeping the strict TypeScript baseline local was a deliberate 0.5.0 decision. The practical effect is that "ecosystem-covered" holds here and not for consumers: Murderbox's own `oxlint.config.ts` carries none of those rules, so the named-cast branch of this rule is load-bearing there and redundant only inside this repository.
 
 ## Contract-Free Literal Narrowing
 

@@ -1,5 +1,7 @@
 # `antidrift/no-sql-string-concat`
 
+Status: `ecosystem-covered` / delegated on 2026-08-03. Replacement: `sql-template/no-unsafe-query` for untagged SQL interpolation, CodeQL/Semgrep for cross-function taint (Learning 9). The measurement that settled it: 71 findings in one Cloudflare Agents file, every one a `this.sql` tagged template that binds interpolations as `?` placeholders. The provenance machinery below is retained as history and as the design basis for a tag-body-proof upgrade if real tag-name evasion ever appears.
+
 ## Definition
 
 Disallow SQL strings assembled with interpolated values or concatenated values.
