@@ -114,7 +114,8 @@
   ],
   "dependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
-    "oxlint": "^1.75.0",
+    "eslint-plugin-sql-template": "^3.2.0",
+    "oxlint": "^1.77.0",
     "yaml": "^2.6.1"
   },
   "peerDependencies": {

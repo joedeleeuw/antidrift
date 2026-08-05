@@ -35,7 +35,7 @@ catalogs:
     eslint: ^9.17.0
     eslint-plugin-boundaries: ^5.0.1
     "@eslint-community/eslint-plugin-eslint-comments": ^4.7.2
-    oxlint: ^1.75.0
+    oxlint: ^1.77.0
     oxlint-tsgolint: ^7.0.2001
     prettier: ^3.4.2
     typescript-eslint: ^8.60.1
