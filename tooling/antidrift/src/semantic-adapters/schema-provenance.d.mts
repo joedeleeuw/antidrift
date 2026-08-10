@@ -70,23 +70,6 @@ export function closedZodTransformInputKeys(
   checker: ts.TypeChecker,
 ): ReadonlySet<string> | null;
 
-export function isAwaitedCallInitializer(node: unknown): boolean;
-
-export function isCallResultExpression(node: unknown): boolean;
-
-export function isZodParseExpression(
-  node: unknown,
-  services: TypeScriptParserServices,
-  checker: ts.TypeChecker,
-): boolean;
-
-export function parsedCallResultMatchesSchemaOutput(
-  checker: ts.TypeChecker,
-  services: TypeScriptParserServices,
-  tsCall: ts.Node,
-  arg: unknown,
-): boolean;
-
 export function recordParsedConst(
   node: unknown,
   schemaSym: ts.Symbol | undefined,

@@ -1013,7 +1013,7 @@ rules:
     concerns:
       - "Test assertion scope is decided: Zod parses inside throw assertion callbacks are schema-contract checks, not validation-boundary drift."
       - "A June 4, 2026 real-test scan found no consumed assertion-callback reparse case across Codebase Atlas, Murderbox, Sudocode, and Chaski; that missing negative gate is accepted as unrepresented in the current corpus."
-      - "Direct inline awaited and synchronous helper-result reparses are covered when TypeScript proves the helper result is equivalent to the schema output."
+      - "Call-result type-equivalence branches were removed on 2026-08-10: bidirectional assignability between a helper's declared return type and the schema output never proves that schema validated the value, because refinements (.min, .positive, .refine, .transform) are invisible to TypeScript. The false-positive shape is NonEmpty.parse(readName()) with readName(): string. Same-binding decoder provenance remains blocking; call-result coverage may return through producer provenance in the schema-provenance adapter."
     external:
       state: net-antidrift
       support: none
@@ -1023,11 +1023,12 @@ rules:
       whyNotOtherState: "Not partial-overlap because generic unsafe-assignment rules do not distinguish raw input from schema-owned output."
     examples:
       flags:
-        - "const row = RowSchema.parse(await getTypedRow());"
+        - "const row = RowSchema.parse(raw); return RowSchema.parse(row);"
       allows:
         - "const row = RowSchema.parse(raw);"
+        - "const row = RowSchema.parse(await getTypedRow());"
         - "expect(() => RowSchema.parse(typedFixture)).not.toThrow();"
-    nextAction: Stable; monitor for first-boundary schema pipelines that need additional clean exclusions.
+    nextAction: Stable for the same-binding provenance core. The removed call-result branches return only with decoder producer provenance; do not reintroduce type-equivalence gating.
   antidrift/no-parse-as-cast:
     status: ready
     stable: false

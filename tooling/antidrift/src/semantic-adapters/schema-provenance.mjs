@@ -1,8 +1,5 @@
 import ts from "typescript";
 
-const TS_TYPE_FLAG_ANY = 1;
-const TS_TYPE_FLAG_UNKNOWN = 2;
-
 // Methods whose call result IS the schema output, so return-type comparison is valid.
 export const ZOD_PARSE_METHODS = new Set(["parse", "parseAsync"]);
 // Every method that performs validation. The safe variants return a
@@ -18,31 +15,6 @@ export const ZOD_THROW_ASSERTION_MATCHERS = new Set([
   "toThrow",
   "toThrowError",
 ]);
-
-function isAnyOrUnknownType(type) {
-  return Boolean(
-    type && type.flags & (TS_TYPE_FLAG_ANY | TS_TYPE_FLAG_UNKNOWN),
-  );
-}
-
-function typeContainsAnyOrUnknown(checker, type, seen = new Set()) {
-  if (!type || seen.has(type)) return false;
-  seen.add(type);
-  if (isAnyOrUnknownType(type)) return true;
-  for (const part of type.types ?? []) {
-    if (typeContainsAnyOrUnknown(checker, part, seen)) return true;
-  }
-  const stringIndexType = type.getStringIndexType?.();
-  if (typeContainsAnyOrUnknown(checker, stringIndexType, seen)) return true;
-  const numberIndexType = type.getNumberIndexType?.();
-  if (typeContainsAnyOrUnknown(checker, numberIndexType, seen)) return true;
-  for (const property of checker.getPropertiesOfType(type)) {
-    if (typeContainsAnyOrUnknown(checker, checker.getTypeOfSymbol(property), seen)) {
-      return true;
-    }
-  }
-  return false;
-}
 
 export function isZodMethod(checker, tsNameNode) {
   const sym = tsNameNode && checker.getSymbolAtLocation(tsNameNode);
@@ -289,48 +261,6 @@ export function closedZodTransformInputKeys(receiver, services, checker) {
       .getPropertiesOfType(inputType)
       .map((property) => property.getName())
       .sort((left, right) => left.localeCompare(right)),
-  );
-}
-
-export function isAwaitedCallInitializer(node) {
-  return (
-    node?.type === "AwaitExpression" && node.argument?.type === "CallExpression"
-  );
-}
-
-export function isCallResultExpression(node) {
-  return node?.type === "CallExpression" || isAwaitedCallInitializer(node);
-}
-
-export function isZodParseExpression(node, services, checker) {
-  if (node?.type === "CallExpression") {
-    return Boolean(zodParseCallParts(node, services, checker));
-  }
-  if (
-    node?.type === "AwaitExpression" &&
-    node.argument?.type === "CallExpression"
-  ) {
-    return Boolean(zodParseCallParts(node.argument, services, checker));
-  }
-  return false;
-}
-
-export function parsedCallResultMatchesSchemaOutput(
-  checker,
-  services,
-  tsCall,
-  arg,
-) {
-  const tsArg = services.esTreeNodeToTSNodeMap.get(arg);
-  const argType = tsArg ? checker.getTypeAtLocation(tsArg) : null;
-  const parseReturnType = checker.getTypeAtLocation(tsCall);
-  return Boolean(
-    argType &&
-    !isAnyOrUnknownType(argType) &&
-    !isAnyOrUnknownType(parseReturnType) &&
-    !typeContainsAnyOrUnknown(checker, parseReturnType) &&
-    checker.isTypeAssignableTo(argType, parseReturnType) &&
-    checker.isTypeAssignableTo(parseReturnType, argType),
   );
 }
 

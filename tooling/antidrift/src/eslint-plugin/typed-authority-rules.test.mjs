@@ -589,6 +589,12 @@ typedRuleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
     fixture("programs/correct/zod-external-call-boundary.ts"),
     // Typed param re-parse — no local provenance, so Rule A correctly abstains (Rule C's case)
     fixture("programs/drift/zod-reparse-typed-value.ts"),
+    // Call-result assignability is not decoder provenance: a helper typed as the
+    // schema output never proves this schema validated the value (refinements are
+    // invisible to TypeScript). Silent until producer provenance exists.
+    fixture("programs/drift/zod-reparse-service-result.ts"),
+    fixture("programs/drift/zod-reparse-array-find.ts"),
+    fixture("programs/drift/zod-reparse-sync-helper-result.ts"),
   ],
   invalid: [
     // Re-parse of a parsed value in the same function
@@ -597,15 +603,6 @@ typedRuleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
     {
       ...fixture("programs/drift/zod-reparse-cross-fn-same-file.ts"),
       errors: 1,
-    },
-    // Re-parse of a service/helper result already typed as the schema output
-    { ...fixture("programs/drift/zod-reparse-service-result.ts"), errors: 1 },
-    // Re-parse of an Array.find result already typed as the schema output
-    { ...fixture("programs/drift/zod-reparse-array-find.ts"), errors: 1 },
-    // Re-parse of assigned and inline synchronous local helper results
-    {
-      ...fixture("programs/drift/zod-reparse-sync-helper-result.ts"),
-      errors: 2,
     },
     // safeParse of a value this schema already validated
     { ...fixture("programs/drift/zod-safe-parse-variants.ts"), errors: 1 },

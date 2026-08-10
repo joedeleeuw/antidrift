@@ -844,22 +844,6 @@ export const murderboxCases = [
     paths: ["apps/client/src/components/auth/use-auth-flow.ts"],
   },
   {
-    id: "murderbox-machine-setup-route-redundant-response-parse",
-    ruleId: "antidrift/no-redundant-zod-parse",
-    kind: "drift",
-    classification: "ready",
-    subproject: "api",
-    typeAware: true,
-    tsconfig: "apps/api/tsconfig.json",
-    paths: ["apps/api/app/api/machines/setup/route.ts"],
-    expectedFindings: [
-      {
-        path: "apps/api/app/api/machines/setup/route.ts",
-        line: 29,
-      },
-    ],
-  },
-  {
     id: "murderbox-workspace-registry-normalization-clean",
     ruleId: "antidrift/no-redundant-zod-parse",
     kind: "correct",
