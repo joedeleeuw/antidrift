@@ -100,6 +100,7 @@ export function createConfig({
         "antidrift/no-identity-schema-transform": "off",
         "antidrift/require-convex-return-validator": "off",
         "antidrift/no-explicit-type-arguments-on-owned-api": "off",
+        "antidrift/no-schema-validator-transcoding": "off",
         "antidrift/no-sql-string-concat": "off",
       },
     },

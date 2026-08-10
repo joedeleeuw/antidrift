@@ -3,6 +3,7 @@
 ## Unreleased
 
 - add default-off `require-convex-return-validator`: flags registered Convex functions (query/mutation/action and internal counterparts, symbol-resolved through the generated server module) whose object-literal registration lacks a static `returns` validator; real Murderbox drift control (18 functions flagged, zero false positives)
+- add default-off `no-schema-validator-transcoding`: flags an Effect `JSONSchema.make` result registered as a Convex `args`/`returns` validator, directly or through one const binding — documentation (OpenAPI) sinks stay clean
 - fix `antidrift/no-nonindependent-test-oracle` error-shape echoes firing on black-box server tests: parsing a dynamic response (`schema.parse(await response.json()).error`) and asserting the server's error contract is downstream behavior, not an arranged parse echo; the act's argument must now be an arranged identifier or literal
 - add default-off `no-explicit-type-arguments-on-owned-api`: flags caller-supplied type arguments where a registered API owns inference — Convex generated api references and TanStack queryOptions/mutationOptions registrations, both symbol-resolved
 
