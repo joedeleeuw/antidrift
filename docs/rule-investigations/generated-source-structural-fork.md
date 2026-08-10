@@ -8,6 +8,12 @@ Extend structural fork detection from installed package exports to local generat
 
 Implemented as registry-backed modes of `antidrift/no-structural-type-fork`, not as separate rules. Configured `generatedSources` and `ownership.yaml` `packageTypeOwners` are accepted owner authority and can block. Unaccepted installed-package matches are inventory/proposal facts when a semantic fact sink is configured.
 
+Convex generated owners are a third, implicit owner source: no registry entry is required because Convex codegen fixes the module paths. When the active TypeScript Program contains a module ending in `convex/_generated/dataModel`, every `Doc<"table">` owner is expanded from the exported `DataModel` table map (`DataModel[table].document` is exactly what convex's `DocumentByName` resolves). When the program contains a module ending in `convex/_generated/api`, the exported `api` object's `FilterApi` tree is walked to its function-reference leaves and each leaf's `_returnType` property is the `FunctionReturnType<typeof api.*>` owner (convex defines `FunctionReturnType<FuncRef> = FuncRef["_returnType"]`). Both candidate sets are accepted authority and block on exact copies. Files under any `convex/_generated/` path are exempt (generated output is owner, never fork), and bare reference aliases such as `type Row = Doc<"machines">` or `type Result = FunctionReturnType<typeof api.machines.get>` are derivations, exempted by resolving the referenced symbol's declarations to the convex-owned modules.
+
+Convex types carry no Zod-style refinements, so checker-level structural identity is sound for them — the no-parse-as-cast lesson (structural equality cannot prove a schema contract because refinements are invisible to the checker) does not apply to plain generated shapes.
+
+Exactness is the existing fingerprint comparison: same property count, same property names, same checker-rendered property types. Renamed, retyped, added, or dropped properties break the match and stay silent. Property order is insignificant because TypeScript object types are unordered; a reordered-but-identical redeclaration is still an exact copy and reports.
+
 ## Ecosystem Check
 
 No generic ecosystem rule can know which generated source is canonical for a repository. Existing import restrictions can block direct generated imports, but they do not catch hand-written local structural copies of generated types.

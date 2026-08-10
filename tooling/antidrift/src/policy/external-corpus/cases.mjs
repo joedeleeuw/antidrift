@@ -894,6 +894,16 @@ export const murderboxCases = [
     paths: ["apps/client/convex/machines.ts"],
   },
   {
+    id: "murderbox-convex-machines-doc-usage-clean",
+    ruleId: "antidrift/no-structural-type-fork",
+    kind: "correct",
+    classification: "ready",
+    subproject: "client",
+    typeAware: true,
+    tsconfig: "apps/client/tsconfig.json",
+    paths: ["apps/client/convex/machines.ts"],
+  },
+  {
     id: "murderbox-codex-notification-decoder-clean",
     ruleId: "antidrift/no-identity-schema-transform",
     kind: "correct",
