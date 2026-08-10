@@ -1,8 +1,13 @@
 # changelog
 
+## Unreleased
+
+- fix `antidrift/no-nonindependent-test-oracle` error-shape echoes firing on black-box server tests: parsing a dynamic response (`schema.parse(await response.json()).error`) and asserting the server's error contract is downstream behavior, not an arranged parse echo; the act's argument must now be an arranged identifier or literal
+
 ## 0.8.0
 
 - add default-off `no-identity-schema-transform` with Zod ownership, closed-shape proof, clean decoder controls, and semantic facts
+- extend `antidrift/no-nonindependent-test-oracle` with arranged parse error-shape echoes: `safeParse` issue-path/message assertions and `toThrow`/`rejects` on arranged-bad input report as `errorShapeEcho`
 
 ## 0.7.0
 
