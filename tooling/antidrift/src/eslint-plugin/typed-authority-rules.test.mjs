@@ -17,6 +17,7 @@ const typeServiceGuardedRules = [
   "no-defensive-shape-probing",
   "no-identity-schema-transform",
   "no-explicit-type-arguments-on-owned-api",
+  "no-schema-validator-transcoding",
   "no-redundant-zod-parse",
   "no-parse-as-cast",
   "no-appeasement-erasure",
@@ -771,6 +772,29 @@ typedRuleTester.run(
           "programs/drift/convex-missing-return-validator-aliased.ts",
         ),
         errors: [{ messageId: "missingReturnValidator" }],
+      },
+    ],
+  },
+);
+
+// ─── no-schema-validator-transcoding fixture suite ───────────────────────────
+// Fires when an Effect JSONSchema.make result is registered as a Convex
+// args/returns validator, directly or through one const binding. Documentation
+// sinks and registrations that keep their own validator owner stay clean.
+typedRuleTester.run(
+  "no-schema-validator-transcoding",
+  rule("no-schema-validator-transcoding"),
+  {
+    valid: [
+      fixture("programs/correct/schema-validator-transcoding-documentation.ts"),
+    ],
+    invalid: [
+      {
+        ...fixture("programs/drift/schema-validator-transcoding-convex.ts"),
+        errors: [
+          { messageId: "schemaValidatorTranscoding" },
+          { messageId: "schemaValidatorTranscoding" },
+        ],
       },
     ],
   },

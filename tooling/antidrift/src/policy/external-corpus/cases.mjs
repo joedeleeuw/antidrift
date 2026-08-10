@@ -900,6 +900,16 @@ export const murderboxCases = [
     ],
   },
   {
+    id: "murderbox-machines-registration-transcoding-clean",
+    ruleId: "antidrift/no-schema-validator-transcoding",
+    kind: "correct",
+    classification: "ready",
+    subproject: "client",
+    typeAware: true,
+    tsconfig: "apps/client/tsconfig.json",
+    paths: ["apps/client/convex/machines.ts"],
+  },
+  {
     id: "murderbox-codex-notification-decoder-clean",
     ruleId: "antidrift/no-identity-schema-transform",
     kind: "correct",

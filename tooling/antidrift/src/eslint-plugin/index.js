@@ -16,6 +16,7 @@ import { ruleNoAppeasementErasure } from "./rules/no-appeasement-erasure.js";
 import { ruleNoIdentitySchemaTransform } from "./rules/no-identity-schema-transform.js";
 import { ruleNoExplicitTypeArgumentsOnOwnedApi } from "./rules/no-explicit-type-arguments-on-owned-api.js";
 import { ruleRequireConvexReturnValidator } from "./rules/require-convex-return-validator.js";
+import { ruleNoSchemaValidatorTranscoding } from "./rules/no-schema-validator-transcoding.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
@@ -34,6 +35,7 @@ const rules = {
   "no-identity-schema-transform": ruleNoIdentitySchemaTransform(),
   "no-explicit-type-arguments-on-owned-api": ruleNoExplicitTypeArgumentsOnOwnedApi(),
   "require-convex-return-validator": ruleRequireConvexReturnValidator(),
+  "no-schema-validator-transcoding": ruleNoSchemaValidatorTranscoding(),
 };
 
 export default {
