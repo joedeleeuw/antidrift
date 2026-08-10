@@ -97,6 +97,7 @@ export function createConfig({
         // CodeQL/Semgrep own cross-function taint. The retired custom rule's
         // text-shape detection flagged parameterized tagged templates.
         "sql-template/no-unsafe-query": "error",
+        "antidrift/no-identity-schema-transform": "off",
         "antidrift/no-sql-string-concat": "off",
       },
     },

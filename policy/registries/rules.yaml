@@ -29,6 +29,22 @@ claudeAdvisory:
   outputDirectory: reports
 
 semanticFactKinds:
+  identitySchemaTransform:
+    rules:
+      - antidrift/no-identity-schema-transform
+    adapterId: typescript-eslint/schema-provenance
+    carrier: semantic-adapter
+    confidence:
+      - deterministic-enforcement
+    emission:
+      - blocking-diagnostic
+    association: Zod transform callbacks to closed schema input shapes and exact object pass-through reconstruction.
+    noSinkBehavior: The identity-transform diagnostic still reports; only the serialized semantic fact is skipped.
+    payloadFields:
+      - diagnostic
+      - inputShape
+      - outputShape
+      - transform
   broadSetterCoMutation:
     rules:
       - antidrift/no-handrolled-resource-lifecycle-cells
@@ -1075,6 +1091,34 @@ rules:
         - "const raw: unknown = JSON.parse(text); return schema.parse(raw);"
         - "const value: unknown = buildProbe(); return typeof value === 'object';"
     nextAction: "Enabled at warn severity on 2026-08-03 by owner decision: zero known false positives across 405 candidate files in two independent zod-bearing repositories, with the gap being a second repository carrying positives rather than any correctness doubt. Warn keeps it visible on new code without blocking builds. Escalation to error needs the post-remediation family measurement plus that second positive-bearing repository."
+  antidrift/no-identity-schema-transform:
+    status: ready
+    stable: false
+    defaultOff: true
+    referenceDoc: docs/rule-investigations/no-identity-schema-transform.md
+    signal: TypeChecker-proven Zod transform ownership plus closed input shape and exact AST pass-through reconstruction
+    solveType: type-contract-shape
+    proofBuckets: [semantic-source-type-provenance]
+    corpusRepositories: [murderbox]
+    concerns:
+      - The first evidence set includes synthetic identity drift and a real Murderbox clean decoder, but no independently replicated real drift.
+      - Generic schemas, indexed input shapes, readonly receivers, async or aliased callbacks, computed properties, spreads, and noncanonical destructuring intentionally remain false negatives.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "Zod documents transforms and input/output inference, but no maintained rule found in the ecosystem search detects exact object reconstruction against a checker-resolved schema input shape."
+      whyNotOtherState: "Syntax selectors cannot prove that transform belongs to Zod or that the output key set equals a closed schema input shape."
+    examples:
+      flags:
+        - "z.object({ a: z.string(), b: z.number() }).transform((value) => ({ a: value.a, b: value.b }))"
+        - "z.object({ a: z.string() }).transform(({ a }) => ({ a }))"
+      allows:
+        - "z.object({ a: z.string(), b: z.string() }).transform((value) => ({ a: value.a }))"
+        - "z.object({ a: z.string() }).transform((value) => ({ a: value.a, createdAt: nowIso() }))"
+        - "ConversationIndexSchema.transform((raw) => ({ id: raw.id || deriveId(raw), title: raw.title?.trim() || 'New conversation' }))"
+    nextAction: Keep default-off until a real identity-transform drift is independently replicated and broader Zod corpus inventory confirms the closed-shape proof has no false positives.
   antidrift/no-sql-string-concat:
     status: ecosystem-covered
     stable: false

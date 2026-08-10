@@ -33,6 +33,11 @@ describe("semantic adapter manifest", () => {
         "type-owner",
       )?.semanticFactContracts.map((entry) => entry.factKind),
     ).toEqual(["structuralMatch"]);
+    expect(
+      semanticAdapterManifestForAdapterId(
+        "schema-provenance",
+      )?.semanticFactContracts.map((entry) => entry.factKind),
+    ).toEqual(["identitySchemaTransform"]);
     expect(semanticAdapterManifestForAdapterId("type-owner")?.rules).toContain(
       "antidrift/no-status-literal-in-type",
     );
@@ -69,6 +74,11 @@ describe("semantic adapter manifest", () => {
       ).map((entry) => entry.id),
     ).toEqual(["tuple-shape"]);
     expect(
+      semanticAdapterManifestForRule(
+        "antidrift/no-identity-schema-transform",
+      ).map((entry) => entry.id),
+    ).toEqual(["schema-provenance"]);
+    expect(
       semanticAdapterManifestForFactKind("structuralMatch").map(
         (entry) => entry.id,
       ),
@@ -78,6 +88,11 @@ describe("semantic adapter manifest", () => {
         (entry) => entry.id,
       ),
     ).toEqual(["react-state"]);
+    expect(
+      semanticAdapterManifestForFactAdapterId(
+        "typescript-eslint/schema-provenance",
+      ).map((entry) => entry.id),
+    ).toEqual(["schema-provenance"]);
     expect(semanticAdapterManifestForRule("antidrift/not-real")).toEqual([]);
   });
 });

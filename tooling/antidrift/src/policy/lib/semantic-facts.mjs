@@ -4,6 +4,23 @@ import { isAbsolute, relative } from "node:path";
 export const SEMANTIC_FACT_SCHEMA_VERSION = 1;
 
 export const SEMANTIC_FACT_KINDS = Object.freeze({
+  identitySchemaTransform: Object.freeze({
+    rules: Object.freeze(["antidrift/no-identity-schema-transform"]),
+    adapterId: "typescript-eslint/schema-provenance",
+    carrier: "semantic-adapter",
+    confidence: Object.freeze(["deterministic-enforcement"]),
+    emission: Object.freeze(["blocking-diagnostic"]),
+    association:
+      "Zod transform callbacks to closed schema input shapes and exact object pass-through reconstruction.",
+    noSinkBehavior:
+      "The identity-transform diagnostic still reports; only the serialized semantic fact is skipped.",
+    payloadFields: Object.freeze([
+      "diagnostic",
+      "inputShape",
+      "outputShape",
+      "transform",
+    ]),
+  }),
   broadSetterCoMutation: Object.freeze({
     rules: Object.freeze(["antidrift/no-handrolled-resource-lifecycle-cells"]),
     adapterId: "react-state",

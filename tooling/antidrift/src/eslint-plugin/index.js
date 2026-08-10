@@ -13,6 +13,7 @@ import { ruleNoCanonicalModelFork } from "./rules/no-canonical-model-fork.js";
 import { ruleNoRedundantZodParse } from "./rules/no-redundant-zod-parse.js";
 import { ruleNoParseAsCast } from "./rules/no-parse-as-cast.js";
 import { ruleNoAppeasementErasure } from "./rules/no-appeasement-erasure.js";
+import { ruleNoIdentitySchemaTransform } from "./rules/no-identity-schema-transform.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
@@ -28,6 +29,7 @@ const rules = {
   "no-redundant-zod-parse": ruleNoRedundantZodParse(),
   "no-parse-as-cast": ruleNoParseAsCast(),
   "no-appeasement-erasure": ruleNoAppeasementErasure(),
+  "no-identity-schema-transform": ruleNoIdentitySchemaTransform(),
 };
 
 export default {

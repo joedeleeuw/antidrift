@@ -92,6 +92,83 @@ async function lintWithStructuralFacts(file, ruleOptions = {}) {
   return { facts, result };
 }
 
+async function lintIdentityTransformWithFacts(file) {
+  const facts = [];
+  const drift = fixture(file);
+  const eslint = new ESLint({
+    overrideConfigFile: true,
+    overrideConfig: [
+      {
+        files: ["**/*.ts"],
+        languageOptions: {
+          parser: tsParser,
+          parserOptions: {
+            projectService: {
+              allowDefaultProject: ["*.ts", "*.tsx"],
+              defaultProject: resolve(fixturesDir, "tsconfig.json"),
+            },
+            tsconfigRootDir: fixturesDir,
+          },
+        },
+        plugins: {
+          antidrift: plugin,
+        },
+        rules: {
+          "antidrift/no-identity-schema-transform": "error",
+        },
+        settings: {
+          antidrift: {
+            semanticFacts: {
+              repoRoot: fixturesDir,
+              sink: {
+                emit(fact) {
+                  facts.push(fact);
+                },
+              },
+            },
+          },
+        },
+      },
+    ],
+  });
+
+  const [result] = await eslint.lintText(drift.code, {
+    filePath: drift.filename,
+  });
+  return { facts, result };
+}
+
+it("emits an identity-schema-transform fact from the reported proof", async () => {
+  const { facts, result } = await lintIdentityTransformWithFacts(
+    "programs/drift/identity-schema-transform-reconstruction.ts",
+  );
+
+  expect(result.messages).toHaveLength(1);
+  expect(facts).toEqual([
+    expect.objectContaining({
+      factKind: "identitySchemaTransform",
+      ruleId: "antidrift/no-identity-schema-transform",
+      adapterId: "typescript-eslint/schema-provenance",
+      confidence: "deterministic-enforcement",
+      provenance: ["AST", "TypeChecker"],
+      payload: {
+        diagnostic: {
+          emitted: true,
+          messageId: "identitySchemaTransform",
+        },
+        inputShape: { keys: ["a", "b"] },
+        outputShape: { keys: ["a", "b"] },
+        transform: {
+          parameterStyle: "identifier",
+          relation: "identity-object-reconstruction",
+          returnStyle: "implicit",
+        },
+      },
+    }),
+  ]);
+  expectFactMatchesRegistry(facts[0]);
+});
+
 it("emits structural proposal facts for unaccepted installed-package matches", async () => {
   const { facts, result } = await lintWithStructuralFacts(
     "programs/drift/redeclares-full.ts",
@@ -816,6 +893,9 @@ it("emits a source-member shard candidate fact (inventory-only, no diagnostic)",
 });
 
 it("emits semantic facts that satisfy the registered public payload contract", async () => {
+  const identityTransform = await lintIdentityTransformWithFacts(
+    "programs/drift/identity-schema-transform-reconstruction.ts",
+  );
   const structural = await lintWithStructuralFacts(
     "programs/drift/redeclares-full.ts",
   );
@@ -841,6 +921,7 @@ it("emits semantic facts that satisfy the registered public payload contract", a
     void ProfileCard;
   `);
   const facts = [
+    ...identityTransform.facts,
     ...structural.facts,
     ...lifecycle.facts,
     ...inventory.facts,
