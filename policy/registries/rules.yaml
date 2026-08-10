@@ -1119,6 +1119,39 @@ rules:
         - "z.object({ a: z.string() }).transform((value) => ({ a: value.a, createdAt: nowIso() }))"
         - "ConversationIndexSchema.transform((raw) => ({ id: raw.id || deriveId(raw), title: raw.title?.trim() || 'New conversation' }))"
     nextAction: Keep default-off until a real identity-transform drift is independently replicated and broader Zod corpus inventory confirms the closed-shape proof has no false positives.
+  antidrift/no-explicit-type-arguments-on-owned-api:
+    status: ready
+    stable: false
+    defaultOff: true
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: Convex hook and TanStack registration symbol resolution live inline with one consumer. Extract to a shared adapter when a second rule needs owned-API provenance.
+    referenceDoc: docs/rule-investigations/no-explicit-type-arguments-on-owned-api.md
+    signal: TypeChecker symbol resolution of the callee to the convex or @tanstack packages plus owner existence proof (generated api reference or queryOptions/mutationOptions registration)
+    solveType: type-contract-shape
+    proofBuckets: [semantic-source-type-provenance]
+    corpusRepositories: [murderbox]
+    concerns:
+      - "The first evidence set is synthetic drift plus Murderbox clean-run controls; no independently replicated real drift yet."
+      - "Only registered owners are proven: Convex generated api references and queryOptions/mutationOptions results. Ad-hoc TanStack key arrays, inline options objects, and wrapper hooks around useQuery intentionally stay silent because no owner can be resolved."
+      - "Aliased or re-exported hook names resolve through the checker; a locally declared function that merely shares the useQuery name is not flagged even when handed a generated api reference."
+    external:
+      state: net-antidrift
+      support: none
+      candidates: ["@typescript-eslint/no-unnecessary-type-arguments"]
+      decision: own-antidrift
+      whyThisState: "@typescript-eslint/no-unnecessary-type-arguments fires only when an explicit type argument equals the default; it has no notion of registration ownership, so it cannot flag a diverging caller-supplied type on useQuery(api.machines.list) or queryClient.getQueryData(machinesQuery.queryKey)."
+      whyNotOtherState: "Not ecosystem-covered because the check needs symbol-resolved provenance from the call site back to a generated Convex api module or a TanStack registration factory, which no generic type-safety rule models."
+    examples:
+      flags:
+        - "useQuery<typeof api.machines.list>(api.machines.list)"
+        - "useQuery<HandwrittenMachine[]>(machinesQuery)"
+        - "queryClient.getQueryData<HandwrittenMachine[]>(machinesQuery.queryKey)"
+      allows:
+        - "useQuery(api.machines.list)"
+        - "queryClient.getQueryData<HandwrittenMachine[]>([\"machines\"])"
+        - "useQuery<HandwrittenMachine[]>({ queryKey: [\"machines\"], queryFn: fetchMachines })"
+    nextAction: Keep default-off until a real explicit-type-argument fork is independently replicated and Murderbox plus one more Convex or TanStack consumer confirm zero false positives on clean-run.
   antidrift/no-sql-string-concat:
     status: ecosystem-covered
     stable: false

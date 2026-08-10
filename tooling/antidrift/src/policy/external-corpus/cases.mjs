@@ -870,6 +870,16 @@ export const murderboxCases = [
     paths: ["apps/api/lib/server/workspace-projects.ts"],
   },
   {
+    id: "murderbox-timeline-durability-owned-api-clean",
+    ruleId: "antidrift/no-explicit-type-arguments-on-owned-api",
+    kind: "correct",
+    classification: "ready",
+    subproject: "client",
+    typeAware: true,
+    tsconfig: "apps/client/tsconfig.json",
+    paths: ["apps/client/src/screens/conversation-timeline-durability.ts"],
+  },
+  {
     id: "murderbox-codex-notification-decoder-clean",
     ruleId: "antidrift/no-identity-schema-transform",
     kind: "correct",

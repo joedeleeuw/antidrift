@@ -16,6 +16,7 @@ const typeServiceGuardedRules = [
   "no-contract-appeasement-projection",
   "no-defensive-shape-probing",
   "no-identity-schema-transform",
+  "no-explicit-type-arguments-on-owned-api",
   "no-redundant-zod-parse",
   "no-parse-as-cast",
   "no-appeasement-erasure",
@@ -718,6 +719,30 @@ typedRuleTester.run(
           "programs/drift/identity-schema-transform-reordered-keys.ts",
         ),
         errors: [{ messageId: "identitySchemaTransform" }],
+      },
+    ],
+  },
+);
+
+typedRuleTester.run(
+  "no-explicit-type-arguments-on-owned-api",
+  rule("no-explicit-type-arguments-on-owned-api"),
+  {
+    valid: [fixture("programs/correct/owned-api-explicit-type.ts")],
+    invalid: [
+      {
+        ...fixture("programs/drift/owned-api-explicit-type-convex.ts"),
+        errors: [
+          { messageId: "explicitTypeArgumentOnOwnedApi" },
+          { messageId: "explicitTypeArgumentOnOwnedApi" },
+        ],
+      },
+      {
+        ...fixture("programs/drift/owned-api-explicit-type-tanstack.ts"),
+        errors: [
+          { messageId: "explicitTypeArgumentOnOwnedApi" },
+          { messageId: "explicitTypeArgumentOnOwnedApi" },
+        ],
       },
     ],
   },

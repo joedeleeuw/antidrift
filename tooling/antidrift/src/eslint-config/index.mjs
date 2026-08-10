@@ -98,6 +98,7 @@ export function createConfig({
         // text-shape detection flagged parameterized tagged templates.
         "sql-template/no-unsafe-query": "error",
         "antidrift/no-identity-schema-transform": "off",
+        "antidrift/no-explicit-type-arguments-on-owned-api": "off",
         "antidrift/no-sql-string-concat": "off",
       },
     },
