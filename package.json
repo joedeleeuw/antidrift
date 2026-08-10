@@ -20,6 +20,7 @@
     "test:integration": "pnpm package:verify",
     "package:verify": "node tooling/antidrift/test/consumer-monorepo.mjs",
     "check": "pnpm policy:check-generated && pnpm policy:check-registries && pnpm policy:check-rule-surface && pnpm policy:validate-corpus && pnpm policy:validate-external-corpus && pnpm typecheck && pnpm lint && pnpm test && pnpm package:verify",
+    "check:ci": "pnpm policy:check-generated && pnpm policy:check-registries && pnpm policy:check-rule-surface && pnpm policy:validate-corpus && pnpm typecheck && pnpm lint && pnpm test && pnpm package:verify",
     "policy:generate": "antidrift generate",
     "policy:check-generated": "antidrift check-generated",
     "policy:check-registries": "antidrift check-registries",
