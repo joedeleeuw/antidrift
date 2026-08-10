@@ -57,7 +57,7 @@ import { createConfig } from "@joedeleeuw/antidrift/eslint-config";
 export default createConfig({ tsconfigRootDir: import.meta.dirname });
 ```
 
-`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, anti-suppression rules, a global 1,500-line module ceiling, `antidrift/require-effect-deps`, and `antidrift/no-static-property-loop`. Other syntax, scope, and local-control-flow Antidrift rules are registered there as default-off inventory. It deliberately does not choose a generic correctness, TypeScript, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Consumers can apply the frozen `antidriftComplexityRules` fragment to deliberate production-code scopes. `createConfig` enables eight custom rules that need TypeScript parser services and keeps `no-defensive-shape-probing`, `no-identity-schema-transform`, `no-sql-string-concat`, and `no-underchecked-type-predicate` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
+`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, anti-suppression rules, a global 1,500-line module ceiling, `antidrift/require-effect-deps`, and `antidrift/no-static-property-loop`. Other syntax, scope, and local-control-flow Antidrift rules are registered there as default-off inventory. It deliberately does not choose a generic correctness, TypeScript, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Consumers can apply the frozen `antidriftComplexityRules` fragment to deliberate production-code scopes. `createConfig` enables eight custom rules that need TypeScript parser services and keeps `no-defensive-shape-probing`, `no-explicit-type-arguments-on-owned-api`, `no-identity-schema-transform`, `no-sql-string-concat`, and `no-underchecked-type-predicate` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
 Oxlint excludes generated output only when its exact file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Generated-looking names are ordinary linted code unless the registry owns them.
 
@@ -221,6 +221,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-unsafe-deserialize` — `JSON.parse` of `any` / `unknown` instead of parsing at a schema boundary
 - `no-defensive-shape-probing` — deterministic broad-value extractor cases backed by real corpus evidence, not ordinary boolean predicates
 - `no-identity-schema-transform` — default-off TypeChecker proof for Zod transforms that reconstruct every input field unchanged
+- `no-explicit-type-arguments-on-owned-api` — default-off symbol-resolved proof against caller-supplied type arguments on Convex generated references and TanStack registrations
 - `import/no-cycle` — import cycles caught by Oxlint's native import graph
 
 Other existing baseline rules may still ship in the config, but they are not the current roadmap.
