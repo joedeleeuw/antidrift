@@ -10,10 +10,11 @@ This rule should catch repeated validation after a value is already known to be 
 
 Type-aware Zod provenance.
 
-The rule confirms that `.parse()` / `.parseAsync()` is a Zod method through TypeScript symbol declarations, not by name. It then reports either:
+The rule confirms that `.parse()` / `.parseAsync()` is a Zod method through TypeScript symbol declarations, not by name. It then reports only:
 
-- a value already recorded as produced by the same schema, or
-- an awaited service/helper result whose type is equivalent to the schema output.
+- a value already recorded as produced by the same schema (same-binding decoder provenance).
+
+The helper-result branch was removed on 2026-08-10. It gated reports on bidirectional TypeScript assignability between the helper's declared return type and the schema output, but assignability never proves the same decoder ran: refinements (`.min`, `.positive`, `.refine`, `.transform`) are invisible to the type system, so `NonEmpty.parse(readName())` with `readName(): string` false-positived. Type equivalence is not decoder provenance.
 
 ## Should Flag
 
@@ -104,13 +105,12 @@ Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-
 
 Follow-up real-corpus search on June 4, 2026 found no consumed assertion-callback reparse case to promote as a drift gate. The scan ran the narrowed rule over 50 Codebase Atlas test files, 30 Murderbox API test files, 132 Sudocode server test files, and 11 Chaski BFF test files; all stayed clean. The consumed-parse edge is accepted as unrepresented in the current corpus rather than blocked on a synthetic fixture. The implementation still keeps the exception narrow by requiring the parse call to be the direct throw-assertion expression.
 
-The later helper-result slice closed the remaining promotion blocker: direct awaited or synchronous helper calls such as `Schema.parse(await getTypedValue())` and `Schema.parse(getTypedValue())` now report when TypeScript proves the helper result is already equivalent to the schema output, while nested schema pipelines remain clean.
+The helper-result slice that closed the promotion blocker was later found unsound and removed on 2026-08-10: `Schema.parse(await getTypedValue())` and `Schema.parse(getTypedValue())` gated on type equivalence, which cannot prove the same decoder ran (refinements are invisible to TypeScript). The slice may return only with real producer provenance in the schema-provenance adapter.
 
 Known remaining limits:
 
-- Inline service reparses such as `Schema.parse(await getTypedValue())` and synchronous helper reparses such as `Schema.parse(getTypedValue())` are caught when TypeScript proves the call result is equivalent to the schema output.
+- Helper/service call results are silent until decoder producer provenance exists; type equivalence is a rejected signal.
 - Nested schema pipelines such as `OutputSchema.parse(CoercionSchema.parse(raw))` stay clean because the inner parse is a first-boundary validation step, not a typed service result.
-- The service-result branch trusts TypeScript annotations. If a helper is typed as a schema output but internally casts raw data without validation, a first real boundary parse can look redundant.
 
 ## Promotion State
 

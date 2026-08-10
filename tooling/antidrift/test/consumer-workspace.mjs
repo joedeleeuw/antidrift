@@ -392,7 +392,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       'import { BROAD_INPUT_ARRAY_TRANSFORM_METHODS, assignmentTarget, callUsesPredicateParam, checkedTargetProperties, collectBindingIdentifiers, collectBindingNames, collectObjectPatternBindingNames, countShapeProbesIn, destructuredTargetPropertyAliases, directAliasName, functionParameterByName, hasBroadObjectEntriesValue, hasParamRoot, hasValidatorDelegation, isAppeasementCastSourceType, isAppeasementCastTargetType, isAppeasementContractCast, isBindingIdentifier, isBroadPredicateInputType, isBroadShapeProbeInputType, isNamedTypeReference, isNullishLiteral, isObjectEntriesCall, isPredicateObjectContract, isTypeofObjectProbe, memberExpressionPropertyName, memberExpressionRootName, objectEntriesCallbackProbe, objectEntriesValueBindings, objectHasOwnPropertyName, predicateValueNames, requiredTypeProps, staticPropertyName, typePredicateParts, unwrapExpression, walkNode, type ObjectEntriesCallbackProbe, type TypePredicateParts, type TypeScriptParserServices as BroadInputParserServices } from "@joedeleeuw/antidrift/semantic-adapters/broad-input";\n' +
       'import { conditionEnsuresString, hasLocalStringBoundary, isJsonParseCall, isUnsafeJsonParseInput, jsonParseArgument, type TypeScriptParserServices as ParseInputParserServices } from "@joedeleeuw/antidrift/semantic-adapters/parse-input";\n' +
       'import { classifyWriteValue, createReactStateTracker, frameStatePayload, lifecycleProof, type ReactStateFrame, type ReactStateFramePayload, type ReactStateLifecycleProof, type ReactStateWriteClass } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
-      'import { ZOD_PARSE_METHODS, ZOD_THROW_ASSERTION_MATCHERS, isAwaitedCallInitializer, isCallResultExpression, isThrowAssertionCallbackParse, isZodParseExpression, parsedCallResultMatchesSchemaOutput, recordParsedConst, zodParseCallParts, type TypeScriptParserServices, type ZodParseCallParts } from "@joedeleeuw/antidrift/semantic-adapters/schema-provenance";\n' +
+      'import { ZOD_PARSE_METHODS, ZOD_THROW_ASSERTION_MATCHERS, isThrowAssertionCallbackParse, recordParsedConst, zodParseCallParts, type TypeScriptParserServices, type ZodParseCallParts } from "@joedeleeuw/antidrift/semantic-adapters/schema-provenance";\n' +
       'import { isSqlDirectionTokenValue, isSqlIdentifierContext, isSqlIdentifierTokenValue, isSqlInterpolationContext, normalizedSqlContext, removeTrailingSqlQuote, safeIdentifierMemberSpecs, safeTemplateTagSpecs, valuesAreSqlDirections, valuesAreSqlIdentifiers, type SafeIdentifierMemberSpec, type SafeTemplateTagSpecs } from "@joedeleeuw/antidrift/semantic-adapters/sql";\n' +
       'import { hasNullablePositionalTuple, nullableTupleSlots, tupleElementIsNullishSlot, tupleElementIsOptional, tupleElementResolvesToNullish, tupleElementTypeNode, typeIncludesNullish, typeNodeIncludesDirectNullish, type TypeScriptParserServices as TupleShapeParserServices } from "@joedeleeuw/antidrift/semantic-adapters/tuple-shape";\n' +
       'import { MIN_PROPS, canonicalStatusLiteralOwner, collectAcceptedPackageCanonicalTypes, collectCanonicalTypes, collectDomainCanonicalTypes, collectGeneratedCanonicalTypes, isObjectType, isStatusContextName, isStatusLiteralContext, normalizedContextName, nodeKeyName, resolvesToDomainCanonicalType, resolvesToGeneratedType, resolvesToInstalledType, typeProps, type DomainCanonicalEntityRegistry, type DomainStatusRegistry, type GeneratedSourceRegistry, type PackageTypeOwnerRegistry, type StatusLiteralOwner, type StructuralTypeCandidate } from "@joedeleeuw/antidrift/semantic-adapters/type-owner";\n' +
@@ -596,12 +596,8 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "frameStatePayload satisfies (frame: ReactStateFrame) => ReactStateFramePayload;\n" +
       'ZOD_PARSE_METHODS.has("parse") satisfies boolean;\n' +
       'ZOD_THROW_ASSERTION_MATCHERS.has("toThrow") satisfies boolean;\n' +
-      'isAwaitedCallInitializer({ type: "AwaitExpression", argument: { type: "CallExpression" } }) satisfies boolean;\n' +
-      'isCallResultExpression({ type: "CallExpression" }) satisfies boolean;\n' +
       "isThrowAssertionCallbackParse satisfies (node: unknown) => boolean;\n" +
       "zodParseCallParts satisfies (node: unknown, services: TypeScriptParserServices, checker: ts.TypeChecker) => ZodParseCallParts | null;\n" +
-      "isZodParseExpression satisfies (node: unknown, services: TypeScriptParserServices, checker: ts.TypeChecker) => boolean;\n" +
-      "parsedCallResultMatchesSchemaOutput satisfies (checker: ts.TypeChecker, services: TypeScriptParserServices, tsCall: ts.Node, arg: unknown) => boolean;\n" +
       "recordParsedConst satisfies (node: unknown, schemaSym: ts.Symbol | undefined, symbolOf: (node: unknown) => ts.Symbol | undefined, validatedBy: Map<ts.Symbol, ts.Symbol>) => void;\n" +
       "parserServices satisfies TypeScriptParserServices;\n" +
       'isSqlIdentifierTokenValue("users") satisfies boolean;\n' +
@@ -698,11 +694,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "void lifecycleProof;\n" +
       "void ZOD_PARSE_METHODS;\n" +
       "void ZOD_THROW_ASSERTION_MATCHERS;\n" +
-      "void isAwaitedCallInitializer;\n" +
-      "void isCallResultExpression;\n" +
       "void isThrowAssertionCallbackParse;\n" +
-      "void isZodParseExpression;\n" +
-      "void parsedCallResultMatchesSchemaOutput;\n" +
       "void recordParsedConst;\n" +
       "void zodParseCallParts;\n" +
       "void isSqlDirectionTokenValue;\n" +
@@ -746,7 +738,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       'import { BROAD_INPUT_ARRAY_TRANSFORM_METHODS, assignmentTarget, callUsesPredicateParam, checkedTargetProperties, collectBindingIdentifiers, collectBindingNames, collectObjectPatternBindingNames, countShapeProbesIn, destructuredTargetPropertyAliases, directAliasName, functionParameterByName, hasBroadObjectEntriesValue, hasParamRoot, hasValidatorDelegation, isAppeasementCastSourceType, isAppeasementCastTargetType, isAppeasementContractCast, isBindingIdentifier, isBroadPredicateInputType, isBroadShapeProbeInputType, isNamedTypeReference, isNullishLiteral, isObjectEntriesCall, isPredicateObjectContract, isTypeofObjectProbe, memberExpressionPropertyName, memberExpressionRootName, objectEntriesCallbackProbe, objectEntriesValueBindings, objectHasOwnPropertyName, predicateValueNames, requiredTypeProps, staticPropertyName, typePredicateParts, unwrapExpression, walkNode } from "@joedeleeuw/antidrift/semantic-adapters/broad-input";\n' +
       'import { hasLocalStringBoundary, isJsonParseCall, jsonParseArgument } from "@joedeleeuw/antidrift/semantic-adapters/parse-input";\n' +
       'import { classifyWriteValue, createReactStateTracker, frameStatePayload, lifecycleProof } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
-      'import { ZOD_PARSE_METHODS, ZOD_THROW_ASSERTION_MATCHERS, isAwaitedCallInitializer, isCallResultExpression, isThrowAssertionCallbackParse, isZodParseExpression, parsedCallResultMatchesSchemaOutput, recordParsedConst, zodParseCallParts } from "@joedeleeuw/antidrift/semantic-adapters/schema-provenance";\n' +
+      'import { ZOD_PARSE_METHODS, ZOD_THROW_ASSERTION_MATCHERS, isThrowAssertionCallbackParse, recordParsedConst, zodParseCallParts } from "@joedeleeuw/antidrift/semantic-adapters/schema-provenance";\n' +
       'import { isSqlDirectionTokenValue, isSqlIdentifierContext, isSqlIdentifierTokenValue, isSqlInterpolationContext, normalizedSqlContext, removeTrailingSqlQuote, safeIdentifierMemberSpecs, valuesAreSqlDirections, valuesAreSqlIdentifiers } from "@joedeleeuw/antidrift/semantic-adapters/sql";\n' +
       'import { hasNullablePositionalTuple, nullableTupleSlots, tupleElementIsNullishSlot, tupleElementIsOptional, tupleElementResolvesToNullish, tupleElementTypeNode, typeIncludesNullish, typeNodeIncludesDirectNullish } from "@joedeleeuw/antidrift/semantic-adapters/tuple-shape";\n' +
       'import { MIN_PROPS, canonicalStatusLiteralOwner, collectAcceptedPackageCanonicalTypes, collectCanonicalTypes, collectDomainCanonicalTypes, collectGeneratedCanonicalTypes, isObjectType, isStatusContextName, isStatusLiteralContext, normalizedContextName, nodeKeyName, resolvesToDomainCanonicalType, resolvesToGeneratedType, resolvesToInstalledType, typeProps } from "@joedeleeuw/antidrift/semantic-adapters/type-owner";\n' +
@@ -852,11 +844,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "  lifecycleProof,\n" +
       "  ZOD_PARSE_METHODS,\n" +
       "  ZOD_THROW_ASSERTION_MATCHERS,\n" +
-      "  isAwaitedCallInitializer,\n" +
-      "  isCallResultExpression,\n" +
       "  isThrowAssertionCallbackParse,\n" +
-      "  isZodParseExpression,\n" +
-      "  parsedCallResultMatchesSchemaOutput,\n" +
       "  recordParsedConst,\n" +
       "  zodParseCallParts,\n" +
       "  isSqlDirectionTokenValue,\n" +
@@ -1048,7 +1036,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       '  throw new Error("Missing broad-input semantic adapter behavior");\n' +
       "}\n" +
       "\n" +
-      'if (!ZOD_PARSE_METHODS.has("parse") || !ZOD_THROW_ASSERTION_MATCHERS.has("toThrow") || !isAwaitedCallInitializer({ type: "AwaitExpression", argument: { type: "CallExpression" } }) || !isCallResultExpression({ type: "CallExpression" })) {\n' +
+      'if (!ZOD_PARSE_METHODS.has("parse") || !ZOD_THROW_ASSERTION_MATCHERS.has("toThrow")) {\n' +
       '  throw new Error("Missing schema-provenance semantic adapter behavior");\n' +
       "}\n" +
       "\n" +
