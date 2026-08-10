@@ -9,9 +9,17 @@ export type TypeOwnerAuthority =
 
 export type TypeOwnerAuthorityState = "accepted" | "proposal";
 
+export interface StructuralProperty {
+  type: string;
+  optional: boolean;
+  readonly: boolean;
+  method: boolean;
+}
+
 export interface StructuralTypeCandidate {
   label: string;
   props: Map<string, string>;
+  detailedProps?: Map<string, StructuralProperty>;
   authority: TypeOwnerAuthority;
   authorityState: TypeOwnerAuthorityState;
   ownerKey?: string;
@@ -64,6 +72,11 @@ export function typeProps(
   checker: ts.TypeChecker,
   type: ts.Type,
 ): Map<string, string>;
+
+export function typePropsDetailed(
+  checker: ts.TypeChecker,
+  type: ts.Type,
+): Map<string, StructuralProperty>;
 
 export function collectCanonicalTypes(
   program: ts.Program,

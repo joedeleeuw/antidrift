@@ -1356,7 +1356,7 @@ rules:
     promotion:
       proofBucket: authority-index-ownership
       association: Hand-written local object type/interface declarations to exact property fingerprints of configured generated-source or accepted package-owner exports.
-      blockingThreshold: A diagnostic emits only when the TypeChecker proves an exact owner copy with the same property count, property names, and checker-rendered property types, and the owner candidate is accepted through generatedSources or packageTypeOwners configuration.
+      blockingThreshold: A diagnostic emits only when the TypeChecker proves an exact owner copy — same properties with identical checker-rendered types, optionality, readonly, and method-ness — and the owner candidate is accepted through generatedSources or packageTypeOwners configuration. Loosened and partial copies of accepted owners emit inventory facts with their relation and do not block. Since 2026-08-10 accepted owners match from one property; discovery proposals keep the four-property minimum.
       ecosystemComparison: Import restrictions and generic naming rules cannot detect structural copies of generated or installed package exported types; no maintained TypeScript ESLint rule compares local object declarations against configured owner exports.
       corpusEvidence: Chaski provides clean pressure for generated imports, installed base-client aliases, local tuple aliases, projected DTO subsets, and utility-type derivations. After subset matching was removed, current real corpus does not yet provide a promoted exact blocking generated/package-owner fork.
       realCorpusInventory: docs/rule-investigations/generated-source-structural-fork.md and docs/real-corpus-validation.md record the exact-copy-only decision and Chaski clean controls.
@@ -1376,6 +1376,7 @@ rules:
       - Installed package fork blocking now requires accepted package-owner facts from policy/registries/ownership.yaml, preferably proposed from existing imports, owner-type derivations, SDK return provenance, generated wrappers, or repeated structural forks.
       - Generated-source matching is registry-gated and should stay off when no generated source is declared.
       - Boundary DTOs may intentionally overlap generated types and stay clean unless they exactly redeclare the owner shape.
+      - "Fingerprint exactness was repaired on 2026-08-10: the shared typeProps fingerprint stripped top-level | undefined and skipped methods, so optional-versus-required and method-versus-property copies fingerprinted as exact. The relation classifier now distinguishes exact-owner-copy (blocking on accepted owners), loosened-owner-copy, and partial-owner-copy (both inventory)."
       - Installed-package exported object types are not always contracts the consuming app was expected to import, so that mode has a weaker owner-authority claim than generated/domain registry modes.
       - "Subset matching was removed from enforcement because projected DTOs with four or more owner fields may be legitimate translation contracts."
     external:
@@ -1400,7 +1401,7 @@ rules:
     promotion:
       proofBucket: authority-index-ownership
       association: Hand-written local object type/interface declarations to exact property fingerprints of configured first-party canonical domain model exports.
-      blockingThreshold: A diagnostic emits only when canonicalEntities config names an owner, the TypeChecker can load that owner, and a local hand-written object/interface is an exact owner copy at or above the shared property threshold.
+      blockingThreshold: A diagnostic emits only when canonicalEntities config names an owner, the TypeChecker can load that owner, and a local hand-written object/interface is an exact owner copy with identical optionality, readonly, and method-ness. Since 2026-08-10 accepted owners match from one property; loosened and partial copies are inventory facts with their relation, not diagnostics.
       ecosystemComparison: TypeScript ESLint, ESLint core, Semgrep, and CodeQL can express adjacent syntax or custom queries, but no maintained rule combines a repo-owned canonical model registry with TypeChecker structural equality and owner-file exceptions.
       corpusEvidence: Chaski proves ActionItem, Stop, and ActionItemsReport forks from the report owner with clean owner and sibling-report controls. Sudocode supplies second-repo configured-owner drift for frontend ProjectInfo copying the server ProjectInfo owner under an explicit cross-project TypeScript Program.
       realCorpusInventory: docs/rule-investigations/domain-canonical-model-fork.md and docs/real-corpus-validation.md record the Chaski and Sudocode configured-owner cases plus clean owner/sibling/schema-inferred controls.

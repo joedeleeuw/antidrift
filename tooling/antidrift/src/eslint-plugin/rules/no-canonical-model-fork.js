@@ -1,9 +1,9 @@
 import {
-  MIN_PROPS,
   collectDomainCanonicalTypes,
   isObjectType,
   resolvesToDomainCanonicalType,
   typeProps,
+  typePropsDetailed,
 } from "../../semantic-adapters/type-owner.mjs";
 import {
   missingTypeServicesVisitors,
@@ -91,12 +91,11 @@ export function ruleNoCanonicalModelFork() {
           return;
         }
         const local = typeProps(checker, declared);
-        if (local.size < MIN_PROPS) {
-          return;
-        }
+        const localDetailed = typePropsDetailed(checker, declared);
         const proof = findStructuralProof(
           sym,
           local,
+          localDetailed,
           candidates,
           "canonicalModelFork",
         );
