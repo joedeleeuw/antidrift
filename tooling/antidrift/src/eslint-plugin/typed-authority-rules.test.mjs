@@ -23,6 +23,7 @@ const typeServiceGuardedRules = [
   "no-structural-type-fork",
   "no-underchecked-type-predicate",
   "no-unsafe-deserialize",
+  "require-convex-return-validator",
 ];
 
 for (const guardedRule of typeServiceGuardedRules) {
@@ -743,6 +744,33 @@ typedRuleTester.run(
           { messageId: "explicitTypeArgumentOnOwnedApi" },
           { messageId: "explicitTypeArgumentOnOwnedApi" },
         ],
+      },
+    ],
+  },
+);
+
+typedRuleTester.run(
+  "require-convex-return-validator",
+  rule("require-convex-return-validator"),
+  {
+    valid: [
+      fixture("programs/correct/convex-returns-validator.ts"),
+      fixture("programs/correct/convex-returns-validator-dynamic-config.ts"),
+      fixture("programs/correct/convex-returns-validator-local-shadow.ts"),
+    ],
+    invalid: [
+      {
+        ...fixture("programs/drift/convex-missing-return-validator.ts"),
+        errors: [
+          { messageId: "missingReturnValidator" },
+          { messageId: "missingReturnValidator" },
+        ],
+      },
+      {
+        ...fixture(
+          "programs/drift/convex-missing-return-validator-aliased.ts",
+        ),
+        errors: [{ messageId: "missingReturnValidator" }],
       },
     ],
   },
