@@ -708,6 +708,16 @@ function classifyOutcomeAssertion(record, facts) {
   return { independent: false, messageId: "outcomeEcho", node: record.node };
 }
 
+function actHasStaticallyArrangedArgument(act) {
+  return act.arguments.some((argument) => {
+    const expression = unwrapExpression(argument);
+    return (
+      expression?.type === "Identifier" ||
+      literalContainerTypes.has(expression?.type)
+    );
+  });
+}
+
 function classifyErrorShapeAssertion(record, facts) {
   if (
     record.kind === "expect" &&
@@ -726,7 +736,8 @@ function classifyErrorShapeAssertion(record, facts) {
       : equalityOperands(record)?.actual;
   if (!actual) return null;
   const info = arrangedActPathForExpression(actual, facts.bindings);
-  if (!info?.path.some((segment) => String(segment) === "error")) return null;
+  if (!info || !actHasStaticallyArrangedArgument(info.act)) return null;
+  if (!info.path.some((segment) => String(segment) === "error")) return null;
   return {
     independent: false,
     messageId: "errorShapeEcho",
