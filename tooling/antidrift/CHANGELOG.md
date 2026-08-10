@@ -1,6 +1,6 @@
 # changelog
 
-## Unreleased
+## 0.8.0
 
 - add default-off `no-identity-schema-transform` with Zod ownership, closed-shape proof, clean decoder controls, and semantic facts
 
