@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- repair structural fork fingerprints: optionality, readonly, and method-ness are now encoded per property, and matching classifies `exact-owner-copy` (the only blocking relation on accepted owners), `loosened-owner-copy`, and `partial-owner-copy` (both inventory facts). Accepted owners now match from one property; discovery proposals keep the four-property minimum. The previous fingerprint stripped `| undefined` and skipped methods, so loosened copies fingerprinted as exact
+
 - fix `antidrift/no-redundant-zod-parse`: remove the call-result branches gated on bidirectional type assignability — type equivalence never proves the same decoder ran (refinements are invisible to TypeScript); same-binding decoder provenance remains at error
 
 - add default-off `require-convex-return-validator`: flags registered Convex functions (query/mutation/action and internal counterparts, symbol-resolved through the generated server module) whose object-literal registration lacks a static `returns` validator; real Murderbox drift control (18 functions flagged, zero false positives)

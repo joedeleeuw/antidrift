@@ -40,6 +40,29 @@ export function typeProps(checker, type) {
   return props;
 }
 
+// Full-fidelity fingerprint: optionality, readonly, and method-ness are encoded
+// per property, and the type string is NOT loosened. This is the blocking-grade
+// shape; typeProps remains the loose discovery fingerprint.
+export function typePropsDetailed(checker, type) {
+  const props = new Map();
+  for (const sym of checker.getPropertiesOfType(type)) {
+    const declarations = sym.declarations ?? [];
+    const method = declarations.some(
+      (declaration) =>
+        ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration),
+    );
+    const readonly = declarations.some((declaration) =>
+      (ts.getModifiers(declaration) ?? []).some(
+        (modifier) => modifier.kind === ts.SyntaxKind.ReadonlyKeyword,
+      ),
+    );
+    const optional = (sym.flags & ts.SymbolFlags.Optional) !== 0;
+    const str = checker.typeToString(checker.getTypeOfSymbol(sym));
+    props.set(sym.name, { type: str, optional, readonly, method });
+  }
+  return props;
+}
+
 // Best-effort package specifier from a declaration file path. Uses the last node_modules segment
 // so pnpm realpaths like `.pnpm/firebase@x/node_modules/@firebase/auth/...` yield `@firebase/auth`.
 function packageOf(fileName) {
@@ -92,8 +115,17 @@ function candidateFor(checker, sym, pkg, metadata = {}) {
   }
   if (!isObjectType(declared)) return null;
   const props = typeProps(checker, declared);
-  if (props.size < MIN_PROPS) return null;
-  return { label: `${pkg}#${sym.getName()}`, props, ...metadata };
+  // Discovery proposals stay at MIN_PROPS to keep coincidence noise out;
+  // explicitly accepted owners are authoritative at any size, down to one
+  // property, so small Convex results and arguments can be enforced.
+  const minimum = metadata.authorityState === "accepted" ? 1 : MIN_PROPS;
+  if (props.size < minimum) return null;
+  return {
+    label: `${pkg}#${sym.getName()}`,
+    props,
+    detailedProps: typePropsDetailed(checker, declared),
+    ...metadata,
+  };
 }
 
 function exportedObjectTypes(

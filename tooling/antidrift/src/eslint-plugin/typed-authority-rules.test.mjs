@@ -524,6 +524,26 @@ typedRuleTester.run(
         options: [generatedStructuralOptions],
       },
       fixture("programs/drift/redeclares-optional.ts"),
+      // Loosened copy (optionality/readonly relaxed) of an accepted owner is
+      // inventory, not blocking — only exact-owner-copy reports
+      {
+        ...fixture("programs/drift/redeclares-optional.ts"),
+        options: [acceptedPackageStructuralOptions],
+      },
+      {
+        // Readonly dropped from an otherwise exact accepted-owner copy: loosened
+        code: `
+          export type UserInfoMutable = {
+            uid: string;
+            email: string | null;
+            displayName: string | null;
+            photoURL: string | null;
+            providerId: string;
+            phoneNumber: string | null;
+          };
+        `,
+        options: [acceptedPackageStructuralOptions],
+      },
     ],
     invalid: [
       {

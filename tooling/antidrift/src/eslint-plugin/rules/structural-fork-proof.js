@@ -7,16 +7,50 @@ export const structuralDerivationUtilities = new Set([
   "Readonly",
   "Required",
 ]);
-export function isExactStructuralFork(local, canonical) {
-  if (local.size !== canonical.size) {
-    return false;
+// Classify a local type against an owner using full-fidelity fingerprints.
+// - exact-owner-copy: same properties, same types, same optionality/readonly/method-ness
+// - loosened-owner-copy: same properties and types, but local relaxes optionality or drops readonly
+// - partial-owner-copy: local is a strict subset of the owner, every local property exact
+// Tightened copies (required where the owner is optional) and any other shape
+// difference are deliberately unmatched.
+export function classifyStructuralRelation(local, owner) {
+  if (local.size === 0 || owner.size === 0 || local.size > owner.size) {
+    return null;
   }
-  for (const [name, typeStr] of local) {
-    if (canonical.get(name) !== typeStr) {
-      return false;
+  let exact = local.size === owner.size;
+  let loosened = local.size === owner.size;
+  let subset = true;
+  for (const [name, localProp] of local) {
+    const ownerProp = owner.get(name);
+    if (!ownerProp) {
+      return null;
+    }
+    if (
+      localProp.type !== ownerProp.type ||
+      localProp.method !== ownerProp.method
+    ) {
+      return null;
+    }
+    if (
+      localProp.optional !== ownerProp.optional ||
+      localProp.readonly !== ownerProp.readonly
+    ) {
+      exact = false;
+      subset = false;
+      const optionalRelaxation = localProp.optional && !ownerProp.optional;
+      const readonlyDrop = ownerProp.readonly && !localProp.readonly;
+      if (
+        (!optionalRelaxation && localProp.optional !== ownerProp.optional) ||
+        (!readonlyDrop && localProp.readonly !== ownerProp.readonly)
+      ) {
+        loosened = false;
+      }
     }
   }
-  return true;
+  if (exact) return "exact-owner-copy";
+  if (loosened) return "loosened-owner-copy";
+  if (subset && local.size < owner.size) return "partial-owner-copy";
+  return null;
 }
 export function sortedProps(props) {
   return [...props.entries()].sort(([left], [right]) =>
@@ -33,7 +67,13 @@ export function sortedStructuralCandidates(candidates) {
       left.label.localeCompare(right.label),
   );
 }
-export function structuralMatchProof(sym, local, candidate, diagnostic) {
+export function structuralMatchProof(
+  sym,
+  local,
+  candidate,
+  diagnostic,
+  relation = "exact-owner-copy",
+) {
   const localProps = sortedProps(local);
   return {
     authorityState: candidate.authorityState ?? "proposal",
@@ -49,7 +89,7 @@ export function structuralMatchProof(sym, local, candidate, diagnostic) {
     },
     structuralMatch: {
       matchedProps: localProps.map(([name]) => name),
-      relation: "exact-owner-copy",
+      relation,
       localPropCount: local.size,
       ownerPropCount: candidate.props.size,
     },
@@ -67,27 +107,59 @@ export function emitStructuralMatchFact(context, node, ruleId, proof) {
     payload: proof,
   });
 }
-export function structuralDiagnosticFor(candidate, messageId) {
-  if (candidate.authorityState === "accepted") {
+export function structuralDiagnosticFor(candidate, messageId, relation) {
+  if (
+    candidate.authorityState === "accepted" &&
+    relation === "exact-owner-copy"
+  ) {
     return { emitted: true, messageId };
+  }
+  if (candidate.authorityState === "accepted") {
+    return {
+      emitted: false,
+      reason: `structural-relation-${relation}`,
+    };
   }
   return {
     emitted: false,
     reason: "owner-authority-unaccepted",
   };
 }
-export function findStructuralProof(sym, local, candidates, messageId) {
+const relationRank = {
+  "exact-owner-copy": 0,
+  "loosened-owner-copy": 1,
+  "partial-owner-copy": 2,
+};
+
+export function findStructuralProof(
+  sym,
+  local,
+  localDetailed,
+  candidates,
+  messageId,
+) {
+  let best = null;
   for (const candidate of sortedStructuralCandidates(candidates)) {
-    if (isExactStructuralFork(local, candidate.props)) {
-      return structuralMatchProof(
-        sym,
-        local,
-        candidate,
-        structuralDiagnosticFor(candidate, messageId),
-      );
+    if (!candidate.detailedProps) continue;
+    const relation = classifyStructuralRelation(
+      localDetailed,
+      candidate.detailedProps,
+    );
+    if (!relation) continue;
+    if (best && relationRank[relation] >= relationRank[best.relation]) {
+      continue;
     }
+    best = { candidate, relation };
+    if (relation === "exact-owner-copy") break;
   }
-  return null;
+  if (!best) return null;
+  return structuralMatchProof(
+    sym,
+    local,
+    best.candidate,
+    structuralDiagnosticFor(best.candidate, messageId, best.relation),
+    best.relation,
+  );
 }
 export function isAllOptionalObjectShape(node) {
   let members = [];

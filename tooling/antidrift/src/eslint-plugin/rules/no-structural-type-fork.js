@@ -1,6 +1,5 @@
 import { semanticFactSink } from "../../policy/lib/semantic-facts.mjs";
 import {
-  MIN_PROPS,
   collectAcceptedPackageCanonicalTypes,
   collectCanonicalTypes,
   collectGeneratedCanonicalTypes,
@@ -8,6 +7,7 @@ import {
   resolvesToGeneratedType,
   resolvesToInstalledType,
   typeProps,
+  typePropsDetailed,
 } from "../../semantic-adapters/type-owner.mjs";
 import {
   missingTypeServicesVisitors,
@@ -127,12 +127,11 @@ export function ruleNoStructuralTypeFork() {
           return;
         }
         const local = typeProps(checker, declared);
-        if (local.size < MIN_PROPS) {
-          return;
-        }
+        const localDetailed = typePropsDetailed(checker, declared);
         const proof = findStructuralProof(
           sym,
           local,
+          localDetailed,
           candidates,
           "structuralTypeFork",
         );

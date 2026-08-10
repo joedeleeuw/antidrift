@@ -9,6 +9,7 @@ export {
   resolvesToGeneratedType,
   resolvesToInstalledType,
   typeProps,
+  typePropsDetailed,
 } from "../policy/lib/type-index.mjs";
 export {
   canonicalStatusLiteralOwner,

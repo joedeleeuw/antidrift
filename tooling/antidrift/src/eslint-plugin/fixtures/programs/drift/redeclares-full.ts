@@ -1,11 +1,11 @@
-// Full structural redeclaration of firebase/auth UserInfo.
-// Unaccepted installed-package authority emits inventory facts only.
+// Exact structural redeclaration of firebase/auth UserInfo, including its
+// readonly modifiers. Accepted package authority blocks on exact copies.
 
 export type UserInfo = {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  providerId: string;
-  phoneNumber: string | null;
+  readonly uid: string;
+  readonly email: string | null;
+  readonly displayName: string | null;
+  readonly photoURL: string | null;
+  readonly providerId: string;
+  readonly phoneNumber: string | null;
 };
