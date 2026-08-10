@@ -191,7 +191,7 @@ Public entry points, one package:
 
 ## The rule worth installing this for
 
-`antidrift/no-structural-type-fork` asks the TypeScript type checker, not a list of names, whether the type you just hand-wrote is structurally a copy of a configured generated-source owner. Installed package matches are semantic inventory until a project accepts the package owner as authority.
+`antidrift/no-structural-type-fork` asks the TypeScript type checker, not a list of names, whether the type you just hand-wrote is structurally a copy of a configured generated-source owner. Installed package matches are semantic inventory until a project accepts the package owner as authority. Convex generated owners are implicit: when the program contains `convex/_generated/dataModel` or `convex/_generated/api`, every `Doc<"table">` and every `FunctionReturnType<typeof api.*>` is an accepted owner with no registry entry, and exact hand-written copies report while references, `Pick`/`Omit` projections, and near-miss shapes stay silent.
 
 ```ts
 // A configured generated owner already exports this exact shape.
@@ -205,7 +205,7 @@ type ReleaseRow = {
 };
 ```
 
-Generated-source and first-party domain owners come from policy registries. Installed packages are scanned only for proposal facts when a semantic fact sink is configured; they do not block by default. Alias an imported type (`type X = UserInfo`) and it stays quiet, because that's a reference and not a fork. All-optional projection DTOs stay quiet because they are usually boundary drafts or patches, not full model redeclarations.
+Generated-source and first-party domain owners come from policy registries. Convex generated owners need no registry entry: any `convex/_generated/dataModel` or `convex/_generated/api` module in the program supplies accepted `Doc<"table">` and `FunctionReturnType<typeof api.*>` owners, and files under `convex/_generated/` are exempt. Installed packages are scanned only for proposal facts when a semantic fact sink is configured; they do not block by default. Alias an imported type (`type X = UserInfo`) and it stays quiet, because that's a reference and not a fork. All-optional projection DTOs stay quiet because they are usually boundary drafts or patches, not full model redeclarations.
 
 The scoped rules that motivated this package go after the usual agent tells:
 

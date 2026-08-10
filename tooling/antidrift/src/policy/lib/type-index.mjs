@@ -106,6 +106,22 @@ export function resolvesToInstalledType(type) {
   );
 }
 
+function candidateForType(checker, type, label, metadata = {}) {
+  if (!type || !isObjectType(type)) return null;
+  const props = typeProps(checker, type);
+  // Discovery proposals stay at MIN_PROPS to keep coincidence noise out;
+  // explicitly accepted owners are authoritative at any size, down to one
+  // property, so small Convex results and arguments can be enforced.
+  const minimum = metadata.authorityState === "accepted" ? 1 : MIN_PROPS;
+  if (props.size < minimum) return null;
+  return {
+    label,
+    props,
+    detailedProps: typePropsDetailed(checker, type),
+    ...metadata,
+  };
+}
+
 function candidateFor(checker, sym, pkg, metadata = {}) {
   let declared;
   try {
@@ -113,19 +129,8 @@ function candidateFor(checker, sym, pkg, metadata = {}) {
   } catch {
     return null;
   }
-  if (!isObjectType(declared)) return null;
-  const props = typeProps(checker, declared);
-  // Discovery proposals stay at MIN_PROPS to keep coincidence noise out;
-  // explicitly accepted owners are authoritative at any size, down to one
-  // property, so small Convex results and arguments can be enforced.
-  const minimum = metadata.authorityState === "accepted" ? 1 : MIN_PROPS;
-  if (props.size < minimum) return null;
-  return {
-    label: `${pkg}#${sym.getName()}`,
-    props,
-    detailedProps: typePropsDetailed(checker, declared),
-    ...metadata,
-  };
+  return candidateForType(checker, declared, `${pkg}#${sym.getName()}`, metadata);
+
 }
 
 function exportedObjectTypes(
@@ -387,4 +392,162 @@ export function resolvesToDomainCanonicalType(type, canonicalEntities = {}) {
       );
     }),
   );
+}
+
+// ─── Implicit Convex generated owners ────────────────────────────────────────
+// Convex codegen emits two owner modules per project: `convex/_generated/dataModel`
+// (Doc<"table"> document types via the DataModel table map) and `convex/_generated/api`
+// (FunctionReturnType<typeof api.*> return types via function-reference leaves). Neither
+// needs registry plumbing: the module paths are fixed by the toolchain, so any program
+// containing them has accepted owner authority available. Convex types carry no Zod-style
+// refinements, so checker-level structural identity is sound here.
+
+export const CONVEX_DATA_MODEL_MODULE = "convex/_generated/dataModel";
+export const CONVEX_API_MODULE = "convex/_generated/api";
+
+export function isConvexGeneratedFile(fileName) {
+  const p = normalizePath(fileName);
+  return p.includes("/convex/_generated/") || p.startsWith("convex/_generated/");
+}
+
+function isConvexGeneratedModule(fileName, modulePath) {
+  const p = normalizePath(fileName);
+  return (
+    p.endsWith(`/${modulePath}.ts`) || p.endsWith(`/${modulePath}.d.ts`)
+  );
+}
+
+function moduleExportSymbol(checker, sourceFile, name) {
+  const moduleSym = checker.getSymbolAtLocation(sourceFile);
+  if (!moduleSym) return null;
+  const sym = checker
+    .getExportsOfModule(moduleSym)
+    .find((candidate) => candidate.getName() === name);
+  if (!sym) return null;
+  return sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
+}
+
+function typeOfSymbol(checker, sym) {
+  try {
+    return checker.getTypeOfSymbol(sym);
+  } catch {
+    return null;
+  }
+}
+
+const convexOwnerMetadata = {
+  authority: "generated-source",
+  authorityState: "accepted",
+};
+
+// DataModel maps each table name to a TableInfo whose `document` property is exactly
+// Doc<"table"> (convex `DocumentByName` resolves through the same path), so expanding the
+// DataModel properties yields every table's document owner without enumerating references.
+function convexDocCandidates(checker, sourceFile) {
+  const dataModelSym = moduleExportSymbol(checker, sourceFile, "DataModel");
+  if (!dataModelSym) return [];
+  let dataModelType;
+  try {
+    dataModelType = checker.getDeclaredTypeOfSymbol(dataModelSym);
+  } catch {
+    return [];
+  }
+  const candidates = [];
+  for (const tableSym of checker.getPropertiesOfType(dataModelType)) {
+    const tableInfo = typeOfSymbol(checker, tableSym);
+    if (!tableInfo) continue;
+    const docProp = checker
+      .getPropertiesOfType(tableInfo)
+      .find((prop) => prop.getName() === "document");
+    const docType = docProp ? typeOfSymbol(checker, docProp) : null;
+    const candidate = candidateForType(
+      checker,
+      docType,
+      `${CONVEX_DATA_MODEL_MODULE}#Doc<"${tableSym.getName()}">`,
+      convexOwnerMetadata,
+    );
+    if (candidate) candidates.push(candidate);
+  }
+  return candidates;
+}
+
+const FUNCTION_REFERENCE_RETURN_PROP = "_returnType";
+const API_WALK_MAX_DEPTH = 8;
+
+// The generated `api` object resolves to FilterApi over ApiFromModules: nested namespace
+// objects whose leaves are FunctionReference-shaped (`{ _type, _args, _returnType, ... }`).
+// convex `FunctionReturnType<FuncRef>` is `FuncRef["_returnType"]`, so a leaf's owner type
+// is the `_returnType` property type read directly off the reference.
+function collectFunctionReturnCandidates(
+  checker,
+  type,
+  path,
+  depth,
+  seenTypes,
+  out,
+) {
+  if (!type || depth <= 0 || !isObjectType(type) || seenTypes.has(type)) {
+    return;
+  }
+  seenTypes.add(type);
+  const props = checker.getPropertiesOfType(type);
+  const returnProp = props.find(
+    (prop) => prop.getName() === FUNCTION_REFERENCE_RETURN_PROP,
+  );
+  if (returnProp) {
+    const candidate = candidateForType(
+      checker,
+      typeOfSymbol(checker, returnProp),
+      `${CONVEX_API_MODULE}#FunctionReturnType<typeof api.${path}>`,
+      convexOwnerMetadata,
+    );
+    if (candidate) out.push(candidate);
+    return;
+  }
+  for (const prop of props) {
+    if (prop.getName().startsWith("_")) continue;
+    collectFunctionReturnCandidates(
+      checker,
+      typeOfSymbol(checker, prop),
+      path ? `${path}.${prop.getName()}` : prop.getName(),
+      depth - 1,
+      seenTypes,
+      out,
+    );
+  }
+}
+
+function convexApiCandidates(checker, sourceFile) {
+  const apiSym = moduleExportSymbol(checker, sourceFile, "api");
+  if (!apiSym) return [];
+  const candidates = [];
+  collectFunctionReturnCandidates(
+    checker,
+    typeOfSymbol(checker, apiSym),
+    "",
+    API_WALK_MAX_DEPTH,
+    new Set(),
+    candidates,
+  );
+  return candidates;
+}
+
+export function collectConvexGeneratedCanonicalTypes(program, checker) {
+  const candidates = [];
+  const seen = new Set();
+  const pushAll = (list) => {
+    for (const candidate of list) {
+      if (seen.has(candidate.label)) continue;
+      seen.add(candidate.label);
+      candidates.push(candidate);
+    }
+  };
+  for (const sf of program.getSourceFiles()) {
+    if (isConvexGeneratedModule(sf.fileName, CONVEX_DATA_MODEL_MODULE)) {
+      pushAll(convexDocCandidates(checker, sf));
+    } else if (isConvexGeneratedModule(sf.fileName, CONVEX_API_MODULE)) {
+      pushAll(convexApiCandidates(checker, sf));
+    }
+  }
+  return candidates;
 }

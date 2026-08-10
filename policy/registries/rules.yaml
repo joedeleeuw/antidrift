@@ -1350,15 +1350,15 @@ rules:
   antidrift/no-structural-type-fork:
     status: ready
     stable: false
-    signal: TypeChecker structural comparison plus authority-index facts
+    signal: TypeChecker structural comparison plus authority-index facts and an implicit Convex generated owner sweep
     solveType: type-fork
     proofBuckets: [authority-index-ownership]
     promotion:
       proofBucket: authority-index-ownership
-      association: Hand-written local object type/interface declarations to exact property fingerprints of configured generated-source or accepted package-owner exports.
-      blockingThreshold: A diagnostic emits only when the TypeChecker proves an exact owner copy — same properties with identical checker-rendered types, optionality, readonly, and method-ness — and the owner candidate is accepted through generatedSources or packageTypeOwners configuration. Loosened and partial copies of accepted owners emit inventory facts with their relation and do not block. Since 2026-08-10 accepted owners match from one property; discovery proposals keep the four-property minimum.
+      association: Hand-written local object type/interface declarations to exact property fingerprints of configured generated-source exports, accepted package-owner exports, or implicit Convex generated owners (Doc<"table"> expanded from the generated DataModel, FunctionReturnType<typeof api.*> read from generated api function references).
+      blockingThreshold: A diagnostic emits only when the TypeChecker proves an exact owner copy — same properties with identical checker-rendered types, optionality, readonly, and method-ness — and the owner candidate is accepted through generatedSources or packageTypeOwners configuration or resolves from a convex/_generated/dataModel or convex/_generated/api module in the active TypeScript Program. Loosened and partial copies of accepted owners emit inventory facts with their relation and do not block. Since 2026-08-10 accepted owners match from one property; discovery proposals keep the four-property minimum.
       ecosystemComparison: Import restrictions and generic naming rules cannot detect structural copies of generated or installed package exported types; no maintained TypeScript ESLint rule compares local object declarations against configured owner exports.
-      corpusEvidence: Chaski provides clean pressure for generated imports, installed base-client aliases, local tuple aliases, projected DTO subsets, and utility-type derivations. After subset matching was removed, current real corpus does not yet provide a promoted exact blocking generated/package-owner fork.
+      corpusEvidence: Chaski provides clean pressure for generated imports, installed base-client aliases, local tuple aliases, projected DTO subsets, and utility-type derivations. After subset matching was removed, current real corpus does not yet provide a promoted exact blocking generated/package-owner fork. Murderbox provides a Convex Doc<"machines"> field-usage clean control; the murderbox dogfood sweep over apps/client src plus convex found no exact-copy forks of the implicit owners.
       realCorpusInventory: docs/rule-investigations/generated-source-structural-fork.md and docs/real-corpus-validation.md record the exact-copy-only decision and Chaski clean controls.
       realCorpusInventoryRefs:
         - docs/rule-investigations/generated-source-structural-fork.md
@@ -1370,7 +1370,7 @@ rules:
       noSinkBehavior: Accepted generated/package owner diagnostics do not depend on the optional semantic fact sink; unaccepted installed-package matches stay proposal facts only when a sink is configured.
       noDeadWorkBehavior: Imports, aliases, zod wrappers around imported types, utility derivations, projected DTO subsets, all-optional local patch shapes, and exact matches to unaccepted installed-package candidates stay non-blocking.
     referenceDoc: docs/rule-roadmap.md
-    corpusRepositories: [chaski]
+    corpusRepositories: [chaski, murderbox]
     concerns:
       - The unconfigured all-node_modules sweep is analytics/inventory for discovering possible owners, not a distributable hard gate by itself.
       - Installed package fork blocking now requires accepted package-owner facts from policy/registries/ownership.yaml, preferably proposed from existing imports, owner-type derivations, SDK return provenance, generated wrappers, or repeated structural forks.
@@ -1379,6 +1379,8 @@ rules:
       - "Fingerprint exactness was repaired on 2026-08-10: the shared typeProps fingerprint stripped top-level | undefined and skipped methods, so optional-versus-required and method-versus-property copies fingerprinted as exact. The relation classifier now distinguishes exact-owner-copy (blocking on accepted owners), loosened-owner-copy, and partial-owner-copy (both inventory)."
       - Installed-package exported object types are not always contracts the consuming app was expected to import, so that mode has a weaker owner-authority claim than generated/domain registry modes.
       - "Subset matching was removed from enforcement because projected DTOs with four or more owner fields may be legitimate translation contracts."
+      - "Convex generated owners are implicit (fixed convex/_generated module paths, no registry entry) and blocking: Convex types carry no Zod-style refinements, so checker-level structural identity is sound for them — the no-parse-as-cast refinement lesson (structural equality cannot prove a schema contract) does not apply to plain generated shapes."
+      - "Property order is insignificant in the exact fingerprint because TypeScript object types are unordered; renamed, retyped, added, or dropped properties break the match and stay silent, while a reordered-but-identical redeclaration is still an exact copy and reports."
     external:
       state: net-antidrift
       support: none
@@ -1389,8 +1391,12 @@ rules:
     examples:
       flags:
         - "type AuthUser = { uid: string; email: string | null; displayName: string | null; photoURL: string | null; providerId: string; phoneNumber: string | null; };"
+        - "type LocalMachine = { _id: Id<\"machines\">; _creationTime: number; name: string; endpoints: MachineEndpoint[]; };"
+        - "type LocalMachineSummary = { id: string; name: string; address: string; online: boolean; };"
       allows:
         - 'import type { User } from "firebase/auth";'
+        - 'type MachineDoc = Doc<"machines">;'
+        - 'type MachineCard = Pick<Doc<"machines">, "name" | "endpoints">;'
     nextAction: Keep default-off inventory; exact generated and accepted package-owner copies are the only eligible future blocking branch, while unconfigured installed-package matches stay analytics that propose package-owner facts before enforcement.
   antidrift/no-canonical-model-fork:
     status: ready

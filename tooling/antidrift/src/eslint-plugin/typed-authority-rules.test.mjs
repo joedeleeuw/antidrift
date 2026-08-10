@@ -544,6 +544,12 @@ typedRuleTester.run(
         `,
         options: [acceptedPackageStructuralOptions],
       },
+      // Implicit Convex owners: Doc references, Pick/Omit projections, and bare
+      // FunctionReturnType aliases are derivations, not hand-written forks
+      fixture("programs/correct/convex-generated-doc-projections.ts"),
+      fixture("programs/correct/convex-function-return-projections.ts"),
+      // Same-shaped-but-not-exact redeclarations of Convex owners stay silent
+      fixture("programs/correct/convex-near-miss-shapes.ts"),
     ],
     invalid: [
       {
@@ -554,6 +560,16 @@ typedRuleTester.run(
       {
         ...fixture("programs/drift/redeclares-full.ts"),
         options: [acceptedPackageStructuralOptions],
+        errors: 1,
+      },
+      // Exact hand-written copy of the implicit Doc<"machines"> generated owner
+      {
+        ...fixture("programs/drift/convex-generated-doc-fork.ts"),
+        errors: 1,
+      },
+      // Exact hand-written copy of FunctionReturnType<typeof api.machines.get>
+      {
+        ...fixture("programs/drift/convex-function-return-fork.ts"),
         errors: 1,
       },
     ],

@@ -101,6 +101,13 @@ export function collectDomainCanonicalTypes(
   canonicalEntities?: DomainCanonicalEntityRegistry,
 ): StructuralTypeCandidate[];
 
+export function collectConvexGeneratedCanonicalTypes(
+  program: ts.Program,
+  checker: ts.TypeChecker,
+): StructuralTypeCandidate[];
+
+export function isConvexGeneratedFile(fileName: string): boolean;
+
 export function resolvesToInstalledType(
   type: ts.Type | null | undefined,
 ): boolean;
