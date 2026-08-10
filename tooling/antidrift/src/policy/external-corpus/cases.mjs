@@ -870,14 +870,14 @@ export const murderboxCases = [
     paths: ["apps/api/lib/server/workspace-projects.ts"],
   },
   {
-    id: "murderbox-conversation-index-decoder-clean",
+    id: "murderbox-codex-notification-decoder-clean",
     ruleId: "antidrift/no-identity-schema-transform",
     kind: "correct",
     classification: "ready",
-    subproject: "client",
+    subproject: "agent-bridge",
     typeAware: true,
-    tsconfig: "apps/client/tsconfig.json",
-    paths: ["apps/client/src/lib/conversation-index.ts"],
+    tsconfig: "apps/agent-bridge/tsconfig.json",
+    paths: ["apps/agent-bridge/src/codex-thread-service.ts"],
   },
   {
     id: "murderbox-live-turn-duplicated-conditional-classnames",
