@@ -33,6 +33,7 @@ const mockCallCountMatcherMethods = new Set([
 ]);
 const outcomeFlagProperties = new Set(["success", "ok"]);
 const outcomeFlagMethods = new Set(["isOk", "isErr", "isSuccess", "isFailure"]);
+const throwingParseMethods = new Set(["parse", "parseAsync"]);
 const testBlockNames = new Set(["it", "test", "xit", "xtest", "fit"]);
 const literalContainerTypes = new Set([
   "ObjectExpression",
@@ -235,6 +236,21 @@ function testBlockCallback(node) {
   );
 }
 
+function enclosingTestBlockCallback(node) {
+  let current = node.parent;
+  while (current) {
+    if (
+      (current.type === "ArrowFunctionExpression" ||
+        current.type === "FunctionExpression") &&
+      testBlockCallback(current.parent) === current
+    ) {
+      return current;
+    }
+    current = current.parent;
+  }
+  return null;
+}
+
 function isNodeLike(value) {
   return (
     Boolean(value) &&
@@ -338,8 +354,7 @@ function bindingCall(init) {
 
 function recordActBinding(declarator, bindings) {
   if (declarator.id?.type !== "Identifier" || !declarator.init) return;
-  const call = bindingCall(declarator.init);
-  if (call) bindings.set(declarator.id.name, call);
+  bindings.set(declarator.id.name, declarator.init);
 }
 
 function collectActArgument(argument, names, literals) {
@@ -562,13 +577,54 @@ function memberPathInfo(expression) {
 function actForRoot(root, bindings) {
   if (!root) return null;
   if (root.type === "CallExpression") return root;
-  if (root.type === "Identifier") return bindings.get(root.name) ?? null;
+  if (root.type === "Identifier") {
+    return bindingCall(bindings.get(root.name)) ?? null;
+  }
   return null;
 }
 
 function arrangedActForRoot(root, bindings) {
   const act = actForRoot(root, bindings);
   return act && act.arguments.length > 0 ? act : null;
+}
+
+function arrangedActPathForExpression(
+  expression,
+  bindings,
+  depth = resolutionDepthLimit,
+) {
+  const target = unwrapExpression(expression);
+  if (!target || depth <= 0) return null;
+  if (target.type === "Identifier") {
+    const act = arrangedActForRoot(target, bindings);
+    if (act) return { act, path: [] };
+    const binding = bindings.get(target.name);
+    return binding
+      ? arrangedActPathForExpression(binding, bindings, depth - 1)
+      : null;
+  }
+  if (target.type === "MemberExpression") {
+    const info = memberPathInfo(target);
+    if (!info) return null;
+    const base = arrangedActPathForExpression(info.root, bindings, depth - 1);
+    return base ? { act: base.act, path: [...base.path, ...info.path] } : null;
+  }
+  if (
+    target.type === "CallExpression" &&
+    target.callee.type === "MemberExpression"
+  ) {
+    const base = arrangedActPathForExpression(
+      target.callee.object,
+      bindings,
+      depth - 1,
+    );
+    if (base) {
+      const method = staticPropertyName(target.callee);
+      return method ? { act: base.act, path: [...base.path, method] } : null;
+    }
+  }
+  const act = arrangedActForRoot(target, bindings);
+  return act ? { act, path: [] } : null;
 }
 
 function pathsEqual(left, right) {
@@ -650,6 +706,64 @@ function classifyOutcomeAssertion(record, facts) {
   }
   if (!isOutcomeFlagExpression(operands.actual, facts.bindings)) return null;
   return { independent: false, messageId: "outcomeEcho", node: record.node };
+}
+
+function classifyErrorShapeAssertion(record, facts) {
+  if (
+    record.kind === "expect" &&
+    record.matcher === "toThrow" &&
+    isArrangedThrowingParseSubject(record, facts.bindings)
+  ) {
+    return {
+      independent: false,
+      messageId: "errorShapeEcho",
+      node: record.node,
+    };
+  }
+  const actual =
+    record.kind === "expect"
+      ? record.subject
+      : equalityOperands(record)?.actual;
+  if (!actual) return null;
+  const info = arrangedActPathForExpression(actual, facts.bindings);
+  if (!info?.path.some((segment) => String(segment) === "error")) return null;
+  return {
+    independent: false,
+    messageId: "errorShapeEcho",
+    node: record.node,
+  };
+}
+
+function isArrangedParseCall(node, bindings) {
+  const call = unwrapExpression(node);
+  return (
+    call?.type === "CallExpression" &&
+    call.callee.type === "MemberExpression" &&
+    throwingParseMethods.has(staticPropertyName(call.callee)) &&
+    Boolean(arrangedActForRoot(call, bindings))
+  );
+}
+
+function functionContainsArrangedParse(subject, bindings) {
+  if (
+    subject?.type !== "ArrowFunctionExpression" &&
+    subject?.type !== "FunctionExpression"
+  ) {
+    return false;
+  }
+  let found = false;
+  walkWithinBlock(subject.body, (node) => {
+    if (!found && isArrangedParseCall(node, bindings)) found = true;
+  });
+  return found;
+}
+
+function isArrangedThrowingParseSubject(record, bindings) {
+  if (functionContainsArrangedParse(record.subject, bindings)) return true;
+  return (
+    record.modifiers.has("rejects") &&
+    isArrangedParseCall(record.subject, bindings)
+  );
 }
 
 function arrangedArrayLength(info, expectedCount, facts, sourceCode) {
@@ -859,6 +973,8 @@ function classifyMockAssertion(record, facts) {
 }
 
 function classifyAssertion(record, facts, sourceCode) {
+  const errorShape = classifyErrorShapeAssertion(record, facts);
+  if (errorShape) return errorShape;
   if (isMembershipAssertionNode(record.node)) {
     return { independent: false, messageId: null, node: record.node };
   }
@@ -894,7 +1010,7 @@ export default function ruleNoNonindependentTestOracle() {
       type: "suggestion",
       docs: {
         description:
-          "Disallow tests whose assertions restate their own arrangement or reduce to bare membership, dependency pass/fail flags, or vacuous existence checks",
+          "Disallow tests whose assertions restate their own arrangement or reduce to bare membership, dependency pass/fail or error shapes, or vacuous existence checks",
       },
       schema: [],
       messages: {
@@ -905,7 +1021,9 @@ export default function ruleNoNonindependentTestOracle() {
         lengthEcho:
           "This length assertion restates the arranged collection size and proves no project transform or filter. Assert transformed contents or an independently derived count instead.",
         outcomeEcho:
-          "This assertion only checks a dependency pass/fail flag on input arranged to produce it. Assert the project-owned consequence: parsed detail, error contents, or downstream behavior.",
+          "This assertion only inspects the outcome or error of an act on input the test arranged to fail. Assert the parsed value on the success path, or a downstream consumer's behavior — inspecting the validator's own error/flag proves nothing the arrangement didn't.",
+        errorShapeEcho:
+          "This assertion only inspects the outcome or error of an act on input the test arranged to fail. Assert the parsed value on the success path, or a downstream consumer's behavior — inspecting the validator's own error/flag proves nothing the arrangement didn't.",
         existenceEcho:
           "This existence check is satisfied by the arranged value's construction and cannot fail. Assert real output instead.",
         mockCallEcho:
@@ -918,6 +1036,16 @@ export default function ruleNoNonindependentTestOracle() {
       return {
         CallExpression(node) {
           if (isMembershipAssertionNode(node)) {
+            const callback = enclosingTestBlockCallback(node);
+            const record =
+              parseExpectAssertion(node) ?? parseAssertAssertion(node);
+            if (
+              callback &&
+              record &&
+              classifyErrorShapeAssertion(record, collectBlockFacts(callback))
+            ) {
+              return;
+            }
             context.report({ node, messageId: "noBareMembership" });
             return;
           }
