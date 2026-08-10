@@ -1152,6 +1152,37 @@ rules:
         - "queryClient.getQueryData<HandwrittenMachine[]>([\"machines\"])"
         - "useQuery<HandwrittenMachine[]>({ queryKey: [\"machines\"], queryFn: fetchMachines })"
     nextAction: Keep default-off until a real explicit-type-argument fork is independently replicated and Murderbox plus one more Convex or TanStack consumer confirm zero false positives on clean-run.
+  antidrift/require-convex-return-validator:
+    status: ready
+    stable: false
+    defaultOff: true
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: Convex registrar symbol and builder-type provenance resolution live inline with one consumer. Extract to a shared adapter when a second rule needs registered-function provenance.
+    referenceDoc: docs/rule-investigations/require-convex-return-validator.md
+    signal: TypeChecker symbol resolution of the callee to the convex package server surface (direct declaration or builder-type provenance through the generated server module) plus a static object-literal property scan for the returns key
+    solveType: type-contract-shape
+    proofBuckets: [semantic-source-type-provenance]
+    corpusRepositories: [murderbox]
+    concerns:
+      - "The first evidence set is synthetic fixtures plus real Murderbox drift: 18 registered functions across conversations.ts, littleBird.ts, machines.ts, and health.ts, all missing returns validators, all flagged with zero false positives on ctx.db query calls."
+      - "Custom function builders (customFn-wrapped registrars) and non-object-literal first arguments intentionally stay silent because no static registration object can be proven; httpAction is out of scope because it has no validator concept."
+      - "Object arguments carrying spread or computed properties stay silent because a static scan cannot prove the returns key is absent."
+    external:
+      state: net-antidrift
+      support: none
+      candidates: ["@convex-dev/eslint-plugin require-args-validator"]
+      decision: own-antidrift
+      whyThisState: "The official @convex-dev/eslint-plugin covers args validators only (require-args-validator); it has no returns-validator rule, and its detection is name-matched rather than symbol-resolved, so it cannot cover the validator to generated-type chain this rule owns."
+      whyNotOtherState: "Not ecosystem-covered because the check needs checker-resolved provenance from the call site to the convex server registrar surface, which no generic type-safety rule models."
+    examples:
+      flags:
+        - "query({ args: { id: v.id(\"machines\") }, handler: async (ctx, args) => ({ id: args.id }) })"
+        - "internalMutation({ args: {}, handler: async (ctx) => ctx.db.delete(id) })"
+      allows:
+        - "query({ args: { id: v.id(\"machines\") }, returns: v.union(machineResult, v.null()), handler: async (ctx, args) => findMachine(ctx, args.id) })"
+        - "mutation({ args: {}, returns: v.null(), handler: async () => null })"
+    nextAction: Keep default-off until the Murderbox drift is remediated or accepted and one more Convex consumer confirms zero false positives on validator-covered code.
   antidrift/no-sql-string-concat:
     status: ecosystem-covered
     stable: false

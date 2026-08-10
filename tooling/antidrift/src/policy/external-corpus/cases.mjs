@@ -880,6 +880,26 @@ export const murderboxCases = [
     paths: ["apps/client/src/screens/conversation-timeline-durability.ts"],
   },
   {
+    id: "murderbox-machines-missing-return-validators",
+    ruleId: "antidrift/require-convex-return-validator",
+    kind: "drift",
+    classification: "ready",
+    subproject: "client",
+    typeAware: true,
+    tsconfig: "apps/client/tsconfig.json",
+    paths: ["apps/client/convex/machines.ts"],
+    expectedFindings: [
+      {
+        path: "apps/client/convex/machines.ts",
+        line: 25,
+      },
+      {
+        path: "apps/client/convex/machines.ts",
+        line: 42,
+      },
+    ],
+  },
+  {
     id: "murderbox-codex-notification-decoder-clean",
     ruleId: "antidrift/no-identity-schema-transform",
     kind: "correct",
