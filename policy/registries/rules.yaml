@@ -1192,13 +1192,13 @@ rules:
       status: inline-pending
       reason: Effect JSONSchema.make and Convex registration symbol resolution live inline with one consumer. Extract to a shared adapter when a second rule needs schema-representation provenance.
     referenceDoc: docs/rule-investigations/no-schema-validator-transcoding.md
-    signal: TypeChecker symbol resolution of the conversion call to the effect package's JSONSchema.make plus TypeChecker symbol resolution of the sink callee to the convex package server surface, with single-const-binding provenance between them
+    signal: TypeChecker symbol resolution of the conversion call (effect JSONSchema.make or zod toJSONSchema) plus TypeChecker symbol resolution of the sink callee to the convex package server surface, with single-const-binding and single-converter-call provenance between them
     solveType: type-contract-shape
     proofBuckets: [semantic-source-type-provenance]
     corpusRepositories: [murderbox]
     concerns:
-      - "The first evidence set is synthetic drift plus a Murderbox clean-run control; no independently replicated real drift yet. Murderbox's one real transcoder (convex/zodToConvex.ts) is zod-sourced and intentionally stays silent."
-      - "Only the effect JSONSchema.make source and the Convex args/returns registration sink are proven. Zod v4 toJSONSchema sources, ajv or other JSON-Schema-consumer sinks, and flows through more than one const binding intentionally stay silent."
+      - "The first evidence set is synthetic drift plus a Murderbox clean-run control. Murderbox's one real transcoder (convex/zodToConvex.ts, zod-sourced) was remediated in murderbox@3a030ff4; the zod source branch added on 2026-08-10 guards against reintroduction."
+      - "Only the effect JSONSchema.make and zod toJSONSchema sources and the Convex args/returns registration sink are proven, with one converter wrapper allowed in the chain. Ajv or other JSON-Schema-consumer sinks and flows through more than one converter or binding intentionally stay silent."
       - "Registrations imported through a project-local _generated/server wrapper resolve to the project file, not the convex package; only direct convex/server builder imports are proven in v1."
     external:
       state: net-antidrift
@@ -1211,6 +1211,7 @@ rules:
       flags:
         - "const returnsDocument = JSONSchema.make(MachineRegistration); query({ returns: returnsDocument, handler })"
         - "query({ returns: JSONSchema.make(MachineRegistration), handler })"
+        - "query({ returns: convexValidatorFromJsonSchema(z.toJSONSchema(MachineRegistration)), handler })"
       allows:
         - "buildApiDocumentation(JSONSchema.make(MachineRegistration))"
         - "query({ returns: v.array(v.object({ machineId: v.string() })), handler })"

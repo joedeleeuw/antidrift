@@ -58,6 +58,22 @@ function isEffectJsonSchemaMakeCall(checker, tsCall) {
   );
 }
 
+function isZodToJsonSchemaCall(checker, tsCall) {
+  const callee = tsCall.expression;
+  if (!ts.isPropertyAccessExpression(callee)) return false;
+  if (callee.name.text !== "toJSONSchema") return false;
+  const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(callee.name));
+  const rest = symbolPackagePath(symbol);
+  return rest !== null && (rest === "zod" || rest.startsWith("zod/"));
+}
+
+function isJsonSchemaConversionCall(checker, tsCall) {
+  return (
+    isEffectJsonSchemaMakeCall(checker, tsCall) ||
+    isZodToJsonSchemaCall(checker, tsCall)
+  );
+}
+
 function isConvexRegistrationCall(checker, tsCall) {
   const symbol = resolvedCalleeSymbol(checker, tsCall);
   const name = symbol?.getName() ?? "";
@@ -78,12 +94,23 @@ function isOpenApiDocumentationCall(checker, tsCall) {
   );
 }
 
-function isJsonSchemaMakeResult(checker, services, estreeNode) {
-  if (!estreeNode) return false;
+function isJsonSchemaConversionResult(checker, services, estreeNode, depth = 4) {
+  if (!estreeNode || depth <= 0) return false;
   const tsNode = services.esTreeNodeToTSNodeMap.get(estreeNode);
   if (!tsNode) return false;
   if (ts.isCallExpression(tsNode)) {
-    return isEffectJsonSchemaMakeCall(checker, tsNode);
+    if (isJsonSchemaConversionCall(checker, tsNode)) return true;
+    // One converter wrapper is part of the chain: the JSON Schema
+    // representation flows through a handwritten or helper converter whose
+    // result becomes the registered validator.
+    return tsNode.arguments.some((argument) =>
+      isJsonSchemaConversionResult(
+        checker,
+        services,
+        services.tsNodeToESTreeNodeMap.get(argument),
+        depth - 1,
+      ),
+    );
   }
   if (ts.isIdentifier(tsNode)) {
     const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(tsNode));
@@ -91,8 +118,12 @@ function isJsonSchemaMakeResult(checker, services, estreeNode) {
       if (
         ts.isVariableDeclaration(declaration) &&
         declaration.initializer &&
-        ts.isCallExpression(declaration.initializer) &&
-        isEffectJsonSchemaMakeCall(checker, declaration.initializer)
+        isJsonSchemaConversionResult(
+          checker,
+          services,
+          services.tsNodeToESTreeNodeMap.get(declaration.initializer),
+          depth - 1,
+        )
       ) {
         return true;
       }
@@ -107,12 +138,12 @@ export function ruleNoSchemaValidatorTranscoding() {
       type: "problem",
       docs: {
         description:
-          "Disallow registering an Effect JSONSchema.make result as a Convex args/returns validator. The JSON Schema representation documents the schema, but re-deriving a runtime validator from it gives the contract two runtime owners that can drift apart.",
+          "Disallow registering a JSON Schema representation of a Zod or Effect schema as a Convex args/returns validator. The JSON Schema representation documents the schema, but re-deriving a runtime validator from it gives the contract two runtime owners that can drift apart.",
       },
       schema: [],
       messages: {
         schemaValidatorTranscoding:
-          "This schema's runtime authority is being re-derived through a second representation: the Effect Schema already owns runtime validation, and registering its JSON Schema as a Convex validator creates a second owner that drifts silently. Keep one runtime owner — register the Convex validator directly (convex/values), or keep the JSON Schema for documentation (OpenAPI) only.",
+          "This schema's runtime authority is being re-derived through a second representation: the source schema already owns runtime validation, and registering its JSON Schema as a Convex validator creates a second owner that drifts silently. Keep one runtime owner — register the Convex validator directly (convex/values), or keep the JSON Schema for documentation (OpenAPI) only.",
       },
     },
     create(context) {
@@ -137,7 +168,7 @@ export function ruleNoSchemaValidatorTranscoding() {
             const key =
               property.key.type === "Identifier" ? property.key.name : null;
             if (!convexRegistrationProperties.has(key)) continue;
-            if (isJsonSchemaMakeResult(checker, services, property.value)) {
+            if (isJsonSchemaConversionResult(checker, services, property.value)) {
               context.report({
                 node: property.value,
                 messageId: "schemaValidatorTranscoding",

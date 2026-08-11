@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- extend `antidrift/no-schema-validator-transcoding` with the zod source: `toJSONSchema` calls resolved to the zod package count as conversion sources, and one converter wrapper between the representation and the Convex registration is part of the chain. Covers the pattern murderbox remediated in 3a030ff4 and guards against reintroduction
+
 - retire `antidrift/no-query-data-type-parameters`: superseded by the symbol-resolved `no-explicit-type-arguments-on-owned-api`; name-matching flagged unrelated same-named methods, and its ad-hoc key coverage predated the ownership doctrine. Removed from the shipped plugin surface — delete the rule from consumer oxlint configs on upgrade
 
 - add `antidrift inventory-type-owner`: crawls local type alias and interface declarations per repo plan, classifies them against installed-package, registry generated-source, and implicit Convex generated owner candidates with the structural relation engine (`exact-owner-copy`/`loosened-owner-copy`/`partial-owner-copy`), and emits a JSON report with ready-to-accept `ownership.yaml` `packageTypeOwners` proposals for exact installed-package copies; test files are included and tagged `test: true`, accepted owners (Convex, generated registry) stay row-only, and murderbox ships as the first external plan

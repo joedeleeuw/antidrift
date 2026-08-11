@@ -829,6 +829,14 @@ typedRuleTester.run(
           { messageId: "schemaValidatorTranscoding" },
         ],
       },
+      {
+        ...fixture("programs/drift/schema-validator-transcoding-zod.ts"),
+        errors: [
+          { messageId: "schemaValidatorTranscoding" },
+          { messageId: "schemaValidatorTranscoding" },
+          { messageId: "schemaValidatorTranscoding" },
+        ],
+      },
     ],
   },
 );
