@@ -1829,6 +1829,39 @@ rules:
         - 'function formatLabel() { try { return readLabel(); } catch { return ""; } }'
         - 'function deviceId() { const id = readMachineId(); if (!id) throw new Error("missing id"); return id; }'
     nextAction: "Use dotfiles as the real clean corpus anchor and keep the rule opt-in until another repo supplies drift evidence."
+  antidrift/no-sentinel-absence-fallback:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: AST nullish coalescing of a member read to an in-band absence sentinel string
+    solveType: absence-sentinel-coercion
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-sentinel-absence-fallback.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - "Only the ?? operator is in scope; || falsy coercion of a member read to a sentinel is a different doctrine and stays out."
+      - "Numeric sentinels such as Number(props.ExecMainStatus ?? 0) stay silent: proving drift there needs property-name semantics (systemd exit code 0 meaning success), and name-trust is rejected."
+      - "Call-expression and plain-identifier left-hand sides stay silent: the murderbox corpus shows display-only fallbacks like score ?? \"unknown\" and branch ?? \"unknown\" on locals whose provenance is not visible at the expression."
+      - "Debug and diagnostics display surfaces (apps/client/app/runtime-diagnostics.tsx, apps/client/app/_debug.tsx) flag on member reads of optional runtime data; measure that pressure before any default-on consideration."
+    external:
+      state: net-antidrift
+      support: low
+      candidates:
+        [
+          "ESLint no-null",
+          "@typescript-eslint/prefer-nullish-coalescing",
+        ]
+      decision: own-antidrift
+      whyThisState: "no-null and prefer-nullish-coalescing police the operator a codebase uses, not the sentinel value the operator produces; no maintained rule models absence coerced to an in-band sentinel string on a member read."
+      whyNotOtherState: "Not ecosystem-covered because the signal requires a fixed sentinel vocabulary and the absence-as-absence doctrine, which generic nullish-discipline rules do not carry."
+    examples:
+      flags:
+        - 'activeState: props.ActiveState ?? "unknown"'
+        - 'const state = row?.state ?? "unavailable";'
+      allows:
+        - 'const title = doc.title ?? "Untitled";'
+        - 'const exit = Number(props.ExecMainStatus ?? 0);'
+    nextAction: "Keep the rule opt-in and inventory member-read flagging pressure on diagnostics display surfaces across at least one more repository before considering stable promotion."
 
 retiredRules:
   antidrift/no-query-data-type-parameters:
