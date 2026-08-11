@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- add `antidrift inventory-type-owner`: crawls local type alias and interface declarations per repo plan, classifies them against installed-package, registry generated-source, and implicit Convex generated owner candidates with the structural relation engine (`exact-owner-copy`/`loosened-owner-copy`/`partial-owner-copy`), and emits a JSON report with ready-to-accept `ownership.yaml` `packageTypeOwners` proposals for exact installed-package copies; test files are included and tagged `test: true`, accepted owners (Convex, generated registry) stay row-only, and murderbox ships as the first external plan
+
 - repair structural fork fingerprints: optionality, readonly, and method-ness are now encoded per property, and matching classifies `exact-owner-copy` (the only blocking relation on accepted owners), `loosened-owner-copy`, and `partial-owner-copy` (both inventory facts). Accepted owners now match from one property; discovery proposals keep the four-property minimum. The previous fingerprint stripped `| undefined` and skipped methods, so loosened copies fingerprinted as exact
 
 - fix `antidrift/no-redundant-zod-parse`: remove the call-result branches gated on bidirectional type assignability — type equivalence never proves the same decoder ran (refinements are invisible to TypeScript); same-binding decoder provenance remains at error

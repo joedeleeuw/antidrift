@@ -57,6 +57,10 @@ import {
   sqlQueryBenchmark,
 } from "./sql-query-benchmark.mjs";
 import {
+  parseTypeOwnerInventoryArgs,
+  typeOwnerInventory,
+} from "./type-owner-inventory.mjs";
+import {
   parseArgs as parseUndercheckedPredicateInventoryArgs,
   undercheckedPredicateInventory,
 } from "./underchecked-predicate-inventory.mjs";
@@ -231,6 +235,8 @@ const commands = {
     undercheckedPredicateInventory(
       parseUndercheckedPredicateInventoryArgs(args),
     ),
+  "inventory-type-owner": () =>
+    typeOwnerInventory(parseTypeOwnerInventoryArgs(args)),
   "change-contract-evidence": () => changeContractEvidenceCommand(args),
   "change-contract": () => changeContractCommand(args),
   "diff-scoped-adapters": () => diffScopedAdaptersCommand(args),
