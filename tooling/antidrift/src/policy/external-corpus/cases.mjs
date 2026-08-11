@@ -935,6 +935,28 @@ export const murderboxCases = [
     subproject: "client",
     paths: ["apps/client/src/lib/voice-openai-session.native.ts"],
   },
+  {
+    id: "murderbox-systemd-service-sentinel-fallback",
+    ruleId: "antidrift/no-sentinel-absence-fallback",
+    kind: "drift",
+    classification: "ready",
+    subproject: "api",
+    paths: ["apps/api/lib/server/chat-runtime.ts"],
+    expectedFindings: [
+      {
+        path: "apps/api/lib/server/chat-runtime.ts",
+        line: 379,
+      },
+      {
+        path: "apps/api/lib/server/chat-runtime.ts",
+        line: 380,
+      },
+      {
+        path: "apps/api/lib/server/chat-runtime.ts",
+        line: 381,
+      },
+    ],
+  },
 ];
 
 export const cloudflareAgentsCases = [

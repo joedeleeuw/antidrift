@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- add default-off `no-sentinel-absence-fallback`: flags `?? "<sentinel>"` on a member read where the fallback is an in-band absence string (`unknown`, `n/a`, `none`, `unavailable`, `error`, `missing`, case-insensitive) — absence coerced to a sentinel reads identically to a real state; motivated by the murderbox type-authority audit's systemd D-Bus reads (`props.ActiveState ?? "unknown"`) and validated against the live drift site in `apps/api/lib/server/chat-runtime.ts`. `||`, numeric sentinels, call/identifier left-hand sides, and display strings outside the sentinel set stay silent
+
 - extend `antidrift/no-schema-validator-transcoding` with the zod source: `toJSONSchema` calls resolved to the zod package count as conversion sources, and one converter wrapper between the representation and the Convex registration is part of the chain. Covers the pattern murderbox remediated in 3a030ff4 and guards against reintroduction
 
 - retire `antidrift/no-query-data-type-parameters`: superseded by the symbol-resolved `no-explicit-type-arguments-on-owned-api`; name-matching flagged unrelated same-named methods, and its ad-hoc key coverage predated the ownership doctrine. Removed from the shipped plugin surface — delete the rule from consumer oxlint configs on upgrade

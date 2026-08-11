@@ -772,6 +772,50 @@ ruleTester.run("no-static-property-loop", rule("no-static-property-loop"), {
 });
 
 ruleTester.run(
+  "no-sentinel-absence-fallback",
+  rule("no-sentinel-absence-fallback"),
+  {
+    valid: [
+      // Display string that is not in the sentinel set
+      'const title = doc.title ?? "Untitled";',
+      // Numeric sentinel — deliberate false negative (needs property-name semantics)
+      "const count = row.count ?? 0;",
+      "const exit = Number(props.ExecMainStatus ?? 0);",
+      // Non-literal fallback
+      "const timeout = config.timeout ?? DEFAULT_TIMEOUT;",
+      // Wrong operator — falsy coercion is a different doctrine
+      'const name = user.name || "unknown";',
+      // Plain identifier LHS — provenance of a local is not visible at the expression
+      'const label = maybeName ?? "unknown";',
+      // Call-expression LHS — out of v1 scope
+      'const state = get(key) ?? "unknown";',
+    ],
+    invalid: [
+      {
+        code: 'const status = props.ExecMainStatus ?? "unknown";',
+        errors: [{ messageId: "sentinelAbsenceFallback" }],
+      },
+      {
+        code: 'const state = row?.state ?? "unavailable";',
+        errors: [{ messageId: "sentinelAbsenceFallback" }],
+      },
+      {
+        code: "const label = entry.status ?? `n/a`;",
+        errors: [{ messageId: "sentinelAbsenceFallback" }],
+      },
+      {
+        code: 'const active = unit.ActiveState ?? "N/A";',
+        errors: [{ messageId: "sentinelAbsenceFallback" }],
+      },
+      {
+        code: 'const missing = result.statuses[id]?.safeStatus ?? "missing";',
+        errors: [{ messageId: "sentinelAbsenceFallback" }],
+      },
+    ],
+  },
+);
+
+ruleTester.run(
   "no-silent-empty-detection-fallback",
   rule("no-silent-empty-detection-fallback"),
   {

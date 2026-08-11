@@ -33,6 +33,7 @@ const disabledAntidriftRules = {
   "antidrift/no-inline-structural-type-at-use-site": "off",
   "antidrift/no-nonindependent-test-oracle": "off",
   "antidrift/no-raw-fetch-in-component": "off",
+  "antidrift/no-sentinel-absence-fallback": "off",
   "antidrift/no-shattered-ingested-entity-state": "off",
   "antidrift/no-silent-empty-detection-fallback": "off",
   "antidrift/no-status-literal-in-type": "off",
