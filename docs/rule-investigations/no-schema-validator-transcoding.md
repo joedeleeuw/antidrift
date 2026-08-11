@@ -52,14 +52,18 @@ name is not flagged.
 
 ## Deliberate boundaries (false negatives by design)
 
-- Zod sources stay silent. Murderbox's one real transcoder,
-  `apps/client/convex/zodToConvex.ts` (`zod` v4-core `toJSONSchema()` into a
-  handwritten `convexValidatorFromJsonSchema`), is exactly this pattern with a
-  zod source and is intentionally out of scope for v1.
+- Zod sources are covered since 2026-08-10: `toJSONSchema` calls whose symbol
+  resolves to the `zod` package count as conversion sources, and one converter
+  wrapper (handwritten or helper) between the representation and the
+  registration is part of the chain. Murderbox's historical transcoder,
+  `apps/client/convex/zodToConvex.ts` (zod v4-core `toJSONSchema()` into a
+  handwritten `convexValidatorFromJsonSchema`), was remediated in murderbox
+  commit 3a030ff4 ("make conversation Convex validators direct"); the zod
+  branch now guards against reintroduction.
 - Ajv and other JSON-Schema-consumer sinks stay silent; only the Convex
   registration sink is proven.
-- Flows through more than one const binding, object property carriers, or
-  function returns stay silent.
+- Flows through more than one converter call, more than one const binding,
+  object property carriers, or function returns stay silent.
 - Registrations imported through a project-local `_generated/server` wrapper
   resolve to the project file, not the `convex` package; v1 proves direct
   `convex/server` builder imports only.
@@ -67,10 +71,11 @@ name is not flagged.
 ## Ecosystem check (2026-08-10)
 
 Converter inventory: `effect@3.22.1` ships `JSONSchema.make`; the installed
-`zod@3.25` exposes v4-core `toJSONSchema` but no `zod-to-json-schema` package
-is present; `ajv` and `convex-helpers` are not installed in either surveyed
-repository. Murderbox carries one real transcoding site (zod-sourced, above)
-and zero Effect-sourced sites; Murderbox does not depend on `effect` at all.
+`zod@3.25` exposes v4-core `toJSONSchema`; no `zod-to-json-schema` package is
+present; `ajv` and `convex-helpers` are not installed in either surveyed
+repository. Murderbox's one real transcoding site (zod-sourced) was remediated
+in murderbox@3a030ff4; zero Effect-sourced sites exist, and Murderbox does not
+depend on `effect` at all.
 `@convex-dev/eslint-plugin` covers Convex file layout and argument
 conventions, not cross-package schema provenance. No typescript-eslint rule
 models a value's conversion history into a second validator registration.
