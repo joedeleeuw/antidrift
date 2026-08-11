@@ -32,7 +32,6 @@ const disabledAntidriftRules = {
   "antidrift/no-handrolled-resource-lifecycle-cells": "off",
   "antidrift/no-inline-structural-type-at-use-site": "off",
   "antidrift/no-nonindependent-test-oracle": "off",
-  "antidrift/no-query-data-type-parameters": "off",
   "antidrift/no-raw-fetch-in-component": "off",
   "antidrift/no-shattered-ingested-entity-state": "off",
   "antidrift/no-silent-empty-detection-fallback": "off",

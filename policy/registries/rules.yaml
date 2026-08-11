@@ -1801,30 +1801,6 @@ rules:
         - 'const itemFields = { item_id: z.string(), content_index: z.number() }; z.object({ type: z.literal("a"), ...itemFields }); z.object({ type: z.literal("b"), ...itemFields });'
         - 'interface ItemFields { itemId: string; contentIndex: number } interface Delta extends ItemFields { type: "delta"; delta: string }'
     nextAction: "Inventory additional schema-heavy repositories for false-positive pressure before considering stable promotion or default-on enforcement."
-  antidrift/no-query-data-type-parameters:
-    status: ready
-    stable: false
-    defaultOff: true
-    signal: AST
-    solveType: query-inference-override
-    proofBuckets: [local-ast-source-shape]
-    referenceDoc: docs/rule-investigations/sentry-mined-react-rules.md
-    corpusRepositories: [sentry, chaski, mrp]
-    concerns:
-      - getsentry/sentry production authorship and real getQueryData/setQueryData type-parameter usage across 16 files in chaski supply drift evidence, but a quantified corpus inventory is not yet recorded, so the rule ships default-off until stable promotion.
-    external:
-      state: net-antidrift
-      support: none
-      candidates: []
-      decision: own-antidrift
-      whyThisState: "No maintained ESLint rule flags explicit type parameters on TanStack Query getQueryData/setQueryData that override key-based inference."
-      whyNotOtherState: "Not ecosystem-covered because @tanstack/eslint-plugin-query does not police type-parameter overrides on cache reads or writes."
-    examples:
-      flags:
-        - "queryClient.getQueryData<number>(['count']);"
-      allows:
-        - "queryClient.getQueryData(['count']);"
-    nextAction: "Quantify chaski getQueryData/setQueryData drift in a corpus inventory, then consider stable promotion and default-on."
   antidrift/no-silent-empty-detection-fallback:
     status: ready
     stable: false
@@ -1854,6 +1830,10 @@ rules:
     nextAction: "Use dotfiles as the real clean corpus anchor and keep the rule opt-in until another repo supplies drift evidence."
 
 retiredRules:
+  antidrift/no-query-data-type-parameters:
+    status: retired
+    reason: Superseded by antidrift/no-explicit-type-arguments-on-owned-api, which resolves the callee symbol and proves registration ownership instead of matching method names; the syntax rule's ad-hoc key coverage was doctrine-rejected (no resolvable owner means no fork).
+    referenceDoc: docs/rule-investigations/sentry-mined-react-rules.md
   antidrift/no-cycle:
     status: retired
     reason: Replaced by Oxlint's native import/no-cycle rule.

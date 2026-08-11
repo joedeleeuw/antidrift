@@ -772,26 +772,6 @@ ruleTester.run("no-static-property-loop", rule("no-static-property-loop"), {
 });
 
 ruleTester.run(
-  "no-query-data-type-parameters",
-  rule("no-query-data-type-parameters"),
-  {
-    valid: [
-      'queryClient.getQueryData(["k"]);',
-      'queryClient.setQueryData(["k"], 1);',
-      'other.getData<number>(["k"]);',
-      'getQueryData<number>(["k"]);',
-    ],
-    invalid: [
-      { code: 'queryClient.getQueryData<number>(["count"]);', errors: 1 },
-      {
-        code: 'client.setQueryData<{ a: number }>(["k"], { a: 1 });',
-        errors: 1,
-      },
-    ],
-  },
-);
-
-ruleTester.run(
   "no-silent-empty-detection-fallback",
   rule("no-silent-empty-detection-fallback"),
   {

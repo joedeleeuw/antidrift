@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- retire `antidrift/no-query-data-type-parameters`: superseded by the symbol-resolved `no-explicit-type-arguments-on-owned-api`; name-matching flagged unrelated same-named methods, and its ad-hoc key coverage predated the ownership doctrine. Removed from the shipped plugin surface — delete the rule from consumer oxlint configs on upgrade
+
 - add `antidrift inventory-type-owner`: crawls local type alias and interface declarations per repo plan, classifies them against installed-package, registry generated-source, and implicit Convex generated owner candidates with the structural relation engine (`exact-owner-copy`/`loosened-owner-copy`/`partial-owner-copy`), and emits a JSON report with ready-to-accept `ownership.yaml` `packageTypeOwners` proposals for exact installed-package copies; test files are included and tagged `test: true`, accepted owners (Convex, generated registry) stay row-only, and murderbox ships as the first external plan
 
 - repair structural fork fingerprints: optionality, readonly, and method-ness are now encoded per property, and matching classifies `exact-owner-copy` (the only blocking relation on accepted owners), `loosened-owner-copy`, and `partial-owner-copy` (both inventory facts). Accepted owners now match from one property; discovery proposals keep the four-property minimum. The previous fingerprint stripped `| undefined` and skipped methods, so loosened copies fingerprinted as exact
