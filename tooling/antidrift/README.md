@@ -121,6 +121,7 @@ pnpm policy:inventory-declaration-clone
 pnpm policy:inventory-declaration-clone-source-fleet
 pnpm policy:inventory-react-state
 pnpm policy:inventory-schema-roundtrip
+pnpm policy:inventory-type-owner
 pnpm policy:inventory-underchecked-predicate
 npx antidrift repo-corpus --slice current-work --rules import/no-cycle
 ```
@@ -142,6 +143,7 @@ The first two validate registry-backed rule facts and verify every custom rule i
 `policy:inventory-declaration-clone` is a non-blocking research inventory for duplicate object contract declarations. It uses the TypeScript checker to group interface declarations and literal object type aliases by exact declared-member name/type/optional/readonly fingerprints, and separates generated-only, mixed generated/source, and source-only clone groups. `policy:inventory-declaration-clone-source-fleet` runs the same inventory against configured local real-code corpora for promotion evidence mining.
 `policy:inventory-react-state` is a non-blocking semantic fact inventory for React state co-mutation. It classifies broad setter co-mutation separately from `no-handrolled-resource-lifecycle-cells` diagnostics so broad inventory cannot become accidental enforcement. Pass `--repo` and `--targets "src/**/*.{ts,tsx}"` to scan a specific checkout; target splitting preserves brace globs.
 `policy:inventory-schema-roundtrip` is a non-blocking research inventory for same-schema `.parse({ ...typedState })` shapes; it classifies real anchors instead of failing the build.
+`policy:inventory-type-owner` is a non-blocking proposal inventory for structural type ownership. It scans local type alias and interface declarations per repo plan, classifies them against installed-package, registry generated-source, and implicit Convex generated owner candidates with the structural relation engine, and emits owner-match rows (test files tagged) plus ready-to-accept `ownership.yaml` `packageTypeOwners` proposals for exact installed-package copies.
 `policy:inventory-underchecked-predicate` is a non-blocking search inventory for `no-underchecked-type-predicate`. It counts type-predicate syntax pressure separately from broad-input contract-laundering diagnostics and records adjacent TypeScript ESLint unsafe-rule overlap.
 
 ## Publishing

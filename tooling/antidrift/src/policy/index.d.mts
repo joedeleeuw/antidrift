@@ -362,6 +362,9 @@ export function classifyReactStateFact(fact: SemanticFact): string;
 export function schemaRoundtripInventory(
   options?: PolicyCommandOptions,
 ): unknown;
+export function typeOwnerInventory(
+  options?: PolicyCommandOptions,
+): Promise<unknown>;
 export function undercheckedPredicateInventory(
   options?: PolicyCommandOptions,
 ): Promise<unknown>;

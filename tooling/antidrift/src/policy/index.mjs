@@ -58,4 +58,5 @@ export {
   reactStateInventory,
 } from "./react-state-inventory.mjs";
 export { schemaRoundtripInventory } from "./schema-roundtrip-inventory.mjs";
+export { typeOwnerInventory } from "./type-owner-inventory.mjs";
 export { undercheckedPredicateInventory } from "./underchecked-predicate-inventory.mjs";
