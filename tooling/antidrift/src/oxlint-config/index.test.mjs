@@ -29,7 +29,7 @@ describe("createGovernanceOxlintConfig", () => {
       suspicious: "off",
     });
     expect(config.options.typeAware).toBeUndefined();
-    expect(config.plugins).toEqual(["eslint"]);
+    expect(config.plugins).toEqual(["eslint", "typescript"]);
     expect(config.jsPlugins.map(({ name }) => name)).toEqual([
       "antidrift",
       "eslint-comments",

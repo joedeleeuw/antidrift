@@ -242,7 +242,7 @@ export function createGovernanceOxlintConfig({
       denyWarnings: true,
       reportUnusedDisableDirectives: "error",
     },
-    plugins: ["eslint"],
+    plugins: ["eslint", "typescript"],
     rules: {
       ...antidriftTypescriptSyntaxRules,
       ...(typescriptBaselineTier(repoRoot) === "full"

@@ -1,6 +1,16 @@
 # changelog
 
-## Unreleased
+## 0.9.0
+
+Upgrading from 0.8.0 activates the native TypeScript baseline for consumers of
+`createGovernanceOxlintConfig` for the first time: the shipped config pinned
+`plugins: ["eslint"]`, which deactivated every `typescript/*` rule. With the
+fix the baseline now fires — expect new `typescript/*` findings on first run
+(the 21 type-aware rules still require `oxlint-tsgolint` and
+`options.typeAware`).
+
+- fix the shipped governance Oxlint config: `plugins` now includes `"typescript"`, so the ~36-rule `typescript/*` baseline (15 syntax, 21 type-aware with `oxlint-tsgolint`) actually activates for consumers; it was silently inert since 0.7.0
+- add a deserialization coverage matrix test: the real oxlint binary runs against the shipped governance config and the ESLint typed lane runs in-process, proving every unsafe `JSON.parse` result path reports (`no-unsafe-assignment`/`no-unsafe-type-assertion`/`no-unsafe-argument`/`no-unsafe-return` natively, `no-unsafe-deserialize` on the input side) while boundary forms stay clean
 
 - add default-off `no-sentinel-absence-fallback`: flags `?? "<sentinel>"` on a member read where the fallback is an in-band absence string (`unknown`, `n/a`, `none`, `unavailable`, `error`, `missing`, case-insensitive) — absence coerced to a sentinel reads identically to a real state; motivated by the murderbox type-authority audit's systemd D-Bus reads (`props.ActiveState ?? "unknown"`) and validated against the live drift site in `apps/api/lib/server/chat-runtime.ts`. `||`, numeric sentinels, call/identifier left-hand sides, and display strings outside the sentinel set stay silent
 
