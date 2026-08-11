@@ -87,14 +87,6 @@ export const defaultCases = [
     paths: ["src/frontend/portal/types/reports.ts"],
   },
   {
-    id: "portal-types-reports-no-query-data-type-parameters-clean",
-    ruleId: "antidrift/no-query-data-type-parameters",
-    kind: "correct",
-    classification: "ready",
-    subproject: "frontend",
-    paths: ["src/frontend/portal/types/reports.ts"],
-  },
-  {
     id: "portal-api-service-axios-error-appeasement-cast",
     ruleId: "antidrift/no-appeasement-cast",
     kind: "drift",
