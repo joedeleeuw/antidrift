@@ -17,10 +17,9 @@ import ruleNoSilentEmptyDetectionFallback from "./oxlint-plugin/rules/no-silent-
 import ruleNoStaticPropertyLoop from "./oxlint-plugin/rules/no-static-property-loop.js";
 import ruleRequireEffectDeps from "./oxlint-plugin/rules/require-effect-deps.js";
 
-// Rules that need no type information. Oxlint's JS plugin API cannot run
-// type-aware rules, so these are exactly the set that both runtimes can host:
-// Oxlint for speed, ESLint for consumers who do not run Oxlint at all.
-// Registered by both plugin entry points from this one definition.
+// Rules that need no type information. Single-owned by the Oxlint plugin
+// entry point per docs/lint-rule-parity.md; the ESLint plugin exports stay
+// disjoint so policy:check-rule-surface can reject dual registration.
 export function createSyntaxRules() {
   return {
     "no-async-array-method": ruleNoAsyncArrayMethod(),
