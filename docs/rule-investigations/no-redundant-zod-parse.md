@@ -45,29 +45,33 @@ The default `nonSchemaModules` list is the one heuristic in the rule, and it is 
 
 ## Real-corpus validation (2026-08-13, canonical-path engine)
 
-Measured by running the shipped Oxlint plugin over seven trees with only this rule enabled. Every clone was shallow and read-only.
+Measured by running the shipped Oxlint plugin over seven trees with only this rule enabled, each pinned to a commit. murderbox was exported from `git archive HEAD` because its working tree changed during the run; every other tree is a shallow read-only clone. The funnel columns are the rule's own gate stages, instrumented.
 
-| Repository | Files linted | `parse`-family call sites | Findings | False positives |
-| --- | --- | --- | --- | --- |
-| murderbox (`chat-profile-resolver`, incl. `apps/client`) | 1157 | 743 (456 non-test) | 0 | 0 |
-| dust-tt/dust | 9908 | 966 | 0 | 0 |
-| elizaOS/eliza | 18139 | 5126 | 0 | 0 |
-| hyperdxio/hyperdx | 1221 | 601 | 0 | 0 |
-| pranitnale/InTown | 264 | 90 | 0 | 0 |
-| ts-rest/ts-rest | 316 | 20 | 0 | 0 |
-| muralibasani/streamlens | 88 | 17 | 0 | 0 |
+| Repository | Files | Validation calls | Canonical path + stable root | Passes schema origin | Value carries provenance | Same canonical path | Findings |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| murderbox @ `777dc1bf` | 896 | 788 | 579 | 578 | 1 | 0 | 0 |
+| dust-tt/dust @ `741e0fb` | 9908 | 946 | 405 | 393 | 0 | 0 | 0 |
+| elizaOS/eliza @ `15c8bc84` | 18141 | 5139 | 879 | 833 | 0 | 0 | 0 |
+| hyperdxio/hyperdx @ `69a89aa` | 1221 | 592 | 172 | 164 | 0 | 0 | 0 |
+| pranitnale/InTown @ `b79dbcb` | 264 | 91 | 53 | 53 | 0 | 0 | 0 |
+| ts-rest/ts-rest @ `dd7239b` | 316 | 17 | 8 | 8 | 0 | 0 | 0 |
+| muralibasani/streamlens @ `8b1cdd1` | 88 | 17 | 15 | 15 | 0 | 0 | 0 |
+| **total** | **30834** | **7590** | **2111** | **2044** | **1** | **0** | **0** |
 
-Zero false positives on roughly 7,563 parse-family call sites, and zero true positives. The zero on both sides is the finding, not an absence of evidence — the populations that could have produced a false positive were present and stayed silent:
+**What the funnel actually shows.** Half the gate is well exercised and half is not, and the two must not be conflated:
 
-- **The newly gained contract seam, exercised and clean.** streamlens is scaffolded `api.<resource>.<op>.responses[<status>].parse(await res.json())` client hooks — ten member-expression receivers with literal computed keys, exactly the shape the migration adds. Every one is a boundary parse of a fetch response, and none reported.
-- **Repeated identical receivers, clean.** 89 murderbox files parse the same schema two or more times in one file (up to 16×). Repetition is not redundancy — each call validates a different raw value — and none reported.
-- **Non-schema receivers, clean.** 106 `JSON.parse` sites in murderbox and five genuine double-`JSON.parse` sites in eliza (`packages/cloud/shared/src/lib/types/message-content.ts`, `plugins/plugin-mcp/src/service.ts`) stayed silent. `JSON` resolves to no binding, so `canon` produces no path — the module-origin veto is not even reached.
-- **The confessed re-parse in hyperdx is a correct bail, twice over.** `packages/api/src/utils/zod.ts` re-parses inside a `.transform` with the comment "Safe to call `.parse()` here — superRefine already validated the data". The receiver is a const initialized from a conditional expression, so there is no static canonical path; and the value is the transform callback's parameter, so there is no in-file provenance. Reproduced on a reduced probe. It is also arguably not drift: the re-parse selects a sub-schema to strip unknown fields, which does real work.
-- **Text-level candidates that scope resolution correctly rejects.** A loose textual scan over all seven trees produced 39 provenance-shaped candidates. All but one are `JSON.parse` boundary decodes feeding a schema parse, or a scoping artifact — `dust/front/lib/api/triggers/built-in-webhooks/linear/linear_client.ts` binds `const webhook = LinearWebhookSchema.parse(...)` at line 169 and an unrelated arrow parameter named `webhook` at line 237. Text matching unifies those two names; scope resolution does not.
+- The **receiver half is genuinely validated**. 2,044 of 7,590 validation calls (27%) resolve to a canonical path on a stable root and pass the schema-origin classification, so `canon`, alias expansion, object-literal collapse, literal computed keys, and the origin rules all ran against real code at scale rather than against fixtures. streamlens contributes 15 of its 17 calls here, including the nine scaffolded `api.<resource>.<op>.responses[<status>].parse(await res.json())` seams — the exact member-expression-with-literal-computed-key shape this migration adds.
+- The **provenance half is essentially unexercised**. Across 7,590 calls the value being parsed carried in-file provenance from any schema exactly **once**, and it never carried provenance from the *same* canonical path. The zero findings therefore mean "this corpus almost never re-parses a locally parsed value", not "the rule discriminated well under pressure". Recall against the canonical-path engine is unproven, which is why the rule ships default-off.
 
-### The one true positive in the corpus is out of scope by design
+An earlier draft of this section claimed the false-positive-capable populations "were present and stayed silent". That overstates the evidence and is corrected here: what was present in volume was *receiver* shape; what was absent was *provenance* shape. The suppression work below is real but was measured at the receiver stage, not at the report stage.
 
-`apps/desktop/src/bridge.ts:23` re-parses a value the same schema already produced:
+- **Non-schema receivers.** `JSON` resolves to no binding, so `canon` yields no path at all and the module-origin veto is never reached — murderbox's `JSON.parse` sites and the genuine double-`JSON.parse` sites in eliza (`packages/cloud/shared/src/lib/types/message-content.ts`, `plugins/plugin-mcp/src/service.ts`) drop out at the canon stage. The origin veto itself rejects 67 of the 2,111 canon-resolved receivers (dust 12, eliza 46, hyperdx 8, murderbox 1), so it does measurable work — but because none of those receivers reached the provenance stage, it changed no end result on this corpus. It is insurance, not a load-bearing measured filter.
+- **hyperdx's confessed re-parse is a correct bail, twice over.** `packages/api/src/utils/zod.ts` re-parses inside a `.transform` with the comment "Safe to call `.parse()` here — superRefine already validated the data". The receiver is a const initialized from a conditional expression, so there is no static canonical path; and the value is the transform callback's parameter, so there is no in-file provenance. Reproduced on a reduced probe. It is also arguably not drift: the re-parse selects a sub-schema to strip unknown fields, which does real work.
+- **Scope resolution beats text matching.** A loose textual scan produced candidates that the rule correctly ignores, including `dust/front/lib/api/triggers/built-in-webhooks/linear/linear_client.ts`, which binds `const webhook = LinearWebhookSchema.parse(...)` at line 169 and an unrelated arrow parameter named `webhook` at line 237.
+
+### The one provenance hit in the corpus is out of scope by design
+
+murderbox `apps/desktop/src/bridge.ts:23` at `777dc1bf` is the single site where the parsed value carried provenance:
 
 ```ts
 import { murderboxDesktopBridgeContract, murderboxDesktopRuntimeInfoResultSchema } from "@murderbox/shared/desktop-bridge";
@@ -76,11 +80,11 @@ const parsedRuntimeInfo = murderboxDesktopRuntimeInfoResultSchema.parse(runtimeI
 return method.resultSchema.parse(parsedRuntimeInfo);
 ```
 
-`murderboxDesktopBridgeContract.getRuntimeInfo.resultSchema` **is** `murderboxDesktopRuntimeInfoResultSchema` — but only the imported module says so. The two receivers root at two different import bindings, and proving they name one object means reading another module, which the syntax tier cannot do. This is the documented "same root binding or nothing" boundary, and it is a measured false negative rather than a bug.
+`murderboxDesktopBridgeContract.getRuntimeInfo.resultSchema` **is** `murderboxDesktopRuntimeInfoResultSchema` — but only the imported module says so. The two receivers root at two different import bindings, so the same-path test fails and nothing is reported. This is the documented "same root binding or nothing" boundary: a measured false negative, not a bug.
 
-A relaxation was implemented and measured before being rejected: unify two roots when both are import bindings from the *same module specifier*. Across all seven trees it produced exactly one finding — this one — and no new false positives. It was still rejected, because it is unsound in a shape that is trivially constructible even though this corpus does not contain it: `import { RequestSchema, contract } from "./contract"` would unify `RequestSchema` with `contract.route.responseSchema`, which are different schemas. The measurement is evidence for the *sound* version of the capability, not for this one.
+A relaxation was implemented and measured before being rejected: unify two roots when both are import bindings from the *same module specifier*. Across the corpus it produced exactly one finding — this one — and no new false positives. It was still rejected, because it is unsound in a trivially constructible shape this corpus happens not to contain: `import { RequestSchema, contract } from "./contract"` would unify `RequestSchema` with `contract.route.responseSchema`, which are different schemas. The measurement argues for the *sound* version of the capability, not for this one.
 
-The honest reading of the whole corpus: in-file same-root re-validation is rare, and the shape that actually occurs is cross-module contract identity. Recall for this rule lives in a registry-declared or module-graph fact, which is the recorded follow-up.
+The honest reading: in-file same-root re-validation is rare, and the shape that actually occurs is cross-module contract identity. Recall for this rule lives in a registry-declared or module-graph fact, which is the recorded follow-up.
 
 ## Known holes
 
