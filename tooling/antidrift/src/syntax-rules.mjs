@@ -11,6 +11,7 @@ import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "./oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
 import ruleNoNonindependentTestOracle from "./oxlint-plugin/rules/no-nonindependent-test-oracle.js";
+import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-mirror-assertion.js";
 import ruleNoSentinelAbsenceFallback from "./oxlint-plugin/rules/no-sentinel-absence-fallback.js";
 import ruleNoSilentEmptyDetectionFallback from "./oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
 import ruleNoStaticPropertyLoop from "./oxlint-plugin/rules/no-static-property-loop.js";
@@ -33,6 +34,7 @@ export function createSyntaxRules() {
       ruleNoInlineStructuralTypeAtUseSite(),
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
     "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
+    "no-repo-state-mirror-assertion": ruleNoRepoStateMirrorAssertion(),
     "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
     "no-shattered-ingested-entity-state": ruleNoShatteredIngestedEntityState(),
     "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),

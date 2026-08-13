@@ -1,5 +1,9 @@
 # changelog
 
+## unreleased
+
+- add default-off `no-repo-state-mirror-assertion`: in test files, flags assertions that compare values derived from configured repo-state loaders (confs, manifests, registries) against literals, and null/existence pins on literal-keyed lookups into those loaders — such tests restate data the repo already defines, prove no behavior, and break on every legitimate tune. Configure `sources: [{ module, names? }]` with the loader import origins; relational assertions, invariants, and fixture-owned data stay silent. Motivated by the murderbox conf.test.ts sweep (43 mirror tests, 1,636 lines removed by hand)
+
 ## 0.9.0
 
 Upgrading from 0.8.0 activates the native TypeScript baseline for consumers of
