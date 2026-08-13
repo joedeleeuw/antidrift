@@ -8,13 +8,49 @@ This rule should catch repeated validation after a value is already known to be 
 
 ## Signal
 
-Type-aware Zod provenance.
+Canonical-path Zod provenance. No type information is consulted anywhere.
 
-The rule confirms that `.parse()` / `.parseAsync()` is a Zod method through TypeScript symbol declarations, not by name. It then reports only:
+The rule was a type-aware ESLint rule until 2026-08-13. It confirmed `.parse()` was a Zod method through TypeScript symbol declarations, and it unified the two parse sites through symbol identity — which meant the schema receiver had to be a plain identifier. That is blind to the ecosystem's dominant architecture: contract-first libraries (ts-rest, oRPC, tRPC, Hono validators) hold schemas as properties of a contract object, so the receiver is a member expression such as `contract.getPost.responses[200]` or `method.resultSchema`.
 
-- a value already recorded as produced by the same schema (same-binding decoder provenance).
+The shipped detector is in the Oxlint syntax tier and works from local AST plus scope bindings:
 
-The helper-result branch was removed on 2026-08-10. It gated reports on bidirectional TypeScript assignability between the helper's declared return type and the schema output, but assignability never proves the same decoder ran: refinements (`.min`, `.positive`, `.refine`, `.transform`) are invisible to the type system, so `NonEmpty.parse(readName())` with `readName(): string` false-positived. Type equivalence is not decoder provenance.
+- **`canon(expr)`** strips chain and TS wrappers, collects member segments while they stay static (identifier properties and literal computed keys, so `responses[200]` resolves), resolves the base identifier to a scope binding, expands const aliases whose initializer is an identifier or member expression (depth-capped and cycle-guarded), and roots at the first non-alias binding. The result is ⟨root binding⟩ plus segments. Dynamic segments, calls anywhere in the chain, and unresolved globals produce no path at all. Bailing is silent by design.
+- **Provenance** is recorded at `const v = P.parse(x)` (and the `parseAsync`/`safeParse`/`safeParseAsync` variants) and reported at `P'.<method>(v)` when the two canonical paths are equal, the root is a const or import that is never rebound, no prefix of the path is written anywhere in the file, and `v` is neither mutated nor escaped into a call between the two sites. The pre-migration same-binding rule is the zero-length-path case of this, so all six `zod-reparse-*` drift fixtures port unchanged.
+- **safeParse provenance flows through the result object**, not only the call: `const r = S.safeParse(x)` marks `r.data` as `S`-validated output, and `const { data } = S.safeParse(x)` marks the destructured binding. This is a bounded special case for the safeParse result shape, not general field-level provenance.
+- **Cross-module unification never happens by inference.** A local mirror of an imported contract schema has a different root binding, so it does not unify. Same root binding or nothing.
+
+The helper-result branch was removed on 2026-08-10 and must not return. It gated reports on bidirectional TypeScript assignability between the helper's declared return type and the schema output, but assignability never proves the same decoder ran: refinements (`.min`, `.positive`, `.refine`, `.transform`) are invisible to the type system, so `NonEmpty.parse(readName())` with `readName(): string` false-positived. Type equivalence is not decoder provenance — and the two public rules that share this rule's name are exactly that retired mechanism.
+
+## Schema-ness without types
+
+The method-name set (`parse`, `parseAsync`, `safeParse`, `safeParseAsync`) is only the trigger. Without a checker, the rule needs positive evidence that the receiver names a schema, because `JSON.parse`, `path.parse`, and document parsers share the method name. The classification, in order:
+
+1. If the path's root binding is an import, classify by module specifier: the zod family (configurable through `schemaModules`) is `zod-rooted`; a specifier in `contractModules` is `declared-container`; `node:` builtins and anything in `nonSchemaModules` are vetoed; everything else is `opaque-container`.
+2. Otherwise resolve the path in-file — descending object literals, array literals, and the object argument of a builder call so `c.router({ getPost: { responses: { 200: PostSchema } } })` resolves — and classify the base identifier of whatever expression the path lands on by the same module rules.
+3. An unresolved or global root (`JSON`, `Date`) is never a schema.
+
+The default `nonSchemaModules` list is the one heuristic in the rule, and it is a bounded, explicit, configurable list rather than a proof. Its residual false-positive shape is a same-file double parse through a member of a first-party or unlisted module that happens to expose a `parse` method; `nonSchemaModules` exists to silence exactly that.
+
+## Exemptions re-derived
+
+`dfine-io/dlint` ships a rule with this name whose detector is type-shape, and its four exemptions exist to suppress failure modes that shape-matching creates. Each was re-derived against the provenance gate:
+
+| Exemption | Verdict | Reasoning |
+| --- | --- | --- |
+| safeParse is always a boundary | Rejected | A shape detector cannot tell a defensive check of untrusted input from a re-check of its own output, so it must exempt the method wholesale. Under provenance, a defensive check of unknown input never reaches the gate, and `S.safeParse(ownOutput)` cannot fail — it is dead code, so it gets its own `alwaysSuccessfulSafeParse` message instead of an exemption. |
+| `.catch()` / `.default()` chain | Kept structurally | `S.catch(x).parse(v)` puts a call in the receiver chain, so `canon` produces no path. It is also a different schema instance, so unifying it would have been wrong. No exemption code exists. |
+| `"use server"` files | Rejected | It exists because a server action's typed parameters are untrusted at runtime, which only matters to a detector reading the parameter's type. A boundary parse of an argument never reaches the gate; a file that parses the same value twice is drift wherever it runs. |
+| Widely-typed veto (`any`/`unknown`) | Rejected | It is a checker query this tier does not have, and it is unnecessary: it protects against a declared type that lies about the runtime value, while the gate requires the literal result of this schema's own parse call. |
+| Throw-assertion callbacks | Kept | Carried over from the pre-migration rule. `expect(() => S.parse(v)).toThrow()` asserts a schema contract, not validation drift, and provenance cannot distinguish it. |
+
+## Known holes
+
+Documented rather than solved, because both need module-graph facts the syntax tier does not have:
+
+- a path segment backed by a getter that returns a fresh object per read, so two reads of the same path are not the same schema instance;
+- cross-module mutation of an exported contract object.
+
+Cross-owner reporting for a generated mirror of a canonical contract is deliberate follow-up scope, not a hole: canonical paths are never unified across module boundaries by inference, so a registry-gated cross-owner message would have to come from declared facts.
 
 ## Should Flag
 

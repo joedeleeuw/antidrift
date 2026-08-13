@@ -985,50 +985,40 @@ rules:
     nextAction: Keep default-off inventory while re-inventorying real component fetch findings under the narrowed same-frame JSX-return proof before restoring blocking severity.
   antidrift/no-redundant-zod-parse:
     status: ready
-    stable: true
+    stable: false
+    defaultOff: true
+    proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/no-redundant-zod-parse.md
-    signal: TypeChecker plus schema provenance
+    signal: Canonical-path schema provenance from local AST and scope bindings
     solveType: validation-boundary-drift
-    promotion:
-      proofBucket: semantic-source-type-provenance
-      association: Values already proven as a Zod schema output to later parse calls on the same schema.
-      blockingThreshold: Same-schema reparse reports only when TypeScript proves the consumed value is already equivalent to that schema output.
-      ecosystemComparison: Generic unsafe-assignment or Zod style rules do not track same-schema provenance from parsed values.
-      corpusEvidence: Chaski, Codebase Atlas, and Murderbox provide same-schema drift plus first-boundary parse and test-contract clean controls.
-      realCorpusInventory: docs/rule-investigations/no-redundant-zod-parse.md and docs/stable-promotion-inventory.md record Chaski and Murderbox drift plus clean first-boundary and assertion-contract controls.
-      realCorpusInventoryRefs:
-        - docs/rule-investigations/no-redundant-zod-parse.md
-        - docs/stable-promotion-inventory.md
-      claudeAdvisoryReview: reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md and docs/rule-investigations/no-redundant-zod-parse.md record the advisory review and accepted corpus edge.
-      claudeAdvisoryReviewRefs:
-        - reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md
-        - docs/rule-investigations/no-redundant-zod-parse.md
-      replicationsNotIntroducedForTest: true
-      knownFalsePositives: 0
-      knownFalseNegatives: 0
-      productionConcerns: none
-      noSinkBehavior: This rule emits no semantic facts; diagnostics depend on parser services and local provenance, not sink availability.
-      noDeadWorkBehavior: First boundary parses, different storage schemas, and assertion-callback contract checks stay clean.
     corpusRepositories: [chaski, codebase-atlas, murderbox]
     concerns:
+      - "Migrated to the Oxlint syntax tier on 2026-08-13. Detection is canonical-path provenance over scope bindings instead of TypeChecker symbol identity, so the shipped surface is new code against a new engine and returns to default-off inventory until a fresh real-corpus inventory replaces the pre-migration one."
+      - "Schema-ness of the receiver is decided without types. Positive evidence is either an in-file resolution to a zod-rooted expression or an import whose module is not a known non-schema parser; globals and node: builtins never pass. The residual false-positive shape is a same-file double parse through a first-party non-schema module member, which the nonSchemaModules option exists to silence."
       - "Test assertion scope is decided: Zod parses inside throw assertion callbacks are schema-contract checks, not validation-boundary drift."
-      - "A June 4, 2026 real-test scan found no consumed assertion-callback reparse case across Codebase Atlas, Murderbox, Sudocode, and Chaski; that missing negative gate is accepted as unrepresented in the current corpus."
-      - "Call-result type-equivalence branches were removed on 2026-08-10: bidirectional assignability between a helper's declared return type and the schema output never proves that schema validated the value, because refinements (.min, .positive, .refine, .transform) are invisible to TypeScript. The false-positive shape is NonEmpty.parse(readName()) with readName(): string. Same-binding decoder provenance remains blocking; call-result coverage may return through producer provenance in the schema-provenance adapter."
+      - "Call-result type-equivalence branches were removed on 2026-08-10 and must not return: bidirectional assignability between a helper's declared return type and the schema output never proves that schema validated the value, because refinements (.min, .positive, .refine, .transform) are invisible to TypeScript."
+      - "Known holes accepted rather than solved: a path segment backed by a getter that returns a fresh object per read, and cross-module mutation of an exported contract object. Both need module-graph facts the syntax tier does not have."
+    unproven:
+      - "Cross-owner reporting for a generated mirror of a canonical contract is not implemented. Canonical paths are never unified across module boundaries by inference; a registry-gated cross-owner message remains follow-up work."
     external:
       state: net-antidrift
       support: none
       candidates: []
       decision: own-antidrift
-      whyThisState: "No supported Zod rule was found that tracks schema provenance and reports re-parsing a value already produced by the same schema."
-      whyNotOtherState: "Not partial-overlap because generic unsafe-assignment rules do not distinguish raw input from schema-owned output."
+      whyThisState: "No supported Zod rule tracks schema provenance and reports re-parsing a value already produced by the same schema. The two public rules sharing this name are type-shape detectors, which is the mechanism this package retired in a093871."
+      whyNotOtherState: "Not partial-overlap because generic unsafe-assignment rules do not distinguish raw input from schema-owned output, and no public rule resolves a schema reached through a contract-object path."
     examples:
       flags:
         - "const row = RowSchema.parse(raw); return RowSchema.parse(row);"
+        - "const post = contract.getPost.responses[200].parse(raw); return contract.getPost.responses[200].parse(post);"
+        - "const result = S.safeParse(raw); if (result.success) return S.parse(result.data);"
       allows:
         - "const row = RowSchema.parse(raw);"
         - "const row = RowSchema.parse(await getTypedRow());"
+        - "const value = schemas[kind].parse(raw); return schemas[kind].parse(value);"
+        - "const doc = YAML.parse(raw); return YAML.parse(doc);"
         - "expect(() => RowSchema.parse(typedFixture)).not.toThrow();"
-    nextAction: Stable for the same-binding provenance core. The removed call-result branches return only with decoder producer provenance; do not reintroduce type-equivalence gating.
+    nextAction: "Default-off inventory on first release under the graduated rollout doctrine. Restore blocking severity only after a real-corpus inventory measured against the canonical-path engine, not the retired TypeChecker one. Do not reintroduce any type-identity or assignability signal."
   antidrift/no-parse-as-cast:
     status: ready
     stable: false

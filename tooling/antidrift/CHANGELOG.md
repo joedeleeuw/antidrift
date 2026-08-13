@@ -1,5 +1,9 @@
 # changelog
 
+## Unreleased
+
+- migrate `antidrift/no-redundant-zod-parse` to the Oxlint syntax tier as its single owner, and re-scope detection from same-binding symbol identity to canonical-path provenance. The receiver may now be a member expression, so contract-first architectures are covered for the first time: `contract.getPost.responses[200].parse(post)`, `method.resultSchema.parse(info)`, and const aliases of either unify with the site that produced the value. Literal computed keys resolve; dynamic segments, calls in the receiver chain, rebound roots, writes to any prefix of the path, and values mutated or escaped into a call between the two sites all bail silently. `safeParse` provenance flows through the result object (`r.data` and `const { data } = ...`), and `S.safeParse(ownOutput)` reports separately as dead defensive validation rather than being exempted. No type-identity or assignability signal is used anywhere. **Breaking for consumers:** the ESLint plugin no longer exports this rule — remove `antidrift/no-redundant-zod-parse` from ESLint configs and enable it in Oxlint instead. It ships default-off on this release under the graduated rollout doctrine
+
 ## 0.9.0
 
 Upgrading from 0.8.0 activates the native TypeScript baseline for consumers of

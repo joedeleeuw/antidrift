@@ -22,7 +22,6 @@ The reduced ESLint pass currently enables:
 
 - `antidrift/no-contract-appeasement-projection`
 - `antidrift/react-max-component-props`
-- `antidrift/no-redundant-zod-parse`
 - `antidrift/no-unsafe-deserialize`
 - `antidrift/no-appeasement-cast`
 - `antidrift/no-canonical-model-fork`
@@ -40,6 +39,7 @@ The structural and canonical rules receive generated, accepted package-owner, an
 - `antidrift/no-nonindependent-test-oracle`
 - `antidrift/no-query-data-type-parameters`
 - `antidrift/no-raw-fetch-in-component`
+- `antidrift/no-redundant-zod-parse`
 - `antidrift/no-shattered-ingested-entity-state`
 - `antidrift/no-silent-empty-detection-fallback`
 - `antidrift/no-status-literal-in-type`
@@ -50,6 +50,8 @@ The ESLint pass preserves these TypeChecker-dependent or hybrid rules as default
 - `antidrift/no-defensive-shape-probing`
 - `antidrift/no-sql-string-concat`
 - `antidrift/no-underchecked-type-predicate`
+
+`antidrift/no-redundant-zod-parse` moved from the ESLint pass to the Oxlint plugin on 2026-08-13. It is a whole-rule migration, not a dual registration: the ESLint plugin no longer exports it, so `repo-corpus` — which derives its rule universe from the ESLint plugin's exports — no longer counts it, which is correct because ESLint no longer runs it. The detection mechanism changed with the tier, from TypeChecker symbol identity to canonical-path provenance over scope bindings, so it re-enters as default-off inventory.
 
 No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. The ESLint and Oxlint plugin exports are disjoint: there is no compatibility export of Oxlint-owned rules through ESLint. `policy:check-rule-surface` fails if a custom rule is exported or enabled by both runtimes.
 
