@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { defineConfig } from "oxlint";
@@ -12,9 +11,7 @@ const packageRequire = createRequire(import.meta.url);
 const javascriptPlugins = [
   {
     name: "antidrift",
-    specifier: fileURLToPath(
-      new URL("../oxlint-plugin/index.js", import.meta.url),
-    ),
+    specifier: "@joedeleeuw/antidrift/oxlint-plugin",
   },
   {
     name: "eslint-comments",

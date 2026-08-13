@@ -4,6 +4,8 @@
 
 - add default-off `no-repo-state-mirror-assertion`: in test files, flags assertions that compare values derived from configured repo-state loaders (confs, manifests, registries) against literals, and null/existence pins on literal-keyed lookups into those loaders — such tests restate data the repo already defines, prove no behavior, and break on every legitimate tune. Configure `sources: [{ module, names? }]` with the loader import origins; relational assertions, invariants, and fixture-owned data stay silent. Motivated by the murderbox conf.test.ts sweep (43 mirror tests, 1,636 lines removed by hand)
 
+- fix the package top entry as an Oxlint plugin specifier: `jsPlugins: [{ specifier: "@joedeleeuw/antidrift" }]` crashed with `Cannot destructure property 'rules' of 'plugin' as it is undefined` because the root entry had no default export — Oxlint's loader reads the default export of the given specifier. The root now re-exports the Oxlint plugin as its default (named exports unchanged), and a registration test drives the real oxlint binary through the top entry. The governance Oxlint config now names the plugin by its package specifier instead of an absolute file path into node_modules — the workaround that path represented is gone with the bug
+
 ## 0.9.0
 
 Upgrading from 0.8.0 activates the native TypeScript baseline for consumers of
