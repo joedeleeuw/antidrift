@@ -43,6 +43,45 @@ The default `nonSchemaModules` list is the one heuristic in the rule, and it is 
 | Widely-typed veto (`any`/`unknown`) | Rejected | It is a checker query this tier does not have, and it is unnecessary: it protects against a declared type that lies about the runtime value, while the gate requires the literal result of this schema's own parse call. |
 | Throw-assertion callbacks | Kept | Carried over from the pre-migration rule. `expect(() => S.parse(v)).toThrow()` asserts a schema contract, not validation drift, and provenance cannot distinguish it. |
 
+## Real-corpus validation (2026-08-13, canonical-path engine)
+
+Measured by running the shipped Oxlint plugin over seven trees with only this rule enabled. Every clone was shallow and read-only.
+
+| Repository | Files linted | `parse`-family call sites | Findings | False positives |
+| --- | --- | --- | --- | --- |
+| murderbox (`chat-profile-resolver`, incl. `apps/client`) | 1157 | 743 (456 non-test) | 0 | 0 |
+| dust-tt/dust | 9908 | 966 | 0 | 0 |
+| elizaOS/eliza | 18139 | 5126 | 0 | 0 |
+| hyperdxio/hyperdx | 1221 | 601 | 0 | 0 |
+| pranitnale/InTown | 264 | 90 | 0 | 0 |
+| ts-rest/ts-rest | 316 | 20 | 0 | 0 |
+| muralibasani/streamlens | 88 | 17 | 0 | 0 |
+
+Zero false positives on roughly 7,563 parse-family call sites, and zero true positives. The zero on both sides is the finding, not an absence of evidence — the populations that could have produced a false positive were present and stayed silent:
+
+- **The newly gained contract seam, exercised and clean.** streamlens is scaffolded `api.<resource>.<op>.responses[<status>].parse(await res.json())` client hooks — ten member-expression receivers with literal computed keys, exactly the shape the migration adds. Every one is a boundary parse of a fetch response, and none reported.
+- **Repeated identical receivers, clean.** 89 murderbox files parse the same schema two or more times in one file (up to 16×). Repetition is not redundancy — each call validates a different raw value — and none reported.
+- **Non-schema receivers, clean.** 106 `JSON.parse` sites in murderbox and five genuine double-`JSON.parse` sites in eliza (`packages/cloud/shared/src/lib/types/message-content.ts`, `plugins/plugin-mcp/src/service.ts`) stayed silent. `JSON` resolves to no binding, so `canon` produces no path — the module-origin veto is not even reached.
+- **The confessed re-parse in hyperdx is a correct bail, twice over.** `packages/api/src/utils/zod.ts` re-parses inside a `.transform` with the comment "Safe to call `.parse()` here — superRefine already validated the data". The receiver is a const initialized from a conditional expression, so there is no static canonical path; and the value is the transform callback's parameter, so there is no in-file provenance. Reproduced on a reduced probe. It is also arguably not drift: the re-parse selects a sub-schema to strip unknown fields, which does real work.
+- **Text-level candidates that scope resolution correctly rejects.** A loose textual scan over all seven trees produced 39 provenance-shaped candidates. All but one are `JSON.parse` boundary decodes feeding a schema parse, or a scoping artifact — `dust/front/lib/api/triggers/built-in-webhooks/linear/linear_client.ts` binds `const webhook = LinearWebhookSchema.parse(...)` at line 169 and an unrelated arrow parameter named `webhook` at line 237. Text matching unifies those two names; scope resolution does not.
+
+### The one true positive in the corpus is out of scope by design
+
+`apps/desktop/src/bridge.ts:23` re-parses a value the same schema already produced:
+
+```ts
+import { murderboxDesktopBridgeContract, murderboxDesktopRuntimeInfoResultSchema } from "@murderbox/shared/desktop-bridge";
+const method = murderboxDesktopBridgeContract.getRuntimeInfo;
+const parsedRuntimeInfo = murderboxDesktopRuntimeInfoResultSchema.parse(runtimeInfo);
+return method.resultSchema.parse(parsedRuntimeInfo);
+```
+
+`murderboxDesktopBridgeContract.getRuntimeInfo.resultSchema` **is** `murderboxDesktopRuntimeInfoResultSchema` — but only the imported module says so. The two receivers root at two different import bindings, and proving they name one object means reading another module, which the syntax tier cannot do. This is the documented "same root binding or nothing" boundary, and it is a measured false negative rather than a bug.
+
+A relaxation was implemented and measured before being rejected: unify two roots when both are import bindings from the *same module specifier*. Across all seven trees it produced exactly one finding — this one — and no new false positives. It was still rejected, because it is unsound in a shape that is trivially constructible even though this corpus does not contain it: `import { RequestSchema, contract } from "./contract"` would unify `RequestSchema` with `contract.route.responseSchema`, which are different schemas. The measurement is evidence for the *sound* version of the capability, not for this one.
+
+The honest reading of the whole corpus: in-file same-root re-validation is rare, and the shape that actually occurs is cross-module contract identity. Recall for this rule lives in a registry-declared or module-graph fact, which is the recorded follow-up.
+
 ## Known holes
 
 Documented rather than solved, because both need module-graph facts the syntax tier does not have:

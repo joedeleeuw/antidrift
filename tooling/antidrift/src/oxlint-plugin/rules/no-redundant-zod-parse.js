@@ -190,6 +190,58 @@ function reportedValueBinding(sourceCode, argument, safeResults) {
   return { variable: null, viaSafeResult: false };
 }
 
+const FUNCTION_NODE_TYPES = new Set([
+  "ArrowFunctionExpression",
+  "FunctionDeclaration",
+  "FunctionExpression",
+]);
+const WALK_SKIP_KEYS = new Set(["parent", "loc", "range", "start", "end", "type"]);
+const MAX_ESCAPE_DEPTH = 24;
+
+// Every identifier an expression hands to someone else. Member property names
+// and non-computed object keys are not values, so they are skipped; everything
+// else — nested literals, spreads, closures — is walked, because a callee that
+// receives or captures the value can mutate it.
+function collectEscapedIdentifiers(node, out, depth = 0) {
+  if (!node || typeof node !== "object" || depth > MAX_ESCAPE_DEPTH) return;
+  if (Array.isArray(node)) {
+    for (const item of node) collectEscapedIdentifiers(item, out, depth + 1);
+    return;
+  }
+  if (typeof node.type !== "string") return;
+  if (node.type === "Identifier") {
+    out.push(node);
+    return;
+  }
+  if (node.type === "MemberExpression") {
+    collectEscapedIdentifiers(node.object, out, depth + 1);
+    if (node.computed) collectEscapedIdentifiers(node.property, out, depth + 1);
+    return;
+  }
+  if (node.type === "Property") {
+    if (node.computed) collectEscapedIdentifiers(node.key, out, depth + 1);
+    collectEscapedIdentifiers(node.value, out, depth + 1);
+    return;
+  }
+  for (const key of Object.keys(node)) {
+    if (WALK_SKIP_KEYS.has(key)) continue;
+    collectEscapedIdentifiers(node[key], out, depth + 1);
+  }
+}
+
+// The same-file function a bare-identifier callee names, if any. Function
+// declarations hoist, so the body may sit after every call site.
+function calledFunctionNode(variable) {
+  const definition = variable?.defs?.[0];
+  if (!definition) return null;
+  if (definition.type === "FunctionName") return definition.node;
+  if (definition.type === "Variable") {
+    const initializer = unwrapExpression(definition.node?.init);
+    return FUNCTION_NODE_TYPES.has(initializer?.type) ? initializer : null;
+  }
+  return null;
+}
+
 export default function ruleNoRedundantZodParse() {
   return {
     meta: {
@@ -222,13 +274,42 @@ export default function ruleNoRedundantZodParse() {
       const calls = [];
       const writes = [];
       const hazards = new Map();
+      // Hazards attributed to the function that contains them, so a call to a
+      // function can stand in for what that function's body does. Function
+      // declarations hoist, so a lexical source-order window cannot see a
+      // mutator declared below the site it affects.
+      const functionStack = [];
+      const functionHazards = new Map();
+      const functionCalls = new Map();
+      const calleeCallSites = [];
 
-      const addHazard = (identifier, node) => {
-        const variable = findVariable(sourceCode, identifier);
+      const currentFunction = () =>
+        functionStack.length > 0
+          ? functionStack[functionStack.length - 1]
+          : null;
+
+      const hazardSetFor = (map, key) => {
+        const existing = map.get(key);
+        if (existing) return existing;
+        const created = new Set();
+        map.set(key, created);
+        return created;
+      };
+
+      const addHazard = (variable, node) => {
         if (!variable) return;
         const sites = hazards.get(variable) ?? [];
         sites.push(node);
         hazards.set(variable, sites);
+        hazardSetFor(functionHazards, currentFunction()).add(variable);
+      };
+
+      const addEscape = (expression, node) => {
+        const identifiers = [];
+        collectEscapedIdentifiers(expression, identifiers);
+        for (const identifier of identifiers) {
+          addHazard(findVariable(sourceCode, identifier), node);
+        }
       };
 
       const addWrite = (target, node) => {
@@ -236,23 +317,45 @@ export default function ruleNoRedundantZodParse() {
         if (!path) return;
         writes.push(path);
         // A write anywhere under a value's own path spends its provenance.
-        const sites = hazards.get(path.variable) ?? [];
-        sites.push(node);
-        hazards.set(path.variable, sites);
+        addHazard(path.variable, node);
       };
 
       const addCallHazards = (node) => {
         if (validationCallParts(node)) return;
-        for (const argument of node.arguments ?? []) {
-          const value = unwrapExpression(
-            argument.type === "SpreadElement" ? argument.argument : argument,
-          );
-          if (value?.type === "Identifier") addHazard(value, node);
-        }
+        for (const argument of node.arguments ?? []) addEscape(argument, node);
         const callee = unwrapExpression(node.callee);
         if (callee?.type === "MemberExpression") {
-          const receiver = unwrapExpression(callee.object);
-          if (receiver?.type === "Identifier") addHazard(receiver, node);
+          addEscape(callee.object, node);
+          return;
+        }
+        if (callee?.type !== "Identifier") return;
+        const target = calledFunctionNode(findVariable(sourceCode, callee));
+        if (!target) return;
+        calleeCallSites.push({ node, target });
+        hazardSetFor(functionCalls, currentFunction()).add(target);
+      };
+
+      // A call to a same-file function hazards everything that function's body
+      // writes or lets escape, transitively, positioned at the call site.
+      const resolveCalleeHazards = () => {
+        const resolved = new Map();
+        const resolveFor = (fn, seen) => {
+          if (resolved.has(fn)) return resolved.get(fn);
+          if (seen.has(fn)) return new Set();
+          seen.add(fn);
+          const out = new Set(functionHazards.get(fn) ?? []);
+          for (const callee of functionCalls.get(fn) ?? []) {
+            for (const variable of resolveFor(callee, seen)) out.add(variable);
+          }
+          resolved.set(fn, out);
+          return out;
+        };
+        for (const { node, target } of calleeCallSites) {
+          for (const variable of resolveFor(target, new Set())) {
+            const sites = hazards.get(variable) ?? [];
+            sites.push(node);
+            hazards.set(variable, sites);
+          }
         }
       };
 
@@ -262,6 +365,7 @@ export default function ruleNoRedundantZodParse() {
         );
 
       const analyze = () => {
+        resolveCalleeHazards();
         const validatedBy = new Map();
         const safeResults = new Map();
         for (const call of [...calls].sort(
@@ -311,9 +415,21 @@ export default function ruleNoRedundantZodParse() {
         }
       };
 
+      const enterFunction = (node) => functionStack.push(node);
+      const exitFunction = () => functionStack.pop();
+
       return {
+        ArrowFunctionExpression: enterFunction,
+        "ArrowFunctionExpression:exit": exitFunction,
+        FunctionDeclaration: enterFunction,
+        "FunctionDeclaration:exit": exitFunction,
+        FunctionExpression: enterFunction,
+        "FunctionExpression:exit": exitFunction,
         AssignmentExpression(node) {
           addWrite(node.left, node);
+          // Storing the value somewhere else hands it to a holder that can be
+          // mutated through, so the right-hand side escapes too.
+          addEscape(node.right, node);
         },
         UpdateExpression(node) {
           addWrite(node.argument, node);

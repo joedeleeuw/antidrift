@@ -991,7 +991,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-redundant-zod-parse.md
     signal: Canonical-path schema provenance from local AST and scope bindings
     solveType: validation-boundary-drift
-    corpusRepositories: [chaski, codebase-atlas, murderbox]
+    corpusRepositories: [chaski, codebase-atlas, murderbox, dust, eliza, hyperdx, intown, streamlens, ts-rest]
     concerns:
       - "Migrated to the Oxlint syntax tier on 2026-08-13. Detection is canonical-path provenance over scope bindings instead of TypeChecker symbol identity, so the shipped surface is new code against a new engine and returns to default-off inventory until a fresh real-corpus inventory replaces the pre-migration one."
       - "Schema-ness of the receiver is decided without types. Positive evidence is either an in-file resolution to a zod-rooted expression or an import whose module is not a known non-schema parser; globals and node: builtins never pass. The residual false-positive shape is a same-file double parse through a first-party non-schema module member, which the nonSchemaModules option exists to silence."
@@ -999,6 +999,8 @@ rules:
       - "Call-result type-equivalence branches were removed on 2026-08-10 and must not return: bidirectional assignability between a helper's declared return type and the schema output never proves that schema validated the value, because refinements (.min, .positive, .refine, .transform) are invisible to TypeScript."
       - "Known holes accepted rather than solved: a path segment backed by a getter that returns a fresh object per read, and cross-module mutation of an exported contract object. Both need module-graph facts the syntax tier does not have."
     unproven:
+      - "Measured false negative: murderbox apps/desktop/src/bridge.ts:23 re-parses a value the same schema produced, but the two receivers root at different import bindings from one module, so proving they name one object needs facts outside the file. A same-module-specifier relaxation was implemented and measured (one finding, the anchor, zero new false positives across seven trees) and rejected as unsound: two different exports of one module would falsely unify."
+      - "Real-corpus validation on 2026-08-13 measured zero findings and zero false positives across roughly 7,563 parse-family call sites in seven trees. Recall against the canonical-path engine is therefore unproven, which is why the rule ships default-off."
       - "Cross-owner reporting for a generated mirror of a canonical contract is not implemented. Canonical paths are never unified across module boundaries by inference; a registry-gated cross-owner message remains follow-up work."
     external:
       state: net-antidrift
