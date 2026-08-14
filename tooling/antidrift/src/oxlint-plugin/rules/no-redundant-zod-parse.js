@@ -16,6 +16,7 @@ import {
   validationCallParts,
   ZOD_SAFE_PARSE_METHODS,
 } from "../../semantic-adapters/schema-parse-shape.mjs";
+import { terminalIdentity } from "../../semantic-adapters/cross-module-identity.mjs";
 
 // Detection is provenance-based, not type-based. The rule fires only when this
 // file shows the value being produced by a validation call on the *same*
@@ -271,6 +272,28 @@ export default function ruleNoRedundantZodParse() {
     create(context) {
       const sourceCode = context.sourceCode ?? context.getSourceCode();
       const options = normalizeOptions(context.options?.[0]);
+      const filename =
+        context.physicalFilename ??
+        context.filename ??
+        context.getFilename?.() ??
+        null;
+      // Cross-module identity: two paths rooted at different bindings still
+      // name the same schema object when both resolve to the same terminal
+      // slot in a defining module. Memoized per path; null never unifies.
+      const terminalKeys = new Map();
+      const terminalKeyOf = (path) => {
+        if (!terminalKeys.has(path)) {
+          terminalKeys.set(
+            path,
+            filename ? terminalIdentity(path, filename) : null,
+          );
+        }
+        return terminalKeys.get(path);
+      };
+      const sameTerminalSlot = (left, right) => {
+        const leftKey = terminalKeyOf(left);
+        return leftKey !== null && leftKey === terminalKeyOf(right);
+      };
       const calls = [];
       const writes = [];
       const hazards = new Map();
@@ -382,7 +405,8 @@ export default function ruleNoRedundantZodParse() {
             : validatedBy.get(variable);
           if (
             record &&
-            samePath(record.path, path) &&
+            (samePath(record.path, path) ||
+              sameTerminalSlot(record.path, path)) &&
             !writes.some((write) => sharesPathPrefix(write, path)) &&
             !escapedBetween(variable, nodeEnd(record.node), nodeStart(node))
           ) {

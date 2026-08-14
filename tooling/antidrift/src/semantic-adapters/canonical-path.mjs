@@ -137,7 +137,7 @@ function rawPath(sourceCode, expression) {
   return { variable, segments, identifier: current };
 }
 
-function descendObject(expression, segment) {
+export function descendObject(expression, segment) {
   const target = unwrapExpression(expression);
   if (target?.type === "ObjectExpression") {
     const match = target.properties.find(

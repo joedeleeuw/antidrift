@@ -40,6 +40,10 @@ ruleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
     fixture("programs/correct/zod-reparse-escape-via-assignment.ts"),
     fixture("programs/correct/zod-reparse-different-path-same-root.ts"),
     fixture("programs/correct/zod-reparse-cross-module-mirror.ts"),
+    // Cross-module resolution unifies terminal slots, never module specifiers:
+    // different slots and different exports of one module stay distinct.
+    fixture("programs/correct/zod-reparse-cross-module-different-slots.ts"),
+    fixture("programs/correct/zod-reparse-cross-module-different-exports.ts"),
     fixture("programs/correct/zod-safe-parse-data-different-schema.ts"),
     // node:path exposes `parse` with the same provenance shape
     `
@@ -80,6 +84,12 @@ ruleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
     `,
   ],
   invalid: [
+    // Cross-module contract seam: the slot resolves through the defining
+    // module to the same terminal binding as the direct schema import.
+    {
+      ...fixture("programs/drift/zod-reparse-cross-module-contract.ts"),
+      errors: 1,
+    },
     // Ported: re-parse of a parsed value in the same function
     { ...fixture("programs/drift/zod-reparse-same-fn.ts"), errors: 1 },
     // Ported: re-parse across functions in the same file
