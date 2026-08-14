@@ -14,11 +14,15 @@ const oxlintBinary = resolve(
   require(oxlintPackage).bin.oxlint,
 );
 const plugin = fileURLToPath(new URL("./index.js", import.meta.url));
+const packageTopEntry = fileURLToPath(
+  new URL("../index.mjs", import.meta.url),
+);
 
 function lint(
   source,
   rules = { "antidrift/require-effect-deps": "error" },
   filename = "component.tsx",
+  specifier = plugin,
 ) {
   const directory = mkdtempSync(join(tmpdir(), "antidrift-oxlint-plugin-"));
   const config = join(directory, ".oxlintrc.json");
@@ -27,7 +31,7 @@ function lint(
     config,
     JSON.stringify({
       categories: { correctness: "off" },
-      jsPlugins: [{ name: "antidrift", specifier: plugin }],
+      jsPlugins: [{ name: "antidrift", specifier }],
       rules,
     }),
   );
@@ -94,5 +98,15 @@ describe("Oxlint plugin", () => {
     expect(`${result.stdout}${result.stderr}`).toContain(
       "antidrift(no-static-property-loop)",
     );
+  });
+
+  it("registers through the package top entry, not only the subpath", () => {
+    const result = lint(
+      'import { useEffect } from "react";\nuseEffect(() => {});\n',
+      { "antidrift/require-effect-deps": "error" },
+      "component.tsx",
+      packageTopEntry,
+    );
+    expect(result.stdout).toContain("antidrift(require-effect-deps)");
   });
 });

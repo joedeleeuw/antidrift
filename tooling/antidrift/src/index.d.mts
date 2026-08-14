@@ -7,6 +7,7 @@ export {
 } from "./oxlint-config/index.mjs";
 export type { AntidriftGovernanceOxlintConfigOptions } from "./oxlint-config/index.mjs";
 export { default as oxlintPlugin } from "./oxlint-plugin/index.js";
+export { default } from "./oxlint-plugin/index.js";
 export {
   loadPolicy,
   loadRegistriesSync,
