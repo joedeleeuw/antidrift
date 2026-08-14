@@ -69,10 +69,3 @@ export function closedZodTransformInputKeys(
   services: TypeScriptParserServices,
   checker: ts.TypeChecker,
 ): ReadonlySet<string> | null;
-
-export function recordParsedConst(
-  node: unknown,
-  schemaSym: ts.Symbol | undefined,
-  symbolOf: (node: unknown) => ts.Symbol | undefined,
-  validatedBy: Map<ts.Symbol, ts.Symbol>,
-): void;

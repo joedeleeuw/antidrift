@@ -1,20 +1,20 @@
 import ts from "typescript";
 
-// Methods whose call result IS the schema output, so return-type comparison is valid.
-export const ZOD_PARSE_METHODS = new Set(["parse", "parseAsync"]);
-// Every method that performs validation. The safe variants return a
-// SafeParseReturnType wrapper rather than the schema output, so callers that
-// compare the call's return type must stay on ZOD_PARSE_METHODS.
-export const ZOD_VALIDATION_METHODS = new Set([
-  ...ZOD_PARSE_METHODS,
-  "safeParse",
-  "safeParseAsync",
-]);
-export const ZOD_TRANSFORM_METHOD = "transform";
-export const ZOD_THROW_ASSERTION_MATCHERS = new Set([
-  "toThrow",
-  "toThrowError",
-]);
+import {
+  ZOD_PARSE_METHODS,
+  ZOD_TRANSFORM_METHOD,
+} from "./schema-parse-shape.mjs";
+
+// Method sets and the throw-assertion-context test live in the syntax tier so
+// the Oxlint plugin can use them without loading the TypeScript compiler; they
+// are re-exported here to keep this adapter's import surface stable.
+export {
+  isThrowAssertionCallbackParse,
+  ZOD_PARSE_METHODS,
+  ZOD_THROW_ASSERTION_MATCHERS,
+  ZOD_TRANSFORM_METHOD,
+  ZOD_VALIDATION_METHODS,
+} from "./schema-parse-shape.mjs";
 
 export function isZodMethod(checker, tsNameNode) {
   const sym = tsNameNode && checker.getSymbolAtLocation(tsNameNode);
@@ -28,83 +28,6 @@ export function isZodMethod(checker, tsNameNode) {
     }
   }
   return false;
-}
-
-function staticMemberName(node) {
-  if (node?.type !== "MemberExpression" || node.computed) return null;
-  return node.property.type === "Identifier" ? node.property.name : null;
-}
-
-function isExpectCall(node) {
-  if (node?.type !== "CallExpression") return false;
-  if (node.callee.type === "Identifier") return node.callee.name === "expect";
-  return (
-    node.callee.type === "MemberExpression" &&
-    !node.callee.computed &&
-    node.callee.object.type === "Identifier" &&
-    node.callee.object.name === "expect"
-  );
-}
-
-function hasThrowAssertionMatcher(expectCall) {
-  let current = expectCall.parent;
-  while (current) {
-    if (current.type === "MemberExpression") {
-      if (ZOD_THROW_ASSERTION_MATCHERS.has(staticMemberName(current))) {
-        return (
-          current.parent?.type === "CallExpression" &&
-          current.parent.callee === current
-        );
-      }
-      current = current.parent;
-      continue;
-    }
-    if (
-      current.type === "CallExpression" ||
-      current.type === "ChainExpression"
-    ) {
-      current = current.parent;
-      continue;
-    }
-    break;
-  }
-  return false;
-}
-
-function nearestFunctionExpression(node) {
-  let current = node?.parent;
-  while (current) {
-    if (
-      current.type === "ArrowFunctionExpression" ||
-      current.type === "FunctionExpression"
-    ) {
-      return current;
-    }
-    if (current.type === "FunctionDeclaration") return null;
-    current = current.parent;
-  }
-  return null;
-}
-
-function isDirectThrowAssertionExpression(node, fn) {
-  if (fn.body === node) return true;
-  return (
-    node.parent?.type === "ExpressionStatement" &&
-    node.parent.parent?.type === "BlockStatement" &&
-    node.parent.parent.parent === fn
-  );
-}
-
-export function isThrowAssertionCallbackParse(node) {
-  const fn = nearestFunctionExpression(node);
-  if (!fn || !isDirectThrowAssertionExpression(node, fn)) return false;
-  const expectCall =
-    fn.parent?.type === "CallExpression" && fn.parent.arguments.includes(fn)
-      ? fn.parent
-      : null;
-  return Boolean(
-    isExpectCall(expectCall) && hasThrowAssertionMatcher(expectCall),
-  );
 }
 
 // ── Schema-derivation trace: resolve a declared type alias back to the
@@ -262,24 +185,4 @@ export function closedZodTransformInputKeys(receiver, services, checker) {
       .map((property) => property.getName())
       .sort((left, right) => left.localeCompare(right)),
   );
-}
-
-export function recordParsedConst(node, schemaSym, symbolOf, validatedBy) {
-  let decl = node.parent;
-  if (decl?.type === "AwaitExpression") decl = decl.parent;
-  if (
-    !schemaSym ||
-    decl?.type !== "VariableDeclarator" ||
-    decl.id.type !== "Identifier"
-  ) {
-    return;
-  }
-  if (
-    decl.parent?.type !== "VariableDeclaration" ||
-    decl.parent.kind !== "const"
-  ) {
-    return;
-  }
-  const declSym = symbolOf(decl.id);
-  if (declSym) validatedBy.set(declSym, schemaSym);
 }

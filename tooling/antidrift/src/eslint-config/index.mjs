@@ -77,7 +77,6 @@ export function createConfig({
         ],
         "antidrift/no-contract-appeasement-projection": "error",
         "antidrift/react-max-component-props": ["error", { max: 12 }],
-        "antidrift/no-redundant-zod-parse": "error",
         "antidrift/no-unsafe-deserialize": "error",
         "antidrift/no-appeasement-cast": "error",
         "antidrift/no-nullable-positional-tuple": "error",
