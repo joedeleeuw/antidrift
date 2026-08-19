@@ -206,28 +206,12 @@ try {
       `default packed Oxlint config should report max-lines for ordinary code even when generated-looking names are undeclared, got: ${JSON.stringify(moduleSizeDiagnostics)}`,
     );
   }
-  const expectedSharedRuleCodes = new Set([
-    "antidrift(no-unknown-returns)",
-    "antidrift(no-unsafe-dictionary-type)",
-  ]);
   const sharedRuleDiagnostics = repositoryDiagnostics.filter(
     ({ code }) => code !== "eslint(max-lines)",
   );
-  const unexpectedSharedDiagnostics = sharedRuleDiagnostics.filter(
-    ({ code }) => !expectedSharedRuleCodes.has(code),
-  );
-  const emittedSharedRuleCodes = new Set(
-    sharedRuleDiagnostics.map(({ code }) => code),
-  );
-  const missingSharedRuleCodes = [...expectedSharedRuleCodes].filter(
-    (code) => !emittedSharedRuleCodes.has(code),
-  );
-  if (
-    unexpectedSharedDiagnostics.length > 0 ||
-    missingSharedRuleCodes.length > 0
-  ) {
+  if (sharedRuleDiagnostics.length > 0) {
     fail(
-      `focused governance should report max-lines plus the expected imported shared-rule fixtures, got unexpected=${JSON.stringify(unexpectedSharedDiagnostics)} missing=${JSON.stringify(missingSharedRuleCodes)}`,
+      `default packed Oxlint config should leave experimental imported rules disabled, got: ${JSON.stringify(sharedRuleDiagnostics)}`,
     );
   }
   const precedenceRuleIds = oxlintRuleIds(

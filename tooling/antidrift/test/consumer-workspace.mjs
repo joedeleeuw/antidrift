@@ -213,6 +213,42 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
   file("src/undeclared.generated.ts", lines(1_501, "// generated line"));
   file("src/routeTree.gen.ts", lines(1_501, "// generated line"));
   file(
+    "packages/app/src/vitest.d.ts",
+    'declare module "vitest" {\n' +
+      "  export const vi: { mock(specifier: string): void };\n" +
+      "}\n",
+  );
+  file(
+    "packages/app/src/legitimate-boundaries.ts",
+    'import { vi } from "vitest";\n' +
+      "\n" +
+      'vi.mock("./external-runtime.js");\n' +
+      "\n" +
+      "export function externalValue(): unknown {\n" +
+      "  return globalThis.structuredClone({});\n" +
+      "}\n" +
+      "\n" +
+      "export function serializeObject(value: object): string {\n" +
+      "  return JSON.stringify(value);\n" +
+      "}\n" +
+      "\n" +
+      "export function jsonObject(): Record<string, unknown> {\n" +
+      "  return {};\n" +
+      "}\n" +
+      "\n" +
+      "export function optionalTimeout(timeout: number | undefined) {\n" +
+      "  return { ...(timeout === undefined ? {} : { timeout }) };\n" +
+      "}\n" +
+      "\n" +
+      "export function dynamicProperty(owner: object, key: PropertyKey) {\n" +
+      "  return Reflect.get(owner, key);\n" +
+      "}\n" +
+      "\n" +
+      "export function dynamicCall(operation: () => string, owner: object) {\n" +
+      "  return Reflect.apply(operation, owner, []);\n" +
+      "}\n",
+  );
+  file(
     "packages/app/src/generated/oversized.ts",
     lines(1_501, "// generated line"),
   );

@@ -1,5 +1,10 @@
 # changelog
 
+## 0.10.1
+
+- keep only unknown aliases and chained assertions blocking from the imported syntax rules; return the categorical style, test-seam, reflection, and external-data boundary rules to opt-in after the first real consumer migration showed that their syntax alone cannot distinguish drift from legitimate boundaries
+- validate the shared default through the packed consumer without relying on findings from experimental rules
+
 ## 0.10.0
 
 - vendor the generic rules and Effect service-constructor rule from `dmmulroy/anti-slop` commit `6d538555cb151d4121ed51a27db81890eacf8ae9`; enable the nine rules with bounded syntax ownership, keep five false-positive-prone rules registered but default-off, make `no-unsafe-cast-chain` own upstream chained-assertion behavior, and incorporate upstream known-value-widening and widen-then-assert detection into `no-appeasement-erasure`

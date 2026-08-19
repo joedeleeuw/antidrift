@@ -10,10 +10,10 @@ The upstream chained-assertion rule is exposed through the existing `antidrift/n
 
 ## Enforcement
 
-Nine imported rules are blocking in the shared Oxlint configuration: conditional empty-object spread, module mocking, broad object parameters, `Reflect.apply`, `Reflect.get`, unknown returns, unknown aliases, chained assertions, and unsafe dictionary values. `antidrift/no-appeasement-erasure` is blocking in the reduced TypeChecker ESLint pass.
+Two imported rules are blocking in the shared Oxlint configuration: unknown aliases and chained assertions. `antidrift/no-appeasement-erasure` is blocking in the reduced TypeChecker ESLint pass.
 
-Five imported rules remain registered but default-off because their syntax does not prove the behavior they claim to own: runtime `typeof`, `makeX` relative imports, `shape` in identifiers, `unknown` parameters, and safety comments on assertions. They are available for explicit consumer experiments, not general enforcement.
+Twelve imported rules remain registered but default-off because their syntax does not prove drift at a general boundary: conditional empty-object spread, module mocking, broad object parameters, `Reflect.apply`, `Reflect.get`, runtime `typeof`, `makeX` relative imports, `shape` in identifiers, `unknown` parameters, unknown returns, unsafe dictionary values, and safety comments on assertions. They are available for explicit consumer experiments, not general enforcement.
 
 ## Verification
 
-Oxlint plugin tests execute a bad and clean program for every imported rule through the real plugin entrypoint. Registry checks own export and configuration consistency. Live external repositories are an explicit sequential research command and are not a release or session prerequisite.
+Oxlint plugin tests execute a bad and clean program for every imported rule through the real plugin entrypoint. Registry checks own export and configuration consistency. The shared default is validated against a packed consumer and a real consumer migration before publication. Live external repositories are an explicit sequential research command and are not a release or session prerequisite.

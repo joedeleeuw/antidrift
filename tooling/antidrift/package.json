@@ -1,6 +1,6 @@
 {
   "name": "@joedeleeuw/antidrift",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "type": "module",
   "license": "MIT",
   "description": "Deterministic Oxlint and TypeScript-aware policy guardrails against code and AI-agent drift.",

@@ -42,11 +42,22 @@ describe("createGovernanceOxlintConfig", () => {
       "error",
     );
     expect(config.rules["antidrift/no-runtime-typeof"]).toBe("off");
+    expect(config.rules["antidrift/no-conditional-empty-object-spread"]).toBe(
+      "off",
+    );
+    expect(config.rules["antidrift/no-module-mocking"]).toBe("off");
+    expect(config.rules["antidrift/no-object-parameters"]).toBe("off");
+    expect(config.rules["antidrift/no-reflect-apply"]).toBe("off");
+    expect(config.rules["antidrift/no-reflect-get"]).toBe("off");
     expect(config.rules["antidrift/no-service-constructor-imports"]).toBe(
       "off",
     );
     expect(config.rules["antidrift/no-shape-in-symbol-names"]).toBe("off");
     expect(config.rules["antidrift/no-unknown-parameters"]).toBe("off");
+    expect(config.rules["antidrift/no-unknown-returns"]).toBe("off");
+    expect(config.rules["antidrift/no-unsafe-dictionary-type"]).toBe("off");
+    expect(config.rules["antidrift/no-unknown-type-aliases"]).toBe("error");
+    expect(config.rules["antidrift/no-unsafe-cast-chain"]).toBe("error");
     expect(
       config.rules["antidrift/require-safety-comment-for-type-assertion"],
     ).toBe("off");

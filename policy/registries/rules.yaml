@@ -1865,15 +1865,17 @@ rules:
     nextAction: "Keep the rule opt-in and inventory member-read flagging pressure on diagnostics display surfaces across at least one more repository before considering stable promotion."
 
   antidrift/no-conditional-empty-object-spread:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST conditional expression with an empty object branch inside an object spread
     solveType: conditional-property-omission
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The implementation is pinned to the imported anti-slop source; upstream changes require an explicit source resync.
+      - A conditional spread can be the exact typed representation of an optional response field; Murderbox provider normalizers produced 42 findings without type-evidence loss.
     external:
       state: equivalent
       support: high
@@ -1886,17 +1888,19 @@ rules:
         - "const options = { ...(timeout !== undefined ? { timeout } : {}) };"
       allows:
         - "const options = {}; if (timeout !== undefined) options.timeout = timeout;"
-    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+    nextAction: "Keep default-off until the rule distinguishes type-evidence loss from ordinary optional property construction."
   antidrift/no-module-mocking:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST import-bound Vitest or Jest module-mock call
     solveType: test-module-seam
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The implementation is pinned to the imported anti-slop source; upstream changes require an explicit source resync.
+      - Module mocking is a consumer test-architecture choice; Murderbox legitimately mocks Electron, Clerk, and preload module boundaries.
     external:
       state: equivalent
       support: high
@@ -1909,17 +1913,19 @@ rules:
         - 'vi.mock("./user-store");'
       allows:
         - "const store = createUserStore({ repository });"
-    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+    nextAction: "Keep default-off; consumers that prohibit module mocking can opt into the rule for their test scopes."
   antidrift/no-object-parameters:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST direct or lexical-alias object parameter annotation
     solveType: broad-input-parameter
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The syntax proof resolves lexical aliases but not imported type aliases.
+      - Generic serialization boundaries can intentionally accept any non-primitive object without defining a domain contract.
     external:
       state: equivalent
       support: high
@@ -1932,17 +1938,19 @@ rules:
         - "function save(value: object) {}"
       allows:
         - "function save(value: UserInput) {}"
-    nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
+    nextAction: "Keep default-off until the rule proves a domain input rather than a generic runtime boundary."
   antidrift/no-reflect-apply:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST global Reflect.apply call
     solveType: reflective-call-escape
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The implementation intentionally treats every global Reflect.apply call as a type-evidence escape.
+      - Runtime adapters and tests can intentionally invoke a dynamically captured function whose owner does not expose a static callable type.
     external:
       state: equivalent
       support: high
@@ -1955,17 +1963,19 @@ rules:
         - "Reflect.apply(operation, owner, args);"
       allows:
         - "operation.apply(owner, args);"
-    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+    nextAction: "Keep default-off until reflective invocation can be separated from avoidable type-evidence escape."
   antidrift/no-reflect-get:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST global Reflect.get call
     solveType: reflective-property-escape
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The implementation intentionally treats every global Reflect.get call as a type-evidence escape.
+      - Runtime adapters can intentionally inspect an injected untyped global or protocol object whose property names are discovered dynamically.
     external:
       state: equivalent
       support: high
@@ -1978,7 +1988,7 @@ rules:
         - "Reflect.get(owner, key);"
       allows:
         - "owner.typedProperty;"
-    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+    nextAction: "Keep default-off until reflective boundary access can be separated from avoidable type-evidence escape."
   antidrift/no-runtime-typeof:
     status: false-positive-prone
     stable: false
@@ -2076,15 +2086,17 @@ rules:
         - "function handle(input: UserInput) {}"
     nextAction: "Keep default-off until the rule proves a non-boundary consumer or recognizes parser and transport boundaries."
   antidrift/no-unknown-returns:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST explicit unknown or Promise unknown return contract
     solveType: unparsed-function-output
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The syntax proof resolves lexical aliases but not imported type aliases.
+      - Unknown is an honest output for raw external data before parsing and for minimal ports that intentionally discard a dependency return value.
     external:
       state: equivalent
       support: high
@@ -2097,7 +2109,7 @@ rules:
         - "function load(): unknown { return input; }"
       allows:
         - "function load(): User { return user; }"
-    nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
+    nextAction: "Keep default-off until the rule recognizes parser, transport, and ignored-return dependency boundaries."
   antidrift/no-unknown-type-aliases:
     status: ready
     stable: false
@@ -2145,15 +2157,17 @@ rules:
         - "const user = UserSchema.parse(input);"
     nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
   antidrift/no-unsafe-dictionary-type:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST dictionary value contract containing unknown any object or empty-object escape types
     solveType: broad-dictionary-value
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The syntax proof resolves lexical aliases but not imported type aliases.
+      - Record<string, unknown> is the honest intermediate type for heterogeneous JSON objects after object-kind validation and before field narrowing.
     external:
       state: equivalent
       support: high
@@ -2166,7 +2180,7 @@ rules:
         - "type Metadata = Record<string, unknown>;"
       allows:
         - "type Metadata = Record<string, MetadataValue>;"
-    nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
+    nextAction: "Keep default-off until the rule distinguishes persisted or domain dictionaries from untrusted JSON boundary objects."
   antidrift/require-safety-comment-for-type-assertion:
     status: false-positive-prone
     stable: false
