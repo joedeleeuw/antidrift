@@ -1,26 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-// The external corpus gate runs only when explicitly available in the current
-// environment. Locally the fleet is partial or sitting on working branches, so
-// session hooks skip it unless CI is exercising the portable default check.
-const externalCorpusStep = process.env.CI
-  ? [["pnpm", ["policy:validate-external-corpus"]]]
-  : [];
-
-const defaultCommands = [
-  ["pnpm", ["policy:check-generated"]],
-  ["pnpm", ["policy:check-registries"]],
-  ["pnpm", ["policy:check-rule-surface"]],
-  ["pnpm", ["policy:inventory-change-contract"]],
-  ["pnpm", ["policy:inventory-diff-scoped-adapters"]],
-  ["pnpm", ["policy:validate-corpus"]],
-  ...externalCorpusStep,
-  ["pnpm", ["package:verify"]],
-  ["pnpm", ["lint"]],
-  ["pnpm", ["typecheck"]],
-  ["pnpm", ["test"]],
-];
+const defaultCommands = [["pnpm", ["verify:release"]]];
 
 const STEP_TIMEOUT_MS = 360_000;
 const MAX_HOOK_OUTPUT_BUFFER = 32 * 1024 * 1024;
@@ -94,7 +75,10 @@ export function verifySession({
     if (result.status !== 0) {
       return emitFailure({
         hook,
-        reason: verificationReason(`Required verification failed: ${text}`, result),
+        reason: verificationReason(
+          `Required verification failed: ${text}`,
+          result,
+        ),
         status: result.status ?? 1,
         stdout,
         stderr,

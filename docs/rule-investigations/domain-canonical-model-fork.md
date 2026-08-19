@@ -50,13 +50,13 @@ Current focused evidence:
 
 ```bash
 pnpm exec antidrift chaski-corpus --slice canonical-model-fork-review --rules antidrift/no-canonical-model-fork --require
-pnpm exec antidrift external-corpus --slice canonical-model-fork-review --rules antidrift/no-canonical-model-fork --require --min-repositories 1
+pnpm exec antidrift external-corpus --all --slice canonical-model-fork-review --rules antidrift/no-canonical-model-fork --require --min-repositories 1
 ```
 
 Both commands pass against the local real repositories. The stricter external-only bar does not pass yet:
 
 ```bash
-pnpm exec antidrift external-corpus --slice canonical-model-fork-review --rules antidrift/no-canonical-model-fork --require --min-repositories 2
+pnpm exec antidrift external-corpus --all --slice canonical-model-fork-review --rules antidrift/no-canonical-model-fork --require --min-repositories 2
 ```
 
 That fails because only Sudocode currently has matching external canonical-model-fork cases; Chaski is covered by the separate Chaski corpus.

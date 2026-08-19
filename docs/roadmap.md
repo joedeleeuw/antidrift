@@ -53,7 +53,7 @@ Completed in this batch:
 
 - `no-contract-appeasement-projection`: replace the `get|select|extract...From...` name gate with TypeChecker-backed detection of internal helpers that project source values into explicit return contracts. **Implemented in this batch.**
 - `no-status-triplet-state`: retired after the behavior-based lifecycle proof moved into `no-handrolled-resource-lifecycle-cells`.
-- `no-unsafe-cast-chain`: retired in favor of `@typescript-eslint/no-unsafe-type-assertion`; `no-appeasement-cast` covers plain `any`/`unknown as NamedObject`.
+- `no-unsafe-cast-chain`: revived as the owner for vendored `anti-slop/no-chained-type-assertions`, which blocks every non-const nested assertion chain; `no-appeasement-cast` continues to own plain `any`/`unknown as NamedObject`.
 - `no-unsafe-deserialize`: type-aware `any`/`unknown` argument signal, not request-root names.
 - `no-defensive-shape-probing`: limited to real-corpus-backed broad-value extractor patterns; predicate helpers remain review-first until the rule can prove a validation/type authority bypass.
 - `no-nullable-positional-tuple`: narrow deterministic syntax rule for multi-slot nullable tuples; ordinary non-null tuples and hook-style tuples with one nullable value slot stay clean.

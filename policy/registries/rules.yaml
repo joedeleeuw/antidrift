@@ -1064,34 +1064,38 @@ rules:
       status: inline-pending
       reason: Declared-vs-inferred type comparison and reference-consumer scanning live inline with one consumer. The schema-derivation trace was extracted to semantic-adapters/schema-provenance.mjs on 2026-08-03; extract these too when a second rule needs them.
     referenceDoc: docs/rule-investigations/no-appeasement-erasure.md
-    signal: TypeChecker comparison of a declared unknown against the initializer's inferred type, plus scope-resolved evidence that a contract is re-established from the erased binding
+    signal: TypeChecker comparison of a declared broad contract against the initializer's inferred type, plus vendored anti-slop syntax proof for known-value widening and widen-then-assert flows
     solveType: validation-boundary-drift
     corpusRepositories: [murderbox, cloudflare-agents, codebase-atlas, executor]
     concerns:
       - "This is the upstream gate for the rest of the contract family. In Murderbox desktop apps/desktop, no-redundant-zod-parse, no-appeasement-cast, no-contract-appeasement-projection, no-unsafe-deserialize, and no-defensive-shape-probing all report zero across 38 files while bridge.ts alone holds 21 parse calls; the erased bindings declare unknown, so no type comparison can fire. Measured 2026-08-03 on branch desktop-erasure-remediation: removing the twelve annotations took no-redundant-zod-parse from 0 to 8 findings (six bridge.ts, two machine-workflows.ts) with no rule changes; the other four rules stayed at zero, so the erasures were masking redundant parses specifically."
-      - "Scope is erasure plus re-establishment (Zod parse or a named-type cast). Bare widening with no downstream contract stays clean because widening to force later narrowing is legitimate. Passing an erased binding to a parameter with a named contract is a known false negative, not yet implemented."
+      - "The local TypeChecker branch retains schema and Effect decoder provenance. Vendored anti-slop branches additionally reject syntactically known values widened into broad targets and local widen-then-assert flows, including bare widening that the previous implementation allowed."
       - "The 12 Murderbox positives include erasures of `boolean` (bridge.ts:151) and `string | null` (bridge.ts:100), which is why this reads as a uniform edge reflex rather than deliberate defensive validation of complex payloads."
       - "Cast-shaped escape hatches are rare in the anchor repo (2 `as unknown`, 0 `as any` across src), so the annotation form carries the evidence. The `as unknown` branch is fixture-backed but has no real-corpus anchor yet."
       - "Only const bindings are reported. A reassigned binding is a traversal cursor rather than a boundary value; the one Executor positive (packages/plugins/openapi/src/sdk/openapi-utils.ts:42) was a `let` walking an untyped OpenAPI document with a guarded Record cast, and narrowing to const removed it."
-      - "Empty object and array literal initializers are excluded. The one Cloudflare Agents positive (packages/agents/src/index.ts:963, `const DEFAULT_STATE = {} as unknown`) is a sentinel placeholder for a generic State default, compared by identity and cast per-use; an empty literal carries no contract, so widening it discards nothing."
+      - "The upstream known-value-widening branch intentionally reports empty object and array literals widened to top types. Empty dictionary accumulators remain exempt only when the destination is an open dictionary or generic container, matching upstream behavior."
       - "Zero findings in a repository is not yet evidence of clean code. Executor, PowerSync Service, and Agent Browser were swept and returned zero, but they carry 5, 1, and 0 zod-importing files respectively, so the parse branch cannot fire there by construction and they are excluded from corpusRepositories. Only Cloudflare Agents (76 zod-importing files, 371 candidates, 0 findings) and Codebase Atlas (17 zod files, 34 candidates, 0 findings) are real clean controls."
       - "Effect Schema decode branch landed 2026-08-03: curried Schema.decode*/decodeUnknown* applications resolved to the effect package now count as contract re-establishment. Executor re-swept with the branch active: 0 findings across 342 candidate files and 168 decode sites, so its zero is now evidence rather than blindness, and executor rejoins corpusRepositories as a clean control. Pre-built decoder bindings (const dec = Schema.decodeUnknownSync(S); dec(value)) are a recorded false-negative slice, unimplemented until a real anchor appears."
-      - "The `as unknown as T` double cast is unmatched by this rule family but is not unmatched overall: typescript/no-unsafe-type-assertion reports it, and is enabled at error in oxlint.config.mts. The 53 Executor and 89 Cloudflare Agents sites are unreported in those repositories because they do not run this configuration, not because the stack lacks a rule. Do not build a custom double-cast rule; delegate."
+      - "Chained assertions are now owned by the revived antidrift/no-unsafe-cast-chain rule, which exposes the vendored anti-slop no-chained-type-assertions behavior."
     external:
-      state: net-antidrift
-      support: none
-      candidates: []
+      state: partial-overlap
+      support: high
+      candidates:
+        [
+          dmmulroy/anti-slop/no-known-value-widening,
+          dmmulroy/anti-slop/no-widen-then-assert,
+        ]
       decision: own-antidrift
-      whyThisState: "Partial overlap, split by branch. The parse branch is net-antidrift: no supported rule compares a declared unknown against the checker's inferred type for the initializer and then asks whether a schema re-establishes the contract. @typescript-eslint/no-unsafe-assignment and no-unsafe-argument police any flowing outward, which is the opposite direction."
-      whyNotOtherState: "Not net-antidrift overall, because the named-cast branch is ecosystem-covered wherever typescript/no-unsafe-type-assertion is enabled. That rule reports `const result: unknown = getSnapshot(); result as Snapshot` and the `value as unknown as T` double cast, while correctly ignoring the pure widening `value as unknown`. It does not report the parse branch. Verified 2026-08-03. Scope caveat: that rule is enabled in this repository's own oxlint.config.mts and is NOT part of the shipped oxlint-config, which exports only antidriftComplexityRules and createGovernanceOxlintConfig. Consumers therefore do not inherit it, so the cast branch is load-bearing for them and only redundant here."
+      whyThisState: "The vendored anti-slop rules now own their syntax-proven widening surfaces inside this rule. The existing TypeChecker branch remains necessary for schema and Effect decoder re-establishment that syntax-only upstream rules do not prove."
+      whyNotOtherState: "Not equivalent because upstream does not use TypeChecker source provenance or schema ownership, and not net-antidrift because two enabled branches are vendored directly from anti-slop."
     examples:
       flags:
         - "const result: unknown = auth.getAuthSnapshot(); return resultSchema.parse(result);"
         - "const result = getSnapshot() as unknown; return result as AuthSnapshot;"
       allows:
         - "const raw: unknown = JSON.parse(text); return schema.parse(raw);"
-        - "const value: unknown = buildProbe(); return typeof value === 'object';"
-    nextAction: "Enabled at warn severity on 2026-08-03 by owner decision: zero known false positives across 405 candidate files in two independent zod-bearing repositories, with the gap being a second repository carrying positives rather than any correctness doubt. Warn keeps it visible on new code without blocking builds. Escalation to error needs the post-remediation family measurement plus that second positive-bearing repository."
+        - "const exact = { id: 'u1' } satisfies User;"
+    nextAction: "Blocking by owner decision after the anti-slop catch-up; track upstream behavior changes while retaining the TypeChecker-backed schema and Effect decoder branch."
   antidrift/no-identity-schema-transform:
     status: ready
     stable: false
@@ -1150,8 +1154,8 @@ rules:
         - "queryClient.getQueryData<HandwrittenMachine[]>(machinesQuery.queryKey)"
       allows:
         - "useQuery(api.machines.list)"
-        - "queryClient.getQueryData<HandwrittenMachine[]>([\"machines\"])"
-        - "useQuery<HandwrittenMachine[]>({ queryKey: [\"machines\"], queryFn: fetchMachines })"
+        - 'queryClient.getQueryData<HandwrittenMachine[]>(["machines"])'
+        - 'useQuery<HandwrittenMachine[]>({ queryKey: ["machines"], queryFn: fetchMachines })'
     nextAction: Keep default-off until a real explicit-type-argument fork is independently replicated and Murderbox plus one more Convex or TanStack consumer confirm zero false positives on clean-run.
   antidrift/require-convex-return-validator:
     status: ready
@@ -1178,10 +1182,10 @@ rules:
       whyNotOtherState: "Not ecosystem-covered because the check needs checker-resolved provenance from the call site to the convex server registrar surface, which no generic type-safety rule models."
     examples:
       flags:
-        - "query({ args: { id: v.id(\"machines\") }, handler: async (ctx, args) => ({ id: args.id }) })"
+        - 'query({ args: { id: v.id("machines") }, handler: async (ctx, args) => ({ id: args.id }) })'
         - "internalMutation({ args: {}, handler: async (ctx) => ctx.db.delete(id) })"
       allows:
-        - "query({ args: { id: v.id(\"machines\") }, returns: v.union(machineResult, v.null()), handler: async (ctx, args) => findMachine(ctx, args.id) })"
+        - 'query({ args: { id: v.id("machines") }, returns: v.union(machineResult, v.null()), handler: async (ctx, args) => findMachine(ctx, args.id) })'
         - "mutation({ args: {}, returns: v.null(), handler: async () => null })"
     nextAction: Keep default-off until the Murderbox drift is remediated or accepted and one more Convex consumer confirms zero false positives on validator-covered code.
   antidrift/no-schema-validator-transcoding:
@@ -1392,7 +1396,7 @@ rules:
     examples:
       flags:
         - "type AuthUser = { uid: string; email: string | null; displayName: string | null; photoURL: string | null; providerId: string; phoneNumber: string | null; };"
-        - "type LocalMachine = { _id: Id<\"machines\">; _creationTime: number; name: string; endpoints: MachineEndpoint[]; };"
+        - 'type LocalMachine = { _id: Id<"machines">; _creationTime: number; name: string; endpoints: MachineEndpoint[]; };'
         - "type LocalMachineSummary = { id: string; name: string; address: string; online: boolean; };"
       allows:
         - 'import type { User } from "firebase/auth";'
@@ -1841,16 +1845,13 @@ rules:
     concerns:
       - "Only the ?? operator is in scope; || falsy coercion of a member read to a sentinel is a different doctrine and stays out."
       - "Numeric sentinels such as Number(props.ExecMainStatus ?? 0) stay silent: proving drift there needs property-name semantics (systemd exit code 0 meaning success), and name-trust is rejected."
-      - "Call-expression and plain-identifier left-hand sides stay silent: the murderbox corpus shows display-only fallbacks like score ?? \"unknown\" and branch ?? \"unknown\" on locals whose provenance is not visible at the expression."
+      - 'Call-expression and plain-identifier left-hand sides stay silent: the murderbox corpus shows display-only fallbacks like score ?? "unknown" and branch ?? "unknown" on locals whose provenance is not visible at the expression.'
       - "Debug and diagnostics display surfaces (apps/client/app/runtime-diagnostics.tsx, apps/client/app/_debug.tsx) flag on member reads of optional runtime data; measure that pressure before any default-on consideration."
     external:
       state: net-antidrift
       support: low
       candidates:
-        [
-          "ESLint no-null",
-          "@typescript-eslint/prefer-nullish-coalescing",
-        ]
+        ["ESLint no-null", "@typescript-eslint/prefer-nullish-coalescing"]
       decision: own-antidrift
       whyThisState: "no-null and prefer-nullish-coalescing police the operator a codebase uses, not the sentinel value the operator produces; no maintained rule models absence coerced to an in-band sentinel string on a member read."
       whyNotOtherState: "Not ecosystem-covered because the signal requires a fixed sentinel vocabulary and the absence-as-absence doctrine, which generic nullish-discipline rules do not carry."
@@ -1860,8 +1861,336 @@ rules:
         - 'const state = row?.state ?? "unavailable";'
       allows:
         - 'const title = doc.title ?? "Untitled";'
-        - 'const exit = Number(props.ExecMainStatus ?? 0);'
+        - "const exit = Number(props.ExecMainStatus ?? 0);"
     nextAction: "Keep the rule opt-in and inventory member-read flagging pressure on diagnostics display surfaces across at least one more repository before considering stable promotion."
+
+  antidrift/no-conditional-empty-object-spread:
+    status: ready
+    stable: false
+    signal: AST conditional expression with an empty object branch inside an object spread
+    solveType: conditional-property-omission
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The implementation is pinned to the imported anti-slop source; upstream changes require an explicit source resync.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-conditional-empty-object-spread]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "No local semantic extension is required for this syntax prohibition."
+    examples:
+      flags:
+        - "const options = { ...(timeout !== undefined ? { timeout } : {}) };"
+      allows:
+        - "const options = {}; if (timeout !== undefined) options.timeout = timeout;"
+    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+  antidrift/no-module-mocking:
+    status: ready
+    stable: false
+    signal: AST import-bound Vitest or Jest module-mock call
+    solveType: test-module-seam
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The implementation is pinned to the imported anti-slop source; upstream changes require an explicit source resync.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-module-mocking]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "Native test rules do not prohibit module mocking as an architectural seam."
+    examples:
+      flags:
+        - 'vi.mock("./user-store");'
+      allows:
+        - "const store = createUserStore({ repository });"
+    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+  antidrift/no-object-parameters:
+    status: ready
+    stable: false
+    signal: AST direct or lexical-alias object parameter annotation
+    solveType: broad-input-parameter
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The syntax proof resolves lexical aliases but not imported type aliases.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-object-parameters]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "The rule owns broad object inputs rather than inline structural boundary contracts."
+    examples:
+      flags:
+        - "function save(value: object) {}"
+      allows:
+        - "function save(value: UserInput) {}"
+    nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
+  antidrift/no-reflect-apply:
+    status: ready
+    stable: false
+    signal: AST global Reflect.apply call
+    solveType: reflective-call-escape
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The implementation intentionally treats every global Reflect.apply call as a type-evidence escape.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-reflect-apply]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "No maintained baseline rule owns this exact reflective-call prohibition."
+    examples:
+      flags:
+        - "Reflect.apply(operation, owner, args);"
+      allows:
+        - "operation.apply(owner, args);"
+    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+  antidrift/no-reflect-get:
+    status: ready
+    stable: false
+    signal: AST global Reflect.get call
+    solveType: reflective-property-escape
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The implementation intentionally treats every global Reflect.get call as a type-evidence escape.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-reflect-get]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "No maintained baseline rule owns this exact reflective-property prohibition."
+    examples:
+      flags:
+        - "Reflect.get(owner, key);"
+      allows:
+        - "owner.typedProperty;"
+    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+  antidrift/no-runtime-typeof:
+    status: false-positive-prone
+    stable: false
+    defaultOff: true
+    signal: AST runtime typeof expression
+    solveType: runtime-representation-narrowing
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The rule rejects ordinary primitive narrowing and feature detection even when no domain contract is being reconstructed.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-runtime-typeof]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "The broader prohibition goes beyond the existing underchecked-predicate and defensive-probing subsets."
+    examples:
+      flags:
+        - 'if (typeof input === "string") useName(input);'
+      allows:
+        - "const input = InputSchema.parse(raw); useName(input.name);"
+    nextAction: "Keep default-off until the rule can distinguish boundary contract laundering from ordinary runtime narrowing."
+  antidrift/no-service-constructor-imports:
+    status: false-positive-prone
+    stable: false
+    defaultOff: true
+    signal: AST project-local imported binding whose name matches make followed by an uppercase letter
+    solveType: effect-service-composition-boundary
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - A relative make-prefixed import does not prove that the binding is an Effect service constructor.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop-effect/no-service-constructor-imports]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop Effect rule under the Antidrift namespace."
+      whyNotOtherState: "Generic import restrictions do not infer the Effect constructor convention from imported bindings."
+    examples:
+      flags:
+        - 'import { makeIssueService } from "./issue-service.js";'
+      allows:
+        - 'import { IssueServiceLive } from "./issue-service.js";'
+    nextAction: "Keep default-off until Effect ownership is proven from the imported symbol or a consumer explicitly opts into the naming convention."
+  antidrift/no-shape-in-symbol-names:
+    status: false-positive-prone
+    stable: false
+    defaultOff: true
+    signal: AST identifier or reference containing the forbidden shape token
+    solveType: structural-symbol-naming
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The visitor reports declarations and references, producing duplicate diagnostics and rejecting legitimate domain vocabulary.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-shape-in-symbol-names]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "This is an explicit vocabulary prohibition rather than an inferred ownership heuristic."
+    examples:
+      flags:
+        - "interface UserShape { id: string }"
+      allows:
+        - "interface UserContract { id: string }"
+    nextAction: "Keep default-off until the rule targets one owned declaration and proves that the name represents a duplicated contract concept."
+  antidrift/no-unknown-parameters:
+    status: false-positive-prone
+    stable: false
+    defaultOff: true
+    signal: AST explicit unknown function parameter outside the cause convention
+    solveType: unparsed-function-input
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - Unknown is the correct input type at parsing and external-data boundaries, but the rule exempts only a parameter named cause.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-unknown-parameters]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "Existing broad-input rules inspect unsafe consumption rather than prohibiting unknown parameter contracts."
+    examples:
+      flags:
+        - "function handle(input: unknown) {}"
+      allows:
+        - "function handle(input: UserInput) {}"
+    nextAction: "Keep default-off until the rule proves a non-boundary consumer or recognizes parser and transport boundaries."
+  antidrift/no-unknown-returns:
+    status: ready
+    stable: false
+    signal: AST explicit unknown or Promise unknown return contract
+    solveType: unparsed-function-output
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The syntax proof resolves lexical aliases but not imported type aliases.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-unknown-returns]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "Native unsafe-return rules do not reject explicit unknown output contracts."
+    examples:
+      flags:
+        - "function load(): unknown { return input; }"
+      allows:
+        - "function load(): User { return user; }"
+    nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
+  antidrift/no-unknown-type-aliases:
+    status: ready
+    stable: false
+    signal: AST lexical type alias resolving to unknown
+    solveType: concealed-unknown-alias
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The syntax proof resolves lexical aliases but not imported type aliases.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-unknown-type-aliases]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "Native TypeScript rules do not prohibit aliases that conceal unknown."
+    examples:
+      flags:
+        - "type ExternalValue = unknown;"
+      allows:
+        - "type ExternalValue = UserInput;"
+    nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
+  antidrift/no-unsafe-cast-chain:
+    status: ready
+    stable: false
+    signal: AST nested TypeScript assertion chain with a non-const assertion
+    solveType: chained-type-assertion
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The revived owner intentionally matches every upstream assertion chain rather than only unknown tunnels.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-chained-type-assertions]
+      decision: use-upstream
+      whyThisState: "The existing Antidrift cast-chain owner now exposes the upstream anti-slop behavior."
+      whyNotOtherState: "The local rule ID is retained to avoid creating a second owner for chained assertions."
+    examples:
+      flags:
+        - "const user = input as object as User;"
+      allows:
+        - "const user = UserSchema.parse(input);"
+    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+  antidrift/no-unsafe-dictionary-type:
+    status: ready
+    stable: false
+    signal: AST dictionary value contract containing unknown any object or empty-object escape types
+    solveType: broad-dictionary-value
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - The syntax proof resolves lexical aliases but not imported type aliases.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/no-unsafe-dictionary-type]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "Native any and empty-object rules do not cover the complete dictionary-value contract."
+    examples:
+      flags:
+        - "type Metadata = Record<string, unknown>;"
+      allows:
+        - "type Metadata = Record<string, MetadataValue>;"
+    nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
+  antidrift/require-safety-comment-for-type-assertion:
+    status: false-positive-prone
+    stable: false
+    defaultOff: true
+    signal: AST non-const type assertion without a nearby SAFETY annotation
+    solveType: assertion-invariant-documentation
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - A comment is not runtime or type evidence, and requiring one encourages appeasement instead of eliminating or proving the assertion.
+    external:
+      state: equivalent
+      support: high
+      candidates: [dmmulroy/anti-slop/require-safety-comment-for-type-assertion]
+      decision: use-upstream
+      whyThisState: "The vendored implementation is the upstream anti-slop rule under the Antidrift namespace."
+      whyNotOtherState: "Semantic cast rules do not require necessary assertions to state their runtime invariant."
+    examples:
+      flags:
+        - "const userId = value as UserId;"
+      allows:
+        - "// SAFETY: parseUserId validated the identifier before branding it.\nconst userId = value as UserId;"
+    nextAction: "Keep default-off and prefer semantic assertion rules that prove the source and destination types."
 
 retiredRules:
   antidrift/no-query-data-type-parameters:
@@ -1907,9 +2236,6 @@ retiredRules:
     status: retired
     reason: No real non-test branded cast forgery was found, and the current rule only detected the package's own under-adopted brand marker.
     referenceDoc: docs/rule-investigations/no-cast-to-branded.md
-  antidrift/no-unsafe-cast-chain:
-    status: retired
-    reason: Replaced by maintained @typescript-eslint/no-unsafe-type-assertion coverage for double-cast tunnels; no-appeasement-cast owns the narrower source-boundary authority policy.
   antidrift/no-status-triplet-state:
     status: retired
     reason: Retired after the provable resource-lifecycle subset moved into antidrift/no-handrolled-resource-lifecycle-cells through semantic AST React state graph proof; standalone configurable name groups are inventory, not enforcement.

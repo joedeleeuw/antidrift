@@ -35,20 +35,29 @@ describe("createGovernanceOxlintConfig", () => {
       "eslint-comments",
     ]);
     expect(severity(config.rules["max-lines"])).toBe("error");
-    expect(
-      severity(config.rules["eslint-comments/disable-enable-pair"]),
-    ).toBe("error");
+    expect(severity(config.rules["eslint-comments/disable-enable-pair"])).toBe(
+      "error",
+    );
     expect(severity(config.rules["antidrift/require-effect-deps"])).toBe(
       "error",
     );
+    expect(config.rules["antidrift/no-runtime-typeof"]).toBe("off");
+    expect(config.rules["antidrift/no-service-constructor-imports"]).toBe(
+      "off",
+    );
+    expect(config.rules["antidrift/no-shape-in-symbol-names"]).toBe("off");
+    expect(config.rules["antidrift/no-unknown-parameters"]).toBe("off");
+    expect(
+      config.rules["antidrift/require-safety-comment-for-type-assertion"],
+    ).toBe("off");
     expect(config.rules.complexity).toBeUndefined();
     expect(config.rules["max-depth"]).toBeUndefined();
     expect(config.rules["max-params"]).toBeUndefined();
     expect(config.rules["react/react-compiler"]).toBeUndefined();
     expect(severity(config.rules["typescript/no-explicit-any"])).toBe("error");
-    expect(
-      severity(config.rules["typescript/no-misused-promises"]),
-    ).toBe("error");
+    expect(severity(config.rules["typescript/no-misused-promises"])).toBe(
+      "error",
+    );
     expect(config.rules["vitest/no-focused-tests"]).toBeUndefined();
     expect(config.rules["unicorn/no-abusive-eslint-disable"]).toBeUndefined();
     expect(config.rules["import/no-cycle"]).toBeUndefined();
@@ -164,12 +173,9 @@ describe("createGovernanceOxlintConfig", () => {
       mkdirSync(registryDirectory, { recursive: true });
       writeFileSync(
         join(registryDirectory, "generated.yaml"),
-        [
-          "generatedSources:",
-          "  widened:",
-          '    generated: "src/**"',
-          "",
-        ].join("\n"),
+        ["generatedSources:", "  widened:", '    generated: "src/**"', ""].join(
+          "\n",
+        ),
       );
 
       expect(() =>

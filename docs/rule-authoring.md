@@ -88,7 +88,7 @@ These should start as warnings:
 - Use syntax-only checks only when syntax is the violation.
 - Use the signal definitions in `docs/rule-status-registry.md` before choosing a rule approach. Syntax can be the violation for construction-pattern bans like `as unknown as T`, but it is not enough for ownership, trust, type authority, or domain meaning.
 - Use `typescript-eslint` parser services for rules that need symbol identity, inferred types, assignability, imported declarations, or schema/type provenance.
-- Use real corpus assertions first when available. For this repo, `pnpm policy:validate-chaski` is the local Chaski-backed gate for real frontend/BFF behavior. If Chaski has only clean controls for a rule, use `pnpm policy:validate-external-corpus` for a narrowly scoped fallback repo case and document that fallback in `docs/real-corpus-validation.md`.
+- Use real corpus assertions first when available. For this repo, `pnpm policy:validate-chaski` is the local Chaski-backed gate for real frontend/BFF behavior. If Chaski has only clean controls for a rule, run a named external corpus with `pnpm policy:research-external-corpus -- --corpus <name>` and document that research evidence in `docs/real-corpus-validation.md`.
 - Do not use reduced fixture programs as a completion gate. Real project files are the assertion surface for rule promotion.
 - Add or update the rule row in `policy/registries/rules.yaml` whenever a rule is added, retired, narrowed, reclassified, or considered for stable promotion.
 - Add or update the corresponding provenance row in `docs/source-ledger.md` whenever a rule, ruleset, tool, or borrowed reference changes.

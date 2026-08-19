@@ -19,12 +19,12 @@ describe("verifySession", () => {
     const stderr = writer();
     const spawn = vi.fn(() => ({
       status: 1,
-      stdout: "external-corpus fail: Only 1 external corpus repositories are available; 2 required by --require for this slice.\n",
-      stderr: "report: reports/external-corpus.json\n",
+      stdout: "release verification failed\n",
+      stderr: "typecheck reported an error\n",
     }));
 
     const status = verifySession({
-      commands: [["pnpm", ["policy:validate-external-corpus"]]],
+      commands: [["pnpm", ["verify:release"]]],
       hook: true,
       spawn,
       stdout,
@@ -37,9 +37,9 @@ describe("verifySession", () => {
     expect(stderr.chunks).toEqual([]);
     expect(payload.decision).toBe("block");
     expect(payload.reason).toContain(
-      "Required verification failed: pnpm policy:validate-external-corpus",
+      "Required verification failed: pnpm verify:release",
     );
-    expect(payload.reason).toContain("external-corpus fail:");
-    expect(payload.reason).toContain("report: reports/external-corpus.json");
+    expect(payload.reason).toContain("release verification failed");
+    expect(payload.reason).toContain("typecheck reported an error");
   });
 });

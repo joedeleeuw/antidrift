@@ -41,13 +41,7 @@ jobs:
             exit 1
           fi
 
-      - run: pnpm policy:check-generated
-      - run: pnpm policy:check-registries
-      - run: pnpm policy:check-rule-surface
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm package:verify
+      - run: pnpm verify:release
 
       - name: Pack package
         run: pnpm --dir tooling/antidrift pack --pack-destination "$RUNNER_TEMP/antidrift-pack"

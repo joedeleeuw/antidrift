@@ -3,6 +3,8 @@ import {
   ZOD_VALIDATION_METHODS,
   zodParseCallParts,
 } from "../../semantic-adapters/schema-provenance.mjs";
+import { noKnownValueWideningRule } from "../../oxlint-plugin/anti-slop/rules/no-known-value-widening.js";
+import { noWidenThenAssertRule } from "../../oxlint-plugin/anti-slop/rules/no-widen-then-assert.js";
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
@@ -11,6 +13,25 @@ import {
 const TS_TYPE_FLAG_ANY = 1;
 const TS_TYPE_FLAG_UNKNOWN = 2;
 
+function mergeVisitors(...visitors) {
+  const handlers = new Map();
+  for (const visitor of visitors) {
+    for (const [selector, handler] of Object.entries(visitor)) {
+      const selectorHandlers = handlers.get(selector) ?? [];
+      selectorHandlers.push(handler);
+      handlers.set(selector, selectorHandlers);
+    }
+  }
+  return Object.fromEntries(
+    [...handlers].map(([selector, selectorHandlers]) => [
+      selector,
+      (node) => {
+        for (const handler of selectorHandlers) handler(node);
+      },
+    ]),
+  );
+}
+
 function isUnknownTypeNode(typeNode) {
   return typeNode?.type === "TSUnknownKeyword";
 }
@@ -18,7 +39,9 @@ function isUnknownTypeNode(typeNode) {
 // `const x: unknown = expr` and `const x = expr as unknown` are the same erasure.
 function erasedInitializer(node) {
   if (isUnknownTypeNode(node.id.typeAnnotation?.typeAnnotation)) {
-    return node.init?.type === "TSAsExpression" ? node.init.expression : node.init;
+    return node.init?.type === "TSAsExpression"
+      ? node.init.expression
+      : node.init;
   }
   if (
     node.init?.type === "TSAsExpression" &&
@@ -35,7 +58,8 @@ function isContractFreeLiteral(expression) {
   return Boolean(
     (expression?.type === "ObjectExpression" &&
       expression.properties.length === 0) ||
-    (expression?.type === "ArrayExpression" && expression.elements.length === 0),
+    (expression?.type === "ArrayExpression" &&
+      expression.elements.length === 0),
   );
 }
 
@@ -90,7 +114,13 @@ export function ruleNoAppeasementErasure() {
       type: "problem",
       docs: {
         description:
-          "Detect widening a known type to unknown and then re-establishing a contract from it. The erasure discards what the compiler proved and converts a compile-time contract into a runtime check.",
+          "Detect known values widened into broad contracts, including flows that later re-establish a narrower contract.",
+      },
+      messages: {
+        widening:
+          "The explicit {{target}} type on {{subject}} discards known type evidence. Keep inference, validate with `satisfies`, or use a named owner contract.",
+        widenThenAssert:
+          'Binding "{{name}}" discards type evidence and later recreates it with an assertion. Keep the precise type from initialization through use; parse boundary input once.',
       },
       schema: [],
     },
@@ -100,13 +130,10 @@ export function ruleNoAppeasementErasure() {
         return missingTypeServicesVisitors(context, "no-appeasement-erasure");
       }
       const checker = services.program.getTypeChecker();
-      return {
+      const localVisitors = {
         VariableDeclarator(node) {
           // A reassigned binding is a traversal cursor, not a boundary value.
-          if (
-            node.id.type !== "Identifier" ||
-            node.parent?.kind !== "const"
-          ) {
+          if (node.id.type !== "Identifier" || node.parent?.kind !== "const") {
             return;
           }
           const initializer = erasedInitializer(node);
@@ -131,6 +158,11 @@ export function ruleNoAppeasementErasure() {
           });
         },
       };
+      return mergeVisitors(
+        noKnownValueWideningRule.createOnce(context),
+        noWidenThenAssertRule.createOnce(context),
+        localVisitors,
+      );
     },
   };
 }

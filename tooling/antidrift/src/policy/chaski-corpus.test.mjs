@@ -310,10 +310,20 @@ export interface OpenProjectInfo extends ProjectInfo {
 });
 
 describe("externalCorpus", () => {
+  it("fails loud when a research run does not select its scope", async () => {
+    const result = await externalCorpus({ report: () => {} });
+
+    expect(result.decision).toBe("fail");
+    expect(result.repositories).toEqual([]);
+    expect(result.reason).toContain("--corpus <name>");
+    expect(result.reason).toContain("--all");
+  });
+
   it("fails required aggregate gates before corpus analysis when the threshold is unreachable", async () => {
     const output = join(tempRepo(), "reports", "external-corpus.json");
     const messages = [];
     const result = await externalCorpus({
+      all: true,
       require: true,
       minRepositories: 99,
       output,

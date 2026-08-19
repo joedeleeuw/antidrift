@@ -1,5 +1,10 @@
 # changelog
 
+## 0.10.0
+
+- vendor the generic rules and Effect service-constructor rule from `dmmulroy/anti-slop` commit `6d538555cb151d4121ed51a27db81890eacf8ae9`; enable the nine rules with bounded syntax ownership, keep five false-positive-prone rules registered but default-off, make `no-unsafe-cast-chain` own upstream chained-assertion behavior, and incorporate upstream known-value-widening and widen-then-assert detection into `no-appeasement-erasure`
+- use one hermetic release verification command locally and in GitHub; keep live external repositories as sequential, named research evidence instead of release or session prerequisites
+
 ## 0.9.0
 
 Upgrading from 0.8.0 activates the native TypeScript baseline for consumers of

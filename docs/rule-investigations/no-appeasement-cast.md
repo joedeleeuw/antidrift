@@ -8,7 +8,7 @@ The rule is type-aware. It reports a plain `as T` assertion when the source expr
 
 The rule deliberately excludes branded targets because the package-specific brand-cast rule is retired until real non-test forgery evidence exists. It also skips `as unknown as T` tunnels because maintained `@typescript-eslint/no-unsafe-type-assertion` owns the broad/double assertion surface. There is no explicit SDK/API allowlist: typed SDK conversions stay clean only when the source type is not `any` or `unknown`.
 
-This is different from the retired `no-unsafe-cast-chain`, which only caught explicit cast tunnels such as `value as unknown as User`.
+This is different from `no-unsafe-cast-chain`, which now exposes the vendored anti-slop rule for explicit nested assertion chains such as `value as unknown as User`.
 
 ## Ecosystem Check
 

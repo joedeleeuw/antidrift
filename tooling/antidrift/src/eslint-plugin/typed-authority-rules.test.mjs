@@ -675,33 +675,45 @@ typedRuleTester.run("no-parse-as-cast", rule("no-parse-as-cast"), {
 });
 
 // ─── no-appeasement-erasure fixture suite ─────────────────────────────────────
-// Fires when a known type is widened to unknown and a contract is then
-// re-established from it by a parse or a named cast. Widening an any-returning
-// source, or widening with no downstream contract, stays clean.
-typedRuleTester.run(
-  "no-appeasement-erasure",
-  rule("no-appeasement-erasure"),
-  {
-    valid: [
-      fixture("programs/correct/appeasement-erasure-real-boundaries.ts"),
-      // Effect decode of a genuine unknown boundary stays clean
-      fixture("programs/correct/effect-decode-boundaries.ts"),
-      // unknown/any parameters are real boundaries, not erasures
-      fixture("programs/correct/parse-as-cast-boundary-inputs.ts"),
-      // External SDK result parsed directly — no erased binding involved
-      fixture("programs/correct/zod-external-call-boundary.ts"),
-    ],
-    invalid: [
-      // Erased-then-parsed and erased-then-cast, the two IPC edge shapes
-      {
-        ...fixture("programs/drift/appeasement-erasure-ipc-result.ts"),
-        errors: 3,
-      },
-      // Erasure re-established through a curried Effect Schema decoder
-      { ...fixture("programs/drift/effect-decode-erasure.ts"), errors: 1 },
-    ],
-  },
-);
+// Fires when a known type is widened to a broad contract, including local flows
+// that later re-establish a narrower contract.
+typedRuleTester.run("no-appeasement-erasure", rule("no-appeasement-erasure"), {
+  valid: [
+    fixture("programs/correct/appeasement-erasure-real-boundaries.ts"),
+    // Effect decode of a genuine unknown boundary stays clean
+    fixture("programs/correct/effect-decode-boundaries.ts"),
+    // unknown/any parameters are real boundaries, not erasures
+    fixture("programs/correct/parse-as-cast-boundary-inputs.ts"),
+    // External SDK result parsed directly — no erased binding involved
+    fixture("programs/correct/zod-external-call-boundary.ts"),
+  ],
+  invalid: [
+    // Erased-then-parsed and erased-then-cast, the two IPC edge shapes
+    {
+      ...fixture("programs/drift/appeasement-erasure-ipc-result.ts"),
+      errors: [
+        { message: /Appeasement erasure/u },
+        { message: /Appeasement erasure/u },
+        { message: /Appeasement erasure/u },
+        { messageId: "widening" },
+        { messageId: "widening" },
+      ],
+    },
+    {
+      code: `
+        const value = { id: "user-1" } as unknown;
+        export const user = value as { id: string };
+      `,
+      errors: [
+        { messageId: "widening" },
+        { messageId: "widening" },
+        { messageId: "widenThenAssert" },
+      ],
+    },
+    // Erasure re-established through a curried Effect Schema decoder
+    { ...fixture("programs/drift/effect-decode-erasure.ts"), errors: 1 },
+  ],
+});
 
 typedRuleTester.run(
   "no-identity-schema-transform",
@@ -717,9 +729,7 @@ typedRuleTester.run(
       fixture(
         "programs/correct/identity-schema-transform-non-object-output.ts",
       ),
-      fixture(
-        "programs/correct/identity-schema-transform-non-zod-receiver.ts",
-      ),
+      fixture("programs/correct/identity-schema-transform-non-zod-receiver.ts"),
       fixture("programs/correct/identity-schema-transform-array-map.ts"),
       fixture(
         "programs/correct/identity-schema-transform-unresolved-input-shape.ts",
@@ -801,9 +811,7 @@ typedRuleTester.run(
         ],
       },
       {
-        ...fixture(
-          "programs/drift/convex-missing-return-validator-aliased.ts",
-        ),
+        ...fixture("programs/drift/convex-missing-return-validator-aliased.ts"),
         errors: [{ messageId: "missingReturnValidator" }],
       },
     ],

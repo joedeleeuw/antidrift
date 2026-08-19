@@ -26,6 +26,7 @@ This ledger records the enforcement owner and provenance of each ruleset or tool
 | Disable-comment policy                | `ecosystem-ruleset`: ESLint comments plugin plus Oxlint directive reporting | Oxlint JavaScript plugin host and root options  |
 | Gateway/generated import restrictions | `generated-config`: registry-backed `no-restricted-imports`                 | Oxlint config factory                           |
 | Syntax-only custom rules              | `local-original`                                                            | `tooling/antidrift/src/oxlint-plugin`           |
+| Vendored anti-slop rules              | `ecosystem-ruleset`: `dmmulroy/anti-slop@6d538555` under MIT                | Antidrift Oxlint plugin and per-rule registry   |
 | TypeChecker-backed custom rules       | `local-original`                                                            | Reduced ESLint config and plugin                |
 | Custom rule maturity and examples     | `local-original` registry                                                   | `policy/registries/rules.yaml`                  |
 | Complexity, nesting, and parameters   | `ecosystem-ruleset`: Oxlint                                                 | Oxlint config                                   |

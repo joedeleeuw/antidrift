@@ -1214,6 +1214,17 @@ function lintOxlintCase(repoRoot, testCase) {
     "--format",
     "json",
   ];
+  if (testCase.noIgnore === true) {
+    args.push("--no-ignore");
+  }
+  if (testCase.standaloneOxlintConfig === true) {
+    args.push(
+      "--config",
+      fileURLToPath(
+        new URL("./external-corpus/oxlint.config.mts", import.meta.url),
+      ),
+    );
+  }
   const tsconfig =
     testCase.tsconfig ?? defaultTypeAwareProjects[testCase.subproject];
   if (tsconfig) {

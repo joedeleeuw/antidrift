@@ -14,6 +14,84 @@ const oxlintBinary = resolve(
   require(oxlintPackage).bin.oxlint,
 );
 const plugin = fileURLToPath(new URL("./index.js", import.meta.url));
+const antiSlopRuleCases = [
+  {
+    ruleId: "no-conditional-empty-object-spread",
+    drift: "const options = { ...(enabled ? { timeout: 1 } : {}) };",
+    correct:
+      "const options: { timeout?: number } = {}; if (enabled) options.timeout = 1;",
+  },
+  {
+    ruleId: "no-module-mocking",
+    drift: 'import { vi } from "vitest"; vi.mock("./dependency");',
+    correct: "const dependency = { run: () => 1 }; dependency.run();",
+  },
+  {
+    ruleId: "no-object-parameters",
+    drift: "function save(value: object) { return value; }",
+    correct:
+      "interface SaveInput { id: string } function save(value: SaveInput) { return value.id; }",
+  },
+  {
+    ruleId: "no-reflect-apply",
+    drift: "Reflect.apply(operation, owner, args);",
+    correct: "operation.apply(owner, args);",
+  },
+  {
+    ruleId: "no-reflect-get",
+    drift: 'Reflect.get(user, "name");',
+    correct: "user.name;",
+  },
+  {
+    ruleId: "no-runtime-typeof",
+    drift: 'if (typeof value === "string") value.length;',
+    correct: 'if (value.kind === "text") value.text.length;',
+  },
+  {
+    ruleId: "no-service-constructor-imports",
+    filename: "runtime.ts",
+    drift: 'import { makeClock } from "./clock";',
+    correct: 'import { ClockLive } from "./clock";',
+  },
+  {
+    ruleId: "no-shape-in-symbol-names",
+    drift: "const userShape = {};",
+    correct: "const userSchema = {};",
+  },
+  {
+    ruleId: "no-unknown-parameters",
+    drift: "function parse(value: unknown) { return value; }",
+    correct:
+      "interface ParseInput { id: string } function parse(value: ParseInput) { return value.id; }",
+  },
+  {
+    ruleId: "no-unknown-returns",
+    drift: "function load(): unknown { return data; }",
+    correct:
+      "interface User { id: string } declare const user: User; function load(): User { return user; }",
+  },
+  {
+    ruleId: "no-unknown-type-aliases",
+    drift: "type Payload = unknown;",
+    correct: "type Payload = { id: string };",
+  },
+  {
+    ruleId: "no-unsafe-cast-chain",
+    drift: "const user = input as unknown as User;",
+    correct: "const user = input as User;",
+  },
+  {
+    ruleId: "no-unsafe-dictionary-type",
+    drift: "const values: Record<string, unknown> = {};",
+    correct: "const values: Record<string, string> = {};",
+  },
+  {
+    ruleId: "require-safety-comment-for-type-assertion",
+    drift: "const user = value as User;",
+    correct:
+      "// SAFETY: parseUser validated value before this assertion.\nconst user = value as User;",
+  },
+];
 
 function lint(
   source,
@@ -95,4 +173,51 @@ describe("Oxlint plugin", () => {
       "antidrift(no-static-property-loop)",
     );
   });
+
+  it("accepts a behavior assertion without a static property loop", () => {
+    const result = lint(
+      `
+        it("exposes config keys", () => {
+          const rules = createConfig();
+          expect(Object.keys(rules)).toStrictEqual(["first", "second"]);
+        });
+      `,
+      { "antidrift/no-static-property-loop": "error" },
+      "config.test.ts",
+    );
+
+    expect(result.status).toBe(0);
+  });
+
+  it.each(antiSlopRuleCases)(
+    "reports vendored $ruleId drift",
+    ({ ruleId, drift, filename = "sample.ts" }) => {
+      const result = lint(
+        drift,
+        { [`antidrift/${ruleId}`]: "error" },
+        filename,
+      );
+
+      expect(result.status).toBe(1);
+      expect(`${result.stdout}${result.stderr}`).toContain(
+        `antidrift(${ruleId})`,
+      );
+    },
+  );
+
+  it.each(antiSlopRuleCases)(
+    "accepts vendored $ruleId clean code",
+    ({ ruleId, correct, filename = "sample.ts" }) => {
+      const result = lint(
+        correct,
+        { [`antidrift/${ruleId}`]: "error" },
+        filename,
+      );
+
+      expect(result.status).toBe(0);
+      expect(`${result.stdout}${result.stderr}`).not.toContain(
+        `antidrift(${ruleId})`,
+      );
+    },
+  );
 });

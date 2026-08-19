@@ -204,12 +204,12 @@ Earlier widened local scan, superseded by the finite source-fleet gate:
 
 Current source-fleet finding classification:
 
-| Class | Count | Examples | Handling |
-|---|---:|---|---|
-| Production drift | 1 | PowerSync `MySQLRouteAPIAdapter.ts:235` raw `sourceTable.table` interpolation | Keep reporting. |
-| Parser-services-only conservative reports | 3 | PowerSync `BinLogStream.ts:311`, `WalStream.ts:437`, `replication-utils.ts:290` | Clean in type-aware plans; do not add name-only exemptions. |
-| Lower-strength demo/test drift | 27 | Cloudflare demo `SqlDemo.tsx:133`, Sudocode dynamic test update helpers, PowerSync integration-test SQL interpolation | Keep as pressure evidence, not stable-production evidence. |
-| Known false positives after this slice | 2 | Cloudflare Voice and AI Chat Agent.sql tags blocked by unresolved external package tsconfigs | Keep the rule off in the shipped config until those member proofs can run type-aware without local shims, then rerun source-fleet/adversarial review. |
+| Class                                     | Count | Examples                                                                                                              | Handling                                                                                                                                              |
+| ----------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production drift                          |     1 | PowerSync `MySQLRouteAPIAdapter.ts:235` raw `sourceTable.table` interpolation                                         | Keep reporting.                                                                                                                                       |
+| Parser-services-only conservative reports |     3 | PowerSync `BinLogStream.ts:311`, `WalStream.ts:437`, `replication-utils.ts:290`                                       | Clean in type-aware plans; do not add name-only exemptions.                                                                                           |
+| Lower-strength demo/test drift            |    27 | Cloudflare demo `SqlDemo.tsx:133`, Sudocode dynamic test update helpers, PowerSync integration-test SQL interpolation | Keep as pressure evidence, not stable-production evidence.                                                                                            |
+| Known false positives after this slice    |     2 | Cloudflare Voice and AI Chat Agent.sql tags blocked by unresolved external package tsconfigs                          | Keep the rule off in the shipped config until those member proofs can run type-aware without local shims, then rerun source-fleet/adversarial review. |
 
 ## Promotion State
 
@@ -223,7 +223,7 @@ Accepted inventory evidence:
 - Chaski, Codebase Atlas, Sudocode, Cloudflare, Opencode, and PowerSync service supply clean and pressure controls for placeholder lists, static SQL fragments, SQL tag ecosystems, ORM-owned SQL composition, closed identifier/direction fragments, serialized payload data, constructor-validated identifiers, local and imported quote escapers, finite static object fragments, numbered placeholder fragments, configured SQL builder tags/members, and bound values.
 - `pnpm policy:benchmark-sql-queries` currently checks 370 files, reports 145 custom findings, and 0 parser errors. The tagged-template inventory is high-noise classification work, not an allowlist.
 - `pnpm policy:inventory-sql-source-fleet` currently checks 1,378 SQL-candidate files across 24 primary source repos, reports 486 custom findings, and 0 parser errors after name-only SQL member proof was removed.
-- `pnpm policy:validate-external-corpus` now proves the configured Drizzle, Cloudflare core Agent, and PowerSync SQL-builder clean controls; it is still not a stable-promotion proof while Cloudflare Voice and AI Chat member proofs are blocked by external tsconfig resolution.
+- Named `pnpm policy:research-external-corpus` runs prove the configured Drizzle, Cloudflare core Agent, and PowerSync SQL-builder clean controls; they are not release gates or stable-promotion proof while Cloudflare Voice and AI Chat member proofs are blocked by external tsconfig resolution.
 - The June 9 adversarial cleanup keeps the placeholder proof limited to `+` and `*` index arithmetic and restores short-circuit safety checks.
 
 Accepted boundaries before stable promotion:

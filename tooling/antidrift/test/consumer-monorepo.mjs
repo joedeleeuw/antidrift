@@ -206,9 +206,28 @@ try {
       `default packed Oxlint config should report max-lines for ordinary code even when generated-looking names are undeclared, got: ${JSON.stringify(moduleSizeDiagnostics)}`,
     );
   }
-  if (repositoryDiagnostics.length !== moduleSizeDiagnostics.length) {
+  const expectedSharedRuleCodes = new Set([
+    "antidrift(no-unknown-returns)",
+    "antidrift(no-unsafe-dictionary-type)",
+  ]);
+  const sharedRuleDiagnostics = repositoryDiagnostics.filter(
+    ({ code }) => code !== "eslint(max-lines)",
+  );
+  const unexpectedSharedDiagnostics = sharedRuleDiagnostics.filter(
+    ({ code }) => !expectedSharedRuleCodes.has(code),
+  );
+  const emittedSharedRuleCodes = new Set(
+    sharedRuleDiagnostics.map(({ code }) => code),
+  );
+  const missingSharedRuleCodes = [...expectedSharedRuleCodes].filter(
+    (code) => !emittedSharedRuleCodes.has(code),
+  );
+  if (
+    unexpectedSharedDiagnostics.length > 0 ||
+    missingSharedRuleCodes.length > 0
+  ) {
     fail(
-      `focused governance should report only max-lines in the consumer, got: ${JSON.stringify(repositoryDiagnostics)}`,
+      `focused governance should report max-lines plus the expected imported shared-rule fixtures, got unexpected=${JSON.stringify(unexpectedSharedDiagnostics)} missing=${JSON.stringify(missingSharedRuleCodes)}`,
     );
   }
   const precedenceRuleIds = oxlintRuleIds(
@@ -265,9 +284,9 @@ try {
     );
   }
 
-  const packageCopyRules = lint(
-    "packages/app/src/package-copy.ts",
-  ).flatMap((r) => r.messages.map((m) => m.ruleId));
+  const packageCopyRules = lint("packages/app/src/package-copy.ts").flatMap(
+    (r) => r.messages.map((m) => m.ruleId),
+  );
   const undercheckedPredicateRules = lint(
     "packages/app/src/underchecked-predicate.ts",
     "eslint.inventory.config.mjs",

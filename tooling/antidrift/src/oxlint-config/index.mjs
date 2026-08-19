@@ -33,11 +33,16 @@ const disabledAntidriftRules = {
   "antidrift/no-inline-structural-type-at-use-site": "off",
   "antidrift/no-nonindependent-test-oracle": "off",
   "antidrift/no-raw-fetch-in-component": "off",
+  "antidrift/no-runtime-typeof": "off",
+  "antidrift/no-service-constructor-imports": "off",
   "antidrift/no-sentinel-absence-fallback": "off",
   "antidrift/no-shattered-ingested-entity-state": "off",
   "antidrift/no-silent-empty-detection-fallback": "off",
+  "antidrift/no-shape-in-symbol-names": "off",
   "antidrift/no-status-literal-in-type": "off",
+  "antidrift/no-unknown-parameters": "off",
   "antidrift/require-authz-check": "off",
+  "antidrift/require-safety-comment-for-type-assertion": "off",
 };
 
 const modifiedComplexityOptions = Object.freeze({
@@ -140,7 +145,6 @@ function gatewayWrapperOverrides(registries, generatedPatterns) {
     }));
 }
 
-
 // TypeScript baseline, split by what it needs to run. Syntax rules work on any
 // Oxlint install. Type-aware rules need the oxlint-tsgolint package, so they
 // are included only when it is installed.
@@ -215,6 +219,43 @@ export function createGovernanceOxlintConfig({
     ...generatedPatterns,
     ...gatewayImportPatterns(registries),
   ];
+  const rules = {
+    ...antidriftTypescriptSyntaxRules,
+    "eslint-comments/require-description": "error",
+    "eslint-comments/disable-enable-pair": "error",
+    "eslint-comments/no-duplicate-disable": "error",
+    "eslint-comments/no-unlimited-disable": "error",
+    "eslint-comments/no-unused-disable": "error",
+    "eslint-comments/no-unused-enable": "error",
+    "antidrift/require-effect-deps": "error",
+    "antidrift/no-static-property-loop": "error",
+    "antidrift/no-conditional-empty-object-spread": "error",
+    "antidrift/no-module-mocking": "error",
+    "antidrift/no-object-parameters": "error",
+    "antidrift/no-reflect-apply": "error",
+    "antidrift/no-reflect-get": "error",
+    "antidrift/no-unknown-returns": "error",
+    "antidrift/no-unknown-type-aliases": "error",
+    "antidrift/no-unsafe-cast-chain": "error",
+    "antidrift/no-unsafe-dictionary-type": "error",
+    ...disabledAntidriftRules,
+    "max-lines": [
+      "error",
+      {
+        max: 1500,
+        skipBlankLines: false,
+        skipComments: false,
+      },
+    ],
+  };
+  if (typescriptBaselineTier(repoRoot) === "full") {
+    Object.assign(rules, antidriftTypescriptTypeAwareRules);
+  }
+  if (restrictedImportPatterns.length > 0) {
+    rules["no-restricted-imports"] = restrictedImportsRule(
+      restrictedImportPatterns,
+    );
+  }
 
   return defineConfig({
     categories: {
@@ -231,6 +272,7 @@ export function createGovernanceOxlintConfig({
       "**/dist/**",
       "**/coverage/**",
       "reports/**",
+      "tooling/antidrift/src/oxlint-plugin/anti-slop/**",
       ...generatedIgnores,
       "**/*.d.ts",
       "**/*.d.mts",
@@ -243,36 +285,7 @@ export function createGovernanceOxlintConfig({
       reportUnusedDisableDirectives: "error",
     },
     plugins: ["eslint", "typescript"],
-    rules: {
-      ...antidriftTypescriptSyntaxRules,
-      ...(typescriptBaselineTier(repoRoot) === "full"
-        ? antidriftTypescriptTypeAwareRules
-        : {}),
-      "eslint-comments/require-description": "error",
-      "eslint-comments/disable-enable-pair": "error",
-      "eslint-comments/no-duplicate-disable": "error",
-      "eslint-comments/no-unlimited-disable": "error",
-      "eslint-comments/no-unused-disable": "error",
-      "eslint-comments/no-unused-enable": "error",
-      "antidrift/require-effect-deps": "error",
-      "antidrift/no-static-property-loop": "error",
-      ...disabledAntidriftRules,
-      "max-lines": [
-        "error",
-        {
-          max: 1500,
-          skipBlankLines: false,
-          skipComments: false,
-        },
-      ],
-      ...(restrictedImportPatterns.length > 0
-        ? {
-            "no-restricted-imports": restrictedImportsRule(
-              restrictedImportPatterns,
-            ),
-          }
-        : {}),
-    },
+    rules,
     overrides: gatewayWrapperOverrides(registries, generatedPatterns),
   });
 }

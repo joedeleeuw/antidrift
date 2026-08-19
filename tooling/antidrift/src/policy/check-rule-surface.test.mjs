@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { checkRuleSurface } from "./check-rule-surface.mjs";
 
 describe("checkRuleSurface", () => {
-  it("requires exported custom rules to be configured and corpus covered", () => {
+  it("requires exported custom rules to be configured", () => {
     const messages = [];
     const ok = checkRuleSurface({
       pluginRules: {
@@ -18,7 +18,6 @@ describe("checkRuleSurface", () => {
           },
         },
       ],
-      corpusCases: [],
       report: (message) => messages.push(message),
     });
 
@@ -29,12 +28,9 @@ describe("checkRuleSurface", () => {
     expect(messages.join("\n")).toContain(
       "exported but not configured: antidrift/beta",
     );
-    expect(messages.join("\n")).toContain(
-      "exported but not covered by corpus evidence: antidrift/beta",
-    );
   });
 
-  it("does not promote RuleTester source shape to a required surface", () => {
+  it("does not couple rule ownership to a separate corpus manifest", () => {
     const messages = [];
     const ok = checkRuleSurface({
       pluginRules: {
@@ -48,10 +44,6 @@ describe("checkRuleSurface", () => {
             "antidrift/beta": "error",
           },
         },
-      ],
-      corpusCases: [
-        { ruleId: "antidrift/alpha" },
-        { ruleId: "antidrift/beta" },
       ],
       report: (message) => messages.push(message),
     });
@@ -77,7 +69,6 @@ describe("checkRuleSurface", () => {
         eslint: [{ rules: { "antidrift/alpha": "error" } }],
         oxlint: [{ rules: { "antidrift/alpha": "error" } }],
       },
-      corpusCases: [{ ruleId: "antidrift/alpha" }],
       ruleRegistry: {
         rules: {
           "antidrift/alpha": { status: "ready", signal: "AST" },
@@ -113,7 +104,6 @@ describe("checkRuleSurface", () => {
         oxlint: [{ rules: { "antidrift/alpha": "error" } }],
         eslint: [{ rules: { "antidrift/alpha": "off" } }],
       },
-      corpusCases: [{ ruleId: "antidrift/alpha" }],
       ruleRegistry: {
         rules: {
           "antidrift/alpha": { status: "ready", signal: "AST" },
@@ -124,34 +114,6 @@ describe("checkRuleSurface", () => {
 
     expect(messages).toEqual([]);
     expect(ok).toBe(true);
-  });
-
-  it("counts default external corpus cases as surface evidence", () => {
-    const messages = [];
-    const ok = checkRuleSurface({
-      pluginRules: {
-        "no-contract-appeasement-projection": {},
-      },
-      configs: [
-        {
-          rules: {
-            "antidrift/no-contract-appeasement-projection": "error",
-          },
-        },
-      ],
-      ruleRegistry: {
-        rules: {
-          "antidrift/no-contract-appeasement-projection": {
-            status: "ready",
-            signal: "TypeChecker",
-          },
-        },
-      },
-      report: (message) => messages.push(message),
-    });
-
-    expect(ok).toBe(true);
-    expect(messages).toEqual([]);
   });
 
   it("rejects blocking custom rules whose registry status is not mature enough", () => {
@@ -172,12 +134,6 @@ describe("checkRuleSurface", () => {
             "antidrift/stable": "error",
           },
         },
-      ],
-      corpusCases: [
-        { ruleId: "antidrift/alpha" },
-        { ruleId: "antidrift/beta" },
-        { ruleId: "antidrift/retired" },
-        { ruleId: "antidrift/stable" },
       ],
       ruleRegistry: {
         rules: {
@@ -216,7 +172,6 @@ describe("checkRuleSurface", () => {
           },
         },
       ],
-      corpusCases: [{ ruleId: "antidrift/alpha" }],
       ruleRegistry: {
         rules: {
           "antidrift/alpha": { status: "under-proven", signal: "TypeChecker" },
@@ -242,7 +197,6 @@ describe("checkRuleSurface", () => {
           },
         },
       ],
-      corpusCases: [{ ruleId: "antidrift/alpha" }],
       ruleRegistry: {
         rules: {
           "antidrift/alpha": {
@@ -269,7 +223,6 @@ describe("checkRuleSurface", () => {
         alpha: {},
       },
       configs: [],
-      corpusCases: [{ ruleId: "antidrift/alpha" }],
       ruleRegistry: {},
       report: (message) => messages.push(message),
     });
@@ -286,7 +239,6 @@ describe("checkRuleSurface", () => {
         repoRoot: "not-the-antidrift-source-repo",
         pluginRules: {},
         configs: [],
-        corpusCases: [],
       }),
     ).toThrow(/rules\.yaml/u);
   });
