@@ -294,7 +294,7 @@ function contract({
   allowedExports = [],
   refactor,
 }) {
-  return {
+  const result = {
     schemaVersion: 1,
     contractId: id,
     task,
@@ -306,8 +306,9 @@ function contract({
       allowedDevDependencies,
       allowedExports,
     },
-    ...(refactor ? { refactor } : {}),
   };
+  if (refactor) result.refactor = refactor;
+  return result;
 }
 
 function compareStrings(left, right) {
