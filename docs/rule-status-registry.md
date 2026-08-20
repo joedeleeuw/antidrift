@@ -96,6 +96,7 @@ Current default-off custom rules:
 - `antidrift/no-nonindependent-test-oracle`: the C#-inspired test-oracle signal remains inventory while language and assertion-framework scope are evaluated.
 - `antidrift/no-query-data-type-parameters`: query type-parameter ownership remains inventory until real consumer drift and maintained query-library overlap are measured.
 - `antidrift/no-raw-fetch-in-component`: component-boundary fetch detection is narrowed to JSX-returning lexical frames and scope-bound browser globals, but it needs a fresh narrowed multi-repo re-inventory before restoring blocking severity.
+- `antidrift/no-redundant-local-return-type`: exact nested shorthand-object inference plus an immediate enclosing return-contract owner is proven for the pinned Murderbox `selectedFor` anchor, but independent replication and broad clean-control review remain open; the retired private-helper rule stays locked.
 - `antidrift/require-authz-check`: handler-local request-param checks are inventory only until typed policy-wrapper route registration or dataflow/dominance proof replaces absence-of-call detection.
 - `antidrift/no-shattered-ingested-entity-state`: source-object fan-out is retained as fact-only inventory; it emits no diagnostic and must not gain a blocking sink until real owned-entity shatter evidence appears across multiple repos with envelope, pagination, and view-state clean controls.
 - `antidrift/no-silent-empty-detection-fallback`: detection helpers returning empty-string sentinels remain opt-in until another repo replicates the failure mode.

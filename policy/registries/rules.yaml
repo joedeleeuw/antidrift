@@ -162,6 +162,15 @@ ruleFamilies:
           - "function compactText(file: ParsedFile) { return file.source.trim(); }"
           - "export function selectSource(file: ParsedFile): string { return file.source; }"
           - "const action = ActionSchema.parse(raw);"
+      inferred-local-return-ownership:
+        intent: Remove a nested implementation return annotation only when exact inference and an independently declared enclosing return contract both preserve type ownership.
+        rules:
+          - antidrift/no-redundant-local-return-type
+        flags:
+          - "function selectedData(): Record<Id, Selection> { const selectedFor = (id: Id): Selection => { const selected = configs[0]; return { configs, id, selected }; }; return { default: selectedFor('default') }; }"
+        allows:
+          - "function selectedData() { const selectedFor = (id: Id): Selection => { const selected = configs[0]; return { configs, id, selected }; }; return selectedFor('default'); }"
+          - "function createApi(): Api { const build = (): Result => { return { value }; }; return { build }; } export const api = { createApi };"
       type-escape-casts:
         intent: Prevent casts from manufacturing named, narrowed, or branded contracts without a guard, parser, or brand constructor.
         rules:
@@ -983,6 +992,58 @@ rules:
         - 'import { fetch } from "./api"; function Orders() { fetch("/api/orders"); return <div />; }'
         - "function Orders() { const { data } = useOrders(); return <div>{data.length}</div>; }"
     nextAction: Keep default-off inventory while re-inventorying real component fetch findings under the narrowed same-frame JSX-return proof before restoring blocking severity.
+  antidrift/no-redundant-local-return-type:
+    status: under-proven
+    stable: false
+    defaultOff: true
+    referenceDoc: docs/rule-investigations/no-redundant-local-return-type.md
+    signal: TypeChecker identity proof for every required mutable property plus same-type contextual ownership at every call in the immediate enclosing function's return expression
+    solveType: type-contract-shape
+    proofBuckets: [semantic-source-type-provenance, local-ast-source-shape]
+    promotion:
+      proofBucket: semantic-source-type-provenance
+      association: A nested local implementation's exact inferred shorthand-object properties to same-type contextual call sites owned by its immediate enclosing function's explicit return contract.
+      blockingThreshold: Report only when every external reference is a direct call inside the immediate enclosing function's return expression and the TypeChecker assigns every call the identical contextual type as the removable annotation.
+      ecosystemComparison: Maintained explicit-return-type rules require annotations at selected surfaces; they do not prove that a nested annotation duplicates inference while another local contract remains authoritative.
+      corpusEvidence: Murderbox committed model-selector-menu-data.ts line 311 supplies the first drift anchor; selectedFor calls are owned by selectedVideoConfigDataFor's Record return contract and then feed ModelSelectorMenuData.selectedVideoConfigByModel.
+      realCorpusInventory: docs/rule-investigations/no-redundant-local-return-type.md, docs/real-corpus-validation.md, and the pinned Murderbox external corpus case record the real source path, owner chain, expected finding, and clean-control boundaries.
+      realCorpusInventoryRefs:
+        - docs/rule-investigations/no-redundant-local-return-type.md
+        - docs/real-corpus-validation.md
+        - tooling/antidrift/src/policy/external-corpus/cases.mjs
+      replicationsNotIntroducedForTest: true
+      knownFalsePositives: 0
+      knownFalseNegatives: Top-level private helpers, inferred enclosing owners, unconstrained local call assignments, indirect result-flow beyond the immediate return expression, non-shorthand objects, and imported or derived return types are deliberately missed.
+      productionConcerns: Murderbox is the only real drift repository. Keep default-off until independent replication and broad clean-control review justify promotion.
+      noSinkBehavior: This rule emits no semantic facts; diagnostics depend on local TypeChecker identity and contextual return ownership.
+      noDeadWorkBehavior: Inferred owners, non-call uses, direct and indirect function-value exports, overloads, recursion, local function dependencies, callbacks, and broader private-helper annotations stay clean.
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: Return-type alias resolution and exact shorthand-property type identity are local to this rule; extract a shared inference-equivalence adapter only if another rule needs the same proof.
+    corpusRepositories: [murderbox]
+    concerns:
+      - "The first real drift anchor is Murderbox selectedFor in model-selector-menu-data.ts; independent replication has not been established."
+      - "The proof intentionally misses top-level private helpers, inferred enclosing returns, unconstrained call sites, non-shorthand object properties, interfaces, imported or derived return types, optional or readonly properties, multiple returns, async/generator functions, overloads, recursion, local function dependencies, contextual callbacks, and direct or indirect public boundary exposure."
+      - "The retired no-explicit-return-type-private-helper decision remains locked; this rule does not revive broad private-helper annotation policing."
+    external:
+      state: net-antidrift
+      support: none
+      candidates:
+        - "@typescript-eslint/explicit-function-return-type"
+        - "@typescript-eslint/explicit-module-boundary-types"
+      decision: own-antidrift
+      whyThisState: "Maintained rules require return annotations at configured surfaces; they do not prove that one nested implementation annotation exactly repeats TypeScript inference."
+      whyNotOtherState: "This is not equivalent or partial overlap because the ecosystem rules enforce the opposite policy and do not compare the inferred shorthand-object shape with a named local type literal."
+    examples:
+      flags:
+        - "function outer(configs: Config[]): Record<Id, Selection> { const selectedFor = (id: Id): Selection => { const selected = configs[0]; return { configs, id, selected }; }; return { default: selectedFor('default') }; }"
+      allows:
+        - "export function selectedFor(id: Id): Selection { return { configs, id, selected }; }"
+        - "function outer() { const selectedFor = (): Selection => { return { configs, id, selected }; }; return selectedFor(); }"
+        - "function createApi(): Api { const build = (): Result => { return { value }; }; return { build }; } export const api = { createApi };"
+        - "function outer() { const selectedFor = (): ReadonlySelection => { return { configs, id, selected }; }; }"
+        - "function outer() { const selectedFor = (): Selection => condition ? first : second; }"
+    nextAction: Keep default-off while inventorying the exact proof against independent repositories and reviewing any findings as either redundant nested implementation annotations or legitimate local contracts.
   antidrift/no-redundant-zod-parse:
     status: ready
     stable: true

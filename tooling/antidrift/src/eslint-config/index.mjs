@@ -98,6 +98,7 @@ export function createConfig({
         "antidrift/require-convex-return-validator": "off",
         "antidrift/no-explicit-type-arguments-on-owned-api": "off",
         "antidrift/no-schema-validator-transcoding": "off",
+        "antidrift/no-redundant-local-return-type": "off",
         "antidrift/no-sql-string-concat": "off",
       },
     },

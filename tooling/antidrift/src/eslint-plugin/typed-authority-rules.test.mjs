@@ -18,6 +18,7 @@ const typeServiceGuardedRules = [
   "no-identity-schema-transform",
   "no-explicit-type-arguments-on-owned-api",
   "no-schema-validator-transcoding",
+  "no-redundant-local-return-type",
   "no-redundant-zod-parse",
   "no-parse-as-cast",
   "no-appeasement-erasure",
@@ -26,6 +27,253 @@ const typeServiceGuardedRules = [
   "no-unsafe-deserialize",
   "require-convex-return-validator",
 ];
+
+typedRuleTester.run(
+  "no-redundant-local-return-type",
+  rule("no-redundant-local-return-type"),
+  {
+    valid: [
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        export function selectedFor(configs: string[]): SelectedConfigData {
+          const selectedId = "default";
+          const selected = configs[0] ?? "default";
+          return { configs, selectedId, selected };
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return selectedFor("default");
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            if (selected === "again") return { configs, selectedId, selected };
+            return { configs, selectedId, selected };
+          };
+          return selectedFor("default");
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[], ids: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return ids.map(selectedFor);
+        }
+      `,
+      `
+        type SelectedConfigData = { readonly configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return selectedFor("default");
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected?: string };
+        function build(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return selectedFor("default");
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[]) {
+          const selectedFor: (id: string) => SelectedConfigData = (id): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return selectedFor("default");
+        }
+      `,
+      `
+        type Result = { value: number; next: () => Result };
+        function build() {
+          const recurse = (): Result => {
+            const value = 1;
+            const next = recurse;
+            return { value, next };
+          };
+          return recurse();
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        export function createSelector(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return { selectedFor };
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        export function createSelector(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return selectedFor;
+        }
+      `,
+      `
+        type Result = { value: number };
+        function build() {
+          function selectedFor(value: number): Result;
+          function selectedFor(value: number | string): Result;
+          function selectedFor(input: number | string): Result {
+            const value = Number(input);
+            return { value };
+          }
+          return selectedFor(1);
+        }
+      `,
+      `
+        type Left = { right: Right };
+        type Right = { left: Left };
+        function build() {
+          const left = (): Left => {
+            const right = rightValue();
+            return { right };
+          };
+          const rightValue = (): Right => {
+            const left = left();
+            return { left };
+          };
+          return left();
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[]) {
+          return configs.map((selected, index): SelectedConfigData => ({
+            configs,
+            selectedId: String(index),
+            selected,
+          }));
+        }
+      `,
+      `
+        type Status = { status: string };
+        function build() {
+          const selectedFor = (): Status => {
+            const status = "ready" as const;
+            return { status };
+          };
+          return selectedFor();
+        }
+      `,
+      `
+        type Result = { value: number };
+        function build(): Result {
+          const create = (): Result => {
+            const value = 1;
+            return { value };
+          };
+          return create();
+        }
+        export const api = { build };
+      `,
+      `
+        type Result = { value: number };
+        declare function wrap<T>(value: T): T;
+        function build(): Result {
+          const create = (): Result => {
+            const value = 1;
+            return { value };
+          };
+          return create();
+        }
+        export default wrap(build);
+      `,
+      `
+        type Result = { value: number };
+        function build(): Result {
+          const create = (): Result => {
+            const value = 1;
+            return { value };
+          };
+          return create();
+        }
+        export { build as apiFactory };
+      `,
+    ],
+    invalid: [
+      {
+        code: `
+          type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+          function build(configs: string[]): SelectedConfigData {
+            const selectedFor = (id: string): SelectedConfigData => {
+              const selectedId = id;
+              const selected = configs[0] ?? id;
+              return { configs, selectedId, selected };
+            };
+            return selectedFor("default");
+          }
+        `,
+        errors: [{ messageId: "redundantLocalReturnType" }],
+      },
+      {
+        code: `
+          type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+          function build(configs: string[]): SelectedConfigData {
+            function selectedFor(id: string): SelectedConfigData {
+              const selectedId = id;
+              const selected = configs[0] ?? id;
+              return { configs, selectedId, selected };
+            }
+            return selectedFor("default");
+          }
+        `,
+        errors: [{ messageId: "redundantLocalReturnType" }],
+      },
+      {
+        code: `
+          type VideoModelId = "first" | "second";
+          type SelectedConfigData = { configs: VideoModelId[]; selectedId: VideoModelId; selected: VideoModelId };
+          function selectedVideoConfigDataFor(): Record<VideoModelId, SelectedConfigData> {
+            const selectedFor = (id: VideoModelId): SelectedConfigData => {
+              const configs = [id];
+              const selectedId = id;
+              const selected = configs[0] ?? id;
+              return { configs, selectedId, selected };
+            };
+            return {
+              first: selectedFor("first"),
+              second: selectedFor("second"),
+            };
+          }
+        `,
+        errors: [{ messageId: "redundantLocalReturnType" }],
+      },
+    ],
+  },
+);
 
 for (const guardedRule of typeServiceGuardedRules) {
   ruleTester.run(`${guardedRule} type-service guard`, rule(guardedRule), {

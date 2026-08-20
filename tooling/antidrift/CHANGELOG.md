@@ -1,5 +1,9 @@
 # changelog
 
+## 0.10.2
+
+- add default-off `no-redundant-local-return-type`: reports only nested local implementations whose final shorthand-object return repeats a direct named type literal and whose calls remain constrained by the immediate enclosing function's explicit return contract; inferred owners, exported/public escapes, contextual callbacks, overloads, recursion, local function dependencies, and broader private-helper annotations stay clean
+
 ## 0.10.1
 
 - keep only unknown aliases and chained assertions blocking from the imported syntax rules; return the categorical style, test-seam, reflection, and external-data boundary rules to opt-in after the first real consumer migration showed that their syntax alone cannot distinguish drift from legitimate boundaries
