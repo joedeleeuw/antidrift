@@ -42,6 +42,9 @@ describe("createGovernanceOxlintConfig", () => {
       "error",
     );
     expect(config.rules["antidrift/no-runtime-typeof"]).toBe("off");
+    expect(config.rules["antidrift/no-raw-react-native-touchables"]).toBe(
+      "off",
+    );
     expect(config.rules["antidrift/no-conditional-empty-object-spread"]).toBe(
       "off",
     );
