@@ -216,7 +216,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-raw-react-native-touchables` — default-off ownership for React Native/RNGH interaction imports, namespace/default bypasses, and re-exports outside exact app-owned primitive files
 - `no-schema-library-in-test` — default-off test-file guard against value imports from runtime-schema libraries; type-only imports remain valid
 - `no-validator-output-oracle` — default-off local-flow guard against assertions whose subject is direct runtime-validator output
-- `no-mocked-response-body-oracle` — default-off same-test guard against mocked `response.json()` object-shape assertions while preserving independently owned effects
+- `no-mocked-response-body-oracle` — default-off guard for `response.json()` object-shape assertions that statically match a same-test mock arrangement while preserving transformed responses and independently owned effects
 - `react-max-component-props` — JSX-returning React components with too many locally-owned accepted props
 - `no-contract-appeasement-projection` — internal helpers that project one owned value contract into another explicit return contract without construction or validation
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning

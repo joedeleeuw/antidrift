@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.10.4
+
+- narrow `no-mocked-response-body-oracle` to response expectations that statically match a value arranged by a mock in the same test; transformed responses, canonical error mappings, and additive-field stripping remain clean
+
 ## 0.10.3
 
 - add default-off `no-raw-react-native-touchables`: consumer-configured owner files may import React Native or RNGH interaction primitives, while feature imports, aliases, namespace/default imports, and re-exports receive direct shared-`Touchable` and narrow-adapter remediation

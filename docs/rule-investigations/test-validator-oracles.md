@@ -66,7 +66,7 @@ Broad `.parse(...)` assertion tracing excludes known JSON, YAML, path, URL, quer
 
 ### `antidrift/no-mocked-response-body-oracle`
 
-The assertion is the policy surface. Inside one test/spec callback, the rule requires both a supported mock arrangement (`mockResolvedValue`, `mockResolvedValueOnce`, `mockReturnValue`, `mockReturnValueOnce`, `mockImplementation`, or `mockImplementationOnce`) and a `toEqual`, `toStrictEqual`, or `toMatchObject` assertion whose subject traces to `response.json()`. Inline object/array expectations, local const aliases, and `expect.objectContaining`/`expect.arrayContaining` shapes are recognized.
+The assertion is the policy surface. Inside one test/spec callback, the rule requires a supported mock arrangement (`mockResolvedValue`, `mockResolvedValueOnce`, `mockReturnValue`, `mockReturnValueOnce`, `mockImplementation`, or `mockImplementationOnce`) and a `toEqual`, `toStrictEqual`, or `toMatchObject` assertion whose subject traces to `response.json()`. The expected static object or array must also match the arranged value (or a nested arranged value); local aliases and `expect.objectContaining`/`expect.arrayContaining` subsets are recognized. Transformed responses, canonical error mappings, and additive-field stripping stay clean.
 
 The trace follows only local const aliases and transparent await/member chains. It does not infer helper behavior, mock-to-route wiring, function names, project names, or cross-file ownership. Status, headers, requests, call counts, scalar body checks, application results not derived from `.json()`, unmocked response bodies, and real filesystem/process/network artifacts stay clean.
 
