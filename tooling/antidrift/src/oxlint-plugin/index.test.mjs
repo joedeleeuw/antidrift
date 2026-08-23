@@ -136,6 +136,30 @@ const mockedResponseOracleCleanCases = [
     });
   `,
   `
+    test("asserts a transformed response body", async () => {
+      backend.mockResolvedValue({ is_sleeping: true });
+      const response = await GET(request);
+      expect(await response.json()).toEqual({ readiness: "sleeping" });
+    });
+  `,
+  `
+    test("asserts a canonical failure derived from upstream status", async () => {
+      backend.mockResolvedValue({ status: 502, payload: { error: "offline" } });
+      const response = await GET(request);
+      expect(await response.json()).toEqual({
+        code: "runtime_failed",
+        message: "runtime request failed (HTTP 502)",
+      });
+    });
+  `,
+  `
+    test("asserts that additive fields are stripped", async () => {
+      backend.mockResolvedValue({ id: "user_1", additive: true });
+      const response = await GET(request);
+      expect(await response.json()).toEqual({ id: "user_1" });
+    });
+  `,
+  `
     test("asserts a scalar response behavior", async () => {
       backend.mockResolvedValue({ id: "user_1" });
       const response = await GET(request);

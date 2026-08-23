@@ -143,47 +143,171 @@ function parseShapeAssertion(node) {
   if (!expectCall) return null;
   return {
     node,
+    matcher,
     subject: expectCall.arguments[0] ?? null,
     expected: node.arguments[0] ?? null,
   };
 }
 
-function resolvesToShape(
+function propertyKey(property) {
+  if (property.computed) return null;
+  if (property.key.type === "Identifier") return property.key.name;
+  if (property.key.type === "Literal") return String(property.key.value);
+  return null;
+}
+
+function literalShape(node) {
+  if (node.type === "Literal") {
+    return { kind: "literal", value: node.value };
+  }
+  if (
+    node.type === "TemplateLiteral" &&
+    node.expressions.length === 0 &&
+    node.quasis.length === 1
+  ) {
+    return { kind: "literal", value: node.quasis[0].value.cooked };
+  }
+  return null;
+}
+
+function resolveObjectShape(node, callback, sourceCode, depth, seen) {
+  const properties = [];
+  for (const property of node.properties) {
+    if (property.type !== "Property" || property.kind !== "init") return null;
+    const key = propertyKey(property);
+    const value = resolveStaticShape(
+      property.value,
+      callback,
+      sourceCode,
+      depth + 1,
+      new Set(seen),
+    );
+    if (key === null || !value) return null;
+    properties.push([key, value.shape]);
+  }
+  properties.sort(([left], [right]) => left.localeCompare(right));
+  return { shape: { kind: "object", properties }, partial: false };
+}
+
+function resolveArrayShape(node, callback, sourceCode, depth, seen) {
+  const items = [];
+  for (const element of node.elements) {
+    if (!element || element.type === "SpreadElement") return null;
+    const item = resolveStaticShape(
+      element,
+      callback,
+      sourceCode,
+      depth + 1,
+      new Set(seen),
+    );
+    if (!item) return null;
+    items.push(item.shape);
+  }
+  return { shape: { kind: "array", items }, partial: false };
+}
+
+function isShapeFactoryCall(node) {
+  if (node.type !== "CallExpression") return false;
+  if (node.callee.type !== "MemberExpression") return false;
+  const owner = unwrapExpression(node.callee.object);
+  return (
+    shapeFactories.has(staticPropertyName(node.callee)) &&
+    owner?.type === "Identifier" &&
+    owner.name === "expect"
+  );
+}
+
+function resolveStaticShape(
   expression,
   callback,
   sourceCode,
   depth = 0,
   seen = new Set(),
 ) {
-  if (depth > resolutionDepthLimit) return false;
+  if (depth > resolutionDepthLimit) return null;
   const node = unwrapExpression(expression);
-  if (!node || seen.has(node)) return false;
+  if (!node || seen.has(node)) return null;
   seen.add(node);
-  if (node.type === "ObjectExpression" || node.type === "ArrayExpression") {
-    return true;
+
+  const literal = literalShape(node);
+  if (literal) return { shape: literal, partial: false };
+
+  if (node.type === "ObjectExpression") {
+    return resolveObjectShape(node, callback, sourceCode, depth, seen);
   }
-  if (
-    node.type === "CallExpression" &&
-    node.callee.type === "MemberExpression" &&
-    shapeFactories.has(staticPropertyName(node.callee)) &&
-    unwrapExpression(node.callee.object)?.type === "Identifier" &&
-    unwrapExpression(node.callee.object).name === "expect"
-  ) {
-    return node.arguments[0]
-      ? resolvesToShape(
+
+  if (node.type === "ArrayExpression") {
+    return resolveArrayShape(node, callback, sourceCode, depth, seen);
+  }
+
+  if (isShapeFactoryCall(node)) {
+    const nested = node.arguments[0]
+      ? resolveStaticShape(
           node.arguments[0],
           callback,
           sourceCode,
           depth + 1,
           seen,
         )
-      : false;
+      : null;
+    return nested ? { ...nested, partial: true } : null;
   }
-  if (node.type !== "Identifier") return false;
+
+  if (node.type !== "Identifier") return null;
   const initializer = localConstInitializer(node, callback, sourceCode);
   return initializer
-    ? resolvesToShape(initializer, callback, sourceCode, depth + 1, seen)
-    : false;
+    ? resolveStaticShape(initializer, callback, sourceCode, depth + 1, seen)
+    : null;
+}
+
+function shapesEqual(left, right) {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === "literal") return Object.is(left.value, right.value);
+  if (left.kind === "array") {
+    return (
+      left.items.length === right.items.length &&
+      left.items.every((item, index) => shapesEqual(item, right.items[index]))
+    );
+  }
+  return (
+    left.properties.length === right.properties.length &&
+    left.properties.every(
+      ([key, value], index) =>
+        key === right.properties[index][0] &&
+        shapesEqual(value, right.properties[index][1]),
+    )
+  );
+}
+
+function shapeIsSubset(expected, arranged) {
+  if (expected.kind !== arranged.kind) return false;
+  if (expected.kind === "literal") {
+    return Object.is(expected.value, arranged.value);
+  }
+  if (expected.kind === "array") {
+    return (
+      expected.items.length <= arranged.items.length &&
+      expected.items.every((item, index) =>
+        shapeIsSubset(item, arranged.items[index]),
+      )
+    );
+  }
+  const arrangedProperties = new Map(arranged.properties);
+  return expected.properties.every(([key, value]) => {
+    const arrangedValue = arrangedProperties.get(key);
+    return arrangedValue ? shapeIsSubset(value, arrangedValue) : false;
+  });
+}
+
+function collectShapes(shape, collected = []) {
+  collected.push(shape);
+  if (shape.kind === "array") {
+    for (const item of shape.items) collectShapes(item, collected);
+  }
+  if (shape.kind === "object") {
+    for (const [, value] of shape.properties) collectShapes(value, collected);
+  }
+  return collected;
 }
 
 function derivesFromResponseJson(
@@ -228,26 +352,73 @@ function derivesFromResponseJson(
   return false;
 }
 
-function isMockArrangement(node) {
-  return (
-    node?.type === "CallExpression" &&
-    node.callee.type === "MemberExpression" &&
-    mockArrangementMethods.has(staticPropertyName(node.callee))
+function directReturnExpression(node) {
+  if (!isFunction(node)) return null;
+  if (node.body.type !== "BlockStatement") return node.body;
+  const returns = node.body.body.filter(
+    (statement) => statement.type === "ReturnStatement" && statement.argument,
+  );
+  return returns.length === 1 ? returns[0].argument : null;
+}
+
+function mockArrangementExpression(node) {
+  if (
+    node?.type !== "CallExpression" ||
+    node.callee.type !== "MemberExpression"
+  ) {
+    return null;
+  }
+  const method = staticPropertyName(node.callee);
+  if (!mockArrangementMethods.has(method)) return null;
+  const arranged = node.arguments[0] ?? null;
+  return method.startsWith("mockImplementation")
+    ? directReturnExpression(arranged)
+    : arranged;
+}
+
+function assertionMatchesMockedShape(
+  assertion,
+  mockedShapes,
+  callback,
+  sourceCode,
+) {
+  const expected = resolveStaticShape(
+    assertion.expected,
+    callback,
+    sourceCode,
+  );
+  if (!expected) return false;
+  const allowsSubset = assertion.matcher === "toMatchObject" || expected.partial;
+  return mockedShapes.some((arranged) =>
+    collectShapes(arranged).some((candidate) =>
+      allowsSubset
+        ? shapeIsSubset(expected.shape, candidate)
+        : shapesEqual(expected.shape, candidate),
+    ),
   );
 }
 
 function analyzeTestBlock(callback, context, sourceCode) {
-  let hasMockArrangement = false;
+  const mockedShapes = [];
   const assertions = [];
   walkSameCallback(callback, (node) => {
-    if (isMockArrangement(node)) hasMockArrangement = true;
+    const arranged = mockArrangementExpression(node);
+    if (arranged) {
+      const resolved = resolveStaticShape(arranged, callback, sourceCode);
+      if (resolved) mockedShapes.push(resolved.shape);
+    }
     const assertion = parseShapeAssertion(node);
     if (assertion) assertions.push(assertion);
   });
-  if (!hasMockArrangement) return;
+  if (mockedShapes.length === 0) return;
   for (const assertion of assertions) {
     if (
-      resolvesToShape(assertion.expected, callback, sourceCode) &&
+      assertionMatchesMockedShape(
+        assertion,
+        mockedShapes,
+        callback,
+        sourceCode,
+      ) &&
       derivesFromResponseJson(assertion.subject, callback, sourceCode)
     ) {
       context.report({
