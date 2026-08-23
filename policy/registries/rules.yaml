@@ -1773,6 +1773,38 @@ rules:
         - "<Widget label={'x'} />"
         - "Schema.Struct({ id });"
     nextAction: "Keep default-off until a second repo provides quantified real drift; then run a corpus inventory and consider stable promotion."
+  antidrift/no-mocked-response-body-oracle:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: deterministic AST plus same-test mock arrangement and local response.json provenance
+    solveType: test-quality-mocked-response-body-oracle
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/test-validator-oracles.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - The rule requires a supported mock arrangement and a response.json-derived object or array shape assertion in the same test/spec callback. It reports the assertion, not the mock.
+      - Local const aliases and transparent await/member chains are followed, but application calls, helper bodies, cross-file ownership, scalar assertions, and unrelated parser APIs terminate the proof.
+      - The cleaned Murderbox corpus supplies the motivating route-test shape, while reduced programs lock status, header, request, call-count, artifact, unmocked-response, and independent-effect clean controls.
+    external:
+      state: net-antidrift
+      support: low
+      candidates:
+        ["Oxlint Vitest rules", "ESLint no-restricted-syntax", "ast-grep"]
+      decision: own-antidrift
+      whyThisState: "Maintained test-integrity rules do not combine same-test mock arrangement with local response.json provenance and object-shape assertion syntax."
+      whyNotOtherState: "Not partial-overlap because selectors can match mock setup or response assertions separately but cannot express the callback-local conjunction and narrow alias flow without broad noise."
+    examples:
+      flags:
+        - "backend.mockResolvedValue(payload); const response = await GET(request); const body = await response.json(); expect(body).toEqual(payload);"
+        - "backend.mockReturnValueOnce(payload); await expect(response.json()).resolves.toMatchObject({ id: 'user_1' });"
+        - "backend.mockImplementation(load); expect(body).toEqual(expect.objectContaining({ id: 'user_1' }));"
+      allows:
+        - "const response = await GET(request); expect(response.status).toBe(200);"
+        - "backend.mockResolvedValue(payload); await GET(request); expect(backend).toHaveBeenCalledWith(request);"
+        - "backend.mockResolvedValue(payload); await GET(request); expect(await persistedUser()).toMatchObject({ state: 'active' });"
+        - "const body = await response.json(); expect(body).toEqual({ id: 'user_1' }); // no mock arranged in this test"
+    nextAction: "Inventory independent repositories and review every finding by deleting pure mock-body echo tests or retaining only independently owned effects before considering default-on enforcement."
   antidrift/no-nonindependent-test-oracle:
     status: ready
     stable: false

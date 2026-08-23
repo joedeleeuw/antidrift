@@ -37,6 +37,7 @@ The structural and canonical rules receive generated, accepted package-owner, an
 - `antidrift/no-duplicated-object-field-blocks`
 - `antidrift/no-handrolled-resource-lifecycle-cells`
 - `antidrift/no-inline-structural-type-at-use-site`
+- `antidrift/no-mocked-response-body-oracle`
 - `antidrift/no-nonindependent-test-oracle`
 - `antidrift/no-schema-library-in-test`
 - `antidrift/no-query-data-type-parameters`
@@ -54,7 +55,7 @@ The ESLint pass preserves these TypeChecker-dependent or hybrid rules as default
 - `antidrift/no-sql-string-concat`
 - `antidrift/no-underchecked-type-predicate`
 
-No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. The ESLint and Oxlint plugin exports are disjoint: there is no compatibility export of Oxlint-owned rules through ESLint. `policy:check-rule-surface` fails if a custom rule is exported or enabled by both runtimes.
+No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. `antidrift/no-mocked-response-body-oracle` is deliberately exported by both syntax-capable plugin surfaces so ESLint-only and Oxlint consumers can opt in, while the shared Oxlint config is its only configured owner and keeps it off. `policy:check-rule-surface` permits dual export but fails if a custom rule is enabled by both runtimes.
 
 Intentional baseline removals:
 

@@ -5,6 +5,7 @@
 - add default-off `no-raw-react-native-touchables`: consumer-configured owner files may import React Native or RNGH interaction primitives, while feature imports, aliases, namespace/default imports, and re-exports receive direct shared-`Touchable` and narrow-adapter remediation
 - add default-off `no-schema-library-in-test` for runtime-schema value imports/requires in test files while preserving type-only imports
 - add default-off `no-validator-output-oracle` for assertions that trace through local bindings and transparent projections to direct validator output or validator-only throw callbacks
+- add default-off `no-mocked-response-body-oracle` on both syntax plugin exports: within one test callback, report object/array shape assertions tracing to `response.json()` when a supported mock arrangement supplies the boundary; recommend deleting pure mock echoes and retaining only independently owned effects
 
 ## 0.10.2
 

@@ -10,6 +10,7 @@ import {
 import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "./oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
+import ruleNoMockedResponseBodyOracle from "./oxlint-plugin/rules/no-mocked-response-body-oracle.js";
 import ruleNoNonindependentTestOracle from "./oxlint-plugin/rules/no-nonindependent-test-oracle.js";
 import ruleNoSchemaLibraryInTest from "./oxlint-plugin/rules/no-schema-library-in-test.js";
 import ruleNoSentinelAbsenceFallback from "./oxlint-plugin/rules/no-sentinel-absence-fallback.js";
@@ -18,10 +19,9 @@ import ruleNoStaticPropertyLoop from "./oxlint-plugin/rules/no-static-property-l
 import ruleNoValidatorOutputOracle from "./oxlint-plugin/rules/no-validator-output-oracle.js";
 import ruleRequireEffectDeps from "./oxlint-plugin/rules/require-effect-deps.js";
 
-// Rules that need no type information. Oxlint's JS plugin API cannot run
-// type-aware rules, so these are exactly the set that both runtimes can host:
-// Oxlint for speed, ESLint for consumers who do not run Oxlint at all.
-// Registered by both plugin entry points from this one definition.
+// Rules that need no type information. Single-owned by the Oxlint plugin
+// entry point per docs/lint-rule-parity.md; selected portable rules may also
+// be exported by ESLint while remaining enabled by at most one runtime.
 export function createSyntaxRules() {
   return {
     "no-async-array-method": ruleNoAsyncArrayMethod(),
@@ -33,6 +33,7 @@ export function createSyntaxRules() {
       ruleNoHandrolledResourceLifecycleCells(),
     "no-inline-structural-type-at-use-site":
       ruleNoInlineStructuralTypeAtUseSite(),
+    "no-mocked-response-body-oracle": ruleNoMockedResponseBodyOracle(),
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
     "no-schema-library-in-test": ruleNoSchemaLibraryInTest(),
     "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),

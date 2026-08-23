@@ -33,6 +33,7 @@ const disabledAntidriftRules = {
   "antidrift/no-handrolled-resource-lifecycle-cells": "off",
   "antidrift/no-inline-structural-type-at-use-site": "off",
   "antidrift/no-module-mocking": "off",
+  "antidrift/no-mocked-response-body-oracle": "off",
   "antidrift/no-nonindependent-test-oracle": "off",
   "antidrift/no-schema-library-in-test": "off",
   "antidrift/no-object-parameters": "off",
