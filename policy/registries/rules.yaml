@@ -938,6 +938,39 @@ rules:
         - 'type ButtonProps = ComponentProps<"button"> & { tone?: Tone; size?: Size };'
         - "function Wrapper(props: BaseProps) { return <Base {...props} />; }"
     nextAction: Run real-corpus inventory for threshold calibration and revisit stable promotion after class/PropTypes/HOC false-negative decisions are explicit.
+  antidrift/no-raw-react-native-touchables:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: deterministic AST import and re-export source plus configured exact owner-file paths
+    solveType: interaction-primitive-ownership
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-raw-react-native-touchables.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - Murderbox is the first real drift and clean corpus; independent replication is still required before stable promotion.
+      - Namespace and default imports from React Native or RNGH are intentionally rejected because they bypass named-import ownership even when their current member usage is clean; their diagnostic first directs clean code to named non-interaction imports.
+      - Type-only imports and re-exports remain clean because they cannot expose a runtime interaction primitive.
+      - Dynamic import, CommonJS require, and deep package subpath forms remain outside this rule; the first consumer already rejects require imports and unowned package internals and has no real dynamic or subpath bypass.
+      - allowedFiles rejects bare filenames, globs, parent paths, and absolute paths so one owner entry cannot accidentally exempt every same-named module.
+    external:
+      state: config-replacement
+      support: high
+      candidates: ["Oxlint no-restricted-imports"]
+      decision: own-antidrift
+      whyThisState: "Core restricted-import configuration can ban the same named imports and apply file overrides."
+      whyNotOtherState: "The custom rule remains the owner because the reusable policy maintains two package-specific primitive sets, blocks namespace/default and re-export bypasses, accepts exact owner files, and emits one feedback-preset and adapter-ownership remediation. Retire it if generated core config becomes equally maintainable."
+    examples:
+      flags:
+        - 'import { Pressable as NativePressable } from "react-native";'
+        - 'import * as RNGH from "react-native-gesture-handler";'
+        - 'export { TouchableOpacity } from "react-native";'
+      allows:
+        - 'import { Touchable } from "@/tw";'
+        - 'import { View } from "react-native";'
+        - 'import { Gesture } from "react-native-gesture-handler";'
+        - 'import type { TouchableOpacityProps } from "react-native";'
+    nextAction: "Enable in Murderbox with apps/client/src/tw/index.tsx as the exact owner, inventory another React Native repository, and retire in favor of generated no-restricted-imports if the custom ownership delta disappears."
   antidrift/no-raw-fetch-in-component:
     status: ready
     stable: false

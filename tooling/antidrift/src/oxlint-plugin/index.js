@@ -1,6 +1,7 @@
 import packageMetadata from "../../package.json" with { type: "json" };
 
 import { createSyntaxRules } from "../syntax-rules.mjs";
+import ruleNoRawReactNativeTouchables from "./rules/no-raw-react-native-touchables.js";
 import { noServiceConstructorImportsRule } from "./anti-slop/effect/rules/no-service-constructor-imports.js";
 import { noChainedTypeAssertionsRule } from "./anti-slop/rules/no-chained-type-assertions.js";
 import { noConditionalEmptyObjectSpreadRule } from "./anti-slop/rules/no-conditional-empty-object-spread.js";
@@ -23,6 +24,7 @@ const rules = {
   "no-object-parameters": noObjectParametersRule,
   "no-reflect-apply": noReflectApplyRule,
   "no-reflect-get": noReflectGetRule,
+  "no-raw-react-native-touchables": ruleNoRawReactNativeTouchables(),
   "no-runtime-typeof": noRuntimeTypeofRule,
   "no-service-constructor-imports": noServiceConstructorImportsRule,
   "no-shape-in-symbol-names": noForbiddenTermInSymbolNamesRule,

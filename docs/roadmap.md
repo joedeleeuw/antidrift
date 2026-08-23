@@ -36,6 +36,7 @@ These were the next project scope because they are the project, not because a br
 - `no-underchecked-type-predicate`: default-off inventory for broad-input type predicates that claim object contracts without checking required asserted fields or delegating to a validator.
 - `no-canonical-model-fork`: registry-backed structural detection for first-party canonical model redeclarations.
 - `no-redundant-local-return-type`: default-off TypeChecker proof for nested local object-return annotations that duplicate inference while an immediate enclosing return contract remains authoritative.
+- `no-raw-react-native-touchables`: explicit consumer-requested, default-off interaction-owner rule for React Native/RNGH touchable imports, namespace/default bypasses, and re-exports; exact owner files remain configurable.
 - Brand kit: `Brand<T, Name>` plus `brand() -> { make, safe, is }`. The separate `no-cast-to-branded` custom rule is retired until real non-test brand-forgery evidence appears.
 - `import/no-cycle`: circular-dependency detection through Oxlint's native import graph.
 

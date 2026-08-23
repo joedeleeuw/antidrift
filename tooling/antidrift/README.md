@@ -213,6 +213,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 
 - `require-effect-deps` — a `useEffect` with no dependency array runs on every render, and `exhaustive-deps` won't say a word about it
 - `no-static-property-loop` — tests that loop over hardcoded keys only to restate one precomputed object's static values
+- `no-raw-react-native-touchables` — default-off ownership for React Native/RNGH interaction imports, namespace/default bypasses, and re-exports outside exact app-owned primitive files
 - `react-max-component-props` — JSX-returning React components with too many locally-owned accepted props
 - `no-contract-appeasement-projection` — internal helpers that project one owned value contract into another explicit return contract without construction or validation
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning

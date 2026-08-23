@@ -40,6 +40,7 @@ The structural and canonical rules receive generated, accepted package-owner, an
 - `antidrift/no-nonindependent-test-oracle`
 - `antidrift/no-query-data-type-parameters`
 - `antidrift/no-raw-fetch-in-component`
+- `antidrift/no-raw-react-native-touchables`
 - `antidrift/no-shattered-ingested-entity-state`
 - `antidrift/no-silent-empty-detection-fallback`
 - `antidrift/no-status-literal-in-type`

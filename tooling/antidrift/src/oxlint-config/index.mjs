@@ -36,6 +36,7 @@ const disabledAntidriftRules = {
   "antidrift/no-nonindependent-test-oracle": "off",
   "antidrift/no-object-parameters": "off",
   "antidrift/no-raw-fetch-in-component": "off",
+  "antidrift/no-raw-react-native-touchables": "off",
   "antidrift/no-reflect-apply": "off",
   "antidrift/no-reflect-get": "off",
   "antidrift/no-runtime-typeof": "off",

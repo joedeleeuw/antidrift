@@ -1,5 +1,9 @@
 # changelog
 
+## unreleased
+
+- add default-off `no-raw-react-native-touchables`: consumer-configured owner files may import React Native or RNGH interaction primitives, while feature imports, aliases, namespace/default imports, and re-exports receive direct shared-`Touchable` and narrow-adapter remediation
+
 ## 0.10.2
 
 - add default-off `no-redundant-local-return-type`: reports only nested local implementations whose final shorthand-object return repeats a direct named type literal and whose calls remain constrained by the immediate enclosing function's explicit return contract; inferred owners, exported/public escapes, contextual callbacks, overloads, recursion, local function dependencies, and broader private-helper annotations stay clean
