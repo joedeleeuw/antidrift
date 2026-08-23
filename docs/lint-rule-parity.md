@@ -38,12 +38,14 @@ The structural and canonical rules receive generated, accepted package-owner, an
 - `antidrift/no-handrolled-resource-lifecycle-cells`
 - `antidrift/no-inline-structural-type-at-use-site`
 - `antidrift/no-nonindependent-test-oracle`
+- `antidrift/no-schema-library-in-test`
 - `antidrift/no-query-data-type-parameters`
 - `antidrift/no-raw-fetch-in-component`
 - `antidrift/no-raw-react-native-touchables`
 - `antidrift/no-shattered-ingested-entity-state`
 - `antidrift/no-silent-empty-detection-fallback`
 - `antidrift/no-status-literal-in-type`
+- `antidrift/no-validator-output-oracle`
 - `antidrift/require-authz-check`
 
 The ESLint pass preserves these TypeChecker-dependent or hybrid rules as default-off inventory:

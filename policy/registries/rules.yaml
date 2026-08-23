@@ -1805,10 +1805,72 @@ rules:
       allows:
         - 'assert.deepEqual(runtimeConnections.map((server) => server.name), ["needle", "context7"]);'
         - "expect(renderConfig(registry)).toEqual({ mcpServers: { executor: { url } } });"
-        - "expect(schema.parse(valid).activation).toEqual(validActivation);"
         - 'expect(renderActivation(schema.parse(valid))).toBe("activation enabled");'
         - "trigger(); trigger(); expect(handler).toHaveBeenCalledTimes(1);"
     nextAction: "Inventory existing guardrails and dotfiles findings, then split actionable replacements into behavioral/full-output assertions while tracking noisy branches before stable promotion."
+  antidrift/no-schema-library-in-test:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: deterministic AST import and test-file scope
+    solveType: test-quality-schema-library-ownership
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/test-validator-oracles.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - The runtime-schema library set is deliberately finite and evidence-backed; do not expand it to parser or serialization packages merely because they expose parse or decode functions.
+      - Type-only imports stay clean. Static value imports, dynamic imports, TypeScript import-equals declarations, and unshadowed CommonJS require calls report only in test/spec files.
+      - The cleaned Murderbox corpus supplies motivating real drift but no current drift path; keep the rule default-off until another repository independently replicates the pattern.
+    external:
+      state: partial-overlap
+      support: high
+      candidates:
+        ["Oxlint no-restricted-imports", "ESLint no-restricted-imports"]
+      decision: own-antidrift
+      whyThisState: "Core import restrictions can ban static schema-library imports in configured test globs, but the portable rule also preserves type-only imports and covers dynamic import, import-equals, and unshadowed CommonJS require syntax."
+      whyNotOtherState: "Not equivalent or config-replacement because the complete cross-module-format test-file behavior is not represented by one maintained rule configuration."
+    examples:
+      flags:
+        - 'import { z } from "zod"; const LocalSchema = z.object({ id: z.string() });'
+        - 'const { object } = require("valibot");'
+      allows:
+        - 'import type { ZodType } from "zod";'
+        - 'import { UserSchema } from "../contracts/user";'
+        - 'import { z } from "zod"; export const UserSchema = z.object({ id: z.string() }); // production file'
+    nextAction: "Run the rule over additional test corpora with type-only imports and non-Zod schema libraries before considering default-on enforcement."
+  antidrift/no-validator-output-oracle:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: deterministic AST plus local const-binding and projection flow
+    solveType: test-quality-validator-output-oracle
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/test-validator-oracles.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - The rule follows assertion subjects through local const bindings and transparent built-in projections, but stops at substantive outer calls and never guesses from application helper names or cross-file wrapper bodies.
+      - JSON, YAML, path, URL, query-string, and TOML parser bindings stay clean. Broad direct .parse assertion matching remains default-off until application parser clean controls are inventoried across more repositories.
+      - The cleaned Murderbox corpus supplies motivating direct validator-oracle drift but no current drift path; reduced programs are regression locks only.
+    external:
+      state: net-antidrift
+      support: low
+      candidates:
+        ["Oxlint Vitest rules", "ESLint no-restricted-syntax", "ast-grep"]
+      decision: own-antidrift
+      whyThisState: "Maintained test-integrity rules do not trace assertion subjects through validator result bindings, outcome/error projections, built-in projections, bound validator methods, async decoders, or validator-only throw callbacks."
+      whyNotOtherState: "Not partial-overlap because syntax selectors can match direct calls but cannot express the local dataflow and application-call stop boundary that defines this rule."
+    examples:
+      flags:
+        - 'const parsed = UserSchema.parse(raw); expect(parsed.id).toBe("user_1");'
+        - "expect(UserSchema.safeParse(raw).success).toBe(true);"
+        - 'expect(Object.keys(UserSchema.parse(raw))).toEqual(["id"]);'
+        - "expect(() => UserSchema.parse(raw)).toThrow();"
+      allows:
+        - 'expect(renderUser(UserSchema.parse(raw))).toBe("User user_1");'
+        - 'const user = UserSchema.parse(raw); expect(renderUser(user)).toBe("User user_1");'
+        - 'expect(JSON.parse(text)).toEqual({ id: "user_1" });'
+        - "expect(YAML.parse(text).version).toBe(2);"
+    nextAction: "Inventory application parser APIs and assertion frameworks across independent repositories before considering default-on enforcement."
   antidrift/no-static-property-loop:
     status: ready
     stable: false

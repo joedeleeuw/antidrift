@@ -37,6 +37,35 @@ const rawTouchableImportCases = [
   },
 ];
 
+const schemaLibraryImportCases = [
+  'import { z } from "zod"; z.string();',
+  'import * as z from "zod/v4"; z.string();',
+  'const { object } = require("valibot"); object({});',
+  'async function load() { return import("@effect/schema/Schema"); }',
+  'import Superstruct = require("superstruct"); Superstruct.string();',
+];
+
+const validatorOracleCases = [
+  'expect(UserSchema.parse(raw).id).toBe("user_1");',
+  'const parsed = UserSchema.parse(raw); expect(parsed).toMatchObject({ id: "user_1" });',
+  'const result = UserSchema.safeParse(raw); expect(result.success).toBe(true); expect(result.data.id).toBe("user_1");',
+  "const result = UserSchema.safeParse(raw); expect(result.error.issues).toHaveLength(1);",
+  'const { success, data } = UserSchema.safeParse(raw); expect(success).toBe(true); expect(data.id).toBe("user_1");',
+  'expect(Object.keys(UserSchema.parse(raw))).toEqual(["id"]);',
+  'expect(JSON.stringify(UserSchema.parse(raw))).toBe("{\\"id\\":\\"user_1\\"}");',
+  "expect(Array.from(UserSchema.parse(raw).items)).toHaveLength(2);",
+  "expect(new Set(UserSchema.parse(raw).roles).size).toBe(2);",
+  'expect(UserSchema.parse(raw).items.map((item) => item.id)).toEqual(["one"]);',
+  "expect(() => UserSchema.parse(raw)).toThrow();",
+  'await expect(UserSchema.parseAsync(raw)).resolves.toMatchObject({ id: "user_1" });',
+  'const parseUser = UserSchema.parse.bind(UserSchema); const parsed = parseUser(raw); expect(parsed.id).toBe("user_1");',
+  'import { safeParse } from "valibot"; expect(safeParse(UserSchema, raw).success).toBe(true);',
+  'import { decodeUnknownSync } from "effect/Schema"; expect(decodeUnknownSync(UserSchema)(raw).id).toBe("user_1");',
+  'import { assert } from "superstruct"; expect(() => assert(raw, UserSchema)).not.toThrow();',
+  "assert.deepEqual(UserSchema.parse(raw), expected);",
+  "assert.throws(() => UserSchema.parse(raw));",
+];
+
 const antiSlopRuleCases = [
   {
     ruleId: "no-conditional-empty-object-spread",
@@ -271,6 +300,97 @@ describe("Oxlint plugin", () => {
       `,
       { "antidrift/no-static-property-loop": "error" },
       "config.test.ts",
+    );
+
+    expect(result.status).toBe(0);
+  });
+
+  it.each(schemaLibraryImportCases)(
+    "rejects runtime-schema value imports in tests",
+    (source) => {
+      const result = lint(
+        source,
+        { "antidrift/no-schema-library-in-test": "error" },
+        "schema.test.ts",
+      );
+
+      expect(result.status).toBe(1);
+      expect(`${result.stdout}${result.stderr}`).toContain(
+        "antidrift(no-schema-library-in-test)",
+      );
+    },
+  );
+
+  it.each([
+    'import type { ZodType } from "zod"; declare const schema: ZodType;',
+    'import { type ZodType } from "zod"; declare const schema: ZodType;',
+    'import { UserSchema } from "./contracts"; UserSchema.parse(raw);',
+    'function require(name) { return fixtures[name]; } const z = require("zod");',
+  ])("allows type-only, project, or shadowed imports in tests", (source) => {
+    const result = lint(
+      source,
+      { "antidrift/no-schema-library-in-test": "error" },
+      "schema.test.ts",
+    );
+
+    expect(result.status).toBe(0);
+  });
+
+  it("allows runtime-schema libraries in production files", () => {
+    const result = lint(
+      'import { z } from "zod"; export const UserSchema = z.object({ id: z.string() });',
+      { "antidrift/no-schema-library-in-test": "error" },
+      "schema.ts",
+    );
+
+    expect(result.status).toBe(0);
+  });
+
+  it.each(validatorOracleCases)(
+    "rejects runtime-validator output as the assertion oracle: %s",
+    (source) => {
+      const result = lint(
+        source,
+        { "antidrift/no-validator-output-oracle": "error" },
+        "schema.test.ts",
+      );
+
+      expect(result.status).toBe(1);
+      const output = `${result.stdout}${result.stderr}`;
+      expect(output).toContain("antidrift(no-validator-output-oracle)");
+      expect(output).toContain(
+        "checking parsed body or payload shapes is often a sign of a low-value test",
+      );
+    },
+  );
+
+  it.each([
+    'expect(JSON.parse(text)).toEqual({ id: "user_1" });',
+    'import YAML from "yaml"; expect(YAML.parse(text).version).toBe(2);',
+    'import * as path from "node:path"; expect(path.parse(filename).ext).toBe(".ts");',
+    'import * as url from "node:url"; expect(url.parse(href).hostname).toBe("example.com");',
+    'import { parse as parseYaml } from "yaml"; expect(parseYaml(text).version).toBe(2);',
+    'expect(renderActivation(UserSchema.parse(raw))).toBe("activation enabled");',
+    'const parsed = UserSchema.parse(raw); expect(renderActivation(parsed)).toBe("activation enabled");',
+    'const fixture = UserSchema.parse(raw); render(<Panel fixture={fixture} />); expect(screen.getByText("Ready")).toBeVisible();',
+    "UserSchema.parse(raw); expect(handler).toHaveBeenCalledTimes(1);",
+    "function parseFixture(value) { return UserSchema.parse(value); } expect(parseFixture(raw)).toEqual(expected);",
+    'expect(() => startApplication(UserSchema.parse(raw))).toThrow("startup failed");',
+  ])("allows non-validator application and parser assertions", (source) => {
+    const result = lint(
+      source,
+      { "antidrift/no-validator-output-oracle": "error" },
+      "schema.test.tsx",
+    );
+
+    expect(result.status).toBe(0);
+  });
+
+  it("does not inspect validator assertions outside test files", () => {
+    const result = lint(
+      "expect(UserSchema.parse(raw)).toEqual(raw);",
+      { "antidrift/no-validator-output-oracle": "error" },
+      "schema.ts",
     );
 
     expect(result.status).toBe(0);
