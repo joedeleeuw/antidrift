@@ -33,7 +33,9 @@ const disabledAntidriftRules = {
   "antidrift/no-handrolled-resource-lifecycle-cells": "off",
   "antidrift/no-inline-structural-type-at-use-site": "off",
   "antidrift/no-module-mocking": "off",
+  "antidrift/no-mocked-response-body-oracle": "off",
   "antidrift/no-nonindependent-test-oracle": "off",
+  "antidrift/no-schema-library-in-test": "off",
   "antidrift/no-object-parameters": "off",
   "antidrift/no-raw-fetch-in-component": "off",
   "antidrift/no-raw-react-native-touchables": "off",
@@ -49,6 +51,7 @@ const disabledAntidriftRules = {
   "antidrift/no-unknown-parameters": "off",
   "antidrift/no-unknown-returns": "off",
   "antidrift/no-unsafe-dictionary-type": "off",
+  "antidrift/no-validator-output-oracle": "off",
   "antidrift/require-authz-check": "off",
   "antidrift/require-safety-comment-for-type-assertion": "off",
 };

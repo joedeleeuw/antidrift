@@ -22,6 +22,9 @@ These rules are already in the package and are part of the core project thesis:
 - `no-redundant-zod-parse`: provenance rule for repeated parsing of the same value by the same schema.
 - `no-contract-appeasement-projection`: subsumes the old selector-wrapper branch with TypeChecker-backed source/return ownership proof. The former `no-explicit-return-type-private-helper` rule is retired because real corpus evidence showed private return annotations are not a deterministic smell.
 - `no-redundant-local-return-type`: default-off replacement research for one narrower post-retirement slice. It requires exact shorthand-object inference and same-type contextual ownership at every call in the immediate enclosing function's return expression; property equality alone does not report.
+- `no-schema-library-in-test`: default-off deterministic test-file guard against runtime-schema value imports while preserving type-only imports.
+- `no-validator-output-oracle`: default-off local-flow guard against direct validator-output assertions; application-call boundaries and document parsers stay clean.
+- `no-mocked-response-body-oracle`: default-off same-test guard against mocked `response.json()` object-shape assertions; independent effects and non-shape response behavior stay clean.
 
 ## Chosen Next Scope
 

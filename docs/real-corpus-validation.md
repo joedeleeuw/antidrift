@@ -46,6 +46,8 @@ For a promotion or slice-completion claim that needs broader evidence, run the r
 pnpm exec antidrift external-corpus --corpus murderbox --require --slice <slice-name>
 ```
 
+The default-off test validator and mocked-response-body guardrails use the completed Murderbox test cleanup as motivating corpus evidence, but they do not register a stale path in `external-corpus/cases.mjs`: that runner executes current source bytes, and the direct validator and mock-supplied body-oracle tests were removed. Pin a reproducible pre-cleanup source or find independent live drift before using the external-corpus gate for promotion.
+
 If the claim specifically depends on replicated drift, require drift-bearing repositories instead of only clean/pass repositories:
 
 ```bash

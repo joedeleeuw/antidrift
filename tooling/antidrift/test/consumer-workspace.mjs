@@ -967,8 +967,9 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "\n" +
       "const eslintRuleNames = new Set(Object.keys(eslintPlugin.rules));\n" +
       "const oxlintRuleNames = new Set(Object.keys(oxlintPlugin.rules));\n" +
-      "if ([...eslintRuleNames].some((rule) => oxlintRuleNames.has(rule))) {\n" +
-      '  throw new Error("Custom rule is exported by both runtime plugins");\n' +
+      "const sharedRuntimeRules = [...eslintRuleNames].filter((rule) => oxlintRuleNames.has(rule));\n" +
+      'if (sharedRuntimeRules.length !== 1 || sharedRuntimeRules[0] !== "no-mocked-response-body-oracle") {\n' +
+      '  throw new Error(`Unexpected custom rules exported by both runtime plugins: ${sharedRuntimeRules.join(", ")}`);\n' +
       "}\n" +
       "\n" +
       'const runtimeOxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false });\n' +

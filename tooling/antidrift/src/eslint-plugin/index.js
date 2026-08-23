@@ -18,6 +18,7 @@ import { ruleNoExplicitTypeArgumentsOnOwnedApi } from "./rules/no-explicit-type-
 import { ruleRequireConvexReturnValidator } from "./rules/require-convex-return-validator.js";
 import { ruleNoSchemaValidatorTranscoding } from "./rules/no-schema-validator-transcoding.js";
 import { ruleNoRedundantLocalReturnType } from "./rules/no-redundant-local-return-type.js";
+import ruleNoMockedResponseBodyOracle from "../oxlint-plugin/rules/no-mocked-response-body-oracle.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
@@ -39,6 +40,7 @@ const rules = {
   "require-convex-return-validator": ruleRequireConvexReturnValidator(),
   "no-schema-validator-transcoding": ruleNoSchemaValidatorTranscoding(),
   "no-redundant-local-return-type": ruleNoRedundantLocalReturnType(),
+  "no-mocked-response-body-oracle": ruleNoMockedResponseBodyOracle(),
 };
 
 export default {

@@ -27,6 +27,7 @@ This ledger records the enforcement owner and provenance of each ruleset or tool
 | Gateway/generated import restrictions | `generated-config`: registry-backed `no-restricted-imports`                 | Oxlint config factory                             |
 | Syntax-only custom rules              | `local-original`                                                            | `tooling/antidrift/src/oxlint-plugin`             |
 | React Native interaction ownership    | `local-original`: `antidrift/no-raw-react-native-touchables`                | Antidrift Oxlint plugin with consumer owner paths |
+| Test validator ownership/oracles      | `local-original`: `no-schema-library-in-test`, `no-validator-output-oracle`, `no-mocked-response-body-oracle` | Antidrift Oxlint plugin                           |
 | Vendored anti-slop rules              | `ecosystem-ruleset`: `dmmulroy/anti-slop@6d538555` under MIT                | Antidrift Oxlint plugin and per-rule registry     |
 | TypeChecker-backed custom rules       | `local-original`                                                            | Reduced ESLint config and plugin                  |
 | Custom rule maturity and examples     | `local-original` registry                                                   | `policy/registries/rules.yaml`                    |
