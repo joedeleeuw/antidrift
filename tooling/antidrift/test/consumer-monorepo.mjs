@@ -11,7 +11,12 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { provePortableRules } from "./consumer-portable.mjs";
+import { proveAdoptionPresets } from "./consumer-adoption.mjs";
+
 import { scaffoldConsumerWorkspace } from "./consumer-workspace.mjs";
+
+const pnpmBinary = process.env.ANTIDRIFT_CONSUMER_PNPM ?? "pnpm";
 
 const pkgDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const work = mkdtempSync(join(tmpdir(), "antidrift-consumer-"));
@@ -79,10 +84,12 @@ try {
 
   console.log("3/7  installing the tarball into the consumer ...");
   runInherit(
-    "pnpm",
+    pnpmBinary,
     [
       "install",
-      "--prefer-offline",
+      process.env.ANTIDRIFT_CONSUMER_OFFLINE === "1"
+        ? "--offline"
+        : "--prefer-offline",
       "--config.confirmModulesPurge=false",
       "--ignore-scripts",
     ],
@@ -98,7 +105,7 @@ try {
   function lint(relFile, config = "eslint.config.mjs") {
     try {
       return runJson(
-        "pnpm",
+        pnpmBinary,
         ["exec", "eslint", relFile, "--format", "json", "--config", config],
         work,
       );
@@ -118,7 +125,7 @@ try {
   function lintOxlint(relFile, config) {
     try {
       return runJson(
-        "pnpm",
+        pnpmBinary,
         [
           "exec",
           "oxlint",
@@ -148,7 +155,7 @@ try {
   function lintOxlintRepository() {
     try {
       return runJson(
-        "pnpm",
+        pnpmBinary,
         [
           "exec",
           "antidrift",
@@ -180,6 +187,13 @@ try {
       return match ? `${match[1]}/${match[2]}` : code;
     });
   }
+
+  provePortableRules({ file, lintOxlint, packedFiles });
+  proveAdoptionPresets({ file, runJson, lintOxlint, work });
+  rmSync(join(work, "portable-proofs"), { recursive: true, force: true });
+  rmSync(join(work, "portable.config.json"));
+  rmSync(join(work, "adoption-proof.tsx"));
+  rmSync(join(work, "adoption.config.json"));
 
   const repositoryDiagnostics = lintOxlintRepository().diagnostics ?? [];
   const moduleSizeDiagnostics = repositoryDiagnostics.filter(
@@ -376,7 +390,7 @@ try {
     "5/7  reading the shipped semantic adapter manifest from the CLI ...",
   );
   const semanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     ["exec", "antidrift", "semantic-manifest"],
     work,
   );
@@ -399,7 +413,7 @@ try {
     );
   }
   const reactStateSemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -410,7 +424,7 @@ try {
     work,
   );
   const asyncControlSemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -421,7 +435,7 @@ try {
     work,
   );
   const tupleShapeSemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -432,7 +446,7 @@ try {
     work,
   );
   const authoritySemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -443,7 +457,7 @@ try {
     work,
   );
   const structuralFactSemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -454,7 +468,7 @@ try {
     work,
   );
   const typeOwnerFactSemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -484,7 +498,7 @@ try {
     );
   }
   const ruleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     ["exec", "antidrift", "rule-status", "policy"],
     work,
   );
@@ -505,7 +519,7 @@ try {
     );
   }
   const typeOwnerRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -517,7 +531,7 @@ try {
     work,
   );
   const asyncControlRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -529,7 +543,7 @@ try {
     work,
   );
   const tupleShapeRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -541,7 +555,7 @@ try {
     work,
   );
   const authorityRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -553,7 +567,7 @@ try {
     work,
   );
   const localAstRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -565,12 +579,12 @@ try {
     work,
   );
   const retiredRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     ["exec", "antidrift", "rule-status", "policy", "--kind", "retired"],
     work,
   );
   const ecosystemCoveredRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -582,7 +596,7 @@ try {
     work,
   );
   const reactStateSemanticSummary = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -595,7 +609,7 @@ try {
     work,
   );
   const localAstSemanticSummary = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -662,12 +676,12 @@ try {
     "6/7  typechecking every public export under supported TS resolution modes ...",
   );
   run(
-    "pnpm",
+    pnpmBinary,
     ["exec", "tsc", "-p", "tsconfig.bundler.json", "--pretty", "false"],
     work,
   );
   run(
-    "pnpm",
+    pnpmBinary,
     ["exec", "tsc", "-p", "tsconfig.nodenext.json", "--pretty", "false"],
     work,
   );

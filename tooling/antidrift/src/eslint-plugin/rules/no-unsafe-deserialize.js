@@ -1,4 +1,5 @@
 import { isUnsafeJsonParseInput } from "../../semantic-adapters/parse-input.mjs";
+import { parsedJsonTarget } from "../../semantic-adapters/parsed-json.mjs";
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
@@ -10,7 +11,7 @@ export function ruleNoUnsafeDeserialize() {
       type: "problem",
       docs: {
         description:
-          "Disallow JSON.parse on any/unknown values without validation.",
+          "Require string input and schema validation before parsed JSON enters a domain contract.",
       },
       schema: [],
     },
@@ -20,8 +21,18 @@ export function ruleNoUnsafeDeserialize() {
         return missingTypeServicesVisitors(context, "no-unsafe-deserialize");
       }
       const checker = services.program.getTypeChecker();
+      function inspectTarget(node) {
+        const target = parsedJsonTarget(node, context, services, checker);
+        if (!target) return false;
+        context.report({
+          node,
+          message: `Validate parsed JSON against the schema for '${target}' before assigning that contract. JSON.parse validates syntax, not domain values.`,
+        });
+        return true;
+      }
       return {
         CallExpression(node) {
+          if (inspectTarget(node)) return;
           if (isUnsafeJsonParseInput(node, services, checker)) {
             context.report({
               node,
@@ -30,6 +41,7 @@ export function ruleNoUnsafeDeserialize() {
             });
           }
         },
+        Identifier: inspectTarget,
       };
     },
   };

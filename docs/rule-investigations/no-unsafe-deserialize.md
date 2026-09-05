@@ -2,7 +2,9 @@
 
 ## Definition
 
-Disallow `JSON.parse` when the argument's TypeScript type is `any` or `unknown`.
+Disallow `JSON.parse` when its argument has broad `any`/`unknown` type without a string boundary, or when its unvalidated result flows into a declared domain contract. The 0.11.0 result check follows direct calls and immutable aliases using contextual TypeScript types; schema-validated results and unknown staging values remain valid.
+
+The complete Homer `apps/api/lib/tools.ts` file at revision `dc7d554d9925f5a4e6adc73844e8cd1b6057c3fc` reproduces the domain-store finding at line 1439. The receiving owner is `Record<string, string>` and the existing imported `z` validator can validate that record before assignment. The authenticated corpus and typed regression pin this location and its message.
 
 This is a TypeChecker rule, not a route-name or request-name heuristic. It does not try to prove taint. It enforces the narrower parse-at-edge pattern: broad values must be narrowed before parsing, and parsed shapes should be validated into contracts.
 

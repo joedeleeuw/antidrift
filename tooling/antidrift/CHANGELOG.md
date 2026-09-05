@@ -1,5 +1,13 @@
 # changelog
 
+## 0.11.0
+
+- Enable 51 portable agent guardrails with configurable owners, local import provenance, package-boundary resolution and default/typed fetch aliases; withdraw eleven provisional detectors after per-rule agent-intent review.
+- Export 436 native rules in eleven named opt-in adoption presets, excluding eighteen Next entries and preserving existing complexity budgets.
+- Extend no-unsafe-deserialize to parsed JSON assigned into declared domain contracts, including immutable aliases.
+- Replace the synthetic 148-sample claim with complete source authenticated by Git commit/tree/blob proofs and exact diagnostics at the pinned Homer revision.
+- Include the verified upstream NOTICE, pinned module provenance and complete Apache license text. Verify every new custom rule and every native preset category through the packed consumer artifact.
+
 ## 0.10.0
 
 - vendor the generic rules and Effect service-constructor rule from `dmmulroy/anti-slop` commit `6d538555cb151d4121ed51a27db81890eacf8ae9`; enable the nine rules with bounded syntax ownership, keep five false-positive-prone rules registered but default-off, make `no-unsafe-cast-chain` own upstream chained-assertion behavior, and incorporate upstream known-value-widening and widen-then-assert detection into `no-appeasement-erasure`

@@ -176,6 +176,7 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/brand` — `Brand<T, Name>`, `Unbrand<T>`, and `brand(name, check)`
 - `@joedeleeuw/antidrift/eslint-config` — the `createConfig` factory above
 - `@joedeleeuw/antidrift/eslint-plugin` — the TypeChecker plugin, if you'd rather wire those rules by hand
+- `@joedeleeuw/antidrift/adoption-config` — named opt-in native rule presets
 - `@joedeleeuw/antidrift/oxlint-config` — focused governance plus the immutable opt-in complexity fragment
 - `@joedeleeuw/antidrift/oxlint-plugin` — syntax-only custom rules supported by Oxlint's JavaScript plugin API
 - `@joedeleeuw/antidrift/policy` — policy check APIs, rule-status registry helpers, semantic fact sinks, and shipped `SEMANTIC_FACT_KINDS` contracts for advanced tooling
@@ -220,7 +221,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-underchecked-type-predicate` — default-off inventory for broad-input type predicates that assert object contracts without checking required asserted fields
 - `no-canonical-model-fork` — configured first-party model redeclarations that should import or derive from the canonical owner
 - `no-handrolled-resource-lifecycle-cells` — behavior-based detection for hand-rolled async resource lifecycle state machines, with broad multi-setter co-mutation emitted as inventory only
-- `no-unsafe-deserialize` — `JSON.parse` of `any` / `unknown` instead of parsing at a schema boundary
+- `no-unsafe-deserialize` — broad `JSON.parse` inputs and unvalidated parsed results assigned into declared domain contracts
 - `no-defensive-shape-probing` — deterministic broad-value extractor cases backed by real corpus evidence, not ordinary boolean predicates
 - `no-identity-schema-transform` — default-off TypeChecker proof for Zod transforms that reconstruct every input field unchanged
 - `no-explicit-type-arguments-on-owned-api` — default-off symbol-resolved proof against caller-supplied type arguments on Convex generated references and TanStack registrations
@@ -311,3 +312,87 @@ Node 22+, ESLint 9.38+ or 10.x (flat config), TypeScript 5+, typescript-eslint 8
 This is an early 0.x release, and I'll be honest about what that means. The rules have local regression tests and a real-corpus validation ledger, but some package-surface rules remain under-proven until they have source-code evidence outside reduced examples. Pin the version.
 
 MIT.
+
+## Portable rules (0.11.0)
+
+The governance config enables 51 new agent guardrails at error severity. The [rule table and evidence report](../../docs/rule-investigations/portable-rules.md) records all rules, repairs, tests, counts and eleven withdrawals. Rules with zero Homer findings are preventive and have no positive corpus evidence. Attribution belongs in `NOTICE`.
+
+| Rule                                             | Behavior / repair                                                                                                            |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `antidrift/confine-owner`                        | Typed entry item schema and configurable registry path and owners                                                            |
+| `antidrift/docs-source-policy`                   | Validate only the single configured policyFile; default docs-sources.mjs; derive dependencies from the real package manifest |
+| `antidrift/icon-button-requires-tooltip`         | Configurable iconComponents; remove product branding                                                                         |
+| `antidrift/no-adhoc-loader`                      | Configurable loaderIcons, owner and skeleton; portable HTML progress default                                                 |
+| `antidrift/no-ai-debt-comments`                  | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-ambient-hotkey-format`             | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-anemic-errors`                     | Accept contextual errors; detect Error calls with or without new; do not prescribe a fictional error class                   |
+| `antidrift/no-as-never`                          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-async-context-enter-with`          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-auth-token-in-web-storage`         | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-awaited-builder-union`             | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-bun-api-in-shared`                 | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-centered-scroll-column`            | Check actual class values, not source-code strings                                                                           |
+| `antidrift/no-debug-residue-filenames`           | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-default-export-in-domain`          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-dialog-trigger-menu-item`          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-disabled-tooltip-trigger`          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-duplicate-context`                 | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-eager-singleton`                   | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-generic-module-names`              | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-inline-style-colors`               | Use declared palette/embedding scope; terminal black surface is a recorded platform boundary                                 |
+| `antidrift/no-omitted-prop-respread`             | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-partial-record-satisfies`          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-path-prefix-containment`           | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-physical-properties`               | Check actual class values, not source-code strings; preserve symmetric insets                                                |
+| `antidrift/no-placeholder-tests`                 | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-portal-under-interactive-ancestor` | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-raw-filename-write`                | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-raw-foreground-opacity`            | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-redacted-log-attribute-key`        | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-relative-cross-package-imports`    | Resolve actual package boundaries and preserve ancestor configuration owners                                                 |
+| `antidrift/no-spread-input-in-query-key`         | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-static-devtools-import`            | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-todo-without-issue`                | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-trivial-property-helpers`          | Require the helper declaration and property/fallback body; names at unrelated call sites are not proof                       |
+| `antidrift/no-tutorial-comments`                 | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-unformatted-number`                | Configurable formatter; Intl.NumberFormat default; raw state in test output is not display text                              |
+| `antidrift/no-unlisted-external-imports`         | Skip marker manifests; honor ancestor devDependencies; sibling packages do not grant dependencies                            |
+| `antidrift/no-unsafe-inner-html`                 | Imported sanitizer and trusted-source registry; resolve aliases and shadowing; remove comment bypass                         |
+| `antidrift/no-unsanitized-href`                  | Imported sanitizer binding resolution; reject local identity functions; exact http(s) protocol prefixes                      |
+| `antidrift/require-detached-label-shape`         | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/require-dir-on-rendered-name`         | Configurable nameProps, isolatingComponents and owner; accept native bdi; portable Unicode FSI/PDI default                   |
+| `antidrift/require-exhaustive-panic`             | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/require-fetch-timeout`                | Follow immutable fetch aliases and typeof fetch/default parameters; preserve real network smoke findings                     |
+| `antidrift/require-function-replacer`            | Accept constant String.raw replacements; dynamic strings still require a callback                                            |
+| `antidrift/require-query-key-factory`            | A shared immutable local key is already an owner; independent inline arrays still report                                     |
+| `antidrift/require-query-signal`                 | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/require-safe-window-open`             | Accept the compile-valid browser API with noopener,noreferrer; distinguish the explicit popup-policy probe                   |
+| `antidrift/require-secure-document-response`     | Remove dead IIFE; accept explicit secure Response headers; configurable response owner                                       |
+| `antidrift/require-stable-snapshot`              | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/require-stream-reader-disposal`       | Portable agent guardrail; declared options and artifact proof                                                                |
+
+All portable rules accept `files` and `excludeFiles`. Configure these for actual ownership boundaries, not to hide violations. `docs-source-policy` checks exactly `policyFile` (default `docs-sources.mjs`), deriving dependencies from its package manifest unless supplied explicitly. Its `sources` and `exclusions` describe the documentation registry. `confine-owner` accepts `registry` and schema-checked `entries` with named owner paths.
+
+`no-adhoc-loader` accepts `loaderIcons`, `owner`, and `skeleton`; `require-dir-on-rendered-name` accepts `nameProps`, `isolatingComponents`, and `owner`; `no-unformatted-number` accepts `formatter`; `icon-button-requires-tooltip` accepts `iconComponents`. Defaults name platform primitives where available.
+
+`no-unsafe-inner-html` accepts `sanitizers` and `trustedSources`; `no-unsanitized-href` accepts `sanitizers`. Each registry entry has `module`, `export`, and optional `member`. Aliased imports and immutable aliases are resolved; local identity functions and shadowing do not establish provenance. HTML defaults recognize `dompurify`’s default `sanitize` member. Comments never prove safety.
+
+`no-unlisted-external-imports` skips marker manifests and honors ancestor devDependencies by default. `ancestorDevDependencies: false` requires local development declarations. Sibling dependencies never grant permission. Workspace and catalog specifiers are declarations.
+
+Corpus tests authenticate complete source files against a pinned Git commit, then compare exact diagnostics. They reject synthetic wrappers and wrong-file substitutions. The former synthetic 148-sample claim is withdrawn.
+
+### Native adoption presets
+
+```js
+import { createAdoptionOxlintConfig } from "@joedeleeuw/antidrift/adoption-config";
+
+export default createAdoptionOxlintConfig({
+  presets: ["eslint", "typescript", "unicorn"],
+});
+```
+
+Named presets are `eslint`, `typescript`, `unicorn`, `import`, `promise`, `node`, `oxc`, `jsdoc`, `react`, `jsx-a11y`, and `vitest`. They compose all 436 eligible native In entries; the eighteen Next entries are excluded. The three existing complexity settings retain their budgets. Every selected rule is an error. Select the React, browser-accessibility and test presets for their actual source scopes; the base governance config does not silently enable these optional native packs.
+
+The existing `antidrift/no-unsafe-deserialize` also detects parsed JSON flowing directly or through immutable local aliases into a declared domain contract. Parsing JSON syntax does not validate the target value. Its diagnostic names the receiving type, and validated schema outputs remain valid.
+
+Eleven provisional custom ports were withdrawn for documented detector or ownership failures after agent-intent re-judgement. The report records the unresolved signal as well as the noise.

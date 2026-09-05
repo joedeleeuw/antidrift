@@ -451,10 +451,18 @@ typedRuleTester.run("no-unsafe-deserialize", rule("no-unsafe-deserialize"), {
   valid: [
     fixture("programs/correct/json-parse-string.ts"),
     fixture("programs/correct/schema-parse-unknown.ts"),
+    fixture("programs/correct/json-domain-validation.ts"),
   ],
   invalid: [
     { ...fixture("programs/drift/json-parse-unknown.ts"), errors: 1 },
     { ...fixture("programs/drift/json-parse-any.ts"), errors: 1 },
+    {
+      ...fixture("programs/drift/json-domain-store.ts"),
+      errors: [4, 5, 8, 10, 12].map((line) => ({
+        line,
+        message: /Validate parsed JSON against the schema for 'Settings'/u,
+      })),
+    },
   ],
 });
 

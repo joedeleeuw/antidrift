@@ -1,0 +1,2187 @@
+{
+  "sourceSha256": "f09f588e7dd9305b483d0d9c0ef7135da5b2b7032a8b2077c5669230f03a484e",
+  "selection": "kind != plugin AND decision startsWith In AND id not startsWith nextjs/",
+  "excludedNext": 18,
+  "rules": [
+    {
+      "id": "eslint/accessor-pairs",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/array-callback-return",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/arrow-body-style",
+      "decision": "In",
+      "surveyCount": 23
+    },
+    {
+      "id": "eslint/block-scoped-var",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/class-methods-use-this",
+      "decision": "In",
+      "surveyCount": 8
+    },
+    {
+      "id": "eslint/complexity",
+      "decision": "In",
+      "surveyCount": 65
+    },
+    {
+      "id": "eslint/curly",
+      "decision": "In",
+      "surveyCount": 1786
+    },
+    {
+      "id": "eslint/default-case",
+      "decision": "In",
+      "surveyCount": 62
+    },
+    {
+      "id": "eslint/default-case-last",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/default-param-last",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "eslint/grouped-accessor-pairs",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/guard-for-in",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/id-denylist",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/id-length",
+      "decision": "In",
+      "surveyCount": 272
+    },
+    {
+      "id": "eslint/id-match",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/logical-assignment-operators",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "eslint/max-depth",
+      "decision": "In",
+      "surveyCount": 5
+    },
+    {
+      "id": "eslint/max-lines-per-function",
+      "decision": "In",
+      "surveyCount": 765
+    },
+    {
+      "id": "eslint/max-nested-callbacks",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/max-params",
+      "decision": "In",
+      "surveyCount": 108
+    },
+    {
+      "id": "eslint/max-statements",
+      "decision": "In",
+      "surveyCount": 761
+    },
+    {
+      "id": "eslint/no-alert",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "eslint/no-array-constructor",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-caller",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-constructor-return",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-continue",
+      "decision": "In",
+      "surveyCount": 145
+    },
+    {
+      "id": "eslint/no-div-regex",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-duplicate-imports",
+      "decision": "In",
+      "surveyCount": 38
+    },
+    {
+      "id": "eslint/no-else-return",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-eval",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-extra-label",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-implicit-coercion",
+      "decision": "In",
+      "surveyCount": 9
+    },
+    {
+      "id": "eslint/no-implied-eval",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-inner-declarations",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-iterator",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-label-var",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-labels",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-lone-blocks",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-lonely-if",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-multi-assign",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-multi-str",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-negated-condition",
+      "decision": "In",
+      "surveyCount": 52
+    },
+    {
+      "id": "eslint/no-nested-ternary",
+      "decision": "In",
+      "surveyCount": 138
+    },
+    {
+      "id": "eslint/no-new",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-new-func",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-new-wrappers",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-object-constructor",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-plusplus",
+      "decision": "In",
+      "surveyCount": 18
+    },
+    {
+      "id": "eslint/no-promise-executor-return",
+      "decision": "In",
+      "surveyCount": 65
+    },
+    {
+      "id": "eslint/no-proto",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-restricted-exports",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-restricted-globals",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-restricted-properties",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-return-assign",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-script-url",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-self-compare",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-sequences",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-shadow",
+      "decision": "In",
+      "surveyCount": 91
+    },
+    {
+      "id": "eslint/no-throw-literal",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-unneeded-ternary",
+      "decision": "In",
+      "surveyCount": 2
+    },
+    {
+      "id": "eslint/no-unreachable-loop",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-useless-call",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-useless-computed-key",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-useless-concat",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-useless-constructor",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-useless-rename",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/no-useless-return",
+      "decision": "In",
+      "surveyCount": 6
+    },
+    {
+      "id": "eslint/no-void",
+      "decision": "In",
+      "surveyCount": 183
+    },
+    {
+      "id": "eslint/no-warning-comments",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "eslint/object-shorthand",
+      "decision": "In",
+      "surveyCount": 6
+    },
+    {
+      "id": "eslint/operator-assignment",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/prefer-destructuring",
+      "decision": "In",
+      "surveyCount": 209
+    },
+    {
+      "id": "eslint/prefer-exponentiation-operator",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "eslint/prefer-named-capture-group",
+      "decision": "In",
+      "surveyCount": 85
+    },
+    {
+      "id": "eslint/prefer-numeric-literals",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/prefer-object-has-own",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "eslint/prefer-object-spread",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/prefer-promise-reject-errors",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/prefer-regex-literals",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/prefer-template",
+      "decision": "In",
+      "surveyCount": 10
+    },
+    {
+      "id": "eslint/radix",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/require-unicode-regexp",
+      "decision": "In",
+      "surveyCount": 376
+    },
+    {
+      "id": "eslint/sort-imports",
+      "decision": "In",
+      "surveyCount": 2189
+    },
+    {
+      "id": "eslint/sort-keys",
+      "decision": "In",
+      "surveyCount": 5629
+    },
+    {
+      "id": "eslint/sort-vars",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "eslint/symbol-description",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "eslint/vars-on-top",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "eslint/yoda",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "import/consistent-type-specifier-style",
+      "decision": "In",
+      "surveyCount": 693
+    },
+    {
+      "id": "import/extensions",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "import/max-dependencies",
+      "decision": "In",
+      "surveyCount": 80
+    },
+    {
+      "id": "import/newline-after-import",
+      "decision": "In",
+      "surveyCount": 14
+    },
+    {
+      "id": "import/no-absolute-path",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "import/no-amd",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "import/no-cycle",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "import/no-dynamic-require",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "import/no-empty-named-blocks",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "import/no-mutable-exports",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "import/no-named-default",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "import/no-self-import",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "import/no-webpack-loader-syntax",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/check-access",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/check-property-names",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/check-tag-names",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/empty-tags",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/implements-on-classes",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/no-defaults",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-param-type",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-property",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-property-description",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-property-name",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-returns-type",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-yields",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "node/handle-callback-err",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "node/no-path-concat",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/approx-constant",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/bad-array-method-on-arguments",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/bad-bitwise-operator",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/bad-char-at-comparison",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/bad-comparison-sequence",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/bad-match-all-arg",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/bad-min-max-func",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/bad-object-literal-comparison",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/bad-replace-all-arg",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/branches-sharing-code",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "oxc/const-comparisons",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/double-comparisons",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/erasing-op",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/misrefactored-assign-op",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/missing-throw",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/no-accumulating-spread",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/no-async-endpoint-handlers",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/no-barrel-file",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "oxc/no-const-enum",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/no-this-in-exported-function",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/number-arg-out-of-range",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/only-used-in-recursion",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "oxc/uninvoked-array-callback",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "promise/catch-or-return",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "promise/no-callback-in-promise",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "promise/no-nesting",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "promise/no-new-statics",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "promise/no-return-in-finally",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "promise/no-return-wrap",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "promise/prefer-catch",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "promise/spec-only",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "promise/valid-params",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/checked-requires-onchange-or-readonly",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/forward-ref-uses-ref",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/jsx-boolean-value",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/jsx-curly-brace-presence",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "react/jsx-fragments",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/jsx-key",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/jsx-no-comment-textnodes",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/jsx-no-constructed-context-values",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/jsx-no-script-url",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/jsx-no-target-blank",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/jsx-no-useless-fragment",
+      "decision": "In",
+      "surveyCount": 6
+    },
+    {
+      "id": "react/jsx-pascal-case",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/jsx-props-no-spread-multi",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-array-index-key",
+      "decision": "In",
+      "surveyCount": 5
+    },
+    {
+      "id": "react/no-children-prop",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-danger",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-danger-with-children",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-this-in-sfc",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/self-closing-comp",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/void-dom-elements-no-children",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/adjacent-overload-signatures",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/ban-tslint-comment",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/ban-types",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/class-literal-property-style",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/consistent-generic-constructors",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/consistent-indexed-object-style",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/explicit-member-accessibility",
+      "decision": "In",
+      "surveyCount": 134
+    },
+    {
+      "id": "typescript/method-signature-style",
+      "decision": "In",
+      "surveyCount": 380
+    },
+    {
+      "id": "typescript/no-confusing-non-null-assertion",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/no-dynamic-delete",
+      "decision": "In",
+      "surveyCount": 5
+    },
+    {
+      "id": "typescript/no-empty-interface",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/no-invalid-void-type",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "typescript/no-non-null-asserted-nullish-coalescing",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/no-restricted-types",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/no-unnecessary-parameter-property-assignment",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/no-var-requires",
+      "decision": "In",
+      "surveyCount": 7
+    },
+    {
+      "id": "typescript/parameter-properties",
+      "decision": "In",
+      "surveyCount": 26
+    },
+    {
+      "id": "typescript/prefer-enum-initializers",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/prefer-for-of",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "typescript/prefer-literal-enum-member",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/prefer-ts-expect-error",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "typescript/unified-signatures",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "unicorn/catch-error-name",
+      "decision": "In",
+      "surveyCount": 197
+    },
+    {
+      "id": "unicorn/consistent-assert",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/consistent-date-clone",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/consistent-empty-array-spread",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/consistent-existence-index-check",
+      "decision": "In",
+      "surveyCount": 17
+    },
+    {
+      "id": "unicorn/consistent-template-literal-escape",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/custom-error-definition",
+      "decision": "In",
+      "surveyCount": 10
+    },
+    {
+      "id": "unicorn/empty-brace-spaces",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/error-message",
+      "decision": "In",
+      "surveyCount": 2
+    },
+    {
+      "id": "unicorn/escape-case",
+      "decision": "In",
+      "surveyCount": 10
+    },
+    {
+      "id": "unicorn/explicit-length-check",
+      "decision": "In",
+      "surveyCount": 35
+    },
+    {
+      "id": "unicorn/explicit-timer-delay",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "unicorn/new-for-builtins",
+      "decision": "In",
+      "surveyCount": 2
+    },
+    {
+      "id": "unicorn/no-abusive-eslint-disable",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-accessor-recursion",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-anonymous-default-export",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-array-for-each",
+      "decision": "In",
+      "surveyCount": 11
+    },
+    {
+      "id": "unicorn/no-array-method-this-argument",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-array-reduce",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "unicorn/no-array-reverse",
+      "decision": "In",
+      "surveyCount": 9
+    },
+    {
+      "id": "unicorn/no-array-sort",
+      "decision": "In",
+      "surveyCount": 33
+    },
+    {
+      "id": "unicorn/no-await-in-promise-methods",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-confusing-array-with",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-console-spaces",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-document-cookie",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-empty-file",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-hex-escape",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-immediate-mutation",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-instanceof-array",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-instanceof-builtins",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-invalid-fetch-options",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-invalid-remove-event-listener",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-length-as-slice-end",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-lonely-if",
+      "decision": "In",
+      "surveyCount": 4
+    },
+    {
+      "id": "unicorn/no-magic-array-flat-depth",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-negated-condition",
+      "decision": "In",
+      "surveyCount": 52
+    },
+    {
+      "id": "unicorn/no-negation-in-equality-check",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-nested-ternary",
+      "decision": "In",
+      "surveyCount": 99
+    },
+    {
+      "id": "unicorn/no-new-buffer",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-single-promise-in-promise-methods",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-static-only-class",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-thenable",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-this-assignment",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-typeof-undefined",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-unnecessary-array-flat-depth",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-unnecessary-array-splice-count",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-unnecessary-await",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-unnecessary-slice-end",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-unreadable-array-destructuring",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "unicorn/no-unreadable-iife",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-useless-collection-argument",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-useless-error-capture-stack-trace",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-useless-fallback-in-spread",
+      "decision": "In",
+      "surveyCount": 9
+    },
+    {
+      "id": "unicorn/no-useless-iterator-to-array",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-useless-length-check",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-useless-promise-resolve-reject",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-useless-spread",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "unicorn/no-useless-switch-case",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/no-zero-fractions",
+      "decision": "In",
+      "surveyCount": 35
+    },
+    {
+      "id": "unicorn/number-literal-case",
+      "decision": "In",
+      "surveyCount": 31
+    },
+    {
+      "id": "unicorn/numeric-separators-style",
+      "decision": "In",
+      "surveyCount": 259
+    },
+    {
+      "id": "unicorn/prefer-array-find",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-array-flat",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-array-flat-map",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-array-index-of",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-array-some",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-at",
+      "decision": "In",
+      "surveyCount": 4
+    },
+    {
+      "id": "unicorn/prefer-bigint-literals",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-blob-reading-methods",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-class-fields",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-classlist-toggle",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-date-now",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-default-parameters",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "unicorn/prefer-dom-node-append",
+      "decision": "In",
+      "surveyCount": 4
+    },
+    {
+      "id": "unicorn/prefer-dom-node-dataset",
+      "decision": "In",
+      "surveyCount": 20
+    },
+    {
+      "id": "unicorn/prefer-dom-node-remove",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-export-from",
+      "decision": "In",
+      "surveyCount": 42
+    },
+    {
+      "id": "unicorn/prefer-global-this",
+      "decision": "In",
+      "surveyCount": 70
+    },
+    {
+      "id": "unicorn/prefer-import-meta-properties",
+      "decision": "In",
+      "surveyCount": 24
+    },
+    {
+      "id": "unicorn/prefer-includes",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-keyboard-event-key",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-logical-operator-over-ternary",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "unicorn/prefer-math-min-max",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-math-trunc",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "unicorn/prefer-modern-dom-apis",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-modern-math-apis",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-native-coercion-functions",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "unicorn/prefer-negative-index",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-node-protocol",
+      "decision": "In",
+      "surveyCount": 10
+    },
+    {
+      "id": "unicorn/prefer-number-coercion",
+      "decision": "In",
+      "surveyCount": 4
+    },
+    {
+      "id": "unicorn/prefer-number-properties",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "unicorn/prefer-object-from-entries",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-optional-catch-binding",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-prototype-methods",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-query-selector",
+      "decision": "In",
+      "surveyCount": 5
+    },
+    {
+      "id": "unicorn/prefer-reflect-apply",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-regexp-test",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-response-static-json",
+      "decision": "In",
+      "surveyCount": 16
+    },
+    {
+      "id": "unicorn/prefer-set-has",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-set-size",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-single-call",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "unicorn/prefer-spread",
+      "decision": "In",
+      "surveyCount": 19
+    },
+    {
+      "id": "unicorn/prefer-string-raw",
+      "decision": "In",
+      "surveyCount": 66
+    },
+    {
+      "id": "unicorn/prefer-string-replace-all",
+      "decision": "In",
+      "surveyCount": 65
+    },
+    {
+      "id": "unicorn/prefer-string-slice",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "unicorn/prefer-string-starts-ends-with",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-string-trim-start-end",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-structured-clone",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/prefer-ternary",
+      "decision": "In",
+      "surveyCount": 8
+    },
+    {
+      "id": "unicorn/prefer-top-level-await",
+      "decision": "In",
+      "surveyCount": 11
+    },
+    {
+      "id": "unicorn/prefer-type-error",
+      "decision": "In",
+      "surveyCount": 21
+    },
+    {
+      "id": "unicorn/relative-url-style",
+      "decision": "In",
+      "surveyCount": 10
+    },
+    {
+      "id": "unicorn/require-array-join-separator",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/require-module-attributes",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/require-number-to-fixed-digits-argument",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/require-post-message-target-origin",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/switch-case-braces",
+      "decision": "In",
+      "surveyCount": 382
+    },
+    {
+      "id": "unicorn/switch-case-break-position",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/text-encoding-identifier-case",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "unicorn/throw-new-error",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/consistent-test-filename",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-conditional-tests",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-import-node-test",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/prefer-called-once",
+      "decision": "In",
+      "surveyCount": 77
+    },
+    {
+      "id": "vitest/prefer-to-be-object",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/no-blank-blocks",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-param-description",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-param-name",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-property-type",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-returns-description",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-throws-description",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-throws-type",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-yields-description",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsdoc/require-yields-type",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/alt-text",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "jsx-a11y/anchor-ambiguous-text",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/anchor-has-content",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/anchor-is-valid",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/aria-activedescendant-has-tabindex",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/aria-props",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/aria-proptypes",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/aria-unsupported-elements",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/autocomplete-valid",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/click-events-have-key-events",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/control-has-associated-label",
+      "decision": "In",
+      "surveyCount": 2
+    },
+    {
+      "id": "jsx-a11y/heading-has-content",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/html-has-lang",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/iframe-has-title",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/img-redundant-alt",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/interactive-supports-focus",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/label-has-associated-control",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/lang",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/media-has-caption",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/mouse-events-have-key-events",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/no-access-key",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/no-aria-hidden-on-focusable",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/no-autofocus",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/no-distracting-elements",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/no-interactive-element-to-noninteractive-role",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/no-noninteractive-element-interactions",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/no-noninteractive-element-to-interactive-role",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/no-noninteractive-tabindex",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/no-redundant-roles",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/no-static-element-interactions",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/role-has-required-aria-props",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/role-supports-aria-props",
+      "decision": "In",
+      "surveyCount": 2
+    },
+    {
+      "id": "jsx-a11y/scope",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "jsx-a11y/tabindex-no-positive",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "node/exports-style",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "node/no-exports-assign",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "node/no-mixed-requires",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "node/no-new-require",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/display-name",
+      "decision": "In",
+      "surveyCount": 9
+    },
+    {
+      "id": "react/forbid-dom-props",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/forbid-elements",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/function-component-definition",
+      "decision": "In",
+      "surveyCount": 38
+    },
+    {
+      "id": "react/jsx-no-duplicate-props",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/jsx-no-undef",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-clone-element",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "react/no-did-mount-set-state",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-did-update-set-state",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-direct-mutation-state",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-find-dom-node",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-is-mounted",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-namespace",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-object-type-as-default-prop",
+      "decision": "In",
+      "surveyCount": 9
+    },
+    {
+      "id": "react/no-react-children",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-redundant-should-component-update",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-render-return-value",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-set-state",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-string-refs",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-unsafe",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-unstable-nested-components",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/no-will-update-set-state",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/prefer-es6-class",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/prefer-function-component",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/require-render-return",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "react/state-in-constructor",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "vitest/consistent-each-for",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/consistent-test-it",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/consistent-vitest-vi",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/hoisted-apis-on-top",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/max-nested-describe",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-alias-methods",
+      "decision": "In",
+      "surveyCount": 2
+    },
+    {
+      "id": "vitest/no-commented-out-tests",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-disabled-tests",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-duplicate-hooks",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-focused-tests",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-identical-title",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-interpolation-in-snapshots",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-large-snapshots",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-mocks-import",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-restricted-matchers",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-restricted-vi-methods",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-test-prefixes",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-test-return-statement",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/no-unneeded-async-expect-function",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/padding-around-after-all-blocks",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/padding-around-test-blocks",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/prefer-called-exactly-once-with",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "vitest/prefer-called-with",
+      "decision": "In",
+      "surveyCount": 3
+    },
+    {
+      "id": "vitest/prefer-comparison-matcher",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/prefer-describe-function-title",
+      "decision": "In",
+      "surveyCount": 131
+    },
+    {
+      "id": "vitest/prefer-each",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "vitest/prefer-equality-matcher",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/prefer-expect-resolves",
+      "decision": "In",
+      "surveyCount": 157
+    },
+    {
+      "id": "vitest/prefer-expect-type-of",
+      "decision": "In",
+      "surveyCount": 1
+    },
+    {
+      "id": "vitest/prefer-hooks-in-order",
+      "decision": "In",
+      "surveyCount": 4
+    },
+    {
+      "id": "vitest/prefer-hooks-on-top",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/prefer-import-in-mock",
+      "decision": "In",
+      "surveyCount": 386
+    },
+    {
+      "id": "vitest/prefer-importing-vitest-globals",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/prefer-mock-promise-shorthand",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/prefer-snapshot-hint",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/prefer-spy-on",
+      "decision": "In",
+      "surveyCount": 4
+    },
+    {
+      "id": "vitest/prefer-strict-equal",
+      "decision": "In",
+      "surveyCount": 744
+    },
+    {
+      "id": "vitest/prefer-to-be",
+      "decision": "In",
+      "surveyCount": 4
+    },
+    {
+      "id": "vitest/prefer-to-contain",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/prefer-to-have-been-called-times",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/prefer-to-have-length",
+      "decision": "In",
+      "surveyCount": 2
+    },
+    {
+      "id": "vitest/prefer-todo",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/require-awaited-expect-poll",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/require-local-test-context-for-concurrent-snapshots",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/require-to-throw-message",
+      "decision": "In",
+      "surveyCount": 42
+    },
+    {
+      "id": "vitest/valid-describe-callback",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/valid-expect-in-promise",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/valid-title",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    },
+    {
+      "id": "vitest/warn-todo",
+      "decision": "In: preventive",
+      "surveyCount": 0
+    }
+  ]
+}

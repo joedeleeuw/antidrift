@@ -1,6 +1,6 @@
 {
   "name": "@joedeleeuw/antidrift",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "type": "module",
   "license": "MIT",
   "description": "Deterministic Oxlint and TypeScript-aware policy guardrails against code and AI-agent drift.",
@@ -101,6 +101,10 @@
     "./semantic-adapters/type-owner": {
       "types": "./src/semantic-adapters/type-owner.d.mts",
       "import": "./src/semantic-adapters/type-owner.mjs"
+    },
+    "./adoption-config": {
+      "types": "./src/oxlint-config/adoption.d.mts",
+      "import": "./src/oxlint-config/adoption.mjs"
     }
   },
   "bin": {
@@ -109,6 +113,8 @@
   "files": [
     "CHANGELOG.md",
     "LICENSE",
+    "NOTICE",
+    "licenses",
     "README.md",
     "ast-grep",
     "src",

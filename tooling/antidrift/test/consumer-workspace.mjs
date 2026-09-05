@@ -93,11 +93,11 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
         type: "module",
         devDependencies: {
           "@joedeleeuw/antidrift": `file:${tarball}`,
-          eslint: "^9",
-          "typescript-eslint": "^8",
-          "@typescript-eslint/parser": "^8",
-          oxlint: "^1.75.0",
-          typescript: "^6",
+          eslint: "9.39.4",
+          "typescript-eslint": "8.60.1",
+          "@typescript-eslint/parser": "8.60.1",
+          oxlint: "1.78.0",
+          typescript: "6.0.3",
           firebase: "workspace:*",
         },
       },
@@ -377,7 +377,9 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
   );
   file(
     "packages/app/src/exports.ts",
-    'import type { ESLint, Linter } from "eslint";\n' +
+    'import { createAdoptionOxlintConfig, antidriftAdoptionPresets, type AntidriftAdoptionPresetName } from "@joedeleeuw/antidrift/adoption-config";\n' +
+      'const selectedPreset: AntidriftAdoptionPresetName = "eslint"; const adoption = createAdoptionOxlintConfig({ presets: [selectedPreset] }); void adoption; void antidriftAdoptionPresets;\n' +
+      'import type { ESLint, Linter } from "eslint";\n' +
       'import type * as ts from "typescript";\n' +
       'import { antidriftComplexityRules, createConfig, createGovernanceOxlintConfig, eslintPlugin, loadPolicy, loadRegistriesSync, oxlintPlugin, renderPolicyArtifacts, type AgentGuardrailsPolicy, type AntidriftConfigOptions, type AntidriftGovernanceOxlintConfigOptions, type AntidriftRegistries, type PolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
       'import { brand, type Brand, type BrandKit, type BrandSafeResult, type Unbrand } from "@joedeleeuw/antidrift/brand";\n' +

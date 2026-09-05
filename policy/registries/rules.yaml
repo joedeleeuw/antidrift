@@ -1538,10 +1538,10 @@ rules:
     solveType: parse-at-edge
     promotion:
       proofBucket: semantic-source-type-provenance
-      association: JSON.parse input provenance to broad any/unknown values and local string proof.
-      blockingThreshold: Broad any/unknown parse input reports unless TypeScript or local control flow proves the parse input is a string.
+      association: JSON.parse input provenance, local string proof, and parsed-result flow into declared contextual domain types.
+      blockingThreshold: Broad parse inputs require string proof; unvalidated parsed results require schema validation before a declared contextual domain assignment.
       ecosystemComparison: "@typescript-eslint/no-unsafe-argument catches all current broad-input JSON.parse drift when forced on, but it is an unconfigurable any-argument-wide migration; the Antidrift rule is justified only as a narrower parse-boundary gate with lower unrelated inventory."
-      corpusEvidence: Chaski, Codebase Atlas, Sudocode, and Opencode provide broad parse-input drift plus string-input clean controls.
+      corpusEvidence: Chaski, Codebase Atlas, Sudocode, and Opencode provide input drift and clean controls. Homer dc7d554d tools.ts line 1439 supplies authenticated domain-store result drift.
       realCorpusInventory: docs/rule-investigations/no-unsafe-deserialize.md and docs/stable-promotion-inventory.md record Sudocode, Codebase Atlas, and Opencode parse-input drift plus Chaski, Codebase Atlas, Opencode, and Sudocode clean controls.
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-unsafe-deserialize.md
@@ -2191,6 +2191,1283 @@ rules:
       allows:
         - "// SAFETY: parseUserId validated the identifier before branding it.\nconst userId = value as UserId;"
     nextAction: "Keep default-off and prefer semantic assertion rules that prove the source and destination types."
+
+  antidrift/no-duplicate-context:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-duplicate-context
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-duplicate-context"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: function loadUserUser() {}"
+      allows:
+        - "component.tsx; options={}; source: function loadUser() {}"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-ai-debt-comments:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-ai-debt-comments
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-ai-debt-comments"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: // TODO clean up AI generated workaround\nexport const value = 1;"
+      allows:
+        - "component.tsx; options={}; source: // The generator owns this mapping.\nexport const value = 1;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-as-never:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-as-never
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-as-never"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: prepareStep({ steps: [toolStep] as never });"
+      allows:
+        - "component.tsx; options={}; source: prepareStep({ steps: [toolStep] });"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-todo-without-issue:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-todo-without-issue
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-todo-without-issue"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: // TODO(verify): confirm remote audio track rendering\nstart();"
+      allows:
+        - "component.tsx; options={}; source: // TODO(APP-42): confirm remote audio track rendering\nstart();"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-generic-module-names:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-generic-module-names
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-generic-module-names"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "shared.ts; options={}; source: export const token = 1;"
+      allows:
+        - "tokens.ts; options={}; source: export const token = 1;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-default-export-in-domain:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-default-export-in-domain
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-default-export-in-domain"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "domain/entity.ts; options={}; source: export default class Entity {}"
+      allows:
+        - "domain/entity.ts; options={}; source: export class Entity {}"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-trivial-property-helpers:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-trivial-property-helpers
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-trivial-property-helpers"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: function getStringValue(value) { return value.name ?? ''; }"
+      allows:
+        - "component.tsx; options={}; source: function userName(value) { return value.name; }"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-tutorial-comments:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-tutorial-comments
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-tutorial-comments"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: // This function returns the value\nfunction value() { return 1; }"
+      allows:
+        - "component.tsx; options={}; source: // The wire protocol uses big endian order.\nfunction value() { return 1; }"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-debug-residue-filenames:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-debug-residue-filenames
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-debug-residue-filenames"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "value_temp.ts; options={}; source: export const value = 1;"
+      allows:
+        - "value.ts; options={}; source: export const value = 1;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-placeholder-tests:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-placeholder-tests
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-placeholder-tests"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'behavior.test.ts; options={}; source: test("saves", () => {});'
+      allows:
+        - 'behavior.test.ts; options={}; source: test("saves", () => { expect(save()).toBe(true); });'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-unlisted-external-imports:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-unlisted-external-imports
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-unlisted-external-imports"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'apps/client/src/imports.ts; options={}; source: import { thing } from "undeclared-package";'
+      allows:
+        - 'apps/client/src/imports.ts; options={}; source: import { thing } from "@homer/shared/machine";'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-bun-api-in-shared:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-bun-api-in-shared
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/bun-no-bun-specific-in-shared"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'packages/shared/portability.ts; options={}; source: import { file } from "bun";'
+      allows:
+        - 'packages/shared/portability.ts; options={}; source: import { read } from "./runtime-adapter";'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/confine-owner:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: confine-owner
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [confine-owner/confine-owner]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={"entries":[{"id":"storage","owner":["src/storage.ts"],"enforcement":{"kind":"import","specifiers":["storage-sdk"]}}]}; source: import { client } from "storage-sdk";'
+      allows:
+        - 'component.tsx; options={"entries":[{"id":"storage","owner":["src/storage.ts"],"enforcement":{"kind":"import","specifiers":["storage-sdk"]}}]}; source: import { store } from "./storage";'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/docs-source-policy:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: docs-source-policy
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [docs-source-policy/docs-source-policy]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'docs-sources.mjs; options={"dependencies":["react"],"sources":{},"policyFile":"docs-sources.mjs"}; source: export const documentation = {};'
+      allows:
+        - 'docs-sources.mjs; options={"dependencies":["react"],"sources":{"react":{"url":"https://react.dev/llms.txt","dependencies":["react"]}}}; source: export const documentation = {};'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/icon-button-requires-tooltip:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: icon-button-requires-tooltip
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [icon-button-requires-tooltip/icon-button-requires-tooltip]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: <Button size="icon"><PlusIcon /></Button>;'
+      allows:
+        - 'component.tsx; options={}; source: <Tooltip><TooltipTrigger><Button size="icon"><PlusIcon /></Button></TooltipTrigger><TooltipContent>Add</TooltipContent></Tooltip>;'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-adhoc-loader:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-adhoc-loader
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-adhoc-loader/no-adhoc-loader]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: <div className="animate-spin" />;'
+      allows:
+        - "component.tsx; options={}; source: <Loader />;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-ambient-hotkey-format:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-ambient-hotkey-format
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-ambient-hotkey-format/no-ambient-hotkey-format]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: import { detectPlatform } from "@tanstack/hotkeys";'
+      allows:
+        - 'component.tsx; options={}; source: import { formatHotkeyForPlatform } from "./hotkeys";'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-async-context-enter-with:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-async-context-enter-with
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-async-context-enter-with/no-async-context-enter-with]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: import { AsyncLocalStorage } from "node:async_hooks"; const storage = new AsyncLocalStorage(); storage.enterWith(value);'
+      allows:
+        - 'component.tsx; options={}; source: import { AsyncLocalStorage } from "node:async_hooks"; const storage = new AsyncLocalStorage(); storage.run(value, execute);'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-auth-token-in-web-storage:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-auth-token-in-web-storage
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-auth-token-in-web-storage/no-auth-token-in-web-storage]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: localStorage.setItem("access_token", token);'
+      allows:
+        - 'component.tsx; options={}; source: localStorage.setItem("theme", "dark");'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-awaited-builder-union:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-awaited-builder-union
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-awaited-builder-union/no-awaited-builder-union]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: async function build() { return await (condition ? query.limit(1) : query); }"
+      allows:
+        - "component.tsx; options={}; source: async function build() { return await factory(); }"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-centered-scroll-column:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-centered-scroll-column
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-centered-scroll-column/no-centered-scroll-column]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: <div className="mx-auto max-w-lg overflow-y-auto" />;'
+      allows:
+        - 'component.tsx; options={}; source: <div className="overflow-y-auto"><main className="mx-auto max-w-lg" /></div>;'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-dialog-trigger-menu-item:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-dialog-trigger-menu-item
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-dialog-trigger-menu-item/no-dialog-trigger-menu-item]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: <DialogTrigger><DropdownMenuItem>Open</DropdownMenuItem></DialogTrigger>;"
+      allows:
+        - "component.tsx; options={}; source: <DropdownMenuItem onSelect={openDialog}>Open</DropdownMenuItem>;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-disabled-tooltip-trigger:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-disabled-tooltip-trigger
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-disabled-tooltip-trigger/no-disabled-tooltip-trigger]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: <TooltipTrigger render={<Button disabled />}>Save</TooltipTrigger>;"
+      allows:
+        - "component.tsx; options={}; source: <TooltipTrigger><span><button disabled>Save</button></span></TooltipTrigger>;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-eager-singleton:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-eager-singleton
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-eager-singleton/no-eager-singleton]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: const storage = new S3Client({});"
+      allows:
+        - "component.tsx; options={}; source: function storage() { return new S3Client({}); }"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-inline-style-colors:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-inline-style-colors
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-inline-style-colors/no-inline-style-colors]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: <View style={{ flex: 1, backgroundColor: "rgb(255 255 255)" }} />;'
+      allows:
+        - "component.tsx; options={}; source: <View style={{ flex: 1, backgroundColor: colors.surface }} />;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-omitted-prop-respread:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-omitted-prop-respread
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-omitted-prop-respread/no-omitted-prop-respread]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: type Props = Omit<ButtonProps, "disabled">; function Action(props: Props) { return <Button {...props} />; }'
+      allows:
+        - 'component.tsx; options={}; source: type Props = Omit<ButtonProps, "disabled">; function Action(props: Props) { return <Button {...props} disabled={false} />; }'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-partial-record-satisfies:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-partial-record-satisfies
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-partial-record-satisfies/no-partial-record-satisfies]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: const labels = { ready: "Ready" } satisfies Partial<Record<State, string>>;'
+      allows:
+        - 'component.tsx; options={}; source: const labels: Partial<Record<State, string>> = { ready: "Ready" };'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-path-prefix-containment:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-path-prefix-containment
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-path-prefix-containment/no-path-prefix-containment]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: import { resolve } from "node:path"; const target = resolve(root, name); if (target.startsWith(root)) read(target);'
+      allows:
+        - 'component.tsx; options={}; source: import { relative, isAbsolute } from "node:path"; const child = relative(root, target); if (!child.startsWith("..") && !isAbsolute(child)) read(target);'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-physical-properties:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-physical-properties
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-physical-properties/no-physical-properties]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: <View className="ml-2 border-l pl-1" />;'
+      allows:
+        - 'component.tsx; options={}; source: <View className="ms-2 border-s ps-1" />;'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-raw-foreground-opacity:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-raw-foreground-opacity
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-raw-foreground-opacity/no-raw-foreground-opacity]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: <p className="text-foreground/50" />;'
+      allows:
+        - 'component.tsx; options={}; source: <p className="text-muted-foreground" />;'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-redacted-log-attribute-key:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-redacted-log-attribute-key
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-redacted-log-attribute-key/no-redacted-log-attribute-key]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: logger.info("saved", { queueName: value });'
+      allows:
+        - 'component.tsx; options={}; source: logger.info("saved", { recordId: value });'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-spread-input-in-query-key:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-spread-input-in-query-key
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-spread-input-in-query-key/no-spread-input-in-query-key]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: const options = { queryKey: ["search", { ...input }] };'
+      allows:
+        - 'component.tsx; options={}; source: const queryKey = ["search", input.term];'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-static-devtools-import:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-static-devtools-import
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-static-devtools-import/no-static-devtools-import]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: import { ReactQueryDevtools } from "@tanstack/react-query-devtools";'
+      allows:
+        - 'component.tsx; options={}; source: const devtools = () => import("@tanstack/react-query-devtools");'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-unformatted-number:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-unformatted-number
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-unformatted-number/no-unformatted-number]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: <Text>{attachments.length} selected</Text>;"
+      allows:
+        - "component.tsx; options={}; source: <Text>{formatter.number(attachments.length)} selected</Text>;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-unsafe-inner-html:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-unsafe-inner-html
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [no-unsafe-inner-html/no-unsafe-inner-html]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: <div dangerouslySetInnerHTML={{ __html: content }} />;"
+      allows:
+        - "component.tsx; options={}; source: <div>{content}</div>;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-portal-under-interactive-ancestor:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-portal-under-interactive-ancestor
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates:
+        [require-contained-handler/no-portal-under-interactive-ancestor]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: <button><DialogContent>Content</DialogContent></button>;"
+      allows:
+        - "component.tsx; options={}; source: <><button>Open</button><DialogContent>Content</DialogContent></>;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-detached-label-shape:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-detached-label-shape
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [require-detached-label-shape/require-detached-label-shape]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: detached(save(), "save");'
+      allows:
+        - 'component.tsx; options={}; source: detached(save(), "storage.save");'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-dir-on-rendered-name:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-dir-on-rendered-name
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [require-dir-on-rendered-name/require-dir-on-rendered-name]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: <Text>{project.displayName}</Text>;"
+      allows:
+        - "component.tsx; options={}; source: <BidiText>{project.displayName}</BidiText>;"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-exhaustive-panic:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-exhaustive-panic
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [require-exhaustive-panic/require-exhaustive-panic]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: function select(value) { const exhaustive: never = value; return exhaustive; }"
+      allows:
+        - "component.tsx; options={}; source: function select(value) { const exhaustive: never = value; throw new Error(`Unsupported: ${exhaustive}`); }"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-fetch-timeout:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-fetch-timeout
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [require-fetch-timeout/require-fetch-timeout]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: const upstream = await fetch(upstreamUrl, { method: "GET", cache: "no-store" });'
+      allows:
+        - "component.tsx; options={}; source: const upstream = await fetch(upstreamUrl, { signal });"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-function-replacer:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-function-replacer
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [require-function-replacer/require-function-replacer]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: next = current.replace(edit.oldString, edit.newString);"
+      allows:
+        - "component.tsx; options={}; source: next = current.replace(edit.oldString, () => edit.newString);"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-query-key-factory:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-query-key-factory
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [require-query-key-factory/require-query-key-factory]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: queryClient.invalidateQueries({ queryKey: ["agent-config", baseURL] });'
+      allows:
+        - "component.tsx; options={}; source: queryClient.invalidateQueries({ queryKey: queryKeys.agentConfig(baseURL) });"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-query-signal:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-query-signal
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [require-query-signal/require-query-signal]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: const options = { queryKey: ["users"], queryFn: async () => fetch(url) };'
+      allows:
+        - 'component.tsx; options={}; source: const options = { queryKey: ["users"], queryFn: async ({ signal }) => fetch(url, { signal }) };'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-safe-window-open:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-safe-window-open
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [require-safe-window-open/require-safe-window-open]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: window.open(conversationUrl(projectId, row.conversationId), "_blank");'
+      allows:
+        - "component.tsx; options={}; source: openIsolatedWindow(conversationUrl(projectId, row.conversationId));"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-stable-snapshot:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-stable-snapshot
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [require-stable-snapshot/require-stable-snapshot]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: import { useSyncExternalStore } from "react"; useSyncExternalStore(subscribe, () => ({ value: store.value }));'
+      allows:
+        - 'component.tsx; options={}; source: import { useSyncExternalStore } from "react"; useSyncExternalStore(subscribe, () => store.snapshot);'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-stream-reader-disposal:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-stream-reader-disposal
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates:
+        [require-stream-reader-disposal/require-stream-reader-disposal]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: async function chunks(stream: ReadableStream) { const reader = stream.getReader(); const result = await reader.read(); return result; }"
+      allows:
+        - "component.tsx; options={}; source: async function chunks(stream: ReadableStream) { const reader = stream.getReader(); try { return await reader.read(); } finally { try { await reader.cancel(); } finally { reader.releaseLock(); } } }"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-raw-filename-write:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-raw-filename-write
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [security-guards/no-raw-filename-write]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - "component.tsx; options={}; source: const row = { fileName: part.filename };"
+      allows:
+        - "component.tsx; options={}; source: const row = { fileName: sanitizeFilename(part.filename) };"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-unsanitized-href:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-unsanitized-href
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [security-guards/no-unsanitized-href]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={"sanitizers":[{"module":"./url-policy","export":"sanitizeHref"}]}; source: <a href={input.url}>Open</a>;'
+      allows:
+        - 'component.tsx; options={"sanitizers":[{"module":"./url-policy","export":"sanitizeHref"}]}; source: import { sanitizeHref as safe } from "./url-policy"; <a href={safe(external)} />;'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/require-secure-document-response:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: require-secure-document-response
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: [security-guards/require-secure-document-response]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: new Response(body, { headers: { "Content-Disposition": "attachment; filename=file.txt" } });'
+      allows:
+        - "component.tsx; options={}; source: secureDocumentResponse(body);"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-relative-cross-package-imports:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-relative-cross-package-imports
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-relative-cross-package-imports"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'apps/client/src/main.ts; options={}; source: import { secret } from "../../other/src/internal";'
+      allows:
+        - 'apps/client/src/main.ts; options={}; source: import { shared } from "@homer/shared";'
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-anemic-errors:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: AST and configured ownership scope
+    solveType: no-anemic-errors
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/portable-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
+    external:
+      state: partial-overlap
+      support: high
+      candidates: ["@rikalabs/no-anemic-errors"]
+      decision: own-antidrift
+      whyThisState: Revision-authenticated corpus, detector repairs and packed consumer proof; see the per-rule review.
+      whyNotOtherState: Upstream application paths and detector errors prevent direct preset adoption.
+    examples:
+      flags:
+        - 'component.tsx; options={}; source: throw new Error("Something went wrong");'
+      allows:
+        - "component.tsx; options={}; source: throw new RequestError({ status, cause });"
+    nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
 
 retiredRules:
   antidrift/no-query-data-type-parameters:

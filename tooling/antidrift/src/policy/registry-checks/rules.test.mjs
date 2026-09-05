@@ -30,7 +30,7 @@ describe("rule promotion and policy reviews", () => {
           "    status: ready",
           "    stable: false",
         ].join("\n"),
-        [
+        () => [
           "  antidrift/no-sql-string-concat:",
           "    status: ready",
           "    stable: false",
@@ -62,7 +62,7 @@ describe("rule promotion and policy reviews", () => {
           "    status: ready",
           "    stable: false",
         ].join("\n"),
-        [
+        () => [
           "  antidrift/no-sql-string-concat:",
           "    status: ready",
           "    stable: true",
@@ -151,7 +151,10 @@ ${lockedRuleSections(root)}
     const text = readFileSync(existing, "utf8");
     writeFileSync(
       existing,
-      text.replace("    proofBuckets: [local-ast-source-shape]\n", ""),
+      text.replace(
+        /(  antidrift\/no-appeasement-cast:\n[\s\S]*?)    proofBuckets: \[local-ast-source-shape\]\n/u,
+        "$1",
+      ),
     );
     const messages = [];
     expect(
@@ -172,8 +175,8 @@ ${lockedRuleSections(root)}
     writeFileSync(
       existing,
       text.replace(
-        "    proofBuckets: [local-ast-source-shape]\n",
-        "    proofBuckets: [diff-relative]\n",
+        /(  antidrift\/no-appeasement-cast:\n[\s\S]*?)    proofBuckets: \[local-ast-source-shape\]\n/u,
+        "$1    proofBuckets: [diff-relative]\n",
       ),
     );
     const messages = [];
