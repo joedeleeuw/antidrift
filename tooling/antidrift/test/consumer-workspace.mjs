@@ -98,6 +98,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
           "@typescript-eslint/parser": "8.60.1",
           oxlint: "1.78.0",
           typescript: "6.0.3",
+          vitest: "2.1.9",
           firebase: "workspace:*",
         },
       },
