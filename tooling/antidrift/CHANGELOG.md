@@ -2,6 +2,7 @@
 
 ## 0.11.0
 
+- Resolve optional research checkout defaults from the current user's home directory instead of shipping maintainer-local absolute paths.
 - Enable 51 portable agent guardrails with configurable owners, local import provenance, package-boundary resolution and default/typed fetch aliases; withdraw eleven provisional detectors after per-rule agent-intent review.
 - Export 436 native rules in eleven named opt-in adoption presets, excluding eighteen Next entries and preserving existing complexity budgets.
 - Extend no-unsafe-deserialize to parsed JSON assigned into declared domain contracts, including immutable aliases.

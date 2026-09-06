@@ -1,35 +1,38 @@
+import { resolve } from "node:path";
+import { homedir } from "node:os";
+
 const sudocodeRepoCandidates = [
   process.env.SUDOCODE_REPO,
-  "/Users/sushi/code/sudocode-main",
+  resolve(homedir(), "code", "sudocode-main"),
 ].filter(Boolean);
 const codebaseAtlasRepoCandidates = [
   process.env.CODEBASE_ATLAS_REPO,
-  "/Users/sushi/code/codebase-atlas",
+  resolve(homedir(), "code", "codebase-atlas"),
 ].filter(Boolean);
 const murderboxRepoCandidates = [
   process.env.MURDERBOX_REPO,
-  "/Users/sushi/code/murderbox",
+  resolve(homedir(), "code", "murderbox"),
 ].filter(Boolean);
 const cloudflareAgentsRepoCandidates = [
   process.env.CLOUDFLARE_AGENTS_REPO,
-  "/Users/sushi/code/cloudflare-agents",
+  resolve(homedir(), "code", "cloudflare-agents"),
 ].filter(Boolean);
 const claudeCodeSourceRepoCandidates = [
   process.env.CLAUDE_CODE_SOURCE_REPO,
-  "/Users/sushi/code/claude-code-src-code",
-  "/Users/sushi/code/claude-code-source-code",
+  resolve(homedir(), "code", "claude-code-src-code"),
+  resolve(homedir(), "code", "claude-code-source-code"),
 ].filter(Boolean);
 const opencodeRepoCandidates = [
   process.env.OPENCODE_REPO,
-  "/Users/sushi/code/opencode",
+  resolve(homedir(), "code", "opencode"),
 ].filter(Boolean);
 const dotfilesRepoCandidates = [
   process.env.DOTFILES_REPO,
-  "/Users/sushi/code/dotfiles",
+  resolve(homedir(), "code", "dotfiles"),
 ].filter(Boolean);
 const powersyncServiceRepoCandidates = [
   process.env.POWERSYNC_SERVICE_REPO,
-  "/Users/sushi/code/powersync-service",
+  resolve(homedir(), "code", "powersync-service"),
 ].filter(Boolean);
 export const coreRuleIds = new Set(["no-restricted-imports"]);
 const powersyncSqlRuleOptions = {

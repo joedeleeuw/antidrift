@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,7 +31,7 @@ const selfRepoCandidates = [
 ].filter(Boolean);
 const murderboxRepoCandidates = [
   process.env.MURDERBOX_REPO,
-  "/Users/sushi/code/murderbox",
+  resolve(homedir(), "code", "murderbox"),
 ].filter(Boolean);
 
 const corpusPlans = [

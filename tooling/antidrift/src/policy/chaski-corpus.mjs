@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -22,7 +23,7 @@ const plugin = {
 
 const defaultRepoCandidates = [
   process.env.CHASKI_REPO,
-  "/Users/sushi/code/chaski",
+  resolve(homedir(), "code", "chaski"),
 ].filter(Boolean);
 const defaultTypeAwareProjects = {
   bff: "src/frontend/bff/tsconfig.json",

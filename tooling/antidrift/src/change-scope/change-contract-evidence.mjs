@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 
 import { gitOrThrow } from "./change-context.mjs";
@@ -8,9 +8,9 @@ import { runChangeContract } from "./change-contract.mjs";
 const repoPlans = {
   "sudocode-main": [
     process.env.SUDOCODE_REPO,
-    "/Users/sushi/code/sudocode-main",
+    resolve(homedir(), "code", "sudocode-main"),
   ].filter(Boolean),
-  chaski: [process.env.CHASKI_REPO, "/Users/sushi/code/chaski"].filter(Boolean),
+  chaski: [process.env.CHASKI_REPO, resolve(homedir(), "code", "chaski")].filter(Boolean),
 };
 
 const cases = [

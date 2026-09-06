@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +10,7 @@ import plugin from "../oxlint-plugin/index.js";
 
 const defaultRepoCandidates = [
   process.env.CHASKI_REPO,
-  "/Users/sushi/code/chaski",
+  resolve(homedir(), "code", "chaski"),
 ].filter(Boolean);
 const defaultTargets = ["src/frontend/**/*.{ts,tsx}"];
 const defaultThreshold = 3;

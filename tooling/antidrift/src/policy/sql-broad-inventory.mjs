@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import {
   existsSync,
   readFileSync,
@@ -13,7 +14,7 @@ import { ESLint } from "eslint";
 
 import antidrift from "../eslint-plugin/index.js";
 
-const defaultCodeRoot = process.env.CODE_ROOT ?? "/Users/sushi/code";
+const defaultCodeRoot = process.env.CODE_ROOT ?? resolve(homedir(), "code");
 const defaultExcludes = ["agent-guardrails-monorepo-template", "chaski"];
 const ignoredDirectoryNames = new Set([
   ".cache",
