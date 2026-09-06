@@ -17,6 +17,8 @@ import { ruleNoIdentitySchemaTransform } from "./rules/no-identity-schema-transf
 import { ruleNoExplicitTypeArgumentsOnOwnedApi } from "./rules/no-explicit-type-arguments-on-owned-api.js";
 import { ruleRequireConvexReturnValidator } from "./rules/require-convex-return-validator.js";
 import { ruleNoSchemaValidatorTranscoding } from "./rules/no-schema-validator-transcoding.js";
+import { ruleNoRedundantLocalReturnType } from "./rules/no-redundant-local-return-type.js";
+import ruleNoMockedResponseBodyOracle from "../oxlint-plugin/rules/no-mocked-response-body-oracle.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
@@ -33,9 +35,12 @@ const rules = {
   "no-parse-as-cast": ruleNoParseAsCast(),
   "no-appeasement-erasure": ruleNoAppeasementErasure(),
   "no-identity-schema-transform": ruleNoIdentitySchemaTransform(),
-  "no-explicit-type-arguments-on-owned-api": ruleNoExplicitTypeArgumentsOnOwnedApi(),
+  "no-explicit-type-arguments-on-owned-api":
+    ruleNoExplicitTypeArgumentsOnOwnedApi(),
   "require-convex-return-validator": ruleRequireConvexReturnValidator(),
   "no-schema-validator-transcoding": ruleNoSchemaValidatorTranscoding(),
+  "no-redundant-local-return-type": ruleNoRedundantLocalReturnType(),
+  "no-mocked-response-body-oracle": ruleNoMockedResponseBodyOracle(),
 };
 
 export default {

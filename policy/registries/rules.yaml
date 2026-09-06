@@ -162,6 +162,15 @@ ruleFamilies:
           - "function compactText(file: ParsedFile) { return file.source.trim(); }"
           - "export function selectSource(file: ParsedFile): string { return file.source; }"
           - "const action = ActionSchema.parse(raw);"
+      inferred-local-return-ownership:
+        intent: Remove a nested implementation return annotation only when exact inference and an independently declared enclosing return contract both preserve type ownership.
+        rules:
+          - antidrift/no-redundant-local-return-type
+        flags:
+          - "function selectedData(): Record<Id, Selection> { const selectedFor = (id: Id): Selection => { const selected = configs[0]; return { configs, id, selected }; }; return { default: selectedFor('default') }; }"
+        allows:
+          - "function selectedData() { const selectedFor = (id: Id): Selection => { const selected = configs[0]; return { configs, id, selected }; }; return selectedFor('default'); }"
+          - "function createApi(): Api { const build = (): Result => { return { value }; }; return { build }; } export const api = { createApi };"
       type-escape-casts:
         intent: Prevent casts from manufacturing named, narrowed, or branded contracts without a guard, parser, or brand constructor.
         rules:
@@ -929,6 +938,39 @@ rules:
         - 'type ButtonProps = ComponentProps<"button"> & { tone?: Tone; size?: Size };'
         - "function Wrapper(props: BaseProps) { return <Base {...props} />; }"
     nextAction: Run real-corpus inventory for threshold calibration and revisit stable promotion after class/PropTypes/HOC false-negative decisions are explicit.
+  antidrift/no-raw-react-native-touchables:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: deterministic AST import and re-export source plus configured exact owner-file paths
+    solveType: interaction-primitive-ownership
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-raw-react-native-touchables.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - Murderbox is the first real drift and clean corpus; independent replication is still required before stable promotion.
+      - Namespace and default imports from React Native or RNGH are intentionally rejected because they bypass named-import ownership even when their current member usage is clean; their diagnostic first directs clean code to named non-interaction imports.
+      - Type-only imports and re-exports remain clean because they cannot expose a runtime interaction primitive.
+      - Dynamic import, CommonJS require, and deep package subpath forms remain outside this rule; the first consumer already rejects require imports and unowned package internals and has no real dynamic or subpath bypass.
+      - allowedFiles rejects bare filenames, globs, parent paths, and absolute paths so one owner entry cannot accidentally exempt every same-named module.
+    external:
+      state: config-replacement
+      support: high
+      candidates: ["Oxlint no-restricted-imports"]
+      decision: own-antidrift
+      whyThisState: "Core restricted-import configuration can ban the same named imports and apply file overrides."
+      whyNotOtherState: "The custom rule remains the owner because the reusable policy maintains two package-specific primitive sets, blocks namespace/default and re-export bypasses, accepts exact owner files, and emits one feedback-preset and adapter-ownership remediation. Retire it if generated core config becomes equally maintainable."
+    examples:
+      flags:
+        - 'import { Pressable as NativePressable } from "react-native";'
+        - 'import * as RNGH from "react-native-gesture-handler";'
+        - 'export { TouchableOpacity } from "react-native";'
+      allows:
+        - 'import { Touchable } from "@/tw";'
+        - 'import { View } from "react-native";'
+        - 'import { Gesture } from "react-native-gesture-handler";'
+        - 'import type { TouchableOpacityProps } from "react-native";'
+    nextAction: "Enable in Murderbox with apps/client/src/tw/index.tsx as the exact owner, inventory another React Native repository, and retire in favor of generated no-restricted-imports if the custom ownership delta disappears."
   antidrift/no-raw-fetch-in-component:
     status: ready
     stable: false
@@ -983,6 +1025,58 @@ rules:
         - 'import { fetch } from "./api"; function Orders() { fetch("/api/orders"); return <div />; }'
         - "function Orders() { const { data } = useOrders(); return <div>{data.length}</div>; }"
     nextAction: Keep default-off inventory while re-inventorying real component fetch findings under the narrowed same-frame JSX-return proof before restoring blocking severity.
+  antidrift/no-redundant-local-return-type:
+    status: under-proven
+    stable: false
+    defaultOff: true
+    referenceDoc: docs/rule-investigations/no-redundant-local-return-type.md
+    signal: TypeChecker identity proof for every required mutable property plus same-type contextual ownership at every call in the immediate enclosing function's return expression
+    solveType: type-contract-shape
+    proofBuckets: [semantic-source-type-provenance, local-ast-source-shape]
+    promotion:
+      proofBucket: semantic-source-type-provenance
+      association: A nested local implementation's exact inferred shorthand-object properties to same-type contextual call sites owned by its immediate enclosing function's explicit return contract.
+      blockingThreshold: Report only when every external reference is a direct call inside the immediate enclosing function's return expression and the TypeChecker assigns every call the identical contextual type as the removable annotation.
+      ecosystemComparison: Maintained explicit-return-type rules require annotations at selected surfaces; they do not prove that a nested annotation duplicates inference while another local contract remains authoritative.
+      corpusEvidence: Murderbox committed model-selector-menu-data.ts line 311 supplies the first drift anchor; selectedFor calls are owned by selectedVideoConfigDataFor's Record return contract and then feed ModelSelectorMenuData.selectedVideoConfigByModel.
+      realCorpusInventory: docs/rule-investigations/no-redundant-local-return-type.md, docs/real-corpus-validation.md, and the pinned Murderbox external corpus case record the real source path, owner chain, expected finding, and clean-control boundaries.
+      realCorpusInventoryRefs:
+        - docs/rule-investigations/no-redundant-local-return-type.md
+        - docs/real-corpus-validation.md
+        - tooling/antidrift/src/policy/external-corpus/cases.mjs
+      replicationsNotIntroducedForTest: true
+      knownFalsePositives: 0
+      knownFalseNegatives: Top-level private helpers, inferred enclosing owners, unconstrained local call assignments, indirect result-flow beyond the immediate return expression, non-shorthand objects, and imported or derived return types are deliberately missed.
+      productionConcerns: Murderbox is the only real drift repository. Keep default-off until independent replication and broad clean-control review justify promotion.
+      noSinkBehavior: This rule emits no semantic facts; diagnostics depend on local TypeChecker identity and contextual return ownership.
+      noDeadWorkBehavior: Inferred owners, non-call uses, direct and indirect function-value exports, overloads, recursion, local function dependencies, callbacks, and broader private-helper annotations stay clean.
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: Return-type alias resolution and exact shorthand-property type identity are local to this rule; extract a shared inference-equivalence adapter only if another rule needs the same proof.
+    corpusRepositories: [murderbox]
+    concerns:
+      - "The first real drift anchor is Murderbox selectedFor in model-selector-menu-data.ts; independent replication has not been established."
+      - "The proof intentionally misses top-level private helpers, inferred enclosing returns, unconstrained call sites, non-shorthand object properties, interfaces, imported or derived return types, optional or readonly properties, multiple returns, async/generator functions, overloads, recursion, local function dependencies, contextual callbacks, and direct or indirect public boundary exposure."
+      - "The retired no-explicit-return-type-private-helper decision remains locked; this rule does not revive broad private-helper annotation policing."
+    external:
+      state: net-antidrift
+      support: none
+      candidates:
+        - "@typescript-eslint/explicit-function-return-type"
+        - "@typescript-eslint/explicit-module-boundary-types"
+      decision: own-antidrift
+      whyThisState: "Maintained rules require return annotations at configured surfaces; they do not prove that one nested implementation annotation exactly repeats TypeScript inference."
+      whyNotOtherState: "This is not equivalent or partial overlap because the ecosystem rules enforce the opposite policy and do not compare the inferred shorthand-object shape with a named local type literal."
+    examples:
+      flags:
+        - "function outer(configs: Config[]): Record<Id, Selection> { const selectedFor = (id: Id): Selection => { const selected = configs[0]; return { configs, id, selected }; }; return { default: selectedFor('default') }; }"
+      allows:
+        - "export function selectedFor(id: Id): Selection { return { configs, id, selected }; }"
+        - "function outer() { const selectedFor = (): Selection => { return { configs, id, selected }; }; return selectedFor(); }"
+        - "function createApi(): Api { const build = (): Result => { return { value }; }; return { build }; } export const api = { createApi };"
+        - "function outer() { const selectedFor = (): ReadonlySelection => { return { configs, id, selected }; }; }"
+        - "function outer() { const selectedFor = (): Selection => condition ? first : second; }"
+    nextAction: Keep default-off while inventorying the exact proof against independent repositories and reviewing any findings as either redundant nested implementation annotations or legitimate local contracts.
   antidrift/no-redundant-zod-parse:
     status: ready
     stable: true
@@ -1679,6 +1773,38 @@ rules:
         - "<Widget label={'x'} />"
         - "Schema.Struct({ id });"
     nextAction: "Keep default-off until a second repo provides quantified real drift; then run a corpus inventory and consider stable promotion."
+  antidrift/no-mocked-response-body-oracle:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: deterministic AST plus same-test mock arrangement and local response.json provenance
+    solveType: test-quality-mocked-response-body-oracle
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/test-validator-oracles.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - The rule requires a supported mock arrangement and a response.json-derived object or array shape assertion in the same test/spec callback. It reports the assertion, not the mock.
+      - Local const aliases and transparent await/member chains are followed, but application calls, helper bodies, cross-file ownership, scalar assertions, and unrelated parser APIs terminate the proof.
+      - The cleaned Murderbox corpus supplies the motivating route-test shape, while reduced programs lock status, header, request, call-count, artifact, unmocked-response, and independent-effect clean controls.
+    external:
+      state: net-antidrift
+      support: low
+      candidates:
+        ["Oxlint Vitest rules", "ESLint no-restricted-syntax", "ast-grep"]
+      decision: own-antidrift
+      whyThisState: "Maintained test-integrity rules do not combine same-test mock arrangement with local response.json provenance and object-shape assertion syntax."
+      whyNotOtherState: "Not partial-overlap because selectors can match mock setup or response assertions separately but cannot express the callback-local conjunction and narrow alias flow without broad noise."
+    examples:
+      flags:
+        - "backend.mockResolvedValue(payload); const response = await GET(request); const body = await response.json(); expect(body).toEqual(payload);"
+        - "backend.mockReturnValueOnce(payload); await expect(response.json()).resolves.toMatchObject({ id: 'user_1' });"
+        - "backend.mockImplementation(load); expect(body).toEqual(expect.objectContaining({ id: 'user_1' }));"
+      allows:
+        - "const response = await GET(request); expect(response.status).toBe(200);"
+        - "backend.mockResolvedValue(payload); await GET(request); expect(backend).toHaveBeenCalledWith(request);"
+        - "backend.mockResolvedValue(payload); await GET(request); expect(await persistedUser()).toMatchObject({ state: 'active' });"
+        - "const body = await response.json(); expect(body).toEqual({ id: 'user_1' }); // no mock arranged in this test"
+    nextAction: "Inventory independent repositories and review every finding by deleting pure mock-body echo tests or retaining only independently owned effects before considering default-on enforcement."
   antidrift/no-nonindependent-test-oracle:
     status: ready
     stable: false
@@ -1711,10 +1837,72 @@ rules:
       allows:
         - 'assert.deepEqual(runtimeConnections.map((server) => server.name), ["needle", "context7"]);'
         - "expect(renderConfig(registry)).toEqual({ mcpServers: { executor: { url } } });"
-        - "expect(schema.parse(valid).activation).toEqual(validActivation);"
         - 'expect(renderActivation(schema.parse(valid))).toBe("activation enabled");'
         - "trigger(); trigger(); expect(handler).toHaveBeenCalledTimes(1);"
     nextAction: "Inventory existing guardrails and dotfiles findings, then split actionable replacements into behavioral/full-output assertions while tracking noisy branches before stable promotion."
+  antidrift/no-schema-library-in-test:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: deterministic AST import and test-file scope
+    solveType: test-quality-schema-library-ownership
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/test-validator-oracles.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - The runtime-schema library set is deliberately finite and evidence-backed; do not expand it to parser or serialization packages merely because they expose parse or decode functions.
+      - Type-only imports stay clean. Static value imports, dynamic imports, TypeScript import-equals declarations, and unshadowed CommonJS require calls report only in test/spec files.
+      - The cleaned Murderbox corpus supplies motivating real drift but no current drift path; keep the rule default-off until another repository independently replicates the pattern.
+    external:
+      state: partial-overlap
+      support: high
+      candidates:
+        ["Oxlint no-restricted-imports", "ESLint no-restricted-imports"]
+      decision: own-antidrift
+      whyThisState: "Core import restrictions can ban static schema-library imports in configured test globs, but the portable rule also preserves type-only imports and covers dynamic import, import-equals, and unshadowed CommonJS require syntax."
+      whyNotOtherState: "Not equivalent or config-replacement because the complete cross-module-format test-file behavior is not represented by one maintained rule configuration."
+    examples:
+      flags:
+        - 'import { z } from "zod"; const LocalSchema = z.object({ id: z.string() });'
+        - 'const { object } = require("valibot");'
+      allows:
+        - 'import type { ZodType } from "zod";'
+        - 'import { UserSchema } from "../contracts/user";'
+        - 'import { z } from "zod"; export const UserSchema = z.object({ id: z.string() }); // production file'
+    nextAction: "Run the rule over additional test corpora with type-only imports and non-Zod schema libraries before considering default-on enforcement."
+  antidrift/no-validator-output-oracle:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: deterministic AST plus local const-binding and projection flow
+    solveType: test-quality-validator-output-oracle
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/test-validator-oracles.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - The rule follows assertion subjects through local const bindings and transparent built-in projections, but stops at substantive outer calls and never guesses from application helper names or cross-file wrapper bodies.
+      - JSON, YAML, path, URL, query-string, and TOML parser bindings stay clean. Broad direct .parse assertion matching remains default-off until application parser clean controls are inventoried across more repositories.
+      - The cleaned Murderbox corpus supplies motivating direct validator-oracle drift but no current drift path; reduced programs are regression locks only.
+    external:
+      state: net-antidrift
+      support: low
+      candidates:
+        ["Oxlint Vitest rules", "ESLint no-restricted-syntax", "ast-grep"]
+      decision: own-antidrift
+      whyThisState: "Maintained test-integrity rules do not trace assertion subjects through validator result bindings, outcome/error projections, built-in projections, bound validator methods, async decoders, or validator-only throw callbacks."
+      whyNotOtherState: "Not partial-overlap because syntax selectors can match direct calls but cannot express the local dataflow and application-call stop boundary that defines this rule."
+    examples:
+      flags:
+        - 'const parsed = UserSchema.parse(raw); expect(parsed.id).toBe("user_1");'
+        - "expect(UserSchema.safeParse(raw).success).toBe(true);"
+        - 'expect(Object.keys(UserSchema.parse(raw))).toEqual(["id"]);'
+        - "expect(() => UserSchema.parse(raw)).toThrow();"
+      allows:
+        - 'expect(renderUser(UserSchema.parse(raw))).toBe("User user_1");'
+        - 'const user = UserSchema.parse(raw); expect(renderUser(user)).toBe("User user_1");'
+        - 'expect(JSON.parse(text)).toEqual({ id: "user_1" });'
+        - "expect(YAML.parse(text).version).toBe(2);"
+    nextAction: "Inventory application parser APIs and assertion frameworks across independent repositories before considering default-on enforcement."
   antidrift/no-static-property-loop:
     status: ready
     stable: false
@@ -1865,15 +2053,17 @@ rules:
     nextAction: "Keep the rule opt-in and inventory member-read flagging pressure on diagnostics display surfaces across at least one more repository before considering stable promotion."
 
   antidrift/no-conditional-empty-object-spread:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST conditional expression with an empty object branch inside an object spread
     solveType: conditional-property-omission
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The implementation is pinned to the imported anti-slop source; upstream changes require an explicit source resync.
+      - A conditional spread can be the exact typed representation of an optional response field; Murderbox provider normalizers produced 42 findings without type-evidence loss.
     external:
       state: equivalent
       support: high
@@ -1886,17 +2076,19 @@ rules:
         - "const options = { ...(timeout !== undefined ? { timeout } : {}) };"
       allows:
         - "const options = {}; if (timeout !== undefined) options.timeout = timeout;"
-    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+    nextAction: "Keep default-off until the rule distinguishes type-evidence loss from ordinary optional property construction."
   antidrift/no-module-mocking:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST import-bound Vitest or Jest module-mock call
     solveType: test-module-seam
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The implementation is pinned to the imported anti-slop source; upstream changes require an explicit source resync.
+      - Module mocking is a consumer test-architecture choice; Murderbox legitimately mocks Electron, Clerk, and preload module boundaries.
     external:
       state: equivalent
       support: high
@@ -1909,17 +2101,19 @@ rules:
         - 'vi.mock("./user-store");'
       allows:
         - "const store = createUserStore({ repository });"
-    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+    nextAction: "Keep default-off; consumers that prohibit module mocking can opt into the rule for their test scopes."
   antidrift/no-object-parameters:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST direct or lexical-alias object parameter annotation
     solveType: broad-input-parameter
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The syntax proof resolves lexical aliases but not imported type aliases.
+      - Generic serialization boundaries can intentionally accept any non-primitive object without defining a domain contract.
     external:
       state: equivalent
       support: high
@@ -1932,17 +2126,19 @@ rules:
         - "function save(value: object) {}"
       allows:
         - "function save(value: UserInput) {}"
-    nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
+    nextAction: "Keep default-off until the rule proves a domain input rather than a generic runtime boundary."
   antidrift/no-reflect-apply:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST global Reflect.apply call
     solveType: reflective-call-escape
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The implementation intentionally treats every global Reflect.apply call as a type-evidence escape.
+      - Runtime adapters and tests can intentionally invoke a dynamically captured function whose owner does not expose a static callable type.
     external:
       state: equivalent
       support: high
@@ -1955,17 +2151,19 @@ rules:
         - "Reflect.apply(operation, owner, args);"
       allows:
         - "operation.apply(owner, args);"
-    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+    nextAction: "Keep default-off until reflective invocation can be separated from avoidable type-evidence escape."
   antidrift/no-reflect-get:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST global Reflect.get call
     solveType: reflective-property-escape
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The implementation intentionally treats every global Reflect.get call as a type-evidence escape.
+      - Runtime adapters can intentionally inspect an injected untyped global or protocol object whose property names are discovered dynamically.
     external:
       state: equivalent
       support: high
@@ -1978,7 +2176,7 @@ rules:
         - "Reflect.get(owner, key);"
       allows:
         - "owner.typedProperty;"
-    nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
+    nextAction: "Keep default-off until reflective boundary access can be separated from avoidable type-evidence escape."
   antidrift/no-runtime-typeof:
     status: false-positive-prone
     stable: false
@@ -2076,15 +2274,17 @@ rules:
         - "function handle(input: UserInput) {}"
     nextAction: "Keep default-off until the rule proves a non-boundary consumer or recognizes parser and transport boundaries."
   antidrift/no-unknown-returns:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST explicit unknown or Promise unknown return contract
     solveType: unparsed-function-output
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The syntax proof resolves lexical aliases but not imported type aliases.
+      - Unknown is an honest output for raw external data before parsing and for minimal ports that intentionally discard a dependency return value.
     external:
       state: equivalent
       support: high
@@ -2097,7 +2297,7 @@ rules:
         - "function load(): unknown { return input; }"
       allows:
         - "function load(): User { return user; }"
-    nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
+    nextAction: "Keep default-off until the rule recognizes parser, transport, and ignored-return dependency boundaries."
   antidrift/no-unknown-type-aliases:
     status: ready
     stable: false
@@ -2145,15 +2345,17 @@ rules:
         - "const user = UserSchema.parse(input);"
     nextAction: "Blocking by owner decision; track upstream behavior changes through an explicit vendored-source update."
   antidrift/no-unsafe-dictionary-type:
-    status: ready
+    status: false-positive-prone
     stable: false
+    defaultOff: true
     signal: AST dictionary value contract containing unknown any object or empty-object escape types
     solveType: broad-dictionary-value
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-    corpusRepositories: [agent-guardrails-monorepo-template]
+    corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
       - The syntax proof resolves lexical aliases but not imported type aliases.
+      - Record<string, unknown> is the honest intermediate type for heterogeneous JSON objects after object-kind validation and before field narrowing.
     external:
       state: equivalent
       support: high
@@ -2166,7 +2368,7 @@ rules:
         - "type Metadata = Record<string, unknown>;"
       allows:
         - "type Metadata = Record<string, MetadataValue>;"
-    nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
+    nextAction: "Keep default-off until the rule distinguishes persisted or domain dictionaries from untrusted JSON boundary objects."
   antidrift/require-safety-comment-for-type-assertion:
     status: false-positive-prone
     stable: false

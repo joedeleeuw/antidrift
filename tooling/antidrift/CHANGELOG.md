@@ -8,6 +8,26 @@
 - Replace the synthetic 148-sample claim with complete source authenticated by Git commit/tree/blob proofs and exact diagnostics at the pinned Homer revision.
 - Include the verified upstream NOTICE, pinned module provenance and complete Apache license text. Verify every new custom rule and every native preset category through the packed consumer artifact.
 
+## 0.10.4
+
+- narrow `no-mocked-response-body-oracle` to response expectations that statically match a value arranged by a mock in the same test; transformed responses, canonical error mappings, and additive-field stripping remain clean
+
+## 0.10.3
+
+- add default-off `no-raw-react-native-touchables`: consumer-configured owner files may import React Native or RNGH interaction primitives, while feature imports, aliases, namespace/default imports, and re-exports receive direct shared-`Touchable` and narrow-adapter remediation
+- add default-off `no-schema-library-in-test` for runtime-schema value imports/requires in test files while preserving type-only imports
+- add default-off `no-validator-output-oracle` for assertions that trace through local bindings and transparent projections to direct validator output or validator-only throw callbacks
+- add default-off `no-mocked-response-body-oracle` on both syntax plugin exports: within one test callback, report object/array shape assertions tracing to `response.json()` when a supported mock arrangement supplies the boundary; recommend deleting pure mock echoes and retaining only independently owned effects
+
+## 0.10.2
+
+- add default-off `no-redundant-local-return-type`: reports only nested local implementations whose final shorthand-object return repeats a direct named type literal and whose calls remain constrained by the immediate enclosing function's explicit return contract; inferred owners, exported/public escapes, contextual callbacks, overloads, recursion, local function dependencies, and broader private-helper annotations stay clean
+
+## 0.10.1
+
+- keep only unknown aliases and chained assertions blocking from the imported syntax rules; return the categorical style, test-seam, reflection, and external-data boundary rules to opt-in after the first real consumer migration showed that their syntax alone cannot distinguish drift from legitimate boundaries
+- validate the shared default through the packed consumer without relying on findings from experimental rules
+
 ## 0.10.0
 
 - vendor the generic rules and Effect service-constructor rule from `dmmulroy/anti-slop` commit `6d538555cb151d4121ed51a27db81890eacf8ae9`; enable the nine rules with bounded syntax ownership, keep five false-positive-prone rules registered but default-off, make `no-unsafe-cast-chain` own upstream chained-assertion behavior, and incorporate upstream known-value-widening and widen-then-assert detection into `no-appeasement-erasure`

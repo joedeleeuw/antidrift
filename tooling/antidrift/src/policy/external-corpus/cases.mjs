@@ -858,6 +858,22 @@ export const murderboxCases = [
     paths: ["apps/client/src/screens/conversation-timeline-durability.ts"],
   },
   {
+    id: "murderbox-model-selector-redundant-local-return-type",
+    ruleId: "antidrift/no-redundant-local-return-type",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "client",
+    typeAware: true,
+    tsconfig: "apps/client/tsconfig.json",
+    paths: ["apps/client/src/components/chat/model-selector-menu-data.ts"],
+    expectedFindings: [
+      {
+        path: "apps/client/src/components/chat/model-selector-menu-data.ts",
+        line: 311,
+      },
+    ],
+  },
+  {
     id: "murderbox-machines-missing-return-validators",
     ruleId: "antidrift/require-convex-return-validator",
     kind: "drift",
