@@ -327,7 +327,7 @@ export function externalCorpus(
   options?: PolicyCommandOptions,
 ): Promise<unknown>;
 export function defaultAstGrepBinary(): string;
-export function defaultAstGrepConfig(): string;
+export const DEFAULT_AST_GREP_CONFIG: string;
 export function parseShellGuardrailsArgs(argv?: string[]): ShellGuardrailsArgs;
 export function shellGuardrails(options?: PolicyCommandOptions): number;
 export function parseOxlintArgs(

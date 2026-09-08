@@ -196,10 +196,6 @@ function selectedPlans(repo, plans) {
   return plans.filter((plan) => requested.has(plan.repo));
 }
 
-function normalizePath(path) {
-  return path.replace(/\\/gu, "/");
-}
-
 function sourceKind(path) {
   return /(^|\/)(?:gen|generated|__generated__)(?:\/|$)|\.generated\./u.test(
     path,
@@ -234,7 +230,7 @@ function escapeSegment(segment) {
 }
 
 function globRegex(pattern) {
-  const segments = normalizePath(pattern).split("/");
+  const segments = pattern.replace(/\\/gu, "/").split("/");
   let source = "^";
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
@@ -282,7 +278,10 @@ function isTypeScriptSource(sourceFile) {
 }
 
 function sourceMatches(repoRoot, sourceFile, targets) {
-  const relativePath = normalizePath(relative(repoRoot, sourceFile.fileName));
+  const relativePath = relative(repoRoot, sourceFile.fileName).replace(
+    /\\/gu,
+    "/",
+  );
   if (relativePath.startsWith("../")) return false;
   return targetMatchers(targets).some((matcher) => matcher.test(relativePath));
 }
@@ -354,15 +353,15 @@ function declarationProperties(checker, type, node) {
     .getPropertiesOfType(type)
     .map((symbol) => propertyShape(checker, symbol, container))
     .filter(Boolean)
-    .sort((left, right) =>
-      left.name.localeCompare(right.name) || left.type.localeCompare(right.type),
+    .sort(
+      (left, right) =>
+        left.name.localeCompare(right.name) ||
+        left.type.localeCompare(right.type),
     );
 }
 
 function fingerprint(properties) {
-  return createHash("sha256")
-    .update(JSON.stringify(properties))
-    .digest("hex");
+  return createHash("sha256").update(JSON.stringify(properties)).digest("hex");
 }
 
 function location(sourceFile, node) {
@@ -382,7 +381,7 @@ function declarationFor(repoRoot, plan, sourceFile, checker, node) {
   if (!isObjectType(declared)) return null;
   const properties = declarationProperties(checker, declared, node);
   if (properties.length < MIN_PROPS) return null;
-  const path = normalizePath(relative(repoRoot, sourceFile.fileName));
+  const path = relative(repoRoot, sourceFile.fileName).replace(/\\/gu, "/");
   return {
     ...info,
     repo: plan.repo,
@@ -462,7 +461,9 @@ function groupDeclarations(declarations) {
           generatedDeclarationCount > 0 &&
           generatedDeclarationCount < sorted.length,
         generatedDeclarationCount,
-        declarations: sorted.map(({ properties: _properties, ...entry }) => entry),
+        declarations: sorted.map(
+          ({ properties: _properties, ...entry }) => entry,
+        ),
       };
     })
     .filter((group) => group.declarations.length >= 2)
@@ -510,7 +511,7 @@ function diagnosticSummary(repoRoot, diagnostics) {
     code: diagnostic.code,
     category: ts.DiagnosticCategory[diagnostic.category],
     path: diagnostic.file
-      ? normalizePath(relative(repoRoot, diagnostic.file.fileName))
+      ? relative(repoRoot, diagnostic.file.fileName).replace(/\\/gu, "/")
       : undefined,
     message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
   }));
@@ -624,7 +625,9 @@ export function declarationCloneInventory({
   report = console.log,
 } = {}) {
   const results = selectedPlans(repo, plans).map((plan) => {
-    progress(`[declaration-clone-inventory] scanning ${plan.repo}/${plan.label}`);
+    progress(
+      `[declaration-clone-inventory] scanning ${plan.repo}/${plan.label}`,
+    );
     const result = runPlan(plan, targets);
     progress(
       `[declaration-clone-inventory] ${plan.repo}/${plan.label}: ${result.checkedFiles ?? 0} files, ${result.declarationCount ?? 0} declarations, ${result.cloneGroupCount ?? 0} clone groups, ${result.parserErrors ?? 0} parser errors`,

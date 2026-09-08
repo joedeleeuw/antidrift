@@ -6,11 +6,15 @@ Regular linters check syntax and a handful of correctness rules. They don't noti
 
 antidrift writes those patterns down as deterministic rules so the machine catches them instead of you.
 
-Oxlint owns syntax-only custom rules and shared governance. ESLint owns only the custom rules that need TypeScript's `Program` and `TypeChecker`. Generic TypeScript, React, Vitest, Unicorn, import-style, and repository-boundary policy belongs to each consumer. No custom rule ID is exported by both plugins.
+Oxlint owns syntax-only custom rules and shared governance. ESLint owns the custom rules that need TypeScript's `Program` and `TypeChecker`. Portable rules may be exported by both plugins, but each rule runs through only one configured runtime. Generic TypeScript, React, Vitest, Unicorn, import-style, and repository-boundary policy belongs to each consumer.
 
 The positive pattern behind the rules is one owner per concept: domain owns business vocabulary, contracts own wire schemas, API boundaries validate and authorize, gateways own SDKs, and UI consumes resource/result unions instead of local duplicate shapes.
 
 ## Install
+
+The shared governance preset enables `antidrift/no-wrapping-functions` as an error by default. Named functions and named arrows that only delegate to another call must earn their extra layer through a concrete boundary or callback requirement. Exports are included. Anonymous inline callbacks, calculations, argument transformations and functions that own additional behavior stay outside the rule. It provides no automatic fix. When removing a callback adapter, preserve its exact signature, receiver behavior, hook position and stable identity; pass the existing owner directly only when it already satisfies that callback contract.
+
+For example, `const loadItems = (id) => owner.load(id)` reports; call `owner.load(id)` directly at its callers. `button.onClick(() => owner.load(id))` remains a callback with deferred execution. For a subscription API, `useSyncExternalStore(subscribeToConsent, getSnapshot)` is the valid direct substitution only when `subscribeToConsent` has the adapter's signature and receiver semantics; do not replace a required stable adapter with a new inline arrow or `.bind`. ESLint-only consumers can enable the same rule through the ESLint plugin; do not enable it in both lint runtimes.
 
 ```sh
 pnpm add -D @joedeleeuw/antidrift oxlint eslint typescript typescript-eslint @typescript-eslint/parser

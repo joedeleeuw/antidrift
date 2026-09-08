@@ -1,5 +1,11 @@
 # changelog
 
+## 0.12.0
+
+- Enable `antidrift/no-wrapping-functions` at error severity by default. It reports named declarations and named arrow/function expressions that only delegate a call, including exports. Inline callbacks and computations stay outside the rule; no automatic fix is provided.
+- Remove delegation-only helpers from Antidrift's own implementation and exercise default enforcement through an installed package in the consumer smoke.
+- Replace the `defaultAstGrepConfig()` policy export with the static `DEFAULT_AST_GREP_CONFIG` path. Consumers should read the constant directly.
+
 ## 0.11.0
 
 - Resolve optional research checkout defaults from the current user's home directory instead of shipping maintainer-local absolute paths.

@@ -15,12 +15,8 @@ function compareStrings(left, right) {
   return 0;
 }
 
-function normalizePath(path) {
-  return path.replace(/\\/gu, "/");
-}
-
 function repoPath(cwd, fileName) {
-  return normalizePath(relative(cwd, fileName));
+  return relative(cwd, fileName).replace(/\\/gu, "/");
 }
 
 function isTsSourcePath(path) {
@@ -73,10 +69,6 @@ function withMaterializedGitTree({ cwd, head }, callback) {
   }
 }
 
-function diagnosticText(diagnostic) {
-  return ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
-}
-
 function readTsconfig(cwd, tsconfig) {
   const configPath = resolve(cwd, tsconfig);
   const loaded = ts.readConfigFile(configPath, (fileName) =>
@@ -84,7 +76,7 @@ function readTsconfig(cwd, tsconfig) {
   );
   if (loaded.error) {
     throw new Error(
-      `module-graph-radius: could not read ${tsconfig}: ${diagnosticText(loaded.error)}`,
+      `module-graph-radius: could not read ${tsconfig}: ${ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n")}`,
     );
   }
   const parsed = ts.parseJsonConfigFileContent(
@@ -96,7 +88,7 @@ function readTsconfig(cwd, tsconfig) {
   );
   if (parsed.errors.length > 0) {
     throw new Error(
-      `module-graph-radius: invalid ${tsconfig}: ${parsed.errors.map(diagnosticText).join("; ")}`,
+      `module-graph-radius: invalid ${tsconfig}: ${parsed.errors.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")).join("; ")}`,
     );
   }
   return parsed;
@@ -225,9 +217,9 @@ function touchedTsFiles(changedFiles) {
   return changedFiles
     .filter((file) => isTsSourcePath(file.path))
     .map((file) => ({
-      path: normalizePath(file.path),
+      path: file.path.replace(/\\/gu, "/"),
       operation: file.operation,
-      oldPath: file.oldPath ? normalizePath(file.oldPath) : null,
+      oldPath: file.oldPath ? file.oldPath.replace(/\\/gu, "/") : null,
     }))
     .sort((left, right) => compareStrings(left.path, right.path));
 }
@@ -318,7 +310,7 @@ function collectTouchedModuleGraphFromDirectory({
     }
   }
   const entrypoints = allowedEntrypoints
-    .map(normalizePath)
+    .map((path) => path.replace(/\\/gu, "/"))
     .sort(compareStrings);
   const missingEntrypoints = entrypoints.filter(
     (entrypoint) => !graph.has(entrypoint),

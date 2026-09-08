@@ -6,7 +6,7 @@ const isAstNode = (node) =>
   node !== null &&
   "type" in node &&
   typeof node.type === "string";
-const isScopeIdentifier = (node) => isIdentifier(node);
+
 const REPLACE_METHODS = new Set(["replace", "replaceAll"]);
 const getStaticPropertyName = (node) => {
   if (isIdentifier(node)) {
@@ -51,7 +51,7 @@ export default {
     if (!isRuleFile(context)) return {};
 
     const resolveVariable = (identifierNode) => {
-      if (!isScopeIdentifier(identifierNode)) {
+      if (!isIdentifier(identifierNode)) {
         return null;
       }
       let scope = context.sourceCode.getScope(identifierNode);

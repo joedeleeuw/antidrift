@@ -4,7 +4,6 @@ import { dirname, resolve } from "node:path";
 
 const defaultStdout = { write: (value) => process.stdout.write(value) };
 const defaultStderr = { write: (value) => process.stderr.write(value) };
-const defaultExit = (status) => process.exit(status);
 
 export function resolveOxlintBinary() {
   const require = createRequire(import.meta.url);
@@ -66,7 +65,7 @@ export function runOxlint({
   spawn = spawnSync,
   stdout = defaultStdout,
   stderr = defaultStderr,
-  exit = defaultExit,
+  exit = process.exit,
 } = {}) {
   const parsed = parseOxlintArgs(argv, { cwd });
   if (parsed.help) {

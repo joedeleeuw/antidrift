@@ -14,12 +14,8 @@ function compareStrings(left, right) {
   return 0;
 }
 
-function normalizedPath(path) {
-  return path.replace(/\\/gu, "/");
-}
-
 function relativePath(root, path) {
-  return normalizedPath(relative(root, path));
+  return relative(root, path).replace(/\\/gu, "/");
 }
 
 function codeFiles(changedFiles) {
@@ -58,7 +54,7 @@ function factEntry(fact) {
     ruleId: fact.ruleId,
     adapterId: fact.adapterId,
     confidence: fact.confidence,
-    path: normalizedPath(fact.filePath ?? ""),
+    path: (fact.filePath ?? "").replace(/\\/gu, "/"),
     line: fact.location?.line ?? null,
     column: fact.location?.column ?? null,
     evidenceHash: fact.evidenceHash,

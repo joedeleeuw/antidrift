@@ -59,10 +59,6 @@ function moduleGraphConfigured(scope) {
   );
 }
 
-function surfaceConfigured(scope, surface) {
-  return scope.checkedSurfaces.includes(surface);
-}
-
 function touchedModuleGraphFor({ contract, surface, cwd, head, tsconfig }) {
   if (!moduleGraphConfigured(contract.scope)) return null;
   if (contract.scope.allowedEntrypoints.length === 0) {
@@ -123,7 +119,7 @@ export function runChangeContract({
     base,
     head,
     cwd,
-    includeExports: surfaceConfigured(contract.scope, "exports"),
+    includeExports: contract.scope.checkedSurfaces.includes("exports"),
     includePatchHunks: false,
   });
   const contractState = contractStateFor(

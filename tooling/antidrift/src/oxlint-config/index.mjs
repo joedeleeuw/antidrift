@@ -72,6 +72,7 @@ const additionalAntidriftRules = {
   "antidrift/no-generic-module-names": "error",
   "antidrift/no-default-export-in-domain": "error",
   "antidrift/no-trivial-property-helpers": "error",
+  "antidrift/no-wrapping-functions": "error",
   "antidrift/no-tutorial-comments": "error",
   "antidrift/no-debug-residue-filenames": "error",
   "antidrift/no-placeholder-tests": "error",

@@ -1,5 +1,11 @@
 export const portableCases = [
   {
+    name: "no-wrapping-functions",
+    invalid: "export const loadItems = (id) => owner.load(id);",
+    valid:
+      "export const area = (radius) => Math.PI * radius ** 2; button.onClick(() => owner.load(id));",
+  },
+  {
     name: "no-bun-api-in-shared",
     filename: "packages/shared/portability.ts",
     invalid: 'import { file } from "bun";',

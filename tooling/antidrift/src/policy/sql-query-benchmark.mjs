@@ -369,18 +369,6 @@ function negativeRegexExitGuard(node) {
   return Boolean(isCallNamed(call, regexTestMethods) && statementExits(node.consequent));
 }
 
-function positiveRegexGuard(node) {
-  return isCallNamed(node.test, regexTestMethods);
-}
-
-function membershipGuard(node) {
-  return isCallNamed(node.test, membershipMethods);
-}
-
-function quantifierGuard(node) {
-  return isCallNamed(node.test, quantifierMethods);
-}
-
 function arrayJoinedText(node) {
   const object = node.callee?.object;
   if (object?.type !== "ArrayExpression") return null;
@@ -425,13 +413,13 @@ function recordSqlGuard({ repo, repoRoot, filePath, inventory, node, source, sql
   if (negativeRegexExitGuard(node)) {
     inventory.guardShapes.negativeRegexExit += 1;
     pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "negative-regex-exit", detail));
-  } else if (positiveRegexGuard(node)) {
+  } else if (isCallNamed(node.test, regexTestMethods)) {
     inventory.guardShapes.positiveRegexBranch += 1;
     pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "positive-regex-branch", detail));
-  } else if (membershipGuard(node)) {
+  } else if (isCallNamed(node.test, membershipMethods)) {
     inventory.guardShapes.membershipBranch += 1;
     pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "membership-branch", detail));
-  } else if (quantifierGuard(node)) {
+  } else if (isCallNamed(node.test, quantifierMethods)) {
     inventory.guardShapes.quantifierBranch += 1;
     pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "quantifier-branch", detail));
   }

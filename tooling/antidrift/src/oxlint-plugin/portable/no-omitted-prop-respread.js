@@ -257,8 +257,7 @@ const isRenderedChild = (child) => {
     child.expression.type !== "JSXEmptyExpression"
   );
 };
-const hasMeaningfulChildren = (element) =>
-  element.children.some(isRenderedChild);
+
 const unwrapSpread = (node) =>
   node?.type === "TSAsExpression" ||
   node?.type === "TSSatisfiesExpression" ||
@@ -380,7 +379,7 @@ export default {
         }
       }
       for (const key of omitted) {
-        if (key === "children" && hasMeaningfulChildren(node)) {
+        if (key === "children" && node.children.some(isRenderedChild)) {
           continue;
         }
         const lastOverrideIndex = attributes.findLastIndex(

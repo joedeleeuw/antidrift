@@ -151,10 +151,6 @@ function selectedPlans(repo, plans) {
   return plans.filter((plan) => requested.has(plan.repo));
 }
 
-function normalizePath(path) {
-  return path.replace(/\\/gu, "/");
-}
-
 function expandBraces(patterns) {
   const expanded = [];
   for (const pattern of patterns) {
@@ -181,7 +177,7 @@ function escapeSegment(segment) {
 }
 
 function globRegex(pattern) {
-  const segments = normalizePath(pattern).split("/");
+  const segments = pattern.replace(/\\/gu, "/").split("/");
   let source = "^";
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
@@ -229,7 +225,10 @@ function isTypeScriptSource(sourceFile) {
 }
 
 function sourceMatches(repoRoot, sourceFile, targets) {
-  const relativePath = normalizePath(relative(repoRoot, sourceFile.fileName));
+  const relativePath = relative(repoRoot, sourceFile.fileName).replace(
+    /\\/gu,
+    "/",
+  );
   if (relativePath.startsWith("../")) return false;
   return targetMatchers(targets).some((matcher) => matcher.test(relativePath));
 }
@@ -245,8 +244,10 @@ function resolvedSymbol(checker, symbol) {
 }
 
 function declaresInConvexOwnedModule(sym) {
-  for (const declaration of sym?.getDeclarations?.() ?? sym?.declarations ?? []) {
-    const file = normalizePath(declaration.getSourceFile().fileName);
+  for (const declaration of sym?.getDeclarations?.() ??
+    sym?.declarations ??
+    []) {
+    const file = declaration.getSourceFile().fileName.replace(/\\/gu, "/");
     if (
       file.includes("/convex/_generated/") ||
       file.includes("/node_modules/convex/")
@@ -322,13 +323,19 @@ function declaredType(checker, node) {
   }
 }
 
-function collectLocalTypes(repoRoot, program, checker, targets, generatedSources) {
+function collectLocalTypes(
+  repoRoot,
+  program,
+  checker,
+  targets,
+  generatedSources,
+) {
   const locals = [];
   for (const sourceFile of program.getSourceFiles()) {
     if (!isTypeScriptSource(sourceFile)) continue;
     if (isConvexGeneratedFile(sourceFile.fileName)) continue;
     if (!sourceMatches(repoRoot, sourceFile, targets)) continue;
-    const file = normalizePath(relative(repoRoot, sourceFile.fileName));
+    const file = relative(repoRoot, sourceFile.fileName).replace(/\\/gu, "/");
     const test = TEST_FILE_PATTERN.test(file);
     function visit(node) {
       if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
@@ -587,7 +594,9 @@ export function typeOwnerInventory({
         `[type-owner-inventory] ${plan.repo}/${plan.label}: ${result.candidateCount} candidates, ${result.scannedTypeCount} local types, ${result.matchCount} matches (exact ${counts["exact-owner-copy"]}, loosened ${counts["loosened-owner-copy"]}, partial ${counts["partial-owner-copy"]})`,
       );
     } else {
-      progress(`[type-owner-inventory] ${plan.repo}/${plan.label}: ${result.reason}`);
+      progress(
+        `[type-owner-inventory] ${plan.repo}/${plan.label}: ${result.reason}`,
+      );
     }
     return result;
   });

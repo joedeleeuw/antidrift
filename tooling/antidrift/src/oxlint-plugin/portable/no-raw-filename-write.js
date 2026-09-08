@@ -31,7 +31,6 @@ export default {
   create(context) {
     if (!isRuleFile(context)) return {};
 
-    const isIdentifierReference = (node) => isIdentifier(node);
     const resolveVariable = (identifier) => {
       let scope = context.sourceCode.getScope(identifier);
       while (scope !== null) {
@@ -107,7 +106,7 @@ export default {
           isRawFilenameExpression(expression.alternate, seenVariables)
         );
       }
-      if (!isIdentifierReference(expression)) {
+      if (!isIdentifier(expression)) {
         return false;
       }
       const variable = resolveVariable(expression);
