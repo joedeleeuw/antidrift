@@ -3,15 +3,12 @@ import ts from "typescript";
 import { unwrapExpression } from "../../semantic-adapters/local-ast-rules.mjs";
 import { isSqlIdentifierTokenValue } from "../../semantic-adapters/sql.mjs";
 
-const sqlPattern =
+export const SQL_PREFIX_PATTERN =
   /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
 const sqlSentencePattern =
   /\b(?:SELECT\b[\s\S]*?\bFROM\b|INSERT\s+INTO\b|UPDATE\b[\s\S]*?\bSET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
-export function containsSqlPrefix(value) {
-  return sqlPattern.test(value);
-}
 export function containsSqlStatement(value) {
-  return containsSqlPrefix(value) || sqlSentencePattern.test(value);
+  return SQL_PREFIX_PATTERN.test(value) || sqlSentencePattern.test(value);
 }
 export function templateText(node) {
   return node.quasis

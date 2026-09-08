@@ -45,6 +45,7 @@ import noTodoWithoutIssueRule from "./portable/no-todo-without-issue.js";
 import noGenericModuleNamesRule from "./portable/no-generic-module-names.js";
 import noDefaultExportInDomainRule from "./portable/no-default-export-in-domain.js";
 import noTrivialPropertyHelpersRule from "./portable/no-trivial-property-helpers.js";
+import noWrappingFunctionsRule from "./portable/no-wrapping-functions.js";
 import noTutorialCommentsRule from "./portable/no-tutorial-comments.js";
 import noDebugResidueFilenamesRule from "./portable/no-debug-residue-filenames.js";
 import noPlaceholderTestsRule from "./portable/no-placeholder-tests.js";
@@ -116,6 +117,7 @@ const rules = {
   "no-generic-module-names": noGenericModuleNamesRule,
   "no-default-export-in-domain": noDefaultExportInDomainRule,
   "no-trivial-property-helpers": noTrivialPropertyHelpersRule,
+  "no-wrapping-functions": noWrappingFunctionsRule,
   "no-tutorial-comments": noTutorialCommentsRule,
   "no-debug-residue-filenames": noDebugResidueFilenamesRule,
   "no-placeholder-tests": noPlaceholderTestsRule,

@@ -131,7 +131,7 @@ export const getFunctionStatements = (node) => {
   }
   return getNodeArray(body, "body");
 };
-export const getFunctionParams = (node) => getNodeArray(node, "params");
+
 export const splitWords = (value) => {
   if (value.length === 0) {
     return [];

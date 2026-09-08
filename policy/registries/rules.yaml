@@ -324,6 +324,12 @@ policyRuleReviews:
     coverage: Not implemented.
     reason: One-use helpers can be fake abstraction, but reference counts and helper size alone produce many legitimate local extraction cases.
     nextAction: Keep out of blocking scope until real programs prove a deterministic rule with clean domain-helper controls.
+  arch/no-wrapping-functions:
+    status: active-custom
+    antidriftRule: antidrift/no-wrapping-functions
+    coverage: Default error for named function declarations and named arrow/function expressions whose only operation is simple call delegation.
+    reason: The owner explicitly chose this as a style policy on September 8, 2026. Exporting or naming a wrapper does not exempt it.
+    nextAction: Keep enabled by default and preserve actual callback timing and boundary contracts when removing wrappers.
   arch/max-function-lines:
     status: spec-only
     coverage: Not enforced locally as a line-count rule; the shared Oxlint config enforces complexity, depth, and parameter budgets.
@@ -2568,6 +2574,35 @@ rules:
       allows:
         - "component.tsx; options={}; source: function userName(value) { return value.name; }"
     nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-wrapping-functions:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: Deterministic AST for an explicitly adopted named-delegation style policy
+    solveType: no-wrapping-functions
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-wrapping-functions.md
+    corpusRepositories: [homer, chatbiz-webapp]
+    concerns:
+      - A matching wrapper can be a legitimate adapter or boundary. This is a style diagnostic, not proof that deleting the function preserves semantics. No automatic fix is provided.
+      - The shared governance preset enables this owner-chosen style policy at error severity. Exceptions need a concrete, documented boundary requirement.
+    external:
+      state: net-antidrift
+      support: none
+      candidates:
+        [eslint/no-useless-call, unicorn/prefer-native-coercion-functions]
+      decision: own-antidrift
+      whyThisState: Adjacent ecosystem rules do not report general named delegation functions.
+      whyNotOtherState: The owner explicitly chose a named-delegation style policy on September 8, 2026; this does not revive the retired typed-return rule.
+    examples:
+      flags:
+        - "export function useMachines() { return useQuery(api.machines.list, {}); }"
+        - "export const loadItems = (id) => owner.load(id);"
+      allows:
+        - "const area = (radius) => Math.PI * radius ** 2;"
+        - "button.onClick(() => owner.load(id));"
+    nextAction: Keep default error severity; review concrete adapter requirements instead of automatically deleting functions. Do not claim stable semantic redundancy detection.
 
   antidrift/no-tutorial-comments:
     status: ready

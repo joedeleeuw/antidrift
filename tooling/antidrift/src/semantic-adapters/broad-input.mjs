@@ -253,7 +253,7 @@ export function objectEntriesCallbackProbe(node) {
   };
 }
 
-function isAnyOrUnknownType(type) {
+export function isAppeasementCastSourceType(type) {
   return Boolean(
     type && type.flags & (TS_TYPE_FLAG_ANY | TS_TYPE_FLAG_UNKNOWN),
   );
@@ -262,7 +262,7 @@ function isAnyOrUnknownType(type) {
 export function isBroadShapeProbeInputType(type, seen = new Set()) {
   if (!type || seen.has(type)) return false;
   seen.add(type);
-  if (isAnyOrUnknownType(type)) return true;
+  if (isAppeasementCastSourceType(type)) return true;
   return (type.types ?? []).some((part) =>
     isBroadShapeProbeInputType(part, seen),
   );
@@ -295,11 +295,11 @@ export function functionParameterByName(fn, name) {
 }
 
 export function isBroadPredicateInputType(checker, type) {
-  if (isAnyOrUnknownType(type)) return true;
+  if (isAppeasementCastSourceType(type)) return true;
   const stringIndexType = type.getStringIndexType?.();
-  if (isAnyOrUnknownType(stringIndexType)) return true;
+  if (isAppeasementCastSourceType(stringIndexType)) return true;
   const numberIndexType = type.getNumberIndexType?.();
-  if (isAnyOrUnknownType(numberIndexType)) return true;
+  if (isAppeasementCastSourceType(numberIndexType)) return true;
   return (
     (type.flags & TS_TYPE_FLAG_OBJECT) !== 0 &&
     checker.getPropertiesOfType(type).length === 0
@@ -331,10 +331,6 @@ function isAntidriftBrandedType(type, seen = new Set()) {
 
 export function isNamedTypeReference(typeNode) {
   return typeNode?.type === "TSTypeReference";
-}
-
-export function isAppeasementCastSourceType(type) {
-  return isAnyOrUnknownType(type);
 }
 
 export function isAppeasementCastTargetType(type) {

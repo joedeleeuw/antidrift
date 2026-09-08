@@ -419,7 +419,7 @@ function checkPackageReadmePublicEntryPoints(packageJson, repoRoot, errors) {
     }
   }
 }
-function checkSemanticAdapterPackageExports(contracts, repoRoot, errors) {
+export function checkPackageSurface(repoRoot, errors) {
   const packageJson = readPackageJson(repoRoot, errors);
   if (!packageJson) {
     return;
@@ -436,7 +436,7 @@ function checkSemanticAdapterPackageExports(contracts, repoRoot, errors) {
     "./src/semantic-adapters/index.mjs",
     errors,
   );
-  for (const contract of Object.values(contracts)) {
+  for (const contract of Object.values(SEMANTIC_ADAPTER_CONTRACTS)) {
     if (!isRecord(contract) || typeof contract.id !== "string") {
       continue;
     }
@@ -452,11 +452,4 @@ function checkSemanticAdapterPackageExports(contracts, repoRoot, errors) {
   checkPackageExportFilesAndDeclarations(packageJson, repoRoot, errors);
   checkPackageBinTargets(packageJson, repoRoot, errors);
   checkPackageReadmePublicEntryPoints(packageJson, repoRoot, errors);
-}
-export function checkPackageSurface(repoRoot, errors) {
-  checkSemanticAdapterPackageExports(
-    SEMANTIC_ADAPTER_CONTRACTS,
-    repoRoot,
-    errors,
-  );
 }

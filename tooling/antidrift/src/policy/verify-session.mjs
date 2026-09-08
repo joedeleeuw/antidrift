@@ -7,7 +7,6 @@ const STEP_TIMEOUT_MS = 360_000;
 const MAX_HOOK_OUTPUT_BUFFER = 32 * 1024 * 1024;
 const defaultStdout = { write: (value) => process.stdout.write(value) };
 const defaultStderr = { write: (value) => process.stderr.write(value) };
-const defaultExit = (status) => process.exit(status);
 
 function commandText(command, args) {
   return [command, ...args].join(" ");
@@ -48,7 +47,7 @@ export function verifySession({
   spawn = spawnSync,
   stdout = defaultStdout,
   stderr = defaultStderr,
-  exit = defaultExit,
+  exit = process.exit,
 } = {}) {
   for (const [command, args] of commands) {
     const result = spawn(command, args, {

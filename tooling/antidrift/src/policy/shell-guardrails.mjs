@@ -5,9 +5,11 @@ import { fileURLToPath } from "node:url";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
-export function defaultAstGrepConfig() {
-  return join(packageRoot, "ast-grep", "sgconfig.yml");
-}
+export const DEFAULT_AST_GREP_CONFIG = join(
+  packageRoot,
+  "ast-grep",
+  "sgconfig.yml",
+);
 
 export function defaultAstGrepBinary(env = process.env) {
   return (
@@ -20,7 +22,7 @@ export function defaultAstGrepBinary(env = process.env) {
 export function parseShellGuardrailsArgs(argv = [], env = process.env) {
   const parsed = {
     astGrepBinary: defaultAstGrepBinary(env),
-    config: defaultAstGrepConfig(),
+    config: DEFAULT_AST_GREP_CONFIG,
     cwd: process.cwd(),
     mode: "scan",
     passthrough: [],
@@ -80,7 +82,10 @@ export function shellGuardrails({
     return 0;
   }
 
-  if (isPathLikeCommand(parsed.astGrepBinary) && !exists(parsed.astGrepBinary)) {
+  if (
+    isPathLikeCommand(parsed.astGrepBinary) &&
+    !exists(parsed.astGrepBinary)
+  ) {
     stderr.write(
       `antidrift shell: ast-grep binary not found: ${parsed.astGrepBinary}\n`,
     );

@@ -221,13 +221,51 @@ try {
     );
   }
   const sharedRuleDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) => code !== "eslint(max-lines)",
+    ({ code }) =>
+      code !== "eslint(max-lines)" &&
+      code !== "antidrift(no-wrapping-functions)",
   );
   if (sharedRuleDiagnostics.length > 0) {
     fail(
       `default packed Oxlint config should leave experimental imported rules disabled, got: ${JSON.stringify(sharedRuleDiagnostics)}`,
     );
   }
+
+  const boundaryWrappers = repositoryDiagnostics.filter(
+    ({ code }) => code === "antidrift(no-wrapping-functions)",
+  );
+  if (
+    boundaryWrappers.length !== 4 ||
+    boundaryWrappers.some(
+      ({ filename, severity }) =>
+        filename !== "packages/app/src/legitimate-boundaries.ts" ||
+        severity !== "error",
+    )
+  ) {
+    fail(
+      `The named boundary examples must still receive default wrapper errors: ${JSON.stringify(boundaryWrappers)}`,
+    );
+  }
+
+  file(
+    "wrapping-default-proof.ts",
+    "declare const owner: { load(id: string): string };\nexport function loadItem(id: string) { return owner.load(id); }\nexport const readItem = (id: string) => owner.load(id);\nexport const area = (radius: number) => Math.PI * radius ** 2;\n",
+  );
+  const wrappingDiagnostics = lintOxlintRepository().diagnostics.filter(
+    ({ filename }) => filename === "wrapping-default-proof.ts",
+  );
+  if (
+    wrappingDiagnostics.length !== 2 ||
+    wrappingDiagnostics.some(
+      ({ code, severity }) =>
+        code !== "antidrift(no-wrapping-functions)" || severity !== "error",
+    )
+  ) {
+    fail(
+      `Default packed policy must reject named function and arrow wrappers: ${JSON.stringify(wrappingDiagnostics)}`,
+    );
+  }
+  rmSync(join(work, "wrapping-default-proof.ts"));
   const precedenceRuleIds = oxlintRuleIds(
     lintOxlint("oversized-root.ts", "oxlint.precedence.config.mjs"),
   );

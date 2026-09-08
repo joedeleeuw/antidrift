@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  defaultAstGrepConfig,
+  DEFAULT_AST_GREP_CONFIG,
   parseShellGuardrailsArgs,
   shellGuardrails,
 } from "./shell-guardrails.mjs";
@@ -28,7 +28,7 @@ describe("shellGuardrails", () => {
     expect(calls[0].args).toEqual([
       "scan",
       "--config",
-      defaultAstGrepConfig(),
+      DEFAULT_AST_GREP_CONFIG,
       ".",
     ]);
     expect(calls[0].options.cwd).toBe("/repo");
@@ -52,7 +52,7 @@ describe("shellGuardrails", () => {
     expect(calls[0].args).toEqual([
       "scan",
       "--config",
-      defaultAstGrepConfig(),
+      DEFAULT_AST_GREP_CONFIG,
       ".",
     ]);
     expect(calls[0].options.cwd).toBe("/repo");
@@ -73,7 +73,7 @@ describe("shellGuardrails", () => {
     expect(calls[0].args).toEqual([
       "scan",
       "--config",
-      defaultAstGrepConfig(),
+      DEFAULT_AST_GREP_CONFIG,
       "--globs",
       "*.sh",
     ]);
@@ -94,7 +94,7 @@ describe("shellGuardrails", () => {
     expect(calls[0].args).toEqual([
       "test",
       "--config",
-      defaultAstGrepConfig(),
+      DEFAULT_AST_GREP_CONFIG,
       "--skip-snapshot-tests",
     ]);
   });
