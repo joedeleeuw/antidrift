@@ -125,6 +125,7 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     exportName: "schemaProvenance",
     subpath: "@joedeleeuw/antidrift/semantic-adapters/schema-provenance",
     rules: Object.freeze([
+      "antidrift/no-redundant-zod-parse",
       "antidrift/no-parse-as-cast",
       "antidrift/no-identity-schema-transform",
     ]),
