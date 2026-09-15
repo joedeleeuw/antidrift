@@ -957,6 +957,41 @@ export const murderboxCases = [
       },
     ],
   },
+  {
+    id: "murderbox-api-laguna-profile-mirrors-conf",
+    ruleId: "antidrift/no-repo-state-mirror-assertion",
+    kind: "drift",
+    classification: "ready",
+    subproject: "api",
+    ruleOptions: {
+      "antidrift/no-repo-state-mirror-assertion": [
+        { sources: [{ module: "./conf" }] },
+      ],
+    },
+    paths: ["apps/api/lib/server/laguna-profile.test.ts"],
+    expectedFindings: [
+      {
+        path: "apps/api/lib/server/laguna-profile.test.ts",
+        line: 17,
+      },
+      {
+        path: "apps/api/lib/server/laguna-profile.test.ts",
+        line: 36,
+      },
+      {
+        path: "apps/api/lib/server/laguna-profile.test.ts",
+        line: 42,
+      },
+      {
+        path: "apps/api/lib/server/laguna-profile.test.ts",
+        line: 50,
+      },
+      {
+        path: "apps/api/lib/server/laguna-profile.test.ts",
+        line: 56,
+      },
+    ],
+  },
 ];
 
 export const cloudflareAgentsCases = [
@@ -1358,6 +1393,20 @@ export const powersyncServiceCases = [
 ];
 
 export const antidriftCases = [
+  ...[
+    ["no-redeclared-owned-union", "owned-union"],
+    ["no-open-dictionary-at-boundary", "open-dictionary"],
+    ["unknown-input-must-be-decoded", "unknown-input"],
+    ["no-convex-return-widening", "convex-return"],
+  ].map(([name, fixture]) => ({
+    id: `antidrift-${name}-clean`,
+    ruleId: `antidrift/${name}`,
+    kind: "correct",
+    classification: "ready",
+    subproject: "tooling",
+    ruleOptions: { [`antidrift/${name}`]: [{ allows: [] }] },
+    paths: [`tooling/antidrift/src/eslint-plugin/fixtures/${fixture}/allows.ts`],
+  })),
   {
     id: "antidrift-eslint-config-static-property-loop",
     ruleId: "antidrift/no-static-property-loop",

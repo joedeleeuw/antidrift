@@ -1856,6 +1856,146 @@ rules:
         - 'const exit = Number(props.ExecMainStatus ?? 0);'
     nextAction: "Keep the rule opt-in and inventory member-read flagging pressure on diagnostics display surfaces across at least one more repository before considering stable promotion."
 
+  antidrift/no-repo-state-mirror-assertion:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: Test assertions that import repo-owned state (configuration, manifests, registries) and compare it against literal values or pin a specific key's presence
+    solveType: repo-state-mirror-assertion
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-repo-state-mirror-assertion.md
+    corpusRepositories: [murderbox]
+    concerns:
+      - The rule is inert until configured with the repository's own state modules, so an unconfigured adoption silently reports nothing rather than failing loudly.
+      - Taint follows imports, aliases, and a small set of expression forms; dynamic property access, re-export indirection, or values routed through helper functions can hide a mirror.
+    external:
+      state: net-antidrift
+      support: low
+      candidates:
+        [
+          "ESLint no-restricted-imports",
+          "eslint-plugin-jest no-conditional-expect",
+          "SonarQube duplicated-literal detection",
+        ]
+      decision: own-antidrift
+      whyThisState: "No ecosystem rule relates an imported repo-owned state module to the literal values an assertion compares it against; import-restriction and duplicated-literal rules do not model the mirrored-state signal."
+      whyNotOtherState: "Not ecosystem-covered because the signal depends on taint from configured repo-owned modules, which no upstream test rule tracks."
+    examples:
+      flags:
+        - 'import { getChatProfileManifest } from "../lib/server/conf"; expect(getChatProfileManifest()).toEqual([{ id: "alpha", confFile: "model-alpha.conf", scope: "switchable" }]);'
+        - 'import { getChatProfileConf } from "../lib/server/conf"; expect(getChatProfileConf("retired-id")).toBeNull();'
+      allows:
+        - 'import { getChatProfileManifest } from "../lib/server/conf"; expect(getChatProfileManifest().length).toBeGreaterThan(0);'
+        - 'import { getChatRuntimeProfiles, getChatProfileManifest } from "../lib/server/conf"; expect(getChatRuntimeProfiles().map((p) => p.id)).toEqual(getChatProfileManifest().map((e) => e.id));'
+    nextAction: "Inventory taint-coverage pressure (re-exports, dynamic access, fixture helpers) on at least one more repository before considering stable promotion or default-on enforcement."
+
+  antidrift/no-redeclared-owned-union:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: Exact AST literal member-set equality between a union and an in-scope exported runtime constant array
+    solveType: redeclared-owned-union
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-redeclared-owned-union.md
+    corpusRepositories: [antidrift]
+    concerns:
+      - Re-export chains and computed arrays remain unproven; ownership requires a directly inspectable exported constant array.
+      - Equal member sets can represent distinct concepts; explicit name exemptions and default-off adoption preserve consumer control.
+    external:
+      state: net-antidrift
+      support: low
+      candidates: ["@typescript-eslint/no-duplicate-type-constituents"]
+      decision: own-antidrift
+      whyThisState: "The candidate checks repeated constituents within one union, rather than equality to a runtime array owner."
+      whyNotOtherState: "Broader ecosystem coverage remains unverified; the local source-shape proof supports provisional independent ownership."
+    examples:
+      flags:
+        - 'export const PHASES = ["queued", "done"] as const; type Phase = "queued" | "done";'
+      allows:
+        - 'export const PHASES = ["queued", "done"] as const; type Phase = (typeof PHASES)[number];'
+    nextAction: "Collect independently pinned external corpus evidence before stable or default-on promotion."
+
+  antidrift/no-open-dictionary-at-boundary:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: Open string-keyed any or unknown dictionary annotations in exported function signatures and variable declarations
+    solveType: open-dictionary-at-boundary
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-open-dictionary-at-boundary.md
+    corpusRepositories: [antidrift]
+    concerns:
+      - Genuine protocol bags need explicit exported-name exemptions.
+      - Named types and inferred signatures are not expanded without type services.
+    external:
+      state: net-antidrift
+      support: low
+      candidates: ["@typescript-eslint/no-restricted-types", "@typescript-eslint/no-explicit-any"]
+      decision: own-antidrift
+      whyThisState: "Type bans do not distinguish open dictionaries at exported boundaries from private implementation types."
+      whyNotOtherState: "Provisional source-shape ownership; independently pinned external false-positive evidence is still needed."
+    examples:
+      flags:
+        - 'export function receive(input: Record<string, unknown>) {}'
+      allows:
+        - 'export function receive(input: Message) {}'
+        - 'function internal(input: Record<string, unknown>) {}'
+    nextAction: "Inventory external API boundaries and genuine dictionary exemptions before promotion."
+
+  antidrift/unknown-input-must-be-decoded:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: Explicit unknown parameters and locals read outside decoding or successful type-predicate control flow
+    solveType: unknown-input-decoding
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/unknown-input-must-be-decoded.md
+    corpusRepositories: [antidrift]
+    concerns:
+      - Decoder names are a syntax convention; AST evidence cannot certify runtime validation behavior.
+      - Predicate signatures must be directly visible; re-export chains and complex control-flow joins remain unproven.
+      - Low-level decoder implementations using structural probes may need exact-name exemptions.
+    external:
+      state: net-antidrift
+      support: low
+      candidates: ["@typescript-eslint/no-unsafe-argument", "@typescript-eslint/no-unsafe-assignment"]
+      decision: own-antidrift
+      whyThisState: "Unsafe-any checks do not require explicitly unknown boundary inputs to flow through decoders or owned type predicates."
+      whyNotOtherState: "This is a provisional opt-in boundary policy; broad external adoption evidence is not yet available."
+    examples:
+      flags:
+        - 'function receive(input: unknown) { return String(input); }'
+      allows:
+        - 'function receive(input: unknown) { return messageSchema.parse(input); }'
+        - 'try { work(); } catch (error: unknown) { report(error); }'
+    nextAction: "Inventory decoder conventions and predicate control-flow false positives in independently pinned external repositories."
+
+  antidrift/no-convex-return-widening:
+    status: ready
+    stable: false
+    defaultOff: true
+    signal: Convex function return validators with direct or nested v.any leaves
+    solveType: convex-return-widening
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/no-convex-return-widening.md
+    corpusRepositories: [antidrift]
+    concerns:
+      - Validator aliases and factory-produced definitions are not expanded by the syntax proof.
+      - Custom function builder wrappers outside Convex imports are intentionally unproven.
+    external:
+      state: net-antidrift
+      support: low
+      candidates: ["@typescript-eslint/no-explicit-any", "Convex return-validator presence checks"]
+      decision: own-antidrift
+      whyThisState: "A present return validator may still widen its leaves; neither TypeScript-any bans nor validator-presence checks prove its owned shape."
+      whyNotOtherState: "Provisional local source-shape ownership pending independently pinned external corpus evidence."
+    examples:
+      flags:
+        - 'import { query } from "./_generated/server"; import { v } from "convex/values"; export const list = query({ returns: v.array(v.any()), handler: run });'
+      allows:
+        - 'import { query } from "./_generated/server"; import { v } from "convex/values"; export const list = query({ returns: v.array(messageValidator), handler: run });'
+    nextAction: "Inventory real Convex return surfaces and wrapper usage in independently pinned external repositories before promotion."
+
 retiredRules:
   antidrift/no-query-data-type-parameters:
     status: retired

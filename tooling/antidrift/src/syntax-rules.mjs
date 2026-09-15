@@ -8,14 +8,18 @@ import {
   ruleRequireAuthzCheck,
 } from "./semantic-adapters/local-ast-rules.mjs";
 import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling-components-as-functions.js";
+import ruleNoConvexReturnWidening from "./oxlint-plugin/rules/no-convex-return-widening.js";
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "./oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
 import ruleNoNonindependentTestOracle from "./oxlint-plugin/rules/no-nonindependent-test-oracle.js";
+import ruleNoOpenDictionaryAtBoundary from "./oxlint-plugin/rules/no-open-dictionary-at-boundary.js";
 import ruleNoRedundantZodParse from "./oxlint-plugin/rules/no-redundant-zod-parse.js";
+import ruleNoRedeclaredOwnedUnion from "./oxlint-plugin/rules/no-redeclared-owned-union.js";
 import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-mirror-assertion.js";
 import ruleNoSentinelAbsenceFallback from "./oxlint-plugin/rules/no-sentinel-absence-fallback.js";
 import ruleNoSilentEmptyDetectionFallback from "./oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
 import ruleNoStaticPropertyLoop from "./oxlint-plugin/rules/no-static-property-loop.js";
+import ruleUnknownInputMustBeDecoded from "./oxlint-plugin/rules/unknown-input-must-be-decoded.js";
 import ruleRequireEffectDeps from "./oxlint-plugin/rules/require-effect-deps.js";
 
 // Rules that need no type information. Single-owned by the Oxlint plugin
@@ -25,6 +29,7 @@ export function createSyntaxRules() {
   return {
     "no-async-array-method": ruleNoAsyncArrayMethod(),
     "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
+    "no-convex-return-widening": ruleNoConvexReturnWidening(),
     "no-duplicated-conditional-classnames":
       ruleNoDuplicatedConditionalClassnames(),
     "no-duplicated-object-field-blocks": ruleNoDuplicatedObjectFieldBlocks(),
@@ -33,7 +38,9 @@ export function createSyntaxRules() {
     "no-inline-structural-type-at-use-site":
       ruleNoInlineStructuralTypeAtUseSite(),
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
+    "no-open-dictionary-at-boundary": ruleNoOpenDictionaryAtBoundary(),
     "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
+    "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
     "no-redundant-zod-parse": ruleNoRedundantZodParse(),
     "no-repo-state-mirror-assertion": ruleNoRepoStateMirrorAssertion(),
     "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
@@ -43,5 +50,6 @@ export function createSyntaxRules() {
     "no-status-literal-in-type": ruleNoStatusLiteralInType(),
     "require-authz-check": ruleRequireAuthzCheck(),
     "require-effect-deps": ruleRequireEffectDeps,
+    "unknown-input-must-be-decoded": ruleUnknownInputMustBeDecoded(),
   };
 }

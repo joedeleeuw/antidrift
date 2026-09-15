@@ -118,21 +118,25 @@ function moduleFacts(filePath) {
   return facts;
 }
 
+function collectImportStatement(statement, imports) {
+  const specifier = statement.source?.value;
+  if (typeof specifier !== "string") return;
+  for (const entry of statement.specifiers ?? []) {
+    if (entry.type === "ImportSpecifier") {
+      const imported =
+        entry.imported?.type === "Identifier"
+          ? entry.imported.name
+          : String(entry.imported?.value ?? "");
+      imports.set(entry.local.name, { specifier, imported });
+    } else if (entry.type === "ImportDefaultSpecifier") {
+      imports.set(entry.local.name, { specifier, imported: "default" });
+    }
+  }
+}
+
 function collectStatement(statement, imports, consts, exportAliases) {
   if (statement.type === "ImportDeclaration") {
-    const specifier = statement.source?.value;
-    if (typeof specifier !== "string") return;
-    for (const entry of statement.specifiers ?? []) {
-      if (entry.type === "ImportSpecifier") {
-        const imported =
-          entry.imported?.type === "Identifier"
-            ? entry.imported.name
-            : String(entry.imported?.value ?? "");
-        imports.set(entry.local.name, { specifier, imported });
-      } else if (entry.type === "ImportDefaultSpecifier") {
-        imports.set(entry.local.name, { specifier, imported: "default" });
-      }
-    }
+    collectImportStatement(statement, imports);
     return;
   }
   if (statement.type === "ExportNamedDeclaration") {

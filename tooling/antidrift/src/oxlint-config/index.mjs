@@ -24,12 +24,15 @@ const javascriptPlugins = [
 const disabledAntidriftRules = {
   "antidrift/no-async-array-method": "off",
   "antidrift/no-calling-components-as-functions": "off",
+  "antidrift/no-convex-return-widening": "off",
   "antidrift/no-duplicated-conditional-classnames": "off",
   "antidrift/no-duplicated-object-field-blocks": "off",
   "antidrift/no-handrolled-resource-lifecycle-cells": "off",
   "antidrift/no-inline-structural-type-at-use-site": "off",
   "antidrift/no-nonindependent-test-oracle": "off",
+  "antidrift/no-open-dictionary-at-boundary": "off",
   "antidrift/no-raw-fetch-in-component": "off",
+  "antidrift/no-redeclared-owned-union": "off",
   "antidrift/no-redundant-zod-parse": "off",
   "antidrift/no-repo-state-mirror-assertion": "off",
   "antidrift/no-sentinel-absence-fallback": "off",
@@ -37,6 +40,7 @@ const disabledAntidriftRules = {
   "antidrift/no-silent-empty-detection-fallback": "off",
   "antidrift/no-status-literal-in-type": "off",
   "antidrift/require-authz-check": "off",
+  "antidrift/unknown-input-must-be-decoded": "off",
 };
 
 const modifiedComplexityOptions = Object.freeze({
