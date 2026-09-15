@@ -45,8 +45,8 @@ export function UserPanel() {
 
   return (
     <section className="rounded-md border-border-subtle bg-surface-default p-4 text-fg-default">
-      <h2>{state.user.displayName}</h2>
-      <p>{state.user.email}</p>
+      <h2><bdi>{state.user.displayName}</bdi></h2>
+      <p><bdi>{state.user.email}</bdi></p>
       <Button>View profile</Button>
     </section>
   );

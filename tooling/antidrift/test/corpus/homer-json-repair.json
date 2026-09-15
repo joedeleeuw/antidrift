@@ -1,0 +1,21 @@
+{
+  "revision": "dc7d554d9925f5a4e6adc73844e8cd1b6057c3fc",
+  "file": "apps/api/lib/tools.ts",
+  "line": 1439,
+  "before": [
+    {
+      "ruleId": "antidrift/no-unsafe-deserialize",
+      "severity": 2,
+      "message": "Validate parsed JSON against the schema for 'Record<string, string>' before assigning that contract. JSON.parse validates syntax, not domain values.",
+      "line": 1439,
+      "column": 15,
+      "nodeType": "CallExpression",
+      "endLine": 1439,
+      "endColumn": 73
+    }
+  ],
+  "after": [],
+  "baselineTypeErrors": 0,
+  "repairedTypeErrors": 0,
+  "noNewTypeErrors": true
+}

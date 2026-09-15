@@ -8,23 +8,25 @@ import {
   ruleRequireAuthzCheck,
 } from "./semantic-adapters/local-ast-rules.mjs";
 import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling-components-as-functions.js";
-import ruleNoConvexReturnWidening from "./oxlint-plugin/rules/no-convex-return-widening.js";
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "./oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
+import ruleNoMockedResponseBodyOracle from "./oxlint-plugin/rules/no-mocked-response-body-oracle.js";
 import ruleNoNonindependentTestOracle from "./oxlint-plugin/rules/no-nonindependent-test-oracle.js";
-import ruleNoOpenDictionaryAtBoundary from "./oxlint-plugin/rules/no-open-dictionary-at-boundary.js";
-import ruleNoRedundantZodParse from "./oxlint-plugin/rules/no-redundant-zod-parse.js";
-import ruleNoRedeclaredOwnedUnion from "./oxlint-plugin/rules/no-redeclared-owned-union.js";
-import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-mirror-assertion.js";
+import ruleNoSchemaLibraryInTest from "./oxlint-plugin/rules/no-schema-library-in-test.js";
 import ruleNoSentinelAbsenceFallback from "./oxlint-plugin/rules/no-sentinel-absence-fallback.js";
 import ruleNoSilentEmptyDetectionFallback from "./oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
 import ruleNoStaticPropertyLoop from "./oxlint-plugin/rules/no-static-property-loop.js";
-import ruleUnknownInputMustBeDecoded from "./oxlint-plugin/rules/unknown-input-must-be-decoded.js";
+import ruleNoValidatorOutputOracle from "./oxlint-plugin/rules/no-validator-output-oracle.js";
 import ruleRequireEffectDeps from "./oxlint-plugin/rules/require-effect-deps.js";
+import ruleNoConvexReturnWidening from "./oxlint-plugin/rules/no-convex-return-widening.js";
+import ruleNoOpenDictionaryAtBoundary from "./oxlint-plugin/rules/no-open-dictionary-at-boundary.js";
+import ruleNoRedeclaredOwnedUnion from "./oxlint-plugin/rules/no-redeclared-owned-union.js";
+import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-mirror-assertion.js";
+import ruleUnknownInputMustBeDecoded from "./oxlint-plugin/rules/unknown-input-must-be-decoded.js";
 
 // Rules that need no type information. Single-owned by the Oxlint plugin
-// entry point per docs/lint-rule-parity.md; the ESLint plugin exports stay
-// disjoint so policy:check-rule-surface can reject dual registration.
+// entry point per docs/lint-rule-parity.md; selected portable rules may also
+// be exported by ESLint while remaining enabled by at most one runtime.
 export function createSyntaxRules() {
   return {
     "no-async-array-method": ruleNoAsyncArrayMethod(),
@@ -37,17 +39,19 @@ export function createSyntaxRules() {
       ruleNoHandrolledResourceLifecycleCells(),
     "no-inline-structural-type-at-use-site":
       ruleNoInlineStructuralTypeAtUseSite(),
+    "no-mocked-response-body-oracle": ruleNoMockedResponseBodyOracle(),
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
     "no-open-dictionary-at-boundary": ruleNoOpenDictionaryAtBoundary(),
-    "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
     "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
-    "no-redundant-zod-parse": ruleNoRedundantZodParse(),
     "no-repo-state-mirror-assertion": ruleNoRepoStateMirrorAssertion(),
+    "no-schema-library-in-test": ruleNoSchemaLibraryInTest(),
+    "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
     "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
     "no-shattered-ingested-entity-state": ruleNoShatteredIngestedEntityState(),
     "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
     "no-static-property-loop": ruleNoStaticPropertyLoop(),
     "no-status-literal-in-type": ruleNoStatusLiteralInType(),
+    "no-validator-output-oracle": ruleNoValidatorOutputOracle(),
     "require-authz-check": ruleRequireAuthzCheck(),
     "require-effect-deps": ruleRequireEffectDeps,
     "unknown-input-must-be-decoded": ruleUnknownInputMustBeDecoded(),

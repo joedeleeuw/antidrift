@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { defineConfig } from "oxlint";
@@ -11,7 +12,9 @@ const packageRequire = createRequire(import.meta.url);
 const javascriptPlugins = [
   {
     name: "antidrift",
-    specifier: "@joedeleeuw/antidrift/oxlint-plugin",
+    specifier: fileURLToPath(
+      new URL("../oxlint-plugin/index.js", import.meta.url),
+    ),
   },
   {
     name: "eslint-comments",
@@ -21,26 +24,93 @@ const javascriptPlugins = [
   },
 ];
 
-const disabledAntidriftRules = {
+const additionalAntidriftRules = {
+  "antidrift/no-anemic-errors": "error",
+  "antidrift/no-relative-cross-package-imports": "error",
+  "antidrift/confine-owner": "error",
+  "antidrift/docs-source-policy": "error",
+  "antidrift/icon-button-requires-tooltip": "error",
+  "antidrift/no-adhoc-loader": "error",
+  "antidrift/no-ambient-hotkey-format": "error",
+  "antidrift/no-async-context-enter-with": "error",
+  "antidrift/no-auth-token-in-web-storage": "error",
+  "antidrift/no-awaited-builder-union": "error",
+  "antidrift/no-centered-scroll-column": "error",
+  "antidrift/no-dialog-trigger-menu-item": "error",
+  "antidrift/no-disabled-tooltip-trigger": "error",
+  "antidrift/no-eager-singleton": "error",
+  "antidrift/no-inline-style-colors": "error",
+  "antidrift/no-omitted-prop-respread": "error",
+  "antidrift/no-partial-record-satisfies": "error",
+  "antidrift/no-path-prefix-containment": "error",
+  "antidrift/no-physical-properties": "error",
+  "antidrift/no-raw-foreground-opacity": "error",
+  "antidrift/no-redacted-log-attribute-key": "error",
+  "antidrift/no-spread-input-in-query-key": "error",
+  "antidrift/no-static-devtools-import": "error",
+  "antidrift/no-unformatted-number": "error",
+  "antidrift/no-unsafe-inner-html": "error",
+  "antidrift/no-portal-under-interactive-ancestor": "error",
+  "antidrift/require-detached-label-shape": "error",
+  "antidrift/require-dir-on-rendered-name": "error",
+  "antidrift/require-exhaustive-panic": "error",
+  "antidrift/require-fetch-timeout": "error",
+  "antidrift/require-function-replacer": "error",
+  "antidrift/require-query-key-factory": "error",
+  "antidrift/require-query-signal": "error",
+  "antidrift/require-safe-window-open": "error",
+  "antidrift/require-stable-snapshot": "error",
+  "antidrift/require-stream-reader-disposal": "error",
+  "antidrift/no-raw-filename-write": "error",
+  "antidrift/no-unsanitized-href": "error",
+  "antidrift/require-secure-document-response": "error",
+  "antidrift/no-bun-api-in-shared": "error",
+  "antidrift/no-duplicate-context": "error",
+  "antidrift/no-ai-debt-comments": "error",
+  "antidrift/no-as-never": "error",
+  "antidrift/no-todo-without-issue": "error",
+  "antidrift/no-generic-module-names": "error",
+  "antidrift/no-default-export-in-domain": "error",
+  "antidrift/no-trivial-property-helpers": "error",
+  "antidrift/no-wrapping-functions": "error",
+  "antidrift/no-tutorial-comments": "error",
+  "antidrift/no-debug-residue-filenames": "error",
+  "antidrift/no-placeholder-tests": "error",
+  "antidrift/no-unlisted-external-imports": "error",
   "antidrift/no-async-array-method": "off",
   "antidrift/no-calling-components-as-functions": "off",
   "antidrift/no-convex-return-widening": "off",
+  "antidrift/no-conditional-empty-object-spread": "off",
   "antidrift/no-duplicated-conditional-classnames": "off",
   "antidrift/no-duplicated-object-field-blocks": "off",
   "antidrift/no-handrolled-resource-lifecycle-cells": "off",
   "antidrift/no-inline-structural-type-at-use-site": "off",
+  "antidrift/no-module-mocking": "off",
+  "antidrift/no-mocked-response-body-oracle": "off",
   "antidrift/no-nonindependent-test-oracle": "off",
   "antidrift/no-open-dictionary-at-boundary": "off",
-  "antidrift/no-raw-fetch-in-component": "off",
   "antidrift/no-redeclared-owned-union": "off",
-  "antidrift/no-redundant-zod-parse": "off",
   "antidrift/no-repo-state-mirror-assertion": "off",
+  "antidrift/no-schema-library-in-test": "off",
+  "antidrift/no-object-parameters": "off",
+  "antidrift/no-raw-fetch-in-component": "off",
+  "antidrift/no-raw-react-native-touchables": "off",
+  "antidrift/no-reflect-apply": "off",
+  "antidrift/no-reflect-get": "off",
+  "antidrift/no-runtime-typeof": "off",
+  "antidrift/no-service-constructor-imports": "off",
   "antidrift/no-sentinel-absence-fallback": "off",
   "antidrift/no-shattered-ingested-entity-state": "off",
   "antidrift/no-silent-empty-detection-fallback": "off",
+  "antidrift/no-shape-in-symbol-names": "off",
   "antidrift/no-status-literal-in-type": "off",
-  "antidrift/require-authz-check": "off",
+  "antidrift/no-unknown-parameters": "off",
   "antidrift/unknown-input-must-be-decoded": "off",
+  "antidrift/no-unknown-returns": "off",
+  "antidrift/no-unsafe-dictionary-type": "off",
+  "antidrift/no-validator-output-oracle": "off",
+  "antidrift/require-authz-check": "off",
+  "antidrift/require-safety-comment-for-type-assertion": "off",
 };
 
 const modifiedComplexityOptions = Object.freeze({
@@ -143,7 +213,6 @@ function gatewayWrapperOverrides(registries, generatedPatterns) {
     }));
 }
 
-
 // TypeScript baseline, split by what it needs to run. Syntax rules work on any
 // Oxlint install. Type-aware rules need the oxlint-tsgolint package, so they
 // are included only when it is installed.
@@ -218,6 +287,36 @@ export function createGovernanceOxlintConfig({
     ...generatedPatterns,
     ...gatewayImportPatterns(registries),
   ];
+  const rules = {
+    ...antidriftTypescriptSyntaxRules,
+    "eslint-comments/require-description": "error",
+    "eslint-comments/disable-enable-pair": "error",
+    "eslint-comments/no-duplicate-disable": "error",
+    "eslint-comments/no-unlimited-disable": "error",
+    "eslint-comments/no-unused-disable": "error",
+    "eslint-comments/no-unused-enable": "error",
+    "antidrift/require-effect-deps": "error",
+    "antidrift/no-static-property-loop": "error",
+    "antidrift/no-unknown-type-aliases": "error",
+    "antidrift/no-unsafe-cast-chain": "error",
+    ...additionalAntidriftRules,
+    "max-lines": [
+      "error",
+      {
+        max: 1500,
+        skipBlankLines: false,
+        skipComments: false,
+      },
+    ],
+  };
+  if (typescriptBaselineTier(repoRoot) === "full") {
+    Object.assign(rules, antidriftTypescriptTypeAwareRules);
+  }
+  if (restrictedImportPatterns.length > 0) {
+    rules["no-restricted-imports"] = restrictedImportsRule(
+      restrictedImportPatterns,
+    );
+  }
 
   return defineConfig({
     categories: {
@@ -234,6 +333,7 @@ export function createGovernanceOxlintConfig({
       "**/dist/**",
       "**/coverage/**",
       "reports/**",
+      "tooling/antidrift/src/oxlint-plugin/anti-slop/**",
       ...generatedIgnores,
       "**/*.d.ts",
       "**/*.d.mts",
@@ -246,36 +346,7 @@ export function createGovernanceOxlintConfig({
       reportUnusedDisableDirectives: "error",
     },
     plugins: ["eslint", "typescript"],
-    rules: {
-      ...antidriftTypescriptSyntaxRules,
-      ...(typescriptBaselineTier(repoRoot) === "full"
-        ? antidriftTypescriptTypeAwareRules
-        : {}),
-      "eslint-comments/require-description": "error",
-      "eslint-comments/disable-enable-pair": "error",
-      "eslint-comments/no-duplicate-disable": "error",
-      "eslint-comments/no-unlimited-disable": "error",
-      "eslint-comments/no-unused-disable": "error",
-      "eslint-comments/no-unused-enable": "error",
-      "antidrift/require-effect-deps": "error",
-      "antidrift/no-static-property-loop": "error",
-      ...disabledAntidriftRules,
-      "max-lines": [
-        "error",
-        {
-          max: 1500,
-          skipBlankLines: false,
-          skipComments: false,
-        },
-      ],
-      ...(restrictedImportPatterns.length > 0
-        ? {
-            "no-restricted-imports": restrictedImportsRule(
-              restrictedImportPatterns,
-            ),
-          }
-        : {}),
-    },
+    rules,
     overrides: gatewayWrapperOverrides(registries, generatedPatterns),
   });
 }

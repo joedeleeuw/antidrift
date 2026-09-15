@@ -25,3 +25,14 @@ export function readAuthStateSafely() {
   const result: unknown = getAuthSnapshot();
   return authSnapshotSchema.safeParse(result);
 }
+
+export function widenForExhaustiveHandling() {
+  const value: unknown = { id: "x" };
+  return typeof value === "object" && value !== null;
+}
+
+const DEFAULT_STATE = {} as unknown;
+
+export function initialStateFor<State>(): State {
+  return DEFAULT_STATE as State;
+}

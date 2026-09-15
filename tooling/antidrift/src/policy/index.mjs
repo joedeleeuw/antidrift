@@ -40,7 +40,7 @@ export { chaskiCorpus } from "./chaski-corpus.mjs";
 export { externalCorpus } from "./external-corpus/runner.mjs";
 export {
   defaultAstGrepBinary,
-  defaultAstGrepConfig,
+  DEFAULT_AST_GREP_CONFIG,
   parseShellGuardrailsArgs,
   shellGuardrails,
 } from "./shell-guardrails.mjs";

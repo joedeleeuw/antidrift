@@ -83,15 +83,12 @@ export function createConfig({
         "antidrift/no-underchecked-type-predicate": "warn",
         "antidrift/no-defensive-shape-probing": "warn",
         "antidrift/no-parse-as-cast": "warn",
-        "antidrift/no-appeasement-erasure": "warn",
+        "antidrift/no-appeasement-erasure": "error",
         "antidrift/no-structural-type-fork": [
           "error",
           { generatedSources, packageTypeOwners },
         ],
-        "antidrift/no-canonical-model-fork": [
-          "error",
-          { canonicalEntities },
-        ],
+        "antidrift/no-canonical-model-fork": ["error", { canonicalEntities }],
         // SQL surface is delegated: sql-template owns untagged interpolation,
         // CodeQL/Semgrep own cross-function taint. The retired custom rule's
         // text-shape detection flagged parameterized tagged templates.
@@ -100,6 +97,7 @@ export function createConfig({
         "antidrift/require-convex-return-validator": "off",
         "antidrift/no-explicit-type-arguments-on-owned-api": "off",
         "antidrift/no-schema-validator-transcoding": "off",
+        "antidrift/no-redundant-local-return-type": "off",
         "antidrift/no-sql-string-concat": "off",
       },
     },

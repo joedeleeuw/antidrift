@@ -1,0 +1,4180 @@
+{
+  "revision": "dc7d554d9925f5a4e6adc73844e8cd1b6057c3fc",
+  "selection": "All 436 eligible native IDs; three lexically spaced samples per rule above fifty findings. Before is direct native configuration with default budgets; after is the exported composition preserving the three existing complexity budgets.",
+  "beforeExitCode": 1,
+  "afterExitCode": 1,
+  "rules": [
+    {
+      "rule": "eslint/accessor-pairs",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/array-callback-return",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/arrow-body-style",
+      "before": 20,
+      "after": 20,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/block-scoped-var",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/class-methods-use-this",
+      "before": 8,
+      "after": 8,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/complexity",
+      "before": 65,
+      "after": 30,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/curly",
+      "before": 1697,
+      "after": 1697,
+      "samples": [
+        {
+          "file": "apps/api/app/[[...rest]]/route.ts",
+          "line": 69,
+          "message": "Expected { after 'if' condition.",
+          "anchor": "  if (dot < 0) return \"application/octet-stream\";",
+          "context": "  const dot = path.lastIndexOf(\".\");\n  if (dot < 0) return \"application/octet-stream\";\n  return MIME.get(path.slice(dot).toLowerCase()) ?? \"application/octet-stream\";\n}\n",
+          "sha256": "ab65c5e71e6a095b849d666fc1bfd4b970b7f3b1071386af7a5e5e79433d0fd3",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Expected { after 'if' condition.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/lib/apple-local-chat-runtime.ts",
+          "line": 163,
+          "message": "Expected { after 'if' condition.",
+          "anchor": "    if (!activeSession) return;",
+          "context": "  async function closeSession() {\n    if (!activeSession) return;\n    activeSession = null;\n    await client.closeSession();\n  }",
+          "sha256": "694ba66083d7b408cc387df8c3a124691d5050e45d2901402b1901108b164b70",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Expected { after 'if' condition.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/opencode-policy.mjs",
+          "line": 266,
+          "message": "Expected { after 'if' condition.",
+          "anchor": "    writeFileSync(backup, readFileSync(opencodeConfigPath));",
+          "context": "  if (existsSync(opencodeConfigPath))\n    writeFileSync(backup, readFileSync(opencodeConfigPath));\n  writeAtomic(opencodeConfigPath, `${JSON.stringify(merged, null, 2)}\\n`);\n  return { path: opencodeConfigPath, backup };\n}",
+          "sha256": "d5190bef0a245a69d491e4547552404d59d6b931d68c8fd03d56b37cfa408081",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Expected { after 'if' condition.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent adding an unbraced branch that a subsequent edit can accidentally escape.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/default-case",
+      "before": 62,
+      "after": 62,
+      "samples": [
+        {
+          "file": "apps/api/lib/image-payload.ts",
+          "line": 163,
+          "message": "Require `default` cases in `switch` statements.",
+          "anchor": "      switch (control.kind) {",
+          "context": "    if (value === undefined || value === \"\") {\n      switch (control.kind) {\n        case \"number\":\n        case \"seed\":\n          fields.set(control.field, String(control.default));",
+          "sha256": "03e70318b34a74ba2c67f2f07b4680f89d9be7524c4edaeb0e690b47691fd277",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Require `default` cases in `switch` statements.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/lib/chat-runtime-view.ts",
+          "line": 194,
+          "message": "Require `default` cases in `switch` statements.",
+          "anchor": "  switch (endpoint.kind) {",
+          "context": "  }\n  switch (endpoint.kind) {\n    case \"loading\":\n      return warmingReadiness(target);\n    case \"offline\":",
+          "sha256": "651d227fcea152d6763e4bbbedea9660584199572265da5f82abf806e09bffb5",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Require `default` cases in `switch` statements.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/shared/src/switch-stream.ts",
+          "line": 463,
+          "message": "Require `default` cases in `switch` statements.",
+          "anchor": "          switch (evt.step) {",
+          "context": "        if (isTerminalSwitchStep(evt.step)) {\n          switch (evt.step) {\n            case \"ready\":\n              handlers.onReady?.();\n              return { outcome: \"ready\", lastPhase: evt.step };",
+          "sha256": "3b7ce71a91a77b2c9c1de0298c7cebbf725d9545dfc1743b804fa0d7edfc3837",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Require `default` cases in `switch` statements.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent leaving a switch without an explicit unmatched-input policy.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/default-case-last",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/default-param-last",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/grouped-accessor-pairs",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/guard-for-in",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/id-denylist",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/id-length",
+      "before": 266,
+      "after": 266,
+      "samples": [
+        {
+          "file": "apps/api/app/[[...rest]]/route.ts",
+          "line": 74,
+          "message": "Identifier name is too short (< 2).",
+          "anchor": "  for (const s of segments) {",
+          "context": "function safeJoin(root: string, segments: string[]): string | null {\n  for (const s of segments) {\n    if (!s || s === \".\" || s === \"..\" || s.includes(\"/\") || s.includes(\"\\\\\")) {\n      return null;\n    }",
+          "sha256": "ab65c5e71e6a095b849d666fc1bfd4b970b7f3b1071386af7a5e5e79433d0fd3",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Identifier name is too short (< 2).",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/chat/machine-chip-menu-handoff.test.tsx",
+          "line": 181,
+          "message": "Identifier name is too short (< 2).",
+          "anchor": "      JSON.stringify({ x: 32, y: 40, width: 120, height: 26 })",
+          "context": "    expect(screen.getByTestId(\"machine-anchor\").textContent).toBe(\n      JSON.stringify({ x: 32, y: 40, width: 120, height: 26 })\n    );\n    expect(screen.getByTestId(\"active-anchor\").textContent).toBe(\n      JSON.stringify({ x: 32, y: 40, width: 120, height: 26 })",
+          "sha256": "6124e1e76496bc7b1905f707324fd3ad60f17ae7ab0e3161a149f08b88026b6a",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Identifier name is too short (< 2).",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/opencode-policy.mjs",
+          "line": 42,
+          "message": "Identifier name is too short (< 2).",
+          "anchor": "    const n = input[i + 1];",
+          "context": "    const c = input[i];\n    const n = input[i + 1];\n    if (inString) {\n      out += c;\n      if (escape) escape = false;",
+          "sha256": "d5190bef0a245a69d491e4547552404d59d6b931d68c8fd03d56b37cfa408081",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Identifier name is too short (< 2).",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent introducing cryptic short bindings under the selected naming policy.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/id-match",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/logical-assignment-operators",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/max-depth",
+      "before": 5,
+      "after": 5,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/max-lines-per-function",
+      "before": 694,
+      "after": 694,
+      "samples": [
+        {
+          "file": "apps/api/app/api/admin/conf/route.test.ts",
+          "line": 31,
+          "message": "The function has too many lines (99). Maximum allowed is 50.",
+          "anchor": "describe(\"/api/admin/conf\", () => {",
+          "context": "\ndescribe(\"/api/admin/conf\", () => {\n  beforeEach(() => {\n    vi.clearAllMocks();\n    getChatProfileConf.mockReturnValue(\"/configs/qwen36.conf\");",
+          "sha256": "c2a7df22f64bbdd26a8b164038adf9a0543dd6d61912b590425e26a6cac6cc9b",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: The function has too many lines (99). Maximum allowed is 50.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/navigation/project-sidebar.tsx",
+          "line": 182,
+          "message": "The function `ThreadContextMenu` has too many lines (105). Maximum allowed is 50.",
+          "anchor": "function ThreadContextMenu({",
+          "context": "\nfunction ThreadContextMenu({\n  onClose,\n  onRename,\n  projectId,",
+          "sha256": "c339559690563bae24731e392b89f0051cf15bb60a1fd4b8495af1bb9f2c74f0",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: The function `ThreadContextMenu` has too many lines (105). Maximum allowed is 50.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/opencode-policy.mjs",
+          "line": 128,
+          "message": "The function `buildPermission` has too many lines (67). Maximum allowed is 50.",
+          "anchor": "function buildPermission(agentConfig) {",
+          "context": "\nfunction buildPermission(agentConfig) {\n  const toolMode = agentConfig.toolMode ?? \"workspace\";\n  if (toolMode === \"off\") return { \"*\": \"deny\", question: \"allow\" };\n",
+          "sha256": "d5190bef0a245a69d491e4547552404d59d6b931d68c8fd03d56b37cfa408081",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: The function `buildPermission` has too many lines (67). Maximum allowed is 50.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent growing one function beyond the explicitly selected review budget.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/max-nested-callbacks",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/max-params",
+      "before": 100,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/max-statements",
+      "before": 641,
+      "after": 641,
+      "samples": [
+        {
+          "file": "apps/api/app/[[...rest]]/route.ts",
+          "line": 143,
+          "message": "function `GET` has too many statements (20). Maximum allowed is 10.",
+          "anchor": "export async function GET(_request: Request, { params }: CatchAllRouteContext) {",
+          "context": "\nexport async function GET(_request: Request, { params }: CatchAllRouteContext) {\n  const { rest } = await params;\n  const segments = rest ?? [];\n  if (segments[0] === \"api\") {",
+          "sha256": "ab65c5e71e6a095b849d666fc1bfd4b970b7f3b1071386af7a5e5e79433d0fd3",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: function `GET` has too many statements (20). Maximum allowed is 10.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/lib/apple-local-models-client.electron.test.ts",
+          "line": 252,
+          "message": "function has too many statements (12). Maximum allowed is 10.",
+          "anchor": "  it(\"ends the local runtime stream with an error when cancellation fails\", async () => {",
+          "context": "\n  it(\"ends the local runtime stream with an error when cancellation fails\", async () => {\n    const { cancelAppleLocalModelOperation } = setup();\n    cancelAppleLocalModelOperation.mockRejectedValueOnce(\n      new Error(\"cancel failed\")",
+          "sha256": "9c193d8161547a2781b389396d11a71bca1df655344f9e8afd0666f3771d2f47",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: function has too many statements (12). Maximum allowed is 10.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/opencode-policy.mjs",
+          "line": 91,
+          "message": "function `dangerousBashRules` has too many statements (15). Maximum allowed is 10.",
+          "anchor": "function dangerousBashRules(agentConfig) {",
+          "context": "\nfunction dangerousBashRules(agentConfig) {\n  const bashRule = agentConfig.toolPathRules?.bash ?? {};\n  const protectedRoots = bashRule.protectedRoots ?? defaultProtectedRoots;\n  const deny = {",
+          "sha256": "d5190bef0a245a69d491e4547552404d59d6b931d68c8fd03d56b37cfa408081",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: function `dangerousBashRules` has too many statements (15). Maximum allowed is 10.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent accumulating sequential responsibilities beyond the selected function budget.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/no-alert",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/no-array-constructor",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-caller",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-constructor-return",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-continue",
+      "before": 144,
+      "after": 144,
+      "samples": [
+        {
+          "file": "apps/api/lib/image-payload.ts",
+          "line": 179,
+          "message": "Unexpected use of `continue` statement.",
+          "anchor": "      continue;",
+          "context": "      }\n      continue;\n    }\n    switch (control.kind) {\n      case \"number\":",
+          "sha256": "03e70318b34a74ba2c67f2f07b4680f89d9be7524c4edaeb0e690b47691fd277",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected use of `continue` statement.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/chat/model-selector-context-options.ts",
+          "line": 23,
+          "message": "Unexpected use of `continue` statement.",
+          "anchor": "    if (!tokens) continue;",
+          "context": "    const tokens = profile.contextWindow?.tokens;\n    if (!tokens) continue;\n    if (profile.contextWindow?.locked === true) continue;\n    const existing = byTokens.get(tokens);\n    if (existing) {",
+          "sha256": "f96e19d33f17636bfb8bf418b1d42c96f755679ae8a47dab6f277b0b945a91f6",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected use of `continue` statement.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/opencode-policy.mjs",
+          "line": 117,
+          "message": "Unexpected use of `continue` statement.",
+          "anchor": "      continue;",
+          "context": "      deny[\"rm -rf /\"] = \"deny\";\n      continue;\n    }\n    deny[`rm ${root}`] = \"deny\";\n    deny[`rm ${root}/`] = \"deny\";",
+          "sha256": "d5190bef0a245a69d491e4547552404d59d6b931d68c8fd03d56b37cfa408081",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected use of `continue` statement.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent adding implicit loop resumption under the selected control-flow convention.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/no-div-regex",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-duplicate-imports",
+      "before": 39,
+      "after": 39,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/no-else-return",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-eval",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-extra-label",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-implicit-coercion",
+      "before": 9,
+      "after": 9,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/no-implied-eval",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-inner-declarations",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-iterator",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-label-var",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-labels",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-lone-blocks",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-lonely-if",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-multi-assign",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-multi-str",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-negated-condition",
+      "before": 53,
+      "after": 53,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-runtime-request.ts",
+          "line": 20,
+          "message": "Unexpected negated condition.",
+          "anchor": "    ...(defaults.temperature !== undefined",
+          "context": "  return {\n    ...(defaults.temperature !== undefined\n      ? { temperature: defaults.temperature }\n      : {}),\n    ...(defaults.topP !== undefined ? { top_p: defaults.topP } : {}),",
+          "sha256": "2276feb840a15d80094e6e729e58c05795664ccda1ee57b533ce4d9b691c9425",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected negated condition.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/chat/generation-primitives.tsx",
+          "line": 153,
+          "message": "Unexpected negated condition.",
+          "anchor": "      {!terminal ? (",
+          "context": "      </View>\n      {!terminal ? (\n        hasPercent ? (\n          <View className=\"h-[3px] rounded-full bg-mb-border overflow-hidden\">\n            <View",
+          "sha256": "5a2f9a94fd97994f577670ab271302a7773c8e9f4a21458065476f2a81695690",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected negated condition.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/needle-mcp-smoke.mjs",
+          "line": 436,
+          "message": "Unexpected negated condition.",
+          "anchor": "    } else if (!classification.names.includes(\"local_read_gltf\")) {",
+          "context": "      stream.emit(\"needle-mcp\", \"error\", \"gltf_probe_blocked\", gltfProbe);\n    } else if (!classification.names.includes(\"local_read_gltf\")) {\n      gltfProbe = { status: \"blocked\", reason: \"local_read_gltf_tool_missing\" };\n      stream.emit(\"needle-mcp\", \"error\", \"gltf_probe_blocked\", gltfProbe);\n    } else {",
+          "sha256": "5d95ccdb5fc1044b1ea735dd78cc04568c78b59ca201cd03a6414840f7ab640e",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected negated condition.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent obscuring the primary branch behind a negative condition.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/no-nested-ternary",
+      "before": 134,
+      "after": 134,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/conf.test.ts",
+          "line": 243,
+          "message": "Do not nest ternary expressions.",
+          "anchor": "          error instanceof Error &&",
+          "context": "        const stderr =\n          error instanceof Error &&\n          \"stderr\" in error &&\n          Buffer.isBuffer(error.stderr)\n            ? error.stderr.toString(\"utf8\").trim()",
+          "sha256": "8aa3ca43a21414b971e501dcbe17eac5b68fd6a1764f22282ac0ee962e7ba66f",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Do not nest ternary expressions.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/chat/send-button.tsx",
+          "line": 72,
+          "message": "Do not nest ternary expressions.",
+          "anchor": "  const iconColor = disabled",
+          "context": "  const { colors } = useThemeMode();\n  const iconColor = disabled\n    ? colors.muted\n    : listening\n      ? colors.accent",
+          "sha256": "06a4bcba7bf4decbac1b4a484698ca1127be68939ca965150c25178e248e18a7",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Do not nest ternary expressions.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/needle-mcp-smoke.mjs",
+          "line": 499,
+          "message": "Do not nest ternary expressions.",
+          "anchor": "      options.requireInspector && inspectorBlocked ? 1 : missing > 0 ? 1 : 0,",
+          "context": "    exitCode:\n      options.requireInspector && inspectorBlocked ? 1 : missing > 0 ? 1 : 0,\n    report,\n  };\n}",
+          "sha256": "5d95ccdb5fc1044b1ea735dd78cc04568c78b59ca201cd03a6414840f7ab640e",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Do not nest ternary expressions.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent compressing multiple branch decisions into nested conditional expressions.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/no-new",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-new-func",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-new-wrappers",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-object-constructor",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-plusplus",
+      "before": 16,
+      "after": 16,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/no-promise-executor-return",
+      "before": 34,
+      "after": 34,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/no-proto",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-restricted-exports",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-restricted-globals",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-restricted-properties",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-return-assign",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-script-url",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-self-compare",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-sequences",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-shadow",
+      "before": 54,
+      "after": 54,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-runtime.ts",
+          "line": 120,
+          "message": "'resolve' is already declared in the upper scope.",
+          "anchor": "  await new Promise((resolve) => setTimeout(resolve, ms));",
+          "context": "async function sleep(ms: number): Promise<void> {\n  await new Promise((resolve) => setTimeout(resolve, ms));\n}\n\nasync function withSwitchLock<T>(fn: () => Promise<T>): Promise<T> {",
+          "sha256": "867fd655845d6a9b48d7c7677631132fc1d9ef7088e6f16c11e857d2bc87b487",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: 'resolve' is already declared in the upper scope.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/plugins/with-apple-local-models-simulator-guard.js",
+          "line": 72,
+          "message": "'config' is already declared in the upper scope.",
+          "anchor": "    async (config) => {",
+          "context": "    \"ios\",\n    async (config) => {\n      const podfilePath = path.join(\n        config.modRequest.platformProjectRoot,\n        \"Podfile\"",
+          "sha256": "d1257ab4fc0fa05ae518c22e95c3556fcdaf56b604d7ac046fbcbae0a2d4609a",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: 'config' is already declared in the upper scope.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/apple-local-models/src/native.ts",
+          "line": 180,
+          "message": "'token' is already declared in the upper scope.",
+          "anchor": "          (token) =>",
+          "context": "          (token) => nativeModule.cancelGeneration(token),\n          (token) =>\n            nativeModule.generate(token, {\n              prompt,\n              options,",
+          "sha256": "b18cf22c640cb0c9a8bb434ed88b4aa45d20273abba3d5d8e92b84cd7d912c47",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: 'token' is already declared in the upper scope.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent reusing an outer binding name for a different inner value.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/no-throw-literal",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-unneeded-ternary",
+      "before": 2,
+      "after": 2,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/no-unreachable-loop",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-useless-call",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-useless-computed-key",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-useless-concat",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-useless-constructor",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-useless-rename",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/no-useless-return",
+      "before": 7,
+      "after": 7,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/no-void",
+      "before": 181,
+      "after": 181,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-route.ts",
+          "line": 387,
+          "message": "Unexpected `void` operator",
+          "anchor": "    void appendChatTrace({",
+          "context": "    const message = describeBackendError(error, backendName);\n    void appendChatTrace({\n      event: \"error\",\n      modelId,\n      execution,",
+          "sha256": "2a67d5958b21ac2e5e4840f448cd1b6bf1b282fb04c23efc7ce76e0a9f5ed95b",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected `void` operator",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/notifications/notification-registration.tsx",
+          "line": 96,
+          "message": "Unexpected `void` operator",
+          "anchor": "    void synchronize().catch((cause: unknown) => {",
+          "context": "    };\n    void synchronize().catch((cause: unknown) => {\n      if (controller.signal.aborted && cause === controller.signal.reason)\n        return;\n      surfaceFailure(cause);",
+          "sha256": "4a3e631dc1d1e1dcfc86832f7b7e2172bc7b3623782b8db0bc83d8966b4c2531",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected `void` operator",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/ci-stub-model-server.mjs",
+          "line": 107,
+          "message": "Unexpected `void` operator",
+          "anchor": "    void respond(req, res, Buffer.concat(buffers));",
+          "context": "  req.on(\"end\", () => {\n    void respond(req, res, Buffer.concat(buffers));\n  });\n});\n",
+          "sha256": "8b3607c3a04970da4ddfd46f47a8dd5cf527f6caf6a1b45c39b468c64df81437",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected `void` operator",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent discarding an operation result under the selected expression policy.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/no-warning-comments",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/object-shorthand",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/operator-assignment",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/prefer-destructuring",
+      "before": 201,
+      "after": 201,
+      "samples": [
+        {
+          "file": "apps/api/app/api/voice/session/route.test.ts",
+          "line": 50,
+          "message": "Use Array destructuring.",
+          "anchor": "      const options = args[4];",
+          "context": "    createVoiceSession.mockImplementation(async (...args) => {\n      const options = args[4];\n      if (options?.safetyIdentifier !== \"user-1\") {\n        throw new Error(\"expected authenticated safety identity\");\n      }",
+          "sha256": "7a5456950125e636eaeb1de907193e046dfd503c5be56879dca04e465716aa09",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Use Array destructuring.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/lib/app-fetch.web.test.ts",
+          "line": 99,
+          "message": "Use Array destructuring.",
+          "anchor": "    const browserCall = browserFetch.mock.calls[0];",
+          "context": "    expect(mocks.installStreamPolyfills).not.toHaveBeenCalled();\n    const browserCall = browserFetch.mock.calls[0];\n    if (!browserCall) throw new Error(\"expected a browser request\");\n    const browserInit = browserCall[1];\n    if (!browserInit) throw new Error(\"expected browser request options\");",
+          "sha256": "2c5b8de97423c4a22df242c50c2f34e942fab36a390b8e3496c87511f3c9a489",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Use Array destructuring.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/needle-mcp-smoke.mjs",
+          "line": 390,
+          "message": "Use Object destructuring.",
+          "anchor": "  const sessionId = initialized.sessionId;",
+          "context": "\n  const sessionId = initialized.sessionId;\n  const serverInfo = initialized.body?.result?.serverInfo ?? null;\n  const capabilities = initialized.body?.result?.capabilities ?? null;\n  const toolsResult = await rpc(options.endpoint, sessionId, 2, \"tools/list\");",
+          "sha256": "5d95ccdb5fc1044b1ea735dd78cc04568c78b59ca201cd03a6414840f7ab640e",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Use Object destructuring.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent creating repetitive extraction statements under the selected binding convention.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/prefer-exponentiation-operator",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/prefer-named-capture-group",
+      "before": 74,
+      "after": 74,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/conf.ts",
+          "line": 849,
+          "message": "Capture group should be named.",
+          "anchor": "    /(?:message|messages\\[0\\])\\.role\\s*==\\s*[\"'](system|developer)[\"']/g,",
+          "context": "  const equalityChecks = [\n    /(?:message|messages\\[0\\])\\.role\\s*==\\s*[\"'](system|developer)[\"']/g,\n    /(?:message|messages\\[0\\])\\[['\"]role['\"]\\]\\s*==\\s*[\"'](system|developer)[\"']/g,\n  ];\n  for (const check of equalityChecks) {",
+          "sha256": "ca401474b6c4955d4407c5dd1b3354321e29590f6f6b915136a2aa3d7333e890",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Capture group should be named.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/chat/composer/chat-composer.tsx",
+          "line": 516,
+          "message": "Capture group should be named.",
+          "anchor": "        !usesDesktopKeyboardShortcuts || /(^|\\s)[/$]\\S*$/.test(value)",
+          "context": "      const nextCursor =\n        !usesDesktopKeyboardShortcuts || /(^|\\s)[/$]\\S*$/.test(value)\n          ? value.length\n          : draft.cursor;\n      if (usesNativeComposerInput) {",
+          "sha256": "1cace8a7a13d9018fbe081ed3de5a639cb20c13422b74ff228659c1c0fa6eb9c",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Capture group should be named.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/opencode-policy.mjs",
+          "line": 70,
+          "message": "Capture group should be named.",
+          "anchor": "  return out.replace(/,\\s*([}\\]])/g, \"$1\");",
+          "context": "  }\n  return out.replace(/,\\s*([}\\]])/g, \"$1\");\n}\n\nfunction readJsonc(path, fallback) {",
+          "sha256": "d5190bef0a245a69d491e4547552404d59d6b931d68c8fd03d56b37cfa408081",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Capture group should be named.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent making capture intent depend on positional regex knowledge.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/prefer-numeric-literals",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/prefer-object-has-own",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/prefer-object-spread",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/prefer-promise-reject-errors",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/prefer-regex-literals",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/prefer-template",
+      "before": 9,
+      "after": 9,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/radix",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/require-unicode-regexp",
+      "before": 370,
+      "after": 370,
+      "samples": [
+        {
+          "file": "apps/api/app/[[...rest]]/route.ts",
+          "line": 127,
+          "message": "Use the 'u' flag.",
+          "anchor": "    `${page.replace(/^\\//, \"\")}.html`",
+          "context": "    /* turbopackIgnore: true */ CLIENT_HTML_DIST,\n    `${page.replace(/^\\//, \"\")}.html`\n  );\n}\n",
+          "sha256": "ab65c5e71e6a095b849d666fc1bfd4b970b7f3b1071386af7a5e5e79433d0fd3",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Use the 'u' flag.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/native-dependency-patches.test.js",
+          "line": 24,
+          "message": "Use the 'u' flag.",
+          "anchor": "    new RegExp(",
+          "context": "  const match = lockfile.match(\n    new RegExp(\n      `^ {2}'?${escapeRegExp(packageName)}@([^':]+)'?: ([a-z0-9]+)$`,\n      \"m\"\n    )",
+          "sha256": "1914af1c745bdd7d6ecc10310a819e7491665963c458f800fd065c5ec571ec77",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Use the 'u' flag.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/opencode-policy.mjs",
+          "line": 264,
+          "message": "Use the 'u' flag.",
+          "anchor": "  const backup = `${opencodeConfigPath}.bak-${new Date().toISOString().replace(/[:.]/g, \"-\")}`;",
+          "context": "  const merged = mergeConfig(base, buildOverlay());\n  const backup = `${opencodeConfigPath}.bak-${new Date().toISOString().replace(/[:.]/g, \"-\")}`;\n  if (existsSync(opencodeConfigPath))\n    writeFileSync(backup, readFileSync(opencodeConfigPath));\n  writeAtomic(opencodeConfigPath, `${JSON.stringify(merged, null, 2)}\\n`);",
+          "sha256": "d5190bef0a245a69d491e4547552404d59d6b931d68c8fd03d56b37cfa408081",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Use the 'u' flag.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent writing regexes with implicit non-Unicode semantics.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/sort-imports",
+      "before": 2045,
+      "after": 2045,
+      "samples": [
+        {
+          "file": "apps/api/app/[[...rest]]/route.ts",
+          "line": 2,
+          "message": "Imports should be sorted alphabetically.",
+          "anchor": "import { dirname, join, resolve } from \"node:path\";",
+          "context": "import { readFileSync, statSync } from \"node:fs\";\nimport { dirname, join, resolve } from \"node:path\";\nimport { fileURLToPath } from \"node:url\";\nimport { problemResponse } from \"@/lib/server/problem\";\nimport { z } from \"zod\";",
+          "sha256": "ab65c5e71e6a095b849d666fc1bfd4b970b7f3b1071386af7a5e5e79433d0fd3",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Imports should be sorted alphabetically.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/navigation/project-sidebar.tsx",
+          "line": 26,
+          "message": "Expected 'Multiple' syntax before 'Single' syntax.",
+          "anchor": "import { Text, Touchable, View } from \"@/tw\";",
+          "context": "import { useThemeMode } from \"@/lib/theme\";\nimport { Text, Touchable, View } from \"@/tw\";\nimport { api } from \"../../../convex/_generated/api\";\nimport { conversationUrl as buildConversationUrl } from \"./sidebar-conversation-links\";\nimport {",
+          "sha256": "c339559690563bae24731e392b89f0051cf15bb60a1fd4b8495af1bb9f2c74f0",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Expected 'Multiple' syntax before 'Single' syntax.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/opencode-policy.mjs",
+          "line": 4,
+          "message": "Expected 'Multiple' syntax before 'Single' syntax.",
+          "anchor": "import { join, resolve } from \"node:path\";",
+          "context": "import { homedir } from \"node:os\";\nimport { join, resolve } from \"node:path\";\nimport { spawnSync } from \"node:child_process\";\n\nconst repoRoot = resolve(process.env.HOMER_WORKSPACE_ROOT ?? process.cwd());",
+          "sha256": "d5190bef0a245a69d491e4547552404d59d6b931d68c8fd03d56b37cfa408081",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Expected 'Multiple' syntax before 'Single' syntax.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent introducing inconsistent import ordering under the selected source convention.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/sort-keys",
+      "before": 5184,
+      "after": 5184,
+      "samples": [
+        {
+          "file": "apps/api/app/[[...rest]]/route.ts",
+          "line": 30,
+          "message": "Object keys should be sorted",
+          "anchor": "  .object({",
+          "context": "const expoHtmlRouteSchema = z\n  .object({\n    page: z.string(),\n    namedRegex: z.string(),\n  })",
+          "sha256": "ab65c5e71e6a095b849d666fc1bfd4b970b7f3b1071386af7a5e5e79433d0fd3",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Object keys should be sorted",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/lib/conversation-message-adapter.ts",
+          "line": 274,
+          "message": "Object keys should be sorted",
+          "anchor": "      return {",
+          "context": "      );\n      return {\n        type: part.type,\n        sourceId: part.sourceId,\n        url: part.url,",
+          "sha256": "1d97c130dd043fbadb8c5a6a2f3aabbdf85965c0b436fa8f9625593b82853c0e",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Object keys should be sorted",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/opencode-policy.mjs",
+          "line": 283,
+          "message": "Object keys should be sorted",
+          "anchor": "    {",
+          "context": "    [\"--model\", `homer/${model}`, \"--agent\", \"homer-build\", project],\n    {\n      stdio: \"inherit\",\n      env: { ...process.env, OPENCODE_CONFIG_CONTENT: overlay },\n    }",
+          "sha256": "d5190bef0a245a69d491e4547552404d59d6b931d68c8fd03d56b37cfa408081",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Object keys should be sorted",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent introducing inconsistent object-key ordering under the selected source convention.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "eslint/sort-vars",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/symbol-description",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "eslint/vars-on-top",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "eslint/yoda",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "import/consistent-type-specifier-style",
+      "before": 631,
+      "after": 631,
+      "samples": [
+        {
+          "file": "apps/api/app/api/admin/conf/route.ts",
+          "line": 4,
+          "message": "Prefer using a top-level type-only import instead of inline type specifiers.",
+          "anchor": "  type AdminConfSaveResponse,",
+          "context": "  adminConfRequestSchema,\n  type AdminConfSaveResponse,\n} from \"@homer/shared/api-types\";\nimport { readChatProfileId } from \"@/lib/server/chat-profile\";\nimport { problemResponse } from \"@/lib/server/problem\";",
+          "sha256": "cd5667ecac794049a077a90b84043b9bd1d4c5a31cfb0aced0774c70c0928d22",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer using a top-level type-only import instead of inline type specifiers.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/lib/config.electron.ts",
+          "line": 5,
+          "message": "Prefer using a top-level type-only import instead of inline type specifiers.",
+          "anchor": "  type ReactNode,",
+          "context": "  type ReactElement,\n  type ReactNode,\n} from \"react\";\nimport {\n  BASE_URL_KEY,",
+          "sha256": "ba55dc0c3b1e24edd9af65fd9f1fcfa8f305a19cf57068ec313c31fc472f205e",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer using a top-level type-only import instead of inline type specifiers.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/shared/src/video-configs.ts",
+          "line": 7,
+          "message": "Prefer using a top-level type-only import instead of inline type specifiers.",
+          "anchor": "  type VideoModelId,",
+          "context": "  videoTaskSchema,\n  type VideoModelId,\n} from \"./model-registry\";\nimport {\n  LIGHTX2V_AITER_VIDEO_RUNTIME_TARGET,",
+          "sha256": "a5c72f31ce1dd6f581d1c118ccfbe8f73ab1b1c9fd8d6f98c5745cd1ee578497",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer using a top-level type-only import instead of inline type specifiers.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent mixing type-import conventions and obscuring runtime dependency intent.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "import/extensions",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "import/max-dependencies",
+      "before": 74,
+      "after": 74,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-route.ts",
+          "line": 38,
+          "message": "File has too many dependencies (24). Maximum allowed is 10.",
+          "anchor": "} from \"@homer/pi-agent\";",
+          "context": "  piAgentUIMessageResponse,\n} from \"@homer/pi-agent\";\nimport type { ChatModelEndpoint } from \"@homer/shared/runtime-types\";\nimport {\n  checkChatRuntimeReadiness,",
+          "sha256": "2a67d5958b21ac2e5e4840f448cd1b6bf1b282fb04c23efc7ce76e0a9f5ed95b",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: File has too many dependencies (24). Maximum allowed is 10.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/chat/use-composer-slots.tsx",
+          "line": 24,
+          "message": "File has too many dependencies (21). Maximum allowed is 10.",
+          "anchor": "import type { ChatRuntimeView } from \"@/lib/chat-runtime-view\";",
+          "context": "import { getHitSlopForVisualSize } from \"@/lib/native-ui\";\nimport type { ChatRuntimeView } from \"@/lib/chat-runtime-view\";\nimport { Touchable, Text } from \"@/tw\";\nimport type {\n  ChatToolCapabilitiesResponse,",
+          "sha256": "f9aa536d56e38fe5475090019e2cf57f301f855b64f5e3249dabb9617754eda6",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: File has too many dependencies (21). Maximum allowed is 10.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/machine/src/turn-lifecycle.ts",
+          "line": 27,
+          "message": "File has too many dependencies (13). Maximum allowed is 10.",
+          "anchor": "} from \"./persistence.js\";",
+          "context": "  PersistedTurn,\n} from \"./persistence.js\";\nimport {\n  isCommittedPersistError,\n  isTerminalTurn,",
+          "sha256": "69d331fdcf77b2d43531f4100124ab96e7cfddb8859ef21938f02003f43f8e9e",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: File has too many dependencies (13). Maximum allowed is 10.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent increasing module responsibilities beyond the selected dependency budget.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "import/newline-after-import",
+      "before": 15,
+      "after": 15,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "import/no-absolute-path",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "import/no-amd",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "import/no-cycle",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "import/no-dynamic-require",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "import/no-empty-named-blocks",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "import/no-mutable-exports",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "import/no-named-default",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "import/no-self-import",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "import/no-webpack-loader-syntax",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/check-access",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/check-property-names",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/check-tag-names",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/empty-tags",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/implements-on-classes",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/no-defaults",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-param-type",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-property",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-property-description",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-property-name",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-returns-type",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-yields",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "node/handle-callback-err",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "node/no-path-concat",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/approx-constant",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/bad-array-method-on-arguments",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/bad-bitwise-operator",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/bad-char-at-comparison",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/bad-comparison-sequence",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/bad-match-all-arg",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/bad-min-max-func",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/bad-object-literal-comparison",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/bad-replace-all-arg",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/branches-sharing-code",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "oxc/const-comparisons",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/double-comparisons",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/erasing-op",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/misrefactored-assign-op",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/missing-throw",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/no-accumulating-spread",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/no-async-endpoint-handlers",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/no-barrel-file",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "oxc/no-const-enum",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/no-this-in-exported-function",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/number-arg-out-of-range",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/only-used-in-recursion",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "oxc/uninvoked-array-callback",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "promise/catch-or-return",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "promise/no-callback-in-promise",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "promise/no-nesting",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "promise/no-new-statics",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "promise/no-return-in-finally",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "promise/no-return-wrap",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "promise/prefer-catch",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "promise/spec-only",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "promise/valid-params",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/checked-requires-onchange-or-readonly",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/forward-ref-uses-ref",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/jsx-boolean-value",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/jsx-curly-brace-presence",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "react/jsx-fragments",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/jsx-key",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/jsx-no-comment-textnodes",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/jsx-no-constructed-context-values",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/jsx-no-script-url",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/jsx-no-target-blank",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/jsx-no-useless-fragment",
+      "before": 6,
+      "after": 6,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "react/jsx-pascal-case",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/jsx-props-no-spread-multi",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-array-index-key",
+      "before": 5,
+      "after": 5,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "react/no-children-prop",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-danger",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-danger-with-children",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-this-in-sfc",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/self-closing-comp",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/void-dom-elements-no-children",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/adjacent-overload-signatures",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/ban-tslint-comment",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/ban-types",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/class-literal-property-style",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/consistent-generic-constructors",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/consistent-indexed-object-style",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/explicit-member-accessibility",
+      "before": 141,
+      "after": 141,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-profile-manifest.ts",
+          "line": 23,
+          "message": "Missing accessibility modifier on method definition constructor.",
+          "anchor": "  constructor(readonly problems: string[]) {",
+          "context": "export class ChatProfileManifestError extends Error {\n  constructor(readonly problems: string[]) {\n    super(problems.join(\"\\n\"));\n    this.name = \"ChatProfileManifestError\";\n  }",
+          "sha256": "9a1e112d0835614e9633e916695b749a1aace03d985e80b924fb6a2c8e2ae2bc",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Missing accessibility modifier on method definition constructor.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/desktop/src/apple-local-models-service.ts",
+          "line": 73,
+          "message": "Missing accessibility modifier on class property code.",
+          "anchor": "  readonly code: LocalModelFailureCode;",
+          "context": "export class AppleLocalModelsHelperError extends Error {\n  readonly code: LocalModelFailureCode;\n\n  constructor(code: LocalModelFailureCode, message: string) {\n    super(message);",
+          "sha256": "e9a9fa24dfbc790bd0ceea54905eef362e93971bc880bdc79f9d7447313b190d",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Missing accessibility modifier on class property code.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/pi-agent/src/index.test.ts",
+          "line": 48,
+          "message": "Missing accessibility modifier on method definition continue.",
+          "anchor": "    async continue() {",
+          "context": "\n    async continue() {\n      await this.options.streamFn?.(\n        this.options.initialState.model,\n        { messages: [] },",
+          "sha256": "3a0926d5b46b15f167ae59dac5170ab2f7d68dea151a6eb20bd3bf5766283001",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Missing accessibility modifier on method definition continue.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent leaving class member accessibility implicit under the selected contract convention.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "typescript/method-signature-style",
+      "before": 331,
+      "after": 331,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-runtime-request.ts",
+          "line": 6,
+          "message": "Use a property signature instead of a method signature.",
+          "anchor": "  serializeRequest(",
+          "context": "type ChatRuntimeAdapter<TProfile extends ChatRuntimeProfile> = {\n  serializeRequest(\n    profile: TProfile,\n    body: OpenAIChatCompletionsRequest\n  ): OpenAIChatCompletionsRequest;",
+          "sha256": "2276feb840a15d80094e6e729e58c05795664ccda1ee57b533ce4d9b691c9425",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Use a property signature instead of a method signature.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/desktop/scripts/authenticated-smoke/electron-sections.ts",
+          "line": 49,
+          "message": "Use a property signature instead of a method signature.",
+          "anchor": "  signOut(evaluate: Evaluate): Promise<void>;",
+          "context": "  assertAuthLifecycle(evaluate: Evaluate): Promise<void>;\n  signOut(evaluate: Evaluate): Promise<void>;\n  mintMachinePairingAction(): Promise<string>;\n  convexUrl: string;\n  sections: Parameters<typeof runAuthenticatedSmokeSections>[0];",
+          "sha256": "1a754624c5da32eae3946bb134f31e067c7dac5e602f803acbaf40c9a43b6a0c",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Use a property signature instead of a method signature.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/shared/src/logging.ts",
+          "line": 23,
+          "message": "Use a property signature instead of a method signature.",
+          "anchor": "  write(level: LogLevel, line: string): void;",
+          "context": "export type LogWriter = {\n  write(level: LogLevel, line: string): void;\n};\n\ntype LogFilterLevel = LogLevel | \"off\";",
+          "sha256": "e4a2f41407767086b58f32da5bb3e6ac8edca709798d7b751121f11458af2838",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Use a property signature instead of a method signature.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent using bivariant method syntax where the selected callback contract requires property variance.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "typescript/no-confusing-non-null-assertion",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/no-dynamic-delete",
+      "before": 5,
+      "after": 5,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "typescript/no-empty-interface",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/no-invalid-void-type",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "typescript/no-non-null-asserted-nullish-coalescing",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/no-restricted-types",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/no-unnecessary-parameter-property-assignment",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/no-var-requires",
+      "before": 7,
+      "after": 7,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "typescript/parameter-properties",
+      "before": 26,
+      "after": 26,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "typescript/prefer-enum-initializers",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/prefer-for-of",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "typescript/prefer-literal-enum-member",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/prefer-ts-expect-error",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "typescript/unified-signatures",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/catch-error-name",
+      "before": 167,
+      "after": 167,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-runtime-readiness.ts",
+          "line": 139,
+          "message": "The catch parameter \"err\" should be named \"error\"",
+          "anchor": "  } catch (err) {",
+          "context": "    };\n  } catch (err) {\n    return {\n      ready: false,\n      kind: \"chat\",",
+          "sha256": "905be307138597f32195df7a5d1562ba68f6a04fa50589a11bbab8ec54032c5f",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: The catch parameter \"err\" should be named \"error\"",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/machine/src/cli.ts",
+          "line": 587,
+          "message": "The catch parameter \"cause\" should be named \"error\"",
+          "anchor": "      } catch (cause) {",
+          "context": "        quiescent = true;\n      } catch (cause) {\n        await failStop(dependencies, runtimeLock, cause);\n      }\n    }",
+          "sha256": "6eb5de9f6686505d16df098f37ba9f2671c7bb387f6ebbb6917733755cc638d9",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: The catch parameter \"cause\" should be named \"error\"",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/shared/src/switch-stream.ts",
+          "line": 475,
+          "message": "The catch parameter \"err\" should be named \"error\"",
+          "anchor": "  } catch (err) {",
+          "context": "    }\n  } catch (err) {\n    handlers.onError?.(err instanceof Error ? err : new Error(String(err)));\n    throw err;\n  }",
+          "sha256": "3b7ce71a91a77b2c9c1de0298c7cebbf725d9545dfc1743b804fa0d7edfc3837",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: The catch parameter \"err\" should be named \"error\"",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent using inconsistent caught-error names under the selected failure-handling convention.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "unicorn/consistent-assert",
+      "before": 5,
+      "after": 5,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/consistent-date-clone",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/consistent-empty-array-spread",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/consistent-existence-index-check",
+      "before": 15,
+      "after": 15,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/consistent-template-literal-escape",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/custom-error-definition",
+      "before": 9,
+      "after": 9,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/empty-brace-spaces",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/error-message",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/escape-case",
+      "before": 8,
+      "after": 8,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/explicit-length-check",
+      "before": 36,
+      "after": 36,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/explicit-timer-delay",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/new-for-builtins",
+      "before": 2,
+      "after": 2,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/no-abusive-eslint-disable",
+      "before": 5,
+      "after": 5,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/no-accessor-recursion",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-anonymous-default-export",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-array-for-each",
+      "before": 9,
+      "after": 9,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/no-array-method-this-argument",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-array-reduce",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/no-array-reverse",
+      "before": 10,
+      "after": 10,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/no-array-sort",
+      "before": 29,
+      "after": 29,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/no-await-in-promise-methods",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-confusing-array-with",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-console-spaces",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-document-cookie",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-empty-file",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-hex-escape",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-immediate-mutation",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-instanceof-array",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-instanceof-builtins",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-invalid-fetch-options",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-invalid-remove-event-listener",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-length-as-slice-end",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-lonely-if",
+      "before": 4,
+      "after": 4,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/no-magic-array-flat-depth",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-negated-condition",
+      "before": 53,
+      "after": 53,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-runtime-request.ts",
+          "line": 20,
+          "message": "Unexpected negated condition.",
+          "anchor": "    ...(defaults.temperature !== undefined",
+          "context": "  return {\n    ...(defaults.temperature !== undefined\n      ? { temperature: defaults.temperature }\n      : {}),\n    ...(defaults.topP !== undefined ? { top_p: defaults.topP } : {}),",
+          "sha256": "2276feb840a15d80094e6e729e58c05795664ccda1ee57b533ce4d9b691c9425",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected negated condition.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/chat/generation-primitives.tsx",
+          "line": 153,
+          "message": "Unexpected negated condition.",
+          "anchor": "      {!terminal ? (",
+          "context": "      </View>\n      {!terminal ? (\n        hasPercent ? (\n          <View className=\"h-[3px] rounded-full bg-mb-border overflow-hidden\">\n            <View",
+          "sha256": "5a2f9a94fd97994f577670ab271302a7773c8e9f4a21458065476f2a81695690",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected negated condition.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/needle-mcp-smoke.mjs",
+          "line": 436,
+          "message": "Unexpected negated condition.",
+          "anchor": "    } else if (!classification.names.includes(\"local_read_gltf\")) {",
+          "context": "      stream.emit(\"needle-mcp\", \"error\", \"gltf_probe_blocked\", gltfProbe);\n    } else if (!classification.names.includes(\"local_read_gltf\")) {\n      gltfProbe = { status: \"blocked\", reason: \"local_read_gltf_tool_missing\" };\n      stream.emit(\"needle-mcp\", \"error\", \"gltf_probe_blocked\", gltfProbe);\n    } else {",
+          "sha256": "5d95ccdb5fc1044b1ea735dd78cc04568c78b59ca201cd03a6414840f7ab640e",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected negated condition.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent obscuring the primary branch behind a negative condition.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "unicorn/no-negation-in-equality-check",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-nested-ternary",
+      "before": 96,
+      "after": 96,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/conf.test.ts",
+          "line": 247,
+          "message": "Unexpected nested ternary expression without parentheses.",
+          "anchor": "            : error instanceof Error",
+          "context": "            ? error.stderr.toString(\"utf8\").trim()\n            : error instanceof Error\n              ? error.message\n              : String(error);\n        throw new Error(",
+          "sha256": "8aa3ca43a21414b971e501dcbe17eac5b68fd6a1764f22282ac0ee962e7ba66f",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected nested ternary expression without parentheses.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/chat/model-selector-rows.tsx",
+          "line": 477,
+          "message": "Unexpected nested ternary expression without parentheses.",
+          "anchor": "            compact ? \"px-2 pb-2\" : dense ? \"px-2.5 pb-2\" : \"px-3 pb-3\"",
+          "context": "          className={`${\n            compact ? \"px-2 pb-2\" : dense ? \"px-2.5 pb-2\" : \"px-3 pb-3\"\n          } mx-3 border-t border-mb-border pt-3 gap-2`}\n        >\n          {details}",
+          "sha256": "a2abfe095a80f5c0505222b0ce23e54ddc93524b2935fa97baad8d494c380b02",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected nested ternary expression without parentheses.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/needle-mcp-smoke.mjs",
+          "line": 499,
+          "message": "Unexpected nested ternary expression without parentheses.",
+          "anchor": "      options.requireInspector && inspectorBlocked ? 1 : missing > 0 ? 1 : 0,",
+          "context": "    exitCode:\n      options.requireInspector && inspectorBlocked ? 1 : missing > 0 ? 1 : 0,\n    report,\n  };\n}",
+          "sha256": "5d95ccdb5fc1044b1ea735dd78cc04568c78b59ca201cd03a6414840f7ab640e",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Unexpected nested ternary expression without parentheses.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent making nested conditional precedence hard to review.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "unicorn/no-new-buffer",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-single-promise-in-promise-methods",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-static-only-class",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-thenable",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-this-assignment",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-typeof-undefined",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-unnecessary-array-flat-depth",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-unnecessary-array-splice-count",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-unnecessary-await",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-unnecessary-slice-end",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-unreadable-array-destructuring",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/no-unreadable-iife",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-useless-collection-argument",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-useless-error-capture-stack-trace",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-useless-fallback-in-spread",
+      "before": 9,
+      "after": 9,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/no-useless-iterator-to-array",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-useless-length-check",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-useless-promise-resolve-reject",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-useless-spread",
+      "before": 2,
+      "after": 2,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/no-useless-switch-case",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/no-zero-fractions",
+      "before": 35,
+      "after": 35,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/number-literal-case",
+      "before": 31,
+      "after": 31,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/numeric-separators-style",
+      "before": 230,
+      "after": 230,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-runtime-readiness.ts",
+          "line": 7,
+          "message": "Invalid group length in numeric value.",
+          "anchor": "const DEFAULT_READY_TIMEOUT_MS = 2_000;",
+          "context": "\nconst DEFAULT_READY_TIMEOUT_MS = 2_000;\n\ntype UnreadyProbeStatus = {\n  ready: false;",
+          "sha256": "905be307138597f32195df7a5d1562ba68f6a04fa50589a11bbab8ec54032c5f",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Invalid group length in numeric value.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/screens/new-conversation-route.test.tsx",
+          "line": 105,
+          "message": "Invalid group length in numeric value.",
+          "anchor": "    port: 11435,",
+          "context": "    generationTitle: \"Service chat\",\n    port: 11435,\n    baseURL: \"http://127.0.0.1:11435/v1\",\n    runtime: \"openai-compatible\",\n  },",
+          "sha256": "fb17ce9d0fcd48c65556cd4c9417ca4ce8671da1e58612666a29fb6e8d5efdf8",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Invalid group length in numeric value.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/needle-mcp-smoke.mjs",
+          "line": 90,
+          "message": "Invalid group length in numeric value.",
+          "anchor": "    timeoutMs: 15000,",
+          "context": "    requireInspector: false,\n    timeoutMs: 15000,\n    help: false,\n  };\n",
+          "sha256": "5d95ccdb5fc1044b1ea735dd78cc04568c78b59ca201cd03a6414840f7ab640e",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Invalid group length in numeric value.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent rendering numeric constants inconsistently under the selected grouping convention.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "unicorn/prefer-array-find",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-array-flat",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-array-flat-map",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-array-index-of",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-array-some",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-at",
+      "before": 4,
+      "after": 4,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-bigint-literals",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-blob-reading-methods",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-class-fields",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-classlist-toggle",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-date-now",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-default-parameters",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-dom-node-append",
+      "before": 4,
+      "after": 4,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-dom-node-dataset",
+      "before": 20,
+      "after": 20,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-dom-node-remove",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-export-from",
+      "before": 42,
+      "after": 42,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-global-this",
+      "before": 70,
+      "after": 70,
+      "samples": [
+        {
+          "file": "apps/client/app/(settings)/settings.tsx",
+          "line": 221,
+          "message": "Prefer `globalThis` over environment-specific global aliases like `window`, `self`, and `global`.",
+          "anchor": "    (Platform.OS === \"web\" && typeof window !== \"undefined\"",
+          "context": "    baseURL ||\n    (Platform.OS === \"web\" && typeof window !== \"undefined\"\n      ? window.location.origin\n      : DEFAULT_BASE_URL);\n",
+          "sha256": "1982f2dfc5807b1526b25d15e6a10945f88f230ab4e806041751c454a0b92cf0",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer `globalThis` over environment-specific global aliases like `window`, `self`, and `global`.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/desktop/scripts/authenticated-smoke/browser-chat-shell-runner.ts",
+          "line": 86,
+          "message": "Prefer `globalThis` over environment-specific global aliases like `window`, `self`, and `global`.",
+          "anchor": "        Boolean(Reflect.get(Reflect.get(window, \"Clerk\") ?? {}, \"user\")) ||",
+          "context": "      () =>\n        Boolean(Reflect.get(Reflect.get(window, \"Clerk\") ?? {}, \"user\")) ||\n        Array.from(\n          document.querySelectorAll('[data-testid=\"homer-auth-code\"]')\n        ).some((candidate) => candidate.getClientRects().length > 0),",
+          "sha256": "bada425361712ab1a962a1ff730c09bf0e86df6b9d78771e3207ae89b5408cf9",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer `globalThis` over environment-specific global aliases like `window`, `self`, and `global`.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/desktop/scripts/smoke.ts",
+          "line": 776,
+          "message": "Prefer `globalThis` over environment-specific global aliases like `window`, `self`, and `global`.",
+          "anchor": "          () => (window as DesktopWindow).homerDesktop !== undefined",
+          "context": "        await page.waitForFunction(\n          () => (window as DesktopWindow).homerDesktop !== undefined\n        );\n        await page.waitForFunction(\n          () => (document.getElementById(\"root\")?.childElementCount ?? 0) > 0",
+          "sha256": "b7587c99b1296326729e510a4407060ce7d39a80461ed3928535ed8b7092ae67",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer `globalThis` over environment-specific global aliases like `window`, `self`, and `global`.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent hardcoding a host-specific global alias under the selected portability convention.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "unicorn/prefer-import-meta-properties",
+      "before": 22,
+      "after": 22,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-includes",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-keyboard-event-key",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-logical-operator-over-ternary",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-math-min-max",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-math-trunc",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-modern-dom-apis",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-modern-math-apis",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-native-coercion-functions",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-negative-index",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-node-protocol",
+      "before": 10,
+      "after": 10,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-number-coercion",
+      "before": 4,
+      "after": 4,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-number-properties",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-object-from-entries",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-optional-catch-binding",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-prototype-methods",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-query-selector",
+      "before": 5,
+      "after": 5,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-reflect-apply",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-regexp-test",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-response-static-json",
+      "before": 15,
+      "after": 15,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-set-has",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-set-size",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-single-call",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-spread",
+      "before": 19,
+      "after": 19,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-string-raw",
+      "before": 59,
+      "after": 59,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-runtime-control.ts",
+          "line": 7,
+          "message": "`String.raw` should be used to avoid escaping `\\`.",
+          "anchor": "  return `'${value.replace(/'/g, \"'\\\\''\")}'`;",
+          "context": "function shellArg(value: string): string {\n  return `'${value.replace(/'/g, \"'\\\\''\")}'`;\n}\n\nexport function commandForChatRuntimeRestart(",
+          "sha256": "514ddbfb9d09885687925ee60a4566df59b853bd4f0259b35ff1f72f4a1d0559",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: `String.raw` should be used to avoid escaping `\\`.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/api/scripts/homer-worker-gpu.validator-decisions.test.ts",
+          "line": 184,
+          "message": "`String.raw` should be used to avoid escaping `\\`.",
+          "anchor": "        '*:TemporaryFileSystem) printf \"%s\\\\n\" \"/dev/dri:mode=0755\" ;;',",
+          "context": "        '*:BindPaths) printf \"%s\\\\n\" \"/dev/dri/renderD128 /dev/dri/renderD129 /dev/dri/renderD130 /dev/dri/card1 /dev/dri/card2 /dev/dri/card3\" ;;',\n        '*:TemporaryFileSystem) printf \"%s\\\\n\" \"/dev/dri:mode=0755\" ;;',\n        '*:Delegate) printf \"%s\\\\n\" no ;;',\n        '*) exit 64 ;;',\n        \"esac\",",
+          "sha256": "c96cae69b3901560187f3ea4834b595d9c18d7a6977a99ef226801810ad05c31",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: `String.raw` should be used to avoid escaping `\\`.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/shared/src/application-routes.test.ts",
+          "line": 104,
+          "message": "`String.raw` should be used to avoid escaping `\\`.",
+          "anchor": "    \"/machines/studio\\\\worker\",",
+          "context": "    \"/machines/studio%00worker\",\n    \"/machines/studio\\\\worker\",\n    \"/machines/studio/unknown\",\n    \"/connect-machine/not-a-uuid\",\n    `/connect-machine/${actionId}/extra`,",
+          "sha256": "81132335f83b246bab1c198641cd34c5de0c607be6211c9e472c046475793d34",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: `String.raw` should be used to avoid escaping `\\`.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent hiding literal backslashes behind avoidable escape layers.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "unicorn/prefer-string-replace-all",
+      "before": 65,
+      "after": 65,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-runtime-control.ts",
+          "line": 7,
+          "message": "Prefer `String#replaceAll()` over `String#replace()` when using a regex with the global flag.",
+          "anchor": "  return `'${value.replace(/'/g, \"'\\\\''\")}'`;",
+          "context": "function shellArg(value: string): string {\n  return `'${value.replace(/'/g, \"'\\\\''\")}'`;\n}\n\nexport function commandForChatRuntimeRestart(",
+          "sha256": "514ddbfb9d09885687925ee60a4566df59b853bd4f0259b35ff1f72f4a1d0559",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer `String#replaceAll()` over `String#replace()` when using a regex with the global flag.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/plugins/with-android-local-properties.js",
+          "line": 24,
+          "message": "Prefer `String#replaceAll()` over `String#replace()` when using a regex with the global flag.",
+          "anchor": "  return value.replace(/\\\\/g, \"\\\\\\\\\").replace(/:/g, \"\\\\:\");",
+          "context": "function escapePropertiesValue(value) {\n  return value.replace(/\\\\/g, \"\\\\\\\\\").replace(/:/g, \"\\\\:\");\n}\n\nfunction upsertProperty(contents, key, value) {",
+          "sha256": "c18c7ee8481d80e7be3bf2541e99a1554f85c7bf8ef463321ab4b3db9b178b9d",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer `String#replaceAll()` over `String#replace()` when using a regex with the global flag.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/opencode-policy.mjs",
+          "line": 264,
+          "message": "Prefer `String#replaceAll()` over `String#replace()` when using a regex with the global flag.",
+          "anchor": "  const backup = `${opencodeConfigPath}.bak-${new Date().toISOString().replace(/[:.]/g, \"-\")}`;",
+          "context": "  const merged = mergeConfig(base, buildOverlay());\n  const backup = `${opencodeConfigPath}.bak-${new Date().toISOString().replace(/[:.]/g, \"-\")}`;\n  if (existsSync(opencodeConfigPath))\n    writeFileSync(backup, readFileSync(opencodeConfigPath));\n  writeAtomic(opencodeConfigPath, `${JSON.stringify(merged, null, 2)}\\n`);",
+          "sha256": "d5190bef0a245a69d491e4547552404d59d6b931d68c8fd03d56b37cfa408081",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer `String#replaceAll()` over `String#replace()` when using a regex with the global flag.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent obscuring all-occurrence replacement behind a regex flag.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "unicorn/prefer-string-slice",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-string-starts-ends-with",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-string-trim-start-end",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-structured-clone",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/prefer-ternary",
+      "before": 8,
+      "after": 8,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-top-level-await",
+      "before": 12,
+      "after": 12,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/prefer-type-error",
+      "before": 18,
+      "after": 18,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/relative-url-style",
+      "before": 2,
+      "after": 2,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "unicorn/require-array-join-separator",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/require-module-attributes",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/require-number-to-fixed-digits-argument",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/require-post-message-target-origin",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/switch-case-braces",
+      "before": 382,
+      "after": 382,
+      "samples": [
+        {
+          "file": "apps/api/lib/image-payload.ts",
+          "line": 165,
+          "message": "Missing braces in case clause.",
+          "anchor": "        case \"seed\":",
+          "context": "        case \"number\":\n        case \"seed\":\n          fields.set(control.field, String(control.default));\n          break;\n        case \"select\":",
+          "sha256": "03e70318b34a74ba2c67f2f07b4680f89d9be7524c4edaeb0e690b47691fd277",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Missing braces in case clause.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/lib/haptics.native.ts",
+          "line": 21,
+          "message": "Missing braces in case clause.",
+          "anchor": "    case \"warning\":",
+          "context": "      return;\n    case \"warning\":\n      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);\n      return;\n    case \"error\":",
+          "sha256": "367bf81e801d1021750cf231807af191de0e34ecc669d93bd9fec3ae7f03442a",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Missing braces in case clause.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "scripts/needle-mcp-smoke.mjs",
+          "line": 132,
+          "message": "Missing braces in case clause.",
+          "anchor": "      default:",
+          "context": "        break;\n      default:\n        throw new Error(\n          arg.startsWith(\"--\")\n            ? `unknown_option:${arg}`",
+          "sha256": "5d95ccdb5fc1044b1ea735dd78cc04568c78b59ca201cd03a6414840f7ab640e",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Missing braces in case clause.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent extending a switch arm without an explicit lexical block.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "unicorn/switch-case-break-position",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/text-encoding-identifier-case",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "unicorn/throw-new-error",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/consistent-test-filename",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-conditional-tests",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-import-node-test",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-called-once",
+      "before": 77,
+      "after": 77,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/model-switch.test.ts",
+          "line": 75,
+          "message": "The use of `toBeCalledTimes(1)` and `toHaveBeenCalledTimes(1)` is discouraged.",
+          "anchor": "    expect(mocks.stopAllImageRuntimes).toHaveBeenCalledTimes(1);",
+          "context": "\n    expect(mocks.stopAllImageRuntimes).toHaveBeenCalledTimes(1);\n    expect(mocks.activateImageRuntime).toHaveBeenCalledTimes(1);\n    expect(events.map((event) => event.step)).toEqual([\n      \"stopping\",",
+          "sha256": "f1b9c483b57aa66419cea3c6f7db2cae731bee880d9e3049c4462dfd6b43dd68",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: The use of `toBeCalledTimes(1)` and `toHaveBeenCalledTimes(1)` is discouraged.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/lib/admin-leave-guard.test.tsx",
+          "line": 203,
+          "message": "The use of `toBeCalledTimes(1)` and `toHaveBeenCalledTimes(1)` is discouraged.",
+          "anchor": "    expect(proceed).toHaveBeenCalledTimes(1);",
+          "context": "    expect(save).toHaveBeenCalledTimes(1);\n    expect(proceed).toHaveBeenCalledTimes(1);\n  });\n\n  it(\"keeps the prompt open when saving fails\", async () => {",
+          "sha256": "8d30791a50cd2eb084a74c8d8c74b6d4136dfb9730924b008de1a6d4b3cc3770",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: The use of `toBeCalledTimes(1)` and `toHaveBeenCalledTimes(1)` is discouraged.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/apple-local-models/src/native.test.ts",
+          "line": 119,
+          "message": "The use of `toBeCalledTimes(1)` and `toHaveBeenCalledTimes(1)` is discouraged.",
+          "anchor": "    expect(nativeModule.availability).toHaveBeenCalledTimes(1);",
+          "context": "\n    expect(nativeModule.availability).toHaveBeenCalledTimes(1);\n    expect(nativeModule.prepare).not.toHaveBeenCalled();\n    expect(nativeModule.addListener).not.toHaveBeenCalled();\n  });",
+          "sha256": "a1fbc564687f3d966c2429425967b2ec2f8c17bf1f5c26f6c7b070697db64d88",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: The use of `toBeCalledTimes(1)` and `toHaveBeenCalledTimes(1)` is discouraged.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent using inconsistent once-only assertion syntax under the selected test convention.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "vitest/prefer-to-be-object",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/no-blank-blocks",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-param-description",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-param-name",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-property-type",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-returns-description",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-throws-description",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-throws-type",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-yields-description",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsdoc/require-yields-type",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/alt-text",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "jsx-a11y/anchor-ambiguous-text",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/anchor-has-content",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/anchor-is-valid",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/aria-activedescendant-has-tabindex",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/aria-props",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/aria-proptypes",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/aria-unsupported-elements",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/autocomplete-valid",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/click-events-have-key-events",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/control-has-associated-label",
+      "before": 2,
+      "after": 2,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "jsx-a11y/heading-has-content",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/html-has-lang",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/iframe-has-title",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/img-redundant-alt",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/interactive-supports-focus",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/label-has-associated-control",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/lang",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/media-has-caption",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/mouse-events-have-key-events",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/no-access-key",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/no-aria-hidden-on-focusable",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/no-autofocus",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/no-distracting-elements",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/no-interactive-element-to-noninteractive-role",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/no-noninteractive-element-interactions",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/no-noninteractive-element-to-interactive-role",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/no-noninteractive-tabindex",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/no-redundant-roles",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/no-static-element-interactions",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/role-has-required-aria-props",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/role-supports-aria-props",
+      "before": 2,
+      "after": 2,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "jsx-a11y/scope",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "jsx-a11y/tabindex-no-positive",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "node/exports-style",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "node/no-exports-assign",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "node/no-mixed-requires",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "node/no-new-require",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/display-name",
+      "before": 9,
+      "after": 9,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "react/forbid-dom-props",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/forbid-elements",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/function-component-definition",
+      "before": 38,
+      "after": 38,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "react/jsx-no-duplicate-props",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/jsx-no-undef",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-clone-element",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "react/no-did-mount-set-state",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-did-update-set-state",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-direct-mutation-state",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-find-dom-node",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-is-mounted",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-namespace",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-object-type-as-default-prop",
+      "before": 9,
+      "after": 9,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "react/no-react-children",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-redundant-should-component-update",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-render-return-value",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-set-state",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-string-refs",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-unsafe",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-unstable-nested-components",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/no-will-update-set-state",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/prefer-es6-class",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/prefer-function-component",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/require-render-return",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "react/state-in-constructor",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "vitest/consistent-each-for",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/consistent-test-it",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/consistent-vitest-vi",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/hoisted-apis-on-top",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/max-nested-describe",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-alias-methods",
+      "before": 2,
+      "after": 2,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "vitest/no-commented-out-tests",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-disabled-tests",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-duplicate-hooks",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-focused-tests",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-identical-title",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-interpolation-in-snapshots",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-large-snapshots",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-mocks-import",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-restricted-matchers",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-restricted-vi-methods",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-test-prefixes",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-test-return-statement",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/no-unneeded-async-expect-function",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/padding-around-after-all-blocks",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/padding-around-test-blocks",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-called-exactly-once-with",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "vitest/prefer-called-with",
+      "before": 3,
+      "after": 3,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "vitest/prefer-comparison-matcher",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-describe-function-title",
+      "before": 127,
+      "after": 127,
+      "samples": [
+        {
+          "file": "apps/api/lib/image-payload.test.ts",
+          "line": 5,
+          "message": "Title description can not have the same content as a imported function name.",
+          "anchor": "describe(\"imageTaskJsonPayload\", () => {",
+          "context": "\ndescribe(\"imageTaskJsonPayload\", () => {\n  it(\"preserves typed fields for text-to-image JSON task submission\", () => {\n    expect(\n      imageTaskJsonPayload(\"zimage\", \"matte black espresso cup\", {",
+          "sha256": "da574aaca6f01325d4c9dd9be962562484c3b0663927a3363bebc6e91bfcdd17",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Title description can not have the same content as a imported function name.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/lib/image-store.test.tsx",
+          "line": 47,
+          "message": "Title description can not have the same content as a imported function name.",
+          "anchor": "describe(\"useImageDefaults\", () => {",
+          "context": "\ndescribe(\"useImageDefaults\", () => {\n  beforeEach(() => {\n    localStorage.clear();\n  });",
+          "sha256": "cab2596e8ba6a2ec68d6994f1909e840da0990576a13b4d94f8981d59241aa43",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Title description can not have the same content as a imported function name.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/shared/src/switch-stream.test.ts",
+          "line": 36,
+          "message": "Title description can not have the same content as a imported function name.",
+          "anchor": "describe(\"isTerminalSwitchStep\", () => {",
+          "context": "\ndescribe(\"isTerminalSwitchStep\", () => {\n  it(\"marks only ready, timeout, and error as terminal\", () => {\n    expect(isTerminalSwitchStep(\"stopping\")).toBe(false);\n    expect(isTerminalSwitchStep(\"starting\")).toBe(false);",
+          "sha256": "5326b39d438665d83b1f297a530aa0118fa507defd5b2d9e699dcc0db75c13de",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Title description can not have the same content as a imported function name.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent allowing a function test title to drift from the imported binding.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "vitest/prefer-each",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-equality-matcher",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-expect-resolves",
+      "before": 96,
+      "after": 96,
+      "samples": [
+        {
+          "file": "apps/api/lib/server/chat-runtime.test.ts",
+          "line": 435,
+          "message": "Prefer `await expect(...).resolves` over `expect(await ...)` syntax.",
+          "anchor": "    expect(await checkChatRuntimeReadiness(endpoint())).toEqual({",
+          "context": "\n    expect(await checkChatRuntimeReadiness(endpoint())).toEqual({\n      ready: true,\n    });\n    expect(await checkChatRuntimeReadiness(endpoint())).toMatchObject({",
+          "sha256": "e472f507b077f34baeb9bee1e121ca9075325452be1531473560f606a85bf3b5",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer `await expect(...).resolves` over `expect(await ...)` syntax.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/convex/notifications.test.ts",
+          "line": 50,
+          "message": "Prefer `await expect(...).resolves` over `expect(await ...)` syntax.",
+          "anchor": "      await test.run((ctx) =>",
+          "context": "    expect(\n      await test.run((ctx) =>\n        ctx.db.query(\"notificationRegistrations\").collect()\n      )\n    ).toHaveLength(1);",
+          "sha256": "3d419242f2df7a6a545e07720f437cf168142af431a11f22bc2891200b9b33da",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer `await expect(...).resolves` over `expect(await ...)` syntax.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/machine/src/persistence.test.ts",
+          "line": 105,
+          "message": "Prefer `await expect(...).resolves` over `expect(await ...)` syntax.",
+          "anchor": "    expect(await readFile(stalePath, \"utf8\")).toBe(\"stale\");",
+          "context": "\n    expect(await readFile(stalePath, \"utf8\")).toBe(\"stale\");\n  });\n\n  it.each([",
+          "sha256": "e862ee86e49633fc31db80bdaf77afb2ad87bfff3d547d5a87570531bd05a18c",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Prefer `await expect(...).resolves` over `expect(await ...)` syntax.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent moving promise settlement outside the assertion owner.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "vitest/prefer-expect-type-of",
+      "before": 1,
+      "after": 1,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "vitest/prefer-hooks-in-order",
+      "before": 4,
+      "after": 4,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "vitest/prefer-hooks-on-top",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-import-in-mock",
+      "before": 377,
+      "after": 377,
+      "samples": [
+        {
+          "file": "apps/api/app/api/admin/conf/route.test.ts",
+          "line": 21,
+          "message": "Mocked modules must be dynamic imported.",
+          "anchor": "vi.mock(\"node:fs\", () => ({ readFileSync, writeFileSync, renameSync }));",
+          "context": "\nvi.mock(\"node:fs\", () => ({ readFileSync, writeFileSync, renameSync }));\nvi.mock(\"@/lib/server/chat-profile\", () => ({ readChatProfileId }));\nvi.mock(\"@/lib/server/conf\", () => ({ getChatProfileConf }));\nvi.mock(\"@/lib/server/runtime-control\", () => ({",
+          "sha256": "c2a7df22f64bbdd26a8b164038adf9a0543dd6d61912b590425e26a6cac6cc9b",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Mocked modules must be dynamic imported.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/lib/voice-selection.test.tsx",
+          "line": 12,
+          "message": "Mocked modules must be dynamic imported.",
+          "anchor": "vi.mock(\"./storage\", () => storage);",
+          "context": "\nvi.mock(\"./storage\", () => storage);\n\ndescribe(\"useVoiceSelection\", () => {\n  it(\"does not overwrite a fresh selection when storage hydration resolves\", async () => {",
+          "sha256": "7b78ad0ca9774c260de0708a9a302f4aefd2d4361e2309bb8babf8621d475ca5",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Mocked modules must be dynamic imported.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/pi-agent/src/index.test.ts",
+          "line": 31,
+          "message": "Mocked modules must be dynamic imported.",
+          "anchor": "vi.mock(\"@earendil-works/pi-agent-core\", () => ({",
+          "context": "\nvi.mock(\"@earendil-works/pi-agent-core\", () => ({\n  Agent: class MockAgent {\n    state = { errorMessage: null };\n    options: MockAgentOptions;",
+          "sha256": "3a0926d5b46b15f167ae59dac5170ab2f7d68dea151a6eb20bd3bf5766283001",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Mocked modules must be dynamic imported.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent creating an untyped string mock target instead of an import-checked contract.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "vitest/prefer-importing-vitest-globals",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-mock-promise-shorthand",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-snapshot-hint",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-spy-on",
+      "before": 4,
+      "after": 4,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "vitest/prefer-strict-equal",
+      "before": 618,
+      "after": 618,
+      "samples": [
+        {
+          "file": "apps/api/app/api/admin/conf/route.test.ts",
+          "line": 46,
+          "message": "Suggest using `toStrictEqual()`.",
+          "anchor": "    await expect(response.json()).resolves.toEqual({",
+          "context": "    expect(response.status).toBe(200);\n    await expect(response.json()).resolves.toEqual({\n      profile: \"qwen36\",\n      content: \"MODEL=qwen36\\n\",\n    });",
+          "sha256": "c2a7df22f64bbdd26a8b164038adf9a0543dd6d61912b590425e26a6cac6cc9b",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Suggest using `toStrictEqual()`.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "apps/client/src/components/chat/generation-primitives.test.mjs",
+          "line": 42,
+          "message": "Suggest using `toStrictEqual()`.",
+          "anchor": "    ).toEqual([\"retry exact\"]);",
+          "context": "      }).map((action) => action.label)\n    ).toEqual([\"retry exact\"]);\n  });\n});",
+          "sha256": "c21009f745f3e265e87cb13ebd246f298bc44d0bfbeda4aed6c4e72fd1843c4c",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Suggest using `toStrictEqual()`.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        },
+        {
+          "file": "packages/shared/src/video-runtime-target.test.ts",
+          "line": 122,
+          "message": "Suggest using `toStrictEqual()`.",
+          "anchor": "    ).toEqual({",
+          "context": "      VIDEO_MODELS[LIGHTX2V_AITER_VIDEO_RUNTIME_TARGET.modelId].benchmarkConfigs\n    ).toEqual({\n      \"720p\": expect.objectContaining({\n        label: LIGHTX2V_AITER_VIDEO_RUNTIME_TARGET.configId,\n        resolution: \"1280x720\",",
+          "sha256": "34a7da7adb14eda2aa167e73e52228a1a44b17e68c138112daa45a251d1d3592",
+          "classification": "TP-policy",
+          "reason": "The real source exhibits the condition named in the diagnostic: Suggest using `toStrictEqual()`.",
+          "reviewChange": "Fresh native-policy judgement; no earlier per-sample review classification is attributed."
+        }
+      ],
+      "intent": "Interrupt an agent using a loose structural assertion where the selected test policy requires exact shape.",
+      "interpretation": "All three samples violate the explicitly selected native policy. These are policy-conformance signals, not evidence that every site is a runtime bug or that a mechanical edit is safe. Numeric budgets and style conventions are opt-in by the owner\u2019s composition request."
+    },
+    {
+      "rule": "vitest/prefer-to-be",
+      "before": 4,
+      "after": 4,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "vitest/prefer-to-contain",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-to-have-been-called-times",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/prefer-to-have-length",
+      "before": 2,
+      "after": 2,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "vitest/prefer-todo",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/require-awaited-expect-poll",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/require-local-test-context-for-concurrent-snapshots",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/require-to-throw-message",
+      "before": 31,
+      "after": 31,
+      "samples": [],
+      "interpretation": "Measured findings below the required greater-than-fifty sampling threshold."
+    },
+    {
+      "rule": "vitest/valid-describe-callback",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/valid-expect-in-promise",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/valid-title",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    },
+    {
+      "rule": "vitest/warn-todo",
+      "before": 0,
+      "after": 0,
+      "samples": [],
+      "interpretation": "No positive corpus evidence; preventive native policy."
+    }
+  ]
+}

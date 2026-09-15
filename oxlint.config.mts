@@ -53,6 +53,7 @@ export default defineConfig({
     ...(governance.ignorePatterns ?? []),
     "tooling/antidrift/src/eslint-plugin/fixtures/programs/**",
     "tooling/antidrift/src/brand/fixtures/programs/**",
+    "tooling/antidrift/src/oxlint-plugin/fixtures/programs/**",
   ],
   jsPlugins: [
     ...(governance.jsPlugins ?? []),

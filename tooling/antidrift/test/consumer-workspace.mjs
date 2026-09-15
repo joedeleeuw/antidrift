@@ -93,11 +93,12 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
         type: "module",
         devDependencies: {
           "@joedeleeuw/antidrift": `file:${tarball}`,
-          eslint: "^9",
-          "typescript-eslint": "^8",
-          "@typescript-eslint/parser": "^8",
-          oxlint: "^1.75.0",
-          typescript: "^6",
+          eslint: "9.39.4",
+          "typescript-eslint": "8.60.1",
+          "@typescript-eslint/parser": "8.60.1",
+          oxlint: "1.78.0",
+          typescript: "6.0.3",
+          vitest: "2.1.9",
           firebase: "workspace:*",
         },
       },
@@ -212,6 +213,42 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
   file("src/undeclared.gen.ts", lines(1_501, "// generated line"));
   file("src/undeclared.generated.ts", lines(1_501, "// generated line"));
   file("src/routeTree.gen.ts", lines(1_501, "// generated line"));
+  file(
+    "packages/app/src/vitest.d.ts",
+    'declare module "vitest" {\n' +
+      "  export const vi: { mock(specifier: string): void };\n" +
+      "}\n",
+  );
+  file(
+    "packages/app/src/legitimate-boundaries.ts",
+    'import { vi } from "vitest";\n' +
+      "\n" +
+      'vi.mock("./external-runtime.js");\n' +
+      "\n" +
+      "export function externalValue(): unknown {\n" +
+      "  return globalThis.structuredClone({});\n" +
+      "}\n" +
+      "\n" +
+      "export function serializeObject(value: object): string {\n" +
+      "  return JSON.stringify(value);\n" +
+      "}\n" +
+      "\n" +
+      "export function jsonObject(): Record<string, unknown> {\n" +
+      "  return {};\n" +
+      "}\n" +
+      "\n" +
+      "export function optionalTimeout(timeout: number | undefined) {\n" +
+      "  return { ...(timeout === undefined ? {} : { timeout }) };\n" +
+      "}\n" +
+      "\n" +
+      "export function dynamicProperty(owner: object, key: PropertyKey) {\n" +
+      "  return Reflect.get(owner, key);\n" +
+      "}\n" +
+      "\n" +
+      "export function dynamicCall(operation: () => string, owner: object) {\n" +
+      "  return Reflect.apply(operation, owner, []);\n" +
+      "}\n",
+  );
   file(
     "packages/app/src/generated/oversized.ts",
     lines(1_501, "// generated line"),
@@ -377,7 +414,9 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
   );
   file(
     "packages/app/src/exports.ts",
-    'import type { ESLint, Linter } from "eslint";\n' +
+    'import { createAdoptionOxlintConfig, antidriftAdoptionPresets, type AntidriftAdoptionPresetName } from "@joedeleeuw/antidrift/adoption-config";\n' +
+      'const selectedPreset: AntidriftAdoptionPresetName = "eslint"; const adoption = createAdoptionOxlintConfig({ presets: [selectedPreset] }); void adoption; void antidriftAdoptionPresets;\n' +
+      'import type { ESLint, Linter } from "eslint";\n' +
       'import type * as ts from "typescript";\n' +
       'import { antidriftComplexityRules, createConfig, createGovernanceOxlintConfig, eslintPlugin, loadPolicy, loadRegistriesSync, oxlintPlugin, renderPolicyArtifacts, type AgentGuardrailsPolicy, type AntidriftConfigOptions, type AntidriftGovernanceOxlintConfigOptions, type AntidriftRegistries, type PolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
       'import { brand, type Brand, type BrandKit, type BrandSafeResult, type Unbrand } from "@joedeleeuw/antidrift/brand";\n' +
@@ -928,8 +967,9 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "\n" +
       "const eslintRuleNames = new Set(Object.keys(eslintPlugin.rules));\n" +
       "const oxlintRuleNames = new Set(Object.keys(oxlintPlugin.rules));\n" +
-      "if ([...eslintRuleNames].some((rule) => oxlintRuleNames.has(rule))) {\n" +
-      '  throw new Error("Custom rule is exported by both runtime plugins");\n' +
+      "const sharedRuntimeRules = [...eslintRuleNames].filter((rule) => oxlintRuleNames.has(rule)).sort();\n" +
+      'if (sharedRuntimeRules.join(",") !== "no-mocked-response-body-oracle,no-wrapping-functions") {\n' +
+      '  throw new Error(`Unexpected custom rules exported by both runtime plugins: ${sharedRuntimeRules.join(", ")}`);\n' +
       "}\n" +
       "\n" +
       'const runtimeOxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false });\n' +

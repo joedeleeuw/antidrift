@@ -20,7 +20,7 @@ import {
 } from "../../semantic-adapters/async-control-flow.mjs";
 import { requireTypeServices } from "./type-services.js";
 import {
-  containsSqlPrefix,
+  SQL_PREFIX_PATTERN,
   containsSqlStatement,
   templateText,
   staticStringValue,
@@ -1161,7 +1161,7 @@ export function ruleNoSqlStringConcat() {
             (side) =>
               side?.type === "Literal" &&
               typeof side.value === "string" &&
-              containsSqlPrefix(side.value),
+              SQL_PREFIX_PATTERN.test(side.value),
           );
           const hasNonLiteral = sides.some(
             (side) => side && side.type !== "Literal",

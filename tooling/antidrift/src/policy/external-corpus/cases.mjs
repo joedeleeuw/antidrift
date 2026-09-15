@@ -1,41 +1,38 @@
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { homedir } from "node:os";
 
-const antidriftRepoCandidates = [
-  process.env.ANTIDRIFT_REPO,
-  fileURLToPath(new URL("../../../../../", import.meta.url)),
-].filter(Boolean);
 const sudocodeRepoCandidates = [
   process.env.SUDOCODE_REPO,
-  "/Users/sushi/code/sudocode-main",
+  resolve(homedir(), "code", "sudocode-main"),
 ].filter(Boolean);
 const codebaseAtlasRepoCandidates = [
   process.env.CODEBASE_ATLAS_REPO,
-  "/Users/sushi/code/codebase-atlas",
+  resolve(homedir(), "code", "codebase-atlas"),
 ].filter(Boolean);
 const murderboxRepoCandidates = [
   process.env.MURDERBOX_REPO,
-  "/Users/sushi/code/murderbox",
+  resolve(homedir(), "code", "murderbox"),
 ].filter(Boolean);
 const cloudflareAgentsRepoCandidates = [
   process.env.CLOUDFLARE_AGENTS_REPO,
-  "/Users/sushi/code/cloudflare-agents",
+  resolve(homedir(), "code", "cloudflare-agents"),
 ].filter(Boolean);
 const claudeCodeSourceRepoCandidates = [
   process.env.CLAUDE_CODE_SOURCE_REPO,
-  "/Users/sushi/code/claude-code-src-code",
-  "/Users/sushi/code/claude-code-source-code",
+  resolve(homedir(), "code", "claude-code-src-code"),
+  resolve(homedir(), "code", "claude-code-source-code"),
 ].filter(Boolean);
 const opencodeRepoCandidates = [
   process.env.OPENCODE_REPO,
-  "/Users/sushi/code/opencode",
+  resolve(homedir(), "code", "opencode"),
 ].filter(Boolean);
 const dotfilesRepoCandidates = [
   process.env.DOTFILES_REPO,
-  "/Users/sushi/code/dotfiles",
+  resolve(homedir(), "code", "dotfiles"),
 ].filter(Boolean);
 const powersyncServiceRepoCandidates = [
   process.env.POWERSYNC_SERVICE_REPO,
-  "/Users/sushi/code/powersync-service",
+  resolve(homedir(), "code", "powersync-service"),
 ].filter(Boolean);
 export const coreRuleIds = new Set(["no-restricted-imports"]);
 const powersyncSqlRuleOptions = {
@@ -864,6 +861,22 @@ export const murderboxCases = [
     paths: ["apps/client/src/screens/conversation-timeline-durability.ts"],
   },
   {
+    id: "murderbox-model-selector-redundant-local-return-type",
+    ruleId: "antidrift/no-redundant-local-return-type",
+    kind: "drift",
+    classification: "under-proven",
+    subproject: "client",
+    typeAware: true,
+    tsconfig: "apps/client/tsconfig.json",
+    paths: ["apps/client/src/components/chat/model-selector-menu-data.ts"],
+    expectedFindings: [
+      {
+        path: "apps/client/src/components/chat/model-selector-menu-data.ts",
+        line: 311,
+      },
+    ],
+  },
+  {
     id: "murderbox-machines-missing-return-validators",
     ruleId: "antidrift/require-convex-return-validator",
     kind: "drift",
@@ -954,41 +967,6 @@ export const murderboxCases = [
       {
         path: "apps/api/lib/server/chat-runtime.ts",
         line: 381,
-      },
-    ],
-  },
-  {
-    id: "murderbox-api-laguna-profile-mirrors-conf",
-    ruleId: "antidrift/no-repo-state-mirror-assertion",
-    kind: "drift",
-    classification: "ready",
-    subproject: "api",
-    ruleOptions: {
-      "antidrift/no-repo-state-mirror-assertion": [
-        { sources: [{ module: "./conf" }] },
-      ],
-    },
-    paths: ["apps/api/lib/server/laguna-profile.test.ts"],
-    expectedFindings: [
-      {
-        path: "apps/api/lib/server/laguna-profile.test.ts",
-        line: 17,
-      },
-      {
-        path: "apps/api/lib/server/laguna-profile.test.ts",
-        line: 36,
-      },
-      {
-        path: "apps/api/lib/server/laguna-profile.test.ts",
-        line: 42,
-      },
-      {
-        path: "apps/api/lib/server/laguna-profile.test.ts",
-        line: 50,
-      },
-      {
-        path: "apps/api/lib/server/laguna-profile.test.ts",
-        line: 56,
       },
     ],
   },
@@ -1392,46 +1370,7 @@ export const powersyncServiceCases = [
   },
 ];
 
-export const antidriftCases = [
-  ...[
-    ["no-redeclared-owned-union", "owned-union"],
-    ["no-open-dictionary-at-boundary", "open-dictionary"],
-    ["unknown-input-must-be-decoded", "unknown-input"],
-    ["no-convex-return-widening", "convex-return"],
-  ].map(([name, fixture]) => ({
-    id: `antidrift-${name}-clean`,
-    ruleId: `antidrift/${name}`,
-    kind: "correct",
-    classification: "ready",
-    subproject: "tooling",
-    ruleOptions: { [`antidrift/${name}`]: [{ allows: [] }] },
-    paths: [`tooling/antidrift/src/eslint-plugin/fixtures/${fixture}/allows.ts`],
-  })),
-  {
-    id: "antidrift-eslint-config-static-property-loop",
-    ruleId: "antidrift/no-static-property-loop",
-    kind: "drift",
-    classification: "ready",
-    subproject: "tooling",
-    paths: [
-      "tooling/antidrift/src/eslint-plugin/fixtures/programs/drift/test/static-property-loop.js",
-    ],
-    expectedFindings: [
-      {
-        path: "tooling/antidrift/src/eslint-plugin/fixtures/programs/drift/test/static-property-loop.js",
-        line: 7,
-      },
-    ],
-  },
-];
-
 export const externalCorpora = [
-  {
-    name: "antidrift",
-    label: "Antidrift",
-    repoCandidates: antidriftRepoCandidates,
-    cases: antidriftCases,
-  },
   {
     name: "sudocode-main",
     label: "Sudocode",

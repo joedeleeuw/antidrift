@@ -1,3 +1,3 @@
-export function receive(input: Record<string, unknown>): void {
-  console.log(input);
+export function receive(input: Record<string, unknown>): number {
+  return Object.keys(input).length;
 }

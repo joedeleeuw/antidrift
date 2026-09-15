@@ -63,6 +63,7 @@ export function parseArgs(argv) {
     slice: "external-corpus",
     output: null,
     require: false,
+    all: false,
     rules: null,
     minRepositories: 1,
     minDriftRepositories: 0,
@@ -74,13 +75,16 @@ export function parseArgs(argv) {
       i += 1;
     } else if (arg === "--require") {
       out.require = true;
+    } else if (arg === "--all") {
+      out.all = true;
     }
   }
   return out;
 }
 
-function selectedCorpora(corpus) {
-  if (!corpus) return externalCorpora;
+function selectedCorpora(corpus, all) {
+  if (all) return externalCorpora;
+  if (!corpus) return [];
   return externalCorpora.filter((entry) => entry.name === corpus);
 }
 
@@ -95,6 +99,24 @@ function unknownCorpusSummary(corpus, sharedOptions) {
     slice: externalSlice(sharedOptions),
     decision: "fail",
     reason: `Unknown external corpus: ${corpus}. Known: ${externalCorpora.map((entry) => entry.name).join(", ")}`,
+    repositories: [],
+  };
+}
+
+function invalidSelectionSummary(corpus, all, sharedOptions) {
+  let reason = `Select one external corpus with --corpus <name>, or pass --all explicitly. Known: ${externalCorpora.map((entry) => entry.name).join(", ")}`;
+  if (corpus && all) {
+    reason = "Pass either --corpus <name> or --all, not both.";
+  } else if (all && sharedOptions.repo) {
+    reason =
+      "--repo requires one --corpus; it cannot override every corpus selected by --all.";
+  }
+  return {
+    schemaVersion: 1,
+    corpus: "external",
+    slice: externalSlice(sharedOptions),
+    decision: "fail",
+    reason,
     repositories: [],
   };
 }
@@ -183,23 +205,31 @@ function missingRepositoryReason(label) {
 }
 
 function skippedRepositorySummary(presence, slice, reason) {
-  return {
+  const summary = {
     schemaVersion: 1,
     corpus: presence.corpus,
     slice,
-    ...(presence.repoRoot ? { repoRoot: presence.repoRoot } : {}),
     decision: "skip",
     reason: presence.repoRoot
       ? reason
       : missingRepositoryReason(presence.label),
     cases: [],
   };
+  if (presence.repoRoot) summary.repoRoot = presence.repoRoot;
+  return summary;
 }
 
 function externalPreconditionFailure({ available, minRepositories, require }) {
   if (!require) return null;
   if (available >= minRepositories) return null;
   return `Only ${available} external corpus repositories are available; ${minRepositories} required by --require for this slice.`;
+}
+
+async function runExternalCorpora(corpora, options) {
+  const [corpus, ...remaining] = corpora;
+  if (!corpus) return [];
+  const result = await runExternalCorpus(corpus, options);
+  return [result, ...(await runExternalCorpora(remaining, options))];
 }
 
 function failingCaseLines(repository) {
@@ -246,13 +276,19 @@ function emitSummary(summary, output, report) {
 export async function externalCorpus(options = {}) {
   const {
     corpus = null,
+    all = false,
     output = null,
     report = console.log,
     minRepositories = 1,
     minDriftRepositories = 0,
     ...sharedOptions
   } = options;
-  const corpora = selectedCorpora(corpus);
+  if ((!corpus && !all) || (corpus && all) || (all && sharedOptions.repo)) {
+    const summary = invalidSelectionSummary(corpus, all, sharedOptions);
+    emitSummary(summary, output, report);
+    return summary;
+  }
+  const corpora = selectedCorpora(corpus, all);
   if (corpus && corpora.length === 0) {
     const summary = unknownCorpusSummary(corpus, sharedOptions);
     emitSummary(summary, output, report);
@@ -292,14 +328,10 @@ export async function externalCorpus(options = {}) {
     emitSummary(summary, output, report);
     return summary;
   }
-  const repositories = await Promise.all(
-    corpora.map((entry) =>
-      runExternalCorpus(entry, {
-        ...sharedOptions,
-        require: requireIndividualRepository,
-      }),
-    ),
-  );
+  const repositories = await runExternalCorpora(corpora, {
+    ...sharedOptions,
+    require: requireIndividualRepository,
+  });
 
   const passed = repositories.filter(
     (result) => result.decision === "pass",

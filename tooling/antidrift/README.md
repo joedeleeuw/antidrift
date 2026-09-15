@@ -1,16 +1,20 @@
 # antidrift
 
-A focused Oxlint governance config and plugin, an eight-rule ESLint TypeChecker pass, and a policy generator. It exists to catch the specific ways a codebase rots when an agent is the one writing it.
+A focused Oxlint governance config and plugin, a reduced ESLint TypeChecker pass, and a policy generator. It exists to catch the specific ways a codebase rots when an agent is the one writing it.
 
 Regular linters check syntax and a handful of correctness rules. They don't notice when an agent redeclares a type that already ships with `firebase`, wires up a `useEffect` with no dependency array, or quietly swallows an error to turn a red test green. Those edits compile. They pass review when the reviewer is skimming. Then they drift. You end up with three slightly different `User` types, four copies of the same fetch logic, and a component that re-renders on every keystroke.
 
 antidrift writes those patterns down as deterministic rules so the machine catches them instead of you.
 
-Oxlint owns syntax-only custom rules and shared governance. ESLint owns only the custom rules that need TypeScript's `Program` and `TypeChecker`. Generic TypeScript, React, Vitest, Unicorn, import-style, and repository-boundary policy belongs to each consumer. No custom rule ID is exported by both plugins.
+Oxlint owns syntax-only custom rules and shared governance. ESLint owns the custom rules that need TypeScript's `Program` and `TypeChecker`. Portable rules may be exported by both plugins, but each rule runs through only one configured runtime. Generic TypeScript, React, Vitest, Unicorn, import-style, and repository-boundary policy belongs to each consumer.
 
 The positive pattern behind the rules is one owner per concept: domain owns business vocabulary, contracts own wire schemas, API boundaries validate and authorize, gateways own SDKs, and UI consumes resource/result unions instead of local duplicate shapes.
 
 ## Install
+
+The shared governance preset enables `antidrift/no-wrapping-functions` as an error by default. Named functions and named arrows that only delegate to another call must earn their extra layer through a concrete boundary or callback requirement. Exports are included. Anonymous inline callbacks, calculations, argument transformations and functions that own additional behavior stay outside the rule. It provides no automatic fix. When removing a callback adapter, preserve its exact signature, receiver behavior, hook position and stable identity; pass the existing owner directly only when it already satisfies that callback contract.
+
+For example, `const loadItems = (id) => owner.load(id)` reports; call `owner.load(id)` directly at its callers. `button.onClick(() => owner.load(id))` remains a callback with deferred execution. For a subscription API, `useSyncExternalStore(subscribeToConsent, getSnapshot)` is the valid direct substitution only when `subscribeToConsent` has the adapter's signature and receiver semantics; do not replace a required stable adapter with a new inline arrow or `.bind`. ESLint-only consumers can enable the same rule through the ESLint plugin; do not enable it in both lint runtimes.
 
 ```sh
 pnpm add -D @joedeleeuw/antidrift oxlint eslint typescript typescript-eslint @typescript-eslint/parser
@@ -57,7 +61,7 @@ import { createConfig } from "@joedeleeuw/antidrift/eslint-config";
 export default createConfig({ tsconfigRootDir: import.meta.dirname });
 ```
 
-`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, anti-suppression rules, a global 1,500-line module ceiling, `antidrift/require-effect-deps`, and `antidrift/no-static-property-loop`. Other syntax, scope, and local-control-flow Antidrift rules are registered there as default-off inventory. It deliberately does not choose a generic correctness, TypeScript, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Consumers can apply the frozen `antidriftComplexityRules` fragment to deliberate production-code scopes. `createConfig` enables eight custom rules that need TypeScript parser services and keeps `no-defensive-shape-probing`, `no-explicit-type-arguments-on-owned-api`, `no-identity-schema-transform`, `no-schema-validator-transcoding`, `no-sql-string-concat`, `no-underchecked-type-predicate`, and `require-convex-return-validator` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
+`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, anti-suppression rules, a global 1,500-line module ceiling, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, and the imported rules for unknown aliases and chained assertions. Test-focused `antidrift/no-schema-library-in-test`, `antidrift/no-validator-output-oracle`, and `antidrift/no-mocked-response-body-oracle` are registered default-off alongside the React Native interaction-owner rule. The remaining imported rules stay registered but default-off because their syntax is not sufficient general evidence at runtime, test, and external-data boundaries. Other syntax, scope, and local-control-flow Antidrift rules are also registered as default-off inventory. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Consumers can apply the frozen `antidriftComplexityRules` fragment to deliberate production-code scopes. `createConfig` enables the custom rules that need TypeScript parser services and keeps `no-defensive-shape-probing`, `no-explicit-type-arguments-on-owned-api`, `no-identity-schema-transform`, `no-redundant-local-return-type`, `no-schema-validator-transcoding`, `no-sql-string-concat`, `no-underchecked-type-predicate`, and `require-convex-return-validator` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
 Oxlint excludes generated output only when its exact file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Generated-looking names are ordinary linted code unless the registry owns them.
 
@@ -126,7 +130,7 @@ pnpm policy:inventory-underchecked-predicate
 npx antidrift repo-corpus --slice current-work --rules import/no-cycle
 ```
 
-The first two validate registry-backed rule facts and verify every custom rule is exported, configured, corpus-covered, mature enough for its severity, and enabled by at most one runtime.
+The first two validate registry-backed rule facts and verify every custom rule is exported, configured, mature enough for its severity, and enabled by at most one runtime. Plugin tests own executable bad and clean behavior evidence; the surface check does not duplicate that evidence in a corpus manifest.
 `shell` runs the packaged ast-grep shell guardrails against the current project. It is opt-in source lint for shell scripts, not an ESLint rule and not an automatic hook installer. `antidrift shell test` validates the packaged ast-grep rule tests.
 `semantic-manifest` prints the composed semantic adapter/fact contract registry as JSON, so downstream tools can discover proof buckets, owned associations, and emitted fact kinds without importing source internals. Use `--adapter`, `--rule`, `--proof-bucket`, `--fact-adapter`, or `--fact-kind` to print a filtered adapter slice.
 `rule-status` prints a normalized view of `policy/registries/rules.yaml`, including active, retired, research, and policy-review rows, so experimental rules can ship with explicit maturity and delegation metadata. Use `--kind`, `--status`, `--semantic-adapter`, or `--proof-bucket` to print a filtered manifest. Add `--semantic-summary` to print joined summaries for the filtered rows. Proof-bucket filtering includes both semantic-adapter contracts and registry `promotion.proofBucket` rows. The policy subpath exposes the same helpers plus joined rule semantic summaries for downstream tooling.
@@ -134,7 +138,7 @@ The first two validate registry-backed rule facts and verify every custom rule i
 `package:verify` packs the npm tarball, installs it in a throwaway consumer workspace, type-checks every public export under Bundler and NodeNext resolution, imports every runtime export, runs the shipped lint configs, proves `SEMANTIC_FACT_KINDS` and the public semantic adapters are available to consumer tooling, proves the CLI exposes the composed semantic manifest and normalized rule-status registry, and proves a configured semantic fact sink receives a generated-source `structuralMatch` fact.
 `check-rule-surface` is only meaningful in this source repository layout; installed consumers can use `verify-session`, `check-generated`, and the normal Oxlint and reduced ESLint passes without carrying Antidrift's own rule tests.
 `policy:validate-corpus` exercises the remaining ESLint-owned rules against the maintained project inventory; the normal Oxlint pass covers Oxlint-owned rules. `repo-corpus` can narrow ESLint evidence to the rules changed in a slice, while the Chaski corpus executes native Oxlint cases directly where ownership moved.
-`policy:validate-chaski` is an optional local corpus gate: it runs explicit assertions against real Chaski frontend/BFF files when `CHASKI_REPO` or `/Users/sushi/code/chaski` is available, and skips otherwise so consumers do not need the private corpus.
+`policy:validate-chaski` is an optional local corpus gate: it runs explicit assertions against real Chaski frontend/BFF files when `CHASKI_REPO` or `~/code/chaski` is available, and skips otherwise so consumers do not need the private corpus.
 `policy:benchmark-sql-queries` runs `antidrift/no-sql-string-concat` on real SQL programs and emits `parserServiceDeltas`: extra-only non-type-aware identifier reports are inventory, while missing non-type-aware findings or parser errors block promotion.
 `policy:inventory-change-contract` runs the inventory-only change-contract spine. Missing contracts exit 0, invalid contracts fail loudly, and present contracts compare merge-base change surfaces against declared paths, dependencies, exports, and optional module graph radius (`--tsconfig` is required when graph entrypoints are declared).
 `policy:validate-change-contract-evidence` replays the documented change-contract MVP gold true-positive and true-negative commits against local `sudocode-main` and `chaski` clones. It fails loudly when a required repo or SHA is unavailable, writes `reports/change-contract-evidence.json`, and is a source-repo evidence gate rather than a consumer requirement.
@@ -175,7 +179,8 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/package.json` — package metadata for consumer tooling
 - `@joedeleeuw/antidrift/brand` — `Brand<T, Name>`, `Unbrand<T>`, and `brand(name, check)`
 - `@joedeleeuw/antidrift/eslint-config` — the `createConfig` factory above
-- `@joedeleeuw/antidrift/eslint-plugin` — the 12-rule TypeChecker plugin, if you'd rather wire those rules by hand
+- `@joedeleeuw/antidrift/eslint-plugin` — the TypeChecker plugin, if you'd rather wire those rules by hand
+- `@joedeleeuw/antidrift/adoption-config` — named opt-in native rule presets
 - `@joedeleeuw/antidrift/oxlint-config` — focused governance plus the immutable opt-in complexity fragment
 - `@joedeleeuw/antidrift/oxlint-plugin` — syntax-only custom rules supported by Oxlint's JavaScript plugin API
 - `@joedeleeuw/antidrift/policy` — policy check APIs, rule-status registry helpers, semantic fact sinks, and shipped `SEMANTIC_FACT_KINDS` contracts for advanced tooling
@@ -213,6 +218,10 @@ The scoped rules that motivated this package go after the usual agent tells:
 
 - `require-effect-deps` — a `useEffect` with no dependency array runs on every render, and `exhaustive-deps` won't say a word about it
 - `no-static-property-loop` — tests that loop over hardcoded keys only to restate one precomputed object's static values
+- `no-raw-react-native-touchables` — default-off ownership for React Native/RNGH interaction imports, namespace/default bypasses, and re-exports outside exact app-owned primitive files
+- `no-schema-library-in-test` — default-off test-file guard against value imports from runtime-schema libraries; type-only imports remain valid
+- `no-validator-output-oracle` — default-off local-flow guard against assertions whose subject is direct runtime-validator output
+- `no-mocked-response-body-oracle` — default-off guard for `response.json()` object-shape assertions that statically match a same-test mock arrangement while preserving transformed responses and independently owned effects
 - `react-max-component-props` — JSX-returning React components with too many locally-owned accepted props
 - `no-contract-appeasement-projection` — internal helpers that project one owned value contract into another explicit return contract without construction or validation
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning
@@ -220,12 +229,13 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-underchecked-type-predicate` — default-off inventory for broad-input type predicates that assert object contracts without checking required asserted fields
 - `no-canonical-model-fork` — configured first-party model redeclarations that should import or derive from the canonical owner
 - `no-handrolled-resource-lifecycle-cells` — behavior-based detection for hand-rolled async resource lifecycle state machines, with broad multi-setter co-mutation emitted as inventory only
-- `no-unsafe-deserialize` — `JSON.parse` of `any` / `unknown` instead of parsing at a schema boundary
+- `no-unsafe-deserialize` — broad `JSON.parse` inputs and unvalidated parsed results assigned into declared domain contracts
 - `no-defensive-shape-probing` — deterministic broad-value extractor cases backed by real corpus evidence, not ordinary boolean predicates
 - `no-identity-schema-transform` — default-off TypeChecker proof for Zod transforms that reconstruct every input field unchanged
 - `no-explicit-type-arguments-on-owned-api` — default-off symbol-resolved proof against caller-supplied type arguments on Convex generated references and TanStack registrations
 - `require-convex-return-validator` — default-off symbol-resolved proof that every registered Convex function declares an explicit `returns` validator
 - `no-schema-validator-transcoding` — default-off proof against an Effect `JSONSchema.make` result registered as a Convex validator instead of keeping one runtime owner
+- `no-redundant-local-return-type` — default-off TypeChecker identity proof for a nested implementation whose shorthand-object inference repeats a direct named type literal while every call remains constrained by the enclosing function's explicit return contract
 - `import/no-cycle` — import cycles caught by Oxlint's native import graph
 
 Other existing baseline rules may still ship in the config, but they are not the current roadmap.
@@ -311,3 +321,87 @@ Node 22+, ESLint 9.38+ or 10.x (flat config), TypeScript 5+, typescript-eslint 8
 This is an early 0.x release, and I'll be honest about what that means. The rules have local regression tests and a real-corpus validation ledger, but some package-surface rules remain under-proven until they have source-code evidence outside reduced examples. Pin the version.
 
 MIT.
+
+## Portable rules (0.11.0)
+
+The governance config enables 51 new agent guardrails at error severity. The [rule table and evidence report](../../docs/rule-investigations/portable-rules.md) records all rules, repairs, tests, counts and eleven withdrawals. Rules with zero Homer findings are preventive and have no positive corpus evidence. Attribution belongs in `NOTICE`.
+
+| Rule                                             | Behavior / repair                                                                                                            |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `antidrift/confine-owner`                        | Typed entry item schema and configurable registry path and owners                                                            |
+| `antidrift/docs-source-policy`                   | Validate only the single configured policyFile; default docs-sources.mjs; derive dependencies from the real package manifest |
+| `antidrift/icon-button-requires-tooltip`         | Configurable iconComponents; remove product branding                                                                         |
+| `antidrift/no-adhoc-loader`                      | Configurable loaderIcons, owner and skeleton; portable HTML progress default                                                 |
+| `antidrift/no-ai-debt-comments`                  | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-ambient-hotkey-format`             | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-anemic-errors`                     | Accept contextual errors; detect Error calls with or without new; do not prescribe a fictional error class                   |
+| `antidrift/no-as-never`                          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-async-context-enter-with`          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-auth-token-in-web-storage`         | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-awaited-builder-union`             | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-bun-api-in-shared`                 | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-centered-scroll-column`            | Check actual class values, not source-code strings                                                                           |
+| `antidrift/no-debug-residue-filenames`           | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-default-export-in-domain`          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-dialog-trigger-menu-item`          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-disabled-tooltip-trigger`          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-duplicate-context`                 | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-eager-singleton`                   | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-generic-module-names`              | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-inline-style-colors`               | Use declared palette/embedding scope; terminal black surface is a recorded platform boundary                                 |
+| `antidrift/no-omitted-prop-respread`             | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-partial-record-satisfies`          | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-path-prefix-containment`           | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-physical-properties`               | Check actual class values, not source-code strings; preserve symmetric insets                                                |
+| `antidrift/no-placeholder-tests`                 | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-portal-under-interactive-ancestor` | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-raw-filename-write`                | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-raw-foreground-opacity`            | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-redacted-log-attribute-key`        | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-relative-cross-package-imports`    | Resolve actual package boundaries and preserve ancestor configuration owners                                                 |
+| `antidrift/no-spread-input-in-query-key`         | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-static-devtools-import`            | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-todo-without-issue`                | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-trivial-property-helpers`          | Require the helper declaration and property/fallback body; names at unrelated call sites are not proof                       |
+| `antidrift/no-tutorial-comments`                 | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-unformatted-number`                | Configurable formatter; Intl.NumberFormat default; raw state in test output is not display text                              |
+| `antidrift/no-unlisted-external-imports`         | Skip marker manifests; honor ancestor devDependencies; sibling packages do not grant dependencies                            |
+| `antidrift/no-unsafe-inner-html`                 | Imported sanitizer and trusted-source registry; resolve aliases and shadowing; remove comment bypass                         |
+| `antidrift/no-unsanitized-href`                  | Imported sanitizer binding resolution; reject local identity functions; exact http(s) protocol prefixes                      |
+| `antidrift/require-detached-label-shape`         | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/require-dir-on-rendered-name`         | Configurable nameProps, isolatingComponents and owner; accept native bdi; portable Unicode FSI/PDI default                   |
+| `antidrift/require-exhaustive-panic`             | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/require-fetch-timeout`                | Follow immutable fetch aliases and typeof fetch/default parameters; preserve real network smoke findings                     |
+| `antidrift/require-function-replacer`            | Accept constant String.raw replacements; dynamic strings still require a callback                                            |
+| `antidrift/require-query-key-factory`            | A shared immutable local key is already an owner; independent inline arrays still report                                     |
+| `antidrift/require-query-signal`                 | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/require-safe-window-open`             | Accept the compile-valid browser API with noopener,noreferrer; distinguish the explicit popup-policy probe                   |
+| `antidrift/require-secure-document-response`     | Remove dead IIFE; accept explicit secure Response headers; configurable response owner                                       |
+| `antidrift/require-stable-snapshot`              | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/require-stream-reader-disposal`       | Portable agent guardrail; declared options and artifact proof                                                                |
+
+All portable rules accept `files` and `excludeFiles`. Configure these for actual ownership boundaries, not to hide violations. `docs-source-policy` checks exactly `policyFile` (default `docs-sources.mjs`), deriving dependencies from its package manifest unless supplied explicitly. Its `sources` and `exclusions` describe the documentation registry. `confine-owner` accepts `registry` and schema-checked `entries` with named owner paths.
+
+`no-adhoc-loader` accepts `loaderIcons`, `owner`, and `skeleton`; `require-dir-on-rendered-name` accepts `nameProps`, `isolatingComponents`, and `owner`; `no-unformatted-number` accepts `formatter`; `icon-button-requires-tooltip` accepts `iconComponents`. Defaults name platform primitives where available.
+
+`no-unsafe-inner-html` accepts `sanitizers` and `trustedSources`; `no-unsanitized-href` accepts `sanitizers`. Each registry entry has `module`, `export`, and optional `member`. Aliased imports and immutable aliases are resolved; local identity functions and shadowing do not establish provenance. HTML defaults recognize `dompurify`’s default `sanitize` member. Comments never prove safety.
+
+`no-unlisted-external-imports` skips marker manifests and honors ancestor devDependencies by default. `ancestorDevDependencies: false` requires local development declarations. Sibling dependencies never grant permission. Workspace and catalog specifiers are declarations.
+
+Corpus tests authenticate complete source files against a pinned Git commit, then compare exact diagnostics. They reject synthetic wrappers and wrong-file substitutions. The former synthetic 148-sample claim is withdrawn.
+
+### Native adoption presets
+
+```js
+import { createAdoptionOxlintConfig } from "@joedeleeuw/antidrift/adoption-config";
+
+export default createAdoptionOxlintConfig({
+  presets: ["eslint", "typescript", "unicorn"],
+});
+```
+
+Named presets are `eslint`, `typescript`, `unicorn`, `import`, `promise`, `node`, `oxc`, `jsdoc`, `react`, `jsx-a11y`, and `vitest`. They compose all 436 eligible native In entries; the eighteen Next entries are excluded. The three existing complexity settings retain their budgets. Every selected rule is an error. Select the React, browser-accessibility and test presets for their actual source scopes; the base governance config does not silently enable these optional native packs.
+
+The existing `antidrift/no-unsafe-deserialize` also detects parsed JSON flowing directly or through immutable local aliases into a declared domain contract. Parsing JSON syntax does not validate the target value. Its diagnostic names the receiving type, and validated schema outputs remain valid.
+
+Eleven provisional custom ports were withdrawn for documented detector or ownership failures after agent-intent re-judgement. The report records the unresolved signal as well as the noise.

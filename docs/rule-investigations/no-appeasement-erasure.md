@@ -1,13 +1,13 @@
 # no-appeasement-erasure Investigation
 
-Status: `ready`, shipped at warn severity (2026-08-03 owner decision). Promotion to error tracks the gate below.
+Status: `ready`, shipped at error severity after the 2026-08-18 anti-slop catch-up.
 
 ## Problem Statement
 
 A value with a known type is widened to `unknown`, and a contract is then re-established from it:
 
 ```ts
-const result: unknown = auth.getAuthSnapshot();      // returns DesktopAuthSnapshot
+const result: unknown = auth.getAuthSnapshot(); // returns DesktopAuthSnapshot
 return readAuthStateMethod.resultSchema.parse(result);
 ```
 
@@ -17,26 +17,32 @@ This is the upstream half of `antidrift/no-appeasement-cast`. That rule owns the
 
 ## Signal
 
-Reported when all of these hold:
+The current rule combines three signals:
 
-1. A variable is declared `unknown` — either `const x: unknown = expr` or `const x = expr as unknown`.
-2. The TypeChecker's type for the initializer expression is neither `any` nor `unknown`.
-3. Scope analysis finds a read reference of that binding that re-establishes a contract: the first argument of a Zod `parse`/`parseAsync`, or the operand of an `as` cast to a named type reference.
+1. The original TypeChecker branch reports a known initializer widened to `unknown` and then passed to a Zod or Effect decoder or cast back to a named contract.
+2. Vendored `anti-slop/no-known-value-widening` reports syntactically established values assigned, returned, or asserted into broad targets.
+3. Vendored `anti-slop/no-widen-then-assert` reports local bindings that discard known evidence and later assert a narrower contract.
 
-Bare widening with no downstream contract stays clean; widening to force exhaustive handling at a later narrowing point is legitimate.
+Genuine raw values remain clean because the initializer has no known evidence to discard. Bare widening of an object, array, literal, function, class, or otherwise syntactically established value now reports even without later re-establishment.
+
+Chained assertions are owned separately by `antidrift/no-unsafe-cast-chain`, now backed by the vendored `anti-slop/no-chained-type-assertions` implementation.
+
+## Historical 2026-08-03 Investigation
+
+The remaining measurements document the narrower TypeChecker-only implementation that preceded the anti-slop catch-up. Statements below that call bare widening clean, exclude empty literal widening, describe chained assertions as unmatched, or defer blocking severity are historical rather than current behavior.
 
 ## Why This Rule Is The Gate
 
 Run against Murderbox desktop (`apps/desktop`, worktree branch `chore/conversation-callgraph-drift`), 38 files in `src`:
 
-| Rule | Findings |
-| --- | --- |
-| `antidrift/no-parse-as-cast` | 6 |
-| `antidrift/no-redundant-zod-parse` | 0 |
-| `antidrift/no-appeasement-cast` | 0 |
-| `antidrift/no-contract-appeasement-projection` | 0 |
-| `antidrift/no-unsafe-deserialize` | 0 |
-| `antidrift/no-defensive-shape-probing` | 0 |
+| Rule                                           | Findings |
+| ---------------------------------------------- | -------- |
+| `antidrift/no-parse-as-cast`                   | 6        |
+| `antidrift/no-redundant-zod-parse`             | 0        |
+| `antidrift/no-appeasement-cast`                | 0        |
+| `antidrift/no-contract-appeasement-projection` | 0        |
+| `antidrift/no-unsafe-deserialize`              | 0        |
+| `antidrift/no-defensive-shape-probing`         | 0        |
 
 `bridge.ts` alone holds 21 parse calls and `preload.ts` holds 18, yet five rules report nothing. The reason is mechanical: every masked site declares `unknown`, and each of those rules needs a type comparison that `unknown` defeats. The erasures are not one more smell alongside the others — they are why the others are silent.
 
@@ -63,13 +69,13 @@ Codebase Atlas — **0 findings across 34 files that declare `: unknown`**. Ever
 
 Zero-finding repositories, after the two narrowings below. The zod column is what decides whether a zero means anything: the parse branch cannot fire in a repository that does not use zod.
 
-| Repository | zod-importing files | Candidate files | Findings | Counts as a control |
-| --- | --- | --- | --- | --- |
-| Cloudflare Agents | 76 | 371 | 0 | yes |
-| Codebase Atlas | 17 | 34 | 0 | yes |
-| Executor | 5 | 342 | 0 | no — 649 Effect files |
-| PowerSync Service | 1 | 9 | 0 | no |
-| Agent Browser | 0 | 7 | 0 | no |
+| Repository        | zod-importing files | Candidate files | Findings | Counts as a control   |
+| ----------------- | ------------------- | --------------- | -------- | --------------------- |
+| Cloudflare Agents | 76                  | 371             | 0        | yes                   |
+| Codebase Atlas    | 17                  | 34              | 0        | yes                   |
+| Executor          | 5                   | 342             | 0        | no — 649 Effect files |
+| PowerSync Service | 1                   | 9               | 0        | no                    |
+| Agent Browser     | 0                   | 7               | 0        | no                    |
 
 Chaski and LibreChat were skipped: no installed `node_modules`, so type-aware linting could not run.
 
@@ -88,12 +94,12 @@ Executor is the useful negative result, for the opposite reason to the one first
 
 `typescript/no-unsafe-type-assertion` is enabled at error in `oxlint.config.mts` and covers more of this ground than the original entry claimed. Verified 2026-08-03 against a probe:
 
-| Shape | `no-unsafe-type-assertion` | this rule |
-| --- | --- | --- |
-| `const result: unknown = getSnapshot(); result as Snapshot` | reports | reports |
-| `value as unknown as T` | reports | does not see it |
-| `value as unknown` (pure widening) | correctly silent | correctly silent |
-| `const result: unknown = getSnapshot(); schema.parse(result)` | silent | **reports** |
+| Shape                                                         | `no-unsafe-type-assertion` | this rule        |
+| ------------------------------------------------------------- | -------------------------- | ---------------- |
+| `const result: unknown = getSnapshot(); result as Snapshot`   | reports                    | reports          |
+| `value as unknown as T`                                       | reports                    | does not see it  |
+| `value as unknown` (pure widening)                            | correctly silent           | correctly silent |
+| `const result: unknown = getSnapshot(); schema.parse(result)` | silent                     | **reports**      |
 
 Two conclusions. The **parse branch is the unique contribution** — no ecosystem rule asks whether a schema re-establishes a contract from an erased binding, and that branch is where all 12 Murderbox positives live. The **named-cast branch is ecosystem-covered** wherever `no-unsafe-type-assertion` is enabled; it is retained for consumers who do not enable it, but earns no independent value otherwise.
 

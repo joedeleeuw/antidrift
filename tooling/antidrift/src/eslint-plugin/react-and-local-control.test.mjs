@@ -2,6 +2,7 @@ import tsParser from "@typescript-eslint/parser";
 import { ESLint } from "eslint";
 import { expect, it } from "vitest";
 
+import eslintPlugin from "./index.js";
 import {
   fixture,
   plugin,
@@ -481,6 +482,40 @@ it("fails loud on partial duplicated object field block controls", async () => {
 });
 
 ruleTester.run(
+  "no-mocked-response-body-oracle ESLint surface",
+  eslintPlugin.rules["no-mocked-response-body-oracle"],
+  {
+    valid: [
+      {
+        code: `
+          test("proves an independent request", async () => {
+            backend.mockResolvedValue({ id: "user_1" });
+            const response = await GET(request);
+            await response.json();
+            expect(backend).toHaveBeenCalledWith(request);
+          });
+        `,
+        filename: "route.test.ts",
+      },
+    ],
+    invalid: [
+      {
+        code: `
+          test("echoes the mocked body", async () => {
+            backend.mockResolvedValue({ id: "user_1" });
+            const response = await GET(request);
+            const body = await response.json();
+            expect(body).toEqual({ id: "user_1" });
+          });
+        `,
+        filename: "route.test.ts",
+        errors: [{ messageId: "mockedResponseBodyOracle" }],
+      },
+    ],
+  },
+);
+
+ruleTester.run(
   "no-nonindependent-test-oracle",
   rule("no-nonindependent-test-oracle"),
   {
@@ -542,9 +577,7 @@ ruleTester.run(
     ],
     invalid: [
       {
-        ...fixture(
-          "programs/drift/nonindependent-test-oracle-error-shape.ts",
-        ),
+        ...fixture("programs/drift/nonindependent-test-oracle-error-shape.ts"),
         filename: "nonindependent-test-oracle-error-shape.test.ts",
         errors: [
           { messageId: "errorShapeEcho" },

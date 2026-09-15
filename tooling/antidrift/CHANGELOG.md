@@ -10,6 +10,46 @@
 
 - fix the package top entry as an Oxlint plugin specifier: `jsPlugins: [{ specifier: "@joedeleeuw/antidrift" }]` crashed with `Cannot destructure property 'rules' of 'plugin' as it is undefined` because the root entry had no default export — Oxlint's loader reads the default export of the given specifier. The root now re-exports the Oxlint plugin as its default (named exports unchanged), and a registration test drives the real oxlint binary through the top entry. The governance Oxlint config now names the plugin by its package specifier instead of an absolute file path into node_modules — the workaround that path represented is gone with the bug
 
+## 0.12.0
+
+- Enable `antidrift/no-wrapping-functions` at error severity by default. It reports named declarations and named arrow/function expressions that only delegate a call, including exports. Inline callbacks and computations stay outside the rule; no automatic fix is provided.
+- Remove delegation-only helpers from Antidrift's own implementation and exercise default enforcement through an installed package in the consumer smoke.
+- Replace the `defaultAstGrepConfig()` policy export with the static `DEFAULT_AST_GREP_CONFIG` path. Consumers should read the constant directly.
+
+## 0.11.0
+
+- Resolve optional research checkout defaults from the current user's home directory instead of shipping maintainer-local absolute paths.
+- Enable 51 portable agent guardrails with configurable owners, local import provenance, package-boundary resolution and default/typed fetch aliases; withdraw eleven provisional detectors after per-rule agent-intent review.
+- Export 436 native rules in eleven named opt-in adoption presets, excluding eighteen Next entries and preserving existing complexity budgets.
+- Extend no-unsafe-deserialize to parsed JSON assigned into declared domain contracts, including immutable aliases.
+- Replace the synthetic 148-sample claim with complete source authenticated by Git commit/tree/blob proofs and exact diagnostics at the pinned Homer revision.
+- Include the verified upstream NOTICE, pinned module provenance and complete Apache license text. Verify every new custom rule and every native preset category through the packed consumer artifact.
+
+## 0.10.4
+
+- narrow `no-mocked-response-body-oracle` to response expectations that statically match a value arranged by a mock in the same test; transformed responses, canonical error mappings, and additive-field stripping remain clean
+
+## 0.10.3
+
+- add default-off `no-raw-react-native-touchables`: consumer-configured owner files may import React Native or RNGH interaction primitives, while feature imports, aliases, namespace/default imports, and re-exports receive direct shared-`Touchable` and narrow-adapter remediation
+- add default-off `no-schema-library-in-test` for runtime-schema value imports/requires in test files while preserving type-only imports
+- add default-off `no-validator-output-oracle` for assertions that trace through local bindings and transparent projections to direct validator output or validator-only throw callbacks
+- add default-off `no-mocked-response-body-oracle` on both syntax plugin exports: within one test callback, report object/array shape assertions tracing to `response.json()` when a supported mock arrangement supplies the boundary; recommend deleting pure mock echoes and retaining only independently owned effects
+
+## 0.10.2
+
+- add default-off `no-redundant-local-return-type`: reports only nested local implementations whose final shorthand-object return repeats a direct named type literal and whose calls remain constrained by the immediate enclosing function's explicit return contract; inferred owners, exported/public escapes, contextual callbacks, overloads, recursion, local function dependencies, and broader private-helper annotations stay clean
+
+## 0.10.1
+
+- keep only unknown aliases and chained assertions blocking from the imported syntax rules; return the categorical style, test-seam, reflection, and external-data boundary rules to opt-in after the first real consumer migration showed that their syntax alone cannot distinguish drift from legitimate boundaries
+- validate the shared default through the packed consumer without relying on findings from experimental rules
+
+## 0.10.0
+
+- vendor the generic rules and Effect service-constructor rule from `dmmulroy/anti-slop` commit `6d538555cb151d4121ed51a27db81890eacf8ae9`; enable the nine rules with bounded syntax ownership, keep five false-positive-prone rules registered but default-off, make `no-unsafe-cast-chain` own upstream chained-assertion behavior, and incorporate upstream known-value-widening and widen-then-assert detection into `no-appeasement-erasure`
+- use one hermetic release verification command locally and in GitHub; keep live external repositories as sequential, named research evidence instead of release or session prerequisites
+
 ## 0.9.0
 
 Upgrading from 0.8.0 activates the native TypeScript baseline for consumers of

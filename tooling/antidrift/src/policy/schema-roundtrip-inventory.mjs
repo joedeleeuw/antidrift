@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { existsSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,7 +7,7 @@ import ts from "typescript";
 
 const codebaseAtlasRepoCandidates = [
   process.env.CODEBASE_ATLAS_REPO,
-  "/Users/sushi/code/codebase-atlas",
+  resolve(homedir(), "code", "codebase-atlas"),
 ].filter(Boolean);
 
 const corpusPlans = [
@@ -83,12 +84,8 @@ function isTypeScriptSource(sourceFile) {
   );
 }
 
-function normalizePath(path) {
-  return path.replace(/\\/gu, "/");
-}
-
 function targetMatches(relativePath, target) {
-  const normalizedTarget = normalizePath(target);
+  const normalizedTarget = target.replace(/\\/gu, "/");
   if (normalizedTarget === relativePath) return true;
   if (normalizedTarget.endsWith("/**/*.{ts,tsx}")) {
     const prefix = normalizedTarget.slice(0, -"**/*.{ts,tsx}".length);
@@ -108,7 +105,10 @@ function targetMatches(relativePath, target) {
 }
 
 function sourceMatches(repoRoot, sourceFile, targets) {
-  const relativePath = normalizePath(relative(repoRoot, sourceFile.fileName));
+  const relativePath = relative(repoRoot, sourceFile.fileName).replace(
+    /\\/gu,
+    "/",
+  );
   return targets.some((target) => targetMatches(relativePath, target));
 }
 
@@ -338,7 +338,7 @@ function buildFinding({
   const position = sourceFile.getLineAndCharacterOfPosition(
     node.getStart(sourceFile),
   );
-  const path = normalizePath(relative(repoRoot, sourceFile.fileName));
+  const path = relative(repoRoot, sourceFile.fileName).replace(/\\/gu, "/");
   const roundtripKind = candidateKind({
     classification: classification.classification,
     exportBoundary: container.exportBoundary,
@@ -436,7 +436,9 @@ function runPlan(plan, options) {
     .getSourceFiles()
     .filter(isTypeScriptSource)
     .filter((sourceFile) =>
-      normalizePath(sourceFile.fileName).startsWith(normalizePath(repoRoot)),
+      sourceFile.fileName
+        .replace(/\\/gu, "/")
+        .startsWith(repoRoot.replace(/\\/gu, "/")),
     )
     .filter((sourceFile) => sourceMatches(repoRoot, sourceFile, targets));
   const findings = sourceFiles.flatMap((sourceFile) =>

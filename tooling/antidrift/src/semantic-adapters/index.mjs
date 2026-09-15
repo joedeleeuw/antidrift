@@ -94,7 +94,7 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     associations: Object.freeze([
       "JSON.parse input provenance to broad any or unknown values",
       "parse input to local string-boundary proof",
-      "JSON.parse input provenance to broad any/unknown values and local string proof.",
+      "JSON.parse input provenance, local string proof, and parsed-result flow into declared contextual domain types.",
     ]),
     carrier: "TypeChecker plus local parse-input control flow",
   }),

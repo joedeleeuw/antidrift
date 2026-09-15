@@ -1,0 +1,102 @@
+antidrift 0.11.0 portable rule provenance
+
+Modified ports by antidrift contributors, 2026.
+
+Rika Labs: @rikalabs/oxlint-standards 0.8.1, MIT.
+Copyright (c) 2026 Rika Labs
+https://github.com/Rika-Labs/oxlint-standards
+Full permission notice: licenses/Rika-Labs-MIT.txt
+Version and MIT license verified against the supplied published package LICENSE
+and package.json. The module hashes identify those original inputs.
+
+Upstream repository: https://github.com/stella/stella
+Upstream directory: .oxlint-plugins
+Pinned revision: 6ce0889e3a21d5dd1e907acfea2bf0248825c1fe
+Revision date: 2026-09-05T14:15:11Z
+LICENSE and NOTICE supplied from that revision by the orchestrator, as recorded
+in the supplied PROVENANCE.txt. The upstream NOTICE was verified PRESENT and
+is reproduced verbatim below. The complete license is licenses/Apache-2.0.txt.
+
+----- upstream NOTICE -----
+stella
+Copyright 2026 stella labs, s.r.o.
+
+This product includes software developed at stella labs, s.r.o.
+(https://stll.app/).
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use this product except in compliance with the License. You may
+obtain a copy of the License in the LICENSE file at the root of this
+repository or at http://www.apache.org/licenses/LICENSE-2.0.
+----- end upstream NOTICE -----
+
+All retained ports listed below differ from upstream at the pinned revision.
+Changes include TypeScript-to-JavaScript conversion, antidrift registration,
+declared option schemas, configurable owners, detector repairs and tests.
+Each upstream module digest identifies the file actually compared.
+
+MODIFIED src/oxlint-plugin/portable/confine-owner.js <- .oxlint-plugins/confine-owner.ts SHA-256 a723fecc6daabcf86db3f8a17fdd889adc3ce385d7a2378831cdaaa707b55df0
+MODIFIED src/oxlint-plugin/portable/docs-source-policy.js <- .oxlint-plugins/docs-source-policy.ts SHA-256 663c732292cf13f65281d79afd6203262a98a3474605f80d928e9863cbc2dba7
+MODIFIED src/oxlint-plugin/portable/icon-button-requires-tooltip.js <- .oxlint-plugins/icon-button-requires-tooltip.ts SHA-256 532a100a6743a59bffd5d60bc5369ec2b43ab6b59959dc0d8c143e1d7b3f395b
+MODIFIED src/oxlint-plugin/portable/no-adhoc-loader.js <- .oxlint-plugins/no-adhoc-loader.ts SHA-256 229565dbe578a835b55efa80df385762b559ec7b7e9c00388223cef3d829efa7
+MODIFIED src/oxlint-plugin/portable/no-ambient-hotkey-format.js <- .oxlint-plugins/no-ambient-hotkey-format.ts SHA-256 62d1b8975dd7b2b901f4573d9bb8c8ccb88d0c62102894a4acc2bb75ae0d9d16
+MODIFIED src/oxlint-plugin/portable/no-async-context-enter-with.js <- .oxlint-plugins/no-async-context-enter-with.ts SHA-256 05a9445003c8cccd030ce1dbbaf22d7f8e100ac8cbc7792d0d4c43cfc6df9339
+MODIFIED src/oxlint-plugin/portable/no-auth-token-in-web-storage.js <- .oxlint-plugins/no-auth-token-in-web-storage.ts SHA-256 210cbd10b7c7aed114193afae5143a886889b96da56ff78591cfdffb826482ff
+MODIFIED src/oxlint-plugin/portable/no-awaited-builder-union.js <- .oxlint-plugins/no-awaited-builder-union.ts SHA-256 45a182e37c58873c55dc2dcd6f93c96c961254ba6631aa915f5eb850f577b6f6
+MODIFIED src/oxlint-plugin/portable/no-centered-scroll-column.js <- .oxlint-plugins/no-centered-scroll-column.ts SHA-256 ba87b54213efe0f9169c1e67d6c791dec709f00ff318e0bacbb9375da2677527
+MODIFIED src/oxlint-plugin/portable/no-dialog-trigger-menu-item.js <- .oxlint-plugins/no-dialog-trigger-menu-item.ts SHA-256 a3308cf330f18923172402250e220af3ac1940a8f21300623feec18983079baf
+MODIFIED src/oxlint-plugin/portable/no-disabled-tooltip-trigger.js <- .oxlint-plugins/no-disabled-tooltip-trigger.ts SHA-256 cf0cd27b8fbc37b847a83341ea6b639e94ddcdae66c344778abaaf31912bd89a
+MODIFIED src/oxlint-plugin/portable/no-eager-singleton.js <- .oxlint-plugins/no-eager-singleton.ts SHA-256 16a4c956a40921e707644e41a193ba4b612bdfc7e4a262bf3b9b12206a8285ba
+MODIFIED src/oxlint-plugin/portable/no-inline-style-colors.js <- .oxlint-plugins/no-inline-style-colors.ts SHA-256 0fb276e22189c93586988cb3b1daea604d2a72658d7b8f9b795294468efa4429
+MODIFIED src/oxlint-plugin/portable/no-omitted-prop-respread.js <- .oxlint-plugins/no-omitted-prop-respread.ts SHA-256 69d6c58e3dbbe2bd989c7ff83c1835941256fbd137a4d8bfceed425365f99fb2
+MODIFIED src/oxlint-plugin/portable/no-partial-record-satisfies.js <- .oxlint-plugins/no-partial-record-satisfies.ts SHA-256 31f6d2f736592ccd0e0965f03f7a2786881cf2427790c0d745109b54db399c5d
+MODIFIED src/oxlint-plugin/portable/no-path-prefix-containment.js <- .oxlint-plugins/no-path-prefix-containment.ts SHA-256 400e99d7a00bed83478fd21ff0cda95306de516bf3ee3b5dcd8fe2e7206f9a44
+MODIFIED src/oxlint-plugin/portable/no-physical-properties.js <- .oxlint-plugins/no-physical-properties.ts SHA-256 0b5e21624e0e7bc8b7496850de062c13f4bfd37120b7eec21637d05e58d843af
+MODIFIED src/oxlint-plugin/portable/no-raw-foreground-opacity.js <- .oxlint-plugins/no-raw-foreground-opacity.ts SHA-256 6c82280a79bc4398a05b80a74293700b9a8afa7944731c7385afc633b3c18b48
+MODIFIED src/oxlint-plugin/portable/no-redacted-log-attribute-key.js <- .oxlint-plugins/no-redacted-log-attribute-key.ts SHA-256 36f4f7dffe803774ddcc078efaaa647d005a31d2f44eca983a138d9264006f16
+MODIFIED src/oxlint-plugin/portable/no-spread-input-in-query-key.js <- .oxlint-plugins/no-spread-input-in-query-key.ts SHA-256 893ef63c9827d1f5d9e3a2829df7f77ec61ef6bd6bbd742e38368790b1fc4f4c
+MODIFIED src/oxlint-plugin/portable/no-static-devtools-import.js <- .oxlint-plugins/no-static-devtools-import.ts SHA-256 6e347acd8be7e65788c6c2b3dca47f88f75bce08312ff2872c698ec5e06225eb
+MODIFIED src/oxlint-plugin/portable/no-unformatted-number.js <- .oxlint-plugins/no-unformatted-number.ts SHA-256 509a4ff8d89996ca2bdcf42af9f0f8f9d6941d9e152924c942e0946e6e52dc54
+MODIFIED src/oxlint-plugin/portable/no-unsafe-inner-html.js <- .oxlint-plugins/no-unsafe-inner-html.ts SHA-256 059fd1d1142dadcecf2eaf45fe4fedcc626203239e452169587be0f4fe3341fa
+MODIFIED src/oxlint-plugin/portable/no-portal-under-interactive-ancestor.js <- .oxlint-plugins/require-contained-handler.ts SHA-256 c8f25fccc5a41b735c6f3f77f1ee763246dacc044096e1d6647e7fccabf69f59
+MODIFIED src/oxlint-plugin/portable/require-detached-label-shape.js <- .oxlint-plugins/require-detached-label-shape.ts SHA-256 3d9f1daaac6f7abcadac3ec49454564567c74072745b834171f2bbb929fdbf59
+MODIFIED src/oxlint-plugin/portable/require-dir-on-rendered-name.js <- .oxlint-plugins/require-dir-on-rendered-name.ts SHA-256 126d556c636d51c2a69a64916f850ef77469cee9ac64c6bfbf3ffe4c75925a38
+MODIFIED src/oxlint-plugin/portable/require-exhaustive-panic.js <- .oxlint-plugins/require-exhaustive-panic.ts SHA-256 7de540199c8fb2e302a0aea864bc93a926b390491ee0c29174335f2edf6f8848
+MODIFIED src/oxlint-plugin/portable/require-fetch-timeout.js <- .oxlint-plugins/require-fetch-timeout.ts SHA-256 cf5d32e7e12c27092a2c52754a91bd6c5d760d213d320351b2e6d624b6d53c69
+MODIFIED src/oxlint-plugin/portable/require-function-replacer.js <- .oxlint-plugins/require-function-replacer.ts SHA-256 41562d2ec9c5ba2ede9e89873b0ea89e176d9ab8c7564c970b4219dd3a7cef68
+MODIFIED src/oxlint-plugin/portable/require-query-key-factory.js <- .oxlint-plugins/require-query-key-factory.ts SHA-256 fb5121e7bf53506cee3d6ce1c54079336b64439838e02885b492eb7624c93e6e
+MODIFIED src/oxlint-plugin/portable/require-query-signal.js <- .oxlint-plugins/require-query-signal.ts SHA-256 84e8bb3c6278197b117690aa843b9a77b8567c3776e1aee9fc8dd3b8ccce7b31
+MODIFIED src/oxlint-plugin/portable/require-safe-window-open.js <- .oxlint-plugins/require-safe-window-open.ts SHA-256 c158a72a1cac240642ec721492866d251dd757aa247143cc9c7142330f68ce98
+MODIFIED src/oxlint-plugin/portable/require-stable-snapshot.js <- .oxlint-plugins/require-stable-snapshot.ts SHA-256 5e7db31960b3b5a9feb4564bf2742c4bf857bb899d89a0c12bdc7908d56dd813
+MODIFIED src/oxlint-plugin/portable/require-stream-reader-disposal.js <- .oxlint-plugins/require-stream-reader-disposal.ts SHA-256 8f08fa6a75878f6ce9e41db3223e1145672cf1b4eb176c4b3dfdb92ec1eacd65
+MODIFIED src/oxlint-plugin/portable/no-raw-filename-write.js <- .oxlint-plugins/security-guards.ts SHA-256 d3f84a7adce0a3e6e117fba874901120acdce6ad1637f6154741e97045cafd1b
+MODIFIED src/oxlint-plugin/portable/no-unsanitized-href.js <- .oxlint-plugins/security-guards.ts SHA-256 d3f84a7adce0a3e6e117fba874901120acdce6ad1637f6154741e97045cafd1b
+MODIFIED src/oxlint-plugin/portable/require-secure-document-response.js <- .oxlint-plugins/security-guards.ts SHA-256 d3f84a7adce0a3e6e117fba874901120acdce6ad1637f6154741e97045cafd1b
+
+Shared helper ast.js is modified from upstream utils.ts. The helper
+physical-properties.js is modified from upstream physical-properties.ts. Test cases
+are adaptations; Homer corpus
+snapshots are separately identified by repository revision and Git blob digest.
+
+Native rules are implemented by Oxlint. The adoption configuration selects
+existing native rule IDs; it copies no native rule implementation.
+
+Source module SHA-256 -> antidrift rule
+rikalabs @rikalabs/no-duplicate-context 81a246bc1e61268afcf6933bd026e6aabe0869cdce55ed6e2ab52aeeb16e482e -> no-duplicate-context
+rikalabs @rikalabs/no-ai-debt-comments effaadf43d86dbe6e76a44e3822c8320e280d40d4af1dad916109a2a3130978f -> no-ai-debt-comments
+rikalabs @rikalabs/no-as-never 040d7738b8774e73ee0dc4ba1951b22f4835eb7c2d8d686d6e19eff9811dc5b0 -> no-as-never
+rikalabs @rikalabs/no-todo-without-issue 8811d9ccf406bb49bcf7010ceb4f4c4eee560b15e388b05d318f0591ca722e22 -> no-todo-without-issue
+rikalabs @rikalabs/no-generic-module-names a8ad8139688e602145311de198c43c53b2cc8930e7d9fe5c7e23e1de02828d99 -> no-generic-module-names
+rikalabs @rikalabs/no-default-export-in-domain e44668aeeb360849e780a42356cc06f7991d701aed3f11dc2f9f14cf42878803 -> no-default-export-in-domain
+rikalabs @rikalabs/no-anemic-errors 8f1e87ea4fda81f95af4b4f1bcfb6cbb55544a4dff6e70be82f5c121c699a005 -> no-anemic-errors
+rikalabs @rikalabs/no-relative-cross-package-imports c0e835d29e9c0b7fd2276b104865821a13d1830293a728f71f4549ae44889c23 -> no-relative-cross-package-imports
+rikalabs @rikalabs/no-trivial-property-helpers c80672391908bd6f82bd73d9cef93e10387bc94719c385965168b554221aa302 -> no-trivial-property-helpers
+rikalabs @rikalabs/no-tutorial-comments 9ae376f94f737bf622919aee560de504be9713814a707f142ea14696837e2247 -> no-tutorial-comments
+rikalabs @rikalabs/no-debug-residue-filenames 0e0e4b7301b09c2bb3064bee81f2b4fb4072a778b5cafe32604c051588b76a61 -> no-debug-residue-filenames
+rikalabs @rikalabs/no-placeholder-tests 85b6ff1116efcae22403a4ef65269c3d2557a8c4723c7a7146286a5b7a76175a -> no-placeholder-tests
+rikalabs @rikalabs/no-unlisted-external-imports 897674b08d1a51df8253ae895b0e73cceb0f80b908b78c3cc093977087e20e5c -> no-unlisted-external-imports
+rikalabs @rikalabs/bun-no-bun-specific-in-shared 46561a398736b2ccd7eb024d293e7be074f0fb8df96faf3e1f6a0e594de1de14 -> no-bun-api-in-shared
+
+MODIFIED src/oxlint-plugin/portable/syntax.js <- @rikalabs/oxlint-standards 0.8.1 dist/plugin/utils.js SHA-256 1f3df79e78250d53f28bb8306b686f9e1bf6bf07af54ffdcaf33bdfc1c5bebc3
+MODIFIED src/oxlint-plugin/portable/ast.js <- .oxlint-plugins/utils.ts SHA-256 33eb3b41e66b3ad3080dfdeec21100114fec749c4177ab1f9ab1b2574632ef71
+MODIFIED src/oxlint-plugin/portable/physical-properties.js <- .oxlint-plugins/physical-properties.ts SHA-256 af9c03068897a8547f04f01e119586d4b1c04e766d95500e19c86713ac6a776a

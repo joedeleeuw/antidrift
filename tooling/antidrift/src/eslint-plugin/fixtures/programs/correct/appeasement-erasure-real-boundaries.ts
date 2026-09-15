@@ -19,23 +19,12 @@ export function parseAnySource() {
   return authSnapshotSchema.parse(raw);
 }
 
-// Widening with no contract re-established downstream stays clean.
-export function widenForExhaustiveHandling() {
-  const value: unknown = { id: "x" };
-  return typeof value === "object" && value !== null;
-}
-
-// A sentinel placeholder for a generic default: the empty literal carries no
-// contract, so widening it discards nothing.
-const DEFAULT_STATE = {} as unknown;
-
-export function initialStateFor<State>(): State {
-  return DEFAULT_STATE as State;
-}
-
 // A reassigned cursor walking an untyped document is a traversal variable,
 // not a boundary value; the cast narrows after a guard rather than appeasing.
-export function resolvePointer(doc: { paths: Record<string, unknown> }, ref: string) {
+export function resolvePointer(
+  doc: { paths: Record<string, unknown> },
+  ref: string,
+) {
   let current: unknown = doc;
   for (const segment of ref.split("/")) {
     if (typeof current !== "object" || current === null) return null;

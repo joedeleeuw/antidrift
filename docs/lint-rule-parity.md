@@ -36,13 +36,17 @@ The structural and canonical rules receive generated, accepted package-owner, an
 - `antidrift/no-duplicated-object-field-blocks`
 - `antidrift/no-handrolled-resource-lifecycle-cells`
 - `antidrift/no-inline-structural-type-at-use-site`
+- `antidrift/no-mocked-response-body-oracle`
 - `antidrift/no-nonindependent-test-oracle`
+- `antidrift/no-schema-library-in-test`
 - `antidrift/no-query-data-type-parameters`
 - `antidrift/no-raw-fetch-in-component`
 - `antidrift/no-redundant-zod-parse`
+- `antidrift/no-raw-react-native-touchables`
 - `antidrift/no-shattered-ingested-entity-state`
 - `antidrift/no-silent-empty-detection-fallback`
 - `antidrift/no-status-literal-in-type`
+- `antidrift/no-validator-output-oracle`
 - `antidrift/require-authz-check`
 
 The ESLint pass preserves these TypeChecker-dependent or hybrid rules as default-off inventory:
@@ -54,6 +58,8 @@ The ESLint pass preserves these TypeChecker-dependent or hybrid rules as default
 `antidrift/no-redundant-zod-parse` moved from the ESLint pass to the Oxlint plugin on 2026-08-13. It is a whole-rule migration, not a dual registration: the ESLint plugin no longer exports it, so `repo-corpus` — which derives its rule universe from the ESLint plugin's exports — no longer counts it, which is correct because ESLint no longer runs it. The detection mechanism changed with the tier, from TypeChecker symbol identity to canonical-path provenance over scope bindings, so it re-enters as default-off inventory.
 
 No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. The ESLint and Oxlint plugin exports are disjoint: there is no compatibility export of Oxlint-owned rules through ESLint. `policy:check-rule-surface` fails if a custom rule is *enabled* by both runtimes. The check is severity-gated, not export-gated: ff50619 removed the duplicate-export check by owner decision, and rules configured `off` are skipped, so the single-owner guarantee it enforces is "no rule is enabled in two runtimes at once" rather than "no rule is exported twice". Disjoint plugin exports remain a convention this repository keeps, not something the check proves.
+No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. The ESLint and Oxlint plugin exports are disjoint: there is no compatibility export of Oxlint-owned rules through ESLint. `policy:check-rule-surface` fails if a custom rule is exported or enabled by both runtimes.
+No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. `antidrift/no-mocked-response-body-oracle` is deliberately exported by both syntax-capable plugin surfaces so ESLint-only and Oxlint consumers can opt in, while the shared Oxlint config is its only configured owner and keeps it off. `policy:check-rule-surface` permits dual export but fails if a custom rule is enabled by both runtimes.
 
 Intentional baseline removals:
 

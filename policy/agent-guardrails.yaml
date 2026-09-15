@@ -85,6 +85,10 @@ clusters:
   - id: abstraction-and-file-shape # Agents over-extract tiny helpers and append to large files.
     owner: architecture # Architecture owns file/module shape and refactoring thresholds.
     rules:
+      - id: arch/no-wrapping-functions
+        severity: error
+        detector: antidrift:no-wrapping-functions
+        message: Call the existing owner directly instead of adding a named delegation wrapper. Keep required adapters only with a concrete boundary or callback requirement.
       - id: arch/no-one-use-helper # Tiny helpers referenced once are usually fake abstraction.
         severity: warn
         detector: localFunctionReferenceCountLte:1,maxStatements:3

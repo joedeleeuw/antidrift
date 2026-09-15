@@ -25,10 +25,6 @@ function configureGit(cwd) {
   runGitIn(cwd, ["config", "core.hooksPath", "/dev/null"]);
 }
 
-function runGit(args) {
-  return runGitIn(dir, args);
-}
-
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), "change-exports-"));
   configureGit(dir);
@@ -65,8 +61,8 @@ beforeAll(() => {
     join(dir, "src/types.d.ts"),
     "export interface Generated { id: string }\n",
   );
-  runGit(["add", "-A"]);
-  runGit(["commit", "-q", "-m", "base"]);
+  runGitIn(dir, ["add", "-A"]);
+  runGitIn(dir, ["commit", "-q", "-m", "base"]);
 
   writeFileSync(
     join(dir, "src/public.ts"),
@@ -106,8 +102,8 @@ beforeAll(() => {
       "",
     ].join("\n"),
   );
-  runGit(["add", "-A"]);
-  runGit(["commit", "-q", "-m", "head"]);
+  runGitIn(dir, ["add", "-A"]);
+  runGitIn(dir, ["commit", "-q", "-m", "head"]);
 });
 
 afterAll(() => {

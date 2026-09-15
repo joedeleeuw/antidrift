@@ -309,7 +309,3 @@ export function terminalIdentity(path, filename) {
   }
   return slotKey(slot);
 }
-
-export function resetCrossModuleCacheForTests() {
-  moduleFactsCache.clear();
-}

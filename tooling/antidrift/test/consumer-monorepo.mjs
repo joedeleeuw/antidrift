@@ -11,7 +11,12 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { provePortableRules } from "./consumer-portable.mjs";
+import { proveAdoptionPresets } from "./consumer-adoption.mjs";
+
 import { scaffoldConsumerWorkspace } from "./consumer-workspace.mjs";
+
+const pnpmBinary = process.env.ANTIDRIFT_CONSUMER_PNPM ?? "pnpm";
 
 const pkgDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const work = mkdtempSync(join(tmpdir(), "antidrift-consumer-"));
@@ -79,10 +84,12 @@ try {
 
   console.log("3/7  installing the tarball into the consumer ...");
   runInherit(
-    "pnpm",
+    pnpmBinary,
     [
       "install",
-      "--prefer-offline",
+      process.env.ANTIDRIFT_CONSUMER_OFFLINE === "1"
+        ? "--offline"
+        : "--prefer-offline",
       "--config.confirmModulesPurge=false",
       "--ignore-scripts",
     ],
@@ -98,7 +105,7 @@ try {
   function lint(relFile, config = "eslint.config.mjs") {
     try {
       return runJson(
-        "pnpm",
+        pnpmBinary,
         ["exec", "eslint", relFile, "--format", "json", "--config", config],
         work,
       );
@@ -118,7 +125,7 @@ try {
   function lintOxlint(relFile, config) {
     try {
       return runJson(
-        "pnpm",
+        pnpmBinary,
         [
           "exec",
           "oxlint",
@@ -148,7 +155,7 @@ try {
   function lintOxlintRepository() {
     try {
       return runJson(
-        "pnpm",
+        pnpmBinary,
         [
           "exec",
           "antidrift",
@@ -181,6 +188,13 @@ try {
     });
   }
 
+  provePortableRules({ file, lintOxlint, packedFiles });
+  proveAdoptionPresets({ file, runJson, lintOxlint, work });
+  rmSync(join(work, "portable-proofs"), { recursive: true, force: true });
+  rmSync(join(work, "portable.config.json"));
+  rmSync(join(work, "adoption-proof.tsx"));
+  rmSync(join(work, "adoption.config.json"));
+
   const repositoryDiagnostics = lintOxlintRepository().diagnostics ?? [];
   const moduleSizeDiagnostics = repositoryDiagnostics.filter(
     ({ code }) => code === "eslint(max-lines)",
@@ -206,11 +220,52 @@ try {
       `default packed Oxlint config should report max-lines for ordinary code even when generated-looking names are undeclared, got: ${JSON.stringify(moduleSizeDiagnostics)}`,
     );
   }
-  if (repositoryDiagnostics.length !== moduleSizeDiagnostics.length) {
+  const sharedRuleDiagnostics = repositoryDiagnostics.filter(
+    ({ code }) =>
+      code !== "eslint(max-lines)" &&
+      code !== "antidrift(no-wrapping-functions)",
+  );
+  if (sharedRuleDiagnostics.length > 0) {
     fail(
-      `focused governance should report only max-lines in the consumer, got: ${JSON.stringify(repositoryDiagnostics)}`,
+      `default packed Oxlint config should leave experimental imported rules disabled, got: ${JSON.stringify(sharedRuleDiagnostics)}`,
     );
   }
+
+  const boundaryWrappers = repositoryDiagnostics.filter(
+    ({ code }) => code === "antidrift(no-wrapping-functions)",
+  );
+  if (
+    boundaryWrappers.length !== 4 ||
+    boundaryWrappers.some(
+      ({ filename, severity }) =>
+        filename !== "packages/app/src/legitimate-boundaries.ts" ||
+        severity !== "error",
+    )
+  ) {
+    fail(
+      `The named boundary examples must still receive default wrapper errors: ${JSON.stringify(boundaryWrappers)}`,
+    );
+  }
+
+  file(
+    "wrapping-default-proof.ts",
+    "declare const owner: { load(id: string): string };\nexport function loadItem(id: string) { return owner.load(id); }\nexport const readItem = (id: string) => owner.load(id);\nexport const area = (radius: number) => Math.PI * radius ** 2;\n",
+  );
+  const wrappingDiagnostics = lintOxlintRepository().diagnostics.filter(
+    ({ filename }) => filename === "wrapping-default-proof.ts",
+  );
+  if (
+    wrappingDiagnostics.length !== 2 ||
+    wrappingDiagnostics.some(
+      ({ code, severity }) =>
+        code !== "antidrift(no-wrapping-functions)" || severity !== "error",
+    )
+  ) {
+    fail(
+      `Default packed policy must reject named function and arrow wrappers: ${JSON.stringify(wrappingDiagnostics)}`,
+    );
+  }
+  rmSync(join(work, "wrapping-default-proof.ts"));
   const precedenceRuleIds = oxlintRuleIds(
     lintOxlint("oversized-root.ts", "oxlint.precedence.config.mjs"),
   );
@@ -265,9 +320,9 @@ try {
     );
   }
 
-  const packageCopyRules = lint(
-    "packages/app/src/package-copy.ts",
-  ).flatMap((r) => r.messages.map((m) => m.ruleId));
+  const packageCopyRules = lint("packages/app/src/package-copy.ts").flatMap(
+    (r) => r.messages.map((m) => m.ruleId),
+  );
   const undercheckedPredicateRules = lint(
     "packages/app/src/underchecked-predicate.ts",
     "eslint.inventory.config.mjs",
@@ -357,7 +412,7 @@ try {
     "5/7  reading the shipped semantic adapter manifest from the CLI ...",
   );
   const semanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     ["exec", "antidrift", "semantic-manifest"],
     work,
   );
@@ -380,7 +435,7 @@ try {
     );
   }
   const reactStateSemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -391,7 +446,7 @@ try {
     work,
   );
   const asyncControlSemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -402,7 +457,7 @@ try {
     work,
   );
   const tupleShapeSemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -413,7 +468,7 @@ try {
     work,
   );
   const authoritySemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -424,7 +479,7 @@ try {
     work,
   );
   const structuralFactSemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -435,7 +490,7 @@ try {
     work,
   );
   const typeOwnerFactSemanticManifest = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -465,7 +520,7 @@ try {
     );
   }
   const ruleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     ["exec", "antidrift", "rule-status", "policy"],
     work,
   );
@@ -486,7 +541,7 @@ try {
     );
   }
   const typeOwnerRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -498,7 +553,7 @@ try {
     work,
   );
   const asyncControlRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -510,7 +565,7 @@ try {
     work,
   );
   const tupleShapeRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -522,7 +577,7 @@ try {
     work,
   );
   const authorityRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -534,7 +589,7 @@ try {
     work,
   );
   const localAstRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -546,12 +601,12 @@ try {
     work,
   );
   const retiredRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     ["exec", "antidrift", "rule-status", "policy", "--kind", "retired"],
     work,
   );
   const ecosystemCoveredRuleStatus = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -563,7 +618,7 @@ try {
     work,
   );
   const reactStateSemanticSummary = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -576,7 +631,7 @@ try {
     work,
   );
   const localAstSemanticSummary = runJson(
-    "pnpm",
+    pnpmBinary,
     [
       "exec",
       "antidrift",
@@ -643,12 +698,12 @@ try {
     "6/7  typechecking every public export under supported TS resolution modes ...",
   );
   run(
-    "pnpm",
+    pnpmBinary,
     ["exec", "tsc", "-p", "tsconfig.bundler.json", "--pretty", "false"],
     work,
   );
   run(
-    "pnpm",
+    pnpmBinary,
     ["exec", "tsc", "-p", "tsconfig.nodenext.json", "--pretty", "false"],
     work,
   );

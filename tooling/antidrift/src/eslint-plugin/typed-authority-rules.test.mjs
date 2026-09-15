@@ -18,6 +18,8 @@ const typeServiceGuardedRules = [
   "no-identity-schema-transform",
   "no-explicit-type-arguments-on-owned-api",
   "no-schema-validator-transcoding",
+  "no-redundant-local-return-type",
+  "no-redundant-zod-parse",
   "no-parse-as-cast",
   "no-appeasement-erasure",
   "no-structural-type-fork",
@@ -25,6 +27,253 @@ const typeServiceGuardedRules = [
   "no-unsafe-deserialize",
   "require-convex-return-validator",
 ];
+
+typedRuleTester.run(
+  "no-redundant-local-return-type",
+  rule("no-redundant-local-return-type"),
+  {
+    valid: [
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        export function selectedFor(configs: string[]): SelectedConfigData {
+          const selectedId = "default";
+          const selected = configs[0] ?? "default";
+          return { configs, selectedId, selected };
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return selectedFor("default");
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            if (selected === "again") return { configs, selectedId, selected };
+            return { configs, selectedId, selected };
+          };
+          return selectedFor("default");
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[], ids: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return ids.map(selectedFor);
+        }
+      `,
+      `
+        type SelectedConfigData = { readonly configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return selectedFor("default");
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected?: string };
+        function build(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return selectedFor("default");
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[]) {
+          const selectedFor: (id: string) => SelectedConfigData = (id): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return selectedFor("default");
+        }
+      `,
+      `
+        type Result = { value: number; next: () => Result };
+        function build() {
+          const recurse = (): Result => {
+            const value = 1;
+            const next = recurse;
+            return { value, next };
+          };
+          return recurse();
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        export function createSelector(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return { selectedFor };
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        export function createSelector(configs: string[]) {
+          const selectedFor = (id: string): SelectedConfigData => {
+            const selectedId = id;
+            const selected = configs[0] ?? id;
+            return { configs, selectedId, selected };
+          };
+          return selectedFor;
+        }
+      `,
+      `
+        type Result = { value: number };
+        function build() {
+          function selectedFor(value: number): Result;
+          function selectedFor(value: number | string): Result;
+          function selectedFor(input: number | string): Result {
+            const value = Number(input);
+            return { value };
+          }
+          return selectedFor(1);
+        }
+      `,
+      `
+        type Left = { right: Right };
+        type Right = { left: Left };
+        function build() {
+          const left = (): Left => {
+            const right = rightValue();
+            return { right };
+          };
+          const rightValue = (): Right => {
+            const left = left();
+            return { left };
+          };
+          return left();
+        }
+      `,
+      `
+        type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+        function build(configs: string[]) {
+          return configs.map((selected, index): SelectedConfigData => ({
+            configs,
+            selectedId: String(index),
+            selected,
+          }));
+        }
+      `,
+      `
+        type Status = { status: string };
+        function build() {
+          const selectedFor = (): Status => {
+            const status = "ready" as const;
+            return { status };
+          };
+          return selectedFor();
+        }
+      `,
+      `
+        type Result = { value: number };
+        function build(): Result {
+          const create = (): Result => {
+            const value = 1;
+            return { value };
+          };
+          return create();
+        }
+        export const api = { build };
+      `,
+      `
+        type Result = { value: number };
+        declare function wrap<T>(value: T): T;
+        function build(): Result {
+          const create = (): Result => {
+            const value = 1;
+            return { value };
+          };
+          return create();
+        }
+        export default wrap(build);
+      `,
+      `
+        type Result = { value: number };
+        function build(): Result {
+          const create = (): Result => {
+            const value = 1;
+            return { value };
+          };
+          return create();
+        }
+        export { build as apiFactory };
+      `,
+    ],
+    invalid: [
+      {
+        code: `
+          type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+          function build(configs: string[]): SelectedConfigData {
+            const selectedFor = (id: string): SelectedConfigData => {
+              const selectedId = id;
+              const selected = configs[0] ?? id;
+              return { configs, selectedId, selected };
+            };
+            return selectedFor("default");
+          }
+        `,
+        errors: [{ messageId: "redundantLocalReturnType" }],
+      },
+      {
+        code: `
+          type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
+          function build(configs: string[]): SelectedConfigData {
+            function selectedFor(id: string): SelectedConfigData {
+              const selectedId = id;
+              const selected = configs[0] ?? id;
+              return { configs, selectedId, selected };
+            }
+            return selectedFor("default");
+          }
+        `,
+        errors: [{ messageId: "redundantLocalReturnType" }],
+      },
+      {
+        code: `
+          type VideoModelId = "first" | "second";
+          type SelectedConfigData = { configs: VideoModelId[]; selectedId: VideoModelId; selected: VideoModelId };
+          function selectedVideoConfigDataFor(): Record<VideoModelId, SelectedConfigData> {
+            const selectedFor = (id: VideoModelId): SelectedConfigData => {
+              const configs = [id];
+              const selectedId = id;
+              const selected = configs[0] ?? id;
+              return { configs, selectedId, selected };
+            };
+            return {
+              first: selectedFor("first"),
+              second: selectedFor("second"),
+            };
+          }
+        `,
+        errors: [{ messageId: "redundantLocalReturnType" }],
+      },
+    ],
+  },
+);
 
 for (const guardedRule of typeServiceGuardedRules) {
   ruleTester.run(`${guardedRule} type-service guard`, rule(guardedRule), {
@@ -450,10 +699,18 @@ typedRuleTester.run("no-unsafe-deserialize", rule("no-unsafe-deserialize"), {
   valid: [
     fixture("programs/correct/json-parse-string.ts"),
     fixture("programs/correct/schema-parse-unknown.ts"),
+    fixture("programs/correct/json-domain-validation.ts"),
   ],
   invalid: [
     { ...fixture("programs/drift/json-parse-unknown.ts"), errors: 1 },
     { ...fixture("programs/drift/json-parse-any.ts"), errors: 1 },
+    {
+      ...fixture("programs/drift/json-domain-store.ts"),
+      errors: [4, 5, 8, 10, 12].map((line) => ({
+        line,
+        message: /Validate parsed JSON against the schema for 'Settings'/u,
+      })),
+    },
   ],
 });
 
@@ -610,6 +867,40 @@ typedRuleTester.run(
   },
 );
 
+// ─── no-redundant-zod-parse fixture suite ─────────────────────────────────────
+// Provenance-based: fires only when a value produced by `S.parse()` is re-parsed by the same S.
+typedRuleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
+  valid: [
+    // Boundary parse of raw/any input — the legitimate first validation
+    fixture("programs/correct/zod-boundary-parse.ts"),
+    // Different schema for the storage shape — a genuine second validation, not redundant
+    fixture("programs/correct/zod-different-schema-reparse.ts"),
+    // Double JSON.parse — not Zod, must stay silent (confirms the zod guard)
+    fixture("programs/correct/zod-non-zod-parse.ts"),
+    // External framework call results are legitimate boundary parses
+    fixture("programs/correct/zod-external-call-boundary.ts"),
+    // Typed param re-parse — no local provenance, so Rule A correctly abstains (Rule C's case)
+    fixture("programs/drift/zod-reparse-typed-value.ts"),
+    // Call-result assignability is not decoder provenance: a helper typed as the
+    // schema output never proves this schema validated the value (refinements are
+    // invisible to TypeScript). Silent until producer provenance exists.
+    fixture("programs/drift/zod-reparse-service-result.ts"),
+    fixture("programs/drift/zod-reparse-array-find.ts"),
+    fixture("programs/drift/zod-reparse-sync-helper-result.ts"),
+  ],
+  invalid: [
+    // Re-parse of a parsed value in the same function
+    { ...fixture("programs/drift/zod-reparse-same-fn.ts"), errors: 1 },
+    // Re-parse across functions in the same file via a module-scoped validated const
+    {
+      ...fixture("programs/drift/zod-reparse-cross-fn-same-file.ts"),
+      errors: 1,
+    },
+    // safeParse of a value this schema already validated
+    { ...fixture("programs/drift/zod-safe-parse-variants.ts"), errors: 1 },
+  ],
+});
+
 // ─── no-parse-as-cast fixture suite ───────────────────────────────────────────
 // Declared-contract based: fires when a parameter is already typed as the schema
 // output, so the parse coerces rather than validates. Complements
@@ -640,33 +931,45 @@ typedRuleTester.run("no-parse-as-cast", rule("no-parse-as-cast"), {
 });
 
 // ─── no-appeasement-erasure fixture suite ─────────────────────────────────────
-// Fires when a known type is widened to unknown and a contract is then
-// re-established from it by a parse or a named cast. Widening an any-returning
-// source, or widening with no downstream contract, stays clean.
-typedRuleTester.run(
-  "no-appeasement-erasure",
-  rule("no-appeasement-erasure"),
-  {
-    valid: [
-      fixture("programs/correct/appeasement-erasure-real-boundaries.ts"),
-      // Effect decode of a genuine unknown boundary stays clean
-      fixture("programs/correct/effect-decode-boundaries.ts"),
-      // unknown/any parameters are real boundaries, not erasures
-      fixture("programs/correct/parse-as-cast-boundary-inputs.ts"),
-      // External SDK result parsed directly — no erased binding involved
-      fixture("programs/correct/zod-external-call-boundary.ts"),
-    ],
-    invalid: [
-      // Erased-then-parsed and erased-then-cast, the two IPC edge shapes
-      {
-        ...fixture("programs/drift/appeasement-erasure-ipc-result.ts"),
-        errors: 3,
-      },
-      // Erasure re-established through a curried Effect Schema decoder
-      { ...fixture("programs/drift/effect-decode-erasure.ts"), errors: 1 },
-    ],
-  },
-);
+// Fires when a known type is widened to a broad contract, including local flows
+// that later re-establish a narrower contract.
+typedRuleTester.run("no-appeasement-erasure", rule("no-appeasement-erasure"), {
+  valid: [
+    fixture("programs/correct/appeasement-erasure-real-boundaries.ts"),
+    // Effect decode of a genuine unknown boundary stays clean
+    fixture("programs/correct/effect-decode-boundaries.ts"),
+    // unknown/any parameters are real boundaries, not erasures
+    fixture("programs/correct/parse-as-cast-boundary-inputs.ts"),
+    // External SDK result parsed directly — no erased binding involved
+    fixture("programs/correct/zod-external-call-boundary.ts"),
+  ],
+  invalid: [
+    // Erased-then-parsed and erased-then-cast, the two IPC edge shapes
+    {
+      ...fixture("programs/drift/appeasement-erasure-ipc-result.ts"),
+      errors: [
+        { message: /Appeasement erasure/u },
+        { message: /Appeasement erasure/u },
+        { message: /Appeasement erasure/u },
+        { messageId: "widening" },
+        { messageId: "widening" },
+      ],
+    },
+    {
+      code: `
+        const value = { id: "user-1" } as unknown;
+        export const user = value as { id: string };
+      `,
+      errors: [
+        { messageId: "widening" },
+        { messageId: "widening" },
+        { messageId: "widenThenAssert" },
+      ],
+    },
+    // Erasure re-established through a curried Effect Schema decoder
+    { ...fixture("programs/drift/effect-decode-erasure.ts"), errors: 1 },
+  ],
+});
 
 typedRuleTester.run(
   "no-identity-schema-transform",
@@ -682,9 +985,7 @@ typedRuleTester.run(
       fixture(
         "programs/correct/identity-schema-transform-non-object-output.ts",
       ),
-      fixture(
-        "programs/correct/identity-schema-transform-non-zod-receiver.ts",
-      ),
+      fixture("programs/correct/identity-schema-transform-non-zod-receiver.ts"),
       fixture("programs/correct/identity-schema-transform-array-map.ts"),
       fixture(
         "programs/correct/identity-schema-transform-unresolved-input-shape.ts",
@@ -766,9 +1067,7 @@ typedRuleTester.run(
         ],
       },
       {
-        ...fixture(
-          "programs/drift/convex-missing-return-validator-aliased.ts",
-        ),
+        ...fixture("programs/drift/convex-missing-return-validator-aliased.ts"),
         errors: [{ messageId: "missingReturnValidator" }],
       },
     ],

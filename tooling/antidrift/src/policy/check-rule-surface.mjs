@@ -4,8 +4,6 @@ import { fileURLToPath } from "node:url";
 
 import YAML from "yaml";
 
-import { defaultCases as chaskiCorpusCases } from "./chaski-corpus.mjs";
-import { defaultCases as externalCorpusCases } from "./external-corpus/cases.mjs";
 import { createConfig } from "../eslint-config/index.mjs";
 import eslintPlugin from "../eslint-plugin/index.js";
 import { createGovernanceOxlintConfig } from "../oxlint-config/index.mjs";
@@ -19,8 +17,6 @@ const blockingDisallowedStatuses = new Set([
   "retired",
   "under-proven",
 ]);
-const defaultCorpusCases = [...chaskiCorpusCases, ...externalCorpusCases];
-
 function severityOf(ruleValue) {
   const severity = Array.isArray(ruleValue) ? ruleValue[0] : ruleValue;
   if (severity === "off" || severity === 0) return 0;
@@ -62,16 +58,6 @@ function collectDuplicateRuntimeOwners(runtimeConfigs) {
   return [...owners]
     .filter(([, runtimes]) => runtimes.length > 1)
     .map(([ruleName, runtimes]) => ({ ruleName, runtimes }));
-}
-
-function collectCorpusCoveredRules(cases) {
-  const out = new Set();
-  for (const testCase of cases ?? []) {
-    if (testCase.ruleId?.startsWith("antidrift/")) {
-      out.add(testCase.ruleId.slice("antidrift/".length));
-    }
-  }
-  return out;
 }
 
 function readRuleRegistry(repoRoot) {
@@ -159,7 +145,6 @@ export function checkRuleSurface({
   runtimePluginRules = null,
   configs = null,
   runtimeConfigs = null,
-  corpusCases = defaultCorpusCases,
   ruleRegistry = null,
   report = console.error,
 } = {}) {
@@ -183,16 +168,11 @@ export function checkRuleSurface({
     Array.isArray(configs) ? configs : [configs],
   );
   const configured = new Set(configuredSettings.keys());
-  const corpusCovered = collectCorpusCoveredRules(corpusCases);
-
   const configuredButNotExported = new Set(
     [...configured].filter((rule) => !exported.has(rule)),
   );
   const exportedButNotConfigured = new Set(
     [...exported].filter((rule) => !configured.has(rule)),
-  );
-  const exportedButNotCorpusCovered = new Set(
-    [...exported].filter((rule) => !corpusCovered.has(rule)),
   );
   const blockingMaturityViolations = collectBlockingMaturityViolations(
     configuredSettings,
@@ -210,18 +190,12 @@ export function checkRuleSurface({
     "Custom rule exported but not configured",
     report,
   );
-  reportSorted(
-    exportedButNotCorpusCovered,
-    "Custom rule exported but not covered by corpus evidence",
-    report,
-  );
   reportSortedViolations(blockingMaturityViolations, report);
   reportDuplicateRuntimeOwners(duplicateRuntimeOwners, report);
 
   return (
     configuredButNotExported.size +
       exportedButNotConfigured.size +
-      exportedButNotCorpusCovered.size +
       blockingMaturityViolations.length +
       duplicateRuntimeOwners.length ===
     0

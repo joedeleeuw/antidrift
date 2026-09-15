@@ -79,7 +79,12 @@ describe("deserialization coverage matrix", () => {
       writeFileSync(probePath, probe);
       const result = spawnSync(
         process.execPath,
-        [oxlintBin, "--config", join(workspace, "oxlint.config.mjs"), probePath],
+        [
+          oxlintBin,
+          "--config",
+          join(workspace, "oxlint.config.mjs"),
+          probePath,
+        ],
         { cwd: repository, encoding: "utf8" },
       );
       if (result.error) throw result.error;
@@ -108,7 +113,7 @@ describe("deserialization coverage matrix", () => {
     120_000,
   );
 
-  it("the ESLint-owned typed lane reports broad-input JSON.parse and stays clean at boundaries", async () => {
+  it("the ESLint-owned typed lane reports parsed JSON contracts and broad inputs while accepting validated boundaries", async () => {
     const probePath = join(workspace, "probe.ts");
     writeFileSync(probePath, probe);
     const eslint = new ESLint({
@@ -130,6 +135,6 @@ describe("deserialization coverage matrix", () => {
     });
     const [result] = await eslint.lintFiles([probePath]);
     const lines = result.messages.map((message) => message.line);
-    expect(lines).toEqual([20]);
+    expect(lines).toEqual([14, 15, 16, 18, 20]);
   }, 120_000);
 });

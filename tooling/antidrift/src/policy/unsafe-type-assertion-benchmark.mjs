@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { existsSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,15 +11,15 @@ import antidrift from "../eslint-plugin/index.js";
 
 const chaskiRepoCandidates = [
   process.env.CHASKI_REPO,
-  "/Users/sushi/code/chaski",
+  resolve(homedir(), "code", "chaski"),
 ].filter(Boolean);
 const codebaseAtlasRepoCandidates = [
   process.env.CODEBASE_ATLAS_REPO,
-  "/Users/sushi/code/codebase-atlas",
+  resolve(homedir(), "code", "codebase-atlas"),
 ].filter(Boolean);
 const sudocodeRepoCandidates = [
   process.env.SUDOCODE_REPO,
-  "/Users/sushi/code/sudocode-main",
+  resolve(homedir(), "code", "sudocode-main"),
 ].filter(Boolean);
 
 const benchmarkRuleIds = [

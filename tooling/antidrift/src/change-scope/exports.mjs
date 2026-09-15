@@ -66,10 +66,6 @@ function gitPathsAt({ ref, cwd }) {
     .sort(compareStrings);
 }
 
-function isTypeScriptSourcePath(path) {
-  return TS_SOURCE_RE.test(path);
-}
-
 function compareStrings(left, right) {
   if (left < right) return -1;
   if (left > right) return 1;
@@ -90,10 +86,6 @@ function exportKey(entry) {
 
 function fileNameFor(path) {
   return `/${path}`;
-}
-
-function pathForFileName(fileName) {
-  return fileName.slice(1);
 }
 
 function extensionForFileName(fileName) {
@@ -142,12 +134,12 @@ function compilerHostFor({ ref, cwd, fileNames, options }) {
     if (!sourceCache.has(candidate)) {
       const sourceText = gitFileAt({
         ref,
-        path: pathForFileName(candidate),
+        path: candidate.slice(1),
         cwd,
       });
       if (sourceText === null) {
         throw new Error(
-          `git tree listed ${pathForFileName(candidate)} at ${ref}, but git show could not read it`,
+          `git tree listed ${candidate.slice(1)} at ${ref}, but git show could not read it`,
         );
       }
       sourceCache.set(candidate, sourceText);
@@ -274,7 +266,7 @@ function exportModuleSpecifiers(sourceFile) {
 }
 
 function relativeExportTargets({ ref, cwd, fileName, fileNameSet }) {
-  const sourceText = gitFileAt({ ref, path: pathForFileName(fileName), cwd });
+  const sourceText = gitFileAt({ ref, path: fileName.slice(1), cwd });
   if (sourceText === null) return [];
   const sourceFile = ts.createSourceFile(
     fileName,
@@ -377,8 +369,8 @@ function exportsForSource({ file, ref, cwd, fileNames }) {
 function changedTsPaths(changedFiles) {
   const paths = new Set();
   for (const file of changedFiles) {
-    if (isTypeScriptSourcePath(file.path)) paths.add(file.path);
-    if (file.oldPath && isTypeScriptSourcePath(file.oldPath)) {
+    if (TS_SOURCE_RE.test(file.path)) paths.add(file.path);
+    if (file.oldPath && TS_SOURCE_RE.test(file.oldPath)) {
       paths.add(file.oldPath);
     }
   }
@@ -411,7 +403,7 @@ function comparedSourcePaths({
     seedFileNames,
   });
   return [...new Set([...baseAffected, ...headAffected])]
-    .map(pathForFileName)
+    .map((fileName) => fileName.slice(1))
     .sort(compareStrings);
 }
 

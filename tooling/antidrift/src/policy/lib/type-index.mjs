@@ -49,7 +49,8 @@ export function typePropsDetailed(checker, type) {
     const declarations = sym.declarations ?? [];
     const method = declarations.some(
       (declaration) =>
-        ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration),
+        ts.isMethodSignature(declaration) ||
+        ts.isMethodDeclaration(declaration),
     );
     const readonly = declarations.some((declaration) =>
       (ts.getModifiers(declaration) ?? []).some(
@@ -129,8 +130,12 @@ function candidateFor(checker, sym, pkg, metadata = {}) {
   } catch {
     return null;
   }
-  return candidateForType(checker, declared, `${pkg}#${sym.getName()}`, metadata);
-
+  return candidateForType(
+    checker,
+    declared,
+    `${pkg}#${sym.getName()}`,
+    metadata,
+  );
 }
 
 function exportedObjectTypes(
@@ -248,12 +253,8 @@ export function collectAcceptedPackageCanonicalTypes(
   return candidates;
 }
 
-function normalizePath(fileName) {
-  return fileName.replace(/\\/gu, "/");
-}
-
 function registryPath(path) {
-  let source = normalizePath(path);
+  let source = path.replace(/\\/gu, "/");
   while (source.startsWith("./")) source = source.slice(2);
   while (source.endsWith("/")) source = source.slice(0, -1);
   return source;
@@ -262,7 +263,7 @@ function registryPath(path) {
 function matchesGeneratedSource(fileName, generated) {
   const source = registryPath(generated);
   if (!source) return false;
-  const p = normalizePath(fileName);
+  const p = fileName.replace(/\\/gu, "/");
   return p.includes(`/${source}/`) || p.endsWith(`/${source}`);
 }
 
@@ -286,7 +287,7 @@ export function collectGeneratedCanonicalTypes(
       const matched = entries.find(([, entry]) =>
         matchesGeneratedSource(sf.fileName, entry.generated),
       );
-      return matched?.[0] ?? normalizePath(sf.fileName);
+      return matched?.[0] ?? sf.fileName.replace(/\\/gu, "/");
     },
     () => ({ authority: "generated-source", authorityState: "accepted" }),
   );
@@ -336,7 +337,7 @@ function canonicalEntityEntries(canonicalEntities = {}) {
 function matchesRegistryFile(fileName, owner) {
   const source = registryPath(owner);
   if (!source) return false;
-  return normalizePath(fileName).endsWith(`/${source}`);
+  return fileName.replace(/\\/gu, "/").endsWith(`/${source}`);
 }
 
 export function collectDomainCanonicalTypes(
@@ -406,15 +407,15 @@ export const CONVEX_DATA_MODEL_MODULE = "convex/_generated/dataModel";
 export const CONVEX_API_MODULE = "convex/_generated/api";
 
 export function isConvexGeneratedFile(fileName) {
-  const p = normalizePath(fileName);
-  return p.includes("/convex/_generated/") || p.startsWith("convex/_generated/");
+  const p = fileName.replace(/\\/gu, "/");
+  return (
+    p.includes("/convex/_generated/") || p.startsWith("convex/_generated/")
+  );
 }
 
 function isConvexGeneratedModule(fileName, modulePath) {
-  const p = normalizePath(fileName);
-  return (
-    p.endsWith(`/${modulePath}.ts`) || p.endsWith(`/${modulePath}.d.ts`)
-  );
+  const p = fileName.replace(/\\/gu, "/");
+  return p.endsWith(`/${modulePath}.ts`) || p.endsWith(`/${modulePath}.d.ts`);
 }
 
 function moduleExportSymbol(checker, sourceFile, name) {

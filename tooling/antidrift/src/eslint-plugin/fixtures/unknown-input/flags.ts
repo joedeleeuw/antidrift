@@ -1,3 +1,3 @@
 export function describe(input: unknown): string {
-  return String(input);
+  return typeof input === "string" ? input : "";
 }

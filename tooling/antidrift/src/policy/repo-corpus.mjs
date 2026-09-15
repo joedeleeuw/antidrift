@@ -6,6 +6,7 @@ import { ESLint } from "eslint";
 import YAML from "yaml";
 
 import eslintPlugin from "../eslint-plugin/index.js";
+import oxlintPlugin from "../oxlint-plugin/index.js";
 
 const defaultTargets = ["apps", "packages", "tooling"];
 const defaultRules = eslintCorpusRuleIds();
@@ -28,6 +29,7 @@ export function eslintCorpusRuleIds({
   eslintRules = eslintPlugin.rules,
 } = {}) {
   return Object.keys(eslintRules ?? {})
+    .filter((name) => !Object.hasOwn(oxlintPlugin.rules, name))
     .map((name) => `antidrift/${name}`)
     .sort((a, b) => a.localeCompare(b));
 }

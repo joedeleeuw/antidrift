@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,27 +10,27 @@ import antidrift from "../eslint-plugin/index.js";
 
 const chaskiRepoCandidates = [
   process.env.CHASKI_REPO,
-  "/Users/sushi/code/chaski",
+  resolve(homedir(), "code", "chaski"),
 ].filter(Boolean);
 const codebaseAtlasRepoCandidates = [
   process.env.CODEBASE_ATLAS_REPO,
-  "/Users/sushi/code/codebase-atlas",
+  resolve(homedir(), "code", "codebase-atlas"),
 ].filter(Boolean);
 const sudocodeRepoCandidates = [
   process.env.SUDOCODE_REPO,
-  "/Users/sushi/code/sudocode-main",
+  resolve(homedir(), "code", "sudocode-main"),
 ].filter(Boolean);
 const cloudflareAgentsRepoCandidates = [
   process.env.CLOUDFLARE_AGENTS_REPO,
-  "/Users/sushi/code/cloudflare-agents",
+  resolve(homedir(), "code", "cloudflare-agents"),
 ].filter(Boolean);
 const opencodeRepoCandidates = [
   process.env.OPENCODE_REPO,
-  "/Users/sushi/code/opencode",
+  resolve(homedir(), "code", "opencode"),
 ].filter(Boolean);
 const powersyncServiceRepoCandidates = [
   process.env.POWERSYNC_SERVICE_REPO,
-  "/Users/sushi/code/powersync-service",
+  resolve(homedir(), "code", "powersync-service"),
 ].filter(Boolean);
 
 const customRuleId = "antidrift/no-sql-string-concat";
@@ -368,18 +369,6 @@ function negativeRegexExitGuard(node) {
   return Boolean(isCallNamed(call, regexTestMethods) && statementExits(node.consequent));
 }
 
-function positiveRegexGuard(node) {
-  return isCallNamed(node.test, regexTestMethods);
-}
-
-function membershipGuard(node) {
-  return isCallNamed(node.test, membershipMethods);
-}
-
-function quantifierGuard(node) {
-  return isCallNamed(node.test, quantifierMethods);
-}
-
 function arrayJoinedText(node) {
   const object = node.callee?.object;
   if (object?.type !== "ArrayExpression") return null;
@@ -424,13 +413,13 @@ function recordSqlGuard({ repo, repoRoot, filePath, inventory, node, source, sql
   if (negativeRegexExitGuard(node)) {
     inventory.guardShapes.negativeRegexExit += 1;
     pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "negative-regex-exit", detail));
-  } else if (positiveRegexGuard(node)) {
+  } else if (isCallNamed(node.test, regexTestMethods)) {
     inventory.guardShapes.positiveRegexBranch += 1;
     pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "positive-regex-branch", detail));
-  } else if (membershipGuard(node)) {
+  } else if (isCallNamed(node.test, membershipMethods)) {
     inventory.guardShapes.membershipBranch += 1;
     pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "membership-branch", detail));
-  } else if (quantifierGuard(node)) {
+  } else if (isCallNamed(node.test, quantifierMethods)) {
     inventory.guardShapes.quantifierBranch += 1;
     pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "quantifier-branch", detail));
   }
