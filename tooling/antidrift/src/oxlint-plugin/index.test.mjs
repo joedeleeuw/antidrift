@@ -285,6 +285,23 @@ const antiSlopRuleCases = [
   },
 ];
 
+const unknownParameterExemptCases = [
+  "promise.catch((reason: unknown) => console.error(reason));",
+  "promise.then(() => 1, (reason: unknown) => console.error(reason));",
+  "try { work(); } catch (error: unknown) { console.error(error); }",
+  "function fail(cause: unknown) { throw cause; }",
+  "function writeJson(body: unknown) { return JSON.stringify(body); }",
+  "function respond(body: unknown) { return Response.json(body); }",
+  "function record(value: unknown) { return JSON.stringify(value, null, 2); }",
+];
+
+const unknownParameterReportedCases = [
+  "promise.then((value: unknown) => value);",
+  'function probe(packet: unknown) { if (typeof packet === "object" && packet !== null && "error" in packet) return packet.error; return null; }',
+  "function mixed(body: unknown) { JSON.stringify(body); return body.length; }",
+  "function unused(input: unknown) {}",
+];
+
 function lint(
   source,
   rules = { "antidrift/require-effect-deps": "error" },
@@ -618,6 +635,38 @@ describe("Oxlint plugin", () => {
       expect(result.status).toBe(0);
       expect(`${result.stdout}${result.stderr}`).not.toContain(
         `antidrift(${ruleId})`,
+      );
+    },
+  );
+
+  it.each(unknownParameterExemptCases)(
+    "accepts an honest unknown parameter: %s",
+    (source) => {
+      const result = lint(
+        source,
+        { "antidrift/no-unknown-parameters": "error" },
+        "sample.ts",
+      );
+
+      expect(result.status).toBe(0);
+      expect(`${result.stdout}${result.stderr}`).not.toContain(
+        "antidrift(no-unknown-parameters)",
+      );
+    },
+  );
+
+  it.each(unknownParameterReportedCases)(
+    "still reports an unparsed unknown parameter: %s",
+    (source) => {
+      const result = lint(
+        source,
+        { "antidrift/no-unknown-parameters": "error" },
+        "sample.ts",
+      );
+
+      expect(result.status).toBe(1);
+      expect(`${result.stdout}${result.stderr}`).toContain(
+        "antidrift(no-unknown-parameters)",
       );
     },
   );

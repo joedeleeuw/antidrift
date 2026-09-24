@@ -2,7 +2,7 @@
 
 ## Intent
 
-Decode explicitly unknown parameters and local bindings before their values enter application logic. Catch bindings are exempt.
+Decode explicitly unknown parameters and local bindings before their values enter application logic. Catch bindings are exempt, as are rejection-handler parameters and serializer-only output parameters.
 
 ## Detection
 
@@ -13,6 +13,8 @@ Decoder names start with `decode`, `parse`, `validate`, or `safeParse`, followed
 Predicates require a visible `value is Type` or `asserts value is Type` signature, either locally declared or directly imported from resolvable source/declarations. Imported aliases work; re-export chains, namespace methods, and inferred signatures are not followed. Merely naming a boolean helper `isMessage` is insufficient. Optional predicate calls are not proof.
 
 Successful if branches, conditional expressions, `&&`/`||` guards, loop tests, assertion statements, and guards whose failing branch exits can establish narrowing. Ignored boolean results cannot. Reassignments invalidate proof; mutable captures and loops with writes cannot inherit outer narrowing. Analysis is conservative across branch writes and unsupported control-flow forms. This is not a general TypeScript flow checker: inline truthiness/typeof probes do not replace decoding under this policy. Low-level decoder implementations can use explicit exemptions.
+
+Two parameter positions are exempt because `unknown` is the honest annotation there. Rejection handlers — the callback of `promise.catch(...)` and the `onRejected` argument of `promise.then(onFulfilled, onRejected)` — receive the rejection reason, which has no decodable contract; the fulfillment handler of `then` is not exempt. Output parameters whose every read is the serialized-value argument of `JSON.stringify` or `Response.json` are exempt: serialization accepts every value by design, so it proves no contract and requires none. The sink set is deliberately limited to those two calls; member access, truthiness, and inline `typeof`/`in` probing of an unknown parameter still report, as does a parameter that reaches both a sink and any other read.
 
 ## Controls
 

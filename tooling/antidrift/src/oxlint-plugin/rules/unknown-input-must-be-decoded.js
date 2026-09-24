@@ -1,6 +1,10 @@
 import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
 import { isNarrowedUse } from "../unknown-narrowing.js";
 import { isDecoderArgument, predicateCall } from "../unknown-predicates.js";
+import {
+  isRejectionHandlerFunction,
+  isSerializerSinkUse,
+} from "../unknown-sinks.js";
 
 function unknownBinding(node) {
   if (node.typeAnnotation?.typeAnnotation.type !== "TSUnknownKeyword") {
@@ -19,7 +23,10 @@ function unknownBinding(node) {
   if (declaration.type === "VariableDeclarator") {
     return declaration.id === binding;
   }
-  return declaration.params?.includes(binding);
+  if (declaration.params?.includes(binding)) {
+    return !isRejectionHandlerFunction(declaration);
+  }
+  return false;
 }
 
 function bindingNames(node) {
@@ -97,6 +104,7 @@ export default function ruleUnknownInputMustBeDecoded() {
             if (!reference.isRead() || reference.isTypeReference) return false;
             const identifier = reference.identifier;
             if (identifier.parent.type === "TSTypePredicate") return false;
+            if (isSerializerSinkUse(identifier)) return false;
             if (isDecoderArgument(identifier)) return false;
             if (predicateCall(identifier.parent, variable, context, cache)) {
               return false;

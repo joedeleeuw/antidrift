@@ -38,6 +38,21 @@ ruleTester.run(
         code: "try { work(); } catch (error: unknown) { console.log(error); }",
       },
       {
+        code: "promise.catch((reason: unknown) => console.error(reason));",
+      },
+      {
+        code: "promise.then(() => 1, (reason: unknown) => console.error(reason));",
+      },
+      {
+        code: "function respond(body: unknown) { return Response.json(body); }",
+      },
+      {
+        code: "function write(body: unknown) { stream.end(JSON.stringify(body)); }",
+      },
+      {
+        code: "function record(value: unknown) { return JSON.stringify(value, null, 2); }",
+      },
+      {
         code: "function receive(input: unknown) { console.log(input); }",
         options: [{ allows: ["input"] }],
       },
@@ -124,6 +139,22 @@ ruleTester.run(
       },
       {
         code: "function receive(input: unknown = read()) { use(input); }",
+        errors,
+      },
+      {
+        code: "promise.then((value: unknown) => use(value));",
+        errors,
+      },
+      {
+        code: 'function receive(payload: unknown) { if (typeof payload === "object" && payload !== null && "error" in payload) return payload.error; return null; }',
+        errors,
+      },
+      {
+        code: "function receive(body: unknown) { JSON.stringify(body); return body.length; }",
+        errors,
+      },
+      {
+        code: "function receive(body: unknown) { JSON.stringify(body); return body; }",
         errors,
       },
       {
