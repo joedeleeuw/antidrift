@@ -44,6 +44,21 @@ ruleTester.run(
         code: "promise.then(() => 1, (reason: unknown) => console.error(reason));",
       },
       {
+        code: "promise.catch((error: unknown) => { throw error; });",
+      },
+      {
+        code: "promise.catch((error: unknown) => setFailure({ cause: error }));",
+      },
+      {
+        code: "promise.catch((error: unknown) => { if (error instanceof Error) report(error); });",
+      },
+      {
+        code: "function onError(error: unknown) { report(error); } promise.catch(onError);",
+      },
+      {
+        code: "const onError = (error: unknown) => report(error); promise.then(ok, onError);",
+      },
+      {
         code: "function respond(body: unknown) { return Response.json(body); }",
       },
       {
@@ -51,6 +66,9 @@ ruleTester.run(
       },
       {
         code: "function record(value: unknown) { return JSON.stringify(value, null, 2); }",
+      },
+      {
+        code: 'function record(value: unknown) { return JSON.stringify(value, ["id"], 2); }',
       },
       {
         code: "function receive(input: unknown) { console.log(input); }",
@@ -143,6 +161,50 @@ ruleTester.run(
       },
       {
         code: "promise.then((value: unknown) => use(value));",
+        errors,
+      },
+      {
+        code: "promise.catch((error: unknown) => setStatus((error as { status: number }).status));",
+        errors,
+      },
+      {
+        code: 'promise.catch((error: unknown) => { if (typeof error === "object" && error !== null && "status" in error) report(error.status); });',
+        errors,
+      },
+      {
+        code: "function onError(error: unknown) { return (error as Error).message; } promise.catch(onError);",
+        errors,
+      },
+      {
+        code: "function onError(error: unknown) { console.error(error); } promise.catch(onError); onError(new Error(\"x\"));",
+        errors,
+      },
+      {
+        code: "function onError(error: unknown) { report(error); } use(onError);",
+        errors,
+      },
+      {
+        code: "class Logger { constructor(private body: unknown) { log(JSON.stringify(body)); } }",
+        errors,
+      },
+      {
+        code: "function receive(body: unknown) { const x = JSON.parse(JSON.stringify(body)); return x.error.code; }",
+        errors,
+      },
+      {
+        code: "function receive(body: unknown) { return Response.json(body).json(); }",
+        errors,
+      },
+      {
+        code: 'function receive(body: unknown) { const JSON = { stringify: (v: unknown) => "" }; return JSON.stringify(body); }',
+        errors,
+      },
+      {
+        code: "function receive(body: unknown) { return JSON.stringify(body, (key, value) => value); }",
+        errors,
+      },
+      {
+        code: 'import { Response } from "./responses"; function receive(body: unknown) { return Response.json(body); }',
         errors,
       },
       {

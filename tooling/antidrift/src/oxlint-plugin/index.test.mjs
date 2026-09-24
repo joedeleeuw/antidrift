@@ -288,18 +288,29 @@ const antiSlopRuleCases = [
 const unknownParameterExemptCases = [
   "promise.catch((reason: unknown) => console.error(reason));",
   "promise.then(() => 1, (reason: unknown) => console.error(reason));",
+  "function onError(error: unknown) { console.error(error); } promise.catch(onError);",
+  "function onError(error: unknown) { console.error(error); } promise.then(ok, onError);",
   "try { work(); } catch (error: unknown) { console.error(error); }",
   "function fail(cause: unknown) { throw cause; }",
   "function writeJson(body: unknown) { return JSON.stringify(body); }",
+  'function writeKeys(body: unknown) { return JSON.stringify(body, ["id"], 2); }',
   "function respond(body: unknown) { return Response.json(body); }",
   "function record(value: unknown) { return JSON.stringify(value, null, 2); }",
 ];
 
 const unknownParameterReportedCases = [
   "promise.then((value: unknown) => value);",
+  "function onError(error: unknown) { console.error(error); } use(onError);",
+  'function onError(error: unknown) { console.error(error); } promise.catch(onError); onError(new Error("x"));',
   'function probe(packet: unknown) { if (typeof packet === "object" && packet !== null && "error" in packet) return packet.error; return null; }',
   "function mixed(body: unknown) { JSON.stringify(body); return body.length; }",
   "function unused(input: unknown) {}",
+  "function launder(body: unknown) { const x = JSON.parse(JSON.stringify(body)); return x; }",
+  "function drill(body: unknown) { return Response.json(body).json(); }",
+  'function shadowed(body: unknown) { const JSON = { stringify: (v: unknown) => "" }; return JSON.stringify(body); }',
+  "function replaced(body: unknown) { return JSON.stringify(body, (key, value) => value); }",
+  'import { Response } from "./responses"; function read(body: unknown) { return Response.json(body); }',
+  "class Logger { constructor(private body: unknown) { console.log(JSON.stringify(body)); } }",
 ];
 
 const capabilityTypeofCases = [

@@ -2,31 +2,36 @@ import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
 import { isNarrowedUse } from "../unknown-narrowing.js";
 import { isDecoderArgument, predicateCall } from "../unknown-predicates.js";
 import {
+  isErrorInspectionRead,
+  isParameterProperty,
   isRejectionHandlerFunction,
-  isSerializerSinkUse,
+  owningBinding,
+  variableReadsOnlySinks,
 } from "../unknown-sinks.js";
 
 function unknownBinding(node) {
   if (node.typeAnnotation?.typeAnnotation.type !== "TSUnknownKeyword") {
     return false;
   }
-  let binding = node;
-  while (
-    ["AssignmentPattern", "TSParameterProperty", "RestElement"].includes(
-      binding.parent.type,
-    )
-  ) {
-    binding = binding.parent;
-  }
+  const binding = owningBinding(node);
   const declaration = binding.parent;
   if (declaration.type === "CatchClause") return false;
   if (declaration.type === "VariableDeclarator") {
     return declaration.id === binding;
   }
-  if (declaration.params?.includes(binding)) {
-    return !isRejectionHandlerFunction(declaration);
-  }
-  return false;
+  return declaration.params?.includes(binding) === true;
+}
+
+// A rejection-handler parameter keeps its honest unknown annotation, but its
+// reads are still analysed: inspection reads (assertions, member access,
+// typeof operands, the right side of `in`) report, forwarding reads do not.
+function rejectionHandlerOwner(node, sourceCode) {
+  const binding = owningBinding(node);
+  const declaration = binding.parent;
+  if (!declaration.params?.includes(binding)) return null;
+  return isRejectionHandlerFunction(declaration, sourceCode)
+    ? declaration
+    : null;
 }
 
 function bindingNames(node) {
@@ -96,6 +101,27 @@ export default function ruleUnknownInputMustBeDecoded() {
           if (!unknownBinding(node) || allows.has(node.name)) return;
           const variable = findVariable(context.sourceCode, node);
           if (!variable) return;
+          if (rejectionHandlerOwner(node, context.sourceCode)) {
+            const inspected = variable.references.some((reference) => {
+              if (!reference.isRead() || reference.isTypeReference) {
+                return false;
+              }
+              return isErrorInspectionRead(reference.identifier);
+            });
+            if (inspected) {
+              context.report({
+                node: node.typeAnnotation,
+                messageId: "decodeUnknown",
+              });
+            }
+            return;
+          }
+          if (
+            !isParameterProperty(node) &&
+            variableReadsOnlySinks(context.sourceCode, variable)
+          ) {
+            return;
+          }
           const writes = variable.references
             .filter((reference) => reference.isWrite() && !reference.init)
             .map((reference) => reference.identifier);
@@ -104,7 +130,6 @@ export default function ruleUnknownInputMustBeDecoded() {
             if (!reference.isRead() || reference.isTypeReference) return false;
             const identifier = reference.identifier;
             if (identifier.parent.type === "TSTypePredicate") return false;
-            if (isSerializerSinkUse(identifier)) return false;
             if (isDecoderArgument(identifier)) return false;
             if (predicateCall(identifier.parent, variable, context, cache)) {
               return false;

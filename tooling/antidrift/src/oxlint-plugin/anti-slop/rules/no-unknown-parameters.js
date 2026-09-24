@@ -2,7 +2,8 @@ import { defineRule } from "@oxlint/plugins";
 import { findVariable } from "../../../semantic-adapters/async-control-flow.mjs";
 import {
   isRejectionHandlerFunction,
-  isSerializerSinkUse,
+  parameterIdentifier,
+  variableReadsOnlySinks,
 } from "../../unknown-sinks.js";
 function parameterAnnotation(parameter) {
   if (parameter.type === "TSParameterProperty") {
@@ -30,37 +31,18 @@ function parameterName(parameter, sourceText) {
     ? parameter.name
     : sourceText.replace(/\s*:\s*unknown\s*$/u, "");
 }
-function parameterIdentifier(parameter) {
-  let current = parameter;
-  while (current?.type === "TSParameterProperty") {
-    current = current.parameter;
-  }
-  if (current?.type === "AssignmentPattern") current = current.left;
-  if (current?.type === "RestElement") current = current.argument;
-  return current?.type === "Identifier" ? current : null;
-}
 // An output parameter is exempt only when it is read at least once and every
 // read hands the value to a serialization sink; unused parameters, writes,
 // and any other read (member access, inline `typeof`/`in` probing, other
-// callees) keep the annotation reported.
+// callees) keep the annotation reported. Constructor parameter properties
+// (`private body: unknown`) are never exempt: `this.body` reads are not
+// parameter references, so no read analysis can cover them.
 function readsOnlySerializationSinks(parameter, sourceCode) {
   const identifier = parameterIdentifier(parameter);
   if (!identifier) return false;
-  const variable = findVariable(sourceCode, identifier);
-  if (!variable) return false;
-  if (
-    variable.references.some(
-      (reference) => reference.isWrite() && !reference.init,
-    )
-  ) {
-    return false;
-  }
-  const reads = variable.references.filter(
-    (reference) => reference.isRead() && !reference.isTypeReference,
-  );
-  return (
-    reads.length > 0 &&
-    reads.every((reference) => isSerializerSinkUse(reference.identifier))
+  return variableReadsOnlySinks(
+    sourceCode,
+    findVariable(sourceCode, identifier),
   );
 }
 /**
@@ -82,7 +64,7 @@ export const noUnknownParametersRule = defineRule({
   },
   createOnce(context) {
     const checkParameters = (node) => {
-      if (isRejectionHandlerFunction(node)) return;
+      if (isRejectionHandlerFunction(node, context.sourceCode)) return;
       for (const parameter of node.params) {
         const annotation = parameterAnnotation(parameter);
         if (annotation?.typeAnnotation.type !== "TSUnknownKeyword") continue;
