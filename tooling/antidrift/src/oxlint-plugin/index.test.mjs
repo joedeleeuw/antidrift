@@ -302,6 +302,15 @@ const unknownParameterReportedCases = [
   "function unused(input: unknown) {}",
 ];
 
+const capabilityTypeofCases = [
+  'if (typeof window === "undefined") console.log("ssr");',
+  'if (typeof document !== "undefined") console.log(document.title);',
+  'if (typeof globalThis.navigator?.share === "function") console.log("share");',
+  'if (typeof navigator.mediaDevices?.getUserMedia !== "function") console.log("no mic");',
+  'if (typeof localStorage === "undefined") console.log("no storage");',
+  'if (typeof process.getuid === "function") process.getuid();',
+];
+
 function lint(
   source,
   rules = { "antidrift/require-effect-deps": "error" },
@@ -670,4 +679,55 @@ describe("Oxlint plugin", () => {
       );
     },
   );
+
+  it.each(capabilityTypeofCases)(
+    "accepts a platform capability check: %s",
+    (source) => {
+      const result = lint(
+        source,
+        { "antidrift/no-runtime-typeof": "error" },
+        "sample.ts",
+      );
+
+      expect(result.status).toBe(0);
+      expect(`${result.stdout}${result.stderr}`).not.toContain(
+        "antidrift(no-runtime-typeof)",
+      );
+    },
+  );
+
+  it("allows runtime typeof inside type guards only with allowInTypeGuards", () => {
+    const guard =
+      'function isText(value: unknown): value is string { return typeof value === "string"; }';
+
+    const allowed = lint(
+      guard,
+      { "antidrift/no-runtime-typeof": ["error", { allowInTypeGuards: true }] },
+      "sample.ts",
+    );
+    expect(allowed.status).toBe(0);
+
+    const rejected = lint(
+      guard,
+      { "antidrift/no-runtime-typeof": "error" },
+      "sample.ts",
+    );
+    expect(rejected.status).toBe(1);
+    expect(`${rejected.stdout}${rejected.stderr}`).toContain(
+      "antidrift(no-runtime-typeof)",
+    );
+  });
+
+  it("still reports runtime typeof outside type guards with allowInTypeGuards", () => {
+    const result = lint(
+      'if (typeof value === "string") value.length;',
+      { "antidrift/no-runtime-typeof": ["error", { allowInTypeGuards: true }] },
+      "sample.ts",
+    );
+
+    expect(result.status).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toContain(
+      "antidrift(no-runtime-typeof)",
+    );
+  });
 });
