@@ -320,6 +320,18 @@ const capabilityTypeofCases = [
   'if (typeof navigator.mediaDevices?.getUserMedia !== "function") console.log("no mic");',
   'if (typeof localStorage === "undefined") console.log("no storage");',
   'if (typeof process.getuid === "function") process.getuid();',
+  'if ("undefined" === typeof self) console.log("no worker scope");',
+];
+
+const capabilityTypeofReportedCases = [
+  'if (typeof process.env.PORT === "string") listen(Number(process.env.PORT));',
+  'const initial = typeof window.__INITIAL_STATE__?.user === "object" ? window.__INITIAL_STATE__.user : null;',
+  'if (typeof localStorage.token === "string") use(localStorage.token);',
+  'if (typeof globalThis[key] === "string") use(globalThis[key]);',
+  'function shadowedDocument(document: unknown) { return typeof document === "undefined"; }',
+  "function shadowedProcess(process: { exitCode: unknown }) { return typeof process.exitCode === \"function\"; }",
+  'function shadowedSelf() { const self = this; return typeof self === "undefined"; }',
+  'const detected = typeof window;',
 ];
 
 function lint(
@@ -702,6 +714,22 @@ describe("Oxlint plugin", () => {
 
       expect(result.status).toBe(0);
       expect(`${result.stdout}${result.stderr}`).not.toContain(
+        "antidrift(no-runtime-typeof)",
+      );
+    },
+  );
+
+  it.each(capabilityTypeofReportedCases)(
+    "still reports a non-capability typeof: %s",
+    (source) => {
+      const result = lint(
+        source,
+        { "antidrift/no-runtime-typeof": "error" },
+        "sample.ts",
+      );
+
+      expect(result.status).toBe(1);
+      expect(`${result.stdout}${result.stderr}`).toContain(
         "antidrift(no-runtime-typeof)",
       );
     },
