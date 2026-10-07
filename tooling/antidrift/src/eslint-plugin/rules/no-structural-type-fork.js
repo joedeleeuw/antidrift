@@ -1,6 +1,7 @@
 import ts from "typescript";
 
 import { semanticFactSink } from "../../policy/lib/semantic-facts.mjs";
+import { collectOwnedContractProvenance } from "../../semantic-adapters/owned-contract-provenance.mjs";
 import {
   collectAcceptedPackageCanonicalTypes,
   collectCanonicalTypes,
@@ -18,6 +19,7 @@ import {
   requireTypeServices,
 } from "./type-services.js";
 import {
+  claimStructuralDiagnostic,
   emitStructuralMatchFact,
   findStructuralProof,
   isAllOptionalObjectShape,
@@ -38,7 +40,9 @@ function resolvedSymbol(checker, symbol) {
 }
 
 function declaresInConvexOwnedModule(sym) {
-  for (const declaration of sym?.getDeclarations?.() ?? sym?.declarations ?? []) {
+  for (const declaration of sym?.getDeclarations?.() ??
+    sym?.declarations ??
+    []) {
     const file = declaration.getSourceFile().fileName.replace(/\\/gu, "/");
     if (
       file.includes("/convex/_generated/") ||
@@ -153,6 +157,32 @@ export function ruleNoStructuralTypeFork() {
       if (!candidates.length) {
         return {};
       }
+      const provenance = collectOwnedContractProvenance(
+        program,
+        checker,
+        candidates,
+      );
+      const reported = new Set();
+      function checkProjection(node) {
+        const tsNode = services.esTreeNodeToTSNodeMap.get(node);
+        const proof = provenance.get(tsNode);
+        if (!proof) return;
+        for (let parent = tsNode; parent; parent = parent.parent) {
+          if (reported.has(parent)) return;
+        }
+        if (!claimStructuralDiagnostic(context, tsNode)) return;
+        reported.add(tsNode);
+        emitStructuralMatchFact(
+          context,
+          node,
+          "antidrift/no-structural-type-fork",
+          proof,
+        );
+        context.report({
+          node,
+          message: `Contract copies ${proof.ownerType.label} through a proven owner use — import or derive the projection instead of redeclaring.`,
+        });
+      }
       function check(node) {
         if (isAllOptionalObjectShape(node)) {
           return;
@@ -204,7 +234,11 @@ export function ruleNoStructuralTypeFork() {
           "antidrift/no-structural-type-fork",
           proof,
         );
-        if (proof.diagnostic.emitted) {
+        if (
+          proof.diagnostic.emitted &&
+          claimStructuralDiagnostic(context, tsNode)
+        ) {
+          reported.add(tsNode);
           context.report({
             node,
             message: `Type matches ${proof.ownerType.label} — import or derive from the owner instead of redeclaring.`,
@@ -213,7 +247,12 @@ export function ruleNoStructuralTypeFork() {
       }
       return {
         TSTypeAliasDeclaration: check,
-        TSInterfaceDeclaration: check,
+        TSInterfaceDeclaration(node) {
+          check(node);
+          checkProjection(node);
+        },
+        TSTypeLiteral: checkProjection,
+        TSUnionType: checkProjection,
       };
     },
   };

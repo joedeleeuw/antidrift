@@ -45,7 +45,14 @@ export function proveHomerJson(checkout) {
       const typeErrors = ts.getPreEmitDiagnostics(program);
       if (typeErrors.length) {
         throw new Error(
-          `${phase}: Homer JSON proof has ${typeErrors.length} TypeScript errors.`,
+          `${phase}: Homer JSON proof has ${typeErrors.length} TypeScript errors.\n${ts.formatDiagnostics(
+            typeErrors,
+            {
+              getCanonicalFileName: (file) => file,
+              getCurrentDirectory: () => checkout,
+              getNewLine: () => "\n",
+            },
+          )}`,
         );
       }
       const linter = new Linter({ cwd: checkout });

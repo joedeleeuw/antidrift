@@ -108,17 +108,28 @@ export function resolvesToInstalledType(type) {
 }
 
 function candidateForType(checker, type, label, metadata = {}) {
-  if (!type || !isObjectType(type)) return null;
+  const acceptedObjectUnion =
+    metadata.authorityState === "accepted" &&
+    type?.isUnion() &&
+    type.types.every(isObjectType);
+  if (!isObjectType(type) && !acceptedObjectUnion) return null;
+  // Union fingerprints contain only common properties; retain the checker type
+  // so provenance consumers can inspect the full owner contract and its branches.
   const props = typeProps(checker, type);
   // Discovery proposals stay at MIN_PROPS to keep coincidence noise out;
   // explicitly accepted owners are authoritative at any size, down to one
   // property, so small Convex results and arguments can be enforced.
   const minimum = metadata.authorityState === "accepted" ? 1 : MIN_PROPS;
-  if (props.size < minimum) return null;
+  if (!acceptedObjectUnion && props.size < minimum) return null;
   return {
     label,
+    type,
     props,
-    detailedProps: typePropsDetailed(checker, type),
+    // Common union properties are a projection, not a whole-owner-copy proof.
+    // Leave legacy structural enforcement to objects; unions need provenance.
+    ...(acceptedObjectUnion
+      ? {}
+      : { detailedProps: typePropsDetailed(checker, type) }),
     ...metadata,
   };
 }
@@ -398,10 +409,9 @@ export function resolvesToDomainCanonicalType(type, canonicalEntities = {}) {
 // ─── Implicit Convex generated owners ────────────────────────────────────────
 // Convex codegen emits two owner modules per project: `convex/_generated/dataModel`
 // (Doc<"table"> document types via the DataModel table map) and `convex/_generated/api`
-// (FunctionReturnType<typeof api.*> return types via function-reference leaves). Neither
-// needs registry plumbing: the module paths are fixed by the toolchain, so any program
-// containing them has accepted owner authority available. Convex types carry no Zod-style
-// refinements, so checker-level structural identity is sound here.
+// (FunctionArgs/FunctionReturnType<typeof api.*> via function-reference leaves).
+// Neither needs registry plumbing: the fixed toolchain paths establish accepted
+// owner authority. Retained checker types preserve nested and union contracts.
 
 export const CONVEX_DATA_MODEL_MODULE = "convex/_generated/dataModel";
 export const CONVEX_API_MODULE = "convex/_generated/api";
@@ -473,13 +483,12 @@ function convexDocCandidates(checker, sourceFile) {
 }
 
 const FUNCTION_REFERENCE_RETURN_PROP = "_returnType";
+const FUNCTION_REFERENCE_ARGS_PROP = "_args";
 const API_WALK_MAX_DEPTH = 8;
 
-// The generated `api` object resolves to FilterApi over ApiFromModules: nested namespace
-// objects whose leaves are FunctionReference-shaped (`{ _type, _args, _returnType, ... }`).
-// convex `FunctionReturnType<FuncRef>` is `FuncRef["_returnType"]`, so a leaf's owner type
-// is the `_returnType` property type read directly off the reference.
-function collectFunctionReturnCandidates(
+// The generated `api` resolves to nested namespaces with FunctionReference leaves.
+// FunctionArgs/FunctionReturnType read their `_args`/`_returnType` owner types.
+function collectFunctionReferenceCandidates(
   checker,
   type,
   path,
@@ -495,19 +504,28 @@ function collectFunctionReturnCandidates(
   const returnProp = props.find(
     (prop) => prop.getName() === FUNCTION_REFERENCE_RETURN_PROP,
   );
-  if (returnProp) {
-    const candidate = candidateForType(
-      checker,
-      typeOfSymbol(checker, returnProp),
-      `${CONVEX_API_MODULE}#FunctionReturnType<typeof api.${path}>`,
-      convexOwnerMetadata,
-    );
-    if (candidate) out.push(candidate);
+  const argsProp = props.find(
+    (prop) => prop.getName() === FUNCTION_REFERENCE_ARGS_PROP,
+  );
+  if (returnProp || argsProp) {
+    for (const [prop, helper] of [
+      [returnProp, "FunctionReturnType"],
+      [argsProp, "FunctionArgs"],
+    ]) {
+      if (!prop) continue;
+      const candidate = candidateForType(
+        checker,
+        typeOfSymbol(checker, prop),
+        `${CONVEX_API_MODULE}#${helper}<typeof api.${path}>`,
+        convexOwnerMetadata,
+      );
+      if (candidate) out.push(candidate);
+    }
     return;
   }
   for (const prop of props) {
     if (prop.getName().startsWith("_")) continue;
-    collectFunctionReturnCandidates(
+    collectFunctionReferenceCandidates(
       checker,
       typeOfSymbol(checker, prop),
       path ? `${path}.${prop.getName()}` : prop.getName(),
@@ -522,7 +540,7 @@ function convexApiCandidates(checker, sourceFile) {
   const apiSym = moduleExportSymbol(checker, sourceFile, "api");
   if (!apiSym) return [];
   const candidates = [];
-  collectFunctionReturnCandidates(
+  collectFunctionReferenceCandidates(
     checker,
     typeOfSymbol(checker, apiSym),
     "",

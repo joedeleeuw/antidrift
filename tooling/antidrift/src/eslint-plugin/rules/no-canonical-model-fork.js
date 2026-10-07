@@ -1,3 +1,4 @@
+import { collectOwnedContractProvenance } from "../../semantic-adapters/owned-contract-provenance.mjs";
 import {
   collectDomainCanonicalTypes,
   isObjectType,
@@ -10,6 +11,7 @@ import {
   requireTypeServices,
 } from "./type-services.js";
 import {
+  claimStructuralDiagnostic,
   emitStructuralMatchFact,
   findStructuralProof,
   isAllOptionalObjectShape,
@@ -65,6 +67,32 @@ export function ruleNoCanonicalModelFork() {
       if (!candidates.length) {
         return {};
       }
+      const provenance = collectOwnedContractProvenance(
+        program,
+        checker,
+        candidates,
+      );
+      const reported = new Set();
+      function checkProjection(node) {
+        const tsNode = services.esTreeNodeToTSNodeMap.get(node);
+        const proof = provenance.get(tsNode);
+        if (!proof) return;
+        for (let parent = tsNode; parent; parent = parent.parent) {
+          if (reported.has(parent)) return;
+        }
+        if (!claimStructuralDiagnostic(context, tsNode)) return;
+        reported.add(tsNode);
+        emitStructuralMatchFact(
+          context,
+          node,
+          "antidrift/no-canonical-model-fork",
+          proof,
+        );
+        context.report({
+          node,
+          message: `Contract copies ${proof.ownerType.label} through a proven owner use — import or derive the projection instead of redeclaring.`,
+        });
+      }
       function check(node) {
         if (
           node.type === "TSTypeAliasDeclaration" &&
@@ -108,7 +136,11 @@ export function ruleNoCanonicalModelFork() {
           "antidrift/no-canonical-model-fork",
           proof,
         );
-        if (proof.diagnostic.emitted) {
+        if (
+          proof.diagnostic.emitted &&
+          claimStructuralDiagnostic(context, tsNode)
+        ) {
+          reported.add(tsNode);
           context.report({
             node,
             message: `Type matches ${proof.ownerType.label} — import or derive from the canonical model owner instead of redeclaring.`,
@@ -117,7 +149,12 @@ export function ruleNoCanonicalModelFork() {
       }
       return {
         TSTypeAliasDeclaration: check,
-        TSInterfaceDeclaration: check,
+        TSInterfaceDeclaration(node) {
+          check(node);
+          checkProjection(node);
+        },
+        TSTypeLiteral: checkProjection,
+        TSUnionType: checkProjection,
       };
     },
   };

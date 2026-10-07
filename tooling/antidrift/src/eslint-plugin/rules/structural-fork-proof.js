@@ -125,6 +125,28 @@ export function structuralDiagnosticFor(candidate, messageId, relation) {
     reason: "owner-authority-unaccepted",
   };
 }
+// Both owner rules may be enabled for the same accepted contract. A lint run
+// reports one diagnostic per copied annotation, including ancestor overlaps.
+const reportedContracts = new WeakMap();
+export function claimStructuralDiagnostic(context, node) {
+  const source = context.sourceCode ?? context.getSourceCode();
+  let claimed = reportedContracts.get(source);
+  if (!claimed) {
+    claimed = new Set();
+    reportedContracts.set(source, claimed);
+  }
+  for (const previous of claimed) {
+    for (let ancestor = node; ancestor; ancestor = ancestor.parent) {
+      if (ancestor === previous) return false;
+    }
+    for (let ancestor = previous; ancestor; ancestor = ancestor.parent) {
+      if (ancestor === node) return false;
+    }
+  }
+  claimed.add(node);
+  return true;
+}
+
 const relationRank = {
   "exact-owner-copy": 0,
   "loosened-owner-copy": 1,

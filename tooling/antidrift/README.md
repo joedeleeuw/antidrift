@@ -198,7 +198,7 @@ Public entry points, one package:
 
 ## The rule worth installing this for
 
-`antidrift/no-structural-type-fork` asks the TypeScript type checker, not a list of names, whether the type you just hand-wrote is structurally a copy of a configured generated-source owner. Installed package matches are semantic inventory until a project accepts the package owner as authority. Convex generated owners are implicit: when the program contains `convex/_generated/dataModel` or `convex/_generated/api`, every `Doc<"table">` and every `FunctionReturnType<typeof api.*>` is an accepted owner with no registry entry, and exact hand-written copies report while references, `Pick`/`Omit` projections, and near-miss shapes stay silent.
+`antidrift/no-structural-type-fork` asks the TypeScript type checker, not a list of names, whether the type you just hand-wrote is structurally a copy of a configured generated-source owner. Installed package matches are semantic inventory until a project accepts the package owner as authority. Convex generated owners are implicit: when the program contains `convex/_generated/dataModel` or `convex/_generated/api`, every `Doc<"table">`, `FunctionArgs<typeof api.*>`, and `FunctionReturnType<typeof api.*>` object contract is an accepted owner with no registry entry, and exact hand-written copies report while references, `Pick`/`Omit` projections, and near-miss shapes stay silent.
 
 ```ts
 // A configured generated owner already exports this exact shape.
@@ -212,7 +212,28 @@ type ReleaseRow = {
 };
 ```
 
-Generated-source and first-party domain owners come from policy registries. Convex generated owners need no registry entry: any `convex/_generated/dataModel` or `convex/_generated/api` module in the program supplies accepted `Doc<"table">` and `FunctionReturnType<typeof api.*>` owners, and files under `convex/_generated/` are exempt. Installed packages are scanned only for proposal facts when a semantic fact sink is configured; they do not block by default. Alias an imported type (`type X = UserInfo`) and it stays quiet, because that's a reference and not a fork. All-optional projection DTOs stay quiet because they are usually boundary drafts or patches, not full model redeclarations.
+Generated-source and first-party domain owners come from policy registries. Convex generated owners need no registry entry: any `convex/_generated/dataModel` or `convex/_generated/api` module in the program supplies accepted `Doc<"table">`, `FunctionArgs<typeof api.*>`, and `FunctionReturnType<typeof api.*>` owners, and files under `convex/_generated/` are exempt. Installed packages are scanned only for proposal facts when a semantic fact sink is configured; they do not block by default. Alias an imported type (`type X = UserInfo`) and it stays quiet, because that's a reference and not a fork. All-optional projection DTOs stay quiet because they are usually boundary drafts or patches, not full model redeclarations.
+
+### Proven owner projections, including component props
+
+Both `no-structural-type-fork` and `no-canonical-model-fork` share an owner-provenance adapter. In addition to existing whole-model checks, they inspect anonymous/nested annotations, named aliases, and interfaces at TypeScript contextual uses: props, function arguments, assignments, and returns. A source value must resolve to an accepted owner or its bounded nested object projection; a lookalike shape or matching literal strings alone does not establish ownership. Property names, types, optionality, readonly, and method status must agree. Direct imports, indexed-access projections, `Pick`/`Omit`, and wrappers composed from owner references remain valid. Enabling both rules produces one diagnostic per copied annotation.
+
+Convex argument/return unions consisting entirely of objects are eligible owners, including unions with no common properties. They are not flattened into whole-model structural fingerprints. An exhaustive conditional constructor can certify a finite string discriminant when every strict equality guard and output tag preserves the same source value binding and accepted contextual owner. This certifies only that discriminant, not unrelated payload fields. For example, a local scope translated into generated API arguments and then passed to JSX can establish that a handwritten nested `kind` union repeats the owner.
+
+The analysis stops at eight nested levels and abstains on ambiguous owner projections, unresolved/broad `any`/`unknown`, generic or indexed/callable field types, assertions, optional/nullish source paths, getters, or non-static member paths. Constructor proofs reject remapped/incomplete tags, spreads, computed/duplicate discriminants, writes, aliases, method calls, and opaque escapes of the source binding. Constructor-backed propagation currently supports stable member reads and contextual JSX attributes; opaque ordinary calls are not certified. Direct accepted-owner values still work at non-JSX boundaries. Partial primitive-only DTOs are not newly blocked. These limits are conservative false negatives, not permission to infer ownership from resemblance.
+
+Enable the typed rules using a parser configured with a TypeScript project (the shared typed preset already configures them):
+
+```js
+rules: {
+  "antidrift/no-structural-type-fork": "error", // Convex owners are implicit
+  "antidrift/no-canonical-model-fork": ["error", {
+    canonicalEntities: { Release: { owner: "src/domain/release.ts", exportName: "Release" } },
+  }],
+}
+```
+
+Generated-source and package acceptance continue to use `generatedSources` and `packageTypeOwners` on `no-structural-type-fork`. No new registry or blanket inline-type restriction is introduced. In particular, the JSX exemption in `no-inline-structural-type-at-use-site` is unchanged. A presentation-only consumer can remove domain coupling (for example, receive `showOrigin: boolean`) rather than import a contract it does not need. Real-repository acceptance and coverage limits are recorded in [the component-contract proof](../../docs/rule-investigations/component-contract-forks-proof.md).
 
 The scoped rules that motivated this package go after the usual agent tells:
 

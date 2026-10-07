@@ -18,6 +18,7 @@ export interface StructuralProperty {
 
 export interface StructuralTypeCandidate {
   label: string;
+  type?: ts.Type;
   props: Map<string, string>;
   detailedProps?: Map<string, StructuralProperty>;
   authority: TypeOwnerAuthority;
