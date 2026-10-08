@@ -216,7 +216,8 @@ function containsStaticAssertion(root, bindingName, sourceCode) {
   const stack = [root];
   while (stack.length > 0) {
     const node = stack.pop();
-    const subject = node.type === "CallExpression" ? assertionSubject(node) : null;
+    const subject =
+      node.type === "CallExpression" ? assertionSubject(node) : null;
     const object = subject
       ? indexedPropertyRoot(subject, bindingName, sourceCode)
       : null;

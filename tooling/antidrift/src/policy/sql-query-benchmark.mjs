@@ -46,11 +46,16 @@ const powersyncSafeIdentifierOptions = {
   ],
 };
 const allowedSqlTagNames = new Set(["sql", "sqlQuery", "sqlRun"]);
-const sqlPattern = /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
-const sqlKeywordPattern = /\b(?:SELECT|FROM|INSERT|INTO|UPDATE|DELETE|DROP|TABLE|WHERE|JOIN|ORDER|GROUP|VALUES|SET)\b/iu;
-const sqlSentencePattern = /\b(?:SELECT\b[\s\S]*?\bFROM\b|INSERT\s+INTO\b|UPDATE\b[\s\S]*?\bSET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
-const sqlFragmentKeywordPattern = /\b(?:WHERE|AND|OR|FROM|JOIN|ORDER|GROUP|LIMIT|OFFSET|HAVING|SET|VALUES)\b/iu;
-const sqlGuardTextPattern = /(?:sql|table|column|identifier|order|sort|direction|namespace)/iu;
+const sqlPattern =
+  /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
+const sqlKeywordPattern =
+  /\b(?:SELECT|FROM|INSERT|INTO|UPDATE|DELETE|DROP|TABLE|WHERE|JOIN|ORDER|GROUP|VALUES|SET)\b/iu;
+const sqlSentencePattern =
+  /\b(?:SELECT\b[\s\S]*?\bFROM\b|INSERT\s+INTO\b|UPDATE\b[\s\S]*?\bSET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;
+const sqlFragmentKeywordPattern =
+  /\b(?:WHERE|AND|OR|FROM|JOIN|ORDER|GROUP|LIMIT|OFFSET|HAVING|SET|VALUES)\b/iu;
+const sqlGuardTextPattern =
+  /(?:sql|table|column|identifier|order|sort|direction|namespace)/iu;
 const regexTestMethods = new Set(["test"]);
 const membershipMethods = new Set(["includes", "has"]);
 const quantifierMethods = new Set(["every", "some"]);
@@ -303,12 +308,18 @@ function parsedAst(source, filePath) {
 }
 
 function templateLiteralText(node) {
-  return node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "").join(" ");
+  return node.quasis
+    .map((quasi) => quasi.value.cooked ?? quasi.value.raw ?? "")
+    .join(" ");
 }
 
 function staticSqlText(node) {
-  if (node?.type === "Literal" && typeof node.value === "string") return node.value;
-  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) return templateLiteralText(node);
+  if (node?.type === "Literal" && typeof node.value === "string") {
+    return node.value;
+  }
+  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) {
+    return templateLiteralText(node);
+  }
   return null;
 }
 
@@ -322,7 +333,9 @@ function hasSqlContext(source) {
 }
 
 function sourceText(source, node) {
-  return Array.isArray(node?.range) ? source.slice(node.range[0], node.range[1]) : "";
+  return Array.isArray(node?.range)
+    ? source.slice(node.range[0], node.range[1])
+    : "";
 }
 
 function sqlGuardDetail(source, node) {
@@ -338,16 +351,28 @@ function tagName(node) {
   if (node?.type === "Identifier") return node.name;
   if (node?.type === "ChainExpression") return tagName(node.expression);
   if (node?.type !== "MemberExpression") return null;
-  if (!node.computed && node.property?.type === "Identifier") return node.property.name;
-  if (node.computed && node.property?.type === "Literal" && typeof node.property.value === "string") return node.property.value;
+  if (!node.computed && node.property?.type === "Identifier") {
+    return node.property.name;
+  }
+  if (
+    node.computed &&
+    node.property?.type === "Literal" &&
+    typeof node.property.value === "string"
+  ) {
+    return node.property.value;
+  }
   return null;
 }
 
 function callMemberName(node) {
   const callee = node?.callee;
   if (callee?.type !== "MemberExpression") return null;
-  if (!callee.computed && callee.property?.type === "Identifier") return callee.property.name;
-  if (callee.computed && callee.property?.type === "Literal") return String(callee.property.value);
+  if (!callee.computed && callee.property?.type === "Identifier") {
+    return callee.property.name;
+  }
+  if (callee.computed && callee.property?.type === "Literal") {
+    return String(callee.property.value);
+  }
   return null;
 }
 
@@ -357,16 +382,25 @@ function isCallNamed(node, names) {
 
 function statementExits(node) {
   if (!node) return false;
-  if (node.type === "ThrowStatement" || node.type === "ReturnStatement") return true;
+  if (node.type === "ThrowStatement" || node.type === "ReturnStatement") {
+    return true;
+  }
   if (node.type === "BlockStatement") return statementExits(node.body.at(-1));
-  if (node.type === "IfStatement") return statementExits(node.consequent) && statementExits(node.alternate);
+  if (node.type === "IfStatement") {
+    return statementExits(node.consequent) && statementExits(node.alternate);
+  }
   return false;
 }
 
 function negativeRegexExitGuard(node) {
   const test = node.test;
-  const call = test?.type === "UnaryExpression" && test.operator === "!" ? test.argument : null;
-  return Boolean(isCallNamed(call, regexTestMethods) && statementExits(node.consequent));
+  const call =
+    test?.type === "UnaryExpression" && test.operator === "!"
+      ? test.argument
+      : null;
+  return Boolean(
+    isCallNamed(call, regexTestMethods) && statementExits(node.consequent),
+  );
 }
 
 function arrayJoinedText(node) {
@@ -385,9 +419,13 @@ function arrayJoinedText(node) {
 function collectSqlBuilderVariables(ast) {
   const variables = new Set();
   walkAst(ast, (node) => {
-    if (node.type !== "VariableDeclarator" || node.id?.type !== "Identifier") return;
+    if (node.type !== "VariableDeclarator" || node.id?.type !== "Identifier") {
+      return;
+    }
     const value = staticSqlText(node.init);
-    if (value !== null && sqlSentencePattern.test(value)) variables.add(node.id.name);
+    if (value !== null && sqlSentencePattern.test(value)) {
+      variables.add(node.id.name);
+    }
   });
   return variables;
 }
@@ -397,52 +435,149 @@ function isSqlBuilderVariable(node, sqlBuilderVariables) {
 }
 
 function recordSqlTag({ repo, repoRoot, filePath, inventory, node }) {
-  if (node.type !== "TaggedTemplateExpression" || node.quasi?.type !== "TemplateLiteral") return;
+  if (
+    node.type !== "TaggedTemplateExpression" ||
+    node.quasi?.type !== "TemplateLiteral"
+  ) {
+    return;
+  }
   const name = tagName(node.tag);
   if (!name || !sqlKeywordPattern.test(templateLiteralText(node.quasi))) return;
   const allowed = allowedSqlTagNames.has(name);
   inventory.sqlTags.total += 1;
   if (allowed) inventory.sqlTags.allowed += 1;
   else inventory.sqlTags.unclassified += 1;
-  pushExample(inventory.sqlTags.examples, baseExample(repo, repoRoot, filePath, node, allowed ? "allowed-sql-tag" : "unclassified-sql-tag", name));
+  pushExample(
+    inventory.sqlTags.examples,
+    baseExample(
+      repo,
+      repoRoot,
+      filePath,
+      node,
+      allowed ? "allowed-sql-tag" : "unclassified-sql-tag",
+      name,
+    ),
+  );
 }
 
-function recordSqlGuard({ repo, repoRoot, filePath, inventory, node, source, sqlContext }) {
-  if (!sqlContext || node.type !== "IfStatement" || !hasSqlGuardText(source, node)) return;
+function recordSqlGuard({
+  repo,
+  repoRoot,
+  filePath,
+  inventory,
+  node,
+  source,
+  sqlContext,
+}) {
+  if (
+    !sqlContext ||
+    node.type !== "IfStatement" ||
+    !hasSqlGuardText(source, node)
+  ) {
+    return;
+  }
   const detail = sqlGuardDetail(source, node);
   if (negativeRegexExitGuard(node)) {
     inventory.guardShapes.negativeRegexExit += 1;
-    pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "negative-regex-exit", detail));
+    pushExample(
+      inventory.guardShapes.examples,
+      baseExample(
+        repo,
+        repoRoot,
+        filePath,
+        node,
+        "negative-regex-exit",
+        detail,
+      ),
+    );
   } else if (isCallNamed(node.test, regexTestMethods)) {
     inventory.guardShapes.positiveRegexBranch += 1;
-    pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "positive-regex-branch", detail));
+    pushExample(
+      inventory.guardShapes.examples,
+      baseExample(
+        repo,
+        repoRoot,
+        filePath,
+        node,
+        "positive-regex-branch",
+        detail,
+      ),
+    );
   } else if (isCallNamed(node.test, membershipMethods)) {
     inventory.guardShapes.membershipBranch += 1;
-    pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "membership-branch", detail));
+    pushExample(
+      inventory.guardShapes.examples,
+      baseExample(repo, repoRoot, filePath, node, "membership-branch", detail),
+    );
   } else if (isCallNamed(node.test, quantifierMethods)) {
     inventory.guardShapes.quantifierBranch += 1;
-    pushExample(inventory.guardShapes.examples, baseExample(repo, repoRoot, filePath, node, "quantifier-branch", detail));
+    pushExample(
+      inventory.guardShapes.examples,
+      baseExample(repo, repoRoot, filePath, node, "quantifier-branch", detail),
+    );
   }
 }
 
-function recordSqlBuilderAppend({ repo, repoRoot, filePath, inventory, node, sqlBuilderVariables, source }) {
-  if (node.type !== "AssignmentExpression" || node.operator !== "+=" || !isSqlBuilderVariable(node.left, sqlBuilderVariables)) return;
+function recordSqlBuilderAppend({
+  repo,
+  repoRoot,
+  filePath,
+  inventory,
+  node,
+  sqlBuilderVariables,
+  source,
+}) {
+  if (
+    node.type !== "AssignmentExpression" ||
+    node.operator !== "+=" ||
+    !isSqlBuilderVariable(node.left, sqlBuilderVariables)
+  ) {
+    return;
+  }
   const rightText = staticSqlText(node.right);
   const detail = sourceText(source, node.right).replace(/\s+/gu, " ").trim();
   if (rightText !== null && sqlFragmentKeywordPattern.test(rightText)) {
     inventory.concatRiskShapes.plusEqualsStaticSqlBuilder += 1;
-    pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "plus-equals-static-sql-builder", detail), 80);
+    pushExample(
+      inventory.concatRiskShapes.examples,
+      baseExample(
+        repo,
+        repoRoot,
+        filePath,
+        node,
+        "plus-equals-static-sql-builder",
+        detail,
+      ),
+      80,
+    );
   } else if (rightText === null) {
     inventory.concatRiskShapes.plusEqualsDynamicSqlBuilder += 1;
-    pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "plus-equals-dynamic-sql-builder", detail), 80);
+    pushExample(
+      inventory.concatRiskShapes.examples,
+      baseExample(
+        repo,
+        repoRoot,
+        filePath,
+        node,
+        "plus-equals-dynamic-sql-builder",
+        detail,
+      ),
+      80,
+    );
   }
 }
 
 function recordConcatCall({ repo, repoRoot, filePath, inventory, node }) {
-  if (node.type !== "CallExpression" || callMemberName(node) !== "concat") return;
+  if (node.type !== "CallExpression" || callMemberName(node) !== "concat") {
+    return;
+  }
   if (![node.callee.object, ...node.arguments].some(containsSqlKeyword)) return;
   inventory.concatRiskShapes.concatCallSql += 1;
-  pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "concat-call-sql"), 80);
+  pushExample(
+    inventory.concatRiskShapes.examples,
+    baseExample(repo, repoRoot, filePath, node, "concat-call-sql"),
+    80,
+  );
 }
 
 function recordArrayJoin({ repo, repoRoot, filePath, inventory, node }) {
@@ -450,15 +585,35 @@ function recordArrayJoin({ repo, repoRoot, filePath, inventory, node }) {
   const joined = arrayJoinedText(node);
   if (!joined || !sqlSentencePattern.test(joined)) return;
   inventory.concatRiskShapes.arrayJoinSql += 1;
-  pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "array-join-sql"), 80);
+  pushExample(
+    inventory.concatRiskShapes.examples,
+    baseExample(repo, repoRoot, filePath, node, "array-join-sql"),
+    80,
+  );
 }
 
-function recordTemplateOutsideMainPattern({ repo, repoRoot, filePath, inventory, node }) {
+function recordTemplateOutsideMainPattern({
+  repo,
+  repoRoot,
+  filePath,
+  inventory,
+  node,
+}) {
   if (node.type !== "TemplateLiteral" || node.expressions.length === 0) return;
   const text = templateLiteralText(node);
   if (sqlPattern.test(text) || !sqlSentencePattern.test(text)) return;
   inventory.concatRiskShapes.keywordTemplateOutsideMainPattern += 1;
-  pushExample(inventory.concatRiskShapes.examples, baseExample(repo, repoRoot, filePath, node, "keyword-template-outside-main-pattern"), 80);
+  pushExample(
+    inventory.concatRiskShapes.examples,
+    baseExample(
+      repo,
+      repoRoot,
+      filePath,
+      node,
+      "keyword-template-outside-main-pattern",
+    ),
+    80,
+  );
 }
 
 function classifySqlInventoryForFile({ repo, repoRoot, filePath }) {
@@ -512,14 +667,23 @@ function mergeInventory(left, right) {
   out.guardShapes.positiveRegexBranch += right.guardShapes.positiveRegexBranch;
   out.guardShapes.membershipBranch += right.guardShapes.membershipBranch;
   out.guardShapes.quantifierBranch += right.guardShapes.quantifierBranch;
-  out.concatRiskShapes.plusEqualsStaticSqlBuilder += right.concatRiskShapes.plusEqualsStaticSqlBuilder;
-  out.concatRiskShapes.plusEqualsDynamicSqlBuilder += right.concatRiskShapes.plusEqualsDynamicSqlBuilder;
+  out.concatRiskShapes.plusEqualsStaticSqlBuilder +=
+    right.concatRiskShapes.plusEqualsStaticSqlBuilder;
+  out.concatRiskShapes.plusEqualsDynamicSqlBuilder +=
+    right.concatRiskShapes.plusEqualsDynamicSqlBuilder;
   out.concatRiskShapes.concatCallSql += right.concatRiskShapes.concatCallSql;
   out.concatRiskShapes.arrayJoinSql += right.concatRiskShapes.arrayJoinSql;
-  out.concatRiskShapes.keywordTemplateOutsideMainPattern += right.concatRiskShapes.keywordTemplateOutsideMainPattern;
-  for (const example of right.sqlTags.examples) pushExample(out.sqlTags.examples, example);
-  for (const example of right.guardShapes.examples) pushExample(out.guardShapes.examples, example);
-  for (const example of right.concatRiskShapes.examples) pushExample(out.concatRiskShapes.examples, example, 80);
+  out.concatRiskShapes.keywordTemplateOutsideMainPattern +=
+    right.concatRiskShapes.keywordTemplateOutsideMainPattern;
+  for (const example of right.sqlTags.examples) {
+    pushExample(out.sqlTags.examples, example);
+  }
+  for (const example of right.guardShapes.examples) {
+    pushExample(out.guardShapes.examples, example);
+  }
+  for (const example of right.concatRiskShapes.examples) {
+    pushExample(out.concatRiskShapes.examples, example, 80);
+  }
   for (const error of right.parseErrors) pushExample(out.parseErrors, error);
   return out;
 }
@@ -528,7 +692,14 @@ function inventoryForResults(repo, repoRoot, results) {
   let inventory = emptyInventory();
   for (const result of results) {
     try {
-      inventory = mergeInventory(inventory, classifySqlInventoryForFile({ repo, repoRoot, filePath: result.filePath }));
+      inventory = mergeInventory(
+        inventory,
+        classifySqlInventoryForFile({
+          repo,
+          repoRoot,
+          filePath: result.filePath,
+        }),
+      );
     } catch (error) {
       pushExample(inventory.parseErrors, {
         repo,
@@ -563,18 +734,26 @@ async function lintPlan(plan, repoRoot) {
 
 function findingLocationSet(findings, ruleId) {
   return new Set(
-    findings
-      .filter((finding) => finding.ruleId === ruleId)
-      .map(locationKey),
+    findings.filter((finding) => finding.ruleId === ruleId).map(locationKey),
   );
 }
 
 function nonTypeAwareComparison(typeAwareFindings, nonTypeAwareFindings) {
-  const typeAwareLocations = findingLocationSet(typeAwareFindings, customRuleId);
-  const nonTypeAwareLocations = findingLocationSet(nonTypeAwareFindings, customRuleId);
+  const typeAwareLocations = findingLocationSet(
+    typeAwareFindings,
+    customRuleId,
+  );
+  const nonTypeAwareLocations = findingLocationSet(
+    nonTypeAwareFindings,
+    customRuleId,
+  );
   return {
-    extraWithoutTypeServices: [...nonTypeAwareLocations].filter((location) => !typeAwareLocations.has(location)).sort((a, b) => a.localeCompare(b)),
-    missingWithoutTypeServices: [...typeAwareLocations].filter((location) => !nonTypeAwareLocations.has(location)).sort((a, b) => a.localeCompare(b)),
+    extraWithoutTypeServices: [...nonTypeAwareLocations]
+      .filter((location) => !typeAwareLocations.has(location))
+      .sort((a, b) => a.localeCompare(b)),
+    missingWithoutTypeServices: [...typeAwareLocations]
+      .filter((location) => !nonTypeAwareLocations.has(location))
+      .sort((a, b) => a.localeCompare(b)),
   };
 }
 
@@ -582,8 +761,7 @@ function classifySqlParserServiceDelta(probe) {
   if (!probe) return "not-applicable";
   if ((probe.parserErrors ?? 0) > 0) return "parser-error";
   const comparison = probe.comparisonWithTypeAware ?? {};
-  const extraWithoutTypeServices =
-    comparison.extraWithoutTypeServices ?? [];
+  const extraWithoutTypeServices = comparison.extraWithoutTypeServices ?? [];
   const missingWithoutTypeServices =
     comparison.missingWithoutTypeServices ?? [];
   if (
@@ -715,7 +893,8 @@ function summarize(results, slice) {
   );
   const findings = results.flatMap((result) => result.findings ?? []);
   const coverageInventory = results.reduce(
-    (inventory, result) => mergeInventory(inventory, result.coverageInventory ?? emptyInventory()),
+    (inventory, result) =>
+      mergeInventory(inventory, result.coverageInventory ?? emptyInventory()),
     emptyInventory(),
   );
   return {

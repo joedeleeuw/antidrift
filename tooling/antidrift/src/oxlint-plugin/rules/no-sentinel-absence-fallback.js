@@ -35,7 +35,8 @@ function sentinelValue(node) {
     expression.quasis.length === 1
   ) {
     const cooked = expression.quasis[0].value.cooked;
-    return typeof cooked === "string" && sentinelValues.has(cooked.toLowerCase())
+    return typeof cooked === "string" &&
+      sentinelValues.has(cooked.toLowerCase())
       ? cooked
       : "";
   }

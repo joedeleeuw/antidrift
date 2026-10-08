@@ -82,7 +82,11 @@ export function loadRuleStatusRegistrySync(policyDir = "policy") {
 export function ruleStatusEntriesFromRegistry(registry = {}) {
   return Object.freeze([
     ...sortedEntries(registry.rules).map(([id, entry]) =>
-      statusEntry(id, entry?.status === "retired" ? "retired" : "active", entry),
+      statusEntry(
+        id,
+        entry?.status === "retired" ? "retired" : "active",
+        entry,
+      ),
     ),
     ...sortedEntries(registry.retiredRules).map(([id, entry]) =>
       statusEntry(id, "retired", entry),

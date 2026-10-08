@@ -153,7 +153,8 @@ function diagnosticsFor(repoRoot, results) {
   return results.flatMap((result) =>
     result.messages
       .filter(
-        (message) => message.ruleId === "antidrift/no-handrolled-resource-lifecycle-cells",
+        (message) =>
+          message.ruleId === "antidrift/no-handrolled-resource-lifecycle-cells",
       )
       .map((message) => ({
         path: relative(repoRoot, result.filePath).replace(/\\/gu, "/"),
@@ -234,7 +235,10 @@ export async function reactStateInventory({
           },
         },
         rules: {
-          "antidrift/no-handrolled-resource-lifecycle-cells": ["error", { threshold }],
+          "antidrift/no-handrolled-resource-lifecycle-cells": [
+            "error",
+            { threshold },
+          ],
         },
       },
     ],
@@ -242,7 +246,10 @@ export async function reactStateInventory({
 
   const results = await eslint.lintFiles(targets);
   const entries = facts
-    .filter((fact) => fact.ruleId === "antidrift/no-handrolled-resource-lifecycle-cells")
+    .filter(
+      (fact) =>
+        fact.ruleId === "antidrift/no-handrolled-resource-lifecycle-cells",
+    )
     .map(factEntry)
     .sort((left, right) =>
       `${left.path}:${left.line}:${left.factKind}`.localeCompare(

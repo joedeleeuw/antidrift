@@ -1040,7 +1040,7 @@ ruleTester.run(
       fixture("programs/correct/stale-while-revalidate.ts"),
       // Append via updater fn is incremental pagination, not a fresh resource load.
       fixture("programs/correct/pagination-next-page.ts"),
-      // Full lifecycle shape, but request-identity guarded by AbortController.
+      // Full lifecycle structure, but request-identity guarded by AbortController.
       fixture("programs/correct/abort-guarded-fetch.ts"),
       // Owned resource hook: no local useState cells to couple.
       fixture("programs/correct/owned-resource-hook.ts"),

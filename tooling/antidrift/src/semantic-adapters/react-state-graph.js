@@ -186,8 +186,8 @@ function statementExits(node) {
   if (node.type === "IfStatement") {
     return Boolean(
       node.alternate &&
-        statementExits(node.consequent) &&
-        statementExits(node.alternate),
+      statementExits(node.consequent) &&
+      statementExits(node.alternate),
     );
   }
   return false;
@@ -227,7 +227,11 @@ function hasAbortStatusGuardFor(frame, node) {
   });
 }
 
-export function createReactStateTracker({ context, onFrameExit, sourceCode } = {}) {
+export function createReactStateTracker({
+  context,
+  onFrameExit,
+  sourceCode,
+} = {}) {
   const eslintSourceCode =
     sourceCode ?? context?.sourceCode ?? context?.getSourceCode?.();
   if (!eslintSourceCode) {
@@ -383,11 +387,13 @@ export function createReactStateTracker({ context, onFrameExit, sourceCode } = {
     frame.ownerSetters = parent
       ? new Set([...frame.setters, ...parent.setters])
       : frame.setters;
-    const proof = frame.isTransition ? lifecycleProof(frame) : { proven: false };
+    const proof = frame.isTransition
+      ? lifecycleProof(frame)
+      : { proven: false };
     frame.requestGuard = Boolean(
       proof.proven &&
-        proof.payloadCell &&
-        frame.abortGuardedSetters.has(proof.payloadCell),
+      proof.payloadCell &&
+      frame.abortGuardedSetters.has(proof.payloadCell),
     );
     frame.sourceMemberTransitions.push(...sourceMemberTransitions(frame));
     if (parent) {

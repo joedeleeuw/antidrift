@@ -32,7 +32,11 @@ function requireOption(options, key) {
 
 function boundedNumber(options, key, predicate, description) {
   const value = requireOption(options, key);
-  if (typeof value !== "number" || !Number.isFinite(value) || !predicate(value)) {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    !predicate(value)
+  ) {
     invalidOptions(`'${key}' must be ${description}.`);
   }
   return value;
@@ -99,7 +103,9 @@ function typeFields(shape, sourceCode) {
   const fields = [];
   const members = shape.type === "TSTypeLiteral" ? shape.members : shape.body;
   for (const member of members) {
-    if (member.type !== "TSPropertySignature" || !member.typeAnnotation) continue;
+    if (member.type !== "TSPropertySignature" || !member.typeAnnotation) {
+      continue;
+    }
     const name = staticPropertyName(member);
     if (!name) continue;
     fields.push({
@@ -170,8 +176,9 @@ function isStrictSubsetOf(candidate, reported) {
 }
 
 function reportedCandidates(groups, options) {
-  const candidates = groups
-    .filter((candidate) => qualifies(candidate, options));
+  const candidates = groups.filter((candidate) =>
+    qualifies(candidate, options),
+  );
   return candidates
     .filter(
       (candidate) =>

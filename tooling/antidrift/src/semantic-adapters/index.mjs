@@ -56,13 +56,17 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     exportName: "authBoundary",
     subpath: "@joedeleeuw/antidrift/semantic-adapters/auth-boundary",
     rules: Object.freeze(["antidrift/require-authz-check"]),
-    proofBuckets: Object.freeze(["local-ast-source-shape", "graph-config-source"]),
+    proofBuckets: Object.freeze([
+      "local-ast-source-shape",
+      "graph-config-source",
+    ]),
     semanticFactAdapterIds: Object.freeze([]),
     semanticFactKinds: Object.freeze([]),
     associations: Object.freeze([
       "route params to nearby caller-configured authorization-call inventory",
     ]),
-    carrier: "handler-local request-param shape plus explicit authz function config",
+    carrier:
+      "handler-local request-param shape plus explicit authz function config",
   }),
   broadInput: Object.freeze({
     id: "broad-input",

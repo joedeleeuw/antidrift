@@ -25,9 +25,7 @@ const blockingDisallowedStatuses = new Set([
   "under-proven",
 ]);
 
-export function eslintCorpusRuleIds({
-  eslintRules = eslintPlugin.rules,
-} = {}) {
+export function eslintCorpusRuleIds({ eslintRules = eslintPlugin.rules } = {}) {
   return Object.keys(eslintRules ?? {})
     .filter((name) => !Object.hasOwn(oxlintPlugin.rules, name))
     .map((name) => `antidrift/${name}`)

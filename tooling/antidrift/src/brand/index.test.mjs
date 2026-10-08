@@ -11,7 +11,10 @@ const repoRoot = resolve(__dirname, "../../../..");
 
 describe("brand", () => {
   it("creates a validation boundary for branded values", () => {
-    const UserId = brand("UserId", (value) => typeof value === "string" && value.startsWith("user_"));
+    const UserId = brand(
+      "UserId",
+      (value) => typeof value === "string" && value.startsWith("user_"),
+    );
 
     expect(UserId.make("user_123")).toBe("user_123");
     expect(UserId.is("user_123")).toBe(true);
@@ -23,7 +26,15 @@ describe("brand", () => {
     expect(() => {
       execFileSync(
         "pnpm",
-        ["exec", "tsc", "-p", "tooling/antidrift/src/brand/fixtures/tsconfig.json", "--noEmit", "--pretty", "false"],
+        [
+          "exec",
+          "tsc",
+          "-p",
+          "tooling/antidrift/src/brand/fixtures/tsconfig.json",
+          "--noEmit",
+          "--pretty",
+          "false",
+        ],
         { cwd: repoRoot, stdio: "pipe" },
       );
     }).not.toThrow();

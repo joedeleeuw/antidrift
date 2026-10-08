@@ -356,7 +356,9 @@ export async function defensiveShapeInventory({
   await selectedPlans(repo, plans).reduce(
     (previous, plan) =>
       previous.then(async () => {
-        progress(`[defensive-shape-inventory] scanning ${plan.repo}/${plan.label}`);
+        progress(
+          `[defensive-shape-inventory] scanning ${plan.repo}/${plan.label}`,
+        );
         const result = await runPlan(plan);
         progress(
           `[defensive-shape-inventory] ${plan.repo}/${plan.label}: ${result.checkedFiles ?? 0} files, ${result.syntaxCandidateFiles ?? 0} syntax candidates, ${result.findingsByRule?.[customRuleId] ?? 0} custom findings, ${result.parserErrors ?? 0} parser errors`,

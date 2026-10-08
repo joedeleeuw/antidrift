@@ -148,7 +148,9 @@ export function isReturnedExpression(node) {
   let parent = current?.parent;
   while (parent) {
     if (parent.type === "ReturnStatement") return parent.argument === current;
-    if (parent.type === "ArrowFunctionExpression") return parent.body === current;
+    if (parent.type === "ArrowFunctionExpression") {
+      return parent.body === current;
+    }
     if (!transparentReturnExpression(parent, current)) return false;
     current = parent;
     parent = current.parent;
@@ -175,7 +177,10 @@ function returnedCollectionVariables(sourceCode, expression) {
     ];
   }
   if (expression.type === "SequenceExpression") {
-    return returnedCollectionVariables(sourceCode, expression.expressions?.at(-1));
+    return returnedCollectionVariables(
+      sourceCode,
+      expression.expressions?.at(-1),
+    );
   }
   if (
     expression.type === "ChainExpression" ||

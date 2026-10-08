@@ -41,10 +41,7 @@ function staticString(node) {
 }
 
 function classTokens(value) {
-  return value
-    .trim()
-    .split(/\s+/u)
-    .filter(Boolean);
+  return value.trim().split(/\s+/u).filter(Boolean);
 }
 
 function uniqueTokens(tokens) {
@@ -111,7 +108,11 @@ function uniqueStringList(options, key) {
 
 function boundedNumber(options, key, predicate, description) {
   const value = requireOption(options, key);
-  if (typeof value !== "number" || !Number.isFinite(value) || !predicate(value)) {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    !predicate(value)
+  ) {
     invalidOptions(`'${key}' must be ${description}.`);
   }
   return value;
@@ -171,7 +172,8 @@ function isClassHelperArgument(node, options) {
   const parent = node.parent;
   if (parent?.type !== "CallExpression") return false;
   return (
-    parent.arguments.includes(node) && options.helperNames.has(calleeName(parent.callee))
+    parent.arguments.includes(node) &&
+    options.helperNames.has(calleeName(parent.callee))
   );
 }
 
@@ -189,11 +191,13 @@ function overlapEvidence(leftValue, rightValue, options) {
 
   const rightSet = new Set(rightTokens);
   const shared = leftTokens.filter((token) => rightSet.has(token));
-  const uniqueCount = Math.max(leftTokens.length, rightTokens.length) - shared.length;
+  const uniqueCount =
+    Math.max(leftTokens.length, rightTokens.length) - shared.length;
   if (uniqueCount === 0) return null;
   if (shared.length < options.minSharedTokens) return null;
 
-  const sharedRatio = shared.length / Math.min(leftTokens.length, rightTokens.length);
+  const sharedRatio =
+    shared.length / Math.min(leftTokens.length, rightTokens.length);
   if (sharedRatio < options.minSharedRatio) return null;
 
   return {
