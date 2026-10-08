@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.15.0
+
+- **Breaking:** extract reusable generic enforcement into the independent `@joedeleeuw/typescript-tooling` package. Antidrift's ESLint factory now owns only its custom TypeChecker rules; its Oxlint governance factory owns custom drift rules, registry-aware restricted imports, generated ignores, and gateway exemptions. Compose tooling's `/eslint` and `/oxlint` entrypoints explicitly to retain SQL safety, enum/React 19 restrictions, lint-directive checks, the 1500-line cap, and the conditional native TypeScript baseline.
+- Remove `antidriftComplexityRules`, the prefixed TypeScript maps, `typescriptBaselineTier`, and `@joedeleeuw/antidrift/adoption-config` without aliases. Use tooling's `complexityRules`, `typescriptSyntaxRules`, `typescriptTypeAwareRules`, `typescriptBaselineTier`, `adoptionPresets`, and `createAdoptionOxlintConfig` from `/oxlint`. The repository configs and packed-consumer evidence now use both actual package owners.
+
 - Fix [#39](https://github.com/joedeleeuw/antidrift/issues/39): share accepted-owner provenance between `no-structural-type-fork` and `no-canonical-model-fork` to detect handwritten anonymous/nested, named-alias, and interface projections at contextual uses, including component props, without removing the syntax rule's JSX exemption. Discover Convex `FunctionArgs` alongside return/document owners, retain pure-object unions without flattening them, and certify identity-preserving exhaustive constructor discriminants only for stable value bindings. Keep independent lookalikes, widened/uncertain contracts, and imported/derived owner references quiet; suppress overlapping diagnostics. Extend the existing real Homer archive reproduction with the original copied-scope and repaired boolean-prop revisions. See the README and real-artifact proof for conservative limits and removed fixture-suite coverage gaps.
 
 ## 0.14.0

@@ -8,6 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -65,7 +66,7 @@ try {
   if (!tgz) fail("pack produced no tarball");
   const tarball = join(work, tgz);
   const packedFiles = new Set(
-    run("tar", ["-tzf", tarball], work).trim().split("\n"),
+    run("tar", ["-tzf", tarball], work).trim().split("\n")
   );
   const shippedTestSupport = [
     "package/src/eslint-plugin/test-harness.mjs",
@@ -75,12 +76,33 @@ try {
   ].filter((path) => packedFiles.has(path));
   if (shippedTestSupport.length > 0) {
     fail(
-      `tarball must not ship test support: ${shippedTestSupport.join(", ")}`,
+      `tarball must not ship test support: ${shippedTestSupport.join(", ")}`
     );
   }
 
   console.log("2/7  scaffolding a consumer pnpm workspace ...");
-  scaffoldConsumerWorkspace({ file, tarball });
+  let toolingTarball = process.env.TYPESCRIPT_TOOLING_TARBALL;
+  if (toolingTarball) {
+    toolingTarball = resolve(toolingTarball);
+    run("tar", ["-tzf", toolingTarball], work);
+  } else {
+    const toolingRoot = dirname(
+      createRequire(import.meta.url).resolve(
+        "@joedeleeuw/typescript-tooling/package.json"
+      )
+    );
+    const toolingPack = join(work, "tooling-pack");
+    mkdirSync(toolingPack);
+    run(pnpmBinary, ["pack", "--pack-destination", toolingPack], toolingRoot);
+    const packed = readdirSync(toolingPack).filter((name) =>
+      name.endsWith(".tgz")
+    );
+    if (packed.length !== 1) {
+      fail("tooling pack must produce exactly one tarball");
+    }
+    toolingTarball = join(toolingPack, packed[0]);
+  }
+  scaffoldConsumerWorkspace({ file, tarball, toolingTarball });
 
   console.log("3/7  installing the tarball into the consumer ...");
   runInherit(
@@ -93,11 +115,11 @@ try {
       "--config.confirmModulesPurge=false",
       "--ignore-scripts",
     ],
-    work,
+    work
   );
 
   console.log(
-    "4/7  linting consumer files through shipped and opt-in configs ...",
+    "4/7  linting consumer files through shipped and opt-in configs ..."
   );
   const semanticFactFile = join(work, "semantic-facts.jsonl");
   rmSync(semanticFactFile, { force: true });
@@ -107,7 +129,7 @@ try {
       return runJson(
         pnpmBinary,
         ["exec", "eslint", relFile, "--format", "json"],
-        work,
+        work
       );
     } catch (error) {
       if (
@@ -137,7 +159,7 @@ try {
           "--tsconfig",
           "tsconfig.bundler.json",
         ],
-        work,
+        work
       );
     } catch (error) {
       if (
@@ -166,7 +188,7 @@ try {
           "--config",
           "oxlint.config.mjs",
         ],
-        work,
+        work
       );
     } catch (error) {
       if (
@@ -197,11 +219,11 @@ try {
 
   file(
     "wrapping-default-proof.ts",
-    "declare const owner: { load(id: string): string };\nexport function loadItem(id: string) { return owner.load(id); }\nexport const readItem = (id: string) => owner.load(id);\nexport const area = (radius: number) => Math.PI * radius ** 2;\n",
+    "declare const owner: { load(id: string): string };\nexport function loadItem(id: string) { return owner.load(id); }\nexport const readItem = (id: string) => owner.load(id);\nexport const area = (radius: number) => Math.PI * radius ** 2;\n"
   );
   const repositoryDiagnostics = lintOxlintRepository().diagnostics ?? [];
   const moduleSizeDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) => code === "eslint(max-lines)",
+    ({ code }) => code === "eslint(max-lines)"
   );
   const oversizedFiles = moduleSizeDiagnostics
     .map(({ filename }) => filename)
@@ -221,96 +243,96 @@ try {
     JSON.stringify(oversizedFiles) !== JSON.stringify(expectedOversizedFiles)
   ) {
     fail(
-      `default packed Oxlint config should report max-lines for ordinary code even when generated-looking names are undeclared, got: ${JSON.stringify(moduleSizeDiagnostics)}`,
+      `default packed Oxlint config should report max-lines for ordinary code even when generated-looking names are undeclared, got: ${JSON.stringify(moduleSizeDiagnostics)}`
     );
   }
   const sharedRuleDiagnostics = repositoryDiagnostics.filter(
     ({ code }) =>
       code !== "eslint(max-lines)" &&
-      code !== "antidrift(no-wrapping-functions)",
+      code !== "antidrift(no-wrapping-functions)"
   );
   if (sharedRuleDiagnostics.length > 0) {
     fail(
-      `default packed Oxlint config should leave experimental imported rules disabled, got: ${JSON.stringify(sharedRuleDiagnostics)}`,
+      `default packed Oxlint config should leave experimental imported rules disabled, got: ${JSON.stringify(sharedRuleDiagnostics)}`
     );
   }
 
   const boundaryWrappers = repositoryDiagnostics.filter(
     ({ code, filename }) =>
       code === "antidrift(no-wrapping-functions)" &&
-      filename !== "wrapping-default-proof.ts",
+      filename !== "wrapping-default-proof.ts"
   );
   if (
     boundaryWrappers.length !== 4 ||
     boundaryWrappers.some(
       ({ filename, severity }) =>
         filename !== "packages/app/src/legitimate-boundaries.ts" ||
-        severity !== "error",
+        severity !== "error"
     )
   ) {
     fail(
-      `The named boundary examples must still receive default wrapper errors: ${JSON.stringify(boundaryWrappers)}`,
+      `The named boundary examples must still receive default wrapper errors: ${JSON.stringify(boundaryWrappers)}`
     );
   }
 
   const wrappingDiagnostics = repositoryDiagnostics.filter(
-    ({ filename }) => filename === "wrapping-default-proof.ts",
+    ({ filename }) => filename === "wrapping-default-proof.ts"
   );
   if (
     wrappingDiagnostics.length !== 2 ||
     wrappingDiagnostics.some(
       ({ code, severity }) =>
-        code !== "antidrift(no-wrapping-functions)" || severity !== "error",
+        code !== "antidrift(no-wrapping-functions)" || severity !== "error"
     )
   ) {
     fail(
-      `Default packed policy must reject named function and arrow wrappers: ${JSON.stringify(wrappingDiagnostics)}`,
+      `Default packed policy must reject named function and arrow wrappers: ${JSON.stringify(wrappingDiagnostics)}`
     );
   }
   rmSync(join(work, "wrapping-default-proof.ts"));
   const precedenceRuleIds = oxlintRuleIds(
-    lintOxlint("oversized-root.ts", "oxlint.precedence.config.mjs"),
+    lintOxlint("oversized-root.ts", "oxlint.precedence.config.mjs")
   );
   if (precedenceRuleIds.includes("eslint/max-lines")) {
     fail(
-      `consumer rules composed after governance must win, got: ${JSON.stringify(precedenceRuleIds)}`,
+      `consumer rules composed after tooling and governance must win, got: ${JSON.stringify(precedenceRuleIds)}`
     );
   }
 
   const RULE = "antidrift/no-structural-type-fork";
   const defaultCleanRules = lint("packages/app/src/clean.ts").flatMap((r) =>
-    r.messages.map((m) => m.ruleId),
+    r.messages.map((m) => m.ruleId)
   );
   const defaultDriftRules = lint("packages/app/src/drift.ts").flatMap((r) =>
-    r.messages.map((m) => m.ruleId),
+    r.messages.map((m) => m.ruleId)
   );
   if (defaultCleanRules.includes(RULE)) {
     fail(
-      `default config must accept clean.ts without ${RULE}, got: ${JSON.stringify(defaultCleanRules)}`,
+      `default config must accept clean.ts without ${RULE}, got: ${JSON.stringify(defaultCleanRules)}`
     );
   }
   if (!defaultDriftRules.includes(RULE)) {
     fail(
-      `default config must load generated owner facts and report ${RULE}, got: ${JSON.stringify(defaultDriftRules)}`,
+      `default config must load generated owner facts and report ${RULE}, got: ${JSON.stringify(defaultDriftRules)}`
     );
   }
 
   const restrictedSyntaxMessages = lint(
-    "packages/app/src/restricted-syntax-drift.ts",
+    "packages/app/src/restricted-syntax-drift.ts"
   ).flatMap((r) =>
     r.messages
       .filter((m) => m.ruleId === "no-restricted-syntax")
-      .map((m) => m.message),
+      .map((m) => m.message)
   );
   const declaresEnum = restrictedSyntaxMessages.some((m) =>
-    m.includes("Do not declare enums"),
+    m.includes("Do not declare enums")
   );
   const usesForwardRef = restrictedSyntaxMessages.some((m) =>
-    m.includes("forwardRef is deprecated"),
+    m.includes("forwardRef is deprecated")
   );
   if (!declaresEnum || !usesForwardRef) {
     fail(
-      `default config must report the enum declaration and the forwardRef call, got: ${JSON.stringify(restrictedSyntaxMessages)}`,
+      `default config must report the enum declaration and the forwardRef call, got: ${JSON.stringify(restrictedSyntaxMessages)}`
     );
   }
   if (
@@ -318,27 +340,27 @@ try {
     restrictedSyntaxMessages.length !== 2
   ) {
     fail(
-      `no-restricted-syntax must fire exactly twice on the probe and stay off clean.ts, got: ${JSON.stringify({ clean: defaultCleanRules, probe: restrictedSyntaxMessages })}`,
+      `no-restricted-syntax must fire exactly twice on the probe and stay off clean.ts, got: ${JSON.stringify({ clean: defaultCleanRules, probe: restrictedSyntaxMessages })}`
     );
   }
 
   const packageCopyRules = lint("packages/app/src/package-copy.ts").flatMap(
-    (r) => r.messages.map((m) => m.ruleId),
+    (r) => r.messages.map((m) => m.ruleId)
   );
   const undercheckedPredicateRules = lint(
-    "packages/app/src/underchecked-predicate.ts",
+    "packages/app/src/underchecked-predicate.ts"
   ).flatMap((r) => r.messages.map((m) => m.ruleId));
 
   if (packageCopyRules.includes(RULE)) {
     fail(
-      `package-copy.ts (unaccepted package authority) must NOT report ${RULE}, got: ${JSON.stringify(packageCopyRules)}`,
+      `package-copy.ts (unaccepted package authority) must NOT report ${RULE}, got: ${JSON.stringify(packageCopyRules)}`
     );
   }
   const UNDERCHECKED_PREDICATE_RULE =
     "antidrift/no-underchecked-type-predicate";
   if (!undercheckedPredicateRules.includes(UNDERCHECKED_PREDICATE_RULE)) {
     fail(
-      `TypeScript 6 consumer should report ${UNDERCHECKED_PREDICATE_RULE} for an under-checked object predicate, got: ${JSON.stringify(undercheckedPredicateRules)}`,
+      `TypeScript 6 consumer should report ${UNDERCHECKED_PREDICATE_RULE} for an under-checked object predicate, got: ${JSON.stringify(undercheckedPredicateRules)}`
     );
   }
 
@@ -346,45 +368,45 @@ try {
   const asyncDefaultConfig = "oxlint.async-array.config.mjs";
   const asyncCollectionConfig = "oxlint.async-array-collection.config.mjs";
   const asyncForEachRules = oxlintRuleIds(
-    lintOxlint("packages/app/src/async-foreach-drift.ts", asyncDefaultConfig),
+    lintOxlint("packages/app/src/async-foreach-drift.ts", asyncDefaultConfig)
   );
   const asyncMapDefaultRules = oxlintRuleIds(
     lintOxlint(
       "packages/app/src/async-map-collection-drift.ts",
-      asyncDefaultConfig,
-    ),
+      asyncDefaultConfig
+    )
   );
   const asyncMapCollectionRules = oxlintRuleIds(
     lintOxlint(
       "packages/app/src/async-map-collection-drift.ts",
-      asyncCollectionConfig,
-    ),
+      asyncCollectionConfig
+    )
   );
   const asyncMapReturnRules = oxlintRuleIds(
     lintOxlint(
       "packages/app/src/async-map-return-clean.ts",
-      asyncCollectionConfig,
-    ),
+      asyncCollectionConfig
+    )
   );
 
   if (!asyncForEachRules.includes(ASYNC_RULE)) {
     fail(
-      `explicit async-array config should report forEach drift, got: ${JSON.stringify(asyncForEachRules)}`,
+      `explicit async-array config should report forEach drift, got: ${JSON.stringify(asyncForEachRules)}`
     );
   }
   if (asyncMapDefaultRules.includes(ASYNC_RULE)) {
     fail(
-      `default async-array branch must not report map collection flow, got: ${JSON.stringify(asyncMapDefaultRules)}`,
+      `default async-array branch must not report map collection flow, got: ${JSON.stringify(asyncMapDefaultRules)}`
     );
   }
   if (!asyncMapCollectionRules.includes(ASYNC_RULE)) {
     fail(
-      `opt-in async-array collection branch should report unjoined map flow, got: ${JSON.stringify(asyncMapCollectionRules)}`,
+      `opt-in async-array collection branch should report unjoined map flow, got: ${JSON.stringify(asyncMapCollectionRules)}`
     );
   }
   if (asyncMapReturnRules.includes(ASYNC_RULE)) {
     fail(
-      `opt-in async-array collection branch must not report returned promise arrays, got: ${JSON.stringify(asyncMapReturnRules)}`,
+      `opt-in async-array collection branch must not report returned promise arrays, got: ${JSON.stringify(asyncMapReturnRules)}`
     );
   }
 
@@ -400,28 +422,28 @@ try {
       fact.confidence === "deterministic-enforcement" &&
       fact.payload?.authorityState === "accepted" &&
       fact.payload?.ownerType?.authority === "generated-source" &&
-      fact.filePath === "packages/app/src/drift.ts",
+      fact.filePath === "packages/app/src/drift.ts"
   );
 
   if (!generatedStructuralFact) {
     fail(
-      `default config drift.ts should have emitted a generated-source structuralMatch fact, got: ${JSON.stringify(semanticFacts)}`,
+      `default config drift.ts should have emitted a generated-source structuralMatch fact, got: ${JSON.stringify(semanticFacts)}`
     );
   }
 
   console.log(
-    "5/7  reading the shipped semantic adapter manifest from the CLI ...",
+    "5/7  reading the shipped semantic adapter manifest from the CLI ..."
   );
   const semanticManifest = runJson(
     pnpmBinary,
     ["exec", "antidrift", "semantic-manifest"],
-    work,
+    work
   );
   const reactStateManifest = semanticManifest.find(
-    (entry) => entry.id === "react-state",
+    (entry) => entry.id === "react-state"
   );
   const typeOwnerManifest = semanticManifest.find(
-    (entry) => entry.id === "type-owner",
+    (entry) => entry.id === "type-owner"
   );
 
   if (
@@ -432,7 +454,7 @@ try {
     !typeOwnerManifest?.proofBuckets?.includes("authority-index-ownership")
   ) {
     fail(
-      `semantic-manifest should expose composed adapter/fact metadata, got: ${JSON.stringify(semanticManifest)}`,
+      `semantic-manifest should expose composed adapter/fact metadata, got: ${JSON.stringify(semanticManifest)}`
     );
   }
   const reactStateSemanticManifest = runJson(
@@ -444,7 +466,7 @@ try {
       "--rule",
       "antidrift/no-handrolled-resource-lifecycle-cells",
     ],
-    work,
+    work
   );
   const asyncControlSemanticManifest = runJson(
     pnpmBinary,
@@ -455,7 +477,7 @@ try {
       "--rule",
       "antidrift/no-async-array-method",
     ],
-    work,
+    work
   );
   const tupleShapeSemanticManifest = runJson(
     pnpmBinary,
@@ -466,7 +488,7 @@ try {
       "--rule",
       "antidrift/no-nullable-positional-tuple",
     ],
-    work,
+    work
   );
   const authoritySemanticManifest = runJson(
     pnpmBinary,
@@ -477,7 +499,7 @@ try {
       "--proof-bucket",
       "authority-index-ownership",
     ],
-    work,
+    work
   );
   const structuralFactSemanticManifest = runJson(
     pnpmBinary,
@@ -488,7 +510,7 @@ try {
       "--fact-kind",
       "structuralMatch",
     ],
-    work,
+    work
   );
   const typeOwnerFactSemanticManifest = runJson(
     pnpmBinary,
@@ -499,7 +521,7 @@ try {
       "--fact-adapter",
       "typescript-eslint/type-owner",
     ],
-    work,
+    work
   );
 
   if (
@@ -517,19 +539,19 @@ try {
       "type-owner"
   ) {
     fail(
-      `semantic-manifest filters should expose rule/proof/fact slices, got: ${JSON.stringify({ reactStateSemanticManifest, asyncControlSemanticManifest, tupleShapeSemanticManifest, authoritySemanticManifest, structuralFactSemanticManifest, typeOwnerFactSemanticManifest })}`,
+      `semantic-manifest filters should expose rule/proof/fact slices, got: ${JSON.stringify({ reactStateSemanticManifest, asyncControlSemanticManifest, tupleShapeSemanticManifest, authoritySemanticManifest, structuralFactSemanticManifest, typeOwnerFactSemanticManifest })}`
     );
   }
   const ruleStatus = runJson(
     pnpmBinary,
     ["exec", "antidrift", "rule-status", "policy"],
-    work,
+    work
   );
   const activeRule = ruleStatus.entries.find(
-    (entry) => entry.id === "antidrift/no-structural-type-fork",
+    (entry) => entry.id === "antidrift/no-structural-type-fork"
   );
   const retiredRule = ruleStatus.entries.find(
-    (entry) => entry.id === "antidrift/no-status-triplet-state",
+    (entry) => entry.id === "antidrift/no-status-triplet-state"
   );
 
   if (
@@ -538,7 +560,7 @@ try {
     retiredRule?.kind !== "retired"
   ) {
     fail(
-      `rule-status should expose normalized consumer rule metadata, got: ${JSON.stringify(ruleStatus)}`,
+      `rule-status should expose normalized consumer rule metadata, got: ${JSON.stringify(ruleStatus)}`
     );
   }
   const typeOwnerRuleStatus = runJson(
@@ -551,7 +573,7 @@ try {
       "--semantic-adapter",
       "type-owner",
     ],
-    work,
+    work
   );
   const asyncControlRuleStatus = runJson(
     pnpmBinary,
@@ -563,7 +585,7 @@ try {
       "--semantic-adapter",
       "async-control-flow",
     ],
-    work,
+    work
   );
   const tupleShapeRuleStatus = runJson(
     pnpmBinary,
@@ -575,7 +597,7 @@ try {
       "--semantic-adapter",
       "tuple-shape",
     ],
-    work,
+    work
   );
   const authorityRuleStatus = runJson(
     pnpmBinary,
@@ -587,7 +609,7 @@ try {
       "--proof-bucket",
       "authority-index-ownership",
     ],
-    work,
+    work
   );
   const localAstRuleStatus = runJson(
     pnpmBinary,
@@ -599,12 +621,12 @@ try {
       "--proof-bucket",
       "local-ast-source-shape",
     ],
-    work,
+    work
   );
   const retiredRuleStatus = runJson(
     pnpmBinary,
     ["exec", "antidrift", "rule-status", "policy", "--kind", "retired"],
-    work,
+    work
   );
   const ecosystemCoveredRuleStatus = runJson(
     pnpmBinary,
@@ -616,7 +638,7 @@ try {
       "--status",
       "ecosystem-covered",
     ],
-    work,
+    work
   );
   const reactStateSemanticSummary = runJson(
     pnpmBinary,
@@ -629,7 +651,7 @@ try {
       "--semantic-adapter",
       "react-state",
     ],
-    work,
+    work
   );
   const localAstSemanticSummary = runJson(
     pnpmBinary,
@@ -642,7 +664,7 @@ try {
       "--proof-bucket",
       "local-ast-source-shape",
     ],
-    work,
+    work
   );
 
   if (
@@ -655,13 +677,13 @@ try {
     authorityRuleStatus.entries.map((entry) => entry.id).join(",") !==
       "antidrift/no-structural-type-fork" ||
     !localAstRuleStatus.entries.some(
-      (entry) => entry.id === "antidrift/no-async-array-method",
+      (entry) => entry.id === "antidrift/no-async-array-method"
     ) ||
     !localAstRuleStatus.entries.some(
-      (entry) => entry.id === "antidrift/no-nullable-positional-tuple",
+      (entry) => entry.id === "antidrift/no-nullable-positional-tuple"
     ) ||
     !localAstRuleStatus.entries.some(
-      (entry) => entry.id === "antidrift/no-raw-fetch-in-component",
+      (entry) => entry.id === "antidrift/no-raw-fetch-in-component"
     ) ||
     retiredRuleStatus.entries.map((entry) => entry.id).join(",") !==
       "antidrift/no-status-triplet-state" ||
@@ -677,46 +699,46 @@ try {
     !localAstSemanticSummary.summaries?.some(
       (summary) =>
         summary.entry.id === "antidrift/no-async-array-method" &&
-        summary.semanticAdapters[0]?.id === "async-control-flow",
+        summary.semanticAdapters[0]?.id === "async-control-flow"
     ) ||
     !localAstSemanticSummary.summaries?.some(
       (summary) =>
         summary.entry.id === "antidrift/no-nullable-positional-tuple" &&
-        summary.semanticAdapters[0]?.id === "tuple-shape",
+        summary.semanticAdapters[0]?.id === "tuple-shape"
     ) ||
     !localAstSemanticSummary.summaries?.some(
       (summary) =>
         summary.entry.id === "antidrift/no-raw-fetch-in-component" &&
-        summary.proofBuckets?.join(",") === "local-ast-source-shape",
+        summary.proofBuckets?.join(",") === "local-ast-source-shape"
     )
   ) {
     fail(
-      `rule-status filters should expose adapter/proof-bucket/status/semantic-summary slices, got: ${JSON.stringify({ typeOwnerRuleStatus, asyncControlRuleStatus, tupleShapeRuleStatus, authorityRuleStatus, localAstRuleStatus, retiredRuleStatus, ecosystemCoveredRuleStatus, reactStateSemanticSummary, localAstSemanticSummary })}`,
+      `rule-status filters should expose adapter/proof-bucket/status/semantic-summary slices, got: ${JSON.stringify({ typeOwnerRuleStatus, asyncControlRuleStatus, tupleShapeRuleStatus, authorityRuleStatus, localAstRuleStatus, retiredRuleStatus, ecosystemCoveredRuleStatus, reactStateSemanticSummary, localAstSemanticSummary })}`
     );
   }
 
   console.log(
-    "6/7  typechecking every public export under supported TS resolution modes ...",
+    "6/7  typechecking every public export under supported TS resolution modes ..."
   );
   run(
     pnpmBinary,
     ["exec", "tsc", "-p", "tsconfig.bundler.json", "--pretty", "false"],
-    work,
+    work
   );
   run(
     pnpmBinary,
     ["exec", "tsc", "-p", "tsconfig.nodenext.json", "--pretty", "false"],
-    work,
+    work
   );
 
   console.log("7/7  importing every public runtime export ...");
   run("node", ["packages/app/src/runtime.mjs"], work);
 
   console.log(
-    `\n✓ tarball installs, type-checks, imports, and enforces in a consumer monorepo`,
+    `\n✓ tarball installs, type-checks, imports, and enforces in a consumer monorepo`
   );
   console.log(
-    `  focused governance rejected oversized root, Convex, script, fixture, test, and undeclared generated-looking modules while ignoring registry-declared generated code, declarations, and raw JSON; consumer precedence disabled max-lines, the default typed config loaded registry owners and fired ${RULE} on drift.ts, the default typed config checked a TypeScript 6 broad-input predicate, async-array shipped behavior matched default and opt-in branch expectations, a structuralMatch fact was emitted, and clean.ts/package-copy.ts stayed clean; public exports and semantic adapters passed Bundler and NodeNext.`,
+    `  composed tooling and governance rejected oversized root, Convex, script, fixture, test, and undeclared generated-looking modules while ignoring registry-declared generated code, declarations, and raw JSON; consumer precedence disabled max-lines, the default typed config loaded registry owners and fired ${RULE} on drift.ts, the default typed config checked a TypeScript 6 broad-input predicate, async-array shipped behavior matched default and opt-in branch expectations, a structuralMatch fact was emitted, and clean.ts/package-copy.ts stayed clean; public exports and semantic adapters passed Bundler and NodeNext.`
   );
   rmSync(work, { recursive: true, force: true });
 } catch (error) {

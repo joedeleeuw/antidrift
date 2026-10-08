@@ -1,19 +1,8 @@
 {
+  "extends": "@joedeleeuw/typescript-tooling/tsconfig/base.json",
   "compilerOptions": {
-    "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "useUnknownInCatchVariables": true,
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "skipLibCheck": true,
     "paths": {
       "@agent-guardrails/domain": ["./packages/domain/src/index.ts"],
       "@agent-guardrails/contracts": ["./packages/contracts/src/index.ts"],

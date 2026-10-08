@@ -1,7 +1,5 @@
-import { spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import tsParser from "@typescript-eslint/parser";
@@ -9,18 +7,7 @@ import { ESLint } from "eslint";
 
 import eslintPlugin from "../eslint-plugin/index.js";
 
-import {
-  createGovernanceOxlintConfig,
-  typescriptBaselineTier,
-} from "./index.mjs";
-
-const packageRequire = createRequire(import.meta.url);
 const repository = resolve(import.meta.dirname, "../../../..");
-const oxlintBin = join(
-  dirname(packageRequire.resolve("oxlint/package.json")),
-  "bin",
-  "oxlint",
-);
 
 let workspace;
 
@@ -31,12 +18,7 @@ beforeAll(() => {
     JSON.stringify({
       compilerOptions: { strict: true, target: "ES2022", module: "ESNext" },
       include: ["probe.ts"],
-    }),
-  );
-  const config = createGovernanceOxlintConfig({ repoRoot: repository });
-  writeFileSync(
-    join(workspace, "oxlint.config.mjs"),
-    `export default ${JSON.stringify({ ...config, options: { ...config.options, typeAware: true } }, null, 2)};\n`,
+    })
   );
 });
 
@@ -72,47 +54,6 @@ void [raw, user, result, assigned];
 `;
 
 describe("deserialization coverage matrix", () => {
-  it.skipIf(typescriptBaselineTier(repository) !== "full")(
-    "the combined stack reports every unsafe result path and stays clean at boundaries",
-    () => {
-      const probePath = join(workspace, "probe.ts");
-      writeFileSync(probePath, probe);
-      const result = spawnSync(
-        process.execPath,
-        [
-          oxlintBin,
-          "--config",
-          join(workspace, "oxlint.config.mjs"),
-          probePath,
-        ],
-        { cwd: repository, encoding: "utf8" },
-      );
-      if (result.error) throw result.error;
-      const output = `${result.stdout}${result.stderr}`;
-
-      const findings = output
-        .split("\n")
-        .filter((line) => /probe\.ts:\d+:\d+:/u.test(line));
-      const rulesAt = (line) =>
-        findings
-          .filter((finding) => finding.includes(`probe.ts:${line}:`))
-          .map((finding) => {
-            const match = /(\w+)\(([^()]+)\):/u.exec(finding);
-            return match ? `${match[1]}/${match[2]}` : undefined;
-          });
-
-      expect(rulesAt(14)).toContain("typescript/no-unsafe-assignment");
-      expect(rulesAt(15)).toContain("typescript/no-unsafe-type-assertion");
-      expect(rulesAt(16)).toContain("typescript/no-unsafe-argument");
-      expect(rulesAt(18)).toContain("typescript/no-unsafe-return");
-
-      expect(rulesAt(22)).toEqual([]);
-      expect(rulesAt(23)).toEqual([]);
-      expect(rulesAt(24)).toEqual([]);
-    },
-    120_000,
-  );
-
   it("the ESLint-owned typed lane reports parsed JSON contracts and broad inputs while accepting validated boundaries", async () => {
     const probePath = join(workspace, "probe.ts");
     writeFileSync(probePath, probe);

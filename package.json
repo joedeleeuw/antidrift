@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.9.0",
   "engines": {
-    "node": ">=22.18.0",
+    "node": ">=24",
     "pnpm": ">=11.0.0"
   },
   "scripts": {
@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "@joedeleeuw/antidrift": "workspace:*",
+    "@joedeleeuw/typescript-tooling": "github:joedeleeuw/typescript-tooling#097019b1fb0fec18872b20ef9bfadee04a2155a3",
     "@types/node": "catalog:core",
     "eslint": "catalog:lint",
     "eslint-plugin-boundaries": "^5.0.1",

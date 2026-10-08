@@ -1,10 +1,9 @@
-const TS_TYPE_FLAG_UNDEFINED = 1 << 15;
-const TS_TYPE_FLAG_NULL = 1 << 16;
+import ts from "typescript";
 
 export function typeIncludesNullish(type, seen = new Set()) {
   if (!type || seen.has(type)) return false;
   seen.add(type);
-  if (type.flags & (TS_TYPE_FLAG_NULL | TS_TYPE_FLAG_UNDEFINED)) return true;
+  if (type.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)) return true;
   return (type.types ?? []).some((part) => typeIncludesNullish(part, seen));
 }
 
@@ -59,7 +58,7 @@ export function tupleElementIsNullishSlot(element, services, checker) {
 
 export function nullableTupleSlots(node, services, checker) {
   return (node?.elementTypes ?? []).filter((element) =>
-    tupleElementIsNullishSlot(element, services, checker),
+    tupleElementIsNullishSlot(element, services, checker)
   );
 }
 
@@ -67,7 +66,7 @@ export function hasNullablePositionalTuple(
   node,
   services,
   checker,
-  threshold = 2,
+  threshold = 2
 ) {
   return nullableTupleSlots(node, services, checker).length >= threshold;
 }

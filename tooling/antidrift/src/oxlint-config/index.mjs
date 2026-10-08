@@ -1,25 +1,15 @@
-import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import { defineConfig } from "oxlint";
 
 import { loadRegistriesSync } from "../policy/lib/registries.mjs";
 
-const packageRequire = createRequire(import.meta.url);
-
 const javascriptPlugins = [
   {
     name: "antidrift",
     specifier: fileURLToPath(
-      new URL("../oxlint-plugin/index.js", import.meta.url),
-    ),
-  },
-  {
-    name: "eslint-comments",
-    specifier: packageRequire.resolve(
-      "@eslint-community/eslint-plugin-eslint-comments",
+      new URL("../oxlint-plugin/index.js", import.meta.url)
     ),
   },
 ];
@@ -113,24 +103,12 @@ const additionalAntidriftRules = {
   "antidrift/require-safety-comment-for-type-assertion": "off",
 };
 
-const modifiedComplexityOptions = Object.freeze({
-  max: 25,
-  variant: "modified",
-});
-const maxParametersOptions = Object.freeze({ max: 7 });
-
-export const antidriftComplexityRules = Object.freeze({
-  complexity: Object.freeze(["error", modifiedComplexityOptions]),
-  "max-depth": Object.freeze(["error", 4]),
-  "max-params": Object.freeze(["error", maxParametersOptions]),
-});
-
 function generatedImportPatterns(registries) {
   return Object.values(registries.generated?.generatedSources ?? {}).flatMap(
     ({
       bannedDirectImports = [],
       message = "Import from the approved generated-type wrapper.",
-    }) => bannedDirectImports.map((group) => ({ group: [group], message })),
+    }) => bannedDirectImports.map((group) => ({ group: [group], message }))
   );
 }
 
@@ -142,12 +120,12 @@ function generatedRegistryPath(repoRoot, name, generated) {
   const normalized = generated.replaceAll("\\", "/");
   if (/[!*?{}()[\]]/u.test(normalized)) {
     throw new TypeError(
-      `${label} must be an exact repo path without glob metacharacters.`,
+      `${label} must be an exact repo path without glob metacharacters.`
     );
   }
   if (isAbsolute(normalized) || /^[A-Za-z]:\//u.test(normalized)) {
     throw new TypeError(
-      `${label} must be a relative repo path below the repository root.`,
+      `${label} must be a relative repo path below the repository root.`
     );
   }
   const root = resolve(repoRoot);
@@ -160,7 +138,7 @@ function generatedRegistryPath(repoRoot, name, generated) {
     isAbsolute(repoRelative)
   ) {
     throw new TypeError(
-      `${label} must be a relative repo path below the repository root.`,
+      `${label} must be a relative repo path below the repository root.`
     );
   }
   return repoRelative.split(sep).join("/");
@@ -170,11 +148,11 @@ function generatedIgnorePatterns(registries, repoRoot) {
   const patterns = new Set();
 
   for (const [name, entry] of Object.entries(
-    registries.generated?.generatedSources ?? {},
+    registries.generated?.generatedSources ?? {}
   )) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       throw new TypeError(
-        `policy/registries/generated.yaml generatedSources.${name} must be a mapping.`,
+        `policy/registries/generated.yaml generatedSources.${name} must be a mapping.`
       );
     }
     const pattern = generatedRegistryPath(repoRoot, name, entry.generated);
@@ -191,7 +169,7 @@ function gatewayImportPatterns(registries) {
       bannedDirectImports.map((group) => ({
         group: [group],
         message: `Import through the approved gateway wrapper (${wrapper}).`,
-      })),
+      }))
   );
 }
 
@@ -213,69 +191,6 @@ function gatewayWrapperOverrides(registries, generatedPatterns) {
     }));
 }
 
-// TypeScript baseline, split by what it needs to run. Syntax rules work on any
-// Oxlint install. Type-aware rules need the oxlint-tsgolint package, so they
-// are included only when it is installed.
-export const antidriftTypescriptSyntaxRules = Object.freeze({
-  "typescript/no-explicit-any": "error",
-  "typescript/no-empty-object-type": "error",
-  "typescript/no-extra-non-null-assertion": "error",
-  "typescript/no-non-null-assertion": "error",
-  "typescript/no-non-null-asserted-optional-chain": "error",
-  "typescript/no-unsafe-function-type": "error",
-  "typescript/no-wrapper-object-types": "error",
-  "typescript/no-namespace": "error",
-  "typescript/no-require-imports": "error",
-  "typescript/consistent-type-imports": [
-    "error",
-    { prefer: "type-imports", fixStyle: "separate-type-imports" },
-  ],
-  "typescript/no-import-type-side-effects": "error",
-  "typescript/no-unnecessary-type-constraint": "error",
-  "typescript/no-useless-empty-export": "error",
-  "typescript/prefer-function-type": "error",
-  "typescript/ban-ts-comment": [
-    "error",
-    { "ts-expect-error": "allow-with-description" },
-  ],
-});
-
-export const antidriftTypescriptTypeAwareRules = Object.freeze({
-  "typescript/no-unsafe-assignment": "error",
-  "typescript/no-unsafe-argument": "error",
-  "typescript/no-unsafe-call": "error",
-  "typescript/no-unsafe-enum-comparison": "error",
-  "typescript/no-unsafe-member-access": "error",
-  "typescript/no-unsafe-return": "error",
-  "typescript/no-unsafe-type-assertion": "error",
-  "typescript/no-base-to-string": "error",
-  "typescript/no-deprecated": "error",
-  "typescript/no-misused-promises": [
-    "error",
-    { checksVoidReturn: { arguments: false, attributes: false } },
-  ],
-  "typescript/restrict-plus-operands": "error",
-  "typescript/no-unnecessary-type-assertion": "error",
-  "typescript/no-unnecessary-template-expression": "error",
-  "typescript/no-unnecessary-type-arguments": "error",
-  "typescript/prefer-find": "error",
-  "typescript/prefer-includes": "error",
-  "typescript/prefer-reduce-type-parameter": "error",
-  "typescript/prefer-promise-reject-errors": "error",
-  "typescript/only-throw-error": "error",
-  "typescript/require-await": "error",
-  "typescript/no-unnecessary-condition": [
-    "error",
-    { allowConstantLoopConditions: true },
-  ],
-});
-
-export function typescriptBaselineTier(repoRoot = process.cwd()) {
-  return existsSync(join(repoRoot, "node_modules", "oxlint-tsgolint"))
-    ? "full"
-    : "syntax-only";
-}
-
 export function createGovernanceOxlintConfig({
   repoRoot = process.cwd(),
   policyDir = "policy",
@@ -288,33 +203,15 @@ export function createGovernanceOxlintConfig({
     ...gatewayImportPatterns(registries),
   ];
   const rules = {
-    ...antidriftTypescriptSyntaxRules,
-    "eslint-comments/require-description": "error",
-    "eslint-comments/disable-enable-pair": "error",
-    "eslint-comments/no-duplicate-disable": "error",
-    "eslint-comments/no-unlimited-disable": "error",
-    "eslint-comments/no-unused-disable": "error",
-    "eslint-comments/no-unused-enable": "error",
     "antidrift/require-effect-deps": "error",
     "antidrift/no-static-property-loop": "error",
     "antidrift/no-unknown-type-aliases": "error",
     "antidrift/no-unsafe-cast-chain": "error",
     ...additionalAntidriftRules,
-    "max-lines": [
-      "error",
-      {
-        max: 1500,
-        skipBlankLines: false,
-        skipComments: false,
-      },
-    ],
   };
-  if (typescriptBaselineTier(repoRoot) === "full") {
-    Object.assign(rules, antidriftTypescriptTypeAwareRules);
-  }
   if (restrictedImportPatterns.length > 0) {
     rules["no-restricted-imports"] = restrictedImportsRule(
-      restrictedImportPatterns,
+      restrictedImportPatterns
     );
   }
 

@@ -17,18 +17,18 @@ export function provePortableRules({ file, lintOxlint, packedFiles }) {
     file(filename, entry.invalid);
     file(
       `${base}/package.json`,
-      JSON.stringify({ name: "portable-proof", private: true }),
+      JSON.stringify({ name: "portable-proof", private: true })
     );
     file(
       `${base}/apps/client/package.json`,
       JSON.stringify({
         name: "@proof/client",
         dependencies: { "@homer/shared": "workspace:*" },
-      }),
+      })
     );
     file(
       `${base}/apps/other/package.json`,
-      JSON.stringify({ name: "@proof/other" }),
+      JSON.stringify({ name: "@proof/other" })
     );
     overrides.push({
       files: [filename],
@@ -63,18 +63,18 @@ export function provePortableRules({ file, lintOxlint, packedFiles }) {
         { name: "antidrift", specifier: "@joedeleeuw/antidrift/oxlint-plugin" },
       ],
       overrides,
-    }),
+    })
   );
   const output = lintOxlint("portable-proofs", "portable.config.json");
   const diagnostics = output.diagnostics ?? [];
   const expected = new Set(
-    portableCases.map((entry) => `antidrift(${entry.name})`),
+    portableCases.map((entry) => `antidrift(${entry.name})`)
   );
   const counts = new Map();
   for (const diagnostic of diagnostics) {
     if (!expected.has(diagnostic.code)) {
       throw new Error(
-        `Unexpected portable consumer diagnostic: ${JSON.stringify(diagnostic)}`,
+        `Unexpected portable consumer diagnostic: ${JSON.stringify(diagnostic)}`
       );
     }
     counts.set(diagnostic.code, (counts.get(diagnostic.code) ?? 0) + 1);
@@ -82,11 +82,11 @@ export function provePortableRules({ file, lintOxlint, packedFiles }) {
   for (const rule of expected) {
     if (counts.get(rule) !== 1) {
       throw new Error(
-        `Packed portable rule ${rule}: expected one finding, got ${counts.get(rule) ?? 0}`,
+        `Packed portable rule ${rule}: expected one finding, got ${counts.get(rule) ?? 0}`
       );
     }
   }
   console.log(
-    `     portable rules: ${expected.size} packed rules each report one finding; licenses included`,
+    `     portable rules: ${expected.size} packed rules each report one finding; licenses included`
   );
 }

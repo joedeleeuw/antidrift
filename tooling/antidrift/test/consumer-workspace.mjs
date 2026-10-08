@@ -2,7 +2,7 @@ function lines(count, contents = "") {
   return Array.from({ length: count }, () => contents).join("\n");
 }
 
-export function scaffoldConsumerWorkspace({ file, tarball }) {
+export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
   file("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
   file(
     "policy/registries/generated.yaml",
@@ -10,7 +10,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "  appGenerated:\n" +
       "    generated: packages/app/src/generated\n" +
       "  routeTree:\n" +
-      "    generated: src/routeTree.gen.ts\n",
+      "    generated: src/routeTree.gen.ts\n"
   );
   file(
     "policy/registries/rules.yaml",
@@ -82,7 +82,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "    antidriftRule: agent/require-checks-before-stop\n" +
       "    coverage: Session fact.\n" +
       "    reason: Requires command history.\n" +
-      "    nextAction: Keep in agent-ops.\n",
+      "    nextAction: Keep in agent-ops.\n"
   );
   file(
     "package.json",
@@ -93,6 +93,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
         type: "module",
         devDependencies: {
           "@joedeleeuw/antidrift": `file:${tarball}`,
+          "@joedeleeuw/typescript-tooling": `file:${toolingTarball}`,
           eslint: "9.39.4",
           "typescript-eslint": "8.60.1",
           "@typescript-eslint/parser": "8.60.1",
@@ -103,8 +104,8 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
         },
       },
       null,
-      2,
-    ) + "\n",
+      2
+    ) + "\n"
   );
   const baseCompilerOptions = {
     target: "ES2022",
@@ -122,8 +123,8 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
         compilerOptions: baseCompilerOptions,
       },
       null,
-      2,
-    ) + "\n",
+      2
+    ) + "\n"
   );
   file(
     "tsconfig.bundler.json",
@@ -135,8 +136,8 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
         include: ["packages/app/src/**/*.ts"],
       },
       null,
-      2,
-    ) + "\n",
+      2
+    ) + "\n"
   );
   file(
     "tsconfig.nodenext.json",
@@ -150,42 +151,50 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
         include: ["packages/app/src/**/*.ts"],
       },
       null,
-      2,
-    ) + "\n",
+      2
+    ) + "\n"
   );
   file(
     "eslint.config.mjs",
     'import { appendFileSync } from "node:fs";\n' +
-      'import { createConfig } from "@joedeleeuw/antidrift/eslint-config";\n' +
+      'import { createConfig as antidrift } from "@joedeleeuw/antidrift/eslint-config";\n' +
+      'import { createConfig as tooling } from "@joedeleeuw/typescript-tooling/eslint";\n' +
       'import { createJsonlFactSink } from "@joedeleeuw/antidrift/policy";\n' +
       "\n" +
       'const factFile = new URL("./semantic-facts.jsonl", import.meta.url);\n' +
       "const sink = createJsonlFactSink((line) => appendFileSync(factFile, line));\n" +
       "\n" +
-      "export default createConfig({\n" +
+      "export default [...tooling({ tsconfigRootDir: import.meta.dirname }), ...antidrift({\n" +
       "  tsconfigRootDir: import.meta.dirname,\n" +
       "  semanticFacts: { repoRoot: import.meta.dirname, sink },\n" +
-      "});\n",
+      "})];\n"
   );
   file(
     "oxlint.config.mjs",
     'import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
-      "\n" +
-      "export default createGovernanceOxlintConfig({ repoRoot: import.meta.dirname });\n",
+      'import { createConfig } from "@joedeleeuw/typescript-tooling/oxlint";\n' +
+      "const governance = createGovernanceOxlintConfig({ repoRoot: import.meta.dirname });\n" +
+      "const tooling = createConfig({ repoRoot: import.meta.dirname, typeAware: false });\n" +
+      "export default {\n" +
+      "  ...tooling, ...governance,\n" +
+      "  rules: { ...tooling.rules, ...governance.rules },\n" +
+      "  jsPlugins: [...governance.jsPlugins, ...tooling.jsPlugins],\n" +
+      "  plugins: [...new Set([...governance.plugins, ...tooling.plugins])],\n" +
+      "  options: { ...tooling.options, ...governance.options },\n" +
+      "  ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])],\n" +
+      "  overrides: [...(tooling.overrides ?? []), ...governance.overrides],\n" +
+      "};\n"
   );
   file(
     "oxlint.precedence.config.mjs",
-    'import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
-      "\n" +
-      "const governance = createGovernanceOxlintConfig({ repoRoot: import.meta.dirname });\n" +
-      "\n" +
+    'import config from "./oxlint.config.mjs";\n' +
       "export default {\n" +
-      "  ...governance,\n" +
+      "  ...config,\n" +
       "  rules: {\n" +
-      "    ...governance.rules,\n" +
+      "    ...config.rules,\n" +
       '    "max-lines": "off",\n' +
       "  },\n" +
-      "};\n",
+      "};\n"
   );
   file("oversized-root.ts", lines(1_501, "// generated line"));
   file("convex/oversized.ts", lines(1_501, "// generated line"));
@@ -202,7 +211,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
     "packages/app/src/vitest.d.ts",
     'declare module "vitest" {\n' +
       "  export const vi: { mock(specifier: string): void };\n" +
-      "}\n",
+      "}\n"
   );
   file(
     "packages/app/src/legitimate-boundaries.ts",
@@ -232,27 +241,27 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "\n" +
       "export function dynamicCall(operation: () => string, owner: object) {\n" +
       "  return Reflect.apply(operation, owner, []);\n" +
-      "}\n",
+      "}\n"
   );
   file(
     "packages/app/src/generated/oversized.ts",
-    lines(1_501, "// generated line"),
+    lines(1_501, "// generated line")
   );
   file(
     "src/fixtures/raw.json",
     JSON.stringify(
       Array.from({ length: 1_501 }, (_, index) => index),
       null,
-      2,
-    ),
+      2
+    )
   );
   file(
     "evidence/raw.json",
     JSON.stringify(
       Array.from({ length: 1_501 }, (_, index) => index),
       null,
-      2,
-    ),
+      2
+    )
   );
   file(
     "oxlint.async-array.config.mjs",
@@ -266,7 +275,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "    ...config.rules,\n" +
       '    "antidrift/no-async-array-method": "error",\n' +
       "  },\n" +
-      "};\n",
+      "};\n"
   );
   file(
     "oxlint.async-array-collection.config.mjs",
@@ -280,7 +289,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "    ...config.rules,\n" +
       '    "antidrift/no-async-array-method": ["error", { branches: ["requires-collection"] }],\n' +
       "  },\n" +
-      "};\n",
+      "};\n"
   );
   file(
     "packages/firebase/package.json",
@@ -297,8 +306,8 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
         },
       },
       null,
-      2,
-    ) + "\n",
+      2
+    ) + "\n"
   );
   file(
     "packages/firebase/auth.d.ts",
@@ -309,7 +318,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "  photoURL: string | null;\n" +
       "  providerId: string;\n" +
       "  phoneNumber: string | null;\n" +
-      "};\n",
+      "};\n"
   );
   file("packages/firebase/auth.js", "export {};\n");
   file(
@@ -320,38 +329,38 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
         include: ["src/**/*.ts"],
       },
       null,
-      2,
-    ) + "\n",
+      2
+    ) + "\n"
   );
   file(
     "packages/app/src/clean.ts",
     'import type { User } from "firebase/auth";\n' +
-      'export function displayName(u: User): string {\n  return u.displayName ?? "anon";\n}\n',
+      'export function displayName(u: User): string {\n  return u.displayName ?? "anon";\n}\n'
   );
   file(
     "packages/app/src/generated/release.ts",
     "export type GeneratedRelease = {\n" +
       "  id: string;\n  appId: string;\n  version: string;\n" +
-      '  status: "draft" | "submitted" | "released";\n  createdAt: number;\n};\n',
+      '  status: "draft" | "submitted" | "released";\n  createdAt: number;\n};\n'
   );
   file(
     "packages/app/src/drift.ts",
     "export type ReleaseRow = {\n" +
       "  id: string;\n  appId: string;\n  version: string;\n" +
-      '  status: "draft" | "submitted" | "released";\n  createdAt: number;\n};\n',
+      '  status: "draft" | "submitted" | "released";\n  createdAt: number;\n};\n'
   );
   file(
     "packages/app/src/underchecked-predicate.ts",
     "type User = { id: string; email: string };\n" +
       "export function isUser(value: unknown): value is User {\n" +
       '  return typeof value === "object" && value !== null && "id" in value;\n' +
-      "}\n",
+      "}\n"
   );
   file(
     "packages/app/src/package-copy.ts",
     "export type AuthUser = {\n" +
       "  uid: string;\n  email: string | null;\n  displayName: string | null;\n" +
-      "  photoURL: string | null;\n  providerId: string;\n  phoneNumber: string | null;\n};\n",
+      "  photoURL: string | null;\n  providerId: string;\n  phoneNumber: string | null;\n};\n"
   );
   file(
     "packages/app/src/async-foreach-drift.ts",
@@ -359,7 +368,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "  items.forEach(async (item) => {\n" +
       "    await item.save();\n" +
       "  });\n" +
-      "}\n",
+      "}\n"
   );
   file(
     "packages/app/src/async-map-collection-drift.ts",
@@ -368,13 +377,13 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "    await item.save();\n" +
       "  });\n" +
       "  return pending.length;\n" +
-      "}\n",
+      "}\n"
   );
   file(
     "packages/app/src/restricted-syntax-drift.ts",
     "export enum Color {\n  Red,\n  Blue,\n}\n\n" +
       "declare function forwardRef(render: () => null): unknown;\n" +
-      "export const Panel = forwardRef(() => null);\n",
+      "export const Panel = forwardRef(() => null);\n"
   );
   file(
     "packages/app/src/async-map-return-clean.ts",
@@ -383,7 +392,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "    await item.save();\n" +
       "  });\n" +
       "  return pending;\n" +
-      "}\n",
+      "}\n"
   );
   file(
     "packages/app/src/brand.ts",
@@ -395,19 +404,21 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "const branded = UserId.make(raw);\n" +
       'const rawLiteral: RawUserId = "user_123";\n' +
       "branded satisfies UserId;\n" +
-      "rawLiteral satisfies string;\n",
+      "rawLiteral satisfies string;\n"
   );
   file(
     "packages/app/src/exports.ts",
-    'import { createAdoptionOxlintConfig, antidriftAdoptionPresets, type AntidriftAdoptionPresetName } from "@joedeleeuw/antidrift/adoption-config";\n' +
-      'const selectedPreset: AntidriftAdoptionPresetName = "eslint"; const adoption = createAdoptionOxlintConfig({ presets: [selectedPreset] }); void adoption; void antidriftAdoptionPresets;\n' +
+    'import { createAdoptionOxlintConfig, adoptionPresets, complexityRules, createConfig as toolingOxlint, typescriptSyntaxRules, typescriptTypeAwareRules, typescriptBaselineTier, type AdoptionPresetName } from "@joedeleeuw/typescript-tooling/oxlint";\n' +
+      'const selectedPreset: AdoptionPresetName = "eslint"; const adoption = createAdoptionOxlintConfig({ presets: [selectedPreset] }); void adoption; void adoptionPresets;\n' +
       'import type { ESLint, Linter } from "eslint";\n' +
+      'import { defineConfig } from "oxlint";\n' +
+      'import { createConfig as toolingEslint, restrictedSyntax } from "@joedeleeuw/typescript-tooling/eslint";\n' +
       'import type * as ts from "typescript";\n' +
-      'import { antidriftComplexityRules, createConfig, createGovernanceOxlintConfig, eslintPlugin, loadPolicy, loadRegistriesSync, oxlintPlugin, renderPolicyArtifacts, type AgentGuardrailsPolicy, type AntidriftConfigOptions, type AntidriftGovernanceOxlintConfigOptions, type AntidriftRegistries, type PolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
+      'import { createConfig, createGovernanceOxlintConfig, eslintPlugin, loadPolicy, loadRegistriesSync, oxlintPlugin, renderPolicyArtifacts, type AgentGuardrailsPolicy, type AntidriftConfigOptions, type AntidriftGovernanceOxlintConfigOptions, type AntidriftRegistries, type PolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
       'import { brand, type Brand, type BrandKit, type BrandSafeResult, type Unbrand } from "@joedeleeuw/antidrift/brand";\n' +
       'import plugin from "@joedeleeuw/antidrift/eslint-plugin";\n' +
       'import { createConfig as createConfigFromSubpath, type AntidriftConfigOptions as SubpathConfigOptions } from "@joedeleeuw/antidrift/eslint-config";\n' +
-      'import { antidriftComplexityRules as complexityRulesFromSubpath, createGovernanceOxlintConfig as createGovernanceOxlintConfigFromSubpath, type AntidriftGovernanceOxlintConfigOptions as OxlintSubpathConfigOptions } from "@joedeleeuw/antidrift/oxlint-config";\n' +
+      'import { createGovernanceOxlintConfig as createGovernanceOxlintConfigFromSubpath, type AntidriftGovernanceOxlintConfigOptions as OxlintSubpathConfigOptions } from "@joedeleeuw/antidrift/oxlint-config";\n' +
       'import oxlintPluginFromSubpath from "@joedeleeuw/antidrift/oxlint-plugin";\n' +
       'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, loadRuleStatusRegistrySync, parseOxlintArgs, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, ruleStatusEntriesForKind, ruleStatusEntriesForProofBucket, ruleStatusEntriesForSemanticAdapter, ruleStatusEntriesForStatus, ruleStatusEntryForId, ruleStatusManifest, ruleStatusSemanticSummaries, ruleStatusSemanticSummaryForId, runOxlint, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession, type AgentGuardrailsPolicy as PolicySubpathPolicy, type OxlintArgs, type RuleStatusManifest, type RuleStatusManifestEntry, type RuleStatusPromotion, type RuleStatusSemanticSummary, type SemanticFact, type SemanticFactKind, type SemanticFactKindContractEntry, type SqlParserServiceDeltaClassification } from "@joedeleeuw/antidrift/policy";\n' +
       'import { SEMANTIC_ADAPTERS, SEMANTIC_ADAPTER_CONTRACTS, SEMANTIC_ADAPTER_CONTRACT_LIST, SEMANTIC_ADAPTER_MANIFEST, type asyncControlFlow as adapterAsyncControlFlow, authBoundary as adapterAuthBoundary, broadInput as adapterBroadInput, type parseInput as adapterParseInput, reactState as adapterReactState, schemaProvenance as adapterSchemaProvenance, semanticAdapterContractsForFactAdapterId, semanticAdapterContractsForFactKind, semanticAdapterContractsForProofBucket, semanticAdapterContractsForRule, semanticAdapterManifestForAdapterId, semanticAdapterManifestForFactAdapterId, semanticAdapterManifestForFactKind, semanticAdapterManifestForProofBucket, semanticAdapterManifestForRule, sql as adapterSql, type tupleShape as adapterTupleShape, typeOwner as adapterTypeOwner, type SemanticAdapterContract, type SemanticAdapterContractKey, type SemanticAdapterManifestEntry } from "@joedeleeuw/antidrift/semantic-adapters";\n' +
@@ -483,14 +494,16 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       'isNamedTypeReference({ type: "TSTypeReference" }) satisfies boolean;\n' +
       "void parseParserServices;\n" +
       "void tupleParserServices;\n" +
+      "toolingEslint(options) satisfies Linter.Config[]; void restrictedSyntax;\n" +
       "createConfig(options) satisfies Linter.Config[];\n" +
       "createConfigFromSubpath(subpathOptions) satisfies Linter.Config[];\n" +
       "createGovernanceOxlintConfig(oxlintOptions);\n" +
       "createGovernanceOxlintConfigFromSubpath(oxlintOptions);\n" +
-      "antidriftComplexityRules.complexity[1].max satisfies 25;\n" +
-      "complexityRulesFromSubpath['max-depth'][1] satisfies 4;\n" +
-      "// @ts-expect-error published complexity thresholds are immutable\n" +
-      "antidriftComplexityRules.complexity[1].max = 26;\n" +
+      "complexityRules.complexity[1].max satisfies 25;\n" +
+      "complexityRules['max-depth'][1] satisfies 4;\n" +
+      "complexityRules['max-params'][1].max satisfies 7;\n" +
+      "defineConfig({ rules: { ...complexityRules } });\n" +
+      "toolingOxlint({ typeAware: false }); void typescriptSyntaxRules; void typescriptTypeAwareRules; void typescriptBaselineTier;\n" +
       "oxlintPlugin satisfies ESLint.Plugin;\n" +
       "oxlintPluginFromSubpath satisfies ESLint.Plugin;\n" +
       "eslintPlugin satisfies ESLint.Plugin;\n" +
@@ -741,17 +754,19 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "void repoCorpus;\n" +
       "void undercheckedPredicateInventory;\n" +
       "void declarationCloneInventory;\n" +
-      "void verifySession;\n",
+      "void verifySession;\n"
   );
   file(
     "packages/app/src/runtime.mjs",
     'import * as antidriftPackage from "@joedeleeuw/antidrift";\n' +
-      'import { antidriftComplexityRules, createConfig, createGovernanceOxlintConfig, eslintPlugin, loadPolicy, loadRegistriesSync, oxlintPlugin, renderPolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
+      'import { createConfig as toolingEslint, restrictedSyntax } from "@joedeleeuw/typescript-tooling/eslint";\n' +
+      'import { complexityRules, createConfig as toolingOxlint, typescriptSyntaxRules, typescriptTypeAwareRules, typescriptBaselineTier, adoptionPresets, createAdoptionOxlintConfig } from "@joedeleeuw/typescript-tooling/oxlint";\n' +
+      'import { createConfig, createGovernanceOxlintConfig, eslintPlugin, loadPolicy, loadRegistriesSync, oxlintPlugin, renderPolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
       'import packageMetadata from "@joedeleeuw/antidrift/package.json" with { type: "json" };\n' +
       'import { brand } from "@joedeleeuw/antidrift/brand";\n' +
       'import plugin from "@joedeleeuw/antidrift/eslint-plugin";\n' +
       'import { createConfig as createConfigFromSubpath } from "@joedeleeuw/antidrift/eslint-config";\n' +
-      'import { antidriftComplexityRules as complexityRulesFromSubpath, createGovernanceOxlintConfig as createGovernanceOxlintConfigFromSubpath } from "@joedeleeuw/antidrift/oxlint-config";\n' +
+      'import { createGovernanceOxlintConfig as createGovernanceOxlintConfigFromSubpath } from "@joedeleeuw/antidrift/oxlint-config";\n' +
       'import oxlintPluginFromSubpath from "@joedeleeuw/antidrift/oxlint-plugin";\n' +
       'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, loadRuleStatusRegistrySync, parseOxlintArgs, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, ruleStatusEntriesForKind, ruleStatusEntriesForProofBucket, ruleStatusEntriesForSemanticAdapter, ruleStatusEntriesForStatus, ruleStatusEntryForId, ruleStatusManifest, ruleStatusSemanticSummaries, ruleStatusSemanticSummaryForId, runOxlint, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession } from "@joedeleeuw/antidrift/policy";\n' +
       'import { SEMANTIC_ADAPTERS, SEMANTIC_ADAPTER_CONTRACTS, SEMANTIC_ADAPTER_CONTRACT_LIST, SEMANTIC_ADAPTER_MANIFEST, asyncControlFlow as adapterAsyncControlFlow, authBoundary as adapterAuthBoundary, broadInput as adapterBroadInput, parseInput as adapterParseInput, reactState as adapterReactState, schemaProvenance as adapterSchemaProvenance, semanticAdapterContractsForFactAdapterId, semanticAdapterContractsForFactKind, semanticAdapterContractsForProofBucket, semanticAdapterContractsForRule, semanticAdapterManifestForAdapterId, semanticAdapterManifestForFactAdapterId, semanticAdapterManifestForFactKind, semanticAdapterManifestForProofBucket, semanticAdapterManifestForRule, sql as adapterSql, tupleShape as adapterTupleShape, typeOwner as adapterTypeOwner } from "@joedeleeuw/antidrift/semantic-adapters";\n' +
@@ -767,8 +782,7 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "\n" +
       "const exportsToCheck = {\n" +
       "  createConfig,\n" +
-      "  antidriftComplexityRules,\n" +
-      "  complexityRulesFromSubpath,\n" +
+      "  complexityRules, toolingEslint, restrictedSyntax, toolingOxlint, typescriptSyntaxRules, typescriptTypeAwareRules, typescriptBaselineTier, adoptionPresets, createAdoptionOxlintConfig,\n" +
       "  createGovernanceOxlintConfig,\n" +
       "  createGovernanceOxlintConfigFromSubpath,\n" +
       "  eslintPlugin,\n" +
@@ -1074,6 +1088,6 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       'const runtimeStatusLiteral = { type: "TSLiteralType", literal: { value: "active" }, parent: { type: "TSTypeAliasDeclaration", id: { name: "UserStatus" } } };\n' +
       'if (MIN_PROPS !== 4 || canonicalStatusLiteralOwner(runtimeStatusLiteral, { UserStatus: { owner: "packages/domain/src/user.ts", values: ["active"] } })?.owner !== "packages/domain/src/user.ts" || !isStatusContextName("user_status", "UserStatus") || !isStatusLiteralContext(runtimeStatusLiteral, "UserStatus") || normalizedContextName("User Status") !== "userstatus" || nodeKeyName({ type: "Identifier", name: "status" }) !== "status") {\n' +
       '  throw new Error("Missing type-owner semantic adapter contract");\n' +
-      "}\n",
+      "}\n"
   );
 }

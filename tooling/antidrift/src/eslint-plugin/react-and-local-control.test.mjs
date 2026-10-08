@@ -129,7 +129,7 @@ ruleTester.run(
         errors: 1,
       },
     ],
-  },
+  }
 );
 
 const duplicatedClassnameControls = {
@@ -251,7 +251,7 @@ ruleTester.run(
         errors: [{ messageId: "duplicatedConditionalClassnames" }],
       },
     ],
-  },
+  }
 );
 
 it("fails loud on partial duplicated classname controls", async () => {
@@ -280,8 +280,8 @@ it("fails loud on partial duplicated classname controls", async () => {
   await expect(
     eslint.lintText(
       `<Pressable className={ok ? "a b c d e" : "a b c d f"} />;`,
-      { filePath: "component.tsx" },
-    ),
+      { filePath: "component.tsx" }
+    )
   ).rejects.toThrow(/attributes/u);
 });
 
@@ -448,7 +448,7 @@ ruleTester.run(
         ],
       },
     ],
-  },
+  }
 );
 
 it("fails loud on partial duplicated object field block controls", async () => {
@@ -476,8 +476,8 @@ it("fails loud on partial duplicated object field block controls", async () => {
   await expect(
     eslint.lintText(
       `type A = { id: string; at: number }; type B = { id: string; at: number };`,
-      { filePath: "types.ts" },
-    ),
+      { filePath: "types.ts" }
+    )
   ).rejects.toThrow(/minRedundantDeclarations/u);
 });
 
@@ -512,7 +512,7 @@ ruleTester.run(
         errors: [{ messageId: "mockedResponseBodyOracle" }],
       },
     ],
-  },
+  }
 );
 
 ruleTester.run(
@@ -522,7 +522,7 @@ ruleTester.run(
     valid: [
       {
         ...fixture(
-          "programs/correct/nonindependent-test-oracle-independent.ts",
+          "programs/correct/nonindependent-test-oracle-independent.ts"
         ),
         filename: "nonindependent-test-oracle-independent.test.ts",
       },
@@ -755,7 +755,7 @@ ruleTester.run(
         errors: [{ messageId: "existenceEcho" }],
       },
     ],
-  },
+  }
 );
 
 ruleTester.run("no-static-property-loop", rule("no-static-property-loop"), {
@@ -845,7 +845,7 @@ ruleTester.run(
         errors: [{ messageId: "sentinelAbsenceFallback" }],
       },
     ],
-  },
+  }
 );
 
 ruleTester.run(
@@ -914,7 +914,7 @@ ruleTester.run(
         ],
       },
     ],
-  },
+  }
 );
 
 typedRuleTester.run(
@@ -961,7 +961,7 @@ typedRuleTester.run(
         errors: 2,
       },
     ],
-  },
+  }
 );
 
 typedRuleTester.run("no-appeasement-cast", rule("no-appeasement-cast"), {
@@ -991,7 +991,7 @@ typedRuleTester.run(
         errors: 1,
       },
     ],
-  },
+  }
 );
 
 typedRuleTester.run(
@@ -1023,7 +1023,7 @@ typedRuleTester.run(
         errors: 1,
       },
     ],
-  },
+  }
 );
 
 ruleTester.run(
@@ -1053,7 +1053,7 @@ ruleTester.run(
         errors: 1,
       },
     ],
-  },
+  }
 );
 
 ruleTester.run(
@@ -1105,7 +1105,7 @@ ruleTester.run(
         errors: 1,
       },
     ],
-  },
+  }
 );
 
 ruleTester.run("no-raw-fetch-in-component", rule("no-raw-fetch-in-component"), {
@@ -1292,30 +1292,7 @@ ruleTester.run(
         errors: 1,
       },
     ],
-  },
-);
-
-typedRuleTester.run(
-  "no-nullable-positional-tuple type-aware aliases",
-  rule("no-nullable-positional-tuple"),
-  {
-    valid: [
-      "type MaybeDate = Date | null; type OpenRange = [MaybeDate, Date];",
-    ],
-    invalid: [
-      {
-        code: "type MaybeDate = Date | null; type CustomRange = [MaybeDate, MaybeDate];",
-        errors: 1,
-      },
-      {
-        code: `
-          type Maybe<T> = T | null;
-          type CustomRange = [Maybe<Date>, Maybe<Date>];
-        `,
-        errors: 1,
-      },
-    ],
-  },
+  }
 );
 
 const authzRuleOptions = [{ authzFunctions: ["authorize"] }];

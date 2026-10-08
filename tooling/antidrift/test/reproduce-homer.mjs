@@ -16,8 +16,8 @@ import review from "./corpus/homer-review.json" with { type: "json" };
 import { portableCases } from "./portable-cases.mjs";
 import {
   createAdoptionOxlintConfig,
-  antidriftAdoptionPresets,
-} from "../src/oxlint-config/adoption.mjs";
+  adoptionPresets,
+} from "@joedeleeuw/typescript-tooling/oxlint";
 import { proveHomerJson } from "./reproduce-homer-json.mjs";
 import selection from "./corpus/native-selection.json" with { type: "json" };
 import { lintTypedArtifact } from "./typed-artifact.mjs";
@@ -25,13 +25,13 @@ import { lintTypedArtifact } from "./typed-artifact.mjs";
 const require = createRequire(import.meta.url);
 const oxlint = join(
   dirname(require.resolve("oxlint/package.json")),
-  "bin/oxlint",
+  "bin/oxlint"
 );
 const repository = process.argv[2];
 if (!repository) throw new Error("Pass the read-only Homer checkout path.");
 if (process.argv[3] && process.argv[3] !== "--owned-projections-only") {
   throw new Error(
-    "Only the optional --owned-projections-only slice is supported.",
+    "Only the optional --owned-projections-only slice is supported."
   );
 }
 const scratch = mkdtempSync(join(tmpdir(), "antidrift-homer-reproduction-"));
@@ -60,7 +60,7 @@ function archiveCheckout(revision) {
     const installed = join(
       repository,
       relative(destination, directory),
-      "node_modules",
+      "node_modules"
     );
     if (existsSync(installed)) {
       symlinkSync(installed, join(directory, "node_modules"), "dir");
@@ -92,7 +92,7 @@ try {
     assert.equal(
       messages.length,
       expected,
-      `${revision}: expected ${expected} owned projections, received ${JSON.stringify(messages)}`,
+      `${revision}: expected ${expected} owned projections, received ${JSON.stringify(messages)}`
     );
     if (expected) {
       assert.equal(messages[0].ruleId, "antidrift/no-structural-type-fork");
@@ -100,7 +100,7 @@ try {
       assert.equal(messages[0].line, 43);
       assert.match(
         messages[0].message,
-        /Contract copies .*FunctionArgs<typeof api\.conversations\.listHistory>\["scope"\]/u,
+        /Contract copies .*FunctionArgs<typeof api\.conversations\.listHistory>\["scope"\]/u
       );
     }
     ownedProjections.push({
@@ -131,7 +131,7 @@ try {
             "restriction",
             "style",
             "suspicious",
-          ].map((name) => [name, "off"]),
+          ].map((name) => [name, "off"])
         ),
         ignorePatterns,
         jsPlugins: [
@@ -139,7 +139,7 @@ try {
             name: "antidrift",
             specifier: resolve(
               import.meta.dirname,
-              "../src/oxlint-plugin/index.js",
+              "../src/oxlint-plugin/index.js"
             ),
           },
         ],
@@ -165,7 +165,7 @@ try {
           "json",
           ...paths,
         ],
-        { cwd: checkout, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+        { cwd: checkout, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
       );
       if (run.error) throw run.error;
       if (![0, 1].includes(run.status)) throw new Error(run.stderr);
@@ -173,7 +173,7 @@ try {
       const expected = reviewed.after;
       if (diagnostics.length !== expected) {
         throw new Error(
-          `${entry.name}: expected ${expected}, received ${diagnostics.length}`,
+          `${entry.name}: expected ${expected}, received ${diagnostics.length}`
         );
       }
       rows.push({
@@ -183,7 +183,7 @@ try {
       });
     }
     const config = createAdoptionOxlintConfig({
-      presets: Object.keys(antidriftAdoptionPresets),
+      presets: Object.keys(adoptionPresets),
     });
     if (Object.keys(config.rules).length !== selection.rules.length) {
       throw new Error("Native selection differs from the reviewed inventory.");
@@ -204,7 +204,7 @@ try {
         "json",
         ...paths,
       ],
-      { cwd: checkout, encoding: "utf8", maxBuffer: 128 * 1024 * 1024 },
+      { cwd: checkout, encoding: "utf8", maxBuffer: 128 * 1024 * 1024 }
     );
     if (native.error) throw native.error;
     if (![0, 1].includes(native.status)) throw new Error(native.stderr);
@@ -223,8 +223,8 @@ try {
           },
         },
         null,
-        2,
-      ),
+        2
+      )
     );
   }
 } finally {

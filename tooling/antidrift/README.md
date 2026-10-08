@@ -17,10 +17,10 @@ The shared governance preset enables `antidrift/no-wrapping-functions` as an err
 For example, `const loadItems = (id) => owner.load(id)` reports; call `owner.load(id)` directly at its callers. `button.onClick(() => owner.load(id))` remains a callback with deferred execution. For a subscription API, `useSyncExternalStore(subscribeToConsent, getSnapshot)` is the valid direct substitution only when `subscribeToConsent` has the adapter's signature and receiver semantics; do not replace a required stable adapter with a new inline arrow or `.bind`. ESLint-only consumers can enable the same rule through the ESLint plugin; do not enable it in both lint runtimes.
 
 ```sh
-pnpm add -D @joedeleeuw/antidrift oxlint eslint typescript typescript-eslint @typescript-eslint/parser
+pnpm add -D @joedeleeuw/antidrift @joedeleeuw/typescript-tooling oxlint oxlint-tsgolint eslint typescript typescript-eslint @typescript-eslint/parser
 ```
 
-Oxlint 1.75+ and `oxlint-tsgolint` 7 are required for the stable type-aware pass. That pass uses TypeScript 7 semantics and requires a TypeScript 7-compatible `tsconfig`; it does not use the workspace's installed TypeScript package. ESLint 9.38+ or 10.x, TypeScript 5+, typescript-eslint 8+, and `@typescript-eslint/parser` remain required for the custom TypeChecker-rule pass.
+Oxlint 1.75+ and `oxlint-tsgolint` 7 are required for the stable type-aware pass. That pass uses TypeScript 7 semantics and requires a TypeScript 7-compatible `tsconfig`; it does not use the workspace's installed TypeScript package. ESLint 9.38+ or 10.x, TypeScript 5+ (TypeScript 6.0.x when composing tooling), typescript-eslint 8+, and `@typescript-eslint/parser` remain required for the custom TypeChecker-rule pass.
 
 ## Stability
 
@@ -31,37 +31,41 @@ Experimental inventory commands, semantic fact payloads, registry metadata, and 
 Create the root Oxlint config:
 
 ```ts
-import {
-  antidriftComplexityRules,
-  createGovernanceOxlintConfig,
-} from "@joedeleeuw/antidrift/oxlint-config";
+import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";
+import { createConfig } from "@joedeleeuw/typescript-tooling/oxlint";
 
 const governance = createGovernanceOxlintConfig({
   repoRoot: import.meta.dirname,
 });
+const tooling = createConfig({ repoRoot: import.meta.dirname });
 
 export default {
+  ...tooling,
   ...governance,
-  overrides: [
-    ...(governance.overrides ?? []),
-    {
-      files: ["src/**/*.{ts,tsx}"],
-      excludeFiles: ["**/*.{test,spec}.{ts,tsx}"],
-      rules: antidriftComplexityRules,
-    },
+  rules: { ...tooling.rules, ...governance.rules },
+  jsPlugins: [...governance.jsPlugins, ...tooling.jsPlugins],
+  plugins: [...new Set([...governance.plugins, ...tooling.plugins])],
+  options: { ...tooling.options, ...governance.options },
+  ignorePatterns: [
+    ...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns]),
   ],
+  overrides: [...(tooling.overrides ?? []), ...governance.overrides],
 };
 ```
 
-Keep the ESLint config as the reduced TypeChecker pass:
+Compose the generic syntax/SQL checks with the reduced Antidrift TypeChecker pass:
 
 ```js
-import { createConfig } from "@joedeleeuw/antidrift/eslint-config";
+import { createConfig as tooling } from "@joedeleeuw/typescript-tooling/eslint";
+import { createConfig as antidrift } from "@joedeleeuw/antidrift/eslint-config";
 
-export default createConfig({ tsconfigRootDir: import.meta.dirname });
+export default [
+  ...tooling({ tsconfigRootDir: import.meta.dirname }),
+  ...antidrift({ tsconfigRootDir: import.meta.dirname }),
+];
 ```
 
-`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, anti-suppression rules, a global 1,500-line module ceiling, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, and the imported rules for unknown aliases and chained assertions. Test-focused `antidrift/no-schema-library-in-test`, `antidrift/no-validator-output-oracle`, and `antidrift/no-mocked-response-body-oracle` are registered default-off alongside the React Native interaction-owner rule. The remaining imported rules stay registered but default-off because their syntax is not sufficient general evidence at runtime, test, and external-data boundaries. Other syntax, scope, and local-control-flow Antidrift rules are also registered as default-off inventory. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Consumers can apply the frozen `antidriftComplexityRules` fragment to deliberate production-code scopes. `createConfig` enables the custom rules that need TypeScript parser services and keeps `no-defensive-shape-probing`, `no-explicit-type-arguments-on-owned-api`, `no-identity-schema-transform`, `no-redundant-local-return-type`, `no-schema-validator-transcoding`, `no-sql-string-concat`, `no-underchecked-type-predicate`, and `require-convex-return-validator` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
+`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, and the imported rules for unknown aliases and chained assertions. Test-focused `antidrift/no-schema-library-in-test`, `antidrift/no-validator-output-oracle`, and `antidrift/no-mocked-response-body-oracle` are registered default-off alongside the React Native interaction-owner rule. The remaining imported rules stay registered but default-off because their syntax is not sufficient general evidence at runtime, test, and external-data boundaries. Other syntax, scope, and local-control-flow Antidrift rules are also registered as default-off inventory. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services, warns for `no-defensive-shape-probing` and `no-underchecked-type-predicate`, and keeps `no-explicit-type-arguments-on-owned-api`, `no-identity-schema-transform`, `no-redundant-local-return-type`, `no-schema-validator-transcoding`, `no-sql-string-concat`, and `require-convex-return-validator` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
 Oxlint excludes generated output only when its exact file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Generated-looking names are ordinary linted code unless the registry owns them.
 
@@ -171,17 +175,34 @@ The workflow uses OIDC trusted publishing rather than a long-lived `NPM_TOKEN`. 
 
 For the initial publication, if `npm view @joedeleeuw/antidrift` still returns 404 and npmjs.com does not expose package settings yet, do one interactive owner publish from `tooling/antidrift` after `pnpm package:verify`, then immediately configure the Trusted Publisher above and restrict token-based publishing in npm package settings.
 
+## Migrating to 0.15.0
+
+Generic enforcement now belongs to `@joedeleeuw/typescript-tooling`, an independent package with no Antidrift dependency. Antidrift no longer exports complexity/TypeScript baseline maps, tier detection, or adoption presets; there are no compatibility aliases. Replace the removed Antidrift `/adoption-config` entrypoint with `@joedeleeuw/typescript-tooling/oxlint` (`adoptionPresets`, `createAdoptionOxlintConfig`). Replace the old prefixed baseline exports with `complexityRules`, `typescriptSyntaxRules`, `typescriptTypeAwareRules`, and `typescriptBaselineTier` from that same owner.
+
+Compose both packages explicitly; keeping only Antidrift no longer enables the generic 1500-line cap, six lint-directive checks, enum/React 19 forwardRef restrictions, SQL template safety, or native TypeScript baseline:
+
+```js
+import { createConfig as tooling } from "@joedeleeuw/typescript-tooling/eslint";
+import { createConfig as antidrift } from "@joedeleeuw/antidrift/eslint-config";
+
+export default [
+  ...tooling({ tsconfigRootDir: import.meta.dirname }),
+  ...antidrift({ tsconfigRootDir: import.meta.dirname }),
+];
+```
+
+For Oxlint, merge both owners' `rules`, `jsPlugins`, `plugins`, `options`, `ignorePatterns`, and `overrides`, then apply repository rules/exceptions last. The root configs demonstrate this composition. Preserve registry-generated ignores and gateway exemptions from Antidrift; filename resemblance alone is not a generated-code exemption. Tooling keeps modified complexity 25, depth 4, parameters 7, and the 1500-line cap counting comments/blanks. The native type-aware tier needs consumer-installed `oxlint-tsgolint`; callers own enabling type-aware analysis and source/test scopes.
+
 ## What's in the box
 
 Public entry points, one package:
 
-- `@joedeleeuw/antidrift` — package primitives: `createGovernanceOxlintConfig`, `antidriftComplexityRules`, `oxlintPlugin`, the reduced `createConfig`/`eslintPlugin` TypeChecker pass, policy rendering, and registry loading
+- `@joedeleeuw/antidrift` — package primitives: `createGovernanceOxlintConfig`, `oxlintPlugin`, the reduced `createConfig`/`eslintPlugin` TypeChecker pass, policy rendering, and registry loading
 - `@joedeleeuw/antidrift/package.json` — package metadata for consumer tooling
 - `@joedeleeuw/antidrift/brand` — `Brand<T, Name>`, `Unbrand<T>`, and `brand(name, check)`
 - `@joedeleeuw/antidrift/eslint-config` — the `createConfig` factory above
 - `@joedeleeuw/antidrift/eslint-plugin` — the TypeChecker plugin, if you'd rather wire those rules by hand
-- `@joedeleeuw/antidrift/adoption-config` — named opt-in native rule presets
-- `@joedeleeuw/antidrift/oxlint-config` — focused governance plus the immutable opt-in complexity fragment
+- `@joedeleeuw/antidrift/oxlint-config` — custom drift governance and registry-aware import restrictions
 - `@joedeleeuw/antidrift/oxlint-plugin` — syntax-only custom rules supported by Oxlint's JavaScript plugin API
 - `@joedeleeuw/antidrift/policy` — policy check APIs, rule-status registry helpers, semantic fact sinks, and shipped `SEMANTIC_FACT_KINDS` contracts for advanced tooling
 - `@joedeleeuw/antidrift/semantic-adapters` — aggregate semantic adapter registry and contracts for tooling that wants the full shared proof surface
@@ -195,6 +216,8 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/semantic-adapters/tuple-shape` — tuple nullish-slot classifiers shared by `no-nullable-positional-tuple`
 - `@joedeleeuw/antidrift/semantic-adapters/type-owner` — TypeChecker-backed owner candidate collectors for generated, domain, and installed-package structural authority
 - `antidrift` — the CLI binary for generate/check/report commands, opt-in `shell` guardrails, plus `semantic-manifest` and `rule-status` for machine-readable metadata
+
+The existing packed-consumer smoke installs both actual tarballs. Set `TYPESCRIPT_TOOLING_TARBALL` to a built artifact, or it packs the installed tooling dependency. No source checkout or symlink replaces that acceptance artifact.
 
 ## The rule worth installing this for
 
@@ -317,7 +340,7 @@ import { brand, type Brand } from "@joedeleeuw/antidrift/brand";
 const UserId = brand(
   "UserId",
   (value): value is string =>
-    typeof value === "string" && value.startsWith("user_"),
+    typeof value === "string" && value.startsWith("user_")
 );
 
 type UserId = Brand<string, "UserId">;
@@ -418,14 +441,14 @@ Corpus tests authenticate complete source files against a pinned Git commit, the
 ### Native adoption presets
 
 ```js
-import { createAdoptionOxlintConfig } from "@joedeleeuw/antidrift/adoption-config";
+import { createAdoptionOxlintConfig } from "@joedeleeuw/typescript-tooling/oxlint";
 
 export default createAdoptionOxlintConfig({
   presets: ["eslint", "typescript", "unicorn"],
 });
 ```
 
-Named presets are `eslint`, `typescript`, `unicorn`, `import`, `promise`, `node`, `oxc`, `jsdoc`, `react`, `jsx-a11y`, and `vitest`. They compose all 436 eligible native In entries; the eighteen Next entries are excluded. The three existing complexity settings retain their budgets. Every selected rule is an error. Select the React, browser-accessibility and test presets for their actual source scopes; the base governance config does not silently enable these optional native packs.
+The independent tooling package owns these presets; Antidrift does not ship them. Named presets are `eslint`, `typescript`, `unicorn`, `import`, `promise`, `node`, `oxc`, `jsdoc`, `react`, `jsx-a11y`, and `vitest`. They compose all 436 eligible native In entries; the eighteen Next entries are excluded. The three existing complexity settings retain their budgets. Every selected rule is an error. Select the React, browser-accessibility and test presets for their actual source scopes; the base governance config does not silently enable these optional native packs.
 
 The existing `antidrift/no-unsafe-deserialize` also detects parsed JSON flowing directly or through immutable local aliases into a declared domain contract. Parsing JSON syntax does not validate the target value. Its diagnostic names the receiving type, and validated schema outputs remain valid.
 

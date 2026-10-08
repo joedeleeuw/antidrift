@@ -1,11 +1,11 @@
 import { createRequire } from "node:module";
 
+import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";
 import {
-  antidriftComplexityRules,
-  antidriftTypescriptSyntaxRules,
-  antidriftTypescriptTypeAwareRules,
-  createGovernanceOxlintConfig,
-} from "@joedeleeuw/antidrift/oxlint-config";
+  createConfig as createToolingConfig,
+  typescriptSyntaxRules,
+  typescriptTypeAwareRules,
+} from "@joedeleeuw/typescript-tooling/oxlint";
 import { defineConfig } from "oxlint";
 import type { DummyRuleMap } from "oxlint";
 
@@ -13,21 +13,17 @@ const packageRequire = createRequire(import.meta.url);
 const governance = createGovernanceOxlintConfig({
   repoRoot: import.meta.dirname,
 });
+const tooling = createToolingConfig({ repoRoot: import.meta.dirname });
 const nativePlugins = ["eslint", "import", "oxc", "react", "unicorn"] as const;
-const complexityRules = {
-  complexity: [
-    antidriftComplexityRules.complexity[0],
-    { ...antidriftComplexityRules.complexity[1] },
-  ],
-  "max-depth": [...antidriftComplexityRules["max-depth"]],
-  "max-params": [
-    antidriftComplexityRules["max-params"][0],
-    { ...antidriftComplexityRules["max-params"][1] },
-  ],
-} satisfies DummyRuleMap;
+// Preserve the repository's TypeScript-only scopes rather than widening JavaScript.
+const toolingBaseRules = Object.fromEntries(
+  Object.entries(tooling.rules ?? {}).filter(
+    ([rule]) => !rule.startsWith("typescript/")
+  )
+);
 const typescriptRules = {
-  ...antidriftTypescriptSyntaxRules,
-  ...antidriftTypescriptTypeAwareRules,
+  ...typescriptSyntaxRules,
+  ...typescriptTypeAwareRules,
 } satisfies DummyRuleMap;
 const vitestRules = {
   "vitest/expect-expect": "error",
@@ -40,6 +36,7 @@ const vitestRules = {
 } satisfies DummyRuleMap;
 
 export default defineConfig({
+  ...tooling,
   ...governance,
   categories: {
     ...governance.categories,
@@ -50,19 +47,24 @@ export default defineConfig({
     node: true,
   },
   ignorePatterns: [
-    ...(governance.ignorePatterns ?? []),
+    ...new Set([
+      ...(governance.ignorePatterns ?? []),
+      ...(tooling.ignorePatterns ?? []),
+    ]),
     "tooling/antidrift/src/eslint-plugin/fixtures/programs/**",
     "tooling/antidrift/src/brand/fixtures/programs/**",
     "tooling/antidrift/src/oxlint-plugin/fixtures/programs/**",
   ],
   jsPlugins: [
     ...(governance.jsPlugins ?? []),
+    ...(tooling.jsPlugins ?? []),
     {
       name: "boundaries",
       specifier: packageRequire.resolve("eslint-plugin-boundaries"),
     },
   ],
   options: {
+    ...tooling.options,
     ...governance.options,
     typeAware: true,
   },
@@ -79,8 +81,8 @@ export default defineConfig({
     ],
   },
   rules: {
+    ...toolingBaseRules,
     ...governance.rules,
-    ...complexityRules,
     "react/react-compiler": "error",
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
@@ -156,6 +158,7 @@ export default defineConfig({
     "no-await-in-loop": "error",
   },
   overrides: [
+    ...(tooling.overrides ?? []),
     ...(governance.overrides ?? []),
     {
       files: ["**/*.{ts,tsx,mts,cts}"],

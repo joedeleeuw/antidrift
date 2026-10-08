@@ -6,9 +6,9 @@ export function proveAdoptionPresets({ file, runJson, lintOxlint, work }) {
     [
       "--input-type=module",
       "-e",
-      'import { createAdoptionOxlintConfig, antidriftAdoptionPresets } from "@joedeleeuw/antidrift/adoption-config"; process.stdout.write(JSON.stringify(createAdoptionOxlintConfig({ presets: Object.keys(antidriftAdoptionPresets) })));',
+      'import assert from "node:assert/strict"; import { createAdoptionOxlintConfig, adoptionPresets } from "@joedeleeuw/typescript-tooling/oxlint"; assert.throws(() => createAdoptionOxlintConfig({ presets: [] }), /Select at least one/); assert.throws(() => createAdoptionOxlintConfig({ presets: ["nextjs"] }), /Unknown adoption preset/); assert.deepEqual(Object.keys(createAdoptionOxlintConfig({ presets: ["node"] }).rules), Object.keys(adoptionPresets.node)); const config = createAdoptionOxlintConfig({ presets: Object.keys(adoptionPresets) }); assert.equal(Object.keys(config.rules).length, 436); assert(!config.plugins.includes("nextjs")); process.stdout.write(JSON.stringify(config));',
     ],
-    work,
+    work
   );
   const expected = selection.rules.map((row) => row.id).sort();
   if (
@@ -16,7 +16,7 @@ export function proveAdoptionPresets({ file, runJson, lintOxlint, work }) {
     JSON.stringify(expected)
   ) {
     throw new Error(
-      "Packed adoption presets do not contain the complete native inventory.",
+      "Packed adoption presets do not contain the complete native inventory."
     );
   }
   for (const [name, setting] of Object.entries(config.rules)) {
@@ -40,13 +40,13 @@ export function proveAdoptionPresets({ file, runJson, lintOxlint, work }) {
       "class Controller { value = 1; run() { return this.value; } }",
       'const View = () => <img src="x.png" />;',
       'it("matches", () => { expect(pi).toEqual(3); });',
-    ].join("\n"),
+    ].join("\n")
   );
   const result = lintOxlint("adoption-proof.tsx", "adoption.config.json");
   const fired = new Set(
     (result.diagnostics ?? []).map(
-      (diagnostic) => diagnostic.code.split("(")[0],
-    ),
+      (diagnostic) => diagnostic.code.split("(")[0]
+    )
   );
   for (const preset of config.plugins) {
     if (!fired.has(preset)) {
@@ -54,6 +54,6 @@ export function proveAdoptionPresets({ file, runJson, lintOxlint, work }) {
     }
   }
   console.log(
-    `     native adoption: ${expected.length} error rules; every named preset reports through the packed export`,
+    `     native adoption: ${expected.length} error rules; every named preset reports through the packed export`
   );
 }

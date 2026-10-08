@@ -4,88 +4,16 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  antidriftComplexityRules,
-  createGovernanceOxlintConfig,
-} from "./index.mjs";
-
-function severity(ruleValue) {
-  return Array.isArray(ruleValue) ? ruleValue[0] : ruleValue;
-}
+import { createGovernanceOxlintConfig } from "./index.mjs";
 
 describe("createGovernanceOxlintConfig", () => {
-  it("owns governance plus the TypeScript baseline, without style baselines", () => {
-    const config = createGovernanceOxlintConfig({
-      repoRoot: process.cwd(),
-    });
-
-    expect(config.categories).toEqual({
-      correctness: "off",
-      nursery: "off",
-      pedantic: "off",
-      perf: "off",
-      restriction: "off",
-      style: "off",
-      suspicious: "off",
-    });
-    expect(config.options.typeAware).toBeUndefined();
-    expect(config.plugins).toEqual(["eslint", "typescript"]);
-    expect(config.jsPlugins.map(({ name }) => name)).toEqual([
-      "antidrift",
-      "eslint-comments",
-    ]);
-    expect(severity(config.rules["max-lines"])).toBe("error");
-    expect(severity(config.rules["eslint-comments/disable-enable-pair"])).toBe(
-      "error",
-    );
-    expect(severity(config.rules["antidrift/require-effect-deps"])).toBe(
-      "error",
-    );
-    expect(config.rules["antidrift/no-runtime-typeof"]).toBe("off");
-    expect(config.rules["antidrift/no-raw-react-native-touchables"]).toBe(
-      "off",
-    );
-    expect(config.rules["antidrift/no-conditional-empty-object-spread"]).toBe(
-      "off",
-    );
-    expect(config.rules["antidrift/no-module-mocking"]).toBe("off");
-    expect(config.rules["antidrift/no-object-parameters"]).toBe("off");
-    expect(config.rules["antidrift/no-reflect-apply"]).toBe("off");
-    expect(config.rules["antidrift/no-reflect-get"]).toBe("off");
-    expect(config.rules["antidrift/no-service-constructor-imports"]).toBe(
-      "off",
-    );
-    expect(config.rules["antidrift/no-shape-in-symbol-names"]).toBe("off");
-    expect(config.rules["antidrift/no-unknown-parameters"]).toBe("off");
-    expect(config.rules["antidrift/no-unknown-returns"]).toBe("off");
-    expect(config.rules["antidrift/no-unsafe-dictionary-type"]).toBe("off");
-    expect(config.rules["antidrift/no-unknown-type-aliases"]).toBe("error");
-    expect(config.rules["antidrift/no-unsafe-cast-chain"]).toBe("error");
-    expect(
-      config.rules["antidrift/require-safety-comment-for-type-assertion"],
-    ).toBe("off");
-    expect(config.rules.complexity).toBeUndefined();
-    expect(config.rules["max-depth"]).toBeUndefined();
-    expect(config.rules["max-params"]).toBeUndefined();
-    expect(config.rules["react/react-compiler"]).toBeUndefined();
-    expect(severity(config.rules["typescript/no-explicit-any"])).toBe("error");
-    expect(severity(config.rules["typescript/no-misused-promises"])).toBe(
-      "error",
-    );
-    expect(config.rules["vitest/no-focused-tests"]).toBeUndefined();
-    expect(config.rules["unicorn/no-abusive-eslint-disable"]).toBeUndefined();
-    expect(config.rules["import/no-cycle"]).toBeUndefined();
-    expect(config.rules["boundaries/element-types"]).toBeUndefined();
-    expect(config.settings).toBeUndefined();
-  });
-
   it("derives restricted imports and gateway exemptions from registries", () => {
     const config = createGovernanceOxlintConfig({
       repoRoot: process.cwd(),
     });
     const [, restrictedImports] = config.rules["no-restricted-imports"];
     const restrictedGroups = restrictedImports.patterns.flatMap(
-      ({ group }) => group,
+      ({ group }) => group
     );
 
     expect(restrictedGroups).toEqual(
@@ -95,7 +23,7 @@ describe("createGovernanceOxlintConfig", () => {
         "stripe",
         "@aws-sdk/**",
         "@google-cloud/**",
-      ]),
+      ])
     );
     expect(config.overrides).toEqual(
       expect.arrayContaining([
@@ -103,7 +31,7 @@ describe("createGovernanceOxlintConfig", () => {
           files: ["packages/gateways/src/aiGateway.ts"],
           rules: { "no-restricted-imports": "off" },
         },
-      ]),
+      ])
     );
   });
 
@@ -125,7 +53,7 @@ describe("createGovernanceOxlintConfig", () => {
           "  convex:",
           "    generated: convex/_generated",
           "",
-        ].join("\n"),
+        ].join("\n")
       );
 
       const config = createGovernanceOxlintConfig({
@@ -138,7 +66,7 @@ describe("createGovernanceOxlintConfig", () => {
           "src/routeTree.gen.ts/**",
           "convex/_generated",
           "convex/_generated/**",
-        ]),
+        ])
       );
       expect(config.ignorePatterns).not.toEqual(
         expect.arrayContaining([
@@ -146,7 +74,7 @@ describe("createGovernanceOxlintConfig", () => {
           "**/generated/**",
           "**/*.gen.*",
           "**/*.generated.*",
-        ]),
+        ])
       );
     } finally {
       rmSync(repository, { recursive: true, force: true });
@@ -166,13 +94,13 @@ describe("createGovernanceOxlintConfig", () => {
           "  escaped:",
           "    generated: ../outside",
           "",
-        ].join("\n"),
+        ].join("\n")
       );
 
       expect(() =>
-        createGovernanceOxlintConfig({ repoRoot: repository }),
+        createGovernanceOxlintConfig({ repoRoot: repository })
       ).toThrow(
-        "policy/registries/generated.yaml generatedSources.escaped.generated must be a relative repo path below the repository root.",
+        "policy/registries/generated.yaml generatedSources.escaped.generated must be a relative repo path below the repository root."
       );
     } finally {
       rmSync(repository, { recursive: true, force: true });
@@ -188,14 +116,14 @@ describe("createGovernanceOxlintConfig", () => {
       writeFileSync(
         join(registryDirectory, "generated.yaml"),
         ["generatedSources:", "  widened:", '    generated: "src/**"', ""].join(
-          "\n",
-        ),
+          "\n"
+        )
       );
 
       expect(() =>
-        createGovernanceOxlintConfig({ repoRoot: repository }),
+        createGovernanceOxlintConfig({ repoRoot: repository })
       ).toThrow(
-        "policy/registries/generated.yaml generatedSources.widened.generated must be an exact repo path without glob metacharacters.",
+        "policy/registries/generated.yaml generatedSources.widened.generated must be an exact repo path without glob metacharacters."
       );
     } finally {
       rmSync(repository, { recursive: true, force: true });
@@ -213,32 +141,16 @@ describe("createGovernanceOxlintConfig", () => {
       mkdirSync(registryDirectory, { recursive: true });
       writeFileSync(
         join(registryDirectory, "generated.yaml"),
-        registryLines.join("\n"),
+        registryLines.join("\n")
       );
 
       expect(() =>
-        createGovernanceOxlintConfig({ repoRoot: repository }),
+        createGovernanceOxlintConfig({ repoRoot: repository })
       ).toThrow(
-        "policy/registries/generated.yaml generatedSources.invalid.generated must be a non-empty string.",
+        "policy/registries/generated.yaml generatedSources.invalid.generated must be a non-empty string."
       );
     } finally {
       rmSync(repository, { recursive: true, force: true });
     }
-  });
-
-  it("exports immutable complexity thresholds for explicit consumer scopes", () => {
-    expect(antidriftComplexityRules).toEqual({
-      complexity: ["error", { max: 25, variant: "modified" }],
-      "max-depth": ["error", 4],
-      "max-params": ["error", { max: 7 }],
-    });
-    expect(Object.isFrozen(antidriftComplexityRules)).toBe(true);
-    expect(Object.isFrozen(antidriftComplexityRules.complexity)).toBe(true);
-    expect(Object.isFrozen(antidriftComplexityRules.complexity[1])).toBe(true);
-    expect(Object.isFrozen(antidriftComplexityRules["max-depth"])).toBe(true);
-    expect(Object.isFrozen(antidriftComplexityRules["max-params"])).toBe(true);
-    expect(Object.isFrozen(antidriftComplexityRules["max-params"][1])).toBe(
-      true,
-    );
   });
 });
