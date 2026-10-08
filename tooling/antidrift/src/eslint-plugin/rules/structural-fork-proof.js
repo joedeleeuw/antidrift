@@ -74,7 +74,8 @@ export function sortedProps(props) {
   );
 }
 export function structuralCandidateRank(candidate) {
-  return candidate.authorityState === "accepted" ? 0 : 1;
+  if (candidate.authorityState !== "accepted") return 2;
+  return candidate.requiresProvenance ? 1 : 0;
 }
 export function sortedStructuralCandidates(candidates) {
   return [...candidates].sort(
@@ -126,6 +127,7 @@ export function emitStructuralMatchFact(context, node, ruleId, proof) {
 export function structuralDiagnosticFor(candidate, messageId, relation) {
   if (
     candidate.authorityState === "accepted" &&
+    !candidate.requiresProvenance &&
     relation === "exact-owner-copy"
   ) {
     return { emitted: true, messageId };
@@ -133,7 +135,9 @@ export function structuralDiagnosticFor(candidate, messageId, relation) {
   if (candidate.authorityState === "accepted") {
     return {
       emitted: false,
-      reason: `structural-relation-${relation}`,
+      reason: candidate.requiresProvenance
+        ? "owner-use-unproven"
+        : `structural-relation-${relation}`,
     };
   }
   return {

@@ -23,6 +23,7 @@ export interface StructuralTypeCandidate {
   detailedProps?: Map<string, StructuralProperty>;
   authority: TypeOwnerAuthority;
   authorityState: TypeOwnerAuthorityState;
+  requiresProvenance?: boolean;
   ownerKey?: string;
 }
 

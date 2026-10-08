@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix implicit Convex ownership false positives: exact shape alone is inventory, not proof that an independent local contract forks the API. Require a proven contextual owner use for automatic owners, and detect cross-file named alias/interface argument copies consumed by real API calls, including `FunctionArgs<Query> | "skip"` contexts. Keep explicit generated/package/domain exact-match policy, shared property equivalence, output provenance, and whole-Program discovery unchanged.
+
 ## 0.15.0
 
 - **Breaking:** extract reusable generic enforcement into the independent `@joedeleeuw/typescript-tooling` package. Antidrift's ESLint factory now owns only its custom TypeChecker rules; its Oxlint governance factory owns custom drift rules, registry-aware restricted imports, generated ignores, and gateway exemptions. Compose tooling's `/eslint` and `/oxlint` entrypoints explicitly to retain SQL safety, enum/React 19 restrictions, lint-directive checks, the 1500-line cap, and the conditional native TypeScript baseline.

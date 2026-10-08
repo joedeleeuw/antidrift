@@ -117,8 +117,8 @@ function candidateForType(checker, type, label, metadata = {}) {
   // so provenance consumers can inspect the full owner contract and its branches.
   const props = typeProps(checker, type);
   // Discovery proposals stay at MIN_PROPS to keep coincidence noise out;
-  // explicitly accepted owners are authoritative at any size, down to one
-  // property, so small Convex results and arguments can be enforced.
+  // accepted owners remain available at any size, down to one property.
+  // Automatically discovered Convex owners require a proven contextual use.
   const minimum = metadata.authorityState === "accepted" ? 1 : MIN_PROPS;
   if (!acceptedObjectUnion && props.size < minimum) return null;
   return {
@@ -449,6 +449,7 @@ function typeOfSymbol(checker, sym) {
 const convexOwnerMetadata = {
   authority: "generated-source",
   authorityState: "accepted",
+  requiresProvenance: true,
 };
 
 // DataModel maps each table name to a TableInfo whose `document` property is exactly

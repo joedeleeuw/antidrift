@@ -117,6 +117,17 @@ function ownerProjections(checker, candidates) {
   return owners;
 }
 
+function contextualOwner(checker, owners, type) {
+  type = nonNullable(checker, type);
+  const owner = owners.get(type);
+  if (owner) return owner;
+  if (!type?.isUnion() || !boundedType(checker, type)) return null;
+  const objects = type.types.filter(
+    (part) => part.flags & (ts.TypeFlags.Object | ts.TypeFlags.Intersection),
+  );
+  return objects.length === 1 ? owners.get(objects[0]) : null;
+}
+
 function declaredPathType(checker, path) {
   let type = checker.getTypeOfSymbol(path.symbol);
   for (const field of path.path) {
@@ -673,6 +684,18 @@ export function collectOwnedContractProvenance(program, checker, candidates) {
     );
   }
   function consumer(node) {
+    if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) return;
+    // Direct calls carry the same checker-owned output as call-initialized
+    // bindings accepted by trustedSource; no lookalike return shape qualifies.
+    if (ts.isCallExpression(node)) {
+      const owner = owners.get(
+        nonNullable(checker, checker.getTypeAtLocation(node)),
+      );
+      const contextual = checker.getContextualType(node);
+      if (owner && contextual) {
+        collectLocalCopies(checker, contextual, owner, node, findings);
+      }
+    }
     if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
       const path = valuePath(checker, node);
       const contextual = checker.getContextualType(node);
@@ -681,6 +704,10 @@ export function collectOwnedContractProvenance(program, checker, candidates) {
         const owner = trustedSource(checker, node) && owners.get(actual);
         if (owner) {
           collectLocalCopies(checker, contextual, owner, node, findings);
+        }
+        const inputOwner = contextualOwner(checker, owners, contextual);
+        if (inputOwner) {
+          collectLocalCopies(checker, actual, inputOwner, node, findings);
         }
         for (const bridge of bridges.get(path.symbol) ?? []) {
           if (samePath(path, bridge)) {
