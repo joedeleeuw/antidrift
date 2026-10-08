@@ -17,12 +17,20 @@ export function requireTenant(context: RequestContext): string {
   return context.tenantId;
 }
 
-export function authorize(principal: Principal, action: "project:update"): void {
+export function authorize(
+  principal: Principal,
+  action: "project:update",
+): void {
   if (!canManageProject(principal)) {
-    throw new Error("Forbidden", { cause: { principalId: principal.id, action } });
+    throw new Error("Forbidden", {
+      cause: { principalId: principal.id, action },
+    });
   }
 }
 
-export function validateInput<TOutput>(schema: z.ZodSchema<TOutput>, input: unknown): TOutput {
+export function validateInput<TOutput>(
+  schema: z.ZodSchema<TOutput>,
+  input: unknown,
+): TOutput {
   return schema.parse(input);
 }
