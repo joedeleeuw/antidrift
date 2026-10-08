@@ -11,7 +11,6 @@ import {
   requireTypeServices,
 } from "./type-services.js";
 import {
-  claimStructuralDiagnostic,
   emitStructuralMatchFact,
   findStructuralProof,
   isAllOptionalObjectShape,
@@ -80,7 +79,6 @@ export function ruleNoCanonicalModelFork() {
         for (let parent = tsNode; parent; parent = parent.parent) {
           if (reported.has(parent)) return;
         }
-        if (!claimStructuralDiagnostic(context, tsNode)) return;
         reported.add(tsNode);
         emitStructuralMatchFact(
           context,
@@ -121,6 +119,8 @@ export function ruleNoCanonicalModelFork() {
         const local = typeProps(checker, declared);
         const localDetailed = typePropsDetailed(checker, declared);
         const proof = findStructuralProof(
+          checker,
+          declared,
           sym,
           local,
           localDetailed,
@@ -136,10 +136,7 @@ export function ruleNoCanonicalModelFork() {
           "antidrift/no-canonical-model-fork",
           proof,
         );
-        if (
-          proof.diagnostic.emitted &&
-          claimStructuralDiagnostic(context, tsNode)
-        ) {
+        if (proof.diagnostic.emitted) {
           reported.add(tsNode);
           context.report({
             node,

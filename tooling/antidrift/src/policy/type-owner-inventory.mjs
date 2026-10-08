@@ -363,6 +363,7 @@ function collectLocalTypes(
                 localName: node.name.text,
                 test,
                 detailedProps,
+                type: declared,
               });
             }
           }
@@ -386,13 +387,16 @@ const relationRank = {
   "partial-owner-copy": 2,
 };
 
-function strongestRelation(localDetailed, candidates) {
+function strongestRelation(checker, local, candidates) {
   let best = null;
   for (const candidate of sortedStructuralCandidates(candidates)) {
     if (!candidate.detailedProps) continue;
     const relation = classifyStructuralRelation(
-      localDetailed,
+      local.detailedProps,
       candidate.detailedProps,
+      checker,
+      local.type,
+      candidate.type,
     );
     if (!relation) continue;
     if (best && relationRank[relation] >= relationRank[best.relation]) {
@@ -513,7 +517,7 @@ function runPlan(plan, targetsOverride) {
   );
   const rows = [];
   for (const local of locals) {
-    const best = strongestRelation(local.detailedProps, candidates);
+    const best = strongestRelation(checker, local, candidates);
     if (!best) continue;
     rows.push({
       file: local.file,

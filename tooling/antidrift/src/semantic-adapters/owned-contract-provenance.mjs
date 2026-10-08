@@ -1,19 +1,17 @@
 import ts from "typescript";
+import {
+  boundedType,
+  dataProperty,
+  equivalentType,
+  objectType,
+  propertyModifiers,
+} from "./contract-types.mjs";
 
 const cache = new WeakMap();
 const maxDepth = 8;
 
 function nonNullable(checker, type) {
   return type && checker.getNonNullableType(type);
-}
-
-function objectType(type) {
-  return Boolean(
-    type &&
-    (type.isUnion()
-      ? type.types.every(objectType)
-      : type.flags & ts.TypeFlags.Object),
-  );
 }
 
 function propertyType(checker, type, name) {
@@ -78,9 +76,28 @@ function ownerProjections(checker, candidates) {
   function visit(type, candidate, label, depth, seen) {
     type = nonNullable(checker, type);
     if (!objectType(type) || depth === 0 || seen.has(type)) return;
+    // Labels describe evidence; they are not competing type identities. Preserve
+    // every accepted route to this exact checker type instead of picking a label.
     const existing = owners.get(type);
-    if (!owners.has(type)) owners.set(type, { ...candidate, type, label });
-    else if (existing?.label !== label) owners.set(type, null);
+    const sources = existing?.sources ?? new Map();
+    sources.set(`${candidate.authority}:${label}`, {
+      authority: candidate.authority,
+      label,
+      root: candidate.type,
+    });
+    owners.set(type, {
+      type,
+      sources,
+      roots: new Set([...sources.values()].map((source) => source.root)),
+      authority: [
+        ...new Set([...sources.values()].map((source) => source.authority)),
+      ]
+        .sort()
+        .join(" | "),
+      label: [...new Set([...sources.values()].map((source) => source.label))]
+        .sort()
+        .join(" | "),
+    });
     const next = new Set([...seen, type]);
     for (const property of checker.getPropertiesOfType(type)) {
       visit(
@@ -98,16 +115,6 @@ function ownerProjections(checker, candidates) {
     }
   }
   return owners;
-}
-
-function dataProperty(property) {
-  return (
-    property &&
-    !(property.declarations ?? []).some(
-      (node) =>
-        ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node),
-    )
-  );
 }
 
 function declaredPathType(checker, path) {
@@ -339,24 +346,92 @@ function trustedSource(checker, expression, seen = new Set()) {
   return trustedSource(checker, initializer, new Set([...seen, path.symbol]));
 }
 
-function referenceComposition(node) {
-  if (ts.isParenthesizedTypeNode(node)) return referenceComposition(node.type);
-  if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
-    return node.types.some(referenceComposition);
+function ownerTypes(checker, owner) {
+  const visited = new Set();
+  function visit(type, depth) {
+    if (depth === 0 || visited.has(type)) return;
+    visited.add(type);
+    if (!objectType(type)) return;
+    for (const property of checker.getPropertiesOfType(type)) {
+      visit(nonNullable(checker, checker.getTypeOfSymbol(property)), depth - 1);
+    }
   }
-  if (ts.isArrayTypeNode(node)) return referenceComposition(node.elementType);
-  if (ts.isTypeLiteralNode(node)) {
-    return node.members.some(
-      (member) => member.type && referenceComposition(member.type),
+  for (const root of owner.roots) visit(root, maxDepth);
+  return visited;
+}
+
+// A reference is a derivation only when it resolves back to an accepted owner.
+// Primitive identity alone is insufficient: `type Text = string` owns no field.
+function ownerReference(checker, node, owner, seen = new Set()) {
+  if (!node || seen.has(node)) return false;
+  const next = new Set([...seen, node]);
+  if (ts.isParenthesizedTypeNode(node)) {
+    return ownerReference(checker, node.type, owner, next);
+  }
+  if (ts.isIndexedAccessTypeNode(node)) {
+    return ownerReference(checker, node.objectType, owner, next);
+  }
+  if (ts.isTypeReferenceNode(node) || ts.isImportTypeNode(node)) {
+    const type = checker.getTypeFromTypeNode(node);
+    const ownedTypes = ownerTypes(checker, owner);
+    // Primitive identity alone is globally shared; only an actual alias or
+    // object identity can establish a direct owner reference.
+    if ((objectType(type) || type.aliasSymbol) && ownedTypes.has(type)) {
+      return true;
+    }
+    const properties = checker.getPropertiesOfType(type);
+    if (
+      properties.length &&
+      [...ownedTypes].some(
+        (owned) =>
+          objectType(owned) &&
+          properties.every((property) => {
+            const original = checker.getPropertyOfType(owned, property.name);
+            return (
+              original &&
+              property.declarations?.length &&
+              property.declarations.every((declaration) =>
+                original.declarations?.includes(declaration),
+              )
+            );
+          }),
+      )
+    ) {
+      return true;
+    }
+    let symbol = ts.isTypeReferenceNode(node)
+      ? checker.getSymbolAtLocation(node.typeName)
+      : type.aliasSymbol;
+    if (symbol?.flags & ts.SymbolFlags.Alias) {
+      symbol = checker.getAliasedSymbol(symbol);
+    }
+    return (symbol?.declarations ?? []).some(
+      (declaration) =>
+        ts.isTypeAliasDeclaration(declaration) &&
+        ownerReference(checker, declaration.type, owner, next),
     );
   }
-  return (
-    ts.isTypeReferenceNode(node) ||
-    ts.isIndexedAccessTypeNode(node) ||
-    ts.isTypeQueryNode(node) ||
-    ts.isImportTypeNode(node) ||
-    ts.isMappedTypeNode(node)
-  );
+  return false;
+}
+
+function derivedComposition(checker, node, owner) {
+  if (ownerReference(checker, node, owner)) return true;
+  if (ts.isParenthesizedTypeNode(node)) {
+    return derivedComposition(checker, node.type, owner);
+  }
+  if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
+    return node.types.every((part) => derivedComposition(checker, part, owner));
+  }
+  if (ts.isTypeLiteralNode(node)) {
+    return (
+      node.members.length > 0 &&
+      node.members.every(
+        (member) =>
+          member.type && derivedComposition(checker, member.type, owner),
+      )
+    );
+  }
+  return false;
 }
 
 function handwritten(typeNode) {
@@ -389,20 +464,12 @@ function handwrittenNode(checker, node, seen = new Set()) {
   return null;
 }
 
-function localPropertyNode(checker, property, ownerProperty) {
-  const ownerType = checker.getTypeOfSymbol(ownerProperty);
+function localPropertyNode(checker, property, owner) {
   for (const declaration of property?.declarations ?? []) {
     if (!ts.isPropertySignature(declaration)) continue;
-    if (
-      ts.isTypeReferenceNode(declaration.type) &&
-      checker.getTypeFromTypeNode(declaration.type).aliasSymbol &&
-      checker.getTypeFromTypeNode(declaration.type).aliasSymbol ===
-        ownerType.aliasSymbol
-    ) {
-      continue;
-    }
+    if (derivedComposition(checker, declaration.type, owner)) continue;
     const node = handwrittenNode(checker, declaration.type);
-    if (node && !referenceComposition(node)) return node;
+    if (node && !derivedComposition(checker, node, owner)) return node;
   }
   return null;
 }
@@ -415,108 +482,6 @@ function directTypeNode(type) {
         ts.isTypeLiteralNode(node) ||
         (ts.isInterfaceDeclaration(node) && !node.heritageClauses?.length),
     ) ?? null
-  );
-}
-
-function propertyModifiers(property) {
-  return {
-    optional: Boolean(property.flags & ts.SymbolFlags.Optional),
-    readonly: (property.declarations ?? []).some((node) =>
-      (ts.getModifiers(node) ?? []).some(
-        (modifier) => modifier.kind === ts.SyntaxKind.ReadonlyKeyword,
-      ),
-    ),
-    method: (property.declarations ?? []).some(
-      (node) => ts.isMethodSignature(node) || ts.isMethodDeclaration(node),
-    ),
-  };
-}
-
-function boundedType(checker, type, depth = maxDepth, seen = new Set()) {
-  if (
-    !type ||
-    type.flags &
-      (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.TypeParameter)
-  ) {
-    return false;
-  }
-  if (seen.has(type)) return true;
-  if (depth === 0) return false;
-  const next = new Set([...seen, type]);
-  if (type.isUnionOrIntersection()) {
-    return type.types.every((part) =>
-      boundedType(checker, part, depth - 1, next),
-    );
-  }
-  if (!(type.flags & ts.TypeFlags.Object)) return true;
-  if (
-    checker.getSignaturesOfType(type, ts.SignatureKind.Call).length ||
-    checker.getSignaturesOfType(type, ts.SignatureKind.Construct).length ||
-    checker.getIndexInfosOfType(type).length
-  ) {
-    return false;
-  }
-  return checker
-    .getPropertiesOfType(type)
-    .every(
-      (property) =>
-        dataProperty(property) &&
-        boundedType(
-          checker,
-          checker.getTypeOfSymbol(property),
-          depth - 1,
-          next,
-        ),
-    );
-}
-
-function equivalentType(
-  checker,
-  left,
-  right,
-  depth = maxDepth,
-  seen = new Map(),
-) {
-  if (
-    !checker.isTypeAssignableTo(left, right) ||
-    !checker.isTypeAssignableTo(right, left)
-  ) {
-    return false;
-  }
-  if (left === right || seen.get(left) === right) return true;
-  if (depth === 0) return false;
-  const next = new Map([...seen, [left, right]]);
-  const leftParts = left.isUnion() ? left.types : [left];
-  const rightParts = right.isUnion() ? right.types : [right];
-  if (left.isUnion() || right.isUnion()) {
-    return (
-      leftParts.length === rightParts.length &&
-      leftParts.every((part) =>
-        rightParts.some((other) =>
-          equivalentType(checker, part, other, depth - 1, next),
-        ),
-      )
-    );
-  }
-  if (!objectType(left) || !objectType(right)) return true;
-  const properties = checker.getPropertiesOfType(left);
-  return (
-    properties.length === checker.getPropertiesOfType(right).length &&
-    properties.every((property) => {
-      const other = checker.getPropertyOfType(right, property.name);
-      return (
-        other &&
-        JSON.stringify(propertyModifiers(property)) ===
-          JSON.stringify(propertyModifiers(other)) &&
-        equivalentType(
-          checker,
-          checker.getTypeOfSymbol(property),
-          checker.getTypeOfSymbol(other),
-          depth - 1,
-          next,
-        )
-      );
-    })
   );
 }
 
@@ -598,7 +563,7 @@ function collectLocalCopies(
       (member) =>
         ts.isPropertySignature(member) &&
         member.type &&
-        !referenceComposition(member.type),
+        !derivedComposition(checker, member.type, owner),
     )
   ) {
     findings.set(
@@ -614,8 +579,7 @@ function collectLocalCopies(
     return;
   }
   for (const property of matching) {
-    const ownerProperty = checker.getPropertyOfType(owner.type, property.name);
-    const node = localPropertyNode(checker, property, ownerProperty);
+    const node = localPropertyNode(checker, property, owner);
     if (
       node &&
       !node.getSourceFile().isDeclarationFile &&

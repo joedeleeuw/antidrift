@@ -168,21 +168,6 @@ export function scaffoldConsumerWorkspace({ file, tarball }) {
       "});\n",
   );
   file(
-    "eslint.inventory.config.mjs",
-    'import { createConfig } from "@joedeleeuw/antidrift/eslint-config";\n' +
-      "\n" +
-      "export default [\n" +
-      "  ...createConfig({\n" +
-      "    tsconfigRootDir: import.meta.dirname,\n" +
-      "  }),\n" +
-      "  {\n" +
-      "    rules: {\n" +
-      '      "antidrift/no-underchecked-type-predicate": "error",\n' +
-      "    },\n" +
-      "  },\n" +
-      "];\n",
-  );
-  file(
     "oxlint.config.mjs",
     'import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
       "\n" +

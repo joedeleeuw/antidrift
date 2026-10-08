@@ -102,11 +102,11 @@ try {
   const semanticFactFile = join(work, "semantic-facts.jsonl");
   rmSync(semanticFactFile, { force: true });
 
-  function lint(relFile, config = "eslint.config.mjs") {
+  function lint(relFile) {
     try {
       return runJson(
         pnpmBinary,
-        ["exec", "eslint", relFile, "--format", "json", "--config", config],
+        ["exec", "eslint", relFile, "--format", "json"],
         work,
       );
     } catch (error) {
@@ -195,6 +195,10 @@ try {
   rmSync(join(work, "adoption-proof.tsx"));
   rmSync(join(work, "adoption.config.json"));
 
+  file(
+    "wrapping-default-proof.ts",
+    "declare const owner: { load(id: string): string };\nexport function loadItem(id: string) { return owner.load(id); }\nexport const readItem = (id: string) => owner.load(id);\nexport const area = (radius: number) => Math.PI * radius ** 2;\n",
+  );
   const repositoryDiagnostics = lintOxlintRepository().diagnostics ?? [];
   const moduleSizeDiagnostics = repositoryDiagnostics.filter(
     ({ code }) => code === "eslint(max-lines)",
@@ -232,7 +236,9 @@ try {
   }
 
   const boundaryWrappers = repositoryDiagnostics.filter(
-    ({ code }) => code === "antidrift(no-wrapping-functions)",
+    ({ code, filename }) =>
+      code === "antidrift(no-wrapping-functions)" &&
+      filename !== "wrapping-default-proof.ts",
   );
   if (
     boundaryWrappers.length !== 4 ||
@@ -247,11 +253,7 @@ try {
     );
   }
 
-  file(
-    "wrapping-default-proof.ts",
-    "declare const owner: { load(id: string): string };\nexport function loadItem(id: string) { return owner.load(id); }\nexport const readItem = (id: string) => owner.load(id);\nexport const area = (radius: number) => Math.PI * radius ** 2;\n",
-  );
-  const wrappingDiagnostics = lintOxlintRepository().diagnostics.filter(
+  const wrappingDiagnostics = repositoryDiagnostics.filter(
     ({ filename }) => filename === "wrapping-default-proof.ts",
   );
   if (
@@ -325,7 +327,6 @@ try {
   );
   const undercheckedPredicateRules = lint(
     "packages/app/src/underchecked-predicate.ts",
-    "eslint.inventory.config.mjs",
   ).flatMap((r) => r.messages.map((m) => m.ruleId));
 
   if (packageCopyRules.includes(RULE)) {
@@ -715,7 +716,7 @@ try {
     `\n✓ tarball installs, type-checks, imports, and enforces in a consumer monorepo`,
   );
   console.log(
-    `  focused governance rejected oversized root, Convex, script, fixture, test, and undeclared generated-looking modules while ignoring registry-declared generated code, declarations, and raw JSON; consumer precedence disabled max-lines, the default typed config loaded registry owners and fired ${RULE} on drift.ts, the inventory config checked a TypeScript 6 broad-input predicate, async-array shipped behavior matched default and opt-in branch expectations, a structuralMatch fact was emitted, and clean.ts/package-copy.ts stayed clean; public exports and semantic adapters passed Bundler and NodeNext.`,
+    `  focused governance rejected oversized root, Convex, script, fixture, test, and undeclared generated-looking modules while ignoring registry-declared generated code, declarations, and raw JSON; consumer precedence disabled max-lines, the default typed config loaded registry owners and fired ${RULE} on drift.ts, the default typed config checked a TypeScript 6 broad-input predicate, async-array shipped behavior matched default and opt-in branch expectations, a structuralMatch fact was emitted, and clean.ts/package-copy.ts stayed clean; public exports and semantic adapters passed Bundler and NodeNext.`,
   );
   rmSync(work, { recursive: true, force: true });
 } catch (error) {

@@ -1,3 +1,4 @@
+import { equivalentType } from "../../semantic-adapters/contract-types.mjs";
 import { emitSemanticFact } from "../../policy/lib/semantic-facts.mjs";
 
 export const structuralDerivationUtilities = new Set([
@@ -7,13 +8,20 @@ export const structuralDerivationUtilities = new Set([
   "Readonly",
   "Required",
 ]);
-// Classify a local type against an owner using full-fidelity fingerprints.
+// Classify using checker types and declaration modifiers, never printed type
+// names. Fingerprints remain the serialized inventory/fact representation.
 // - exact-owner-copy: same properties, same types, same optionality/readonly/method-ness
 // - loosened-owner-copy: same properties and types, but local relaxes optionality or drops readonly
 // - partial-owner-copy: local is a strict subset of the owner, every local property exact
 // Tightened copies (required where the owner is optional) and any other shape
 // difference are deliberately unmatched.
-export function classifyStructuralRelation(local, owner) {
+export function classifyStructuralRelation(
+  local,
+  owner,
+  checker,
+  localType,
+  ownerType,
+) {
   if (local.size === 0 || owner.size === 0 || local.size > owner.size) {
     return null;
   }
@@ -26,7 +34,11 @@ export function classifyStructuralRelation(local, owner) {
       return null;
     }
     if (
-      localProp.type !== ownerProp.type ||
+      !equivalentType(
+        checker,
+        checker.getTypeOfSymbol(checker.getPropertyOfType(localType, name)),
+        checker.getTypeOfSymbol(checker.getPropertyOfType(ownerType, name)),
+      ) ||
       localProp.method !== ownerProp.method
     ) {
       return null;
@@ -47,7 +59,11 @@ export function classifyStructuralRelation(local, owner) {
       }
     }
   }
-  if (exact) return "exact-owner-copy";
+  if (exact) {
+    return equivalentType(checker, localType, ownerType)
+      ? "exact-owner-copy"
+      : null;
+  }
   if (loosened) return "loosened-owner-copy";
   if (subset && local.size < owner.size) return "partial-owner-copy";
   return null;
@@ -125,28 +141,6 @@ export function structuralDiagnosticFor(candidate, messageId, relation) {
     reason: "owner-authority-unaccepted",
   };
 }
-// Both owner rules may be enabled for the same accepted contract. A lint run
-// reports one diagnostic per copied annotation, including ancestor overlaps.
-const reportedContracts = new WeakMap();
-export function claimStructuralDiagnostic(context, node) {
-  const source = context.sourceCode ?? context.getSourceCode();
-  let claimed = reportedContracts.get(source);
-  if (!claimed) {
-    claimed = new Set();
-    reportedContracts.set(source, claimed);
-  }
-  for (const previous of claimed) {
-    for (let ancestor = node; ancestor; ancestor = ancestor.parent) {
-      if (ancestor === previous) return false;
-    }
-    for (let ancestor = previous; ancestor; ancestor = ancestor.parent) {
-      if (ancestor === node) return false;
-    }
-  }
-  claimed.add(node);
-  return true;
-}
-
 const relationRank = {
   "exact-owner-copy": 0,
   "loosened-owner-copy": 1,
@@ -154,6 +148,8 @@ const relationRank = {
 };
 
 export function findStructuralProof(
+  checker,
+  declared,
   sym,
   local,
   localDetailed,
@@ -166,6 +162,9 @@ export function findStructuralProof(
     const relation = classifyStructuralRelation(
       localDetailed,
       candidate.detailedProps,
+      checker,
+      declared,
+      candidate.type,
     );
     if (!relation) continue;
     if (best && relationRank[relation] >= relationRank[best.relation]) {
