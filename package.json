@@ -53,7 +53,7 @@
   },
   "devDependencies": {
     "@joedeleeuw/antidrift": "workspace:*",
-    "@joedeleeuw/typescript-tooling": "github:joedeleeuw/typescript-tooling#097019b1fb0fec18872b20ef9bfadee04a2155a3",
+    "@joedeleeuw/typescript-tooling": "github:joedeleeuw/typescript-tooling#4388458794287c49242ca250ba27812d9553d78b",
     "@types/node": "catalog:core",
     "eslint": "catalog:lint",
     "eslint-plugin-boundaries": "^5.0.1",
