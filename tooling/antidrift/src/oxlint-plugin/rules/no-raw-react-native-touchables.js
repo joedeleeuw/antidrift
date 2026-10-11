@@ -115,20 +115,20 @@ function shouldReportSpecifier(specifier, forbidden) {
   };
 }
 
-function report(
-  context,
-  node,
-  source,
-  imported,
-  replacementImport,
-  broad = false
-) {
+function messageId(owned, broad) {
+  if (broad) {
+    return owned ? "rawTouchableNamespace" : "unownedTouchableNamespace";
+  }
+  return owned ? "rawTouchableImport" : "unownedTouchableImport";
+}
+
+function report(context, node, source, imported, options, broad = false) {
   context.report({
     node,
-    messageId: broad ? "rawTouchableNamespace" : "rawTouchableImport",
+    messageId: messageId(options.allowedFiles.length > 0, broad),
     data: {
       imported,
-      replacementImport,
+      replacementImport: options.replacementImport,
       source,
     },
   });
@@ -161,6 +161,10 @@ export default function ruleNoRawReactNativeTouchables() {
           'Raw {{imported}} access from "{{source}}" bypasses the app-owned interaction policy. Import the shared Touchable from {{replacementImport}} and choose a named feedback preset. If this needs router-link or custom gesture semantics, add a narrow app-owned adapter and register only its owner file in allowedFiles.',
         rawTouchableNamespace:
           'Raw {{imported}} access from "{{source}}" can bypass the app-owned interaction policy. Import non-interaction APIs by name. For a touch target, import the shared Touchable from {{replacementImport}} and choose a named feedback preset; custom semantics belong in a narrow registered adapter.',
+        unownedTouchableImport:
+          'Raw {{imported}} access from "{{source}}" bypasses a shared Touchable, and this rule has no owner configured. Create one shared Touchable module, import it everywhere instead of raw React Native touchables, and set that module as this rule\'s owner in allowedFiles so the owner file alone may import the raw primitives.',
+        unownedTouchableNamespace:
+          'Raw {{imported}} access from "{{source}}" can bypass a shared Touchable, and this rule has no owner configured. Import non-interaction APIs by name. For touch targets, create one shared Touchable module, import it everywhere instead of raw React Native touchables, and set that module as this rule\'s owner in allowedFiles so the owner file alone may import the raw primitives.',
       },
     },
     create(context) {
@@ -184,7 +188,7 @@ export default function ruleNoRawReactNativeTouchables() {
                 specifier,
                 source,
                 result.imported,
-                options.replacementImport,
+                options,
                 result.broad
               );
             }
@@ -194,14 +198,7 @@ export default function ruleNoRawReactNativeTouchables() {
           if (isTypeOnly(node)) return;
           const source = sourceName(node);
           if (!source || !forbiddenImports.has(source)) return;
-          report(
-            context,
-            node,
-            source,
-            "namespace re-export",
-            options.replacementImport,
-            true
-          );
+          report(context, node, source, "namespace re-export", options, true);
         },
         ExportNamedDeclaration(node) {
           if (isTypeOnly(node)) return;
@@ -217,7 +214,7 @@ export default function ruleNoRawReactNativeTouchables() {
                 specifier,
                 source,
                 result.imported,
-                options.replacementImport,
+                options,
                 result.broad
               );
             }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `no-raw-react-native-touchables`: every React Native repository routes presses through one shared Touchable. With no `allowedFiles` owner configured, each raw touchable import reports with advice to create one shared Touchable module, import it everywhere, and register it as the rule's owner so the owner file alone may import the raw primitives; the configured exact-owner exemption and its remediation message are unchanged
+
 - `unknown-input-must-be-decoded`: decoders own their unknown parameter. Parameters of type predicates and assertion functions (`x is T`, `asserts x is T`) are exempt, as are helpers whose single returned expression only narrows the parameter (typeof, `in`, instanceof, `Array.isArray` and null checks joined by `&&` or `||`, with a final property comparison). Casts and unnarrowed reads still report
 
 - `no-calling-components-as-functions`: report only when the callee resolves in scope to a function or arrow that lexically returns JSX, or to a `forwardRef`/`memo` wrapper. Imported and otherwise unresolvable callees are no longer reported, so action creators, minified bundles and generated clients stay clean

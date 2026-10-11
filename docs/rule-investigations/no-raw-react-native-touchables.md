@@ -17,6 +17,8 @@ The import or re-export syntax is the policy violation. The rule requires no typ
 
 `allowedFiles` contains exact repository-relative owner paths with at least one directory segment and no glob, parent, or absolute-path syntax. Each entry matches either the whole normalized filename or that fully qualified repository-relative suffix. The rule does not infer owners from component names and does not allow feature-level exceptions. A legitimate router-link or custom-gesture exception belongs behind a narrow app-owned adapter in a registered owner file.
 
+Every React Native repository routes presses through one shared Touchable. With no `allowedFiles` entry configured, the rule still reports every raw import, and the message tells the repository to create one shared Touchable module, import it everywhere instead, and register that module in `allowedFiles` so the owner file alone may import the raw primitives.
+
 ## Desired replacement
 
 Import the shared `Touchable`, choose a named feedback preset, and preserve semantic action behavior at the call site. Router links and genuinely custom gestures should use a narrow app-owned adapter rather than a raw primitive import.

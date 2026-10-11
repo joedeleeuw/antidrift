@@ -383,17 +383,40 @@ describe("Oxlint plugin", () => {
     expect(result.status).toBe(0);
   });
 
-  it.each(rawTouchableImportCases)("rejects $label", ({ source }) => {
-    const result = lint(source, {
-      "antidrift/no-raw-react-native-touchables": "error",
-    });
-    const output = `${result.stdout}${result.stderr}`;
+  it.each(rawTouchableImportCases)(
+    "rejects $label with owner advice when no owner is configured",
+    ({ source }) => {
+      const result = lint(source, {
+        "antidrift/no-raw-react-native-touchables": "error",
+      });
+      const output = `${result.stdout}${result.stderr}`;
 
-    expect(result.status).toBe(1);
-    expect(output).toContain("antidrift(no-raw-react-native-touchables)");
-    expect(output).toMatch(/import the shared Touchable/iu);
-    expect(output).toContain("choose a named feedback preset");
-  });
+      expect(result.status).toBe(1);
+      expect(output).toContain("antidrift(no-raw-react-native-touchables)");
+      expect(output).toMatch(/create one shared Touchable module/iu);
+      expect(output).toContain(
+        "set that module as this rule's owner in allowedFiles"
+      );
+    }
+  );
+
+  it.each(rawTouchableImportCases)(
+    "rejects $label outside the configured owner",
+    ({ source }) => {
+      const ownedLint = lint(source, {
+        "antidrift/no-raw-react-native-touchables": [
+          "error",
+          { allowedFiles: ["apps/client/src/tw/index.tsx"] },
+        ],
+      });
+      const output = `${ownedLint.stdout}${ownedLint.stderr}`;
+
+      expect(ownedLint.status).toBe(1);
+      expect(output).toContain("antidrift(no-raw-react-native-touchables)");
+      expect(output).toMatch(/import the shared Touchable/iu);
+      expect(output).toContain("choose a named feedback preset");
+    }
+  );
 
   it("allows non-touchable platform imports and the shared primitive", () => {
     const result = lint(
