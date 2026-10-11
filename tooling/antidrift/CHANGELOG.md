@@ -1,6 +1,6 @@
 # changelog
 
-## Unreleased
+## 0.15.0
 
 - `no-schema-library-in-test`: schema-library value imports report only for test-owned validation, reads or sanitizing. Schema values and errors that flow straight into application APIs (call or constructor arguments, JSX props), e.g. `generateForm(z.object(...))` or `new FormError(new ZodError([]))`, are allowed; dynamic `import()` and side-effect imports still report
 
@@ -51,8 +51,6 @@
 - add directive rules, each naming its AGENT.md directive in the rule registry's new `directive` field (validated against a declared `directives` table): `no-pass-through-parameters` (G22), `no-vague-names` (G21) and `no-compat-names` (G5) at error in the ESLint pass, ratcheted by `eslint-suppressions.json`; `no-fallback-to-empty` (G7, promoted from research), `no-else-if-chain` (G9), `no-hash-literal` (S1), `no-host-path-literal` (S4) and `no-dated-comments` (S5) at error in the Oxlint governance preset. G8 maps to native `no-nested-ternary`, owned outside Antidrift. `eslint-suppressions.json` is a protected policy file. Consumers baseline once with `eslint . --suppress-rule ...` and commit the file
 
 - Fix implicit Convex ownership false positives: exact shape alone is inventory, not proof that an independent local contract forks the API. Require a proven contextual owner use for automatic owners, and detect cross-file named alias/interface argument copies consumed by real API calls, including `FunctionArgs<Query> | "skip"` contexts. Keep explicit generated/package/domain exact-match policy, shared property equivalence, output provenance, and whole-Program discovery unchanged.
-
-## 0.15.0
 
 - **Breaking:** extract reusable generic enforcement into the independent `@joedeleeuw/typescript-tooling` package. Antidrift's ESLint factory now owns only its custom TypeChecker rules; its Oxlint governance factory owns custom drift rules, registry-aware restricted imports, generated ignores, and gateway exemptions. Compose tooling's `/eslint` and `/oxlint` entrypoints explicitly to retain SQL safety, enum/React 19 restrictions, lint-directive checks, the 1500-line cap, and the conditional native TypeScript baseline.
 - Remove `antidriftComplexityRules`, the prefixed TypeScript maps, `typescriptBaselineTier`, and `@joedeleeuw/antidrift/adoption-config` without aliases. Use tooling's `complexityRules`, `typescriptSyntaxRules`, `typescriptTypeAwareRules`, `typescriptBaselineTier`, `adoptionPresets`, and `createAdoptionOxlintConfig` from `/oxlint`. The repository configs and packed-consumer evidence now use both actual package owners.
