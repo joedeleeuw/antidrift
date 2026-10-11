@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- add directive rules, each naming its AGENT.md directive in the rule registry's new `directive` field (validated against a declared `directives` table): `no-pass-through-parameters` (G22), `no-vague-names` (G21) and `no-compat-names` (G5) at error in the ESLint pass, ratcheted by `eslint-suppressions.json`; `no-fallback-to-empty` (G7, promoted from research), `no-else-if-chain` (G9), `no-hash-literal` (S1), `no-host-path-literal` (S4) and `no-dated-comments` (S5) at error in the Oxlint governance preset. G8 maps to native `no-nested-ternary`, owned outside Antidrift. `eslint-suppressions.json` is a protected policy file. Consumers baseline once with `eslint . --suppress-rule ...` and commit the file
+
 - Fix implicit Convex ownership false positives: exact shape alone is inventory, not proof that an independent local contract forks the API. Require a proven contextual owner use for automatic owners, and detect cross-file named alias/interface argument copies consumed by real API calls, including `FunctionArgs<Query> | "skip"` contexts. Keep explicit generated/package/domain exact-match policy, shared property equivalence, output provenance, and whole-Program discovery unchanged.
 
 ## 0.15.0

@@ -204,8 +204,44 @@ clusters:
         message: Preserve the caught error as cause.
       - id: errors/no-fallback-to-empty # Returning [] or {} on failure makes bad data look valid.
         severity: error
-        detector: catchReturnsEmptyCollection
+        detector: antidrift:no-fallback-to-empty
         message: Return a typed failure unless empty is the explicit contract.
+
+  - id: directive-smells # Shared AGENT.md directives that dotfiles enforces for Python, JSON and YAML.
+    owner: engineering-productivity # One directive ID per rule keeps antidrift and the dotfiles enforcement map in agreement.
+    rules:
+      - id: naming/no-vague-names # G21 vague nouns, abbreviations, single letters and filler affixes.
+        severity: error
+        detector: antidrift:no-vague-names
+        message: Name the binding for what it holds in this domain.
+      - id: arch/no-pass-through-parameters # G22 parameters a function only forwards to another first-party layer.
+        severity: error
+        detector: antidrift:no-pass-through-parameters
+        message: Let the layer that reads a value obtain it from its owner instead of threading it through.
+      - id: compat/no-compat-names # G5 and G16 declared names that keep or record a compatibility or removal path.
+        severity: error
+        detector: antidrift:no-compat-names
+        message: Delete the old path instead of keeping or naming it.
+      - id: simplicity/no-nested-ternary # G8 nested conditional expressions.
+        severity: error
+        detector: no-nested-ternary
+        message: Compose in the simplest form; use a case table or statements.
+      - id: simplicity/no-else-if-chain # G9 if/else-if chains of four or more branches over one discriminant.
+        severity: error
+        detector: antidrift:no-else-if-chain
+        message: Declare the case space first with a typed table, a discriminated union or an exhaustive switch.
+      - id: provenance/no-hash-literal # S1 64-hex literals bound to hash, sha, digest, checksum or integrity names.
+        severity: error
+        detector: antidrift:no-hash-literal
+        message: Do not pin repo content by hash; third-party artifact pins belong in lockfiles.
+      - id: provenance/no-host-path-literal # S4 /home/<user>/ and /Users/<user>/ literals outside tests.
+        severity: error
+        detector: antidrift:no-host-path-literal
+        message: Resolve paths from the home directory, the repository root or configuration.
+      - id: provenance/no-dated-comments # S5 dated provenance prose in comments outside @example blocks.
+        severity: error
+        detector: antidrift:no-dated-comments
+        message: History belongs in commit bodies and field notes, not in code.
 
   - id: test-integrity # Agents often write tests that execute code without constraining behavior.
     owner: quality # Quality owns test evidence policy.

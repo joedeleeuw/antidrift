@@ -9,6 +9,15 @@ Full permission notice: licenses/Rika-Labs-MIT.txt
 Version and MIT license verified against the supplied published package LICENSE
 and package.json. The module hashes identify those original inputs.
 
+eslint-plugin-unicorn 77.0.0, MIT.
+Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
+https://github.com/sindresorhus/eslint-plugin-unicorn
+Full permission notice: licenses/Sindre-Sorhus-MIT.txt
+The abbreviation keys and replacements in src/eslint-plugin/rules/no-vague-names.js
+come from rules/shared/name-replacements.js (defaultReplacements), SHA-256
+429478de8d9a2d9be39b81979e2a06369d8505ac9f5242679e5f7058f8b1b0d2, restricted to
+abbreviation keys.
+
 Upstream repository: https://github.com/stella/stella
 Upstream directory: .oxlint-plugins
 Pinned revision: 6ce0889e3a21d5dd1e907acfea2bf0248825c1fe

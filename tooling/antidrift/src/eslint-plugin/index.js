@@ -20,6 +20,9 @@ import { ruleNoSchemaValidatorTranscoding } from "./rules/no-schema-validator-tr
 import { ruleNoRedundantLocalReturnType } from "./rules/no-redundant-local-return-type.js";
 import ruleNoMockedResponseBodyOracle from "../oxlint-plugin/rules/no-mocked-response-body-oracle.js";
 import noWrappingFunctionsRule from "../oxlint-plugin/portable/no-wrapping-functions.js";
+import noPassThroughParametersRule from "./rules/no-pass-through-parameters.js";
+import noVagueNamesRule from "./rules/no-vague-names.js";
+import noCompatNamesRule from "./rules/no-compat-names.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
@@ -43,6 +46,9 @@ const rules = {
   "no-redundant-local-return-type": ruleNoRedundantLocalReturnType(),
   "no-mocked-response-body-oracle": ruleNoMockedResponseBodyOracle(),
   "no-wrapping-functions": noWrappingFunctionsRule,
+  "no-pass-through-parameters": noPassThroughParametersRule,
+  "no-vague-names": noVagueNamesRule,
+  "no-compat-names": noCompatNamesRule,
 };
 
 export default {

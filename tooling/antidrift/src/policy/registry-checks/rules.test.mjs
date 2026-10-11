@@ -1085,4 +1085,54 @@ policyRuleReviews:
       "policy/registries/rules.yaml policyRuleReviews.agent/require-checks-before-stop.status must be hook-covered, policy-script, delegated, spec-only, research, or retired for agent-ops policy rules.",
     );
   });
+  it("requires rule directives to name a declared directive", () => {
+    const root = workspace();
+    writePolicySource(root, ["test/reviewed"]);
+    writeValidRulesRegistry(root);
+    const existing = join(root, "policy", "registries", "rules.yaml");
+    const text = readFileSync(existing, "utf8").replace(
+      ["  antidrift/no-sql-string-concat:", "    status: ready"].join("\n"),
+      () =>
+        [
+          "  antidrift/no-sql-string-concat:",
+          "    directive: G99",
+          "    status: ready",
+        ].join("\n"),
+    );
+    writeFileSync(
+      existing,
+      `${text}
+directives:
+  G7:
+    directive: Fail loudly.
+  W4x:
+    directive: Not an ID.
+policyRuleReviews:
+  test/reviewed:
+    status: research
+    directive: G7
+    coverage: Not implemented in the synthetic policy.
+    reason: Reviewed for test.
+    nextAction: Leave as documented policy.
+`,
+    );
+    const messages = [];
+    expect(
+      checkRegistries({
+        repoRoot: root,
+        report: (message) => messages.push(message),
+      }),
+    ).toBe(false);
+    const output = messages.join("\n");
+    expect(output).toContain(
+      "rules.antidrift/no-sql-string-concat.directive must name a directive declared under directives.",
+    );
+    expect(output).toContain(
+      "directives.W4x must be a G, W, S, L or R directive ID.",
+    );
+    expect(output).toContain(
+      "directives.W4x is not named by any rule or policy rule review.",
+    );
+    expect(output).not.toContain("directives.G7 is not named");
+  });
 });

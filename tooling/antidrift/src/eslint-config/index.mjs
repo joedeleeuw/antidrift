@@ -6,6 +6,12 @@ import { defineConfig } from "eslint/config";
 import aiPolicy from "../eslint-plugin/index.js";
 import { loadRegistriesSync } from "../policy/lib/registries.mjs";
 
+const ratchetedRules = {
+  "antidrift/no-compat-names": "error",
+  "antidrift/no-pass-through-parameters": "error",
+  "antidrift/no-vague-names": "error",
+};
+
 export function createConfig({
   tsconfigRootDir = process.cwd(),
   policyDir = "policy",
@@ -75,7 +81,17 @@ export function createConfig({
         "antidrift/no-schema-validator-transcoding": "off",
         "antidrift/no-redundant-local-return-type": "off",
         "antidrift/no-sql-string-concat": "off",
+        ...ratchetedRules,
       },
+    },
+    {
+      files: ["**/*.{js,jsx,mjs,cjs}"],
+      languageOptions: {
+        parser,
+        parserOptions: { ecmaFeatures: { jsx: true } },
+      },
+      plugins: { antidrift: aiPolicy },
+      rules: ratchetedRules,
     }
   );
 }

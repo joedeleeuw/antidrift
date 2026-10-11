@@ -332,6 +332,13 @@ function requireValue(argv, index, flag) {
   return value;
 }
 
+const argumentOptions = {
+  "--output": { field: "output", read: String },
+  "--slice": { field: "slice", read: String },
+  "--repo": { field: "repo", read: parseCsv },
+  "--case": { field: "caseIds", read: parseCsv },
+};
+
 export function parseArgs(argv) {
   const parsed = {
     output: null,
@@ -341,21 +348,14 @@ export function parseArgs(argv) {
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--output") {
-      parsed.output = requireValue(argv, index, arg);
-      index += 1;
-    } else if (arg === "--slice") {
-      parsed.slice = requireValue(argv, index, arg);
-      index += 1;
-    } else if (arg === "--repo") {
-      parsed.repo = parseCsv(requireValue(argv, index, arg));
-      index += 1;
-    } else if (arg === "--case") {
-      parsed.caseIds = parseCsv(requireValue(argv, index, arg));
-      index += 1;
-    } else {
+    const option = Object.hasOwn(argumentOptions, arg)
+      ? argumentOptions[arg]
+      : null;
+    if (!option) {
       throw new Error(`change-contract-evidence: unknown argument "${arg}"`);
     }
+    parsed[option.field] = option.read(requireValue(argv, index, arg));
+    index += 1;
   }
   return parsed;
 }

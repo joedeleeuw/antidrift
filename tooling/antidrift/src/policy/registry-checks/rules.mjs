@@ -913,6 +913,54 @@ function checkPolicyRuleReviews(registry, policySource, errors) {
     }
   }
 }
+const directiveIdPattern = /^[GWSLR]\d+$/;
+function directiveEntries(registry) {
+  return [
+    ["rules", registry.rules],
+    ["policyRuleReviews", registry.policyRuleReviews],
+  ].flatMap(([section, entries]) =>
+    isRecord(entries)
+      ? Object.entries(entries)
+          .filter(([, entry]) => isRecord(entry) && "directive" in entry)
+          .map(([id, entry]) => [`${section}.${id}`, entry.directive])
+      : [],
+  );
+}
+function checkDirectives(registry, errors) {
+  const declared = isRecord(registry.directives) ? registry.directives : {};
+  if (registry.directives !== undefined && !isRecord(registry.directives)) {
+    errors.push("policy/registries/rules.yaml directives must be a mapping.");
+  }
+  for (const [id, entry] of Object.entries(declared)) {
+    if (!directiveIdPattern.test(id)) {
+      errors.push(
+        `policy/registries/rules.yaml directives.${id} must be a G, W, S, L or R directive ID.`,
+      );
+    }
+    requireString(
+      entry?.directive,
+      `policy/registries/rules.yaml directives.${id}.directive`,
+      errors,
+    );
+  }
+  const referenced = new Set();
+  for (const [label, directive] of directiveEntries(registry)) {
+    if (typeof directive !== "string" || !Object.hasOwn(declared, directive)) {
+      errors.push(
+        `policy/registries/rules.yaml ${label}.directive must name a directive declared under directives.`,
+      );
+      continue;
+    }
+    referenced.add(directive);
+  }
+  for (const id of Object.keys(declared)) {
+    if (!referenced.has(id)) {
+      errors.push(
+        `policy/registries/rules.yaml directives.${id} is not named by any rule or policy rule review.`,
+      );
+    }
+  }
+}
 export function checkRuleRegistry(registry, repoRoot, policySource, errors) {
   if (Object.keys(registry).length === 0) {
     errors.push(
@@ -946,5 +994,6 @@ export function checkRuleRegistry(registry, repoRoot, policySource, errors) {
     errors,
   );
   checkRuleFamilies(registry.ruleFamilies, registry, repoRoot, errors);
+  checkDirectives(registry, errors);
   checkPolicyRuleReviews(registry, policySource, errors);
 }

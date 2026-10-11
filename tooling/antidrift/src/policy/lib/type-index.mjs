@@ -458,12 +458,7 @@ const convexOwnerMetadata = {
 function convexDocCandidates(checker, sourceFile) {
   const dataModelSym = moduleExportSymbol(checker, sourceFile, "DataModel");
   if (!dataModelSym) return [];
-  let dataModelType;
-  try {
-    dataModelType = checker.getDeclaredTypeOfSymbol(dataModelSym);
-  } catch {
-    return [];
-  }
+  const dataModelType = checker.getDeclaredTypeOfSymbol(dataModelSym);
   const candidates = [];
   for (const tableSym of checker.getPropertiesOfType(dataModelType)) {
     const tableInfo = typeOfSymbol(checker, tableSym);

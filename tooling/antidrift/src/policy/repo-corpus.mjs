@@ -180,6 +180,34 @@ async function ruleRows(eslint, results, rules) {
   return [...rows.values()];
 }
 
+function readSuppressions(repoRoot) {
+  try {
+    return JSON.parse(
+      readFileSync(resolve(repoRoot, "eslint-suppressions.json"), "utf8"),
+    );
+  } catch (error) {
+    if (error.code === "ENOENT") return {};
+    throw error;
+  }
+}
+
+function withSuppressions(repoRoot, results) {
+  const suppressions = readSuppressions(repoRoot);
+  return results.map((result) => {
+    const fileSuppressions =
+      suppressions[relative(repoRoot, result.filePath).replace(/\\/gu, "/")];
+    if (!fileSuppressions) return result;
+    const messages = result.messages.filter((message) => {
+      const allowed = fileSuppressions[message.ruleId]?.count ?? 0;
+      const actual = result.messages.filter(
+        (candidate) => candidate.ruleId === message.ruleId,
+      ).length;
+      return actual > allowed;
+    });
+    return { ...result, messages };
+  });
+}
+
 export async function repoCorpus({
   repoRoot = process.cwd(),
   targets = defaultTargets,
@@ -189,7 +217,10 @@ export async function repoCorpus({
   report = console.log,
 } = {}) {
   const eslint = new ESLint({ cwd: repoRoot });
-  const results = await eslint.lintFiles(targets);
+  const results = withSuppressions(
+    repoRoot,
+    await eslint.lintFiles(targets),
+  );
   const checkedByTop = {};
   for (const result of results) {
     const top = topOf(repoRoot, result.filePath);

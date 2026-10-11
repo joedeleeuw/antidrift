@@ -100,6 +100,15 @@ function requireValue(argv, index, flag) {
   return value;
 }
 
+const argumentOptions = {
+  "--base": { field: "base", read: String },
+  "--head": { field: "head", read: String },
+  "--cwd": { field: "cwd", read: resolve },
+  "--output": { field: "output", read: String },
+  "--facts-out": { field: "factsOut", read: String },
+  "--slice": { field: "slice", read: String },
+};
+
 export function parseArgs(argv) {
   const parsed = {
     base: process.env.ANTIDRIFT_BASE_REF ?? "HEAD",
@@ -111,27 +120,14 @@ export function parseArgs(argv) {
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--base") {
-      parsed.base = requireValue(argv, index, arg);
-      index += 1;
-    } else if (arg === "--head") {
-      parsed.head = requireValue(argv, index, arg);
-      index += 1;
-    } else if (arg === "--cwd") {
-      parsed.cwd = resolve(requireValue(argv, index, arg));
-      index += 1;
-    } else if (arg === "--output") {
-      parsed.output = requireValue(argv, index, arg);
-      index += 1;
-    } else if (arg === "--facts-out") {
-      parsed.factsOut = requireValue(argv, index, arg);
-      index += 1;
-    } else if (arg === "--slice") {
-      parsed.slice = requireValue(argv, index, arg);
-      index += 1;
-    } else {
+    const option = Object.hasOwn(argumentOptions, arg)
+      ? argumentOptions[arg]
+      : null;
+    if (!option) {
       throw new Error(`diff-scoped-adapters: unknown argument "${arg}"`);
     }
+    parsed[option.field] = option.read(requireValue(argv, index, arg));
+    index += 1;
   }
   return parsed;
 }

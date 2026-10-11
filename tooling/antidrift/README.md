@@ -16,6 +16,14 @@ The shared governance preset enables `antidrift/no-wrapping-functions` as an err
 
 For example, `const loadItems = (id) => owner.load(id)` reports; call `owner.load(id)` directly at its callers. `button.onClick(() => owner.load(id))` remains a callback with deferred execution. For a subscription API, `useSyncExternalStore(subscribeToConsent, getSnapshot)` is the valid direct substitution only when `subscribeToConsent` has the adapter's signature and receiver semantics; do not replace a required stable adapter with a new inline arrow or `.bind`. ESLint-only consumers can enable the same rule through the ESLint plugin; do not enable it in both lint runtimes.
 
+The presets also enforce one rule per shared AGENT.md directive, each recorded with its directive ID in `policy/registries/rules.yaml`: `antidrift/no-fallback-to-empty` (G7), `antidrift/no-else-if-chain` (G9), `antidrift/no-hash-literal` (S1), `antidrift/no-host-path-literal` (S4) and `antidrift/no-dated-comments` (S5) in Oxlint, and `antidrift/no-vague-names` (G21), `antidrift/no-pass-through-parameters` (G22) and `antidrift/no-compat-names` (G5) in the ESLint pass. G8 maps to native `no-nested-ternary`, which the generic tooling package owns. The ESLint three are ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
+
+```sh
+eslint . --suppress-rule antidrift/no-vague-names --suppress-rule antidrift/no-pass-through-parameters --suppress-rule antidrift/no-compat-names
+```
+
+See `docs/rule-investigations/directive-rules.md` in the repository for scope and corpus evidence.
+
 ```sh
 pnpm add -D @joedeleeuw/antidrift @joedeleeuw/typescript-tooling oxlint oxlint-tsgolint eslint typescript typescript-eslint @typescript-eslint/parser
 ```

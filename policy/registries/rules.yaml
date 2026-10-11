@@ -28,6 +28,38 @@ claudeAdvisory:
   mode: read-only
   outputDirectory: reports
 
+directives:
+  G2:
+    directive: TS strict; no appeasement casts.
+  G3:
+    directive: Case tables via satisfies.
+  G4:
+    directive: Parse at boundaries; no reparsing.
+  G5:
+    directive: No backwards compatibility.
+  G7:
+    directive: Fail loudly; no silent default.
+  G8:
+    directive: Simplest form; no nested ternaries.
+  G9:
+    directive: Declare the case space first.
+  G10:
+    directive: Remove single-call hops.
+  G13:
+    directive: No dependency cycles.
+  G15:
+    directive: No unit tests, mocks or fixtures.
+  G21:
+    directive: No vague names.
+  G22:
+    directive: No pass-through variables.
+  S1:
+    directive: No hash pins of tracked files.
+  S4:
+    directive: No host-absolute paths.
+  S5:
+    directive: No dated provenance prose.
+
 semanticFactKinds:
   identitySchemaTransform:
     rules:
@@ -325,6 +357,7 @@ policyRuleReviews:
     reason: One-use helpers can be fake abstraction, but reference counts and helper size alone produce many legitimate local extraction cases.
     nextAction: Keep out of blocking scope until real programs prove a deterministic rule with clean domain-helper controls.
   arch/no-wrapping-functions:
+    directive: G10
     status: active-custom
     antidriftRule: antidrift/no-wrapping-functions
     coverage: Default error for named function declarations and named arrow/function expressions whose only operation is simple call delegation.
@@ -364,6 +397,7 @@ policyRuleReviews:
     reason: Maintained boundary rules are a better fit than custom path parsing.
     nextAction: Keep public/private entrypoint facts aligned with architecture policy.
   arch/no-new-dependency-cycle:
+    directive: G13
     status: ecosystem-covered
     replacement: import/no-cycle
     coverage: Covered by Oxlint's native import/no-cycle rule.
@@ -438,10 +472,68 @@ policyRuleReviews:
     reason: Preserving caught error cause is ecosystem-covered; custom silent-catch work was retired.
     nextAction: Keep the maintained rule enabled.
   errors/no-fallback-to-empty:
-    status: research
-    coverage: Not implemented.
-    reason: Returning [] or {} from catch remains a clear drift candidate with higher value than generic silent-catch detection.
-    nextAction: Create a real-program matrix before implementation.
+    status: active-custom
+    directive: G7
+    antidriftRule: antidrift/no-fallback-to-empty
+    coverage: Default error for a catch clause or promise .catch handler that drops the error and returns an empty array or object.
+    reason: The real-program matrix across the sushi corpus found 77 silent empty fallbacks in 12 repositories once catches that read or rethrow their error were excluded.
+    nextAction: Keep enabled by default; extend to helper-delegated catches only with dataflow proof.
+  naming/no-vague-names:
+    status: active-custom
+    directive: G21
+    antidriftRule: antidrift/no-vague-names
+    coverage: Default error in the ESLint pass over declared bindings, with existing debt pinned in eslint-suppressions.json.
+    reason: Vague nouns, abbreviations, single letters and filler affixes hide what a binding holds.
+    nextAction: Prune suppressions as names are fixed; align categories with the dotfiles g21 rule.
+  arch/no-pass-through-parameters:
+    status: active-custom
+    directive: G22
+    antidriftRule: antidrift/no-pass-through-parameters
+    coverage: Default error in the ESLint pass for parameters a named function or component only forwards to another first-party layer.
+    reason: Pass-through variables are Ousterhout's red flag for a layer that carries data it never uses.
+    nextAction: Prune suppressions as layers stop threading values they do not read.
+  compat/no-compat-names:
+    status: active-custom
+    directive: G5
+    antidriftRule: antidrift/no-compat-names
+    coverage: Default error in the ESLint pass for declared names containing legacy, compat, deprecated, retire or no longer.
+    reason: No backwards compatibility and no codified removals; the name marks the path to delete.
+    nextAction: Prune suppressions as compatibility paths are deleted; antidrift's retiredRules ledger is open G16 debt.
+  simplicity/no-nested-ternary:
+    status: ecosystem-covered
+    directive: G8
+    replacement: no-nested-ternary
+    coverage: Native no-nested-ternary is generic enforcement owned by @joedeleeuw/typescript-tooling (its eslint adoption preset); this repository enables it in the root oxlint.config.mts.
+    reason: The maintained rule matches the directive exactly, and Antidrift 0.15 leaves generic native rules to typescript-tooling.
+    nextAction: Make no-nested-ternary a typescript-tooling default so consumers get G8 without opting into an adoption preset.
+  simplicity/no-else-if-chain:
+    status: active-custom
+    directive: G9
+    antidriftRule: antidrift/no-else-if-chain
+    coverage: Default error for if/else-if chains of four or more branches whose equality tests share one discriminant.
+    reason: A long chain over one value is an undeclared case space.
+    nextAction: Keep enabled by default.
+  provenance/no-hash-literal:
+    status: active-custom
+    directive: S1
+    antidriftRule: antidrift/no-hash-literal
+    coverage: Default error for 64-hex literals bound to hash, sha, digest, checksum or integrity names.
+    reason: Hash pins of repo content go stale silently and duplicate what version control already proves.
+    nextAction: Keep enabled by default.
+  provenance/no-host-path-literal:
+    status: active-custom
+    directive: S4
+    antidriftRule: antidrift/no-host-path-literal
+    coverage: Default error for /home/<user>/ and /Users/<user>/ string literals outside test files.
+    reason: Host-absolute paths tie code to one machine.
+    nextAction: Keep enabled by default.
+  provenance/no-dated-comments:
+    status: active-custom
+    directive: S5
+    antidriftRule: antidrift/no-dated-comments
+    coverage: Default error for standalone comments containing a 20xx date outside @example blocks and timestamps.
+    reason: Dated provenance prose belongs in commit bodies and field notes.
+    nextAction: Keep enabled by default.
   test/no-only-or-skip:
     status: ecosystem-covered
     replacement: vitest/no-focused-tests plus vitest/no-disabled-tests
@@ -611,6 +703,7 @@ policyRuleReviews:
 
 rules:
   antidrift/no-appeasement-cast:
+    directive: G2
     status: ready
     stable: false
     signal: TypeChecker
@@ -1084,6 +1177,7 @@ rules:
         - "function outer() { const selectedFor = (): Selection => condition ? first : second; }"
     nextAction: Keep default-off while inventorying the exact proof against independent repositories and reviewing any findings as either redundant nested implementation annotations or legitimate local contracts.
   antidrift/no-redundant-zod-parse:
+    directive: G4
     status: ready
     stable: true
     referenceDoc: docs/rule-investigations/no-redundant-zod-parse.md
@@ -1130,6 +1224,7 @@ rules:
         - "expect(() => RowSchema.parse(typedFixture)).not.toThrow();"
     nextAction: Stable for the same-binding provenance core. The removed call-result branches return only with decoder producer provenance; do not reintroduce type-equivalence gating.
   antidrift/no-parse-as-cast:
+    directive: G4
     status: ready
     stable: false
     proofBuckets: [semantic-source-type-provenance]
@@ -1157,6 +1252,7 @@ rules:
         - "function validateProjectId(id: string) { return z.string().min(1).parse(id); }"
     nextAction: "Test-context exemption landed 2026-08-03: files matching the taxonomy test pattern are skipped, closing the sceneContractOracle.test.ts false positive; known false positives now zero. Next: promotion block for stable: true. Corpus is 10 positives across Murderbox desktop (6) and Codebase Atlas (4 accepted-drift), zero known FPs."
   antidrift/no-appeasement-erasure:
+    directive: G2
     status: ready
     stable: false
     proofBuckets: [semantic-source-type-provenance]
@@ -1549,6 +1645,7 @@ rules:
         - 'import type { ActionItem } from "@portal/types/reports";'
     nextAction: Keep default-off inventory; run fresh adversarial review and classify boundary DTO/view-model clean pressure before blocking promotion.
   antidrift/no-contract-appeasement-projection:
+    directive: G2
     status: ready
     stable: false
     signal: TypeChecker plus structural return-flow proof
@@ -2132,16 +2229,20 @@ rules:
     external:
       state: net-antidrift
       support: low
-      candidates: ["@typescript-eslint/no-restricted-types", "@typescript-eslint/no-explicit-any"]
+      candidates:
+        [
+          "@typescript-eslint/no-restricted-types",
+          "@typescript-eslint/no-explicit-any",
+        ]
       decision: own-antidrift
       whyThisState: "Type bans do not distinguish open dictionaries at exported boundaries from private implementation types."
       whyNotOtherState: "Provisional source-shape ownership; independently pinned external false-positive evidence is still needed."
     examples:
       flags:
-        - 'export function receive(input: Record<string, unknown>) {}'
+        - "export function receive(input: Record<string, unknown>) {}"
       allows:
-        - 'export function receive(input: Message) {}'
-        - 'function internal(input: Record<string, unknown>) {}'
+        - "export function receive(input: Message) {}"
+        - "function internal(input: Record<string, unknown>) {}"
     nextAction: "Inventory external API boundaries and genuine dictionary exemptions before promotion."
 
   antidrift/unknown-input-must-be-decoded:
@@ -2160,16 +2261,20 @@ rules:
     external:
       state: net-antidrift
       support: low
-      candidates: ["@typescript-eslint/no-unsafe-argument", "@typescript-eslint/no-unsafe-assignment"]
+      candidates:
+        [
+          "@typescript-eslint/no-unsafe-argument",
+          "@typescript-eslint/no-unsafe-assignment",
+        ]
       decision: own-antidrift
       whyThisState: "Unsafe-any checks do not require explicitly unknown boundary inputs to flow through decoders or owned type predicates."
       whyNotOtherState: "This is a provisional opt-in boundary policy; broad external adoption evidence is not yet available."
     examples:
       flags:
-        - 'function receive(input: unknown) { return String(input); }'
+        - "function receive(input: unknown) { return String(input); }"
       allows:
-        - 'function receive(input: unknown) { return messageSchema.parse(input); }'
-        - 'try { work(); } catch (error: unknown) { report(error); }'
+        - "function receive(input: unknown) { return messageSchema.parse(input); }"
+        - "try { work(); } catch (error: unknown) { report(error); }"
     nextAction: "Inventory decoder conventions and predicate control-flow false positives in independently pinned external repositories."
 
   antidrift/no-convex-return-widening:
@@ -2187,7 +2292,11 @@ rules:
     external:
       state: net-antidrift
       support: low
-      candidates: ["@typescript-eslint/no-explicit-any", "Convex return-validator presence checks"]
+      candidates:
+        [
+          "@typescript-eslint/no-explicit-any",
+          "Convex return-validator presence checks",
+        ]
       decision: own-antidrift
       whyThisState: "A present return validator may still widen its leaves; neither TypeScript-any bans nor validator-presence checks prove its owned shape."
       whyNotOtherState: "Provisional local source-shape ownership pending independently pinned external corpus evidence."
@@ -2224,6 +2333,7 @@ rules:
         - "const options = {}; if (timeout !== undefined) options.timeout = timeout;"
     nextAction: "Keep default-off until the rule distinguishes type-evidence loss from ordinary optional property construction."
   antidrift/no-module-mocking:
+    directive: G15
     status: false-positive-prone
     stable: false
     defaultOff: true
@@ -2468,6 +2578,7 @@ rules:
         - "type ExternalValue = UserInput;"
     nextAction: "Blocking by owner decision; extend alias provenance when upstream does."
   antidrift/no-unsafe-cast-chain:
+    directive: G2
     status: ready
     stable: false
     signal: AST nested TypeScript assertion chain with a non-const assertion
@@ -2591,6 +2702,7 @@ rules:
     nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
 
   antidrift/no-as-never:
+    directive: G2
     status: ready
     stable: false
     defaultOff: false
@@ -2716,6 +2828,7 @@ rules:
     nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
 
   antidrift/no-wrapping-functions:
+    directive: G10
     status: ready
     stable: false
     defaultOff: false
@@ -2795,6 +2908,7 @@ rules:
     nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
 
   antidrift/no-placeholder-tests:
+    directive: G15
     status: ready
     stable: false
     defaultOff: false
@@ -3220,6 +3334,7 @@ rules:
     nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
 
   antidrift/no-partial-record-satisfies:
+    directive: G3
     status: ready
     stable: false
     defaultOff: false
@@ -3521,6 +3636,7 @@ rules:
     nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
 
   antidrift/require-exhaustive-panic:
+    directive: G3
     status: ready
     stable: false
     defaultOff: false
@@ -3845,6 +3961,266 @@ rules:
       allows:
         - "component.tsx; options={}; source: throw new RequestError({ status, cause });"
     nextAction: Keep real findings at error severity; remediate through the named owner. Reassess documented false-positive boundaries before expanding scope.
+
+  antidrift/no-pass-through-parameters:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: G22
+    signal: ESLint scope analysis of every parameter reference plus first-party callee resolution
+    solveType: no-pass-through-parameters
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/directive-rules.md
+    corpusRepositories:
+      [
+        homer,
+        opencode,
+        executor,
+        chatbiz-webapp,
+        sudocode-main,
+        pierre,
+        hunk,
+        mrp,
+      ]
+    concerns:
+      - Runs in the ESLint pass so existing debt is pinned in eslint-suppressions.json; Oxlint has no baseline.
+      - Only same-module functions, classes and components, relative or root-alias imports, and `this` methods count as layers, so library calls and intrinsic JSX elements are consumption, not forwarding.
+      - A forwarding call must be discarded or returned; a helper whose result this function uses counts as a read.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: [eslint/no-unused-vars, react/no-unused-prop-types]
+      decision: own-antidrift
+      whyThisState: Ecosystem rules report unused bindings; none reports a binding whose only uses forward it to another layer.
+      whyNotOtherState: Ousterhout's pass-through variable needs every reference classified, which no maintained rule does.
+    examples:
+      flags:
+        - "import { queryEvents } from './events'; export function listEvents(db, filter) { if (!filter.kind) return []; return queryEvents(db, filter); }"
+        - "import { Button } from './button'; export function IconButton({ icon, ...rest }) { return <Button {...rest}>{icon}</Button>; }"
+      allows:
+        - "function Badge({ label, ...rest }) { return <span {...rest}>{label}</span>; }"
+        - "import { write } from './review'; useMutation({ mutationFn: (input) => write(input) });"
+    nextAction: Keep at error with the suppressions ratchet; prune suppressions as pass-through debt is removed.
+
+  antidrift/no-vague-names:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: G21
+    signal: Deterministic AST over declared binding names
+    solveType: no-vague-names
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/directive-rules.md
+    corpusRepositories:
+      [
+        homer,
+        opencode,
+        executor,
+        chatbiz-webapp,
+        sudocode-main,
+        agent-browser,
+        mrp,
+      ]
+    concerns:
+      - Runs in the ESLint pass so existing debt is pinned in eslint-suppressions.json; Oxlint has no baseline.
+      - The first `props` parameter of a component or JSX-returning function is React's defined role and stays allowed.
+      - Imports, property keys and type names are not declarations this rule owns.
+    external:
+      state: partial-overlap
+      support: high
+      candidates:
+        [unicorn/prevent-abbreviations, eslint/id-denylist, eslint/id-length]
+      decision: own-antidrift
+      whyThisState: The abbreviation map comes from unicorn prevent-abbreviations; the vague nouns, filler affixes and single-letter allowance come from the G21 directive.
+      whyNotOtherState: No single maintained rule covers the directive's categories, and Oxlint does not host unicorn prevent-abbreviations.
+    examples:
+      flags:
+        - "const data = load();"
+        - "try { run(); } catch (e) { report(e); }"
+        - "const userData = load();"
+      allows:
+        - "const invoices = load();"
+        - "function Profile(props) { return <div>{props.name}</div>; }"
+        - "for (let i = 0; i < n; i += 1) {}"
+    nextAction: Keep at error with the suppressions ratchet; align the category list with dotfiles g21-vague-name when it lands.
+
+  antidrift/no-compat-names:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: G5
+    signal: Deterministic AST over declared names, matching the dotfiles g5-compat-identifier declaration contexts
+    solveType: no-compat-names
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/directive-rules.md
+    corpusRepositories:
+      [
+        opencode,
+        executor,
+        homer,
+        chatbiz-webapp,
+        sudocode-main,
+        pi-smart-compact,
+      ]
+    concerns:
+      - Runs in the ESLint pass so existing debt is pinned in eslint-suppressions.json.
+      - "`compatible` is excluded: an OpenAI-compatible protocol is a shape, not a compatibility path."
+      - Antidrift's own retiredRules ledger is G16 debt held in the suppressions file.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: [eslint/id-denylist, typescript/no-deprecated]
+      decision: own-antidrift
+      whyThisState: id-denylist matches whole names only and typescript/no-deprecated reports uses of deprecated APIs, not declarations that keep an old path.
+      whyNotOtherState: The directive targets substrings in declared names across declaration kinds.
+    examples:
+      flags:
+        - "function readLegacyConfig() {}"
+        - "interface RetiredRule { id: string }"
+      allows:
+        - "type OpenAICompatibleModelId = string;"
+        - "import { legacyLoader } from './loader';"
+    nextAction: Keep at error with the suppressions ratchet; delete compatibility paths instead of renaming them.
+
+  antidrift/no-fallback-to-empty:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: G7
+    signal: Deterministic AST plus scope references of the caught error
+    solveType: no-fallback-to-empty
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/directive-rules.md
+    corpusRepositories:
+      [opencode, sudocode-main, executor, chatbiz-webapp, homer, agent-browser]
+    concerns:
+      - Only silent failure paths report; a catch that reads its error or rethrows keeps empty as an explicit contract.
+    external:
+      state: partial-overlap
+      support: medium
+      candidates:
+        [
+          eslint/no-empty,
+          preserve-caught-error,
+          unicorn/prefer-optional-catch-binding,
+        ]
+      decision: own-antidrift
+      whyThisState: Ecosystem rules catch empty blocks and lost causes, not a failure path that returns an empty collection.
+      whyNotOtherState: The empty-collection return is the construct the policy names.
+    examples:
+      flags:
+        - "async function load() { try { return await read(); } catch { return []; } }"
+        - "const body = await response.json().catch(() => ({}));"
+      allows:
+        - 'function readRegistry(path) { try { return parse(read(path)); } catch (error) { if (error.code === "ENOENT") return {}; throw error; } }'
+    nextAction: Keep at error severity in the governance preset.
+
+  antidrift/no-else-if-chain:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: G9
+    signal: Deterministic AST over equality tests that share one discriminant
+    solveType: no-else-if-chain
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/directive-rules.md
+    corpusRepositories:
+      [chatbiz-webapp, pierre, executor, opencode, sudocode-main, hunk, codiff]
+    concerns:
+      - Four or more branches matches the dotfiles g9-elif-chain threshold of an if plus three elifs.
+    external:
+      state: partial-overlap
+      support: medium
+      candidates: [unicorn/prefer-switch, sonar/max-switch-cases]
+      decision: own-antidrift
+      whyThisState: unicorn/prefer-switch is not hosted by the governance preset and suggests a switch rather than a declared case table.
+      whyNotOtherState: The directive asks for the case space to be declared, which a table checked with satisfies satisfies.
+    examples:
+      flags:
+        - 'if (mode === "a") run(1); else if (mode === "b") run(2); else if (mode === "c") run(3); else if (mode === "e") run(4);'
+      allows:
+        - 'if (mode === "a") run(1); else if (kind === "b") run(2); else if (mode === "c") run(3); else if (mode === "e") run(4);'
+    nextAction: Keep at error severity in the governance preset.
+
+  antidrift/no-hash-literal:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: S1
+    signal: Deterministic AST for a 64-hex literal bound to a hash, sha, digest, checksum or integrity name
+    solveType: no-hash-literal
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/directive-rules.md
+    corpusRepositories: [homer]
+    concerns:
+      - Unnamed 64-hex literals such as test keys and OAuth client IDs are not hash pins and stay out.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: [sec/no-hardcoded-secret]
+      decision: own-antidrift
+      whyThisState: Secret scanners look for credentials, not content pins.
+      whyNotOtherState: The binding name is what identifies a pin.
+    examples:
+      flags:
+        - 'const patchSha256 = "abababababababababababababababababababababababababababababababab";'
+      allows:
+        - 'const encryptionKey = "abababababababababababababababababababababababababababababababab";'
+    nextAction: Keep at error severity in the governance preset.
+
+  antidrift/no-host-path-literal:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: S4
+    signal: Deterministic AST for /home/<user>/ and /Users/<user>/ string prefixes outside test files
+    solveType: no-host-path-literal
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/directive-rules.md
+    corpusRepositories: [opencode, executor]
+    concerns:
+      - Test fixture paths and the /home/linuxbrew/ Homebrew prefix do not couple code to a developer host and stay out.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: No maintained lint rule reports host-absolute path literals.
+      whyNotOtherState: The dotfiles s4-host-path rule covers Python, Bash, JSON, YAML and Markdown only.
+    examples:
+      flags:
+        - 'const root = "/home/joe/code/app";'
+      allows:
+        - 'const root = join(homedir(), "code/app");'
+    nextAction: Keep at error severity in the governance preset.
+
+  antidrift/no-dated-comments:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: S5
+    signal: Deterministic comment text match with the dotfiles s5-dated-comment date pattern
+    solveType: no-dated-comments
+    proofBuckets: [local-ast-source-shape]
+    referenceDoc: docs/rule-investigations/directive-rules.md
+    corpusRepositories: [executor, chatbiz-webapp, homer, opencode]
+    concerns:
+      - Comments trailing code on the same line annotate data, and timestamps followed by a time of day are format examples; both stay out.
+      - Dated specification revisions such as "MCP Authorization 2025-06-18" still match.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: [eslint/no-warning-comments]
+      decision: own-antidrift
+      whyThisState: no-warning-comments matches configured terms, not dates.
+      whyNotOtherState: The date pattern is the provenance signal.
+    examples:
+      flags:
+        - "// Verified against the live API on 2026-06-10."
+      allows:
+        - "/** @example formatDay(new Date('2026-06-10')) */"
+        - 'expect(card).toHaveTextContent("SPEC-002"); // 2024-01-21'
+    nextAction: Keep at error severity in the governance preset.
 
 retiredRules:
   antidrift/no-query-data-type-parameters:

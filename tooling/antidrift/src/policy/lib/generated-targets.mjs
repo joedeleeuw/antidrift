@@ -14,6 +14,7 @@ export const protectedPolicyFiles = [
   ...generatedTargets,
   "policy/agent-guardrails.yaml",
   "eslint.config.mjs",
+  "eslint-suppressions.json",
   "oxlint.config.mts",
   "tsconfig.base.json",
   "tsconfig.json",
