@@ -102,6 +102,11 @@
       "count": 1
     }
   },
+  "tooling/antidrift/src/eslint-plugin/rules/no-canonical-model-fork.js": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 1
+    }
+  },
   "tooling/antidrift/src/eslint-plugin/rules/no-contract-appeasement-projection.js": {
     "antidrift/no-pass-through-parameters": {
       "count": 21
@@ -144,6 +149,11 @@
       "count": 29
     }
   },
+  "tooling/antidrift/src/eslint-plugin/rules/no-structural-type-fork.js": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 1
+    }
+  },
   "tooling/antidrift/src/eslint-plugin/rules/no-underchecked-type-predicate.js": {
     "antidrift/no-vague-names": {
       "count": 2
@@ -175,17 +185,7 @@
       "count": 16
     }
   },
-  "tooling/antidrift/src/oxlint-config/adoption.test.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
   "tooling/antidrift/src/oxlint-config/deserialization-coverage.test.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-config/index.test.mjs": {
     "antidrift/no-vague-names": {
       "count": 1
     }
@@ -248,7 +248,7 @@
   },
   "tooling/antidrift/src/oxlint-plugin/index.test.mjs": {
     "antidrift/no-vague-names": {
-      "count": 22
+      "count": 27
     }
   },
   "tooling/antidrift/src/oxlint-plugin/owned-union-source.js": {
@@ -566,6 +566,14 @@
       "count": 1
     }
   },
+  "tooling/antidrift/src/oxlint-plugin/unknown-sinks.js": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 1
+    },
+    "antidrift/no-vague-names": {
+      "count": 4
+    }
+  },
   "tooling/antidrift/src/policy/chaski-corpus.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
@@ -861,6 +869,11 @@
     },
     "antidrift/no-vague-names": {
       "count": 13
+    }
+  },
+  "tooling/antidrift/src/semantic-adapters/owned-contract-provenance.mjs": {
+    "antidrift/no-vague-names": {
+      "count": 4
     }
   },
   "tooling/antidrift/src/semantic-adapters/parse-input.mjs": {
