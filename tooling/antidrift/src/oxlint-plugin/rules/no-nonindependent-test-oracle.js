@@ -15,6 +15,8 @@ const equalityMatcherMethods = new Set([
   "toStrictEqual",
   "toMatchObject",
 ]);
+const fullEqualityMatcherMethods = new Set(["toEqual", "toStrictEqual"]);
+const fullEqualityMethods = new Set(["deepEqual", "deepStrictEqual"]);
 const existenceMatcherMethods = new Set(["toBeDefined", "toBeTruthy"]);
 const mockCallRecordMatcherMethods = new Set([
   "toHaveBeenCalledWith",
@@ -1002,16 +1004,66 @@ function classifyAssertion(record, facts, sourceCode) {
   );
 }
 
-function analyzeTestBlock(callback, context, sourceCode) {
-  const facts = collectBlockFacts(callback);
-  if (facts.assertions.length === 0) return;
-  const classified = facts.assertions.map((record) =>
-    classifyAssertion(record, facts, sourceCode)
+function fullEqualityCollectionInfo(record, sourceCode) {
+  const deep =
+    record.kind === "expect"
+      ? fullEqualityMatcherMethods.has(record.matcher)
+      : fullEqualityMethods.has(record.method);
+  if (!deep) return null;
+  const operands = equalityOperands(record);
+  if (!operands?.actual) return null;
+  const expected = resolveLiteralNode(
+    operands.expected,
+    sourceCode,
+    resolutionDepthLimit
   );
-  for (const result of classified) {
-    if (result.messageId) {
-      context.report({ node: result.node, messageId: result.messageId });
+  if (expected?.type !== "ArrayExpression") return null;
+  return memberPathInfo(operands.actual);
+}
+
+function lengthCollectionInfo(record) {
+  const parts = lengthAssertionParts(record);
+  if (!parts) return null;
+  return parts.collectionInfo ?? memberPathInfo(parts.collection);
+}
+
+function sameCollection(left, right) {
+  return (
+    left.root.type === "Identifier" &&
+    right.root.type === "Identifier" &&
+    left.root.name === right.root.name &&
+    pathsEqual(left.path, right.path)
+  );
+}
+
+// A length assertion is redundant, not an echo, when a sibling independent
+// full-equality assertion over the same collection already proves its
+// transformed contents and ordering.
+function hasIndependentContentsOracle(lengthRecord, results, sourceCode) {
+  const collection = lengthCollectionInfo(lengthRecord);
+  if (!collection) return false;
+  return results.some((result) => {
+    if (!result.independent || result.record === lengthRecord) return false;
+    const contents = fullEqualityCollectionInfo(result.record, sourceCode);
+    return Boolean(contents) && sameCollection(collection, contents);
+  });
+}
+
+function analyzeTestBlock(facts, context, sourceCode) {
+  if (facts.assertions.length === 0) return;
+  const results = facts.assertions.map((record) => ({
+    ...classifyAssertion(record, facts, sourceCode),
+    record,
+  }));
+  for (const result of results) {
+    if (!result.messageId) continue;
+    if (
+      result.messageId === "lengthEcho" &&
+      hasIndependentContentsOracle(result.record, results, sourceCode)
+    ) {
+      continue;
     }
+    context.report({ node: result.node, messageId: result.messageId });
   }
 }
 
@@ -1044,6 +1096,15 @@ export default function ruleNoNonindependentTestOracle() {
     create(context) {
       if (!isTestFilename(contextFilename(context))) return {};
       const sourceCode = context.sourceCode ?? context.getSourceCode();
+      const factsByCallback = new WeakMap();
+      const blockFacts = (callback) => {
+        let facts = factsByCallback.get(callback);
+        if (!facts) {
+          facts = collectBlockFacts(callback);
+          factsByCallback.set(callback, facts);
+        }
+        return facts;
+      };
       return {
         CallExpression(node) {
           if (isMembershipAssertionNode(node)) {
@@ -1053,7 +1114,7 @@ export default function ruleNoNonindependentTestOracle() {
             if (
               callback &&
               record &&
-              classifyErrorShapeAssertion(record, collectBlockFacts(callback))
+              classifyErrorShapeAssertion(record, blockFacts(callback))
             ) {
               return;
             }
@@ -1061,7 +1122,9 @@ export default function ruleNoNonindependentTestOracle() {
             return;
           }
           const callback = testBlockCallback(node);
-          if (callback) analyzeTestBlock(callback, context, sourceCode);
+          if (callback) {
+            analyzeTestBlock(blockFacts(callback), context, sourceCode);
+          }
         },
       };
     },

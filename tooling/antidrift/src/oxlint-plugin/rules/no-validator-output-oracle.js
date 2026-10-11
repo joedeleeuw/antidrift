@@ -1,5 +1,9 @@
 import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
-import { isRuntimeSchemaLibrarySource } from "../shared/runtime-schema-libraries.js";
+import {
+  hasRuntimeSchemaProvenance,
+  isRuntimeSchemaLibraryFile,
+  isRuntimeSchemaLibrarySource,
+} from "../shared/runtime-schema-libraries.js";
 import {
   contextFilename,
   isTestFilename,
@@ -7,51 +11,28 @@ import {
   unwrapExpression,
 } from "../shared/test-files.js";
 
-const parserLibrarySources = new Set([
-  "js-yaml",
-  "node:path",
-  "node:querystring",
-  "node:url",
-  "path",
-  "qs",
-  "querystring",
-  "toml",
-  "url",
-  "yaml",
-]);
-const parserGlobalNames = new Set([
-  "Date",
-  "JSON",
-  "YAML",
-  "path",
-  "querystring",
-  "qs",
-  "toml",
-  "url",
-  "yaml",
-]);
-const directValidatorMethods = new Set([
-  "parse",
-  "parseAsync",
-  "safeParse",
-  "safeParseAsync",
-]);
+// Only runtime-schema libraries define these names, so the call proves a validator.
 const distinctiveValidatorMethods = new Set([
   "decodeUnknown",
   "decodeUnknownPromise",
   "decodeUnknownSync",
   "decodeSync",
 ]);
-const provenanceValidatorMethods = new Set([
+// Document parsers and application code share these names, so the receiver
+// must be proven a runtime-schema value.
+const schemaValidatorMethods = new Set([
   "assert",
   "decode",
   "decodeAsync",
+  "parse",
+  "parseAsync",
+  "safeParse",
+  "safeParseAsync",
   "validate",
 ]);
 const validatorFunctionNames = new Set([
-  ...directValidatorMethods,
   ...distinctiveValidatorMethods,
-  ...provenanceValidatorMethods,
+  ...schemaValidatorMethods,
 ]);
 const arrayProjectionMethods = new Set([
   "at",
@@ -130,59 +111,27 @@ function rootIdentifier(expression) {
   return current?.type === "Identifier" ? current : null;
 }
 
-function isKnownParserReceiver(receiver, sourceCode) {
-  const root = rootIdentifier(receiver);
-  if (!root) return false;
-  const source = importSourceForIdentifier(root, sourceCode);
-  if (source && parserLibrarySources.has(source)) return true;
-  return !source && parserGlobalNames.has(root.name);
-}
-
-function hasSchemaProvenance(
-  expression,
-  sourceCode,
-  depth = 0,
-  seen = new Set()
-) {
-  if (depth > resolutionDepthLimit) return false;
-  const node = unwrapExpression(expression);
-  if (!node || seen.has(node)) return false;
-  seen.add(node);
-  if (node.type === "Identifier") {
-    const source = importSourceForIdentifier(node, sourceCode);
-    if (source && isRuntimeSchemaLibrarySource(source)) return true;
-    const initializer = constInitializer(node, sourceCode);
-    return initializer
-      ? hasSchemaProvenance(initializer, sourceCode, depth + 1, seen)
-      : false;
-  }
-  if (node.type === "MemberExpression") {
-    return hasSchemaProvenance(node.object, sourceCode, depth + 1, seen);
-  }
-  if (node.type === "CallExpression") {
-    if (node.callee.type === "MemberExpression") {
-      return hasSchemaProvenance(
-        node.callee.object,
-        sourceCode,
-        depth + 1,
-        seen
-      );
-    }
-    return hasSchemaProvenance(node.callee, sourceCode, depth + 1, seen);
-  }
-  return false;
+// With type information, a method declared by a runtime-schema package proves
+// the receiver even when the schema is imported from project code.
+function isTypedSchemaMethod(member, sourceCode) {
+  const services = sourceCode.parserServices;
+  if (!services?.program || !services.esTreeNodeToTSNodeMap) return false;
+  const tsNode = services.esTreeNodeToTSNodeMap.get(member.property);
+  const symbol =
+    tsNode && services.program.getTypeChecker().getSymbolAtLocation(tsNode);
+  return (symbol?.declarations ?? []).some((declaration) =>
+    isRuntimeSchemaLibraryFile(declaration.getSourceFile().fileName)
+  );
 }
 
 function isValidatorMember(member, sourceCode) {
   const method = staticPropertyName(member);
   if (!method) return false;
-  if (directValidatorMethods.has(method)) {
-    return !isKnownParserReceiver(member.object, sourceCode);
-  }
   if (distinctiveValidatorMethods.has(method)) return true;
   return (
-    provenanceValidatorMethods.has(method) &&
-    hasSchemaProvenance(member.object, sourceCode)
+    schemaValidatorMethods.has(method) &&
+    (isTypedSchemaMethod(member, sourceCode) ||
+      hasRuntimeSchemaProvenance(member.object, sourceCode))
   );
 }
 
@@ -192,7 +141,6 @@ function isValidatorFunctionIdentifier(identifier, sourceCode, depth = 0) {
   }
   const source = importSourceForIdentifier(identifier, sourceCode);
   if (source) {
-    if (parserLibrarySources.has(source)) return false;
     const importedName = importedNameForIdentifier(identifier, sourceCode);
     return (
       isRuntimeSchemaLibrarySource(source) &&
