@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- enable fourteen syntax rules at error in the ESLint pass, ratcheted by `eslint-suppressions.json`; the Oxlint plugin still exports them but the Oxlint governance config no longer lists them: `no-nonindependent-test-oracle`, `no-validator-output-oracle` and `no-schema-library-in-test` (G15); `no-inline-structural-type-at-use-site`, `no-duplicated-object-field-blocks` and `no-redeclared-owned-union` (W4); `no-open-dictionary-at-boundary` and `unknown-input-must-be-decoded` (G4); `no-sentinel-absence-fallback` and `no-silent-empty-detection-fallback` (G7); `no-raw-fetch-in-component` and `no-raw-react-native-touchables` (G11); `no-duplicated-conditional-classnames` and `no-calling-components-as-functions`. The rule registry declares W4 and G11. Consumers add these rules to their one-time `eslint . --suppress-rule ...` baseline and commit `eslint-suppressions.json`
+
 - `no-raw-react-native-touchables`: every React Native repository routes presses through one shared Touchable. With no `allowedFiles` owner configured, each raw touchable import reports with advice to create one shared Touchable module, import it everywhere, and register it as the rule's owner so the owner file alone may import the raw primitives; the configured exact-owner exemption and its remediation message are unchanged
 
 - `unknown-input-must-be-decoded`: decoders own their unknown parameter. Parameters of type predicates and assertion functions (`x is T`, `asserts x is T`) are exempt, as are helpers whose single returned expression only narrows the parameter (typeof, `in`, instanceof, `Array.isArray` and null checks joined by `&&` or `||`, with a final property comparison). Casts and unnarrowed reads still report

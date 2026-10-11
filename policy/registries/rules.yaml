@@ -45,6 +45,8 @@ directives:
     directive: Declare the case space first.
   G10:
     directive: Remove single-call hops.
+  G11:
+    directive: Deep modules; one owner per concern.
   G13:
     directive: No dependency cycles.
   G15:
@@ -59,6 +61,8 @@ directives:
     directive: No host-absolute paths.
   S5:
     directive: No dated provenance prose.
+  W4:
+    directive: Type reuse; no parallel shapes.
 
 semanticFactKinds:
   identitySchemaTransform:
@@ -899,7 +903,8 @@ rules:
   antidrift/no-inline-structural-type-at-use-site:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: W4
     signal: AST
     solveType: type-contract-shape
     proofBuckets: [local-ast-source-shape]
@@ -918,7 +923,7 @@ rules:
       replicationsNotIntroducedForTest: true
       knownFalsePositives: 0
       knownFalseNegatives: Interface/type-call signatures, return-type object literals, and exported JSX-returning functions are outside the current implementation-parameter proof.
-      productionConcerns: Keep default-off until independent repo replication proves exported/boundary inline object contracts and local UI prop/callback clean controls outside Chaski.
+      productionConcerns: Enabled at error in the ESLint pass; existing debt is pinned in eslint-suppressions.json rather than gated on further replication.
       noSinkBehavior: This rule emits no semantic facts; diagnostics depend only on local AST boundary shape.
       noDeadWorkBehavior: Named parameter contracts, local unexported helpers, JSX-returning React components, local React props, callback payload types, and non-parameter object literals stay clean.
     referenceDoc: docs/rule-roadmap.md
@@ -937,7 +942,7 @@ rules:
         - "export function load(input: { userId: string }) {}"
       allows:
         - "export function load(input: LoadInput) {}"
-    nextAction: Keep default-off inventory until independent repo replication proves exported/boundary inline structural contracts beyond the current Chaski-only evidence.
+    nextAction: Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus (31,557 tracked TS/JS files, 53 repositories) reports 3,443 findings in 29 repositories; prune suppressions as exported inline contracts are named.
   antidrift/no-nullable-positional-tuple:
     status: ready
     stable: false
@@ -1040,14 +1045,15 @@ rules:
   antidrift/no-raw-react-native-touchables:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: G11
     signal: deterministic AST import and re-export source plus configured exact owner-file paths
     solveType: interaction-primitive-ownership
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/no-raw-react-native-touchables.md
     corpusRepositories: [murderbox]
     concerns:
-      - Murderbox is the first real drift and clean corpus; independent replication is still required before stable promotion.
+      - Murderbox is the first real drift and clean corpus. Every React Native repository routes presses through one shared Touchable; with no allowedFiles owner configured, every raw import reports with advice to create that module and register it as the owner.
       - Namespace and default imports from React Native or RNGH are intentionally rejected because they bypass named-import ownership even when their current member usage is clean; their diagnostic first directs clean code to named non-interaction imports.
       - Type-only imports and re-exports remain clean because they cannot expose a runtime interaction primitive.
       - Dynamic import, CommonJS require, and deep package subpath forms remain outside this rule; the first consumer already rejects require imports and unowned package internals and has no real dynamic or subpath bypass.
@@ -1069,11 +1075,12 @@ rules:
         - 'import { View } from "react-native";'
         - 'import { Gesture } from "react-native-gesture-handler";'
         - 'import type { TouchableOpacityProps } from "react-native";'
-    nextAction: "Enable in Murderbox with apps/client/src/tw/index.tsx as the exact owner, inventory another React Native repository, and retire in favor of generated no-restricted-imports if the custom ownership delta disappears."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 222 raw touchable imports in 6 React Native repositories (paseo 123, chaski 82); each repository registers its shared Touchable as the exact owner. Retire in favor of generated no-restricted-imports if the custom ownership delta disappears."
   antidrift/no-raw-fetch-in-component:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: G11
     signal: JSX-return lexical function frame plus scope-bound global fetch
     solveType: side-effect-boundary
     proofBuckets: [local-ast-source-shape]
@@ -1123,7 +1130,7 @@ rules:
         - "async function downloadQrCode(url) { return fetch(url); } function QrActionCard() { return <button />; }"
         - 'import { fetch } from "./api"; function Orders() { fetch("/api/orders"); return <div />; }'
         - "function Orders() { const { data } = useOrders(); return <div>{data.length}</div>; }"
-    nextAction: Keep default-off inventory while re-inventorying real component fetch findings under the narrowed same-frame JSX-return proof before restoring blocking severity.
+    nextAction: Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 54 component fetch findings in 11 repositories under the same-frame JSX-return proof; prune suppressions as fetches move behind owned data clients.
   antidrift/no-redundant-local-return-type:
     status: under-proven
     stable: false
@@ -1854,14 +1861,14 @@ rules:
   antidrift/no-calling-components-as-functions:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     signal: AST
     solveType: react-component-call-contract
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/sentry-mined-react-rules.md
     corpusRepositories: [sentry, mrp]
     concerns:
-      - Promoted on getsentry/sentry production authorship plus a clean validation in mrp; no second independent repo with quantified real drift is pinned yet, so stable stays false and the rule ships default-off.
+      - The callee must resolve in scope to a function or arrow that lexically returns JSX, or to a forwardRef/memo wrapper. Imported and otherwise unresolvable callees are not reported, so action creators, minified bundles and generated clients stay clean.
     external:
       state: net-antidrift
       support: none
@@ -1871,11 +1878,14 @@ rules:
       whyNotOtherState: "Not partial-overlap because react/* and react-hooks/* rules do not model component-call-versus-render at the call site."
     examples:
       flags:
-        - "Widget({ label: 'x' });"
+        - "function Widget() { return <div />; } Widget({ label: 'x' });"
+        - "const Field = forwardRef((props, ref) => <input ref={ref} />); Field(props);"
       allows:
         - "<Widget label={'x'} />"
         - "Schema.Struct({ id });"
-    nextAction: "Keep default-off until a second repo provides quantified real drift; then run a corpus inventory and consider stable promotion."
+        - "function EndTurnAction() { return { type: 'end-turn' }; } dispatch(EndTurnAction());"
+        - "import { Card } from './card'; Card();"
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). After scope resolution the sushi corpus dropped from 1,247 findings in 22 repositories (action creators, a minified bundle, generated clients) to 4 in 2 (opencode SolidJS components called inside fallback render functions)."
   antidrift/no-mocked-response-body-oracle:
     status: ready
     stable: false
@@ -1911,7 +1921,8 @@ rules:
   antidrift/no-nonindependent-test-oracle:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: G15
     signal: AST
     solveType: test-quality-nonindependent-oracle
     proofBuckets: [local-ast-source-shape]
@@ -1942,11 +1953,12 @@ rules:
         - "expect(renderConfig(registry)).toEqual({ mcpServers: { executor: { url } } });"
         - 'expect(renderActivation(schema.parse(valid))).toBe("activation enabled");'
         - "trigger(); trigger(); expect(handler).toHaveBeenCalledTimes(1);"
-    nextAction: "Inventory existing guardrails and dotfiles findings, then split actionable replacements into behavioral/full-output assertions while tracking noisy branches before stable promotion."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 202 findings in 25 test files). The sushi corpus reports 20,203 findings in 29 repositories; replace pinned assertions with behavioral or full-output assertions and prune the suppressions."
   antidrift/no-schema-library-in-test:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: G15
     signal: deterministic AST import and test-file scope
     solveType: test-quality-schema-library-ownership
     proofBuckets: [local-ast-source-shape]
@@ -1955,7 +1967,7 @@ rules:
     concerns:
       - The runtime-schema library set is deliberately finite and evidence-backed; do not expand it to parser or serialization packages merely because they expose parse or decode functions.
       - Type-only imports stay clean. Static value imports, dynamic imports, TypeScript import-equals declarations, and unshadowed CommonJS require calls report only in test/spec files.
-      - The cleaned Murderbox corpus supplies motivating real drift but no current drift path; keep the rule default-off until another repository independently replicates the pattern.
+      - The cleaned Murderbox corpus supplies motivating real drift; the sushi corpus replicates it in 11 repositories.
     external:
       state: partial-overlap
       support: high
@@ -1972,11 +1984,12 @@ rules:
         - 'import type { ZodType } from "zod";'
         - 'import { UserSchema } from "../contracts/user";'
         - 'import { z } from "zod"; export const UserSchema = z.object({ id: z.string() }); // production file'
-    nextAction: "Run the rule over additional test corpora with type-only imports and non-Zod schema libraries before considering default-on enforcement."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 69 runtime-schema value imports in test files across 11 repositories."
   antidrift/no-validator-output-oracle:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: G15
     signal: deterministic AST plus local const-binding and projection flow
     solveType: test-quality-validator-output-oracle
     proofBuckets: [local-ast-source-shape]
@@ -1984,7 +1997,7 @@ rules:
     corpusRepositories: [murderbox]
     concerns:
       - The rule follows assertion subjects through local const bindings and transparent built-in projections, but stops at substantive outer calls and never guesses from application helper names or cross-file wrapper bodies.
-      - JSON, YAML, path, URL, query-string, and TOML parser bindings stay clean. Broad direct .parse assertion matching remains default-off until application parser clean controls are inventoried across more repositories.
+      - JSON, YAML, path, URL, query-string, and TOML parser bindings stay clean. Application parsers whose names match validator methods are pinned in eslint-suppressions.json when they report.
       - The cleaned Murderbox corpus supplies motivating direct validator-oracle drift but no current drift path; reduced programs are regression locks only.
     external:
       state: net-antidrift
@@ -2005,7 +2018,7 @@ rules:
         - 'const user = UserSchema.parse(raw); expect(renderUser(user)).toBe("User user_1");'
         - 'expect(JSON.parse(text)).toEqual({ id: "user_1" });'
         - "expect(YAML.parse(text).version).toBe(2);"
-    nextAction: "Inventory application parser APIs and assertion frameworks across independent repositories before considering default-on enforcement."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 1,656 direct validator-output assertions in 11 repositories."
   antidrift/no-static-property-loop:
     status: ready
     stable: false
@@ -2035,14 +2048,14 @@ rules:
   antidrift/no-duplicated-conditional-classnames:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     signal: AST class-token overlap in conditional string branches
     solveType: conditional-classname-duplication
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/no-duplicated-conditional-classnames.md
     corpusRepositories: [murderbox]
     concerns:
-      - The rule is a maintainability guard for conditional class strings, not a design-token authority rule. Keep it default-off until more real UI files classify clean and drift pressure.
+      - The rule is a maintainability guard for conditional class strings, not a design-token authority rule.
       - It compares static branch class tokens under configurable JSX class attributes. Standalone class helper calls are explicit opt-in controls rather than default name conventions.
       - "Alert controls fail loudly: omitted options use the default shape, while provided option objects must include attributes, helpers, minSharedRatio, and minSharedTokens."
     external:
@@ -2064,11 +2077,12 @@ rules:
       allows:
         - 'className={cn("w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3", disabled ? "opacity-50" : "active:opacity-75")}'
         - 'className={`h-9 items-center justify-center rounded-lg border border-mb-border-strong bg-mb-surface px-3 active:opacity-75 ${fetching ? "opacity-50" : ""}`}'
-    nextAction: "Run the Murderbox client file as the first drift corpus case and inventory additional UI repos before considering default-on enforcement."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 5 findings in 4 repositories."
   antidrift/no-duplicated-object-field-blocks:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: W4
     signal: AST co-occurrence of identical name-and-source-type field blocks across Zod or TypeScript object shapes
     solveType: duplicated-object-field-block
     proofBuckets: [local-ast-source-shape]
@@ -2096,11 +2110,12 @@ rules:
       allows:
         - 'const itemFields = { item_id: z.string(), content_index: z.number() }; z.object({ type: z.literal("a"), ...itemFields }); z.object({ type: z.literal("b"), ...itemFields });'
         - 'interface ItemFields { itemId: string; contentIndex: number } interface Delta extends ItemFields { type: "delta"; delta: string }'
-    nextAction: "Inventory additional schema-heavy repositories for false-positive pressure before considering stable promotion or default-on enforcement."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 2,157 findings in 36 repositories; hoist shared field blocks and prune the suppressions."
   antidrift/no-silent-empty-detection-fallback:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: G7
     signal: AST recovery/fallback source plus regex fallback candidate
     solveType: detection-failure-sentinel
     proofBuckets: [local-ast-source-shape]
@@ -2123,11 +2138,12 @@ rules:
       allows:
         - 'function formatLabel() { try { return readLabel(); } catch { return ""; } }'
         - 'function deviceId() { const id = readMachineId(); if (!id) throw new Error("missing id"); return id; }'
-    nextAction: "Use dotfiles as the real clean corpus anchor and keep the rule opt-in until another repo supplies drift evidence."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 6 findings in 4 repositories, with dotfiles as the clean anchor."
   antidrift/no-sentinel-absence-fallback:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: G7
     signal: AST nullish coalescing of a member read to an in-band absence sentinel string
     solveType: absence-sentinel-coercion
     proofBuckets: [local-ast-source-shape]
@@ -2137,7 +2153,7 @@ rules:
       - "Only the ?? operator is in scope; || falsy coercion of a member read to a sentinel is a different doctrine and stays out."
       - "Numeric sentinels such as Number(props.ExecMainStatus ?? 0) stay silent: proving drift there needs property-name semantics (systemd exit code 0 meaning success), and name-trust is rejected."
       - 'Call-expression and plain-identifier left-hand sides stay silent: the murderbox corpus shows display-only fallbacks like score ?? "unknown" and branch ?? "unknown" on locals whose provenance is not visible at the expression.'
-      - "Debug and diagnostics display surfaces (apps/client/app/runtime-diagnostics.tsx, apps/client/app/_debug.tsx) flag on member reads of optional runtime data; measure that pressure before any default-on consideration."
+      - "Debug and diagnostics display surfaces (apps/client/app/runtime-diagnostics.tsx, apps/client/app/_debug.tsx) flag on member reads of optional runtime data; that pressure is pinned in eslint-suppressions.json where it exists."
     external:
       state: net-antidrift
       support: low
@@ -2153,7 +2169,7 @@ rules:
       allows:
         - 'const title = doc.title ?? "Untitled";'
         - "const exit = Number(props.ExecMainStatus ?? 0);"
-    nextAction: "Keep the rule opt-in and inventory member-read flagging pressure on diagnostics display surfaces across at least one more repository before considering stable promotion."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 2 findings in 2 files). The sushi corpus reports 250 findings in 20 repositories."
 
   antidrift/no-repo-state-mirror-assertion:
     status: ready
@@ -2191,7 +2207,8 @@ rules:
   antidrift/no-redeclared-owned-union:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: W4
     signal: Exact AST literal member-set equality between a union and an in-scope exported runtime constant array
     solveType: redeclared-owned-union
     proofBuckets: [local-ast-source-shape]
@@ -2199,7 +2216,7 @@ rules:
     corpusRepositories: [antidrift]
     concerns:
       - Re-export chains and computed arrays remain unproven; ownership requires a directly inspectable exported constant array.
-      - Equal member sets can represent distinct concepts; explicit name exemptions and default-off adoption preserve consumer control.
+      - Equal member sets can represent distinct concepts; explicit name exemptions preserve consumer control.
     external:
       state: net-antidrift
       support: low
@@ -2212,12 +2229,13 @@ rules:
         - 'export const PHASES = ["queued", "done"] as const; type Phase = "queued" | "done";'
       allows:
         - 'export const PHASES = ["queued", "done"] as const; type Phase = (typeof PHASES)[number];'
-    nextAction: "Collect independently pinned external corpus evidence before stable or default-on promotion."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 7 findings in 7 repositories."
 
   antidrift/no-open-dictionary-at-boundary:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: G4
     signal: Open string-keyed any or unknown dictionary annotations in exported function signatures and variable declarations
     solveType: open-dictionary-at-boundary
     proofBuckets: [local-ast-source-shape]
@@ -2236,19 +2254,20 @@ rules:
         ]
       decision: own-antidrift
       whyThisState: "Type bans do not distinguish open dictionaries at exported boundaries from private implementation types."
-      whyNotOtherState: "Provisional source-shape ownership; independently pinned external false-positive evidence is still needed."
+      whyNotOtherState: "Not ecosystem-covered because type bans cannot scope an open dictionary to exported boundaries."
     examples:
       flags:
         - "export function receive(input: Record<string, unknown>) {}"
       allows:
         - "export function receive(input: Message) {}"
         - "function internal(input: Record<string, unknown>) {}"
-    nextAction: "Inventory external API boundaries and genuine dictionary exemptions before promotion."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 355 findings in 19 repositories; genuine protocol bags take exact-name exemptions."
 
   antidrift/unknown-input-must-be-decoded:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
+    directive: G4
     signal: Explicit unknown parameters and locals read outside decoding or successful type-predicate control flow
     solveType: unknown-input-decoding
     proofBuckets: [local-ast-source-shape]
@@ -2257,7 +2276,7 @@ rules:
     concerns:
       - Decoder names are a syntax convention; AST evidence cannot certify runtime validation behavior.
       - Predicate signatures must be directly visible; re-export chains and complex control-flow joins remain unproven.
-      - Low-level decoder implementations using structural probes may need exact-name exemptions.
+      - Decoders own their unknown parameter. Type predicates and assertion functions (`x is T`, `asserts x is T`) are exempt, as are helpers whose single returned expression only narrows the parameter with typeof, `in`, instanceof, Array.isArray and null checks joined by && or ||, plus a final property comparison. Casts and unnarrowed reads still report.
     external:
       state: net-antidrift
       support: low
@@ -2268,14 +2287,17 @@ rules:
         ]
       decision: own-antidrift
       whyThisState: "Unsafe-any checks do not require explicitly unknown boundary inputs to flow through decoders or owned type predicates."
-      whyNotOtherState: "This is a provisional opt-in boundary policy; broad external adoption evidence is not yet available."
+      whyNotOtherState: "Not ecosystem-covered because no maintained rule requires an explicitly unknown input to flow through a decoder before use."
     examples:
       flags:
         - "function receive(input: unknown) { return String(input); }"
+        - "promise.catch((e: unknown) => log((e as Error).message));"
       allows:
         - "function receive(input: unknown) { return messageSchema.parse(input); }"
         - "try { work(); } catch (error: unknown) { report(error); }"
-    nextAction: "Inventory decoder conventions and predicate control-flow false positives in independently pinned external repositories."
+        - 'const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;'
+        - 'function hasName(error: unknown, name: string): boolean { return typeof error === "object" && error !== null && "name" in error && error.name === name; }'
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). Exempting type predicates, assertion functions and pure narrowing helpers dropped the sushi corpus from 4,350 to 3,785 findings in 34 repositories; the remainder mixes casts and unnarrowed reads with forwarding and logging helpers."
 
   antidrift/no-convex-return-widening:
     status: ready

@@ -28,25 +28,32 @@ The reduced ESLint pass currently enables:
 - `antidrift/no-nullable-positional-tuple`
 - `antidrift/no-structural-type-fork`
 
-The structural and canonical rules receive generated, accepted package-owner, and domain-owner facts from the consumer policy registries. The Oxlint plugin enables `antidrift/require-effect-deps` and `antidrift/no-static-property-loop`. It also preserves these rules as default-off inventory:
+It also enables these portable syntax rules at error so `eslint-suppressions.json` ratchets existing debt (Oxlint has no baseline). The Oxlint plugin keeps exporting them but leaves them unconfigured:
 
-- `antidrift/no-async-array-method`
 - `antidrift/no-calling-components-as-functions`
 - `antidrift/no-duplicated-conditional-classnames`
 - `antidrift/no-duplicated-object-field-blocks`
-- `antidrift/no-handrolled-resource-lifecycle-cells`
 - `antidrift/no-inline-structural-type-at-use-site`
-- `antidrift/no-mocked-response-body-oracle`
 - `antidrift/no-nonindependent-test-oracle`
-- `antidrift/no-schema-library-in-test`
-- `antidrift/no-query-data-type-parameters`
+- `antidrift/no-open-dictionary-at-boundary`
 - `antidrift/no-raw-fetch-in-component`
-- `antidrift/no-redundant-zod-parse`
 - `antidrift/no-raw-react-native-touchables`
-- `antidrift/no-shattered-ingested-entity-state`
+- `antidrift/no-redeclared-owned-union`
+- `antidrift/no-schema-library-in-test`
+- `antidrift/no-sentinel-absence-fallback`
 - `antidrift/no-silent-empty-detection-fallback`
-- `antidrift/no-status-literal-in-type`
 - `antidrift/no-validator-output-oracle`
+- `antidrift/unknown-input-must-be-decoded`
+
+The structural and canonical rules receive generated, accepted package-owner, and domain-owner facts from the consumer policy registries. The Oxlint plugin enables `antidrift/require-effect-deps` and `antidrift/no-static-property-loop`. It also preserves these rules as default-off inventory:
+
+- `antidrift/no-async-array-method`
+- `antidrift/no-handrolled-resource-lifecycle-cells`
+- `antidrift/no-mocked-response-body-oracle`
+- `antidrift/no-query-data-type-parameters`
+- `antidrift/no-redundant-zod-parse`
+- `antidrift/no-shattered-ingested-entity-state`
+- `antidrift/no-status-literal-in-type`
 - `antidrift/require-authz-check`
 
 The ESLint pass preserves these TypeChecker-dependent or hybrid rules as default-off inventory:

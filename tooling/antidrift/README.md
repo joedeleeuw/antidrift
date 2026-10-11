@@ -16,10 +16,40 @@ The shared governance preset enables `antidrift/no-wrapping-functions` as an err
 
 For example, `const loadItems = (id) => owner.load(id)` reports; call `owner.load(id)` directly at its callers. `button.onClick(() => owner.load(id))` remains a callback with deferred execution. For a subscription API, `useSyncExternalStore(subscribeToConsent, getSnapshot)` is the valid direct substitution only when `subscribeToConsent` has the adapter's signature and receiver semantics; do not replace a required stable adapter with a new inline arrow or `.bind`. ESLint-only consumers can enable the same rule through the ESLint plugin; do not enable it in both lint runtimes.
 
-The presets also enforce one rule per shared AGENT.md directive, each recorded with its directive ID in `policy/registries/rules.yaml`: `antidrift/no-fallback-to-empty` (G7), `antidrift/no-else-if-chain` (G9), `antidrift/no-hash-literal` (S1), `antidrift/no-host-path-literal` (S4) and `antidrift/no-dated-comments` (S5) in Oxlint, and `antidrift/no-vague-names` (G21), `antidrift/no-pass-through-parameters` (G22) and `antidrift/no-compat-names` (G5) in the ESLint pass. G8 maps to native `no-nested-ternary`, which the generic tooling package owns. The ESLint three are ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
+The presets also enforce one rule per shared AGENT.md directive, each recorded with its directive ID in `policy/registries/rules.yaml`: `antidrift/no-fallback-to-empty` (G7), `antidrift/no-else-if-chain` (G9), `antidrift/no-hash-literal` (S1), `antidrift/no-host-path-literal` (S4) and `antidrift/no-dated-comments` (S5) in Oxlint, and `antidrift/no-vague-names` (G21), `antidrift/no-pass-through-parameters` (G22) and `antidrift/no-compat-names` (G5) in the ESLint pass. G8 maps to native `no-nested-ternary`, which the generic tooling package owns.
+
+The ESLint pass also enforces these syntax rules at error, exported by both plugins but configured only in ESLint:
+
+- G15 test independence: `antidrift/no-nonindependent-test-oracle`, `antidrift/no-validator-output-oracle`, `antidrift/no-schema-library-in-test`
+- W4 type reuse: `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-duplicated-object-field-blocks`, `antidrift/no-redeclared-owned-union`
+- G4 boundary decoding: `antidrift/no-open-dictionary-at-boundary`, `antidrift/unknown-input-must-be-decoded`
+- G7 loud failure: `antidrift/no-sentinel-absence-fallback`, `antidrift/no-silent-empty-detection-fallback`
+- G11 one owner per concern: `antidrift/no-raw-fetch-in-component`, `antidrift/no-raw-react-native-touchables`
+- React and markup hygiene: `antidrift/no-calling-components-as-functions`, `antidrift/no-duplicated-conditional-classnames`
+
+`antidrift/no-raw-react-native-touchables` reports every raw React Native or gesture-handler touchable import until a repository creates one shared Touchable module and registers it as the rule's owner (`allowedFiles`); the owner file alone may then import the raw primitives.
+
+Every ESLint-pass rule above is ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
 
 ```sh
-eslint . --suppress-rule antidrift/no-vague-names --suppress-rule antidrift/no-pass-through-parameters --suppress-rule antidrift/no-compat-names
+eslint . \
+  --suppress-rule antidrift/no-vague-names \
+  --suppress-rule antidrift/no-pass-through-parameters \
+  --suppress-rule antidrift/no-compat-names \
+  --suppress-rule antidrift/no-nonindependent-test-oracle \
+  --suppress-rule antidrift/no-validator-output-oracle \
+  --suppress-rule antidrift/no-schema-library-in-test \
+  --suppress-rule antidrift/no-inline-structural-type-at-use-site \
+  --suppress-rule antidrift/no-duplicated-object-field-blocks \
+  --suppress-rule antidrift/no-redeclared-owned-union \
+  --suppress-rule antidrift/no-open-dictionary-at-boundary \
+  --suppress-rule antidrift/unknown-input-must-be-decoded \
+  --suppress-rule antidrift/no-sentinel-absence-fallback \
+  --suppress-rule antidrift/no-silent-empty-detection-fallback \
+  --suppress-rule antidrift/no-raw-fetch-in-component \
+  --suppress-rule antidrift/no-raw-react-native-touchables \
+  --suppress-rule antidrift/no-calling-components-as-functions \
+  --suppress-rule antidrift/no-duplicated-conditional-classnames
 ```
 
 See `docs/rule-investigations/directive-rules.md` in the repository for scope and corpus evidence.
@@ -73,7 +103,7 @@ export default [
 ];
 ```
 
-`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, and the imported rules for unknown aliases and chained assertions. Test-focused `antidrift/no-schema-library-in-test`, `antidrift/no-validator-output-oracle`, and `antidrift/no-mocked-response-body-oracle` are registered default-off alongside the React Native interaction-owner rule. The remaining imported rules stay registered but default-off because their syntax is not sufficient general evidence at runtime, test, and external-data boundaries. Other syntax, scope, and local-control-flow Antidrift rules are also registered as default-off inventory. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services, warns for `no-defensive-shape-probing` and `no-underchecked-type-predicate`, and keeps `no-explicit-type-arguments-on-owned-api`, `no-identity-schema-transform`, `no-redundant-local-return-type`, `no-schema-validator-transcoding`, `no-sql-string-concat`, and `require-convex-return-validator` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
+`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, and the imported rules for unknown aliases and chained assertions. Test-focused `antidrift/no-mocked-response-body-oracle` is registered default-off. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. The remaining imported rules stay registered but default-off because their syntax is not sufficient general evidence at runtime, test, and external-data boundaries. Other syntax, scope, and local-control-flow Antidrift rules are also registered as default-off inventory. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services and the ratcheted syntax rules above, warns for `no-defensive-shape-probing` and `no-underchecked-type-predicate`, and keeps `no-explicit-type-arguments-on-owned-api`, `no-identity-schema-transform`, `no-redundant-local-return-type`, `no-schema-validator-transcoding`, `no-sql-string-concat`, and `require-convex-return-validator` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
 Oxlint excludes generated output only when its exact file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Generated-looking names are ordinary linted code unless the registry owns them.
 
@@ -274,9 +304,9 @@ The scoped rules that motivated this package go after the usual agent tells:
 
 - `require-effect-deps` — a `useEffect` with no dependency array runs on every render, and `exhaustive-deps` won't say a word about it
 - `no-static-property-loop` — tests that loop over hardcoded keys only to restate one precomputed object's static values
-- `no-raw-react-native-touchables` — default-off ownership for React Native/RNGH interaction imports, namespace/default bypasses, and re-exports outside exact app-owned primitive files
-- `no-schema-library-in-test` — default-off test-file guard against value imports from runtime-schema libraries; type-only imports remain valid
-- `no-validator-output-oracle` — default-off local-flow guard against assertions whose subject is direct runtime-validator output
+- `no-raw-react-native-touchables` — one shared Touchable per React Native app: raw React Native/RNGH interaction imports, namespace/default bypasses, and re-exports report outside the exact owner files in `allowedFiles`, and with no owner configured every raw import reports with advice to create and register one
+- `no-schema-library-in-test` — test-file guard against value imports from runtime-schema libraries; type-only imports remain valid
+- `no-validator-output-oracle` — local-flow guard against assertions whose subject is direct runtime-validator output
 - `no-mocked-response-body-oracle` — default-off guard for `response.json()` object-shape assertions that statically match a same-test mock arrangement while preserving transformed responses and independently owned effects
 - `react-max-component-props` — JSX-returning React components with too many locally-owned accepted props
 - `no-contract-appeasement-projection` — internal helpers that project one owned value contract into another explicit return contract without construction or validation

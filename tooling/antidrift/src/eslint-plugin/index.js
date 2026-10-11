@@ -23,6 +23,22 @@ import noWrappingFunctionsRule from "../oxlint-plugin/portable/no-wrapping-funct
 import noPassThroughParametersRule from "./rules/no-pass-through-parameters.js";
 import noVagueNamesRule from "./rules/no-vague-names.js";
 import noCompatNamesRule from "./rules/no-compat-names.js";
+import {
+  ruleNoInlineStructuralTypeAtUseSite,
+  ruleNoRawFetchInComponent,
+} from "../semantic-adapters/local-ast-rules.mjs";
+import ruleNoCallingComponentsAsFunctions from "../oxlint-plugin/rules/no-calling-components-as-functions.js";
+import ruleNoDuplicatedConditionalClassnames from "../oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
+import ruleNoDuplicatedObjectFieldBlocks from "../oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
+import ruleNoNonindependentTestOracle from "../oxlint-plugin/rules/no-nonindependent-test-oracle.js";
+import ruleNoOpenDictionaryAtBoundary from "../oxlint-plugin/rules/no-open-dictionary-at-boundary.js";
+import ruleNoRawReactNativeTouchables from "../oxlint-plugin/rules/no-raw-react-native-touchables.js";
+import ruleNoRedeclaredOwnedUnion from "../oxlint-plugin/rules/no-redeclared-owned-union.js";
+import ruleNoSchemaLibraryInTest from "../oxlint-plugin/rules/no-schema-library-in-test.js";
+import ruleNoSentinelAbsenceFallback from "../oxlint-plugin/rules/no-sentinel-absence-fallback.js";
+import ruleNoSilentEmptyDetectionFallback from "../oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
+import ruleNoValidatorOutputOracle from "../oxlint-plugin/rules/no-validator-output-oracle.js";
+import ruleUnknownInputMustBeDecoded from "../oxlint-plugin/rules/unknown-input-must-be-decoded.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
@@ -49,6 +65,22 @@ const rules = {
   "no-pass-through-parameters": noPassThroughParametersRule,
   "no-vague-names": noVagueNamesRule,
   "no-compat-names": noCompatNamesRule,
+  "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
+  "no-duplicated-conditional-classnames":
+    ruleNoDuplicatedConditionalClassnames(),
+  "no-duplicated-object-field-blocks": ruleNoDuplicatedObjectFieldBlocks(),
+  "no-inline-structural-type-at-use-site":
+    ruleNoInlineStructuralTypeAtUseSite(),
+  "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
+  "no-open-dictionary-at-boundary": ruleNoOpenDictionaryAtBoundary(),
+  "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
+  "no-raw-react-native-touchables": ruleNoRawReactNativeTouchables(),
+  "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
+  "no-schema-library-in-test": ruleNoSchemaLibraryInTest(),
+  "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
+  "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
+  "no-validator-output-oracle": ruleNoValidatorOutputOracle(),
+  "unknown-input-must-be-decoded": ruleUnknownInputMustBeDecoded(),
 };
 
 export default {

@@ -7,9 +7,23 @@ import aiPolicy from "../eslint-plugin/index.js";
 import { loadRegistriesSync } from "../policy/lib/registries.mjs";
 
 const ratchetedRules = {
+  "antidrift/no-calling-components-as-functions": "error",
   "antidrift/no-compat-names": "error",
+  "antidrift/no-duplicated-conditional-classnames": "error",
+  "antidrift/no-duplicated-object-field-blocks": "error",
+  "antidrift/no-inline-structural-type-at-use-site": "error",
+  "antidrift/no-nonindependent-test-oracle": "error",
+  "antidrift/no-open-dictionary-at-boundary": "error",
   "antidrift/no-pass-through-parameters": "error",
+  "antidrift/no-raw-fetch-in-component": "error",
+  "antidrift/no-raw-react-native-touchables": "error",
+  "antidrift/no-redeclared-owned-union": "error",
+  "antidrift/no-schema-library-in-test": "error",
+  "antidrift/no-sentinel-absence-fallback": "error",
+  "antidrift/no-silent-empty-detection-fallback": "error",
   "antidrift/no-vague-names": "error",
+  "antidrift/no-validator-output-oracle": "error",
+  "antidrift/unknown-input-must-be-decoded": "error",
 };
 
 export function createConfig({
