@@ -4,6 +4,11 @@
       "count": 1
     }
   },
+  "packages/ui/src/Button.tsx": {
+    "antidrift/no-vague-names": {
+      "count": 1
+    }
+  },
   "tooling/antidrift/src/brand/index.mjs": {
     "antidrift/no-vague-names": {
       "count": 3
@@ -193,6 +198,9 @@
     },
     "antidrift/no-sentinel-absence-fallback": {
       "count": 1
+    },
+    "antidrift/no-vague-names": {
+      "count": 2
     }
   },
   "tooling/antidrift/src/eslint-plugin/semantic-facts.test.mjs": {
@@ -275,7 +283,7 @@
       "count": 24
     },
     "antidrift/no-vague-names": {
-      "count": 27
+      "count": 28
     }
   },
   "tooling/antidrift/src/oxlint-plugin/owned-union-source.js": {
@@ -509,6 +517,14 @@
       "count": 24
     }
   },
+  "tooling/antidrift/src/oxlint-plugin/rules/no-calling-components-as-functions.js": {
+    "antidrift/no-compat-names": {
+      "count": 1
+    },
+    "antidrift/no-vague-names": {
+      "count": 1
+    }
+  },
   "tooling/antidrift/src/oxlint-plugin/rules/no-convex-return-widening.js": {
     "antidrift/no-vague-names": {
       "count": 2
@@ -534,10 +550,10 @@
   },
   "tooling/antidrift/src/oxlint-plugin/rules/no-nonindependent-test-oracle.js": {
     "antidrift/no-pass-through-parameters": {
-      "count": 3
+      "count": 2
     },
     "antidrift/no-vague-names": {
-      "count": 20
+      "count": 26
     }
   },
   "tooling/antidrift/src/oxlint-plugin/rules/no-open-dictionary-at-boundary.js": {
@@ -565,7 +581,7 @@
   },
   "tooling/antidrift/src/oxlint-plugin/rules/no-schema-library-in-test.js": {
     "antidrift/no-vague-names": {
-      "count": 1
+      "count": 2
     }
   },
   "tooling/antidrift/src/oxlint-plugin/rules/no-sentinel-absence-fallback.js": {
@@ -728,7 +744,7 @@
       "count": 5
     },
     "antidrift/no-vague-names": {
-      "count": 9
+      "count": 13
     }
   },
   "tooling/antidrift/src/policy/no-appeasement-remediation-corpus.mjs": {
@@ -874,7 +890,7 @@
       "count": 2
     },
     "antidrift/no-vague-names": {
-      "count": 10
+      "count": 11
     }
   },
   "tooling/antidrift/src/policy/type-owner-inventory.test.mjs": {
@@ -942,7 +958,7 @@
       "count": 4
     },
     "antidrift/no-vague-names": {
-      "count": 8
+      "count": 9
     }
   },
   "tooling/antidrift/src/semantic-adapters/canonical-path.mjs": {
@@ -973,7 +989,7 @@
   },
   "tooling/antidrift/src/semantic-adapters/owned-contract-provenance.mjs": {
     "antidrift/no-vague-names": {
-      "count": 4
+      "count": 5
     }
   },
   "tooling/antidrift/src/semantic-adapters/parse-input.mjs": {

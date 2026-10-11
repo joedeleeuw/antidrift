@@ -1868,7 +1868,8 @@ rules:
     referenceDoc: docs/rule-investigations/sentry-mined-react-rules.md
     corpusRepositories: [sentry, mrp]
     concerns:
-      - The callee must resolve in scope to a function or arrow that lexically returns JSX, or to a forwardRef/memo wrapper. Imported and otherwise unresolvable callees are not reported, so action creators, minified bundles and generated clients stay clean.
+      - The callee must resolve in scope, through local const aliases, to a function or arrow that returns JSX outside nested functions, or to a forwardRef/memo wrapper imported from React. Imported and otherwise unresolvable callees are not reported, so action creators, minified bundles and generated clients stay clean.
+      - Files importing Solid, Qwik, Vue, or Preact without preact/compat are skipped because calling components as functions is idiomatic there.
     external:
       state: net-antidrift
       support: none
@@ -1879,7 +1880,7 @@ rules:
     examples:
       flags:
         - "function Widget() { return <div />; } Widget({ label: 'x' });"
-        - "const Field = forwardRef((props, ref) => <input ref={ref} />); Field(props);"
+        - "import { forwardRef } from 'react'; const Field = forwardRef((props, ref) => <input ref={ref} />); Field(props);"
       allows:
         - "<Widget label={'x'} />"
         - "Schema.Struct({ id });"
@@ -1966,7 +1967,7 @@ rules:
     corpusRepositories: [murderbox]
     concerns:
       - The runtime-schema library set is deliberately finite and evidence-backed; do not expand it to parser or serialization packages merely because they expose parse or decode functions.
-      - Type-only imports stay clean. Static value imports, dynamic imports, TypeScript import-equals declarations, and unshadowed CommonJS require calls report only in test/spec files.
+      - Type-only imports stay clean, and so do schema values and errors whose every read flows into an application API (a call or constructor argument, or a JSX prop). Test-owned validation, reads and sanitizing, dynamic imports, side-effect imports, TypeScript import-equals declarations, and unshadowed CommonJS require calls report, only in test/spec files.
       - The cleaned Murderbox corpus supplies motivating real drift; the sushi corpus replicates it in 11 repositories.
     external:
       state: partial-overlap
@@ -1990,14 +1991,14 @@ rules:
     stable: false
     defaultOff: false
     directive: G15
-    signal: deterministic AST plus local const-binding and projection flow
+    signal: deterministic AST plus local const-binding and projection flow; validator receivers proven by TypeScript types in the typed pass or by schema-library binding provenance
     solveType: test-quality-validator-output-oracle
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/test-validator-oracles.md
     corpusRepositories: [murderbox]
     concerns:
       - The rule follows assertion subjects through local const bindings and transparent built-in projections, but stops at substantive outer calls and never guesses from application helper names or cross-file wrapper bodies.
-      - JSON, YAML, path, URL, query-string, and TOML parser bindings stay clean. Application parsers whose names match validator methods are pinned in eslint-suppressions.json when they report.
+      - parse/safeParse/assert/decode/validate count as validator calls only when the receiver is proven to be a runtime schema, by TypeScript types in the typed ESLint pass or by binding provenance to a schema-library import; application parsers with the same method names stay clean without receiver-name exemptions.
       - The cleaned Murderbox corpus supplies motivating direct validator-oracle drift but no current drift path; reduced programs are regression locks only.
     external:
       state: net-antidrift
@@ -2009,11 +2010,12 @@ rules:
       whyNotOtherState: "Not partial-overlap because syntax selectors can match direct calls but cannot express the local dataflow and application-call stop boundary that defines this rule."
     examples:
       flags:
-        - 'const parsed = UserSchema.parse(raw); expect(parsed.id).toBe("user_1");'
-        - "expect(UserSchema.safeParse(raw).success).toBe(true);"
-        - 'expect(Object.keys(UserSchema.parse(raw))).toEqual(["id"]);'
-        - "expect(() => UserSchema.parse(raw)).toThrow();"
+        - 'import { z } from "zod"; const UserSchema = z.object({ id: z.string() }); const parsed = UserSchema.parse(raw); expect(parsed.id).toBe("user_1");'
+        - 'import { z } from "zod"; const UserSchema = z.object({ id: z.string() }); expect(UserSchema.safeParse(raw).success).toBe(true);'
+        - 'import * as v from "valibot"; const UserSchema = v.object({ id: v.string() }); expect(Object.keys(v.parse(UserSchema, raw))).toEqual(["id"]);'
+        - 'import { z } from "zod"; const UserSchema = z.object({ id: z.string() }); expect(() => UserSchema.parse(raw)).toThrow();'
       allows:
+        - 'import { parseCommand } from "./commands"; const commandParser = { parse: parseCommand }; expect(commandParser.parse("ls").name).toBe("ls");'
         - 'expect(renderUser(UserSchema.parse(raw))).toBe("User user_1");'
         - 'const user = UserSchema.parse(raw); expect(renderUser(user)).toBe("User user_1");'
         - 'expect(JSON.parse(text)).toEqual({ id: "user_1" });'
@@ -2278,7 +2280,7 @@ rules:
       - Predicate signatures must be directly visible; re-export chains and complex control-flow joins remain unproven.
       - Decoders own their unknown parameter. Type predicates and assertion functions (`x is T`, `asserts x is T`) are exempt, as are helpers whose single returned expression only narrows the parameter with typeof, `in`, instanceof, Array.isArray and null checks joined by && or ||, plus a final property comparison.
       - Forwarding the whole value as a call argument is not use; the receiving function owns the decoding and is checked there when it is first-party. Built-in coercions and serializers (String, Number, Boolean, BigInt, JSON.stringify, Response.json) and template interpolation remain use.
-      - Branch and if-exit guards (typeof, instanceof, `in`, Array.isArray) narrow later reads in the same block; guard operands, truthiness tests and null comparisons are not use. Casts report even behind a guard.
+      - Branch and if-exit guards (typeof, instanceof, `in`, Array.isArray) narrow later reads in the same block. Guard operands (typeof, `!`, instanceof, `in`, equality) are not use only when the guard steers control flow (a branch, loop, conditional or switch test, a short-circuit left operand, or a type-predicate return); `return typeof input` is use. Casts report even behind a guard.
     external:
       state: net-antidrift
       support: low
@@ -4121,6 +4123,7 @@ rules:
       [opencode, sudocode-main, executor, chatbiz-webapp, homer, agent-browser]
     concerns:
       - Only silent failure paths report; a catch that reads its error or rethrows keeps empty as an explicit contract.
+      - The governance preset excludes `**/fixtures/**`, where failure behavior is modeled on purpose, matching the ESLint pass ignores.
     external:
       state: partial-overlap
       support: medium

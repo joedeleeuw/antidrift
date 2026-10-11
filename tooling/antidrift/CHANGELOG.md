@@ -2,7 +2,43 @@
 
 ## Unreleased
 
-- `unknown-input-must-be-decoded`: use means member reads, casts, coercions and returns. Forwarding the whole unknown value as a call argument is no longer reported, because the receiving function owns the decoding; built-in coercions and serializers (`String`, `Number`, `Boolean`, `BigInt`, `JSON.stringify`, `Response.json`) and template interpolation still are. Branch and if-exit guards (`typeof`, `instanceof`, `in`, `Array.isArray`) narrow later reads in the same block, and guard operands, truthiness tests and null comparisons are not use. Casts report even behind a guard
+- `no-schema-library-in-test`: schema-library value imports report only for test-owned validation, reads or sanitizing. Schema values and errors that flow straight into application APIs (call or constructor arguments, JSX props), e.g. `generateForm(z.object(...))` or `new FormError(new ZodError([]))`, are allowed; dynamic `import()` and side-effect imports still report
+
+- `no-validator-output-oracle`: `parse`/`safeParse` (and `assert`/`decode`/`validate`) count as validator calls only when the receiver is proven to be a runtime schema, by TypeScript types in the typed ESLint pass or by binding provenance to a schema-library import. This replaces method-name inference and the JSON/YAML/path receiver-name exemptions, so application parsers stay clean and shadowing aliases such as `const JSON = UserSchema` report
+
+- `no-nonindependent-test-oracle`: a length echo is not reported when a sibling independent full-equality assertion on the same collection proves its contents; block facts are cached per test so analysis is linear in assertion count
+
+- `no-inline-structural-type-at-use-site`: the JSX-returning exemption covers returns nested in if/switch/try/loop blocks (not nested functions); exported objects and functions wrapped in `satisfies`/`as` are checked as boundaries; constructors and accessors report only on exported classes
+
+- `no-duplicated-object-field-blocks`: repeated field blocks are found even when one of their fields also appears in other shapes, using a bounded near-linear search over field-occurrence intersections
+
+- `no-open-dictionary-at-boundary`: generic constraints and defaults of exported functions are inspected, and exported functions wrapped in `satisfies`/`as` are unwrapped
+
+- `no-redeclared-owned-union`: the message says "owned literal value space" so numeric unions are described correctly
+
+- `unknown-input-must-be-decoded`: guard operands (`typeof`, `!`, `instanceof`, `in`, equality) are exempt only when the guard steers control flow (a branch, loop, conditional or switch test, a short-circuit left operand, or a type-predicate return); `return typeof input` and `{ missing: !input }` report
+
+- `no-fallback-to-empty`: empty collections are matched through `as`/`satisfies`/`!`/`<T>` and chain wrappers, and block-bodied `.catch` handlers that return `[]`/`{}` and drop the error report. The Oxlint governance preset excludes `**/fixtures/**` for this rule
+
+- `no-silent-empty-detection-fallback`: a directly returned empty string from a detection helper reports (source `ast-direct-empty`), `hostname` is a detection token, and names containing `format`/`render`/`display` are not detection helpers
+
+- `no-calling-components-as-functions`: files importing Solid, Qwik, Vue, or Preact without `preact/compat` are skipped; `forwardRef`/`memo` count as wrappers only when they resolve to React imports, aliases included; local `const Alias = Component` bindings are followed and JSX returns nested in if/try/loop blocks are found
+
+- `no-raw-react-native-touchables`: React Native `Button` and gesture-handler `BaseButton`/`BorderlessButton`/`RawButton`/`RectButton` are forbidden, and `{ default as X }` imports and re-exports from React Native report as broad namespace access
+
+- `no-duplicated-conditional-classnames`: configured helpers (`cn`, `clsx`) see conditionals nested inside array, object and spread arguments, e.g. `cn([ok ? "a b" : "a c"])`
+
+- `no-vague-names`: matches the G21 patterns: vague nouns ignore case (`DATA`), snake_case filler affixes (`user_data`, `my_config`) and numbered abbreviations (`req2`) report, uppercase `I`/`J`/`K`/`N`/`X`/`Y` are allowed, and `props` reports again outside a component's first parameter
+
+- `no-compat-names`: names bound inside destructuring patterns in declarations and parameters are checked
+
+- `no-pass-through-parameters`: parameters forwarded through `void call(...)` and calls to local functions whose initializers are wrapped in `as`/`satisfies`/`!` report
+
+- `no-hash-literal`: hash literals wrapped in TypeScript assertions such as `as const` report
+
+- the ESLint ratcheted pass covers `.mts` and `.cts` files and skips minified bundles (`**/*.min.{js,mjs,cjs}`)
+
+- `unknown-input-must-be-decoded`: use means member reads, casts, coercions and returns. Forwarding the whole unknown value as a call argument is no longer reported, because the receiving function owns the decoding; built-in coercions and serializers (`String`, `Number`, `Boolean`, `BigInt`, `JSON.stringify`, `Response.json`) and template interpolation still are. Branch and if-exit guards (`typeof`, `instanceof`, `in`, `Array.isArray`) narrow later reads in the same block, and truthiness tests, null comparisons and control-flow guard operands are not use. Casts report even behind a guard
 
 - enable fourteen syntax rules at error in the ESLint pass, ratcheted by `eslint-suppressions.json`; the Oxlint plugin still exports them but the Oxlint governance config no longer lists them: `no-nonindependent-test-oracle`, `no-validator-output-oracle` and `no-schema-library-in-test` (G15); `no-inline-structural-type-at-use-site`, `no-duplicated-object-field-blocks` and `no-redeclared-owned-union` (W4); `no-open-dictionary-at-boundary` and `unknown-input-must-be-decoded` (G4); `no-sentinel-absence-fallback` and `no-silent-empty-detection-fallback` (G7); `no-raw-fetch-in-component` and `no-raw-react-native-touchables` (G11); `no-duplicated-conditional-classnames` and `no-calling-components-as-functions`. The rule registry declares W4 and G11. Consumers add these rules to their one-time `eslint . --suppress-rule ...` baseline and commit `eslint-suppressions.json`
 
