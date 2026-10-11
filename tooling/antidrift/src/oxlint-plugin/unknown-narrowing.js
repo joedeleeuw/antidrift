@@ -151,3 +151,102 @@ export function isNarrowedUse(identifier, state) {
   }
   return false;
 }
+
+const equalityOperators = new Set(["===", "!==", "==", "!="]);
+
+function rootedAt(node, name) {
+  let current = node;
+  while (
+    current?.type === "MemberExpression" ||
+    current?.type === "ChainExpression"
+  ) {
+    current =
+      current.type === "ChainExpression" ? current.expression : current.object;
+  }
+  return current?.type === "Identifier" && current.name === name;
+}
+
+function mentions(node, name) {
+  if (!node || typeof node.type !== "string") return false;
+  if (node.type === "Identifier" && node.name === name) return true;
+  return Object.entries(node).some(([key, child]) => {
+    if (key === "parent") return false;
+    if (Array.isArray(child)) {
+      return child.some((element) => mentions(element, name));
+    }
+    return mentions(child, name);
+  });
+}
+
+function isArrayIsArray(callee) {
+  return (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object.type === "Identifier" &&
+    callee.object.name === "Array" &&
+    callee.property.name === "isArray"
+  );
+}
+
+function isNarrowingComparison(subject, other, name) {
+  if (mentions(other, name)) return false;
+  if (subject.type === "UnaryExpression" && subject.operator === "typeof") {
+    return rootedAt(subject.argument, name);
+  }
+  return rootedAt(subject, name);
+}
+
+// The expression only narrows `name`: typeof, `in`, instanceof,
+// Array.isArray, truthiness and null checks joined by && or ||, with property
+// comparisons on the narrowed value. A cast (`as`) is not narrowing.
+function isNarrowing(node, name) {
+  switch (node?.type) {
+    case "Identifier":
+      return node.name === name;
+    case "LogicalExpression":
+      return (
+        ["&&", "||"].includes(node.operator) &&
+        isNarrowing(node.left, name) &&
+        isNarrowing(node.right, name)
+      );
+    case "UnaryExpression":
+      return node.operator === "!" && isNarrowing(node.argument, name);
+    case "CallExpression":
+      return (
+        isArrayIsArray(node.callee) &&
+        node.arguments.length === 1 &&
+        rootedAt(node.arguments[0], name)
+      );
+    case "BinaryExpression":
+      if (node.operator === "in") {
+        return rootedAt(node.right, name) && !mentions(node.left, name);
+      }
+      if (node.operator === "instanceof") {
+        return rootedAt(node.left, name) && !mentions(node.right, name);
+      }
+      return (
+        equalityOperators.has(node.operator) &&
+        (isNarrowingComparison(node.left, node.right, name) ||
+          isNarrowingComparison(node.right, node.left, name))
+      );
+    default:
+      return false;
+  }
+}
+
+function returnedExpression(owner) {
+  const body = owner.body;
+  if (body?.type !== "BlockStatement") return body;
+  const [statement] = body.body;
+  return body.body.length === 1 && statement.type === "ReturnStatement"
+    ? statement.argument
+    : null;
+}
+
+// A narrowing helper decodes its unknown parameter: its single returned
+// expression only narrows that parameter. Returning the bare parameter is
+// forwarding, not narrowing.
+export function returnsOnlyNarrowing(owner, name) {
+  const returned = returnedExpression(owner);
+  return returned?.type !== "Identifier" && isNarrowing(returned, name);
+}

@@ -125,6 +125,26 @@ ruleTester.run(
       {
         code: `${predicate} const input: unknown = read(); function other(input: string) { use(input); } schema.parse(input);`,
       },
+      // Decoders own the unknown: type predicates and assertion functions.
+      {
+        code: 'const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);',
+      },
+      {
+        code: 'function isMessage(value: unknown): value is Message { if (typeof value !== "object" || value === null) return false; return "title" in value; }',
+      },
+      {
+        code: 'function assertMessage(value: unknown): asserts value is Message { if (!(value as Message).title) throw new Error("invalid"); }',
+      },
+      // Boolean narrowing helpers decode by narrowing only.
+      {
+        code: 'class Errors { static hasName(error: unknown, name: string): boolean { return typeof error === "object" && error !== null && "name" in error && error.name === name; } }',
+      },
+      {
+        code: "const isFailure = (error: unknown) => error instanceof Error || Array.isArray(error);",
+      },
+      {
+        code: 'function isCode(error: unknown, code: string) { return !!error && typeof error === "object" && "code" in error && typeof error.code === "string" && error.code === code; }',
+      },
     ],
     invalid: [
       {
@@ -173,6 +193,22 @@ ruleTester.run(
       },
       {
         code: "function onError(error: unknown) { return (error as Error).message; } promise.catch(onError);",
+        errors,
+      },
+      {
+        code: "promise.catch((e: unknown) => log((e as Error).message));",
+        errors,
+      },
+      {
+        code: "function identity(value: unknown) { return value; }",
+        errors,
+      },
+      {
+        code: 'function hasTitle(value: unknown) { return (value as Message).title === "x"; }',
+        errors,
+      },
+      {
+        code: 'function titleOf(value: unknown) { return typeof value === "object" && value !== null && "title" in value && value.title; }',
         errors,
       },
       {

@@ -1,5 +1,5 @@
 import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
-import { isNarrowedUse } from "../unknown-narrowing.js";
+import { isNarrowedUse, returnsOnlyNarrowing } from "../unknown-narrowing.js";
 import { isDecoderArgument, predicateCall } from "../unknown-predicates.js";
 import {
   isErrorInspectionRead,
@@ -32,6 +32,17 @@ function rejectionHandlerOwner(node, sourceCode) {
   return isRejectionHandlerFunction(declaration, sourceCode)
     ? declaration
     : null;
+}
+
+// The parameter belongs to a decoder: a type predicate or assertion function
+// (`x is T` / `asserts x is T`), or a helper whose returned expression only
+// narrows the parameter.
+function isDecoderParameter(node) {
+  const binding = owningBinding(node);
+  const owner = binding.parent;
+  if (!owner.params?.includes(binding)) return false;
+  if (owner.returnType?.typeAnnotation?.type === "TSTypePredicate") return true;
+  return returnsOnlyNarrowing(owner, node.name);
 }
 
 function bindingNames(node) {
@@ -99,6 +110,7 @@ export default function ruleUnknownInputMustBeDecoded() {
         RestElement: checkPattern,
         Identifier(node) {
           if (!unknownBinding(node) || allows.has(node.name)) return;
+          if (isDecoderParameter(node)) return;
           const variable = findVariable(context.sourceCode, node);
           if (!variable) return;
           if (rejectionHandlerOwner(node, context.sourceCode)) {
