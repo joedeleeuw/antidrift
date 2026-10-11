@@ -1,5 +1,12 @@
 // Rule ported from getsentry/sentry static/eslint/eslintPluginSentry
 // (no-calling-components-as-functions). See that repo's LICENSE.
+import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
+import {
+  functionReturnsJsx,
+  isFunctionLike,
+  unwrapExpression,
+} from "../../semantic-adapters/local-ast-rules.mjs";
+
 const IGNORED_NAMES = new Set(["OverrideOrDefault"]);
 const NOT_PASCAL_CASE_RE = /^[A-Z][A-Z\d]*_|^[A-Z][A-Z\d_]*$/u;
 
@@ -46,6 +53,34 @@ function buildJsxFix(fixer, node, name, arg, sourceCode) {
   return fixer.replaceText(node, `<${name} ${attrs.join(" ")} />`);
 }
 
+const COMPONENT_WRAPPERS = new Set(["forwardRef", "memo"]);
+
+function isComponentWrapperCall(node) {
+  if (node?.type !== "CallExpression") return false;
+  const callee = node.callee;
+  if (callee.type === "Identifier") return COMPONENT_WRAPPERS.has(callee.name);
+  return (
+    callee.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.property.type === "Identifier" &&
+    COMPONENT_WRAPPERS.has(callee.property.name)
+  );
+}
+
+// A callee is a component only when its binding resolves in scope to a
+// function that lexically returns JSX, or to a forwardRef/memo wrapper.
+// Imported and otherwise unresolvable callees are not reported.
+function resolvesToComponent(sourceCode, callee) {
+  const definition = findVariable(sourceCode, callee)?.defs?.[0];
+  if (definition?.type === "FunctionName") {
+    return functionReturnsJsx(definition.node);
+  }
+  if (definition?.type !== "Variable") return false;
+  const init = unwrapExpression(definition.node.init);
+  if (isFunctionLike(init)) return functionReturnsJsx(init);
+  return isComponentWrapperCall(init);
+}
+
 export default function ruleNoCallingComponentsAsFunctions() {
   return {
     meta: {
@@ -62,35 +97,12 @@ export default function ruleNoCallingComponentsAsFunctions() {
       },
     },
     create(context) {
-      const knownComponents = new Set();
       return {
-        ImportDeclaration(node) {
-          for (const specifier of node.specifiers) {
-            if (/^[A-Z]/u.test(specifier.local.name)) {
-              knownComponents.add(specifier.local.name);
-            }
-          }
-        },
-        FunctionDeclaration(node) {
-          if (node.id && /^[A-Z]/u.test(node.id.name)) {
-            knownComponents.add(node.id.name);
-          }
-        },
-        VariableDeclarator(node) {
-          if (
-            node.id.type === "Identifier" &&
-            /^[A-Z]/u.test(node.id.name) &&
-            node.init &&
-            (node.init.type === "ArrowFunctionExpression" ||
-              node.init.type === "FunctionExpression")
-          ) {
-            knownComponents.add(node.id.name);
-          }
-        },
         CallExpression(node) {
           if (node.callee.type !== "Identifier") return;
           const name = node.callee.name;
-          if (!knownComponents.has(name) || shouldSkip(name)) return;
+          if (!/^[A-Z]/u.test(name) || shouldSkip(name)) return;
+          if (!resolvesToComponent(context.sourceCode, node.callee)) return;
           if (node.arguments.length > 1) return;
           const arg = node.arguments[0];
           if (

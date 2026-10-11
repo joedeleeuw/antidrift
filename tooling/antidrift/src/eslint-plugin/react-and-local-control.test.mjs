@@ -111,24 +111,45 @@ ruleTester.run(
       'import { Schema } from "effect"; Schema.Struct({ id: 1 });',
       'import { Widget } from "./w"; const ref = Widget;',
       "unknownThing({ a: 1 });",
+      // Action creators are PascalCase functions that return plain objects.
+      'function EndTurnAction() { return { type: "end-turn" }; } dispatch(EndTurnAction());',
+      // A minified bundle calls PascalCase bindings that return no JSX.
+      "var Ab = function (e) { return e.a + 1; }; Ab(t);",
+      // A generated client endpoint is a function, not a component.
+      "const Endpoint0_0 = (raw) => ({ ...raw, kind: 'endpoint' }); Endpoint0_0(raw);",
+      // Imported callees cannot be resolved to a JSX-returning body.
+      'import { Card } from "./c"; Card();',
+      "function Widget() { return null; } Widget({ label: 'x' });",
+      "const Box = () => null; Box({ a: 1 });",
     ],
     invalid: [
       {
-        code: "function Widget() { return null; } Widget({ label: 'x' });",
-        output: "function Widget() { return null; } <Widget label={'x'} />;",
-        errors: 1,
+        code: "function Widget() { return <div />; } Widget({ label: 'x' });",
+        output: "function Widget() { return <div />; } <Widget label={'x'} />;",
       },
       {
-        code: 'import { Card } from "./c"; Card();',
-        output: 'import { Card } from "./c"; <Card />;',
-        errors: 1,
+        code: "const Box = () => <span />; Box({ a: 1 });",
+        output: "const Box = () => <span />; <Box a={1} />;",
       },
       {
-        code: "const Box = () => null; Box({ a: 1 });",
-        output: "const Box = () => null; <Box a={1} />;",
-        errors: 1,
+        code: "const List = function () { return <></>; }; List();",
+        output: "const List = function () { return <></>; }; <List />;",
       },
-    ],
+      {
+        code: 'import { forwardRef } from "react"; const Field = forwardRef((props, ref) => <input ref={ref} />); Field(props);',
+        output:
+          'import { forwardRef } from "react"; const Field = forwardRef((props, ref) => <input ref={ref} />); <Field {...props} />;',
+      },
+      {
+        code: 'import React from "react"; const Row = React.memo(Item); Row({ id });',
+        output:
+          'import React from "react"; const Row = React.memo(Item); <Row id={id} />;',
+      },
+    ].map((testCase) => ({
+      ...testCase,
+      filename: "component.tsx",
+      errors: 1,
+    })),
   }
 );
 
