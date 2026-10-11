@@ -69,7 +69,10 @@ const additionalAntidriftRules = {
   "antidrift/no-unlisted-external-imports": "error",
   "antidrift/no-dated-comments": "error",
   "antidrift/no-else-if-chain": "error",
-  "antidrift/no-fallback-to-empty": "error",
+  "antidrift/no-fallback-to-empty": [
+    "error",
+    { excludeFiles: ["**/fixtures/**"] },
+  ],
   "antidrift/no-hash-literal": "error",
   "antidrift/no-host-path-literal": "error",
   "antidrift/no-async-array-method": "off",

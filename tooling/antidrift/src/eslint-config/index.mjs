@@ -99,7 +99,8 @@ export function createConfig({
       },
     },
     {
-      files: ["**/*.{js,jsx,mjs,cjs}"],
+      files: ["**/*.{js,jsx,mjs,cjs,mts,cts}"],
+      ignores: ["**/*.min.{js,mjs,cjs}"],
       languageOptions: {
         parser,
         parserOptions: { ecmaFeatures: { jsx: true } },
