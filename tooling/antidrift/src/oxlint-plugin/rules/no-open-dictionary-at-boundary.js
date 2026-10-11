@@ -1,4 +1,5 @@
 import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
+import { unwrapExpression } from "../../semantic-adapters/local-ast-rules.mjs";
 
 function isOpenValue(node) {
   return node?.type === "TSUnknownKeyword" || node?.type === "TSAnyKeyword";
@@ -35,26 +36,31 @@ function annotation(node) {
 }
 
 function signatureTypes(node) {
-  return [...node.params.map(annotation), node.returnType].filter(Boolean);
+  return [
+    node.typeParameters,
+    ...node.params.map(annotation),
+    node.returnType,
+  ].filter(Boolean);
 }
 
+const functionTypes = new Set([
+  "FunctionDeclaration",
+  "TSDeclareFunction",
+  "FunctionExpression",
+  "ArrowFunctionExpression",
+]);
+
 function boundaryTypes(node) {
+  const boundary = unwrapExpression(node);
+  if (functionTypes.has(boundary.type)) return signatureTypes(boundary);
+  if (boundary.type !== "VariableDeclarator") return [];
+  const types = [boundary.id.typeAnnotation].filter(Boolean);
+  const init = unwrapExpression(boundary.init);
   if (
-    [
-      "FunctionDeclaration",
-      "TSDeclareFunction",
-      "FunctionExpression",
-      "ArrowFunctionExpression",
-    ].includes(node.type)
+    init?.type === "FunctionExpression" ||
+    init?.type === "ArrowFunctionExpression"
   ) {
-    return signatureTypes(node);
-  }
-  if (node.type !== "VariableDeclarator") return [];
-  const types = [node.id.typeAnnotation].filter(Boolean);
-  if (
-    ["FunctionExpression", "ArrowFunctionExpression"].includes(node.init?.type)
-  ) {
-    types.push(...signatureTypes(node.init));
+    types.push(...signatureTypes(init));
   }
   return types;
 }

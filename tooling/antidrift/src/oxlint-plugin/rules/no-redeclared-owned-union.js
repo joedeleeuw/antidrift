@@ -175,7 +175,7 @@ export default function ruleNoRedeclaredOwnedUnion() {
       ],
       messages: {
         redeclaredOwner:
-          "This union re-declares an owned string space; derive it from the owning runtime array {{owner}}.",
+          "This union re-declares an owned literal value space; derive it from the owning runtime array {{owner}}.",
       },
     },
     create(context) {

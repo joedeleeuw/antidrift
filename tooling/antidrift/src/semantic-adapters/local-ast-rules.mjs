@@ -142,13 +142,29 @@ function enclosingClassExported(memberNode) {
   );
 }
 
+// `value satisfies T` and `value as T` keep `value` owned by the enclosing
+// declaration; return the outermost such wrapper so callers can read its owner.
+function outermostTypeWrapper(node) {
+  let cur = node;
+  while (
+    (cur.parent?.type === "TSSatisfiesExpression" ||
+      cur.parent?.type === "TSAsExpression") &&
+    cur.parent.expression === cur
+  ) {
+    cur = cur.parent;
+  }
+  return cur;
+}
+
 function enclosingObjectExported(memberNode) {
   const objectNode = memberNode.parent;
   if (objectNode?.type !== "ObjectExpression") return false;
-  if (objectNode.parent?.type === "ExportDefaultDeclaration") return true;
+  const owned = outermostTypeWrapper(objectNode);
+  if (owned.parent?.type === "ExportDefaultDeclaration") return true;
   return (
-    objectNode.parent?.type === "VariableDeclarator" &&
-    isBoundary(objectNode.parent)
+    owned.parent?.type === "VariableDeclarator" &&
+    owned.parent.init === owned &&
+    isBoundary(owned.parent)
   );
 }
 
@@ -185,11 +201,16 @@ function enclosingReturnedObjectFromBoundary(memberNode) {
 function functionBoundaryNode(fn) {
   if (fn?.type === "FunctionDeclaration") return fn;
   if (
-    (fn?.type === "FunctionExpression" ||
-      fn?.type === "ArrowFunctionExpression") &&
-    fn.parent?.type === "VariableDeclarator"
+    fn?.type === "FunctionExpression" ||
+    fn?.type === "ArrowFunctionExpression"
   ) {
-    return fn.parent;
+    const owned = outermostTypeWrapper(fn);
+    if (
+      owned.parent?.type === "VariableDeclarator" &&
+      owned.parent.init === owned
+    ) {
+      return owned.parent;
+    }
   }
   if (fn && memberNodeTypes.has(fn.parent?.type)) return fn.parent;
   return fn;
@@ -352,23 +373,72 @@ function returnsJsxExpression(statement, jsxLocals) {
   );
 }
 
-function blockReturnsJsx(body) {
-  const jsxLocals = new Set();
-  for (const statement of body.body) {
+function statementsReturnJsx(statements, outerJsxLocals) {
+  const jsxLocals = new Set(outerJsxLocals);
+  for (const statement of statements) {
     collectJsxLocals(statement, jsxLocals);
-    if (returnsJsxExpression(statement, jsxLocals)) return true;
+    if (statementReturnsJsx(statement, jsxLocals)) return true;
   }
   return false;
 }
 
+// Follows nested control flow to its return statements; nested functions own
+// their own returns and are not statements here, so they are never entered.
+function statementReturnsJsx(statement, jsxLocals) {
+  switch (statement?.type) {
+    case "ReturnStatement":
+      return returnsJsxExpression(statement, jsxLocals);
+    case "BlockStatement":
+      return statementsReturnJsx(statement.body, jsxLocals);
+    case "IfStatement":
+      return (
+        statementReturnsJsx(statement.consequent, jsxLocals) ||
+        statementReturnsJsx(statement.alternate, jsxLocals)
+      );
+    case "SwitchStatement":
+      return statement.cases.some((switchCase) =>
+        statementsReturnJsx(switchCase.consequent, jsxLocals)
+      );
+    case "TryStatement":
+      return (
+        statementReturnsJsx(statement.block, jsxLocals) ||
+        statementReturnsJsx(statement.handler?.body, jsxLocals) ||
+        statementReturnsJsx(statement.finalizer, jsxLocals)
+      );
+    case "LabeledStatement":
+    case "WhileStatement":
+    case "DoWhileStatement":
+    case "ForStatement":
+    case "ForInStatement":
+    case "ForOfStatement":
+      return statementReturnsJsx(statement.body, jsxLocals);
+    default:
+      return false;
+  }
+}
+
 export function functionReturnsJsx(fn) {
   if (fn?.body?.type !== "BlockStatement") return containsJsxNode(fn?.body);
-  return blockReturnsJsx(fn.body);
+  return statementsReturnJsx(fn.body.body, new Set());
 }
 
 function isExportedFunctionBoundary(fn) {
   const owner = functionBoundaryNode(fn);
-  return Boolean(owner && isBoundary(owner));
+  if (!owner) return false;
+  // isBoundary treats every constructor and accessor as a boundary; this rule
+  // only guards members of classes that leave the module.
+  if (owner.type === "MethodDefinition" && !memberOfExportedClass(owner)) {
+    return false;
+  }
+  return isBoundary(owner);
+}
+
+function memberOfExportedClass(memberNode) {
+  const classNode = memberNode.parent?.parent;
+  return (
+    enclosingClassExported(memberNode) ||
+    (classNode?.type === "ClassDeclaration" && isExported(classNode))
+  );
 }
 
 function inlineStructuralTypeAtBoundary(node) {

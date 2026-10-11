@@ -106,6 +106,22 @@ ruleTester.run(
         options: [{ allows: ["headers"] }],
         errors,
       },
+      {
+        code: "export function receive<T extends Record<string, unknown>>(input: T) { return input; }",
+        errors,
+      },
+      {
+        code: "export const receive = <T extends { [key: string]: unknown }>(input: T) => input;",
+        errors,
+      },
+      {
+        code: "export const receive = ((input: Record<string, unknown>) => input) satisfies Handler;",
+        errors,
+      },
+      {
+        code: "export const receive = ((input: Record<string, unknown>) => input) as Handler;",
+        errors,
+      },
     ],
   }
 );

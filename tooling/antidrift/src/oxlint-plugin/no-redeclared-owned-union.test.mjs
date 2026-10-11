@@ -91,6 +91,15 @@ ruleTester.run("no-redeclared-owned-union", rule("no-redeclared-owned-union"), {
       errors,
     },
     {
+      code: "export const CODES = [-1, 0, 2] as const; type Code = 2 | -1 | 0;",
+      errors: [
+        {
+          message:
+            "This union re-declares an owned literal value space; derive it from the owning runtime array CODES.",
+        },
+      ],
+    },
+    {
       code: `${convex} ${owner} const phase = v.union(v.literal("done"), v.literal("queued"));`,
       errors,
     },

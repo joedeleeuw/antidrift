@@ -116,39 +116,99 @@ function typeFields(shape, sourceCode) {
   return fields;
 }
 
-function fieldOccurrences(shapes, sourceCode, fieldsForShape) {
+// Each shape-index set worth inspecting is an intersection of field occurrence
+// sets. Exploring every intersection is exponential, so the search visits the
+// occurrence sets themselves first and then at most this many derived
+// intersections per distinct occurrence set.
+const derivedIntersectionsPerOccurrenceSet = 4;
+
+function fieldIndex(shapes, sourceCode, fieldsForShape, options) {
   const occurrences = new Map();
-  shapes.forEach((shape, shapeIndex) => {
-    const seen = new Set();
+  const shapeFieldKeys = shapes.map((shape, shapeIndex) => {
+    const keys = [];
     for (const field of fieldsForShape(shape, sourceCode)) {
-      if (seen.has(field.key)) continue;
-      seen.add(field.key);
-      const occurrence = occurrences.get(field.key) ?? {
-        name: field.name,
-        shapeIndices: new Set(),
-      };
-      occurrence.shapeIndices.add(shapeIndex);
-      occurrences.set(field.key, occurrence);
+      const occurrence = occurrences.get(field.key);
+      if (occurrence?.shapeIndices.at(-1) === shapeIndex) continue;
+      keys.push(field.key);
+      if (occurrence) {
+        occurrence.shapeIndices.push(shapeIndex);
+      } else {
+        occurrences.set(field.key, {
+          name: field.name,
+          shapeIndices: [shapeIndex],
+        });
+      }
     }
+    return keys;
   });
-  return occurrences;
+  for (const [fieldKey, occurrence] of occurrences) {
+    if (occurrence.shapeIndices.length < options.minShapes) {
+      occurrences.delete(fieldKey);
+    }
+  }
+  return {
+    occurrences,
+    shapeFieldKeys: shapeFieldKeys.map((keys) =>
+      keys.filter((key) => occurrences.has(key))
+    ),
+  };
 }
 
-function cooccurrenceGroups(occurrences) {
-  const groups = new Map();
-  for (const [fieldKey, occurrence] of occurrences) {
-    const shapeIndices = [...occurrence.shapeIndices];
-    const signature = shapeIndices.join(",");
-    const group = groups.get(signature) ?? {
-      fieldKeys: [],
-      fieldNames: [],
-      shapeIndices,
-    };
-    group.fieldKeys.push(fieldKey);
-    group.fieldNames.push(occurrence.name);
-    groups.set(signature, group);
+// Returns the fields present in every shape of `shapeIndices`, plus each
+// narrower shape set obtained by intersecting it with one field's occurrences.
+function inspectShapeSet(shapeIndices, index, options) {
+  const shapesByField = new Map();
+  for (const shapeIndex of shapeIndices) {
+    for (const fieldKey of index.shapeFieldKeys[shapeIndex]) {
+      const fieldShapes = shapesByField.get(fieldKey) ?? [];
+      fieldShapes.push(shapeIndex);
+      shapesByField.set(fieldKey, fieldShapes);
+    }
   }
-  return [...groups.values()];
+  const fieldKeys = [];
+  const narrower = [];
+  for (const [fieldKey, fieldShapes] of shapesByField) {
+    if (fieldShapes.length === shapeIndices.length) {
+      fieldKeys.push(fieldKey);
+    } else if (fieldShapes.length >= options.minShapes) {
+      narrower.push(fieldShapes);
+    }
+  }
+  return { fieldKeys, narrower };
+}
+
+function sharedFieldGroups(shapes, sourceCode, fieldsForShape, options) {
+  const index = fieldIndex(shapes, sourceCode, fieldsForShape, options);
+  const queue = [];
+  const queued = new Set();
+  const enqueue = (shapeIndices) => {
+    const signature = shapeIndices.join(",");
+    if (queued.has(signature)) return;
+    queued.add(signature);
+    queue.push(shapeIndices);
+  };
+  for (const occurrence of index.occurrences.values()) {
+    enqueue(occurrence.shapeIndices);
+  }
+  const maxQueued = queued.size * (1 + derivedIntersectionsPerOccurrenceSet);
+  const groups = [];
+  for (const shapeIndices of queue) {
+    const { fieldKeys, narrower } = inspectShapeSet(
+      shapeIndices,
+      index,
+      options
+    );
+    groups.push({
+      fieldKeys,
+      fieldNames: fieldKeys.map((key) => index.occurrences.get(key).name),
+      shapeIndices,
+    });
+    for (const narrowerShapeIndices of narrower) {
+      if (queued.size >= maxQueued) break;
+      enqueue(narrowerShapeIndices);
+    }
+  }
+  return groups;
 }
 
 function candidateScore(candidate) {
@@ -163,9 +223,16 @@ function qualifies(candidate, options) {
   );
 }
 
+// Both arrays hold ascending shape indices.
 function isSubset(left, right) {
-  const rightSet = new Set(right);
-  return left.every((item) => rightSet.has(item));
+  let rightIndex = 0;
+  for (const item of left) {
+    while (rightIndex < right.length && right[rightIndex] < item) {
+      rightIndex += 1;
+    }
+    if (right[rightIndex] !== item) return false;
+  }
+  return true;
 }
 
 function isStrictSubsetOf(candidate, reported) {
@@ -194,8 +261,7 @@ function reportedCandidates(groups, options) {
 }
 
 function reportShapeKind(context, shapes, sourceCode, fieldsForShape, options) {
-  const occurrences = fieldOccurrences(shapes, sourceCode, fieldsForShape);
-  const groups = cooccurrenceGroups(occurrences);
+  const groups = sharedFieldGroups(shapes, sourceCode, fieldsForShape, options);
   for (const candidate of reportedCandidates(groups, options)) {
     const fields = candidate.fieldNames.toSorted().slice(0, 6).join(", ");
     context.report({
