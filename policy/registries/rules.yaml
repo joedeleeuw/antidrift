@@ -1944,11 +1944,11 @@ rules:
       flags:
         - 'assert.equal(items.some((item) => item.name === "node_repl"), false);'
         - 'expect(names).toContain("executor");'
-        - "const parsed = schema.parse(fixture); expect(parsed).toEqual(fixture);"
-        - 'expect(schema.safeParse({ status: "bad" }).success).toBe(false);'
-        - 'const result = schema.safeParse(arrangedBad); expect(result.error.issues[0].message).toBe("authored message");'
-        - 'expect(() => schema.parse(arrangedBad)).toThrow("invalid input");'
-        - "service.save(user); expect(repository.save).toHaveBeenCalledWith(user);"
+        - 'it("parses the fixture", () => { const parsed = schema.parse(fixture); expect(parsed).toEqual(fixture); });'
+        - 'it("rejects a bad status", () => { expect(schema.safeParse({ status: "bad" }).success).toBe(false); });'
+        - 'it("reports the issue message", () => { const result = schema.safeParse(arrangedBad); expect(result.error.issues[0].message).toBe("authored message"); });'
+        - 'it("throws on bad input", () => { expect(() => schema.parse(arrangedBad)).toThrow("invalid input"); });'
+        - 'it("saves the user", () => { service.save(user); expect(repository.save).toHaveBeenCalledWith(user); });'
       allows:
         - 'assert.deepEqual(runtimeConnections.map((server) => server.name), ["needle", "context7"]);'
         - "expect(renderConfig(registry)).toEqual({ mcpServers: { executor: { url } } });"

@@ -1,5 +1,9 @@
 # changelog
 
+## Unreleased
+
+- `no-nonindependent-test-oracle`: the registry's input, outcome, error-shape and mock-call echo `flags` examples now sit inside an `it(...)` callback. The rule bounds arrangement to the enclosing test callback, so the bare snippets never reported; rule behavior is unchanged
+
 ## 0.15.0
 
 - `no-schema-library-in-test`: schema-library value imports report only for test-owned validation, reads or sanitizing. Schema values and errors that flow straight into application APIs (call or constructor arguments, JSX props), e.g. `generateForm(z.object(...))` or `new FormError(new ZodError([]))`, are allowed; dynamic `import()` and side-effect imports still report
