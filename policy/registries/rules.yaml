@@ -4031,7 +4031,7 @@ rules:
       candidates:
         [unicorn/prevent-abbreviations, eslint/id-denylist, eslint/id-length]
       decision: own-antidrift
-      whyThisState: The abbreviation map comes from unicorn prevent-abbreviations; the vague nouns, filler affixes and single-letter allowance come from the G21 directive.
+      whyThisState: The category list matches the dotfiles g21-vague-name rule, including a curated subset of unicorn prevent-abbreviations keys that are vague in any context.
       whyNotOtherState: No single maintained rule covers the directive's categories, and Oxlint does not host unicorn prevent-abbreviations.
     examples:
       flags:
@@ -4042,7 +4042,7 @@ rules:
         - "const invoices = load();"
         - "function Profile(props) { return <div>{props.name}</div>; }"
         - "for (let i = 0; i < n; i += 1) {}"
-    nextAction: Keep at error with the suppressions ratchet; align the category list with dotfiles g21-vague-name when it lands.
+    nextAction: Keep at error with the suppressions ratchet; change the category list only together with dotfiles g21-vague-name.
 
   antidrift/no-compat-names:
     status: ready
