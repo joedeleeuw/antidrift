@@ -4,13 +4,14 @@ import {
 } from "../../oxlint-plugin/portable/scope.js";
 
 const VAGUE_NOUN =
-  /^(?:data|info|value|values|val|vals|obj|objs|objects|thing|things|stuff|temp|tmp|foo|bar|baz|res|ret|retval|misc|result|results|item|items|var|vars|variable|content|contents|param|params|parameters|arr|spam|ham|toto|tutu|tata)\d*$/;
+  /^(?:data|info|value|values|val|vals|obj|objects|objs|thing|things|stuff|temp|tmp|foo|bar|baz|res|ret|retval|misc|result|results|item|items|var|vars|variable|content|contents|param|params|parameters|arr|spam|ham|toto|tutu|tata)\d*$/i;
 const FILLER_SUFFIX = /^\w+(?:Value|Data|Info|Obj|Object|Thing|Stuff)$/;
-const FILLER_PREFIX = /^(?:my|the|some|temp|tmp)[A-Z]/;
-const ALLOWED_SINGLE_LETTERS = new Set(["i", "j", "k", "n", "x", "y", "_"]);
-const PLATFORM_INSTANCE_NAMES = new Set(["formData", "imageData"]);
-const TEMPORARY_PATH =
-  /^(?:temp|tmp)(?:Dir|Directory|File|Path|Root|Base|Home)s?$/;
+const SNAKE_FILLER_SUFFIX = /^\w+_(?:value|data|info|obj|object|thing|stuff)$/;
+const FILLER_PREFIX = /^(?:my|the|some|temp|tmp)[A-Z_]/;
+const ABBREVIATION = /^([a-z]+)\d*$/;
+const SINGLE_LETTER = /^[a-hl-mo-wzA-HL-MO-WZ]$/;
+const EXEMPT_NAME =
+  /^(?:te?mp_?(?:dir|directory|file|path|root|base|home)s?|formData|imageData)$/i;
 const FUNCTION_TYPES = new Set([
   "ArrowFunctionExpression",
   "FunctionDeclaration",
@@ -36,25 +37,24 @@ const ABBREVIATIONS = new Map(
     fn: "function",
     msg: "message",
     opts: "options",
+    props: "properties",
     req: "request",
     str: "string",
   })
 );
 
 function vagueReason(name) {
+  if (EXEMPT_NAME.test(name)) return null;
   if (VAGUE_NOUN.test(name)) return "a vague noun";
-  if (ABBREVIATIONS.has(name)) {
-    return `an abbreviation of '${ABBREVIATIONS.get(name)}'`;
+  const abbreviation = ABBREVIATION.exec(name)?.[1];
+  if (ABBREVIATIONS.has(abbreviation)) {
+    return `an abbreviation of '${ABBREVIATIONS.get(abbreviation)}'`;
   }
-  if (name.length === 1 && !ALLOWED_SINGLE_LETTERS.has(name)) {
-    return "a single letter";
-  }
-  if (FILLER_SUFFIX.test(name) && !PLATFORM_INSTANCE_NAMES.has(name)) {
+  if (SINGLE_LETTER.test(name)) return "a single letter";
+  if (FILLER_SUFFIX.test(name) || SNAKE_FILLER_SUFFIX.test(name)) {
     return "a filler suffix";
   }
-  if (FILLER_PREFIX.test(name) && !TEMPORARY_PATH.test(name)) {
-    return "a filler prefix";
-  }
+  if (FILLER_PREFIX.test(name)) return "a filler prefix";
   return null;
 }
 

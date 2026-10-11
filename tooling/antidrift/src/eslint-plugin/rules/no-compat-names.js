@@ -6,12 +6,32 @@ import {
 const REMOVAL_VOCABULARY =
   /legacy|compat(?!ible)|deprecated|retire|no_?longer/i;
 
-function parameterIdentifier(node) {
-  if (node.type === "TSParameterProperty") {
-    return parameterIdentifier(node.parameter);
+function* patternIdentifiers(node) {
+  switch (node?.type) {
+    case "Identifier":
+      yield node;
+      return;
+    case "AssignmentPattern":
+      yield* patternIdentifiers(node.left);
+      return;
+    case "RestElement":
+      yield* patternIdentifiers(node.argument);
+      return;
+    case "ArrayPattern":
+      for (const element of node.elements) yield* patternIdentifiers(element);
+      return;
+    case "ObjectPattern":
+      for (const property of node.properties) {
+        yield* patternIdentifiers(
+          property.type === "RestElement" ? property : property.value
+        );
+      }
+      return;
+    case "TSParameterProperty":
+      yield* patternIdentifiers(node.parameter);
+      return;
+    default:
   }
-  if (node.type === "AssignmentPattern") return node.left;
-  return node;
 }
 
 export default {
@@ -45,10 +65,13 @@ export default {
         });
       }
     }
+    function checkPattern(pattern) {
+      for (const identifier of patternIdentifiers(pattern)) check(identifier);
+    }
     function checkFunction(node) {
       if (node.type === "FunctionDeclaration") check(node.id);
       for (const parameter of node.params) {
-        check(parameterIdentifier(parameter));
+        checkPattern(parameter);
       }
     }
     function checkKey(node) {
@@ -60,7 +83,7 @@ export default {
       FunctionExpression: checkFunction,
       ArrowFunctionExpression: checkFunction,
       VariableDeclarator(node) {
-        check(node.id);
+        checkPattern(node.id);
       },
       ClassDeclaration(node) {
         check(node.id);

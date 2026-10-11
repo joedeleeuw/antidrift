@@ -50,6 +50,14 @@ ruleTester.run(
           },
         ],
       },
+      {
+        code: "import { save } from './store'; function forward(entry) { void save(entry); }",
+        errors: [{ messageId: "passThrough" }],
+      },
+      {
+        code: "const save = ((entry) => entry) satisfies ((entry: string) => string); function forward(entry: string) { return save(entry); }",
+        errors: [{ messageId: "passThrough" }],
+      },
     ],
   }
 );
@@ -71,6 +79,8 @@ ruleTester.run("no-compat-names", rule("no-compat-names"), {
     { code: "interface RetiredRule { id: string }", errors: 1 },
     { code: "class Store { migrateLegacy() {} noLongerUsed = 1; }", errors: 2 },
     { code: "type Options = { compatibilityDate: string };", errors: 1 },
+    { code: "const { legacyPath } = settings;", errors: 1 },
+    { code: "function load({ compatMode }) { return compatMode; }", errors: 1 },
   ],
 });
 
@@ -84,6 +94,9 @@ ruleTester.run("no-vague-names", rule("no-vague-names"), {
     "const formData = new FormData(form);",
     "const tempDir = mkdtempSync(prefix);",
     "const { data: invoices } = useQuery(query);",
+    "const X = horizontal;",
+    "const tmp_path = mkdtempSync(prefix);",
+    "const TempDir = mkdtempSync(prefix);",
   ],
   invalid: [
     {
@@ -134,6 +147,27 @@ ruleTester.run("no-vague-names", rule("no-vague-names"), {
       code: "export function load(ctx, value) { return ctx.db.get(value); }",
       errors: 2,
     },
+    { code: "const DATA = load();", errors: 1 },
+    { code: "const user_data = load();", errors: 1 },
+    { code: "const my_config = load();", errors: 1 },
+    {
+      code: "const req2 = request;",
+      errors: [
+        {
+          messageId: "vague",
+          data: { name: "req2", reason: "an abbreviation of 'request'" },
+        },
+      ],
+    },
+    {
+      code: "function normalize(props) { return Object.keys(props); }",
+      errors: [
+        {
+          messageId: "vague",
+          data: { name: "props", reason: "an abbreviation of 'properties'" },
+        },
+      ],
+    },
   ],
 });
 
@@ -148,6 +182,7 @@ ruleTester.run("no-hash-literal", rule("no-hash-literal"), {
     { code: `const patchSha256 = "${hash}";`, errors: 1 },
     { code: `const source = { sha256: "${hash}" };`, errors: 1 },
     { code: `if (digest !== "${hash}") fail();`, errors: 1 },
+    { code: `const patchSha256 = "${hash}" as const;`, errors: 1 },
   ],
 });
 
@@ -188,10 +223,28 @@ ruleTester.run("no-fallback-to-empty", rule("no-fallback-to-empty"), {
   valid: [
     'function readRegistry(path) { try { return parse(read(path)); } catch (error) { if (error.code === "ENOENT") return {}; throw error; } }',
     "function readRegistry(path) { try { return parse(read(path)); } catch (error) { errors.push(error.message); return {}; } }",
+    "const body = await read().catch((error) => { log(error); return []; });",
+    "const body = await read().catch(() => { const build = () => { return []; }; throw build(); });",
   ],
   invalid: [
     {
       code: "function readRegistry(path) { try { return parse(read(path)); } catch (error) { return {}; } }",
+      errors: 1,
+    },
+    {
+      code: "async function load() { try { return await read(); } catch { return [] as Item[]; } }",
+      errors: 1,
+    },
+    {
+      code: "async function load() { try { return await read(); } catch { return {} satisfies Record<string, never>; } }",
+      errors: 1,
+    },
+    {
+      code: "const body = await read().catch(() => { return []; });",
+      errors: 1,
+    },
+    {
+      code: "const body = await read().catch(function () { return {}; });",
       errors: 1,
     },
     {

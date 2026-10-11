@@ -77,7 +77,9 @@ const FUNCTION_VALUES = new Set([
   "FunctionExpression",
 ]);
 
-function definesFunction(node) {
+function definesFunction(initializer) {
+  let node = initializer;
+  while (TYPE_WRAPPERS.has(node?.type)) node = node.expression;
   return (
     FUNCTION_VALUES.has(node?.type) ||
     (node?.type === "CallExpression" &&
@@ -112,7 +114,8 @@ function isDelegatedResult(call) {
   let node = outerExpression(call);
   while (
     node.parent.type === "AwaitExpression" ||
-    node.parent.type === "ChainExpression"
+    node.parent.type === "ChainExpression" ||
+    (node.parent.type === "UnaryExpression" && node.parent.operator === "void")
   ) {
     node = outerExpression(node.parent);
   }

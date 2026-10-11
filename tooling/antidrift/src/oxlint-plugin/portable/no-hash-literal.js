@@ -23,7 +23,16 @@ function nameOf(node) {
   return "";
 }
 
-function bindingName(literal) {
+const TYPE_WRAPPERS = new Set([
+  "TSAsExpression",
+  "TSNonNullExpression",
+  "TSSatisfiesExpression",
+  "TSTypeAssertion",
+]);
+
+function bindingName(node) {
+  let literal = node;
+  while (TYPE_WRAPPERS.has(literal.parent?.type)) literal = literal.parent;
   const { parent } = literal;
   switch (parent.type) {
     case "VariableDeclarator":
