@@ -79,19 +79,19 @@ function repoRootFor(repoRoot) {
 
 function cellEntries(payload) {
   return Object.values(payload?.cells ?? {}).filter(
-    (entry) => entry && typeof entry === "object",
+    (entry) => entry && typeof entry === "object"
   );
 }
 
 function cellWrites(payload) {
   return cellEntries(payload).flatMap((entry) =>
-    Array.isArray(entry.writes) ? entry.writes : [],
+    Array.isArray(entry.writes) ? entry.writes : []
   );
 }
 
 function hasCellWith(payload, predicate) {
   return cellEntries(payload).some((entry) =>
-    predicate(new Set(Array.isArray(entry.writes) ? entry.writes : [])),
+    predicate(new Set(Array.isArray(entry.writes) ? entry.writes : []))
   );
 }
 
@@ -105,7 +105,7 @@ export function classifyReactStateFact(fact) {
   const writes = new Set(cellWrites(payload));
   const togglesBoolean = hasCellWith(
     payload,
-    (cell) => cell.has("trueConst") && cell.has("falseConst"),
+    (cell) => cell.has("trueConst") && cell.has("falseConst")
   );
   const hasLifecycleReset = writes.has("nullConst") || togglesBoolean;
   if (writes.has("awaited") && writes.has("caughtError") && hasLifecycleReset) {
@@ -145,7 +145,7 @@ function countBy(entries, key) {
   const out = {};
   for (const entry of entries) increment(out, entry[key]);
   return Object.fromEntries(
-    Object.entries(out).sort(([left], [right]) => left.localeCompare(right)),
+    Object.entries(out).sort(([left], [right]) => left.localeCompare(right))
   );
 }
 
@@ -154,7 +154,7 @@ function diagnosticsFor(repoRoot, results) {
     result.messages
       .filter(
         (message) =>
-          message.ruleId === "antidrift/no-handrolled-resource-lifecycle-cells",
+          message.ruleId === "antidrift/no-handrolled-resource-lifecycle-cells"
       )
       .map((message) => ({
         path: relative(repoRoot, result.filePath).replace(/\\/gu, "/"),
@@ -163,7 +163,7 @@ function diagnosticsFor(repoRoot, results) {
         column: message.column,
         severity: message.severity === 2 ? "error" : "warn",
         message: message.message,
-      })),
+      }))
   );
 }
 
@@ -248,13 +248,13 @@ export async function reactStateInventory({
   const entries = facts
     .filter(
       (fact) =>
-        fact.ruleId === "antidrift/no-handrolled-resource-lifecycle-cells",
+        fact.ruleId === "antidrift/no-handrolled-resource-lifecycle-cells"
     )
     .map(factEntry)
     .sort((left, right) =>
       `${left.path}:${left.line}:${left.factKind}`.localeCompare(
-        `${right.path}:${right.line}:${right.factKind}`,
-      ),
+        `${right.path}:${right.line}:${right.factKind}`
+      )
     );
   const diagnostics = diagnosticsFor(root, results);
   const summary = {

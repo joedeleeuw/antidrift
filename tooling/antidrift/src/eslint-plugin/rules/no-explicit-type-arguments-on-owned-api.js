@@ -34,12 +34,18 @@ function resolvedSymbol(checker, symbol) {
 }
 
 function resolvedCalleeName(checker, tsNameNode) {
-  const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(tsNameNode));
+  const symbol = resolvedSymbol(
+    checker,
+    checker.getSymbolAtLocation(tsNameNode)
+  );
   return symbol?.getName() ?? null;
 }
 
 function calleePackagePath(checker, tsNameNode) {
-  const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(tsNameNode));
+  const symbol = resolvedSymbol(
+    checker,
+    checker.getSymbolAtLocation(tsNameNode)
+  );
   for (const declaration of symbol?.declarations ?? []) {
     const file = declaration.getSourceFile().fileName.replace(/\\/gu, "/");
     const index = file.lastIndexOf("/node_modules/");
@@ -133,12 +139,15 @@ function resolvesToRegistration(checker, services, estreeNode, depth = 6) {
   const tsNode = services.esTreeNodeToTSNodeMap.get(estreeNode);
   if (!tsNode) return false;
   if (isRegistrationFactoryCall(checker, tsNode)) return true;
-  if (ts.isPropertyAccessExpression(tsNode) && tsNode.name.text === "queryKey") {
+  if (
+    ts.isPropertyAccessExpression(tsNode) &&
+    tsNode.name.text === "queryKey"
+  ) {
     return resolvesToRegistration(
       checker,
       services,
       services.tsNodeToESTreeNodeMap.get(tsNode.expression),
-      depth - 1,
+      depth - 1
     );
   }
   if (ts.isIdentifier(tsNode)) {
@@ -174,7 +183,7 @@ export function ruleNoExplicitTypeArgumentsOnOwnedApi() {
       if (!services) {
         return missingTypeServicesVisitors(
           context,
-          "no-explicit-type-arguments-on-owned-api",
+          "no-explicit-type-arguments-on-owned-api"
         );
       }
       const checker = services.program.getTypeChecker();

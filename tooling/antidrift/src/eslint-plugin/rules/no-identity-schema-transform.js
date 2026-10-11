@@ -131,7 +131,7 @@ function identityTransformProof(callback, inputKeys) {
   return {
     inputKeys: [...inputKeys],
     outputKeys: [...outputKeys].sort((left, right) =>
-      left.localeCompare(right),
+      left.localeCompare(right)
     ),
     parameterStyle:
       callback.params[0].type === "Identifier"
@@ -183,7 +183,7 @@ export function ruleNoIdentitySchemaTransform() {
       if (!services) {
         return missingTypeServicesVisitors(
           context,
-          "no-identity-schema-transform",
+          "no-identity-schema-transform"
         );
       }
       const checker = services.program.getTypeChecker();
@@ -194,7 +194,7 @@ export function ruleNoIdentitySchemaTransform() {
           const inputKeys = closedZodTransformInputKeys(
             parts.callee.object,
             services,
-            checker,
+            checker
           );
           if (!inputKeys) return;
           const proof = identityTransformProof(parts.callback, inputKeys);

@@ -74,7 +74,7 @@ export function runOxlint({
         "Usage: antidrift oxlint [paths...] [-- oxlint-options...]",
         "",
         "Runs the repository Oxlint gate, including native type-aware rules and Antidrift JS rules.",
-      ].join("\n") + "\n",
+      ].join("\n") + "\n"
     );
     return exit(0);
   }

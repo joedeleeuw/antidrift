@@ -61,7 +61,7 @@ export function isRejectionHandlerFunction(node, sourceCode) {
   const variable = findVariable(sourceCode, name);
   if (!variable) return false;
   const reads = variable.references.filter(
-    (reference) => reference.isRead() && !reference.isTypeReference,
+    (reference) => reference.isRead() && !reference.isTypeReference
   );
   return (
     reads.length > 0 &&
@@ -75,7 +75,7 @@ export function owningBinding(node) {
   let binding = node;
   while (
     ["AssignmentPattern", "TSParameterProperty", "RestElement"].includes(
-      binding.parent.type,
+      binding.parent.type
     )
   ) {
     binding = binding.parent;
@@ -151,9 +151,7 @@ export function isSerializerSinkUse(sourceCode, identifier) {
   ) {
     return false;
   }
-  return (
-    isUnshadowedGlobal(sourceCode, object) && !sinkResultEscape(call)
-  );
+  return isUnshadowedGlobal(sourceCode, object) && !sinkResultEscape(call);
 }
 
 // A variable is a sink-only output when it is read at least once, never
@@ -163,18 +161,18 @@ export function variableReadsOnlySinks(sourceCode, variable) {
   if (!variable) return false;
   if (
     variable.references.some(
-      (reference) => reference.isWrite() && !reference.init,
+      (reference) => reference.isWrite() && !reference.init
     )
   ) {
     return false;
   }
   const reads = variable.references.filter(
-    (reference) => reference.isRead() && !reference.isTypeReference,
+    (reference) => reference.isRead() && !reference.isTypeReference
   );
   return (
     reads.length > 0 &&
     reads.every((reference) =>
-      isSerializerSinkUse(sourceCode, reference.identifier),
+      isSerializerSinkUse(sourceCode, reference.identifier)
     )
   );
 }

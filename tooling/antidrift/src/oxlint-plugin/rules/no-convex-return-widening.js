@@ -29,7 +29,7 @@ function unwrap(node) {
   while (
     current &&
     ["TSAsExpression", "TSSatisfiesExpression", "TSNonNullExpression"].includes(
-      current.type,
+      current.type
     )
   ) {
     current = current.expression;
@@ -104,7 +104,7 @@ function containsAny(node, sourceCode) {
       fields.properties.some(
         (property) =>
           property.type === "Property" &&
-          containsAny(property.value, sourceCode),
+          containsAny(property.value, sourceCode)
       )
     );
   }
@@ -175,7 +175,7 @@ export default function ruleNoConvexReturnWidening() {
           const returns = definition.properties.findLast(
             (property) =>
               property.type === "Property" &&
-              propertyName(property) === "returns",
+              propertyName(property) === "returns"
           );
           if (returns && containsAny(returns.value, context.sourceCode)) {
             context.report({ node: returns.value, messageId: "widenedReturn" });

@@ -28,7 +28,7 @@ describe("reactStateInventory", () => {
         "src/**/*.{ts,tsx},apps/**/*.tsx",
         "--threshold",
         "2",
-      ]),
+      ])
     ).toMatchObject({
       targets: ["src/**/*.{ts,tsx}", "apps/**/*.tsx"],
       threshold: 2,
@@ -74,7 +74,7 @@ export function Users() {
 
   return { refresh, updateQuery };
 }
-`,
+`
     );
 
     const result = await reactStateInventory({
@@ -101,7 +101,7 @@ export function Users() {
           errorCell: "setFailure",
           payloadCell: "setUsers",
         }),
-      ]),
+      ])
     );
   });
 

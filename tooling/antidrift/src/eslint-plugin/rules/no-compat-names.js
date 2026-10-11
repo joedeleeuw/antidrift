@@ -1,10 +1,15 @@
-import { isRuleFile, scopeProperties } from "../../oxlint-plugin/portable/scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../oxlint-plugin/portable/scope.js";
 
 const REMOVAL_VOCABULARY =
   /legacy|compat(?!ible)|deprecated|retire|no_?longer/i;
 
 function parameterIdentifier(node) {
-  if (node.type === "TSParameterProperty") return parameterIdentifier(node.parameter);
+  if (node.type === "TSParameterProperty") {
+    return parameterIdentifier(node.parameter);
+  }
   if (node.type === "AssignmentPattern") return node.left;
   return node;
 }
@@ -42,7 +47,9 @@ export default {
     }
     function checkFunction(node) {
       if (node.type === "FunctionDeclaration") check(node.id);
-      for (const parameter of node.params) check(parameterIdentifier(parameter));
+      for (const parameter of node.params) {
+        check(parameterIdentifier(parameter));
+      }
     }
     function checkKey(node) {
       if (!node.computed) check(node.key);

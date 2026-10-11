@@ -38,8 +38,8 @@ describe("defensiveShapeInventory", () => {
           include: ["src/**/*.ts"],
         },
         null,
-        2,
-      ),
+        2
+      )
     );
     writeProgram(
       root,
@@ -61,7 +61,7 @@ export const normalized = Object.fromEntries(
     return [key, value];
   }),
 );
-`,
+`
     );
     writeProgram(
       root,
@@ -74,7 +74,7 @@ export const labels = Object.entries(users).map(([id, user]) => [
   id,
   user.enabled ? user.name : "disabled",
 ]);
-`,
+`
     );
 
     const result = await defensiveShapeInventory({
@@ -104,8 +104,8 @@ export const labels = Object.entries(users).map(([id, user]) => [
   it("recognizes Object.entries transform syntax as inventory pressure", () => {
     expect(
       isEntryTransformCandidate(
-        "Object.entries(values).flatMap(([key, value]) => [key, value])",
-      ),
+        "Object.entries(values).flatMap(([key, value]) => [key, value])"
+      )
     ).toBe(true);
     expect(isEntryTransformCandidate("Object.entries(values);")).toBe(false);
   });

@@ -16,7 +16,7 @@ export default defineConfig({
     {
       name: "antidrift",
       specifier: fileURLToPath(
-        new URL("../../oxlint-plugin/index.js", import.meta.url),
+        new URL("../../oxlint-plugin/index.js", import.meta.url)
       ),
     },
   ],

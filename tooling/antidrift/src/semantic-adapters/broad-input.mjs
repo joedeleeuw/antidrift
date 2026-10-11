@@ -99,7 +99,7 @@ export function collectBindingIdentifiers(node, identifiers) {
     for (const property of target.properties ?? []) {
       collectBindingIdentifiers(
         property.type === "RestElement" ? property.argument : property.value,
-        identifiers,
+        identifiers
       );
     }
   }
@@ -255,7 +255,7 @@ export function objectEntriesCallbackProbe(node) {
 
 export function isAppeasementCastSourceType(type) {
   return Boolean(
-    type && type.flags & (TS_TYPE_FLAG_ANY | TS_TYPE_FLAG_UNKNOWN),
+    type && type.flags & (TS_TYPE_FLAG_ANY | TS_TYPE_FLAG_UNKNOWN)
   );
 }
 
@@ -264,7 +264,7 @@ export function isBroadShapeProbeInputType(type, seen = new Set()) {
   seen.add(type);
   if (isAppeasementCastSourceType(type)) return true;
   return (type.types ?? []).some((part) =>
-    isBroadShapeProbeInputType(part, seen),
+    isBroadShapeProbeInputType(part, seen)
   );
 }
 
@@ -289,7 +289,7 @@ export function typePredicateParts(fn) {
 export function functionParameterByName(fn, name) {
   return (
     (fn.params ?? []).find(
-      (param) => param?.type === "Identifier" && param.name === name,
+      (param) => param?.type === "Identifier" && param.name === name
     ) ?? null
   );
 }
@@ -437,7 +437,7 @@ export function predicateValueNames(node, paramName) {
 export function destructuredTargetPropertyAliases(
   node,
   paramNames,
-  targetProps,
+  targetProps
 ) {
   const aliases = new Map();
   walkNode(node, (current) => {
@@ -486,7 +486,7 @@ export function checkedTargetProperties(node, paramName, targetProps) {
   const propertyAliases = destructuredTargetPropertyAliases(
     node,
     paramNames,
-    targetProps,
+    targetProps
   );
   walkNode(node, (current) => {
     if (
@@ -522,7 +522,7 @@ export function checkedTargetProperties(node, paramName, targetProps) {
 export function callUsesPredicateParam(node, paramName) {
   const paramNames = new Set([paramName]);
   return (node.arguments ?? []).some(
-    (arg) => arg.type !== "SpreadElement" && hasParamRoot(arg, paramNames),
+    (arg) => arg.type !== "SpreadElement" && hasParamRoot(arg, paramNames)
   );
 }
 

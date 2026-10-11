@@ -149,11 +149,11 @@ Flags:
 
 ```ts
 const LineItemSchema = z.custom<LineItem>(
-  (value) => typeof value === "object" && value !== null,
+  (value) => typeof value === "object" && value !== null
 );
 
 Object.entries(raw as Record<string, unknown>).map(([, value]) =>
-  "numberValue" in value ? value.numberValue : null,
+  "numberValue" in value ? value.numberValue : null
 );
 ```
 
@@ -164,7 +164,7 @@ const DateMessageSchema = z.custom<DateMessage>(
   (value) =>
     hasNumber(value, "year") &&
     hasNumber(value, "month") &&
-    hasNumber(value, "day"),
+    hasNumber(value, "day")
 );
 
 Object.entries(typedMap).map(([, value]) => value.name);
@@ -223,7 +223,7 @@ function renderSprite(id: string): VisualTokenRegistryEntry {
     `render.sprite.${id}`,
     ["render.sprite"],
     [`sprite.${id}`],
-    "sprite token",
+    "sprite token"
   );
 }
 

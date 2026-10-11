@@ -103,7 +103,7 @@ export function isThrowAssertionCallbackParse(node) {
       ? fn.parent
       : null;
   return Boolean(
-    isExpectCall(expectCall) && hasThrowAssertionMatcher(expectCall),
+    isExpectCall(expectCall) && hasThrowAssertionMatcher(expectCall)
   );
 }
 
@@ -130,7 +130,7 @@ function symbolForExpression(checker, expression) {
   ) {
     return resolvedSymbol(
       checker,
-      checker.getSymbolAtLocation(declaration.initializer),
+      checker.getSymbolAtLocation(declaration.initializer)
     );
   }
   return symbol;
@@ -171,16 +171,19 @@ function aliasDeclarationOfTypeNode(checker, typeNode) {
   const reference = ts.isQualifiedName(typeNode.typeName)
     ? typeNode.typeName.right
     : typeNode.typeName;
-  const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(reference));
+  const symbol = resolvedSymbol(
+    checker,
+    checker.getSymbolAtLocation(reference)
+  );
   return (symbol?.declarations ?? []).find((declaration) =>
-    ts.isTypeAliasDeclaration(declaration),
+    ts.isTypeAliasDeclaration(declaration)
   );
 }
 
 export function declaredSchemaSymbolOfParameter(checker, tsArg) {
   const symbol = checker.getSymbolAtLocation(tsArg);
   const parameter = (symbol?.declarations ?? []).find(
-    (declaration) => ts.isParameter(declaration) && declaration.type,
+    (declaration) => ts.isParameter(declaration) && declaration.type
   );
   if (!parameter) {
     return undefined;
@@ -189,12 +192,11 @@ export function declaredSchemaSymbolOfParameter(checker, tsArg) {
   return alias && schemaSymbolOfOutputAlias(checker, alias.type);
 }
 
-
 export function zodParseCallParts(
   node,
   services,
   checker,
-  methods = ZOD_PARSE_METHODS,
+  methods = ZOD_PARSE_METHODS
 ) {
   if (node?.type !== "CallExpression") return null;
   const callee = node.callee;
@@ -260,7 +262,7 @@ export function closedZodTransformInputKeys(receiver, services, checker) {
     checker
       .getPropertiesOfType(inputType)
       .map((property) => property.getName())
-      .sort((left, right) => left.localeCompare(right)),
+      .sort((left, right) => left.localeCompare(right))
   );
 }
 

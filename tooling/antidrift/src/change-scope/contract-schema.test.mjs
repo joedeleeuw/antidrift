@@ -48,7 +48,7 @@ describe("parseContract", () => {
         `    - ${NARROW_GLOB}`,
         "  allowedChangeTypes:",
         "    - modify",
-      ].join("\n"),
+      ].join("\n")
     );
     expect(contract.contractId).toBe(CONTRACT_ID);
     expect(contract.scope.allowedPaths).toEqual([NARROW_GLOB]);
@@ -59,7 +59,7 @@ describe("parseContract", () => {
 
   it("throws loudly on unparseable input", () => {
     expect(() => parseContract("contractId: [unterminated")).toThrow(
-      ContractValidationError,
+      ContractValidationError
     );
   });
 });
@@ -67,13 +67,13 @@ describe("parseContract", () => {
 describe("validateContract", () => {
   it("rejects an empty contractId", () => {
     expect(() => validateContract(rawContract({ contractId: "" }))).toThrow(
-      /contractId/u,
+      /contractId/u
     );
   });
 
   it("rejects empty allowedPaths", () => {
     expect(() =>
-      validateContract(rawContract({ scope: { allowedPaths: [] } })),
+      validateContract(rawContract({ scope: { allowedPaths: [] } }))
     ).toThrow(/allowedPaths/u);
   });
 
@@ -83,37 +83,37 @@ describe("validateContract", () => {
         schemaVersion: 1,
         contractId: CONTRACT_ID,
         scope: { allowedPaths: [NARROW_GLOB] },
-      }),
+      })
     ).toThrow(/checkedSurfaces/u);
   });
 
   it("rejects invalid checked surfaces", () => {
     expect(() =>
       validateContract(
-        rawContract({ scope: { checkedSurfaces: ["telepathy"] } }),
-      ),
+        rawContract({ scope: { checkedSurfaces: ["telepathy"] } })
+      )
     ).toThrow(/checkedSurfaces/u);
   });
 
   it("rejects an absolute path", () => {
     expect(() =>
       validateContract(
-        rawContract({ scope: { allowedPaths: ["/etc/passwd"] } }),
-      ),
+        rawContract({ scope: { allowedPaths: ["/etc/passwd"] } })
+      )
     ).toThrow(/absolute/u);
   });
 
   it("rejects a parent-directory traversal", () => {
     expect(() =>
       validateContract(
-        rawContract({ scope: { allowedPaths: ["../secrets/**"] } }),
-      ),
+        rawContract({ scope: { allowedPaths: ["../secrets/**"] } })
+      )
     ).toThrow(/\.\./u);
   });
 
   it("rejects a broad glob without refactor.approved", () => {
     expect(() =>
-      validateContract(rawContract({ scope: { allowedPaths: ["**"] } })),
+      validateContract(rawContract({ scope: { allowedPaths: ["**"] } }))
     ).toThrow(/broad glob/u);
   });
 
@@ -122,7 +122,7 @@ describe("validateContract", () => {
       rawContract({
         scope: { allowedPaths: ["**"] },
         refactor: { approved: true, justification: "repo-wide format sweep" },
-      }),
+      })
     );
     expect(contract.refactor.approved).toBe(true);
     expect(contract.refactor.justification).toBe("repo-wide format sweep");
@@ -134,8 +134,8 @@ describe("validateContract", () => {
         rawContract({
           scope: { allowedPaths: ["**"] },
           refactor: { approved: true },
-        }),
-      ),
+        })
+      )
     ).toThrow(/justification/u);
   });
 
@@ -147,8 +147,8 @@ describe("validateContract", () => {
             allowedPaths: [NARROW_GLOB],
             allowedExports: [{ file: "a.ts" }],
           },
-        }),
-      ),
+        })
+      )
     ).toThrow(/allowedExports/u);
   });
 
@@ -162,7 +162,7 @@ describe("validateContract", () => {
           allowedOwnerSymbols: ["GeneratedUser"],
           maxTouchedModuleRadius: 1,
         },
-      }),
+      })
     );
     expect(contract.scope.allowedEntrypoints).toEqual(["apps/shop/page.tsx"]);
     expect(contract.scope.allowedOwnerSymbols).toEqual(["GeneratedUser"]);
@@ -179,7 +179,7 @@ describe("validateContract", () => {
           allowedPaths: [NARROW_GLOB],
           allowedExports: [{ file: "a.ts", name: "User", kind: "type" }],
         },
-      }),
+      })
     );
     expect(contract.scope.allowedExports).toEqual([
       { file: "a.ts", name: "User", kind: "type" },
@@ -194,14 +194,14 @@ describe("validateContract", () => {
             allowedPaths: [NARROW_GLOB],
             allowedExports: [{ file: "a.ts", name: "User", kind: "class" }],
           },
-        }),
-      ),
+        })
+      )
     ).toThrow(/allowedExports kind/u);
   });
 
   it("rejects an unknown top-level key", () => {
     expect(() => validateContract(rawContract({ bogus: 1 }))).toThrow(
-      /unknown top-level key/u,
+      /unknown top-level key/u
     );
   });
 
@@ -213,8 +213,8 @@ describe("validateContract", () => {
             allowedPaths: [NARROW_GLOB],
             allowedChangeTypes: ["frobnicate"],
           },
-        }),
-      ),
+        })
+      )
     ).toThrow(/allowedChangeTypes/u);
   });
 

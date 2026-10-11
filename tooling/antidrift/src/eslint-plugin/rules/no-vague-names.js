@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "../../oxlint-plugin/portable/scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../oxlint-plugin/portable/scope.js";
 
 const VAGUE_NOUN =
   /^(?:data|info|value|values|val|vals|obj|objs|objects|thing|things|stuff|temp|tmp|foo|bar|baz|res|ret|retval|misc|result|results|item|items|var|vars|variable|content|contents|param|params|parameters|arr|spam|ham|toto|tutu|tata)\d*$/;
@@ -35,7 +38,7 @@ const ABBREVIATIONS = new Map(
     opts: "options",
     req: "request",
     str: "string",
-  }),
+  })
 );
 
 function vagueReason(name) {
@@ -73,7 +76,7 @@ function* patternIdentifiers(node) {
     case "ObjectPattern":
       for (const property of node.properties) {
         yield* patternIdentifiers(
-          property.type === "RestElement" ? property : property.value,
+          property.type === "RestElement" ? property : property.value
         );
       }
       return;

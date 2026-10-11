@@ -290,7 +290,7 @@ export default {
           (part) =>
             isAstNode(part) &&
             part.type !== "TSNullKeyword" &&
-            part.type !== "TSUndefinedKeyword",
+            part.type !== "TSUndefinedKeyword"
         );
         return (
           meaningfulTypes.length > 0 &&
@@ -394,7 +394,7 @@ export default {
         return false;
       }
       return ["globalThis", "self", "window"].some((host) =>
-        isGlobalReference(callee.object, host),
+        isGlobalReference(callee.object, host)
       );
     };
     const isGlobalFetch = (node) => {
@@ -413,7 +413,7 @@ export default {
         return false;
       }
       return ["globalThis", "self", "window"].some((host) =>
-        isGlobalReference(callee.object, host),
+        isGlobalReference(callee.object, host)
       );
     };
     const isBunStdinStream = (node) => {
@@ -594,7 +594,7 @@ export default {
       for (const [index, statement] of block.body.entries()) {
         if (
           callWithinExpressionStatement(statement, (candidate) =>
-            readerMethodCall(candidate, method, binding),
+            readerMethodCall(candidate, method, binding)
           )
         ) {
           indexes.push(index);
@@ -632,7 +632,7 @@ export default {
       for (const statement of block.body) {
         if (
           callWithinExpressionStatement(statement, (candidate) =>
-            readerMethodCall(candidate, "releaseLock", binding),
+            readerMethodCall(candidate, "releaseLock", binding)
           )
         ) {
           return {
@@ -642,7 +642,7 @@ export default {
         }
         if (
           callWithinExpressionStatement(statement, (candidate) =>
-            readerMethodCall(candidate, "cancel", binding),
+            readerMethodCall(candidate, "cancel", binding)
           )
         ) {
           if (!handledCancelStatement(statement, binding)) {
@@ -687,7 +687,7 @@ export default {
         return false;
       }
       const acquisitionIndex = acquisitionSite.block.body.indexOf(
-        acquisitionSite.statement,
+        acquisitionSite.statement
       );
       const tryIndex = acquisitionSite.block.body.indexOf(trySite.statement);
       return (
@@ -705,8 +705,8 @@ export default {
                 (declaration) =>
                   isAstNode(declaration) &&
                   declaration.type === "VariableDeclarator" &&
-                  canonicalBinding(declaration.init) === binding,
-              ),
+                  canonicalBinding(declaration.init) === binding
+              )
           )
       );
     };
@@ -768,8 +768,8 @@ export default {
                 (declaration) =>
                   isAstNode(declaration) &&
                   declaration.type === "VariableDeclarator" &&
-                  canonicalBinding(declaration.init) === binding,
-              ),
+                  canonicalBinding(declaration.init) === binding
+              )
           )
       ) {
         return false;
@@ -786,7 +786,7 @@ export default {
         if (
           node.type === "CallExpression" &&
           ["cancel", "read", "releaseLock"].some((method) =>
-            readerMethodCall(node, method, binding),
+            readerMethodCall(node, method, binding)
           )
         ) {
           used = true;
@@ -802,7 +802,7 @@ export default {
       if (
         variable.references.some(
           (reference) =>
-            reference.init !== true && reference.isWrite?.() === true,
+            reference.init !== true && reference.isWrite?.() === true
         )
       ) {
         return null;
@@ -837,7 +837,7 @@ export default {
               isAstNode(property) &&
               property.type === "Property" &&
               getPropertyName(property.key) === "done" &&
-              isIdentifier(property.value, identifier.name),
+              isIdentifier(property.value, identifier.name)
           )
         ) {
           return "done";
@@ -900,8 +900,8 @@ export default {
         .slice(0, index)
         .some((statement) =>
           callWithinExpressionStatement(statement, (candidate) =>
-            readerMethodCall(candidate, "cancel", binding),
-          ),
+            readerMethodCall(candidate, "cancel", binding)
+          )
         );
     };
     const catchCancels = (tryNode, binding) => {
@@ -910,7 +910,7 @@ export default {
       }
       return (
         methodStatementIndexes(tryNode.handler.body, "cancel", binding).at(
-          0,
+          0
         ) === 0
       );
     };
@@ -945,7 +945,7 @@ export default {
       }
       const lastReadIndex = Math.max(...readStatementIndexes);
       return methodStatementIndexes(block, "cancel", binding).some(
-        (index) => index === lastReadIndex + 1,
+        (index) => index === lastReadIndex + 1
       );
     };
     const readPathsRequireFinalCancel = (tryNode, binding) => {
@@ -1081,7 +1081,7 @@ export default {
               (reference) =>
                 reference.isWrite() &&
                 reference.identifier.range[0] > acquisition.node.range[1] &&
-                reference.identifier.range[0] < releaseEnd,
+                reference.identifier.range[0] < releaseEnd
             )
           ) {
             context.report({

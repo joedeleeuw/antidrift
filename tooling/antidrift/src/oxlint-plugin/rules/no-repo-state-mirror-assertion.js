@@ -75,11 +75,11 @@ function isLiteralLike(node) {
         (property) =>
           property.type === "Property" &&
           !property.computed &&
-          isLiteralLike(property.value),
+          isLiteralLike(property.value)
       );
     case "ArrayExpression":
       return target.elements.every(
-        (element) => element !== null && isLiteralLike(element),
+        (element) => element !== null && isLiteralLike(element)
       );
     default:
       return false;

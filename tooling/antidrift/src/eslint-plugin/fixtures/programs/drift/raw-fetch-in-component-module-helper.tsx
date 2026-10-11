@@ -3,5 +3,7 @@ async function downloadQrCode(url: string) {
 }
 
 export function QrActionCard() {
-  return <button onClick={() => void downloadQrCode("/qr.png")}>Download</button>;
+  return (
+    <button onClick={() => void downloadQrCode("/qr.png")}>Download</button>
+  );
 }

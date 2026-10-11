@@ -20,7 +20,7 @@ function readPackageJson(repoRoot, errors) {
     return parsed;
   } catch (error) {
     errors.push(
-      `tooling/antidrift/package.json could not be parsed: ${error.message}`,
+      `tooling/antidrift/package.json could not be parsed: ${error.message}`
     );
     return null;
   }
@@ -41,7 +41,7 @@ function checkSemanticAdapterPackageExportEntry(
   exportKey,
   expectedTypes,
   expectedImport,
-  errors,
+  errors
 ) {
   const label = "tooling/antidrift/package.json exports";
   const exportLabel = `${label}${exportKey}`;
@@ -61,7 +61,7 @@ function requireExistingPackageExportPath(
   repoRoot,
   packagePath,
   label,
-  errors,
+  errors
 ) {
   if (
     typeof packagePath !== "string" ||
@@ -73,7 +73,7 @@ function requireExistingPackageExportPath(
   }
   const target = safeRepoPath(
     repoRoot,
-    join("tooling", "antidrift", packagePath.slice(2)),
+    join("tooling", "antidrift", packagePath.slice(2))
   );
   if (!target) {
     errors.push(`${label} must stay inside tooling/antidrift.`);
@@ -93,7 +93,7 @@ function packageExportTarget(repoRoot, packagePath) {
   }
   const target = safeRepoPath(
     repoRoot,
-    join("tooling", "antidrift", packagePath.slice(2)),
+    join("tooling", "antidrift", packagePath.slice(2))
   );
   return target && existsSync(target) ? target : null;
 }
@@ -164,7 +164,7 @@ function packageExportedValueNames(sourceText, fileName, scriptKind) {
     sourceText,
     ts.ScriptTarget.Latest,
     false,
-    scriptKind,
+    scriptKind
   );
   const names = new Set();
   for (const statement of source.statements) {
@@ -182,7 +182,7 @@ function checkPackageExportRuntimeDeclarations(
   typesPath,
   importPath,
   repoRoot,
-  errors,
+  errors
 ) {
   const runtimeTarget = packageExportTarget(repoRoot, importPath);
   const typeTarget = packageExportTarget(repoRoot, typesPath);
@@ -192,24 +192,24 @@ function checkPackageExportRuntimeDeclarations(
   const runtimeNames = packageExportedValueNames(
     readFileSync(runtimeTarget, "utf8"),
     importPath,
-    ts.ScriptKind.JS,
+    ts.ScriptKind.JS
   );
   const typeNames = packageExportedValueNames(
     readFileSync(typeTarget, "utf8"),
     typesPath,
-    ts.ScriptKind.TS,
+    ts.ScriptKind.TS
   );
   for (const name of sortedStrings(runtimeNames)) {
     if (!typeNames.has(name)) {
       errors.push(
-        `${exportLabel}.import runtime export ${name} is missing from types path ${typesPath}`,
+        `${exportLabel}.import runtime export ${name} is missing from types path ${typesPath}`
       );
     }
   }
   for (const name of sortedStrings(typeNames)) {
     if (!runtimeNames.has(name)) {
       errors.push(
-        `${exportLabel}.types declaration ${name} is missing from runtime import path ${importPath}`,
+        `${exportLabel}.types declaration ${name} is missing from runtime import path ${importPath}`
       );
     }
   }
@@ -218,7 +218,7 @@ function checkPackageExportEntryFilesAndDeclarations(
   exportKey,
   entry,
   repoRoot,
-  errors,
+  errors
 ) {
   if (!isRecord(entry)) {
     return;
@@ -231,20 +231,20 @@ function checkPackageExportEntryFilesAndDeclarations(
     repoRoot,
     entry.types,
     `${label}.types`,
-    errors,
+    errors
   );
   requireExistingPackageExportPath(
     repoRoot,
     entry.import,
     `${label}.import`,
-    errors,
+    errors
   );
   checkPackageExportRuntimeDeclarations(
     label,
     entry.types,
     entry.import,
     repoRoot,
-    errors,
+    errors
   );
 }
 function checkPackageExportFilesAndDeclarations(packageJson, repoRoot, errors) {
@@ -257,7 +257,7 @@ function checkPackageExportFilesAndDeclarations(packageJson, repoRoot, errors) {
       exportKey,
       exportsMap[exportKey],
       repoRoot,
-      errors,
+      errors
     );
   }
 }
@@ -280,7 +280,7 @@ function packageRelativeTarget(repoRoot, packagePath, label, errors) {
   }
   const target = safeRepoPath(
     repoRoot,
-    join("tooling", "antidrift", relativePackagePath),
+    join("tooling", "antidrift", relativePackagePath)
   );
   if (!target) {
     errors.push(`${label} must stay inside tooling/antidrift.`);
@@ -305,7 +305,7 @@ function checkPackageBinTarget(binary, packagePath, repoRoot, errors) {
     repoRoot,
     packagePath,
     label,
-    errors,
+    errors
   );
   if (!target) {
     return;
@@ -329,7 +329,7 @@ function checkPackageBinTargets(packageJson, repoRoot, errors) {
   }
   if (!isRecord(packageJson.bin)) {
     errors.push(
-      "tooling/antidrift/package.json bin must be a string or mapping.",
+      "tooling/antidrift/package.json bin must be a string or mapping."
     );
     return;
   }
@@ -349,14 +349,14 @@ function packageExportPublicSpecifier(packageName, exportKey) {
 function checkPackageReadmePublicEntry(readme, specifier, errors) {
   if (!readme.includes(`\`${specifier}\``)) {
     errors.push(
-      `tooling/antidrift/README.md public entry points missing package export: ${specifier}`,
+      `tooling/antidrift/README.md public entry points missing package export: ${specifier}`
     );
   }
 }
 function checkPackageReadmeBinaryEntry(readme, binary, errors) {
   if (!readme.includes(`\`${binary}\``)) {
     errors.push(
-      `tooling/antidrift/README.md public entry points missing CLI binary: ${binary}`,
+      `tooling/antidrift/README.md public entry points missing CLI binary: ${binary}`
     );
   }
 }
@@ -365,19 +365,19 @@ function readmeCodeSpans(readme) {
 }
 function packageReadmeSpecifiers(readme, packageName) {
   return readmeCodeSpans(readme).filter(
-    (span) => span === packageName || span.startsWith(`${packageName}/`),
+    (span) => span === packageName || span.startsWith(`${packageName}/`)
   );
 }
 function checkPackageReadmeNoStalePublicEntries(
   readme,
   packageName,
   expectedSpecifiers,
-  errors,
+  errors
 ) {
   for (const specifier of packageReadmeSpecifiers(readme, packageName)) {
     if (!expectedSpecifiers.has(specifier)) {
       errors.push(
-        `tooling/antidrift/README.md public entry points lists non-exported package specifier: ${specifier}`,
+        `tooling/antidrift/README.md public entry points lists non-exported package specifier: ${specifier}`
       );
     }
   }
@@ -397,7 +397,7 @@ function checkPackageReadmePublicEntryPoints(packageJson, repoRoot, errors) {
     for (const exportKey of sortedStrings(Object.keys(exportsMap))) {
       const specifier = packageExportPublicSpecifier(
         packageJson.name,
-        exportKey,
+        exportKey
       );
       if (specifier) {
         expectedSpecifiers.add(specifier);
@@ -408,7 +408,7 @@ function checkPackageReadmePublicEntryPoints(packageJson, repoRoot, errors) {
       readme,
       packageJson.name,
       expectedSpecifiers,
-      errors,
+      errors
     );
   }
   if (typeof packageJson.bin === "string") {
@@ -434,7 +434,7 @@ export function checkPackageSurface(repoRoot, errors) {
     "./semantic-adapters",
     "./src/semantic-adapters/index.d.mts",
     "./src/semantic-adapters/index.mjs",
-    errors,
+    errors
   );
   for (const contract of Object.values(SEMANTIC_ADAPTER_CONTRACTS)) {
     if (!isRecord(contract) || typeof contract.id !== "string") {
@@ -446,7 +446,7 @@ export function checkPackageSurface(repoRoot, errors) {
       exportKey,
       `./src/semantic-adapters/${contract.id}.d.mts`,
       `./src/semantic-adapters/${contract.id}.mjs`,
-      errors,
+      errors
     );
   }
   checkPackageExportFilesAndDeclarations(packageJson, repoRoot, errors);

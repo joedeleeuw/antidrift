@@ -15,7 +15,7 @@ const getHeadersObject = (node) => {
   const headersProperty = node.properties.find(
     (property) =>
       property.type === "Property" &&
-      getPropertyName(property.key) === "headers",
+      getPropertyName(property.key) === "headers"
   );
   if (!headersProperty || headersProperty.type !== "Property") {
     return null;
@@ -29,7 +29,7 @@ const hasAttachmentDisposition = (node) => {
   const disposition = node.properties.find(
     (property) =>
       property.type === "Property" &&
-      getPropertyName(property.key)?.toLowerCase() === "content-disposition",
+      getPropertyName(property.key)?.toLowerCase() === "content-disposition"
   );
   if (!disposition || disposition.type !== "Property") {
     return false;
@@ -79,7 +79,7 @@ export default {
         }
         const manualSecurityHeadersImport = node.specifiers.find(
           (specifier) =>
-            getImportedName(specifier) === RAW_DOCUMENT_SECURITY_HEADERS,
+            getImportedName(specifier) === RAW_DOCUMENT_SECURITY_HEADERS
         );
         if (manualSecurityHeadersImport) {
           context.report({
@@ -135,7 +135,7 @@ export default {
               .map((property) => [
                 getPropertyName(property.key)?.toLowerCase(),
                 property.value,
-              ]),
+              ])
           );
           if (
             names.has("content-type") &&

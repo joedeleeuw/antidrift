@@ -34,11 +34,11 @@ Not reported: `expect(() => S.parse(x)).toThrow()` callbacks, via the existing t
 
 The first implementation reused `parsedCallResultMatchesSchemaOutput` — mutual assignability between the argument type and the parse return type. It produced 6/6 true positives in Murderbox but 3 false positives out of 4 findings in Codebase Atlas:
 
-| Site | Why it is clean |
-| --- | --- |
-| `src/programs/persistenceCuration.ts:1073` | Schema is `z.string().min(1)`; the parameter is `string`. Types are identical, but `.min(1)` is a real runtime check. |
+| Site                                                     | Why it is clean                                                                                                           |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `src/programs/persistenceCuration.ts:1073`               | Schema is `z.string().min(1)`; the parameter is `string`. Types are identical, but `.min(1)` is a real runtime check.     |
 | `src/programs/repo-ingestion/extractSemanticFacts.ts:56` | Parameter is `z.input<typeof AstFactsSchema>` — deliberately the pre-validation contract — and the schema is `.strict()`. |
-| `src/test/sceneContractOracle.test.ts:53` | Test contract oracle asserting an adapter emits schema-valid output. |
+| `src/test/sceneContractOracle.test.ts:53`                | Test contract oracle asserting an adapter emits schema-valid output.                                                      |
 
 The lesson is general: **TypeScript type identity is not a proxy for "this parse validates nothing new."** Zod refinements (`.min`, `.int`, `.nonnegative`, `.regex`), `.strict()`, and `z.input`/`z.output` divergence are all invisible to the type system. Only derivation provenance — this type came from this schema — supports the claim.
 

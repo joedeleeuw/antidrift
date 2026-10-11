@@ -1,6 +1,8 @@
 import { useState } from "react";
 
-declare function fetchPage(cursor: number): Promise<{ items: string[]; next: number }>;
+declare function fetchPage(
+  cursor: number
+): Promise<{ items: string[]; next: number }>;
 
 function FeedList() {
   const [items, setItems] = useState<string[]>([]);

@@ -68,14 +68,14 @@ afterAll(() => {
 describe("change-context", () => {
   it("resolves a merge-base sha", () => {
     expect(mergeBase({ base: BASE, head: HEAD, cwd: dir })).toMatch(
-      SHA_PATTERN,
+      SHA_PATTERN
     );
   });
 
   it("lists changed files with operations", () => {
     const files = changedFilesBetween({ base: BASE, head: HEAD, cwd: dir });
     const operationByPath = Object.fromEntries(
-      files.map((file) => [file.path, file.operation]),
+      files.map((file) => [file.path, file.operation])
     );
     expect(operationByPath[SRC_FILE]).toBe("modify");
     expect(operationByPath[DOC_FILE]).toBe("add");
@@ -150,7 +150,7 @@ describe("change-context", () => {
     badGit(["config", "core.hooksPath", "/dev/null"]);
     writeFileSync(
       join(bad, PKG),
-      `${JSON.stringify({ name: "x", dependencies: {} }, null, 2)}\n`,
+      `${JSON.stringify({ name: "x", dependencies: {} }, null, 2)}\n`
     );
     badGit(["add", "-A"]);
     badGit(["commit", "-q", "-m", "base"]);
@@ -158,7 +158,7 @@ describe("change-context", () => {
     badGit(["add", "-A"]);
     badGit(["commit", "-q", "-m", "bad"]);
     expect(() =>
-      collectChangeSurface({ base: BASE, head: HEAD, cwd: bad }),
+      collectChangeSurface({ base: BASE, head: HEAD, cwd: bad })
     ).toThrow(/JSON/u);
     rmSync(bad, { recursive: true, force: true });
   });
@@ -183,7 +183,7 @@ describe("change-context", () => {
         "  return 2;",
         "}",
         "",
-      ].join("\n"),
+      ].join("\n")
     );
     counterGit(["add", "-A"]);
     counterGit(["commit", "-q", "-m", "base"]);
@@ -200,7 +200,7 @@ describe("change-context", () => {
         "  return 3;",
         "}",
         "",
-      ].join("\n"),
+      ].join("\n")
     );
     counterGit(["add", "-A"]);
     counterGit(["commit", "-q", "-m", "head"]);
@@ -211,7 +211,7 @@ describe("change-context", () => {
           { start: 2, end: 4 },
           { start: 8, end: 8 },
         ],
-      },
+      }
     );
     rmSync(counter, { recursive: true, force: true });
   });

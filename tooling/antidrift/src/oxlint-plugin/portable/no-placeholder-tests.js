@@ -43,7 +43,7 @@ const hasOnlyPlaceholderText = (node) => {
     return false;
   }
   return toNodeArray(body.comments).some((comment) =>
-    PLACEHOLDER_PATTERN.test(getCommentText(comment)),
+    PLACEHOLDER_PATTERN.test(getCommentText(comment))
   );
 };
 export const noPlaceholderTestsRule = {

@@ -1,10 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import {
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -14,7 +10,7 @@ const repository = resolve(import.meta.dirname, "../../../..");
 const oxlintBin = join(
   dirname(packageRequire.resolve("oxlint/package.json")),
   "bin",
-  "oxlint",
+  "oxlint"
 );
 const configPath = join(repository, "oxlint.config.mts");
 let workspace;
@@ -36,7 +32,7 @@ function lintProbe(filename, source) {
     {
       cwd: repository,
       encoding: "utf8",
-    },
+    }
   );
   if (result.error) throw result.error;
   return `${result.stdout}${result.stderr}`;
@@ -51,7 +47,7 @@ describe("root Oxlint TypeScript scopes", () => {
   ])("applies TypeScript rules to %s only when owned", (filename, expected) => {
     const output = lintProbe(
       filename,
-      'const modulePath = require("node:path");\nvoid modulePath;\n',
+      'const modulePath = require("node:path");\nvoid modulePath;\n'
     );
 
     expect(output.includes("typescript(no-require-imports)")).toBe(expected);
@@ -72,13 +68,13 @@ describe("root Oxlint TypeScript scopes", () => {
           "void modulePath;",
           'it.only("scope", () => {});',
           "",
-        ].join("\n"),
+        ].join("\n")
       );
 
       expect(output).toContain("vitest(no-focused-tests)");
       expect(output.includes("typescript(no-require-imports)")).toBe(
-        typescriptExpected,
+        typescriptExpected
       );
-    },
+    }
   );
 });

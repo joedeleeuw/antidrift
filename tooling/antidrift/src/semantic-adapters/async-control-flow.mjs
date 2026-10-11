@@ -179,7 +179,7 @@ function returnedCollectionVariables(sourceCode, expression) {
   if (expression.type === "SequenceExpression") {
     return returnedCollectionVariables(
       sourceCode,
-      expression.expressions?.at(-1),
+      expression.expressions?.at(-1)
     );
   }
   if (
@@ -208,7 +208,7 @@ export function queuePendingAsyncMap(
   node,
   callback,
   method,
-  pendingAsyncMaps,
+  pendingAsyncMaps
 ) {
   const parent = node.parent;
   if (parent?.type !== "VariableDeclarator") return false;

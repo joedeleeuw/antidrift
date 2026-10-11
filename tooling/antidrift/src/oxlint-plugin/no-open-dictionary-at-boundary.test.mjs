@@ -107,5 +107,5 @@ ruleTester.run(
         errors,
       },
     ],
-  },
+  }
 );

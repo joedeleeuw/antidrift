@@ -64,7 +64,7 @@ function validatorMembers(node, sourceCode) {
         return null;
       }
       return literalValue(argument.arguments[0]);
-    }),
+    })
   );
 }
 
@@ -110,7 +110,7 @@ function localOwnerVariable(program, sourceCode, name) {
     const declaration = statement.declaration ?? statement;
     if (declaration.type !== "VariableDeclaration") continue;
     const owner = declaration.declarations.find(
-      (entry) => entry.id.type === "Identifier" && entry.id.name === name,
+      (entry) => entry.id.type === "Identifier" && entry.id.name === name
     );
     if (owner) return findVariable(sourceCode, owner.id);
   }
@@ -122,7 +122,7 @@ function importOwners(statement, context, cache) {
   const arrays = importedArrays(
     context.filename,
     statement.source.value,
-    cache,
+    cache
   );
   return statement.specifiers.flatMap((specifier) => {
     if (specifier.importKind === "type") return [];
@@ -189,7 +189,7 @@ export default function ruleNoRedeclaredOwnedUnion() {
             candidate.members === members &&
             candidate.variable &&
             scopeVariable(sourceCode, node, candidate.binding) ===
-              candidate.variable,
+              candidate.variable
         );
         if (owner) {
           context.report({
@@ -208,7 +208,7 @@ export default function ruleNoRedeclaredOwnedUnion() {
               name: array.local,
               binding: array.local,
               variable: localOwnerVariable(node, sourceCode, array.local),
-            }),
+            })
           );
           for (const statement of node.body) {
             if (statement.type === "ImportDeclaration") {
@@ -221,7 +221,7 @@ export default function ruleNoRedeclaredOwnedUnion() {
           report(
             node.typeAnnotation,
             memberSet(node.typeAnnotation.types.map(literalValue)),
-            node.id.name,
+            node.id.name
           );
         },
         CallExpression(node) {

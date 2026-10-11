@@ -272,7 +272,7 @@ typedRuleTester.run(
         errors: [{ messageId: "redundantLocalReturnType" }],
       },
     ],
-  },
+  }
 );
 
 for (const guardedRule of typeServiceGuardedRules) {
@@ -422,7 +422,7 @@ typedRuleTester.run(
         errors: [{ message: /too many locally-owned props \(4 > 3\)/u }],
       },
     ],
-  },
+  }
 );
 
 typedRuleTester.run(
@@ -522,7 +522,7 @@ typedRuleTester.run(
       },
     ],
     invalid: [],
-  },
+  }
 );
 
 ruleTester.run("no-sql-string-concat", rule("no-sql-string-concat"), {
@@ -684,7 +684,7 @@ typedRuleTester.run(
         errors: 1,
       },
     ],
-  },
+  }
 );
 
 typedRuleTester.run("no-unsafe-deserialize", rule("no-unsafe-deserialize"), {
@@ -816,18 +816,18 @@ typedRuleTester.run(
   {
     valid: [
       fixture(
-        "programs/correct/identity-schema-transform-trust-boundary-decoder.ts",
+        "programs/correct/identity-schema-transform-trust-boundary-decoder.ts"
       ),
       fixture("programs/correct/identity-schema-transform-drops-key.ts"),
       fixture("programs/correct/identity-schema-transform-adds-key.ts"),
       fixture("programs/correct/identity-schema-transform-renames-key.ts"),
       fixture(
-        "programs/correct/identity-schema-transform-non-object-output.ts",
+        "programs/correct/identity-schema-transform-non-object-output.ts"
       ),
       fixture("programs/correct/identity-schema-transform-non-zod-receiver.ts"),
       fixture("programs/correct/identity-schema-transform-array-map.ts"),
       fixture(
-        "programs/correct/identity-schema-transform-unresolved-input-shape.ts",
+        "programs/correct/identity-schema-transform-unresolved-input-shape.ts"
       ),
       fixture("programs/correct/identity-schema-transform-outside-proof.ts"),
       fixture("programs/correct/identity-schema-transform-readonly.ts"),
@@ -836,7 +836,7 @@ typedRuleTester.run(
     invalid: [
       {
         ...fixture(
-          "programs/drift/identity-schema-transform-reconstruction.ts",
+          "programs/drift/identity-schema-transform-reconstruction.ts"
         ),
         errors: [{ messageId: "identitySchemaTransform" }],
       },
@@ -850,18 +850,18 @@ typedRuleTester.run(
       },
       {
         ...fixture(
-          "programs/drift/identity-schema-transform-function-expression.ts",
+          "programs/drift/identity-schema-transform-function-expression.ts"
         ),
         errors: [{ messageId: "identitySchemaTransform" }],
       },
       {
         ...fixture(
-          "programs/drift/identity-schema-transform-reordered-keys.ts",
+          "programs/drift/identity-schema-transform-reordered-keys.ts"
         ),
         errors: [{ messageId: "identitySchemaTransform" }],
       },
     ],
-  },
+  }
 );
 
 typedRuleTester.run(
@@ -885,7 +885,7 @@ typedRuleTester.run(
         ],
       },
     ],
-  },
+  }
 );
 
 typedRuleTester.run(
@@ -910,7 +910,7 @@ typedRuleTester.run(
         errors: [{ messageId: "missingReturnValidator" }],
       },
     ],
-  },
+  }
 );
 
 // ─── no-schema-validator-transcoding fixture suite ───────────────────────────
@@ -941,5 +941,5 @@ typedRuleTester.run(
         ],
       },
     ],
-  },
+  }
 );

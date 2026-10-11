@@ -10,7 +10,10 @@ const repoPlans = {
     process.env.SUDOCODE_REPO,
     resolve(homedir(), "code", "sudocode-main"),
   ].filter(Boolean),
-  chaski: [process.env.CHASKI_REPO, resolve(homedir(), "code", "chaski")].filter(Boolean),
+  chaski: [
+    process.env.CHASKI_REPO,
+    resolve(homedir(), "code", "chaski"),
+  ].filter(Boolean),
 };
 
 const cases = [
@@ -366,7 +369,7 @@ function selectedCases(parsed) {
   return cases.filter(
     (item) =>
       (!repoFilter || repoFilter.has(item.repo)) &&
-      (!caseFilter || caseFilter.has(item.id)),
+      (!caseFilter || caseFilter.has(item.id))
   );
 }
 
@@ -385,7 +388,7 @@ function repoRootFor(repo) {
   });
   if (!root) {
     throw new Error(
-      `change-contract-evidence: repo "${repo}" not found in candidates: ${candidates.join(", ")}`,
+      `change-contract-evidence: repo "${repo}" not found in candidates: ${candidates.join(", ")}`
     );
   }
   return root;
@@ -402,21 +405,21 @@ function caseDecision(item, result) {
   const actualDependencies = new Set(
     violations
       .map((violation) => violation.dependency)
-      .filter((dependency) => typeof dependency === "string"),
+      .filter((dependency) => typeof dependency === "string")
   );
   const actualPaths = new Set(
     violations
       .map((violation) => violation.path)
-      .filter((path) => typeof path === "string"),
+      .filter((path) => typeof path === "string")
   );
   const missingTypes = [...expectedTypes].filter(
-    (type) => !actualTypes.has(type),
+    (type) => !actualTypes.has(type)
   );
   const missingDependencies = (item.expected.dependencies ?? []).filter(
-    (dependency) => !actualDependencies.has(dependency),
+    (dependency) => !actualDependencies.has(dependency)
   );
   const missingPaths = (item.expected.paths ?? []).filter(
-    (path) => !actualPaths.has(path),
+    (path) => !actualPaths.has(path)
   );
   const unexpectedClean = item.kind === "gold-tp" && violations.length === 0;
   const unexpectedViolation =
@@ -486,12 +489,12 @@ export function changeContractEvidence(parsed) {
   const repoRoots = Object.fromEntries(
     [...new Set(selected.map((item) => item.repo))]
       .sort(compareStrings)
-      .map((repo) => [repo, repoRootFor(repo)]),
+      .map((repo) => [repo, repoRootFor(repo)])
   );
   const tempRoot = mkdtempSync(resolve(tmpdir(), "antidrift-change-contract-"));
   try {
     const results = selected.map((item) =>
-      replayCase(item, repoRoots[item.repo], tempRoot),
+      replayCase(item, repoRoots[item.repo], tempRoot)
     );
     const report = {
       schemaVersion: 1,
@@ -504,7 +507,7 @@ export function changeContractEvidence(parsed) {
         total: results.length,
         goldTp: results.filter((result) => result.kind === "gold-tp").length,
         trueNegative: results.filter(
-          (result) => result.kind === "true-negative",
+          (result) => result.kind === "true-negative"
         ).length,
         failed: results.filter((result) => result.decision === "fail").length,
       },

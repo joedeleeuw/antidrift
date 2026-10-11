@@ -4,7 +4,10 @@ const options = [
   {
     sources: [
       { module: "lib/server/conf" },
-      { module: "@murderbox/shared/model-registry", names: ["getChatModelMeta"] },
+      {
+        module: "@murderbox/shared/model-registry",
+        names: ["getChatModelMeta"],
+      },
     ],
   },
 ];
@@ -154,5 +157,5 @@ ruleTester.run(
         errors: [{ messageId: "mirroredLiteral" }],
       },
     ],
-  },
+  }
 );

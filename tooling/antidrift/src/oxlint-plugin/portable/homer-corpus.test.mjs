@@ -38,13 +38,13 @@ describe.each(corpus.files)("Homer $filename", (entry) => {
     expect(corpus.revision).toBe("dc7d554d9925f5a4e6adc73844e8cd1b6057c3fc");
     expect(blobAtPath(entry.filename)).toBe(entry.blob);
     expect(createHash("sha256").update(entry.source).digest("hex")).toBe(
-      entry.sha256,
+      entry.sha256
     );
     expect(
       createHash("sha1")
         .update(`blob ${Buffer.byteLength(entry.source)}\0`)
         .update(entry.source)
-        .digest("hex"),
+        .digest("hex")
     ).toBe(entry.blob);
   });
   it.each(entry.expected)(
@@ -54,7 +54,7 @@ describe.each(corpus.files)("Homer $filename", (entry) => {
         expected.rule,
         entry.source,
         entry.filename,
-        expected.options,
+        expected.options
       );
       expect(
         actual.map(({ ruleId, line, column, message }) => ({
@@ -62,13 +62,13 @@ describe.each(corpus.files)("Homer $filename", (entry) => {
           line,
           column,
           message,
-        })),
+        }))
       ).toEqual(
         expected.messages.toSorted(
-          (a, b) => a.line - b.line || a.column - b.column,
-        ),
+          (a, b) => a.line - b.line || a.column - b.column
+        )
       );
-    },
+    }
   );
 });
 
@@ -77,8 +77,8 @@ it("rejects a fabricated wrapper and a file-name substitution", () => {
   expect(
     objectId(
       "blob",
-      Buffer.from(`const sample = ${JSON.stringify(entry.source)};`),
-    ),
+      Buffer.from(`const sample = ${JSON.stringify(entry.source)};`)
+    )
   ).not.toBe(blobAtPath(entry.filename));
   expect(blobAtPath(corpus.files[1].filename)).not.toBe(entry.blob);
 });
@@ -94,10 +94,10 @@ it("pins every reviewed custom sample and preserves signal while removing sample
       const expected = file.expected.find((entry) => entry.rule === rule.rule);
       expect(expected).toBeDefined();
       const fires = expected.messages.some(
-        (message) => message.line === sample.line,
+        (message) => message.line === sample.line
       );
       expect(fires, `${rule.rule} ${sample.file}:${sample.line}`).toBe(
-        sample.classification === "TP",
+        sample.classification === "TP"
       );
     }
   }

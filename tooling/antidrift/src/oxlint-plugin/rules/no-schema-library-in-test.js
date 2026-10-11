@@ -13,7 +13,7 @@ function hasValueImport(node) {
   if (node.specifiers.length === 0) return true;
   return node.specifiers.some(
     (specifier) =>
-      specifier.type !== "ImportSpecifier" || specifier.importKind !== "type",
+      specifier.type !== "ImportSpecifier" || specifier.importKind !== "type"
   );
 }
 

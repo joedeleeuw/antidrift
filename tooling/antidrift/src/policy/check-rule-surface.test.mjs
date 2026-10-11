@@ -23,10 +23,10 @@ describe("checkRuleSurface", () => {
 
     expect(ok).toBe(false);
     expect(messages.join("\n")).toContain(
-      "configured but not exported: antidrift/gamma",
+      "configured but not exported: antidrift/gamma"
     );
     expect(messages.join("\n")).toContain(
-      "exported but not configured: antidrift/beta",
+      "exported but not configured: antidrift/beta"
     );
   });
 
@@ -79,7 +79,7 @@ describe("checkRuleSurface", () => {
 
     expect(ok).toBe(false);
     expect(messages.join("\n")).toContain(
-      "enabled by multiple runtimes: antidrift/alpha (eslint, oxlint)",
+      "enabled by multiple runtimes: antidrift/alpha (eslint, oxlint)"
     );
   });
 
@@ -148,13 +148,13 @@ describe("checkRuleSurface", () => {
 
     expect(ok).toBe(false);
     expect(messages.join("\n")).toContain(
-      "blocking despite registry status under-proven: antidrift/alpha",
+      "blocking despite registry status under-proven: antidrift/alpha"
     );
     expect(messages.join("\n")).toContain(
-      "blocking despite registry status retired: antidrift/retired",
+      "blocking despite registry status retired: antidrift/retired"
     );
     expect(messages.join("\n")).toContain(
-      "blocking despite heuristic signal heuristic: antidrift/beta",
+      "blocking despite heuristic signal heuristic: antidrift/beta"
     );
     expect(messages.join("\n")).not.toContain("antidrift/stable");
   });
@@ -211,7 +211,7 @@ describe("checkRuleSurface", () => {
 
     expect(ok).toBe(false);
     expect(messages.join("\n")).toContain(
-      "configured as blocking despite defaultOff metadata: antidrift/alpha",
+      "configured as blocking despite defaultOff metadata: antidrift/alpha"
     );
   });
 
@@ -229,7 +229,7 @@ describe("checkRuleSurface", () => {
 
     expect(ok).toBe(false);
     expect(messages.join("\n")).toContain(
-      "Custom rule exported but not configured: antidrift/alpha",
+      "Custom rule exported but not configured: antidrift/alpha"
     );
   });
 
@@ -239,7 +239,7 @@ describe("checkRuleSurface", () => {
         repoRoot: "not-the-antidrift-source-repo",
         pluginRules: {},
         configs: [],
-      }),
+      })
     ).toThrow(/rules\.yaml/u);
   });
 });

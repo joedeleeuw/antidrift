@@ -21,10 +21,10 @@ describe("imported sanitizer ownership", () => {
         expect(
           harness
             .lint(rule, source, undefined, { sanitizers: sanitizer })
-            .map((message) => message.ruleId),
+            .map((message) => message.ruleId)
         ).toEqual([`antidrift/${rule}`]);
       }
-    },
+    }
   );
   it("accepts an aliased imported sanitizer and its immutable local alias", () => {
     expect(
@@ -32,16 +32,16 @@ describe("imported sanitizer ownership", () => {
         "no-unsafe-inner-html",
         'import { sanitize as clean } from "./security"; const sanitize = clean; const html = sanitize(input); <div dangerouslySetInnerHTML={{__html: html}} />;',
         undefined,
-        { sanitizers: sanitizer },
-      ),
+        { sanitizers: sanitizer }
+      )
     ).toEqual([]);
     expect(
       harness.lint(
         "no-unsanitized-href",
         'import { sanitize as clean } from "./security"; <a href={clean(input)} />;',
         undefined,
-        { sanitizers: sanitizer },
-      ),
+        { sanitizers: sanitizer }
+      )
     ).toEqual([]);
   });
   it("accepts registered imported provenance but rejects comment-only claims", () => {
@@ -50,16 +50,16 @@ describe("imported sanitizer ownership", () => {
         "no-unsafe-inner-html",
         'import { html } from "./static-document"; <div dangerouslySetInnerHTML={{__html: html}} />;',
         undefined,
-        { trustedSources: [{ module: "./static-document", export: "html" }] },
-      ),
+        { trustedSources: [{ module: "./static-document", export: "html" }] }
+      )
     ).toEqual([]);
     expect(
       harness.lint(
         "no-unsafe-inner-html",
         "// safe-html: reviewed\nnode.innerHTML = external;",
         undefined,
-        undefined,
-      ),
+        undefined
+      )
     ).toHaveLength(1);
   });
 });
@@ -75,7 +75,7 @@ describe("portable display owners", () => {
     expect(
       harness.lint("no-adhoc-loader", "<LoadingIndicator />;", undefined, {
         loaderIcons: ["BusyGlyph"],
-      }),
+      })
     ).toEqual([]);
   });
   it("isolates configured names through the configured text component", () => {
@@ -89,24 +89,24 @@ describe("portable display owners", () => {
         "require-dir-on-rendered-name",
         "<Text>{customer.customerLabel}</Text>;",
         undefined,
-        options,
-      )[0].message,
+        options
+      )[0].message
     ).toContain("IsolatedText from @ui/text");
     expect(
       harness.lint(
         "require-dir-on-rendered-name",
         "<IsolatedText>{customer.customerLabel}</IsolatedText>;",
         undefined,
-        options,
-      ),
+        options
+      )
     ).toEqual([]);
     expect(
       harness.lint(
         "require-dir-on-rendered-name",
         "<bdi>{customer.displayName}</bdi>;",
         undefined,
-        undefined,
-      ),
+        undefined
+      )
     ).toEqual([]);
   });
   it("names the selected number formatter", () => {
@@ -117,16 +117,16 @@ describe("portable display owners", () => {
         undefined,
         {
           formatter: "formatCount from @ui/numbers",
-        },
-      )[0].message,
+        }
+      )[0].message
     ).toContain("formatCount from @ui/numbers");
     expect(
       harness.lint(
         "no-unformatted-number",
         "<Text>{formatCount(item.count)}</Text>;",
         undefined,
-        { formatter: "formatCount from @ui/numbers" },
-      ),
+        { formatter: "formatCount from @ui/numbers" }
+      )
     ).toEqual([]);
   });
   it("recognizes an application icon without upstream branding", () => {
@@ -135,16 +135,16 @@ describe("portable display owners", () => {
         "icon-button-requires-tooltip",
         "<Button><BrandGlyph /></Button>;",
         undefined,
-        { iconComponents: ["BrandGlyph"] },
-      ),
+        { iconComponents: ["BrandGlyph"] }
+      )
     ).toHaveLength(1);
     expect(
       harness.lint(
         "icon-button-requires-tooltip",
         '<Button tooltip="Home"><BrandGlyph /></Button>;',
         undefined,
-        { iconComponents: ["BrandGlyph"] },
-      ),
+        { iconComponents: ["BrandGlyph"] }
+      )
     ).toEqual([]);
   });
 });
@@ -157,7 +157,7 @@ describe("fetch identity", () => {
     "const fetchImpl = globalThis.fetch; const request = fetchImpl; request(url);",
   ])("follows %s", (source) => {
     expect(
-      harness.lint("require-fetch-timeout", source, undefined, undefined),
+      harness.lint("require-fetch-timeout", source, undefined, undefined)
     ).toHaveLength(1);
   });
   it("does not mistake a local fetch function for the platform API", () => {
@@ -166,16 +166,16 @@ describe("fetch identity", () => {
         "require-fetch-timeout",
         "function fetch(value) { return value; } fetch(url);",
         undefined,
-        undefined,
-      ),
+        undefined
+      )
     ).toEqual([]);
     expect(
       harness.lint(
         "require-fetch-timeout",
         "function load(fetchImpl: typeof fetch) { return fetchImpl(url, {signal: AbortSignal.timeout(1000)}); }",
         undefined,
-        undefined,
-      ),
+        undefined
+      )
     ).toEqual([]);
   });
 });
@@ -191,32 +191,32 @@ it("checks documentation policy only at its single configured registry file", ()
       "docs-source-policy",
       "export const registry = {};",
       "docs-sources.mjs",
-      options,
-    ),
+      options
+    )
   ).toHaveLength(1);
   expect(
     harness.lint(
       "docs-source-policy",
       "export const value = 1;",
       "src/a.ts",
-      options,
-    ),
+      options
+    )
   ).toEqual([]);
   expect(
     harness.lint(
       "docs-source-policy",
       "export const value = 1;",
       "src/b.ts",
-      options,
-    ),
+      options
+    )
   ).toEqual([]);
   expect(
     harness.lint(
       "docs-source-policy",
       "export const value = 1;",
       undefined,
-      undefined,
-    ),
+      undefined
+    )
   ).toEqual([]);
 });
 
@@ -226,16 +226,16 @@ it("requires actual document headers and accepts the prescribed Response constru
       "require-secure-document-response",
       'new Response(bytes, {headers: {"Content-Disposition": "attachment; filename=a.txt"}});',
       undefined,
-      undefined,
-    ),
+      undefined
+    )
   ).toHaveLength(1);
   expect(
     harness.lint(
       "require-secure-document-response",
       'new Response(bytes, {headers: {"Content-Disposition": "attachment; filename=a.txt", "Content-Type": "text/plain", "X-Content-Type-Options": "nosniff"}});',
       undefined,
-      undefined,
-    ),
+      undefined
+    )
   ).toEqual([]);
 });
 
@@ -245,24 +245,24 @@ it("follows class bindings without mistaking quoted source for class values", ()
       "no-physical-properties",
       'const reserve = compact ? "pr-12" : "pr-2"; <View className={reserve} />;',
       undefined,
-      undefined,
-    ),
+      undefined
+    )
   ).toHaveLength(2);
   expect(
     harness.lint(
       "no-physical-properties",
       "const fixture = '<View className=\"ml-2\" />;';",
       undefined,
-      undefined,
-    ),
+      undefined
+    )
   ).toEqual([]);
   expect(
     harness.lint(
       "no-centered-scroll-column",
       "const fixture = '<div className=\"mx-auto max-w-lg overflow-y-auto\" />;';",
       undefined,
-      undefined,
-    ),
+      undefined
+    )
   ).toEqual([]);
 });
 
@@ -272,7 +272,7 @@ it("does not diagnose a helper call from its spelling alone", () => {
       "no-trivial-property-helpers",
       'import { getString } from "parser"; getString(value);',
       undefined,
-      undefined,
-    ),
+      undefined
+    )
   ).toEqual([]);
 });

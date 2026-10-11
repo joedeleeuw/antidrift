@@ -163,8 +163,8 @@ function expandBraces(patterns) {
     const suffix = pattern.slice(match.index + match[0].length);
     expanded.push(
       ...expandBraces(
-        match[1].split(",").map((part) => `${prefix}${part}${suffix}`),
-      ),
+        match[1].split(",").map((part) => `${prefix}${part}${suffix}`)
+      )
     );
   }
   return expanded;
@@ -201,11 +201,11 @@ function targetMatchers(targets) {
 function readTsconfig(repoRoot, tsconfig) {
   const configPath = resolve(repoRoot, tsconfig);
   const loaded = ts.readConfigFile(configPath, (fileName) =>
-    ts.sys.readFile(fileName),
+    ts.sys.readFile(fileName)
   );
   if (loaded.error) {
     throw new Error(
-      ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n"),
+      ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n")
     );
   }
   return ts.parseJsonConfigFileContent(
@@ -213,7 +213,7 @@ function readTsconfig(repoRoot, tsconfig) {
     ts.sys,
     dirname(configPath),
     undefined,
-    configPath,
+    configPath
   );
 }
 
@@ -227,7 +227,7 @@ function isTypeScriptSource(sourceFile) {
 function sourceMatches(repoRoot, sourceFile, targets) {
   const relativePath = relative(repoRoot, sourceFile.fileName).replace(
     /\\/gu,
-    "/",
+    "/"
   );
   if (relativePath.startsWith("../")) return false;
   return targetMatchers(targets).some((matcher) => matcher.test(relativePath));
@@ -267,7 +267,7 @@ function isConvexOwnerReferenceAlias(checker, node) {
   if (!ts.isTypeReferenceNode(annotation)) return false;
   const sym = resolvedSymbol(
     checker,
-    checker.getSymbolAtLocation(annotation.typeName),
+    checker.getSymbolAtLocation(annotation.typeName)
   );
   return declaresInConvexOwnedModule(sym);
 }
@@ -288,7 +288,7 @@ function isStructuralDerivationAlias(node) {
   }
   const [source] = annotation.typeArguments ?? [];
   return Boolean(
-    source && (ts.isTypeReferenceNode(source) || ts.isImportTypeNode(source)),
+    source && (ts.isTypeReferenceNode(source) || ts.isImportTypeNode(source))
   );
 }
 
@@ -304,7 +304,7 @@ function localShapeMembers(node) {
 // skips these for the same reason.
 function isAllOptionalLocalShape(node) {
   const props = localShapeMembers(node).filter((member) =>
-    ts.isPropertySignature(member),
+    ts.isPropertySignature(member)
   );
   return props.length > 0 && props.every((prop) => Boolean(prop.questionToken));
 }
@@ -328,7 +328,7 @@ function collectLocalTypes(
   program,
   checker,
   targets,
-  generatedSources,
+  generatedSources
 ) {
   const locals = [];
   for (const sourceFile of program.getSourceFiles()) {
@@ -355,7 +355,7 @@ function collectLocalTypes(
             const detailedProps = typePropsDetailed(checker, declared);
             if (detailedProps.size > 0) {
               const position = sourceFile.getLineAndCharacterOfPosition(
-                node.name.getStart(sourceFile),
+                node.name.getStart(sourceFile)
               );
               locals.push({
                 file,
@@ -377,7 +377,7 @@ function collectLocalTypes(
     (left, right) =>
       left.file.localeCompare(right.file) ||
       left.line - right.line ||
-      left.localName.localeCompare(right.localName),
+      left.localName.localeCompare(right.localName)
   );
 }
 
@@ -396,7 +396,7 @@ function strongestRelation(checker, local, candidates) {
       candidate.detailedProps,
       checker,
       local.type,
-      candidate.type,
+      candidate.type
     );
     if (!relation) continue;
     if (best && relationRank[relation] >= relationRank[best.relation]) {
@@ -499,21 +499,21 @@ function runPlan(plan, targetsOverride) {
   const { generatedSources, candidates } = ownerCandidates(
     program,
     checker,
-    repoRoot,
+    repoRoot
   );
   const checkedFiles = program
     .getSourceFiles()
     .filter(
       (sourceFile) =>
         isTypeScriptSource(sourceFile) &&
-        sourceMatches(repoRoot, sourceFile, targets),
+        sourceMatches(repoRoot, sourceFile, targets)
     ).length;
   const locals = collectLocalTypes(
     repoRoot,
     program,
     checker,
     targets,
-    generatedSources,
+    generatedSources
   );
   const rows = [];
   for (const local of locals) {
@@ -558,7 +558,7 @@ function summarize({ results, slice }) {
     checkedFiles: passed.reduce((sum, result) => sum + result.checkedFiles, 0),
     scannedTypeCount: passed.reduce(
       (sum, result) => sum + result.scannedTypeCount,
-      0,
+      0
     ),
     matchCount: rows.length,
     relationCounts,
@@ -595,11 +595,11 @@ export function typeOwnerInventory({
     if (result.decision === "pass") {
       const counts = result.relationCounts;
       progress(
-        `[type-owner-inventory] ${plan.repo}/${plan.label}: ${result.candidateCount} candidates, ${result.scannedTypeCount} local types, ${result.matchCount} matches (exact ${counts["exact-owner-copy"]}, loosened ${counts["loosened-owner-copy"]}, partial ${counts["partial-owner-copy"]})`,
+        `[type-owner-inventory] ${plan.repo}/${plan.label}: ${result.candidateCount} candidates, ${result.scannedTypeCount} local types, ${result.matchCount} matches (exact ${counts["exact-owner-copy"]}, loosened ${counts["loosened-owner-copy"]}, partial ${counts["partial-owner-copy"]})`
       );
     } else {
       progress(
-        `[type-owner-inventory] ${plan.repo}/${plan.label}: ${result.reason}`,
+        `[type-owner-inventory] ${plan.repo}/${plan.label}: ${result.reason}`
       );
     }
     return result;
@@ -608,7 +608,7 @@ export function typeOwnerInventory({
   emit(summary, output, report);
   const counts = summary.relationCounts;
   progress(
-    `[type-owner-inventory] total: ${summary.checkedFiles} files, ${summary.scannedTypeCount} local types, ${summary.matchCount} matches (exact ${counts["exact-owner-copy"]}, loosened ${counts["loosened-owner-copy"]}, partial ${counts["partial-owner-copy"]}), ${summary.proposalCount} ownership proposals`,
+    `[type-owner-inventory] total: ${summary.checkedFiles} files, ${summary.scannedTypeCount} local types, ${summary.matchCount} matches (exact ${counts["exact-owner-copy"]}, loosened ${counts["loosened-owner-copy"]}, partial ${counts["partial-owner-copy"]}), ${summary.proposalCount} ownership proposals`
   );
   return Promise.resolve(summary);
 }

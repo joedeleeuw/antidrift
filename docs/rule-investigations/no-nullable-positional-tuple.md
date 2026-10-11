@@ -30,18 +30,18 @@ Import the owner type when a library already owns the tuple shape.
 
 ## Case Matrix
 
-| Case | Should report | Reason |
-|---|---:|---|
-| `type CustomRange = [Date \| null, Date \| null]` | yes | Two nullable positional slots hide `start`/`end` meaning. |
-| `type CustomRange = readonly [Date \| null, Date \| null]` | yes | Readonly does not remove the positional partial-state smell. |
-| `type CustomRange = [start: Date \| null, end: Date \| null]` | yes | Labels help readers, but the type is still a nullable positional state model. |
-| `type MaybeDate = Date \| null; type CustomRange = [MaybeDate, MaybeDate]` | yes, when type-aware | Alias chains should not dodge the rule when parser services are available. |
-| `function select(range: [Date \| null, Date \| null]) {}` | yes | Inline tuple contracts are the same smell. |
-| `type Point = [number, number]` | no | Non-null numeric coordinate pairs are ordinary tuple use. |
-| `type HookResult = [value: Date \| null, setValue: (value: Date \| null) => void]` | no | Only one slot is nullable; common hook tuple shape stays out of scope. |
-| `type Range = PickerRangeValue<Date>` | no | Importing the owner type is the desired path. |
-| `type Dates = Array<Date \| null>` | no | Arrays are collections, not fixed positional fields. |
-| `type MaybeRange = [Date, Date] \| null` | no | The whole value is nullable; the tuple slots are not partial fields. |
+| Case                                                                               |        Should report | Reason                                                                        |
+| ---------------------------------------------------------------------------------- | -------------------: | ----------------------------------------------------------------------------- |
+| `type CustomRange = [Date \| null, Date \| null]`                                  |                  yes | Two nullable positional slots hide `start`/`end` meaning.                     |
+| `type CustomRange = readonly [Date \| null, Date \| null]`                         |                  yes | Readonly does not remove the positional partial-state smell.                  |
+| `type CustomRange = [start: Date \| null, end: Date \| null]`                      |                  yes | Labels help readers, but the type is still a nullable positional state model. |
+| `type MaybeDate = Date \| null; type CustomRange = [MaybeDate, MaybeDate]`         | yes, when type-aware | Alias chains should not dodge the rule when parser services are available.    |
+| `function select(range: [Date \| null, Date \| null]) {}`                          |                  yes | Inline tuple contracts are the same smell.                                    |
+| `type Point = [number, number]`                                                    |                   no | Non-null numeric coordinate pairs are ordinary tuple use.                     |
+| `type HookResult = [value: Date \| null, setValue: (value: Date \| null) => void]` |                   no | Only one slot is nullable; common hook tuple shape stays out of scope.        |
+| `type Range = PickerRangeValue<Date>`                                              |                   no | Importing the owner type is the desired path.                                 |
+| `type Dates = Array<Date \| null>`                                                 |                   no | Arrays are collections, not fixed positional fields.                          |
+| `type MaybeRange = [Date, Date] \| null`                                           |                   no | The whole value is nullable; the tuple slots are not partial fields.          |
 
 ## Real Corpus Evidence
 

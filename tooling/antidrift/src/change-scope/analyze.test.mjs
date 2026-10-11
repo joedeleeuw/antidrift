@@ -41,16 +41,16 @@ function changedFile(path, operation = "modify", oldPath = null) {
 describe("globToRegExp", () => {
   it("matches ** across path separators", () => {
     expect(
-      globToRegExp(ORDERS_GLOB).test("apps/shop/src/orders/format.ts"),
+      globToRegExp(ORDERS_GLOB).test("apps/shop/src/orders/format.ts")
     ).toBe(true);
     expect(
-      globToRegExp(ORDERS_GLOB).test("apps/shop/src/orders/deep/nested.ts"),
+      globToRegExp(ORDERS_GLOB).test("apps/shop/src/orders/deep/nested.ts")
     ).toBe(true);
   });
 
   it("does not match a sibling directory", () => {
     expect(
-      matchesAnyGlob("apps/shop/src/billing/index.ts", [ORDERS_GLOB]),
+      matchesAnyGlob("apps/shop/src/billing/index.ts", [ORDERS_GLOB])
     ).toBe(false);
   });
 
@@ -79,7 +79,7 @@ describe("analyzeChangeScope", () => {
       contract(),
       surface({
         changedFiles: [changedFile("apps/shop/src/orders/format.ts")],
-      }),
+      })
     );
     expect(result).toEqual([]);
   });
@@ -87,7 +87,7 @@ describe("analyzeChangeScope", () => {
   it("flags a path outside the allowed scope", () => {
     const result = analyzeChangeScope(
       contract(),
-      surface({ changedFiles: [changedFile("apps/shop/src/billing/tax.ts")] }),
+      surface({ changedFiles: [changedFile("apps/shop/src/billing/tax.ts")] })
     );
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe(VIOLATION_TYPES.pathOutOfScope);
@@ -99,10 +99,10 @@ describe("analyzeChangeScope", () => {
         allowedPaths: ["apps/shop/**"],
         forbiddenPaths: ["apps/shop/src/billing/**"],
       }),
-      surface({ changedFiles: [changedFile("apps/shop/src/billing/tax.ts")] }),
+      surface({ changedFiles: [changedFile("apps/shop/src/billing/tax.ts")] })
     );
     expect(result.map((violation) => violation.type)).toContain(
-      VIOLATION_TYPES.forbiddenPath,
+      VIOLATION_TYPES.forbiddenPath
     );
   });
 
@@ -112,7 +112,7 @@ describe("analyzeChangeScope", () => {
         allowedPaths: ["apps/orders/**"],
         forbiddenPaths: ["apps/billing/**"],
       }),
-      surface({ changedFiles: [changedFile("apps/billing/secret.ts")] }),
+      surface({ changedFiles: [changedFile("apps/billing/secret.ts")] })
     );
     const types = result.map((violation) => violation.type);
     expect(types).toContain(VIOLATION_TYPES.forbiddenPath);
@@ -127,30 +127,30 @@ describe("analyzeChangeScope", () => {
           changedFile(
             "apps/shop/src/orders/new.ts",
             "rename",
-            "apps/shop/src/billing/old.ts",
+            "apps/shop/src/billing/old.ts"
           ),
         ],
-      }),
+      })
     );
     expect(result.map((violation) => violation.type)).toContain(
-      VIOLATION_TYPES.pathOutOfScope,
+      VIOLATION_TYPES.pathOutOfScope
     );
   });
 
   it("flags an undeclared runtime dependency", () => {
     const result = analyzeChangeScope(
       contract(),
-      surface({ addedRuntimeDependencies: ["@copilotkit/react-core"] }),
+      surface({ addedRuntimeDependencies: ["@copilotkit/react-core"] })
     );
     expect(result.map((violation) => violation.type)).toContain(
-      VIOLATION_TYPES.undeclaredRuntimeDependency,
+      VIOLATION_TYPES.undeclaredRuntimeDependency
     );
   });
 
   it("allows a declared runtime dependency", () => {
     const result = analyzeChangeScope(
       contract({ allowedRuntimeDependencies: ["@speckit/core"] }),
-      surface({ addedRuntimeDependencies: ["@speckit/core"] }),
+      surface({ addedRuntimeDependencies: ["@speckit/core"] })
     );
     expect(result).toEqual([]);
   });
@@ -160,10 +160,10 @@ describe("analyzeChangeScope", () => {
       contract({ allowedChangeTypes: ["modify"] }),
       surface({
         changedFiles: [changedFile("apps/shop/src/orders/old.ts", "delete")],
-      }),
+      })
     );
     expect(result.map((violation) => violation.type)).toContain(
-      VIOLATION_TYPES.undeclaredChangeType,
+      VIOLATION_TYPES.undeclaredChangeType
     );
   });
 
@@ -175,7 +175,7 @@ describe("analyzeChangeScope", () => {
       }),
       surface({
         changedFiles: [changedFile("apps/shop/src/orders/old.ts", "delete")],
-      }),
+      })
     );
     expect(result).toEqual([]);
   });
@@ -191,10 +191,10 @@ describe("analyzeChangeScope", () => {
             kind: "value",
           },
         ],
-      }),
+      })
     );
     expect(result.map((violation) => violation.type)).toContain(
-      VIOLATION_TYPES.undeclaredAddedExport,
+      VIOLATION_TYPES.undeclaredAddedExport
     );
   });
 
@@ -209,7 +209,7 @@ describe("analyzeChangeScope", () => {
             kind: "value",
           },
         ],
-      }),
+      })
     );
     expect(result).toEqual([]);
   });
@@ -233,7 +233,7 @@ describe("analyzeChangeScope", () => {
             kind: "value",
           },
         ],
-      }),
+      })
     );
     expect(result).toEqual([]);
   });
@@ -257,10 +257,10 @@ describe("analyzeChangeScope", () => {
             kind: "value",
           },
         ],
-      }),
+      })
     );
     expect(result.map((violation) => violation.type)).toContain(
-      VIOLATION_TYPES.undeclaredAddedExport,
+      VIOLATION_TYPES.undeclaredAddedExport
     );
   });
 
@@ -282,10 +282,10 @@ describe("analyzeChangeScope", () => {
             kind: "value",
           },
         ],
-      }),
+      })
     );
     expect(result.map((violation) => violation.type)).toContain(
-      VIOLATION_TYPES.undeclaredAddedExport,
+      VIOLATION_TYPES.undeclaredAddedExport
     );
   });
 });

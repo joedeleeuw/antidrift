@@ -179,7 +179,7 @@ export function previousGuardInBlockEnsuresString(statement, expression) {
   return Boolean(
     previous.alternate &&
     statementAlwaysExits(previous.alternate) &&
-    conditionEnsuresString(previous.test, expression, true),
+    conditionEnsuresString(previous.test, expression, true)
   );
 }
 
@@ -234,7 +234,7 @@ export function hasLocalStringBoundary(node, expression) {
 
 export function isAnyOrUnknownType(type) {
   return Boolean(
-    type && type.flags & (TS_TYPE_FLAG_ANY | TS_TYPE_FLAG_UNKNOWN),
+    type && type.flags & (TS_TYPE_FLAG_ANY | TS_TYPE_FLAG_UNKNOWN)
   );
 }
 
@@ -242,11 +242,11 @@ export function isJsonParseCall(node) {
   const callee = node?.callee;
   return Boolean(
     node?.type === "CallExpression" &&
-      callee?.type === "MemberExpression" &&
-      callee.object?.type === "Identifier" &&
-      callee.object.name === "JSON" &&
-      callee.property?.type === "Identifier" &&
-      callee.property.name === "parse",
+    callee?.type === "MemberExpression" &&
+    callee.object?.type === "Identifier" &&
+    callee.object.name === "JSON" &&
+    callee.property?.type === "Identifier" &&
+    callee.property.name === "parse"
   );
 }
 
@@ -260,7 +260,7 @@ export function isUnsafeJsonParseInput(node, services, checker) {
   const tsArg = services.esTreeNodeToTSNodeMap.get(arg);
   return Boolean(
     tsArg &&
-      isAnyOrUnknownType(checker.getTypeAtLocation(tsArg)) &&
-      !hasLocalStringBoundary(node, arg),
+    isAnyOrUnknownType(checker.getTypeAtLocation(tsArg)) &&
+    !hasLocalStringBoundary(node, arg)
   );
 }

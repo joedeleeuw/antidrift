@@ -65,8 +65,8 @@ function frozenAllowedExports(value) {
         file: entry.file,
         name: entry.name,
         kind: entry.kind,
-      }),
-    ),
+      })
+    )
   );
 }
 
@@ -86,7 +86,7 @@ function checkPath(path, field, problems) {
 function validateAllowedPaths(scope, refactorApproved, problems) {
   if (!isStringArray(scope.allowedPaths) || scope.allowedPaths.length === 0) {
     problems.push(
-      "scope.allowedPaths must be a non-empty array of repo-relative globs",
+      "scope.allowedPaths must be a non-empty array of repo-relative globs"
     );
     return;
   }
@@ -94,7 +94,7 @@ function validateAllowedPaths(scope, refactorApproved, problems) {
     checkPath(path, "scope.allowedPaths", problems);
     if (BROAD_GLOBS.has(path) && !refactorApproved) {
       problems.push(
-        `scope.allowedPaths uses broad glob "${path}" without refactor.approved: true`,
+        `scope.allowedPaths uses broad glob "${path}" without refactor.approved: true`
       );
     }
   }
@@ -106,14 +106,14 @@ function validateCheckedSurfaces(scope, problems) {
     scope.checkedSurfaces.length === 0
   ) {
     problems.push(
-      "scope.checkedSurfaces must be a non-empty array of deterministic surface names",
+      "scope.checkedSurfaces must be a non-empty array of deterministic surface names"
     );
     return;
   }
   for (const surface of scope.checkedSurfaces) {
     if (!CHECKED_SURFACES.has(surface)) {
       problems.push(
-        `scope.checkedSurfaces has invalid value "${surface}" (expected paths|changeTypes|dependencies|exports)`,
+        `scope.checkedSurfaces has invalid value "${surface}" (expected paths|changeTypes|dependencies|exports)`
       );
     }
   }
@@ -145,7 +145,7 @@ function validateChangeTypes(scope, problems) {
   for (const type of scope.allowedChangeTypes) {
     if (!CHANGE_TYPES.has(type)) {
       problems.push(
-        `scope.allowedChangeTypes has invalid value "${type}" (expected add|modify|delete|rename)`,
+        `scope.allowedChangeTypes has invalid value "${type}" (expected add|modify|delete|rename)`
       );
     }
   }
@@ -172,14 +172,14 @@ function validateExports(scope, problems) {
       typeof entry.name !== "string"
     ) {
       problems.push(
-        "scope.allowedExports entries must be objects with string file and name",
+        "scope.allowedExports entries must be objects with string file and name"
       );
       continue;
     }
     checkPath(entry.file, "scope.allowedExports.file", problems);
     if (!EXPORT_KINDS.has(entry.kind)) {
       problems.push(
-        `scope.allowedExports kind must be one of value|type|default|namespace: ${entry.kind}`,
+        `scope.allowedExports kind must be one of value|type|default|namespace: ${entry.kind}`
       );
     }
   }
@@ -212,7 +212,7 @@ function validateModuleRadius(scope, problems) {
     (typeof radius !== "number" || !Number.isInteger(radius) || radius < 0)
   ) {
     problems.push(
-      "scope.maxTouchedModuleRadius must be a non-negative integer",
+      "scope.maxTouchedModuleRadius must be a non-negative integer"
     );
   }
 }
@@ -251,7 +251,7 @@ function validateRefactor(raw, problems) {
       refactor.justification.trim().length === 0)
   ) {
     problems.push(
-      "refactor.approved: true requires a non-empty refactor.justification",
+      "refactor.approved: true requires a non-empty refactor.justification"
     );
   }
   return {
@@ -287,7 +287,7 @@ export function validateContract(raw) {
 
   const { approved: refactorApproved, justification } = validateRefactor(
     raw,
-    problems,
+    problems
   );
 
   if (isObject(raw.scope)) {
@@ -312,7 +312,7 @@ export function validateContract(raw) {
       allowedChangeTypes: frozenStringArray(scope.allowedChangeTypes),
       allowedExports: frozenAllowedExports(scope.allowedExports),
       allowedRuntimeDependencies: frozenStringArray(
-        scope.allowedRuntimeDependencies,
+        scope.allowedRuntimeDependencies
       ),
       allowedDevDependencies: frozenStringArray(scope.allowedDevDependencies),
       allowedEntrypoints: frozenStringArray(scope.allowedEntrypoints),

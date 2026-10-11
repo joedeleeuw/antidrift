@@ -69,14 +69,15 @@
   "lint-staged": {
     "*.{js,cjs,mjs,ts,tsx}": [
       "antidrift oxlint --fix",
-      "eslint --max-warnings 0"
+      "prettier --write",
+      "eslint --max-warnings 0 --no-warn-ignored"
     ],
     "*.{json,jsonc,md,mdc,yml,yaml}": [
       "prettier --write"
     ]
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm exec lint-staged",
+    "pre-commit": "pnpm exec lint-staged --no-stash",
     "pre-push": "pnpm policy:verify-session"
   }
 }

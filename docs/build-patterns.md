@@ -50,7 +50,7 @@ import { brand, type Brand } from "@joedeleeuw/antidrift/brand";
 export const UserId = brand(
   "UserId",
   (value): value is string =>
-    typeof value === "string" && value.startsWith("user_"),
+    typeof value === "string" && value.startsWith("user_")
 );
 export type UserId = Brand<string, "UserId">;
 ```
@@ -104,14 +104,14 @@ export type ExplorationState = z.infer<typeof ExplorationStateSchema>;
 
 export function markTileUnderstood(
   state: ExplorationState,
-  tileId: TerrainNodeId,
+  tileId: TerrainNodeId
 ): ExplorationState {
   return {
     ...state,
     tiles: state.tiles.map((tile) =>
       tile.terrainNodeId === tileId
         ? { ...tile, seen: true, understood: true }
-        : tile,
+        : tile
     ),
   };
 }

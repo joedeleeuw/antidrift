@@ -13,7 +13,7 @@ function localPredicate(node) {
     return null;
   }
   const index = signature.params.findIndex(
-    (parameter) => parameter.name === predicate.parameterName.name,
+    (parameter) => parameter.name === predicate.parameterName.name
   );
   return index < 0 ? null : { index, asserts: predicate.asserts };
 }
@@ -34,7 +34,7 @@ function sourcePredicate(node) {
   const index = signature.parameters.findIndex(
     (parameter) =>
       ts.isIdentifier(parameter.name) &&
-      parameter.name.text === predicate.parameterName.text,
+      parameter.name.text === predicate.parameterName.text
   );
   return index < 0
     ? null
@@ -49,7 +49,7 @@ function modulePredicates(filename, specifier, cache) {
       ? ts.parseJsonConfigFileContent(
           config.config,
           ts.sys,
-          dirname(configPath),
+          dirname(configPath)
         ).options
       : { moduleResolution: ts.ModuleResolutionKind.Bundler };
   const target = ts.resolveModuleName(specifier, filename, options, ts.sys)
@@ -64,12 +64,12 @@ function modulePredicates(filename, specifier, cache) {
     target,
     text,
     ts.ScriptTarget.Latest,
-    true,
+    true
   );
   for (const statement of source.statements) {
     if (
       !statement.modifiers?.some(
-        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
       )
     ) {
       continue;
@@ -81,7 +81,7 @@ function modulePredicates(filename, specifier, cache) {
       const predicate = sourcePredicate(declaration);
       if (!predicate) continue;
       const isDefault = statement.modifiers.some(
-        (modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword,
+        (modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword
       );
       predicates.set(isDefault ? "default" : declaration.name?.text, predicate);
     }
@@ -101,7 +101,7 @@ export function predicateCall(call, variable, context, cache) {
   if (
     !callee ||
     callee.references.some(
-      (reference) => reference.isWrite() && !reference.init,
+      (reference) => reference.isWrite() && !reference.init
     )
   ) {
     return null;
@@ -123,7 +123,7 @@ export function predicateCall(call, variable, context, cache) {
       predicate = modulePredicates(
         context.filename,
         definition.parent.source.value,
-        cache,
+        cache
       ).get(name);
     } else {
       predicate = localPredicate(definition.node);

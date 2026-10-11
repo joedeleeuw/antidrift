@@ -77,7 +77,7 @@ const getAttributeName = (attribute) => {
 };
 const findAttribute = (openingElement, name) =>
   getAttributes(openingElement).find(
-    (attribute) => getAttributeName(attribute) === name,
+    (attribute) => getAttributeName(attribute) === name
   ) ?? null;
 const hasAttribute = (openingElement, names) =>
   getAttributes(openingElement).some((attribute) => {

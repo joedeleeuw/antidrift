@@ -20,14 +20,14 @@ export function callExpressionName(callee: unknown): string | null;
 
 export function isRequestParamsAccess(
   node: unknown,
-  requestParamRoots?: readonly string[],
+  requestParamRoots?: readonly string[]
 ): boolean;
 
 export function isAuthzCall(
   callee: unknown,
-  authzFunctions: readonly string[],
+  authzFunctions: readonly string[]
 ): boolean;
 
 export function createAuthBoundaryTracker(
-  options: AuthBoundaryTrackerOptions,
+  options: AuthBoundaryTrackerOptions
 ): AuthBoundaryTracker;

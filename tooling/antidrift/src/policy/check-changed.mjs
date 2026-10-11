@@ -8,10 +8,10 @@ import { runOxlint } from "./oxlint.mjs";
 export function checkChanged() {
   const changed = changedFiles();
   const codeFiles = changed.filter((file) =>
-    /\.(js|mjs|cjs|ts|tsx)$/u.test(file),
+    /\.(js|mjs|cjs|ts|tsx)$/u.test(file)
   );
   const protectedChanged = changed.filter((file) =>
-    protectedPolicyFiles.includes(file),
+    protectedPolicyFiles.includes(file)
   );
   const policyChanged = changed.includes("policy/agent-guardrails.yaml");
 
@@ -21,11 +21,11 @@ export function checkChanged() {
     !process.env.POLICY_CHANGE
   ) {
     console.error(
-      "Protected policy/config files changed without policy source update:",
+      "Protected policy/config files changed without policy source update:"
     );
     for (const file of protectedChanged) console.error(`- ${file}`);
     console.error(
-      "Edit policy/agent-guardrails.yaml and run pnpm policy:generate, or set POLICY_CHANGE=1 for an explicit policy task.",
+      "Edit policy/agent-guardrails.yaml and run pnpm policy:generate, or set POLICY_CHANGE=1 for an explicit policy task."
     );
     process.exit(1);
   }
@@ -44,7 +44,7 @@ export function checkChanged() {
   const eslintResult = spawnSync(
     "pnpm",
     ["exec", "eslint", ...codeFiles, "--max-warnings", "0"],
-    { stdio: "inherit" },
+    { stdio: "inherit" }
   );
   if (eslintResult.status !== 0) process.exit(eslintResult.status ?? 1);
 }

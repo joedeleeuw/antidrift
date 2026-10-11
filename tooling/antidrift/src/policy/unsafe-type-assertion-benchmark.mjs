@@ -27,7 +27,7 @@ const benchmarkRuleIds = [
   "@typescript-eslint/no-unsafe-type-assertion",
 ];
 const antidriftRuleIds = benchmarkRuleIds.filter((ruleId) =>
-  ruleId.startsWith("antidrift/"),
+  ruleId.startsWith("antidrift/")
 );
 const upstreamRuleId = "@typescript-eslint/no-unsafe-type-assertion";
 
@@ -165,7 +165,7 @@ function eslintConfig(repoRoot, tsconfig) {
         antidrift,
       },
       rules: Object.fromEntries(
-        benchmarkRuleIds.map((ruleId) => [ruleId, "error"]),
+        benchmarkRuleIds.map((ruleId) => [ruleId, "error"])
       ),
     },
   ];
@@ -190,21 +190,28 @@ function countByRule(findings) {
     benchmarkRuleIds.map((ruleId) => [
       ruleId,
       findings.filter((finding) => finding.ruleId === ruleId).length,
-    ]),
+    ])
   );
 }
 
 function compare(findings) {
-  const upstream = findings.filter((finding) => finding.ruleId === upstreamRuleId);
+  const upstream = findings.filter(
+    (finding) => finding.ruleId === upstreamRuleId
+  );
   const antidriftFindings = findings.filter((finding) =>
-    antidriftRuleIds.includes(finding.ruleId),
+    antidriftRuleIds.includes(finding.ruleId)
   );
   const upstreamKeys = new Set(upstream.map(locationKey));
   const antidriftKeys = new Set(antidriftFindings.map(locationKey));
   return {
-    overlapLocations: [...upstreamKeys].filter((key) => antidriftKeys.has(key)).length,
-    upstreamOnly: upstream.filter((finding) => !antidriftKeys.has(locationKey(finding))).length,
-    antidriftOnly: antidriftFindings.filter((finding) => !upstreamKeys.has(locationKey(finding))).length,
+    overlapLocations: [...upstreamKeys].filter((key) => antidriftKeys.has(key))
+      .length,
+    upstreamOnly: upstream.filter(
+      (finding) => !antidriftKeys.has(locationKey(finding))
+    ).length,
+    antidriftOnly: antidriftFindings.filter(
+      (finding) => !upstreamKeys.has(locationKey(finding))
+    ).length,
   };
 }
 
@@ -228,12 +235,12 @@ async function runPlan(plan) {
   const parserErrors = results.flatMap((result) =>
     result.messages
       .filter((message) => !message.ruleId)
-      .map((message) => toFinding(repoRoot, result, message)),
+      .map((message) => toFinding(repoRoot, result, message))
   );
   const findings = results.flatMap((result) =>
     result.messages
       .filter((message) => benchmarkRuleIds.includes(message.ruleId))
-      .map((message) => toFinding(repoRoot, result, message)),
+      .map((message) => toFinding(repoRoot, result, message))
   );
 
   return {
@@ -254,11 +261,11 @@ async function runPlan(plan) {
 function summarize(results, slice) {
   const checkedFiles = results.reduce(
     (sum, result) => sum + (result.checkedFiles ?? 0),
-    0,
+    0
   );
   const parserErrors = results.reduce(
     (sum, result) => sum + (result.parserErrors ?? 0),
-    0,
+    0
   );
   const findings = results.flatMap((result) => result.findings ?? []);
   const comparison = compare(findings);
@@ -298,7 +305,7 @@ export async function unsafeTypeAssertionBenchmark({
       previous.then(async () => {
         results.push(await runPlan(plan));
       }),
-    Promise.resolve(),
+    Promise.resolve()
   );
   const summary = summarize(results, slice);
   emit(summary, output, report);

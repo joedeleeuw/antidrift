@@ -90,7 +90,7 @@ describe("runChangeContract", () => {
         head: HEAD,
         cwd: dir,
         requireContract: true,
-      }),
+      })
     ).toThrow(/not found/u);
   });
 
@@ -176,8 +176,8 @@ describe("runChangeContract", () => {
     expect(graph.entrypoints).toEqual(["apps/orders/format.ts"]);
     expect(
       Object.fromEntries(
-        graph.touchedFiles.map((file) => [file.path, file.distance]),
-      ),
+        graph.touchedFiles.map((file) => [file.path, file.distance])
+      )
     ).toEqual({
       "apps/billing/tax.ts": null,
       "apps/orders/format.ts": 0,
@@ -216,7 +216,7 @@ describe("change-contract CLI", () => {
 
   it("rejects a value flag that swallows the next flag", () => {
     expect(() => parseArgs(["--contract", "--base", "main"])).toThrow(
-      /requires a value/u,
+      /requires a value/u
     );
   });
 
@@ -236,7 +236,7 @@ describe("change-contract CLI", () => {
         base: null,
         head: HEAD,
         cwd: dir,
-      }),
+      })
     ).toThrow(/base ref is required/u);
   });
 });

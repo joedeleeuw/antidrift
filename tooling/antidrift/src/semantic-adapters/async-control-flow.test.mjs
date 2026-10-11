@@ -63,8 +63,9 @@ describe("async-control-flow array callback helpers", () => {
       method: "map",
       kind: "requires-collection",
     });
-    expect(queuePendingAsyncMap(sourceCode, mapCall, callback, "map", pending))
-      .toBe(true);
+    expect(
+      queuePendingAsyncMap(sourceCode, mapCall, callback, "map", pending)
+    ).toBe(true);
     expect(pending).toEqual([
       {
         variable,
@@ -129,8 +130,11 @@ describe("async-control-flow array callback helpers", () => {
     ];
     markReturnedPendingMaps(
       sourceCode,
-      { type: "ReturnStatement", argument: { type: "Identifier", name: "mapped" } },
-      pendingForReturn,
+      {
+        type: "ReturnStatement",
+        argument: { type: "Identifier", name: "mapped" },
+      },
+      pendingForReturn
     );
     expect(pendingForReturn[0].returned).toBe(true);
 
@@ -153,7 +157,7 @@ describe("async-control-flow array callback helpers", () => {
           property: { type: "Identifier", name: "length" },
         },
       },
-      pendingForLength,
+      pendingForLength
     );
     expect(pendingForLength[0].returned).toBe(false);
   });

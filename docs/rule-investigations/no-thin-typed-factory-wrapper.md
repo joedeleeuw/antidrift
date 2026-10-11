@@ -20,7 +20,7 @@ The suspected smell is an internal helper that appears to "make" a domain or con
 function buildRoute(
   path: string,
   title: string,
-  visible: boolean,
+  visible: boolean
 ): WebviewRoute {
   return makeRoute(path, title, visible);
 }

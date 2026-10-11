@@ -57,7 +57,7 @@ export const SQL_INTERPOLATION_AFTER_KEYWORDS: readonly string[];
 
 export function isSqlIdentifierTokenValue(value: string): boolean;
 export function isSqlDirectionTokenValue(
-  value: string,
+  value: string
 ): value is SqlDirectionToken;
 export function isSqlIdentifierContext(before: string, after: string): boolean;
 export function normalizedSqlContext(value: string): string;
@@ -68,16 +68,16 @@ export function endsWithSqlInterpolationOperator(value: string): boolean;
 export function startsWithSqlInterpolationKeyword(value: string): boolean;
 export function isSqlInterpolationContext(
   before: string,
-  after: string,
+  after: string
 ): boolean;
 export function templateStaticPartsAreSqlIdentifierSafe(
-  node: SqlTemplateLike,
+  node: SqlTemplateLike
 ): boolean;
 export function valuesAreSqlIdentifiers(
-  values: ReadonlySet<string> | null | undefined,
+  values: ReadonlySet<string> | null | undefined
 ): boolean;
 export function valuesAreSqlDirections(
-  values: ReadonlySet<string> | null | undefined,
+  values: ReadonlySet<string> | null | undefined
 ): boolean;
 export function safeIdentifierMemberSpecs(options: {
   safeIdentifierMembers?: readonly SafeIdentifierMemberSpecInput[];

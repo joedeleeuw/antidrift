@@ -1,6 +1,11 @@
 import { updateUserInputSchema } from "@agent-guardrails/contracts";
 
-import { authorize, requireTenant, requireUser, validateInput } from "../security";
+import {
+  authorize,
+  requireTenant,
+  requireUser,
+  validateInput,
+} from "../security";
 
 import type { RequestContext } from "../security";
 import type { UserDto } from "@agent-guardrails/contracts";

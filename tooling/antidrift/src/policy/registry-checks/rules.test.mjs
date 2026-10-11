@@ -30,22 +30,23 @@ describe("rule promotion and policy reviews", () => {
           "    status: ready",
           "    stable: false",
         ].join("\n"),
-        () => [
-          "  antidrift/no-sql-string-concat:",
-          "    status: ready",
-          "    stable: false",
-          "    defaultOff: yes",
-        ].join("\n"),
-      ),
+        () =>
+          [
+            "  antidrift/no-sql-string-concat:",
+            "    status: ready",
+            "    stable: false",
+            "    defaultOff: yes",
+          ].join("\n")
+      )
     );
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-sql-string-concat.defaultOff must be a boolean.",
+      "policy/registries/rules.yaml rules.antidrift/no-sql-string-concat.defaultOff must be a boolean."
     );
   });
   it("rejects stable rules marked default-off", () => {
@@ -62,22 +63,23 @@ describe("rule promotion and policy reviews", () => {
           "    status: ready",
           "    stable: false",
         ].join("\n"),
-        () => [
-          "  antidrift/no-sql-string-concat:",
-          "    status: ready",
-          "    stable: true",
-          "    defaultOff: true",
-        ].join("\n"),
-      ),
+        () =>
+          [
+            "  antidrift/no-sql-string-concat:",
+            "    status: ready",
+            "    stable: true",
+            "    defaultOff: true",
+          ].join("\n")
+      )
     );
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-sql-string-concat.defaultOff must not be true for stable rules.",
+      "policy/registries/rules.yaml rules.antidrift/no-sql-string-concat.defaultOff must not be true for stable rules."
     );
   });
   it("requires active rule entries to declare flag and allow examples", () => {
@@ -106,7 +108,7 @@ describe("rule promotion and policy reviews", () => {
       flags: []
       allows: []
     nextAction: Test action.
-`,
+`
       )
       .join("");
     writeRegistry(
@@ -132,14 +134,14 @@ statuses:
 rules:
 ${rules}
 ${lockedRuleSections(root)}
-`,
+`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(".examples.flags must not be empty");
     expect(messages.join("\n")).toContain(".examples.allows must not be empty");
@@ -153,18 +155,18 @@ ${lockedRuleSections(root)}
       existing,
       text.replace(
         /(  antidrift\/no-appeasement-cast:\n[\s\S]*?)    proofBuckets: \[local-ast-source-shape\]\n/u,
-        "$1",
-      ),
+        "$1"
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-appeasement-cast.proofBuckets must be an array of strings.",
+      "policy/registries/rules.yaml rules.antidrift/no-appeasement-cast.proofBuckets must be an array of strings."
     );
   });
   it("rejects diff-relative proof buckets in active rule registry rows", () => {
@@ -176,18 +178,18 @@ ${lockedRuleSections(root)}
       existing,
       text.replace(
         /(  antidrift\/no-appeasement-cast:\n[\s\S]*?)    proofBuckets: \[local-ast-source-shape\]\n/u,
-        "$1    proofBuckets: [diff-relative]\n",
-      ),
+        "$1    proofBuckets: [diff-relative]\n"
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-appeasement-cast.proofBuckets contains unsupported value 'diff-relative'",
+      "policy/registries/rules.yaml rules.antidrift/no-appeasement-cast.proofBuckets contains unsupported value 'diff-relative'"
     );
   });
   it("rejects diff-relative proof buckets in stable active rule registry rows", () => {
@@ -233,18 +235,18 @@ ${lockedRuleSections(root)}
       productionConcerns: none
       noSinkBehavior: Test no-sink behavior.
       noDeadWorkBehavior: Test no-dead-work behavior.
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.proofBuckets contains unsupported value 'diff-relative'",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.proofBuckets contains unsupported value 'diff-relative'"
     );
   });
   it("accepts diff-relative proof buckets in research candidate rows", () => {
@@ -265,15 +267,15 @@ ${lockedRuleSections(root)}
     proofBuckets: [diff-relative]
     referenceDoc: docs/specs/change-contract-conformance-spine.md
     nextAction: Keep inventory-only until promotion evidence exists.
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(true);
     expect(messages).toEqual([]);
   });
@@ -286,18 +288,18 @@ ${lockedRuleSections(root)}
       existing,
       text.replace(
         "  ecosystem/discriminated-union-exhaustiveness:\n    status: ecosystem-covered\n",
-        "  ecosystem/discriminated-union-exhaustiveness:\n    status: ecosystem-covered\n    proofBuckets: [diff-relative]\n",
-      ),
+        "  ecosystem/discriminated-union-exhaustiveness:\n    status: ecosystem-covered\n    proofBuckets: [diff-relative]\n"
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml researchCandidates.ecosystem/discriminated-union-exhaustiveness.proofBuckets contains command-owned proof bucket 'diff-relative' but no command-owned semantic fact maps to ecosystem/discriminated-union-exhaustiveness.",
+      "policy/registries/rules.yaml researchCandidates.ecosystem/discriminated-union-exhaustiveness.proofBuckets contains command-owned proof bucket 'diff-relative' but no command-owned semantic fact maps to ecosystem/discriminated-union-exhaustiveness."
     );
   });
   it("rejects unsupported proof buckets in research candidate rows", () => {
@@ -309,18 +311,18 @@ ${lockedRuleSections(root)}
       existing,
       text.replace(
         "  ecosystem/discriminated-union-exhaustiveness:\n    status: ecosystem-covered\n",
-        "  ecosystem/discriminated-union-exhaustiveness:\n    status: ecosystem-covered\n    proofBuckets: [not-a-proof-bucket]\n",
-      ),
+        "  ecosystem/discriminated-union-exhaustiveness:\n    status: ecosystem-covered\n    proofBuckets: [not-a-proof-bucket]\n"
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml researchCandidates.ecosystem/discriminated-union-exhaustiveness.proofBuckets contains unsupported value 'not-a-proof-bucket'",
+      "policy/registries/rules.yaml researchCandidates.ecosystem/discriminated-union-exhaustiveness.proofBuckets contains unsupported value 'not-a-proof-bucket'"
     );
   });
   it("requires active rule entries to explain external rule ownership state", () => {
@@ -351,7 +353,7 @@ ${lockedRuleSections(root)}
       allows:
         - good()
     nextAction: Test action.
-`,
+`
       )
       .join("");
     writeRegistry(
@@ -377,20 +379,20 @@ statuses:
 rules:
 ${rules}
 ${lockedRuleSections(root)}
-`,
+`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      ".external.whyThisState must be a non-empty string",
+      ".external.whyThisState must be a non-empty string"
     );
     expect(messages.join("\n")).toContain(
-      ".external.whyNotOtherState must be a non-empty string",
+      ".external.whyNotOtherState must be a non-empty string"
     );
   });
   it("requires active rule entries to document a reference investigation", () => {
@@ -451,17 +453,17 @@ ${semanticFactKindSections()}
 rules:
 ${rules}
 ${lockedRuleSections(root)}
-`,
+`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.referenceDoc must be a non-empty string.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.referenceDoc must be a non-empty string."
     );
   });
   it("rejects rule-family subsets that reference unknown rules", () => {
@@ -483,17 +485,17 @@ ruleFamilies:
           - raw as Order
         allows:
           - OrderSchema.parse(raw)
-`,
+`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "ruleFamilies.type-contract-authority.subsets.casts.rules references unknown rule: antidrift/not-a-rule",
+      "ruleFamilies.type-contract-authority.subsets.casts.rules references unknown rule: antidrift/not-a-rule"
     );
   });
   it("requires unclaimed non-local proof bucket rules to document pending adapter extraction", () => {
@@ -517,18 +519,18 @@ ruleFamilies:
     signal: test-signal
     solveType: test-solve
     proofBuckets: [semantic-source-type-provenance]
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-contract-appeasement-projection.semanticAdapterStatus is required when non-local proof buckets are not claimed by a shipped semantic adapter.",
+      "policy/registries/rules.yaml rules.antidrift/no-contract-appeasement-projection.semanticAdapterStatus is required when non-local proof buckets are not claimed by a shipped semantic adapter."
     );
   });
   it("requires promotion metadata for stable active rules", () => {
@@ -546,18 +548,18 @@ ruleFamilies:
         `  antidrift/no-async-array-method:
     status: ready
     stable: true
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion must be a mapping for stable rules.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion must be a mapping for stable rules."
     );
   });
   it("requires stable active rules to document a reference investigation", () => {
@@ -601,18 +603,18 @@ ruleFamilies:
       productionConcerns: none
       noSinkBehavior: Test no-sink behavior.
       noDeadWorkBehavior: Test no-dead-work behavior.
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.referenceDoc must be a non-empty string.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.referenceDoc must be a non-empty string."
     );
   });
   it("requires stable active rules to be owned by Antidrift instead of delegated externally", () => {
@@ -663,7 +665,7 @@ ruleFamilies:
       productionConcerns: none
       noSinkBehavior: Test no-sink behavior.
       noDeadWorkBehavior: Test no-dead-work behavior.
-`,
+`
       )
       .replace(
         `      decision: own-antidrift
@@ -673,21 +675,21 @@ ruleFamilies:
         `      decision: use-upstream
       whyThisState: Synthetic stable rule delegates to ecosystem support.
       whyNotOtherState: Synthetic stable rule should not use upstream.
-`,
+`
       );
     writeFileSync(
       existing,
-      `${text.slice(0, ruleStart)}${invalidRuleBlock}${text.slice(nextRuleStart)}`,
+      `${text.slice(0, ruleStart)}${invalidRuleBlock}${text.slice(nextRuleStart)}`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.external.decision must be own-antidrift for stable active rules.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.external.decision must be own-antidrift for stable active rules."
     );
   });
   it("requires non-stable active rules to document a blocker and next action", () => {
@@ -708,26 +710,26 @@ ruleFamilies:
         `    concerns:
       - Test non-stable blocker.
 `,
-        "    concerns: []\n",
+        "    concerns: []\n"
       )
       .replace(nextActionLine, "");
     writeFileSync(
       existing,
-      `${text.slice(0, ruleStart)}${invalidRuleBlock}${text.slice(nextActionEnd)}`,
+      `${text.slice(0, ruleStart)}${invalidRuleBlock}${text.slice(nextActionEnd)}`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.nextAction must be a non-empty string.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.nextAction must be a non-empty string."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method must document at least one non-stable blocker in concerns, unproven, or openReviewConcerns.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method must document at least one non-stable blocker in concerns, unproven, or openReviewConcerns."
     );
   });
   it("requires stable active rules to meet the minimum independent repo count", () => {
@@ -770,18 +772,18 @@ ruleFamilies:
       productionConcerns: none
       noSinkBehavior: Test no-sink behavior.
       noDeadWorkBehavior: Test no-dead-work behavior.
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.corpusRepositories must list at least 2 independent repositories for stable promotion.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.corpusRepositories must list at least 2 independent repositories for stable promotion."
     );
   });
   it("requires stable active rules to satisfy configured promotion evidence gates", () => {
@@ -816,40 +818,40 @@ ruleFamilies:
       corpusEvidence: Test corpus evidence.
       noSinkBehavior: Test no-sink behavior.
       noDeadWorkBehavior: Test no-dead-work behavior.
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.replicationsNotIntroducedForTest must be true for stable promotion.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.replicationsNotIntroducedForTest must be true for stable promotion."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.knownFalsePositives must be 0 for stable promotion.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.knownFalsePositives must be 0 for stable promotion."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.knownFalseNegatives must be 0 for stable promotion.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.knownFalseNegatives must be 0 for stable promotion."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.productionConcerns must be 'none' for stable promotion.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.productionConcerns must be 'none' for stable promotion."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.claudeAdvisoryReview must be a non-empty string.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.claudeAdvisoryReview must be a non-empty string."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventory must be a non-empty string.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventory must be a non-empty string."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.claudeAdvisoryReviewRefs must be an array of strings.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.claudeAdvisoryReviewRefs must be an array of strings."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventoryRefs must be an array of strings.",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventoryRefs must be an array of strings."
     );
   });
   it("requires stable promotion evidence references to exist", () => {
@@ -892,22 +894,22 @@ ruleFamilies:
       productionConcerns: none
       noSinkBehavior: Test no-sink behavior.
       noDeadWorkBehavior: Test no-dead-work behavior.
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.claudeAdvisoryReviewRefs entry path does not exist: reports/missing-advisory.md",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.claudeAdvisoryReviewRefs entry path does not exist: reports/missing-advisory.md"
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventoryRefs entry path does not exist: docs/missing-corpus.md",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventoryRefs entry path does not exist: docs/missing-corpus.md"
     );
   });
   it("rejects fixture paths as stable real-corpus promotion evidence", () => {
@@ -952,18 +954,18 @@ ruleFamilies:
       productionConcerns: none
       noSinkBehavior: Test no-sink behavior.
       noDeadWorkBehavior: Test no-dead-work behavior.
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventoryRefs entry must not point at fixture evidence: tooling/antidrift/src/eslint-plugin/fixtures/drift.ts",
+      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventoryRefs entry must not point at fixture evidence: tooling/antidrift/src/eslint-plugin/fixtures/drift.ts"
     );
   });
   it("requires a review row for every policy-scoped rule", () => {
@@ -981,17 +983,17 @@ policyRuleReviews:
     coverage: Not implemented in the synthetic policy.
     reason: Reviewed for test.
     nextAction: Leave as documented policy.
-`,
+`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policyRuleReviews missing policy rule review: test/missing",
+      "policyRuleReviews missing policy rule review: test/missing"
     );
   });
   it("rejects policy rule reviews that are not in the policy source", () => {
@@ -1014,17 +1016,17 @@ policyRuleReviews:
     coverage: Not implemented in the synthetic policy.
     reason: Reviewed for test.
     nextAction: Leave as documented policy.
-`,
+`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policyRuleReviews contains non-policy rule review: test/extra",
+      "policyRuleReviews contains non-policy rule review: test/extra"
     );
   });
   it("requires active-custom policy reviews to reference active antidrift rules", () => {
@@ -1043,17 +1045,17 @@ policyRuleReviews:
     coverage: Not implemented in the synthetic policy.
     reason: Reviewed for test.
     nextAction: Leave as documented policy.
-`,
+`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policyRuleReviews.test/reviewed.antidriftRule references unknown active custom rule: antidrift/not-real",
+      "policyRuleReviews.test/reviewed.antidriftRule references unknown active custom rule: antidrift/not-real"
     );
   });
   it("keeps agent-ops policy reviews out of active custom lint status", () => {
@@ -1072,17 +1074,17 @@ policyRuleReviews:
     coverage: Incorrectly modeled as a custom lint rule.
     reason: Session completion evidence depends on command history.
     nextAction: Move back to hook-covered agent-ops.
-`,
+`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml policyRuleReviews.agent/require-checks-before-stop.status must be hook-covered, policy-script, delegated, spec-only, research, or retired for agent-ops policy rules.",
+      "policy/registries/rules.yaml policyRuleReviews.agent/require-checks-before-stop.status must be hook-covered, policy-script, delegated, spec-only, research, or retired for agent-ops policy rules."
     );
   });
   it("requires rule directives to name a declared directive", () => {
@@ -1097,7 +1099,7 @@ policyRuleReviews:
           "  antidrift/no-sql-string-concat:",
           "    directive: G99",
           "    status: ready",
-        ].join("\n"),
+        ].join("\n")
     );
     writeFileSync(
       existing,
@@ -1114,24 +1116,24 @@ policyRuleReviews:
     coverage: Not implemented in the synthetic policy.
     reason: Reviewed for test.
     nextAction: Leave as documented policy.
-`,
+`
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "rules.antidrift/no-sql-string-concat.directive must name a directive declared under directives.",
+      "rules.antidrift/no-sql-string-concat.directive must name a directive declared under directives."
     );
     expect(output).toContain(
-      "directives.W4x must be a G, W, S, L or R directive ID.",
+      "directives.W4x must be a G, W, S, L or R directive ID."
     );
     expect(output).toContain(
-      "directives.W4x is not named by any rule or policy rule review.",
+      "directives.W4x is not named by any rule or policy rule review."
     );
     expect(output).not.toContain("directives.G7 is not named");
   });

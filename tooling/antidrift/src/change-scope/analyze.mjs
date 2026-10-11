@@ -103,7 +103,7 @@ function exportAllowed(addedExport, allowedExports) {
     (allowed) =>
       allowed.file === addedExport.file &&
       allowed.name === addedExport.name &&
-      allowed.kind === addedExport.kind,
+      allowed.kind === addedExport.kind
   );
 }
 
@@ -138,14 +138,14 @@ export function analyzeChangeScope(contract, surface) {
   const fileViolationList = [];
   if (requiresSurface(scope, "paths")) {
     fileViolationList.push(
-      ...surface.changedFiles.flatMap((file) => pathViolations(file, scope)),
+      ...surface.changedFiles.flatMap((file) => pathViolations(file, scope))
     );
   }
   if (requiresSurface(scope, "changeTypes")) {
     fileViolationList.push(
       ...surface.changedFiles.flatMap((file) =>
-        changeTypeViolations(file, scope),
-      ),
+        changeTypeViolations(file, scope)
+      )
     );
   }
   const dependencyViolationList = requiresSurface(scope, "dependencies")
@@ -154,13 +154,13 @@ export function analyzeChangeScope(contract, surface) {
           surface.addedRuntimeDependencies,
           scope.allowedRuntimeDependencies,
           VIOLATION_TYPES.undeclaredRuntimeDependency,
-          "runtime",
+          "runtime"
         ),
         ...dependencyViolations(
           surface.addedDevDependencies,
           scope.allowedDevDependencies,
           VIOLATION_TYPES.undeclaredDevDependency,
-          "dev",
+          "dev"
         ),
       ]
     : [];

@@ -46,7 +46,7 @@ function contractStateFor(contractRelativePath, changedFiles) {
   const match = changedFiles.find(
     (file) =>
       file.path === contractRelativePath ||
-      file.oldPath === contractRelativePath,
+      file.oldPath === contractRelativePath
   );
   if (!match) return "present";
   return match.operation === "add" ? "new-in-diff" : "modified-in-diff";
@@ -63,7 +63,7 @@ function touchedModuleGraphFor({ contract, surface, cwd, head, tsconfig }) {
   if (!moduleGraphConfigured(contract.scope)) return null;
   if (contract.scope.allowedEntrypoints.length === 0) {
     throw new Error(
-      "change-contract: scope.allowedEntrypoints is required when scope.maxTouchedModuleRadius is configured",
+      "change-contract: scope.allowedEntrypoints is required when scope.maxTouchedModuleRadius is configured"
     );
   }
   return collectTouchedModuleGraph({
@@ -112,7 +112,7 @@ export function runChangeContract({
   const contract = parseContract(readFileSync(resolvedContract, "utf8"));
   if (typeof base !== "string" || base.length === 0) {
     throw new Error(
-      "change-contract: a base ref is required when a contract is present (pass --base or ANTIDRIFT_BASE_REF)",
+      "change-contract: a base ref is required when a contract is present (pass --base or ANTIDRIFT_BASE_REF)"
     );
   }
   const surface = collectChangeSurface({
@@ -124,7 +124,7 @@ export function runChangeContract({
   });
   const contractState = contractStateFor(
     relative(cwd, resolvedContract),
-    surface.changedFiles,
+    surface.changedFiles
   );
   const violations = analyzeChangeScope(contract, surface);
   const touchedModuleGraph = touchedModuleGraphFor({
@@ -207,7 +207,7 @@ export function changeContractCommand(argv) {
   const parsed = parseArgs(argv);
   if (parsed.mode !== "inventory") {
     console.error(
-      `change-contract: --mode ${parsed.mode} is not available in v0 (inventory-only).`,
+      `change-contract: --mode ${parsed.mode} is not available in v0 (inventory-only).`
     );
     process.exitCode = 1;
     return null;
@@ -223,22 +223,22 @@ export function changeContractCommand(argv) {
   if (parsed.output) {
     writeFileSync(
       resolve(parsed.cwd, parsed.output),
-      `${JSON.stringify(result, null, 2)}\n`,
+      `${JSON.stringify(result, null, 2)}\n`
     );
   }
   if (parsed.factsOut && result.contractState !== "missing") {
     writeFileSync(
       resolve(parsed.cwd, parsed.factsOut),
-      semanticFactToJsonLine(changeContractFact(result, parsed.contractPath)),
+      semanticFactToJsonLine(changeContractFact(result, parsed.contractPath))
     );
   }
   if (result.contractState === "missing") {
     process.stdout.write(
-      `change-contract: no contract at ${parsed.contractPath}; inventory-only (exit 0).\n`,
+      `change-contract: no contract at ${parsed.contractPath}; inventory-only (exit 0).\n`
     );
   } else {
     process.stdout.write(
-      `change-contract [${result.contractId}] ${result.contractState}: ${result.violations.length} violation(s), inventory-only.\n`,
+      `change-contract [${result.contractId}] ${result.contractState}: ${result.violations.length} violation(s), inventory-only.\n`
     );
   }
   return result;

@@ -7,7 +7,7 @@ export function objectType(type) {
     type &&
     (type.isUnion()
       ? type.types.every(objectType)
-      : type.flags & ts.TypeFlags.Object),
+      : type.flags & ts.TypeFlags.Object)
   );
 }
 
@@ -16,7 +16,7 @@ export function dataProperty(property) {
     property &&
     !(property.declarations ?? []).some(
       (node) =>
-        ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node),
+        ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)
     )
   );
 }
@@ -26,11 +26,11 @@ export function propertyModifiers(property) {
     optional: Boolean(property.flags & ts.SymbolFlags.Optional),
     readonly: (property.declarations ?? []).some((node) =>
       (ts.getModifiers(node) ?? []).some(
-        (modifier) => modifier.kind === ts.SyntaxKind.ReadonlyKeyword,
-      ),
+        (modifier) => modifier.kind === ts.SyntaxKind.ReadonlyKeyword
+      )
     ),
     method: (property.declarations ?? []).some(
-      (node) => ts.isMethodSignature(node) || ts.isMethodDeclaration(node),
+      (node) => ts.isMethodSignature(node) || ts.isMethodDeclaration(node)
     ),
   };
 }
@@ -48,7 +48,7 @@ export function boundedType(checker, type, depth = maxDepth, seen = new Set()) {
   const next = new Set([...seen, type]);
   if (type.isUnionOrIntersection()) {
     return type.types.every((part) =>
-      boundedType(checker, part, depth - 1, next),
+      boundedType(checker, part, depth - 1, next)
     );
   }
   if (!(type.flags & ts.TypeFlags.Object)) return true;
@@ -64,12 +64,7 @@ export function boundedType(checker, type, depth = maxDepth, seen = new Set()) {
     .every(
       (property) =>
         dataProperty(property) &&
-        boundedType(
-          checker,
-          checker.getTypeOfSymbol(property),
-          depth - 1,
-          next,
-        ),
+        boundedType(checker, checker.getTypeOfSymbol(property), depth - 1, next)
     );
 }
 
@@ -78,7 +73,7 @@ export function equivalentType(
   left,
   right,
   depth = maxDepth,
-  seen = new Map(),
+  seen = new Map()
 ) {
   if (!left || !right) return false;
   // Mutual assignability through `any` is not contract equality. Identical
@@ -111,7 +106,7 @@ export function equivalentType(
         checker.getIndexInfosOfType(type).length ||
         checker
           .getPropertiesOfType(type)
-          .some((property) => !dataProperty(property)),
+          .some((property) => !dataProperty(property))
     )
   ) {
     return false;
@@ -129,8 +124,8 @@ export function equivalentType(
       leftParts.length === rightParts.length &&
       leftParts.every((part) =>
         rightParts.some((other) =>
-          equivalentType(checker, part, other, depth - 1, next),
-        ),
+          equivalentType(checker, part, other, depth - 1, next)
+        )
       )
     );
   }
@@ -149,7 +144,7 @@ export function equivalentType(
           checker.getTypeOfSymbol(property),
           checker.getTypeOfSymbol(other),
           depth - 1,
-          next,
+          next
         )
       );
     })

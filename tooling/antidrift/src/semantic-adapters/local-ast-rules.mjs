@@ -240,8 +240,8 @@ function returnedObjectExposesIdentifier(fn, name) {
       statement.type === "ReturnStatement" &&
       objectExpressionExposesIdentifier(
         unwrapExpression(statement.argument),
-        name,
-      ),
+        name
+      )
   );
 }
 
@@ -348,7 +348,7 @@ function returnsJsxExpression(statement, jsxLocals) {
   if (containsJsxNode(statement.argument)) return true;
   return Boolean(
     statement.argument?.type === "Identifier" &&
-    jsxLocals.has(statement.argument.name),
+    jsxLocals.has(statement.argument.name)
   );
 }
 
@@ -489,7 +489,7 @@ function isGlobalFetchCall(sourceCode, callee) {
   return (
     propertyName === "fetch" &&
     ["globalThis", "window", "self"].some((name) =>
-      isUnshadowedGlobalName(sourceCode, callee.object, name),
+      isUnshadowedGlobalName(sourceCode, callee.object, name)
     )
   );
 }
@@ -718,7 +718,7 @@ export function ruleNoAsyncArrayMethod() {
                 node,
                 callback,
                 method,
-                pendingAsyncMaps,
+                pendingAsyncMaps
               )
             ) {
               return;
@@ -762,7 +762,7 @@ export function ruleRequireAuthzCheck() {
       const options = context.options[0];
       if (!options) {
         throw new Error(
-          "antidrift/require-authz-check requires authzFunctions",
+          "antidrift/require-authz-check requires authzFunctions"
         );
       }
       const tracker = createAuthBoundaryTracker({

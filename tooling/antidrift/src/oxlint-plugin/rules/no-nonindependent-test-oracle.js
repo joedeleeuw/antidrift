@@ -144,7 +144,7 @@ function isSomeMembershipCall(node) {
   }
   return callback.body.body.some(
     (statement) =>
-      statement.type === "ReturnStatement" && Boolean(statement.argument),
+      statement.type === "ReturnStatement" && Boolean(statement.argument)
   );
 }
 
@@ -231,7 +231,7 @@ function testBlockCallback(node) {
     node.arguments.find(
       (argument) =>
         argument.type === "ArrowFunctionExpression" ||
-        argument.type === "FunctionExpression",
+        argument.type === "FunctionExpression"
     ) ?? null
   );
 }
@@ -436,14 +436,14 @@ function objectPropertyValue(objectExpression, segment, sourceCode, depth) {
       const spread = resolveLiteralNode(
         property.argument,
         sourceCode,
-        depth - 1,
+        depth - 1
       );
       if (spread?.type !== "ObjectExpression") continue;
       const inherited = objectPropertyValue(
         spread,
         segment,
         sourceCode,
-        depth - 1,
+        depth - 1
       );
       if (inherited) result = inherited;
       continue;
@@ -459,7 +459,7 @@ function literalStep(container, segment, sourceCode, depth) {
   }
   if (container.type === "ArrayExpression" && typeof segment === "number") {
     const hasSpread = container.elements.some(
-      (element) => element?.type === "SpreadElement",
+      (element) => element?.type === "SpreadElement"
     );
     return hasSpread ? null : (container.elements[segment] ?? null);
   }
@@ -487,7 +487,7 @@ function templateText(template) {
 
 function hasSpreadProperty(objectExpression) {
   return objectExpression.properties.some(
-    (property) => property.type === "SpreadElement",
+    (property) => property.type === "SpreadElement"
   );
 }
 
@@ -591,7 +591,7 @@ function arrangedActForRoot(root, bindings) {
 function arrangedActPathForExpression(
   expression,
   bindings,
-  depth = resolutionDepthLimit,
+  depth = resolutionDepthLimit
 ) {
   const target = unwrapExpression(expression);
   if (!target || depth <= 0) return null;
@@ -616,7 +616,7 @@ function arrangedActPathForExpression(
     const base = arrangedActPathForExpression(
       target.callee.object,
       bindings,
-      depth - 1,
+      depth - 1
     );
     if (base) {
       const method = staticPropertyName(target.callee);
@@ -784,7 +784,7 @@ function arrangedArrayLength(info, expectedCount, facts, sourceCode) {
     const target = literalAtPath(argument, info.path, sourceCode);
     if (target?.type !== "ArrayExpression") return false;
     const countable = target.elements.every(
-      (element) => element && element.type !== "SpreadElement",
+      (element) => element && element.type !== "SpreadElement"
     );
     return countable && target.elements.length === expectedCount;
   });
@@ -929,7 +929,7 @@ function classifyExistenceAssertion(record, sourceCode) {
     const target = resolveLiteralNode(
       record.subject,
       sourceCode,
-      resolutionDepthLimit,
+      resolutionDepthLimit
     );
     if (!isVacuousExistenceTarget(target, record.matcher === "toBeTruthy")) {
       return null;
@@ -945,7 +945,7 @@ function classifyExistenceAssertion(record, sourceCode) {
   const target = resolveLiteralNode(
     record.args[0],
     sourceCode,
-    resolutionDepthLimit,
+    resolutionDepthLimit
   );
   if (!isVacuousExistenceTarget(target, true)) return null;
   return { independent: false, messageId: "existenceEcho", node: record.node };
@@ -976,7 +976,7 @@ function classifyMockAssertion(record, facts) {
       return facts.actArgNames.has(expression.name);
     }
     return facts.actArgLiterals.some((literal) =>
-      literalNodesEqual(literal, expression),
+      literalNodesEqual(literal, expression)
     );
   });
   if (!echoed) return { independent: true, messageId: null, node: record.node };
@@ -1006,7 +1006,7 @@ function analyzeTestBlock(callback, context, sourceCode) {
   const facts = collectBlockFacts(callback);
   if (facts.assertions.length === 0) return;
   const classified = facts.assertions.map((record) =>
-    classifyAssertion(record, facts, sourceCode),
+    classifyAssertion(record, facts, sourceCode)
   );
   for (const result of classified) {
     if (result.messageId) {

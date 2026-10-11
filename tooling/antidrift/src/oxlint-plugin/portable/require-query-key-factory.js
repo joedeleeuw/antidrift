@@ -163,7 +163,7 @@ export default {
           const positionalKey = literalOf(
             args.at(0),
             "ArrayExpression",
-            context,
+            context
           );
           if (positionalKey && args.at(0)?.type !== "Identifier") {
             context.report({

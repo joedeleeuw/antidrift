@@ -6,10 +6,12 @@ type UserDto = {
 declare const raw: unknown;
 
 function isUserDto(value: unknown): value is UserDto {
-  return typeof value === "object"
-    && value !== null
-    && "id" in value
-    && "email" in value;
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    "email" in value
+  );
 }
 
 export function loadUser(): UserDto {

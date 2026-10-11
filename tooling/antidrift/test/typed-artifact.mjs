@@ -11,21 +11,21 @@ export function lintTypedArtifact({ checkout, project, file, rules }) {
   const config = ts.readConfigFile(configFile, ts.sys.readFile);
   if (config.error) {
     throw new Error(
-      ts.flattenDiagnosticMessageText(config.error.messageText, " "),
+      ts.flattenDiagnosticMessageText(config.error.messageText, " ")
     );
   }
   const parsed = ts.parseJsonConfigFileContent(
     config.config,
     ts.sys,
-    dirname(configFile),
+    dirname(configFile)
   );
   if (parsed.errors.length) {
     throw new Error(
       parsed.errors
         .map(({ messageText }) =>
-          ts.flattenDiagnosticMessageText(messageText, " "),
+          ts.flattenDiagnosticMessageText(messageText, " ")
         )
-        .join("\n"),
+        .join("\n")
     );
   }
   const program = ts.createProgram(parsed.fileNames, {
@@ -35,7 +35,7 @@ export function lintTypedArtifact({ checkout, project, file, rules }) {
   });
   if (!program.getSourceFile(filename)) {
     throw new Error(
-      `${file} is absent from the real artifact TypeScript program.`,
+      `${file} is absent from the real artifact TypeScript program.`
     );
   }
   const messages = new Linter({ cwd: checkout }).verify(
@@ -48,7 +48,7 @@ export function lintTypedArtifact({ checkout, project, file, rules }) {
         rules,
       },
     ],
-    { filename },
+    { filename }
   );
   return {
     messages,

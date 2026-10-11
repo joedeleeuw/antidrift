@@ -30,7 +30,7 @@ export function createPortableHarness(manifests) {
         name: "@homer/shared",
         dependencies: { zod: "catalog:" },
       },
-    },
+    }
   )) {
     const target = join(directory, file);
     mkdirSync(dirname(target), { recursive: true });
@@ -38,7 +38,7 @@ export function createPortableHarness(manifests) {
   }
   writeFileSync(
     join(directory, "pnpm-workspace.yaml"),
-    "packages:\n  - apps/*\n  - packages/*\ncatalog:\n  react: ^19\n  zod: ^3\n",
+    "packages:\n  - apps/*\n  - packages/*\ncatalog:\n  react: ^19\n  zod: ^3\n"
   );
   const linter = new Linter({ cwd: directory });
   return {
@@ -60,7 +60,7 @@ export function createPortableHarness(manifests) {
             rules: { [`antidrift/${name}`]: ["error", options] },
           },
         ],
-        { filename: join(directory, filename) },
+        { filename: join(directory, filename) }
       );
     },
   };

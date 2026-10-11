@@ -8,7 +8,7 @@ export type TypeScriptParserServices = {
 
 export function typeIncludesNullish(
   type: ts.Type | null | undefined,
-  seen?: Set<ts.Type>,
+  seen?: Set<ts.Type>
 ): boolean;
 
 export function tupleElementTypeNode(element: unknown): unknown;
@@ -20,24 +20,24 @@ export function typeNodeIncludesDirectNullish(typeNode: unknown): boolean;
 export function tupleElementResolvesToNullish(
   element: unknown,
   services?: TypeScriptParserServices,
-  checker?: ts.TypeChecker,
+  checker?: ts.TypeChecker
 ): boolean;
 
 export function tupleElementIsNullishSlot(
   element: unknown,
   services?: TypeScriptParserServices,
-  checker?: ts.TypeChecker,
+  checker?: ts.TypeChecker
 ): boolean;
 
 export function nullableTupleSlots(
   node: unknown,
   services?: TypeScriptParserServices,
-  checker?: ts.TypeChecker,
+  checker?: ts.TypeChecker
 ): unknown[];
 
 export function hasNullablePositionalTuple(
   node: unknown,
   services?: TypeScriptParserServices,
   checker?: ts.TypeChecker,
-  threshold?: number,
+  threshold?: number
 ): boolean;

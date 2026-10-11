@@ -7,7 +7,7 @@ export function normalizedContextName(value) {
 export function isStatusContextName(contextName, statusName) {
   const normalized = normalizedContextName(contextName);
   return Boolean(
-    normalized && normalized === normalizedContextName(statusName),
+    normalized && normalized === normalizedContextName(statusName)
   );
 }
 

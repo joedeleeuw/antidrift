@@ -1,6 +1,7 @@
 import { isRuleFile, scopeProperties } from "./scope.js";
 
-const DATE = /(?:^|[^\w-])20\d{2}-?[01]\d-?[0-3]\d(?=[^\w-]|$)(?! \d{1,2}:\d{2})/;
+const DATE =
+  /(?:^|[^\w-])20\d{2}-?[01]\d-?[0-3]\d(?=[^\w-]|$)(?! \d{1,2}:\d{2})/;
 const EXAMPLE = /@example|```/;
 
 function trailsCode(comment, text) {

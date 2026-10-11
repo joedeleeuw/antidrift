@@ -40,10 +40,10 @@ export default {
       let current = owner;
       while (current && dirname(current.directory) !== current.directory) {
         current = packageOwner(
-          join(dirname(current.directory), "__dependency_probe__.js"),
+          join(dirname(current.directory), "__dependency_probe__.js")
         );
         for (const name of Object.keys(
-          current?.manifest.devDependencies ?? {},
+          current?.manifest.devDependencies ?? {}
         )) {
           dependencies.add(name);
         }

@@ -7,9 +7,9 @@ Status: under-proven, default-off.
 Agent-written React code often ingests one entity or resource object, then immediately splits its members across sibling `useState` cells:
 
 ```ts
-const user = await fetchUser()
-setId(user.id)
-setName(user.name)
+const user = await fetchUser();
+setId(user.id);
+setName(user.name);
 ```
 
 The broken association is not the shared `user*` name prefix. It is source-member provenance: multiple local state cells receive distinct members of the same freshly awaited source object in one transition. The preferred shape keeps the ingested entity/resource together, or moves the transition into a reducer/resource hook that owns the lifecycle.
@@ -35,8 +35,13 @@ The rule is inventory-only: semantic source-member fan-out is recorded as `sourc
 Editable draft fields must stay clean. Hydrating a form from one entity is idiomatic when each cell is controlled by an input and independently edited:
 
 ```tsx
-setName(user.name)
-return <input value={name} onChange={(event) => setName(event.currentTarget.value)} />
+setName(user.name);
+return (
+  <input
+    value={name}
+    onChange={(event) => setName(event.currentTarget.value)}
+  />
+);
 ```
 
 The adapter therefore suppresses source-shard proof for cells that are both controlled by `value`/`checked` and updated from an event-derived setter. Pagination metadata, query cursors, response envelopes, and anonymous view models remain inventory candidates, not diagnostics. Large owned entities intentionally split into tab, wizard, or section view state remain the main false-positive class to validate before any enforcement tier is rebuilt.

@@ -26,11 +26,11 @@ const hasDirAttr = (opening) =>
     (attr) =>
       attr.type === "JSXAttribute" &&
       attr.name?.type === "JSXIdentifier" &&
-      attr.name.name === "dir",
+      attr.name.name === "dir"
   );
 const meaningfulChildren = (children) =>
   children.filter(
-    (child) => !(child.type === "JSXText" && child.value.trim().length === 0),
+    (child) => !(child.type === "JSXText" && child.value.trim().length === 0)
   );
 const isNameExpr = (expr, nameProps) =>
   (expr.type === "MemberExpression" ||
@@ -83,7 +83,7 @@ export default {
         const nameKids = kids.filter(
           (child) =>
             child.type === "JSXExpressionContainer" &&
-            isNameExpr(child.expression, names),
+            isNameExpr(child.expression, names)
         );
         if (nameKids.length === 0) {
           return;

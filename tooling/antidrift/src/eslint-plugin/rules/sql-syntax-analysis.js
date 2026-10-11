@@ -108,7 +108,7 @@ export function sqlEscaperFunctionKind(node) {
   }
   return sqlEscaperKindFromReturnExpression(
     singleReturnExpression(node),
-    param.name,
+    param.name
   );
 }
 function tsStaticStringValue(node) {
@@ -200,7 +200,7 @@ function tsTemplateSqlEscaperKind(node, paramName) {
   }
   const skeleton = template.parts.join("A");
   const isIdentifierSkeleton = /^(?:"A"|`A`)(?:\.(?:"A"|`A`))*$/u.test(
-    skeleton,
+    skeleton
   );
   const isStringSkeleton = skeleton === "'A'";
   if (!isIdentifierSkeleton && !isStringSkeleton) {
@@ -214,14 +214,14 @@ function tsTemplateSqlEscaperKind(node, paramName) {
   });
   if (
     expectedQuotes.some(
-      (quote) => quote !== '"' && quote !== "'" && quote !== "`",
+      (quote) => quote !== '"' && quote !== "'" && quote !== "`"
     )
   ) {
     return null;
   }
   if (
     !template.expressions.every((expression, index) =>
-      tsEscapedReplaceCall(expression, paramName, expectedQuotes[index]),
+      tsEscapedReplaceCall(expression, paramName, expectedQuotes[index])
     )
   ) {
     return null;
@@ -256,7 +256,7 @@ export function tsSqlEscaperDeclarationKind(node) {
   }
   return tsTemplateSqlEscaperKind(
     tsSingleReturnExpression(fn),
-    param.name.text,
+    param.name.text
   );
 }
 function hasOpenSqlQuote(value, quote) {
@@ -430,7 +430,7 @@ export function isPlaceholderSqlFragmentMapJoin(node) {
   }
   return isPostgresPlaceholderTemplate(
     singleReturnExpression(callback),
-    indexParam.name,
+    indexParam.name
   );
 }
 export function transparentRawSqlFragmentExpression(node) {
@@ -456,7 +456,7 @@ function unsafeTrustedRawSqlCallChildren(node) {
   return [
     node.callee,
     ...node.arguments.map((argument) =>
-      argument?.type === "SpreadElement" ? argument.argument : argument,
+      argument?.type === "SpreadElement" ? argument.argument : argument
     ),
   ];
 }
@@ -688,7 +688,7 @@ export function declarationOwnerNames(declaration) {
       parent?.name?.text,
       parent?.symbol?.getName?.(),
       parent?.localSymbol?.getName?.(),
-    ].filter(Boolean),
+    ].filter(Boolean)
   );
 }
 function normalizedSourcePath(value) {

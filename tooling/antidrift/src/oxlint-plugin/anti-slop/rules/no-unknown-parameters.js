@@ -42,7 +42,7 @@ function readsOnlySerializationSinks(parameter, sourceCode) {
   if (!identifier) return false;
   return variableReadsOnlySinks(
     sourceCode,
-    findVariable(sourceCode, identifier),
+    findVariable(sourceCode, identifier)
   );
 }
 /**
@@ -70,7 +70,7 @@ export const noUnknownParametersRule = defineRule({
         if (annotation?.typeAnnotation.type !== "TSUnknownKeyword") continue;
         const name = parameterName(
           parameter,
-          context.sourceCode.getText(parameter),
+          context.sourceCode.getText(parameter)
         );
         if (name === "cause") continue;
         if (readsOnlySerializationSinks(parameter, context.sourceCode)) {

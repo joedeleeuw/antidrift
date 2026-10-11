@@ -14,7 +14,7 @@ it("flags an arranged parse failure through its issue path", () => {
   const result = schema.safeParse(arrangedBad);
 
   expect(
-    result.error.issues.some((issue) => issue.path.includes("activation")),
+    result.error.issues.some((issue) => issue.path.includes("activation"))
   ).toBe(true);
   expect(result.error.issues).toEqual([
     expect.objectContaining({
@@ -33,6 +33,6 @@ it("reports a bare throwing assertion on an arranged parse", () => {
 
 it("reports a rejected async parse on arranged input", async () => {
   await expect(schema.parseAsync(arrangedBad)).rejects.toThrow(
-    "activation is required",
+    "activation is required"
   );
 });

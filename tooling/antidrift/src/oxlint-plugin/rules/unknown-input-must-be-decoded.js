@@ -46,7 +46,7 @@ function bindingNames(node) {
       return node.elements.filter(Boolean).flatMap(bindingNames);
     case "ObjectPattern":
       return node.properties.flatMap((property) =>
-        bindingNames(property.value ?? property.argument),
+        bindingNames(property.value ?? property.argument)
       );
     default:
       return [];

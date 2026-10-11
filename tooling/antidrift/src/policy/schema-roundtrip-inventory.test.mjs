@@ -18,12 +18,12 @@ describe("schemaRoundtripInventory", () => {
       });
 
       const app = result.results.find(
-        (entry) => entry.repo === "codebase-atlas",
+        (entry) => entry.repo === "codebase-atlas"
       );
       expect(app?.decision).toBe("pass");
 
       const moveTo = app?.findings.find(
-        (finding) => finding.enclosing === "LanternController.moveTo",
+        (finding) => finding.enclosing === "LanternController.moveTo"
       );
       expect(moveTo).toMatchObject({
         path: "src/programs/lanternController.ts",
@@ -35,7 +35,7 @@ describe("schemaRoundtripInventory", () => {
       expect(moveTo?.reasons).toContain("override-from-cross-source");
 
       const markUnderstood = app?.findings.find(
-        (finding) => finding.enclosing === "markExplorationTileUnderstood",
+        (finding) => finding.enclosing === "markExplorationTileUnderstood"
       );
       expect(markUnderstood).toMatchObject({
         path: "src/programs/lanternController.ts",
@@ -46,8 +46,8 @@ describe("schemaRoundtripInventory", () => {
       });
       expect(markUnderstood?.reasons).toContain("object-spread-same-output");
       expect(markUnderstood?.reasons).toContain(
-        "owner-transition-helper-candidate",
+        "owner-transition-helper-candidate"
       );
-    },
+    }
   );
 });

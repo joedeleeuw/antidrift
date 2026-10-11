@@ -5,14 +5,14 @@ type MemoryResult = {
 };
 
 function actionForEventKind(
-  eventKind: EventKind,
+  eventKind: EventKind
 ): MemoryResult["action"] | undefined {
   if (eventKind === "recall" || eventKind === "capture") return eventKind;
   return undefined;
 }
 
 function actionLiteralForEventKind(
-  eventKind: EventKind,
+  eventKind: EventKind
 ): MemoryResult["action"] | undefined {
   switch (eventKind) {
     case "recall":
@@ -25,7 +25,7 @@ function actionLiteralForEventKind(
 }
 
 const actionTernaryForEventKind = (
-  eventKind: EventKind,
+  eventKind: EventKind
 ): MemoryResult["action"] | undefined =>
   eventKind === "recall" ? eventKind : undefined;
 

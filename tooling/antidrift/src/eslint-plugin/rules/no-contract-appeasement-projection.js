@@ -150,7 +150,7 @@ function collectObjectPatternBindings(
   bindings,
   ownerNames,
   services,
-  checker,
+  checker
 ) {
   for (const property of pattern.properties ?? []) {
     if (property.type === "RestElement") {
@@ -180,7 +180,7 @@ function collectObjectPatternBindings(
         bindings,
         ownerNames,
         services,
-        checker,
+        checker
       );
     }
   }
@@ -205,7 +205,7 @@ function sourceBindingsForFunction(fn, services, checker) {
         bindings,
         ownerNames,
         services,
-        checker,
+        checker
       );
     }
   }
@@ -249,7 +249,7 @@ function projectionSourceForExpression(
   expression,
   bindings,
   services,
-  checker,
+  checker
 ) {
   const unwrapped = unwrapExpression(expression);
   if (unwrapped?.type === "Identifier") {
@@ -283,13 +283,13 @@ function sourceConstraintFromExpression(
   bindings,
   sourceCode,
   services,
-  checker,
+  checker
 ) {
   const source = projectionSourceForExpression(
     expression,
     bindings,
     services,
-    checker,
+    checker
   );
   if (!source) {
     return null;
@@ -309,14 +309,14 @@ function equalityConstraints(test, bindings, sourceCode, services, checker) {
         bindings,
         sourceCode,
         services,
-        checker,
+        checker
       ),
       ...equalityConstraints(
         unwrapped.right,
         bindings,
         sourceCode,
         services,
-        checker,
+        checker
       ),
     ];
   }
@@ -338,7 +338,7 @@ function equalityConstraints(test, bindings, sourceCode, services, checker) {
     bindings,
     sourceCode,
     services,
-    checker,
+    checker
   );
   if (!constraint || !constraint.typeKeys.has(literal)) {
     return [];
@@ -368,21 +368,21 @@ function sameType(checker, left, right) {
     left &&
     right &&
     checker.isTypeAssignableTo(left, right) &&
-    checker.isTypeAssignableTo(right, left),
+    checker.isTypeAssignableTo(right, left)
   );
 }
 function sameTypeIgnoringNullish(checker, left, right) {
   return sameType(
     checker,
     left && checker.getNonNullableType(left),
-    right && checker.getNonNullableType(right),
+    right && checker.getNonNullableType(right)
   );
 }
 function collectExpressionWithTestConstraints(
   expression,
   test,
   constraints,
-  context,
+  context
 ) {
   const { records, bindings, sourceCode, services, checker } = context;
   const nextConstraints = equalityConstraints(
@@ -390,13 +390,13 @@ function collectExpressionWithTestConstraints(
     bindings,
     sourceCode,
     services,
-    checker,
+    checker
   );
   const branches =
     nextConstraints.length === 0
       ? [constraints]
       : nextConstraints.map((constraint) =>
-          addConstraint(constraints, constraint),
+          addConstraint(constraints, constraint)
         );
   for (const branchConstraints of branches) {
     collectReturnRecordsFromExpression(
@@ -406,7 +406,7 @@ function collectExpressionWithTestConstraints(
       bindings,
       sourceCode,
       services,
-      checker,
+      checker
     );
   }
 }
@@ -417,7 +417,7 @@ function collectReturnRecordsFromExpression(
   bindings,
   sourceCode,
   services,
-  checker,
+  checker
 ) {
   const unwrapped = unwrapExpression(expression);
   if (unwrapped?.type === "ConditionalExpression") {
@@ -425,7 +425,7 @@ function collectReturnRecordsFromExpression(
       unwrapped.consequent,
       unwrapped.test,
       constraints,
-      { records, bindings, sourceCode, services, checker },
+      { records, bindings, sourceCode, services, checker }
     );
     collectReturnRecordsFromExpression(
       unwrapped.alternate,
@@ -434,7 +434,7 @@ function collectReturnRecordsFromExpression(
       bindings,
       sourceCode,
       services,
-      checker,
+      checker
     );
     return;
   }
@@ -446,7 +446,7 @@ function collectReturnRecordsFromExpression(
     unwrapped,
     bindings,
     services,
-    checker,
+    checker
   );
   if (source) {
     records.push(source);
@@ -469,7 +469,7 @@ function collectReturnRecordsFromStatements(
   bindings,
   sourceCode,
   services,
-  checker,
+  checker
 ) {
   for (const child of statements ?? []) {
     collectReturnRecordsFromStatement(
@@ -479,7 +479,7 @@ function collectReturnRecordsFromStatements(
       bindings,
       sourceCode,
       services,
-      checker,
+      checker
     );
   }
 }
@@ -487,7 +487,7 @@ function collectStatementWithTestConstraints(
   statement,
   test,
   constraints,
-  context,
+  context
 ) {
   const { records, bindings, sourceCode, services, checker } = context;
   const nextConstraints = equalityConstraints(
@@ -495,13 +495,13 @@ function collectStatementWithTestConstraints(
     bindings,
     sourceCode,
     services,
-    checker,
+    checker
   );
   const branches =
     nextConstraints.length === 0
       ? [constraints]
       : nextConstraints.map((constraint) =>
-          addConstraint(constraints, constraint),
+          addConstraint(constraints, constraint)
         );
   for (const branchConstraints of branches) {
     collectReturnRecordsFromStatement(
@@ -511,7 +511,7 @@ function collectStatementWithTestConstraints(
       bindings,
       sourceCode,
       services,
-      checker,
+      checker
     );
   }
 }
@@ -522,14 +522,14 @@ function collectSwitchReturnRecords(
   bindings,
   sourceCode,
   services,
-  checker,
+  checker
 ) {
   const discriminant = sourceConstraintFromExpression(
     statement.discriminant,
     bindings,
     sourceCode,
     services,
-    checker,
+    checker
   );
   for (const switchCase of statement.cases ?? []) {
     const literal = expressionLiteralKey(switchCase.test);
@@ -544,7 +544,7 @@ function collectSwitchReturnRecords(
       bindings,
       sourceCode,
       services,
-      checker,
+      checker
     );
   }
 }
@@ -555,7 +555,7 @@ function collectReturnRecordsFromStatement(
   bindings,
   sourceCode,
   services,
-  checker,
+  checker
 ) {
   switch (statement.type) {
     case "ReturnStatement":
@@ -566,7 +566,7 @@ function collectReturnRecordsFromStatement(
         bindings,
         sourceCode,
         services,
-        checker,
+        checker
       );
       return;
     case "BlockStatement":
@@ -577,7 +577,7 @@ function collectReturnRecordsFromStatement(
         bindings,
         sourceCode,
         services,
-        checker,
+        checker
       );
       return;
     case "IfStatement":
@@ -585,7 +585,7 @@ function collectReturnRecordsFromStatement(
         statement.consequent,
         statement.test,
         constraints,
-        { records, bindings, sourceCode, services, checker },
+        { records, bindings, sourceCode, services, checker }
       );
       if (statement.alternate) {
         collectReturnRecordsFromStatement(
@@ -595,7 +595,7 @@ function collectReturnRecordsFromStatement(
           bindings,
           sourceCode,
           services,
-          checker,
+          checker
         );
       }
       return;
@@ -607,7 +607,7 @@ function collectReturnRecordsFromStatement(
         bindings,
         sourceCode,
         services,
-        checker,
+        checker
       );
       return;
     default:
@@ -648,7 +648,7 @@ function returnProjectionRecords(fn, bindings, sourceCode, services, checker) {
         bindings,
         sourceCode,
         services,
-        checker,
+        checker
       );
     }
   } else {
@@ -659,7 +659,7 @@ function returnProjectionRecords(fn, bindings, sourceCode, services, checker) {
       bindings,
       sourceCode,
       services,
-      checker,
+      checker
     );
   }
   return records;
@@ -681,7 +681,7 @@ function contractProjectionProof(fn, sourceCode, services, checker) {
     bindings,
     sourceCode,
     services,
-    checker,
+    checker
   );
   const meaningful = records.filter((record) => record.kind !== "fallback");
   if (meaningful.length === 0) {
@@ -700,7 +700,7 @@ function contractProjectionProof(fn, sourceCode, services, checker) {
   return meaningful.every(
     (record) =>
       record.kind !== "identity" &&
-      sameTypeIgnoringNullish(checker, record.type, returnType),
+      sameTypeIgnoringNullish(checker, record.type, returnType)
   );
 }
 // Visit free functions, arrow consts, and class methods/fields uniformly — agents hide the same
@@ -743,12 +743,12 @@ export function ruleNoContractAppeasementProjection() {
       if (!services) {
         return missingTypeServicesVisitors(
           context,
-          "no-contract-appeasement-projection",
+          "no-contract-appeasement-projection"
         );
       }
       const checker = services.program.getTypeChecker();
       return callableVisitors((node) =>
-        checkContractAppeasementProjection(node, context, services, checker),
+        checkContractAppeasementProjection(node, context, services, checker)
       );
     },
   };

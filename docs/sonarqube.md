@@ -89,7 +89,7 @@ Native Sonar rules intentionally excluded as exact local duplicates:
 
 | Sonar rule                                                                              | Local owner                                   |
 | --------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `S104` Files should not have too many lines of code                                      | Oxlint `max-lines`                            |
+| `S104` Files should not have too many lines of code                                     | Oxlint `max-lines`                            |
 | `S6477` JSX list components should have a key property                                  | `react/jsx-key`                               |
 | `S6478` React components should not be nested                                           | `react/no-unstable-nested-components`         |
 | `S6479` JSX list components should not use array indexes as key                         | `react/no-array-index-key`                    |

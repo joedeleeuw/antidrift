@@ -12,5 +12,7 @@ export function changedFiles() {
     git(["diff", "--name-only", "--diff-filter=ACMRTUXB", "HEAD"]),
     git(["diff", "--name-only", "--diff-filter=ACMRTUXB", "--cached"]),
   ];
-  return [...new Set(outputs.flatMap((output) => output.split("\n")).filter(Boolean))];
+  return [
+    ...new Set(outputs.flatMap((output) => output.split("\n")).filter(Boolean)),
+  ];
 }

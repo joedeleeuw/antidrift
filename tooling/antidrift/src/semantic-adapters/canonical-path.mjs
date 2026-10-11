@@ -108,7 +108,7 @@ export function constDeclarator(variable) {
 
 export function hasNonInitWrite(variable) {
   return (variable?.references ?? []).some(
-    (reference) => reference.isWrite?.() && reference.init !== true,
+    (reference) => reference.isWrite?.() && reference.init !== true
   );
 }
 
@@ -141,7 +141,7 @@ export function descendObject(expression, segment) {
   const target = unwrapExpression(expression);
   if (target?.type === "ObjectExpression") {
     const match = target.properties.find(
-      (property) => staticPropertyKey(property) === segment,
+      (property) => staticPropertyKey(property) === segment
     );
     return match ? match.value : null;
   }
@@ -216,10 +216,10 @@ export function canonicalPath(sourceCode, expression) {
 export function samePath(left, right) {
   return Boolean(
     left &&
-      right &&
-      left.variable === right.variable &&
-      left.segments.length === right.segments.length &&
-      left.segments.every((segment, index) => segment === right.segments[index]),
+    right &&
+    left.variable === right.variable &&
+    left.segments.length === right.segments.length &&
+    left.segments.every((segment, index) => segment === right.segments[index])
   );
 }
 

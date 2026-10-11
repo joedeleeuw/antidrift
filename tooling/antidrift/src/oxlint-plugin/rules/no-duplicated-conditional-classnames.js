@@ -76,7 +76,7 @@ function isRecord(value) {
 
 function invalidOptions(message) {
   throw new TypeError(
-    `antidrift/no-duplicated-conditional-classnames options: ${message}`,
+    `antidrift/no-duplicated-conditional-classnames options: ${message}`
   );
 }
 
@@ -127,13 +127,13 @@ function normalizeOptionShape(options) {
       options,
       "minSharedRatio",
       (value) => value >= 0 && value <= 1,
-      "between 0 and 1",
+      "between 0 and 1"
     ),
     minSharedTokens: boundedNumber(
       options,
       "minSharedTokens",
       (value) => Number.isInteger(value) && value >= 1,
-      "an integer greater than or equal to 1",
+      "an integer greater than or equal to 1"
     ),
   };
 }

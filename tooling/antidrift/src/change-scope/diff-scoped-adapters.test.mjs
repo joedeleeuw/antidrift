@@ -11,7 +11,7 @@ import { diffScopedAdapters, parseArgs } from "./diff-scoped-adapters.mjs";
 const BASE = "HEAD~1";
 const HEAD = "HEAD";
 const PLUGIN_URL = pathToFileURL(
-  resolve("tooling/antidrift/src/oxlint-plugin/index.js"),
+  resolve("tooling/antidrift/src/oxlint-plugin/index.js")
 ).href;
 
 let dir;
@@ -35,7 +35,7 @@ function writeConfig() {
       "  },",
       "}];",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
 }
 
@@ -58,7 +58,7 @@ beforeAll(() => {
       "  });",
       "}",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   runGit(["add", "-A"]);
   runGit(["commit", "-q", "-m", "base"]);
@@ -90,7 +90,7 @@ beforeAll(() => {
       "}",
       "void ProfileCard;",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   runGit(["add", "-A"]);
   runGit(["commit", "-q", "-m", "head"]);
@@ -146,7 +146,7 @@ describe("diffScopedAdapters", () => {
 
   it("parses strict CLI flags", () => {
     expect(
-      parseArgs(["--base", "main", "--head", "HEAD", "--slice", "ci"]),
+      parseArgs(["--base", "main", "--head", "HEAD", "--slice", "ci"])
     ).toMatchObject({ base: "main", head: "HEAD", slice: "ci" });
     expect(() => parseArgs(["--base", "--head"])).toThrow(/requires a value/u);
     expect(() => parseArgs(["--bogus"])).toThrow(/unknown argument/u);

@@ -11,18 +11,18 @@ import {
 describe("semantic adapter manifest", () => {
   it("composes adapter contracts with their owned semantic fact contracts", () => {
     expect(
-      semanticAdapterManifestForAdapterId("async-control-flow")?.rules,
+      semanticAdapterManifestForAdapterId("async-control-flow")?.rules
     ).toContain("antidrift/no-async-array-method");
     expect(semanticAdapterManifestForAdapterId("parse-input")?.rules).toEqual([
       "antidrift/no-unsafe-deserialize",
     ]);
     expect(semanticAdapterManifestForAdapterId("broad-input")?.rules).toContain(
-      "antidrift/no-appeasement-cast",
+      "antidrift/no-appeasement-cast"
     );
     expect(
       semanticAdapterManifestForAdapterId(
-        "react-state",
-      )?.semanticFactContracts.map((entry) => entry.factKind),
+        "react-state"
+      )?.semanticFactContracts.map((entry) => entry.factKind)
     ).toEqual([
       "broadSetterCoMutation",
       "resourceLifecycleProof",
@@ -30,68 +30,68 @@ describe("semantic adapter manifest", () => {
     ]);
     expect(
       semanticAdapterManifestForAdapterId(
-        "type-owner",
-      )?.semanticFactContracts.map((entry) => entry.factKind),
+        "type-owner"
+      )?.semanticFactContracts.map((entry) => entry.factKind)
     ).toEqual(["structuralMatch"]);
     expect(
       semanticAdapterManifestForAdapterId(
-        "schema-provenance",
-      )?.semanticFactContracts.map((entry) => entry.factKind),
+        "schema-provenance"
+      )?.semanticFactContracts.map((entry) => entry.factKind)
     ).toEqual(["identitySchemaTransform"]);
     expect(semanticAdapterManifestForAdapterId("type-owner")?.rules).toContain(
-      "antidrift/no-status-literal-in-type",
+      "antidrift/no-status-literal-in-type"
     );
     expect(semanticAdapterManifestForAdapterId("tuple-shape")?.rules).toContain(
-      "antidrift/no-nullable-positional-tuple",
+      "antidrift/no-nullable-positional-tuple"
     );
     expect(semanticAdapterManifestForAdapterId("not-real")).toBeNull();
   });
 
   it("indexes manifest entries by rule, proof bucket, and semantic fact ownership", () => {
     expect(
-      semanticAdapterManifestForRule("antidrift/no-handrolled-resource-lifecycle-cells").map(
-        (entry) => entry.id,
-      ),
+      semanticAdapterManifestForRule(
+        "antidrift/no-handrolled-resource-lifecycle-cells"
+      ).map((entry) => entry.id)
     ).toEqual(["react-state"]);
     expect(
       semanticAdapterManifestForRule("antidrift/no-unsafe-deserialize").map(
-        (entry) => entry.id,
-      ),
+        (entry) => entry.id
+      )
     ).toEqual(["parse-input"]);
     expect(
       semanticAdapterManifestForRule("antidrift/no-async-array-method").map(
-        (entry) => entry.id,
-      ),
+        (entry) => entry.id
+      )
     ).toEqual(["async-control-flow"]);
     expect(
       semanticAdapterManifestForProofBucket("authority-index-ownership").map(
-        (entry) => entry.id,
-      ),
+        (entry) => entry.id
+      )
     ).toEqual(["type-owner"]);
     expect(
       semanticAdapterManifestForRule(
-        "antidrift/no-nullable-positional-tuple",
-      ).map((entry) => entry.id),
+        "antidrift/no-nullable-positional-tuple"
+      ).map((entry) => entry.id)
     ).toEqual(["tuple-shape"]);
     expect(
       semanticAdapterManifestForRule(
-        "antidrift/no-identity-schema-transform",
-      ).map((entry) => entry.id),
+        "antidrift/no-identity-schema-transform"
+      ).map((entry) => entry.id)
     ).toEqual(["schema-provenance"]);
     expect(
       semanticAdapterManifestForFactKind("structuralMatch").map(
-        (entry) => entry.id,
-      ),
+        (entry) => entry.id
+      )
     ).toEqual(["type-owner"]);
     expect(
       semanticAdapterManifestForFactAdapterId("react-state").map(
-        (entry) => entry.id,
-      ),
+        (entry) => entry.id
+      )
     ).toEqual(["react-state"]);
     expect(
       semanticAdapterManifestForFactAdapterId(
-        "typescript-eslint/schema-provenance",
-      ).map((entry) => entry.id),
+        "typescript-eslint/schema-provenance"
+      ).map((entry) => entry.id)
     ).toEqual(["schema-provenance"]);
     expect(semanticAdapterManifestForRule("antidrift/not-real")).toEqual([]);
   });

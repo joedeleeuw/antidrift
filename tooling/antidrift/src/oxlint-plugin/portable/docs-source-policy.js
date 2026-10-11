@@ -37,7 +37,7 @@ export const checkDocumentationSourcePolicy = ({
       const url = new URL(source.url);
       if (url.protocol !== "https:" || !url.pathname.endsWith("/llms.txt")) {
         failures.push(
-          `${sourceName} must use an HTTPS URL ending in /llms.txt.`,
+          `${sourceName} must use an HTTPS URL ending in /llms.txt.`
         );
       }
     }
@@ -54,48 +54,48 @@ export const checkDocumentationSourcePolicy = ({
     const expiresAt = parsedExactUtcTimestamp(exclusion.expiresAt);
     if (checkedAt === null) {
       failures.push(
-        `${exclusion.dependency} has an invalid no-llms-txt checkedAt timestamp.`,
+        `${exclusion.dependency} has an invalid no-llms-txt checkedAt timestamp.`
       );
       continue;
     }
     if (expiresAt === null) {
       failures.push(
-        `${exclusion.dependency} has an invalid no-llms-txt expiresAt timestamp.`,
+        `${exclusion.dependency} has an invalid no-llms-txt expiresAt timestamp.`
       );
       continue;
     }
     if (expiresAt <= checkedAt) {
       failures.push(
-        `${exclusion.dependency} has a no-llms-txt quarantine that does not follow its check time.`,
+        `${exclusion.dependency} has a no-llms-txt quarantine that does not follow its check time.`
       );
     }
     if (expiresAt - checkedAt > MAX_QUARANTINE_MILLISECONDS) {
       failures.push(
-        `${exclusion.dependency} has a no-llms-txt quarantine longer than 31 days.`,
+        `${exclusion.dependency} has a no-llms-txt quarantine longer than 31 days.`
       );
     }
     if (now.getTime() >= expiresAt) {
       failures.push(
-        `${exclusion.dependency} has an expired no-llms-txt quarantine (${exclusion.expiresAt}); recheck its canonical documentation.`,
+        `${exclusion.dependency} has an expired no-llms-txt quarantine (${exclusion.expiresAt}); recheck its canonical documentation.`
       );
     }
   }
   for (const dependency of dependencies) {
     if (!classifications.has(dependency)) {
       failures.push(
-        `${dependency} is a direct dependency without an llms.txt source or explained exclusion.`,
+        `${dependency} is a direct dependency without an llms.txt source or explained exclusion.`
       );
     }
   }
   for (const [dependency, dispositions] of classifications) {
     if (!dependencies.has(dependency)) {
       failures.push(
-        `${dependency} is classified by ${dispositions.join(" and ")} but is not a direct dependency.`,
+        `${dependency} is classified by ${dispositions.join(" and ")} but is not a direct dependency.`
       );
     }
     if (dispositions.length > 1) {
       failures.push(
-        `${dependency} is classified by ${dispositions.join(" and ")}.`,
+        `${dependency} is classified by ${dispositions.join(" and ")}.`
       );
     }
   }
@@ -152,7 +152,7 @@ export default {
     const filename = context.filename ?? context.getFilename();
     const local = relative(context.cwd ?? process.cwd(), filename).replaceAll(
       "\\",
-      "/",
+      "/"
     );
     const policyFile = options.policyFile ?? "docs-sources.mjs";
     if (local !== policyFile) return {};
@@ -162,7 +162,7 @@ export default {
         const failures = checkDocumentationSourcePolicy({
           dependencies: new Set(
             options.dependencies ??
-              Object.keys(owner?.manifest.dependencies ?? {}),
+              Object.keys(owner?.manifest.dependencies ?? {})
           ),
           sources: options.sources ?? {},
           exclusions: options.exclusions ?? [],

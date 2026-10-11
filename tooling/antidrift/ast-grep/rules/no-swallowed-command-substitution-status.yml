@@ -37,7 +37,7 @@ rule:
               - kind: command
               - has:
                   kind: command_name
-                  regex: '^(true|:)$'
+                  regex: "^(true|:)$"
                   stopBy: end
               - not:
                   inside:
@@ -59,7 +59,7 @@ rule:
                           - kind: command
                           - has:
                               kind: command_name
-                              regex: '^(true|:)$'
+                              regex: "^(true|:)$"
                               stopBy: end
                         stopBy: end
                   stopBy: end

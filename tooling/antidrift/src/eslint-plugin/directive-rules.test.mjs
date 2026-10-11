@@ -1,34 +1,58 @@
 import { rule, ruleTester } from "../../test/support/eslint-plugin-harness.mjs";
 
-ruleTester.run("no-pass-through-parameters", rule("no-pass-through-parameters"), {
-  valid: [
-    "import { save } from './store'; function persist(user) { validate(user); return save(user); }",
-    "import { measure } from './geometry'; function area(shape) { const size = measure(shape); return size.width * size.height; }",
-    "function Badge({ label, ...rest }) { return <span {...rest}>{label}</span>; }",
-    "function report(error) { console.error(error); }",
-    "items.map((item) => render(item)); function render(entry) { return entry.name; }",
-    "import { write } from './review'; useMutation({ mutationFn: (input) => write(input) });",
-    "import { load } from 'remote-sdk'; function fetchUser(id) { return load(id); }",
-  ],
-  invalid: [
-    {
-      code: "import { queryEvents } from './events'; export function listEvents(db, filter) { if (!filter.kind) return []; return queryEvents(db, filter); }",
-      errors: [{ messageId: "passThrough", data: { name: "db", targets: "'queryEvents'" } }],
-    },
-    {
-      code: "import { Card } from '@/components/card'; export function DocumentList({ documents, className }) { return <Card className={className}>{documents.length}</Card>; }",
-      errors: [{ messageId: "passThrough", data: { name: "className", targets: "'Card'" } }],
-    },
-    {
-      code: "import { Button } from './button'; export function IconButton({ icon, ...rest }) { return <Button {...rest}>{icon}</Button>; }",
-      errors: [{ messageId: "passThrough", data: { name: "rest", targets: "'Button'" } }],
-    },
-    {
-      code: "class Runner { run(command, cwd) { this.log(command); return this.spawn({ cwd, args: command.split(' ') }); } }",
-      errors: [{ messageId: "passThrough", data: { name: "cwd", targets: "'this.spawn'" } }],
-    },
-  ],
-});
+ruleTester.run(
+  "no-pass-through-parameters",
+  rule("no-pass-through-parameters"),
+  {
+    valid: [
+      "import { save } from './store'; function persist(user) { validate(user); return save(user); }",
+      "import { measure } from './geometry'; function area(shape) { const size = measure(shape); return size.width * size.height; }",
+      "function Badge({ label, ...rest }) { return <span {...rest}>{label}</span>; }",
+      "function report(error) { console.error(error); }",
+      "items.map((item) => render(item)); function render(entry) { return entry.name; }",
+      "import { write } from './review'; useMutation({ mutationFn: (input) => write(input) });",
+      "import { load } from 'remote-sdk'; function fetchUser(id) { return load(id); }",
+    ],
+    invalid: [
+      {
+        code: "import { queryEvents } from './events'; export function listEvents(db, filter) { if (!filter.kind) return []; return queryEvents(db, filter); }",
+        errors: [
+          {
+            messageId: "passThrough",
+            data: { name: "db", targets: "'queryEvents'" },
+          },
+        ],
+      },
+      {
+        code: "import { Card } from '@/components/card'; export function DocumentList({ documents, className }) { return <Card className={className}>{documents.length}</Card>; }",
+        errors: [
+          {
+            messageId: "passThrough",
+            data: { name: "className", targets: "'Card'" },
+          },
+        ],
+      },
+      {
+        code: "import { Button } from './button'; export function IconButton({ icon, ...rest }) { return <Button {...rest}>{icon}</Button>; }",
+        errors: [
+          {
+            messageId: "passThrough",
+            data: { name: "rest", targets: "'Button'" },
+          },
+        ],
+      },
+      {
+        code: "class Runner { run(command, cwd) { this.log(command); return this.spawn({ cwd, args: command.split(' ') }); } }",
+        errors: [
+          {
+            messageId: "passThrough",
+            data: { name: "cwd", targets: "'this.spawn'" },
+          },
+        ],
+      },
+    ],
+  }
+);
 
 ruleTester.run("no-compat-names", rule("no-compat-names"), {
   valid: [
@@ -38,7 +62,10 @@ ruleTester.run("no-compat-names", rule("no-compat-names"), {
     "import { legacyLoader } from './loader';",
   ],
   invalid: [
-    { code: "function readLegacyConfig() {}", errors: [{ messageId: "compatName", data: { name: "readLegacyConfig" } }] },
+    {
+      code: "function readLegacyConfig() {}",
+      errors: [{ messageId: "compatName", data: { name: "readLegacyConfig" } }],
+    },
     { code: "const deprecatedPaths = [];", errors: 1 },
     { code: "function load(compatMode) { return compatMode; }", errors: 1 },
     { code: "interface RetiredRule { id: string }", errors: 1 },
@@ -59,17 +86,54 @@ ruleTester.run("no-vague-names", rule("no-vague-names"), {
     "const { data: invoices } = useQuery(query);",
   ],
   invalid: [
-    { code: "const data = load();", errors: [{ messageId: "vague", data: { name: "data", reason: "a vague noun" } }] },
+    {
+      code: "const data = load();",
+      errors: [
+        { messageId: "vague", data: { name: "data", reason: "a vague noun" } },
+      ],
+    },
     { code: "const res2 = load();", errors: 1 },
-    { code: "try { run(); } catch (e) { report(e); }", errors: [{ messageId: "vague", data: { name: "e", reason: "a single letter" } }] },
-    { code: "fetch(url).catch((err) => report(err));", errors: [{ messageId: "vague", data: { name: "err", reason: "an abbreviation of 'error'" } }] },
+    {
+      code: "try { run(); } catch (e) { report(e); }",
+      errors: [
+        { messageId: "vague", data: { name: "e", reason: "a single letter" } },
+      ],
+    },
+    {
+      code: "fetch(url).catch((err) => report(err));",
+      errors: [
+        {
+          messageId: "vague",
+          data: { name: "err", reason: "an abbreviation of 'error'" },
+        },
+      ],
+    },
     { code: "items.sort((a, b) => a.rank - b.rank);", errors: 2 },
-    { code: "const userData = load();", errors: [{ messageId: "vague", data: { name: "userData", reason: "a filler suffix" } }] },
-    { code: "const myClient = connect();", errors: [{ messageId: "vague", data: { name: "myClient", reason: "a filler prefix" } }] },
+    {
+      code: "const userData = load();",
+      errors: [
+        {
+          messageId: "vague",
+          data: { name: "userData", reason: "a filler suffix" },
+        },
+      ],
+    },
+    {
+      code: "const myClient = connect();",
+      errors: [
+        {
+          messageId: "vague",
+          data: { name: "myClient", reason: "a filler prefix" },
+        },
+      ],
+    },
     { code: "function handle(items) { return items.length; }", errors: 1 },
     { code: "const result = run(); const contents = read();", errors: 2 },
     { code: "const { value } = field;", errors: 1 },
-    { code: "export function load(ctx, value) { return ctx.db.get(value); }", errors: 2 },
+    {
+      code: "export function load(ctx, value) { return ctx.db.get(value); }",
+      errors: 2,
+    },
   ],
 });
 
@@ -89,11 +153,21 @@ ruleTester.run("no-hash-literal", rule("no-hash-literal"), {
 
 ruleTester.run("no-host-path-literal", rule("no-host-path-literal"), {
   valid: [
-    { code: 'const brew = "/home/linuxbrew/.linuxbrew/bin";', filename: "scripts/path.ts" },
-    { code: 'const root = "/Users/alex/repos/project";', filename: "src/paths.test.ts" },
+    {
+      code: 'const brew = "/home/linuxbrew/.linuxbrew/bin";',
+      filename: "scripts/path.ts",
+    },
+    {
+      code: 'const root = "/Users/alex/repos/project";',
+      filename: "src/paths.test.ts",
+    },
   ],
   invalid: [
-    { code: "const root = `/Users/joe/code/${name}`;", filename: "scripts/path.ts", errors: 1 },
+    {
+      code: "const root = `/Users/joe/code/${name}`;",
+      filename: "scripts/path.ts",
+      errors: 1,
+    },
   ],
 });
 
@@ -103,7 +177,10 @@ ruleTester.run("no-dated-comments", rule("no-dated-comments"), {
     '/** Matches lines like updated_at: "2025-01-01 10:00:00". */\nstart();',
   ],
   invalid: [
-    { code: "/** A court docket. Verified live 2026-08-14. */\nstart();", errors: 1 },
+    {
+      code: "/** A court docket. Verified live 2026-08-14. */\nstart();",
+      errors: 1,
+    },
   ],
 });
 
@@ -113,8 +190,14 @@ ruleTester.run("no-fallback-to-empty", rule("no-fallback-to-empty"), {
     "function readRegistry(path) { try { return parse(read(path)); } catch (error) { errors.push(error.message); return {}; } }",
   ],
   invalid: [
-    { code: "function readRegistry(path) { try { return parse(read(path)); } catch (error) { return {}; } }", errors: 1 },
-    { code: "const body = await response.json().catch(() => ({}));", errors: 1 },
+    {
+      code: "function readRegistry(path) { try { return parse(read(path)); } catch (error) { return {}; } }",
+      errors: 1,
+    },
+    {
+      code: "const body = await response.json().catch(() => ({}));",
+      errors: 1,
+    },
   ],
 });
 
@@ -125,7 +208,9 @@ ruleTester.run("no-else-if-chain", rule("no-else-if-chain"), {
   invalid: [
     {
       code: 'if (event.key === "Up" || event.key === "Left") up(); else if (event.key === "Down") down(); else if (event.key === "Enter") open(); else if (event.key === "Escape") close(); else idle();',
-      errors: [{ messageId: "chain", data: { count: 4, discriminant: "event.key" } }],
+      errors: [
+        { messageId: "chain", data: { count: 4, discriminant: "event.key" } },
+      ],
     },
   ],
 });

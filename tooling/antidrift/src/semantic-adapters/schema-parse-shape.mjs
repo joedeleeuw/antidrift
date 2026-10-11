@@ -88,7 +88,7 @@ export function isThrowAssertionCallbackParse(node) {
       ? fn.parent
       : null;
   return Boolean(
-    isExpectCall(expectCall) && hasThrowAssertionMatcher(expectCall),
+    isExpectCall(expectCall) && hasThrowAssertionMatcher(expectCall)
   );
 }
 

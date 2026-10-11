@@ -1,5 +1,3 @@
-
-
 ---
 
 <!-- Source: README.md -->
@@ -176,7 +174,6 @@ The prior artifact was a broad capability pack. This version is an implementatio
    - Layer 4 reports fun/friction/polish/learning hypotheses from proxies and evidence.
    - Human calibration remains a future Layer 5.
 
-
 ---
 
 <!-- Source: MVP_LADDER.md -->
@@ -200,18 +197,18 @@ existing world systems
 
 ## MVP summary
 
-| MVP | Adds | Agent playability unlocked | How success is known | TITAN pressure |
-|---|---|---|---|---|
-| 0. Wrap-map + adapter spine | Repo truth audit, capability manifest, adapter namespace | None; prevents waste | Existing systems classified with source/test proof | State-abstraction inventory |
-| 1. Observation baseline | FrameEnvelope from existing state, screenshot refs, serializeXray, fog, change-source | Agent can observe through current semantic state | One command emits timestamped envelope with explicit missing fields | State perception |
-| 2. Action-result tracing | Wrapper over existing walk/CDP commands | Agent can act and know what happened | Move/turn/wait produce before/after traces and no-op detection | Action prioritization + trace memory |
-| 3. Hot-region scenario | Scenario runner tied to CHANGE_SOURCE verdict+witness | Agent attempts the core product loop | Scenario selects semantic target and emits reached/not-reached evidence | Functional correctness |
-| 4. Registry + nav probes | Object registry adapter, screen projection, clearance probes | Agent reasons about objects and reachable space | IDs/projections/probes work or fail explicitly | Richer abstraction + action prioritization |
-| 5. RGB replay windows | Time-bounded visual evidence | Agent can cite what player saw | Replay refs resolve to RGB/actions/events/witnesses | Trace memory/reflection |
-| 6. Diagnostic vision | Same-camera x-ray/depth/object-ID/affordance views | Agent reasons spatially from render-grounded views | Diagnostic image is live-rendered, aligned, toggleable | High-dimensional state abstraction |
-| 7. Oracles + Layer-4 report | Conservative findings and report artifact | Agent reports playability/friction/polish/learning hypotheses | High-severity findings have evidence refs | LLM/oracle-backed bug detection |
-| 8. Ablation harness | JSON/RGB/x-ray/memory comparison | System can test whether x-ray/images/memory help | Same scenario runs under isolated perception arms | Component-value validation |
-| 9. Optional TITAN-style campaign runner | Multi-scenario campaign, coverage map, bug triage | Long-running evaluation campaign | Report covers completion, coverage, oracle findings, regressions | Holistic testing framework |
+| MVP                                     | Adds                                                                                  | Agent playability unlocked                                    | How success is known                                                    | TITAN pressure                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------ |
+| 0. Wrap-map + adapter spine             | Repo truth audit, capability manifest, adapter namespace                              | None; prevents waste                                          | Existing systems classified with source/test proof                      | State-abstraction inventory                |
+| 1. Observation baseline                 | FrameEnvelope from existing state, screenshot refs, serializeXray, fog, change-source | Agent can observe through current semantic state              | One command emits timestamped envelope with explicit missing fields     | State perception                           |
+| 2. Action-result tracing                | Wrapper over existing walk/CDP commands                                               | Agent can act and know what happened                          | Move/turn/wait produce before/after traces and no-op detection          | Action prioritization + trace memory       |
+| 3. Hot-region scenario                  | Scenario runner tied to CHANGE_SOURCE verdict+witness                                 | Agent attempts the core product loop                          | Scenario selects semantic target and emits reached/not-reached evidence | Functional correctness                     |
+| 4. Registry + nav probes                | Object registry adapter, screen projection, clearance probes                          | Agent reasons about objects and reachable space               | IDs/projections/probes work or fail explicitly                          | Richer abstraction + action prioritization |
+| 5. RGB replay windows                   | Time-bounded visual evidence                                                          | Agent can cite what player saw                                | Replay refs resolve to RGB/actions/events/witnesses                     | Trace memory/reflection                    |
+| 6. Diagnostic vision                    | Same-camera x-ray/depth/object-ID/affordance views                                    | Agent reasons spatially from render-grounded views            | Diagnostic image is live-rendered, aligned, toggleable                  | High-dimensional state abstraction         |
+| 7. Oracles + Layer-4 report             | Conservative findings and report artifact                                             | Agent reports playability/friction/polish/learning hypotheses | High-severity findings have evidence refs                               | LLM/oracle-backed bug detection            |
+| 8. Ablation harness                     | JSON/RGB/x-ray/memory comparison                                                      | System can test whether x-ray/images/memory help              | Same scenario runs under isolated perception arms                       | Component-value validation                 |
+| 9. Optional TITAN-style campaign runner | Multi-scenario campaign, coverage map, bug triage                                     | Long-running evaluation campaign                              | Report covers completion, coverage, oracle findings, regressions        | Holistic testing framework                 |
 
 ## Stage gate applies to every MVP
 
@@ -252,7 +249,6 @@ Avoid these words before Layer 5:
 - definitive playability
 - complete coverage
 ```
-
 
 ---
 
@@ -351,7 +347,6 @@ Preserve reviewer disagreement. Resolve by source refs, test output, and replay 
 - Do not mark success without concrete commands, artifacts, or blocker reports.
 ```
 
-
 ---
 
 <!-- Source: reviews/PER_MVP_ADVERSARIAL_STAGE_GATE.md -->
@@ -444,7 +439,6 @@ An MVP is complete only if one of these is true:
 
 Do not mark complete based on “implementation appears correct.”
 
-
 ---
 
 <!-- Source: goal-cards/00-mvp-0-wrap-map-and-adapter-spine.md -->
@@ -512,7 +506,6 @@ Run `reviews/PER_MVP_ADVERSARIAL_STAGE_GATE.md` with at least:
 - worldspace-qa-runner
 ```
 
-
 ---
 
 <!-- Source: goal-cards/01-mvp-1-observation-baseline-frame-envelope.md -->
@@ -579,7 +572,6 @@ Run:
 - worldspace-code-mapper if any source ownership is uncertain
 ```
 
-
 ---
 
 <!-- Source: goal-cards/02-mvp-2-action-result-tracing.md -->
@@ -642,7 +634,6 @@ Run:
 - worldspace-qa-runner
 - worldspace-adversarial-reviewer
 ```
-
 
 ---
 
@@ -711,7 +702,6 @@ Run:
 - titan-oracle-reviewer
 ```
 
-
 ---
 
 <!-- Source: goal-cards/04-mvp-4-object-registry-and-nav-probes.md -->
@@ -760,7 +750,6 @@ Run:
 - worldspace-qa-runner
 - worldspace-adversarial-reviewer
 ```
-
 
 ---
 
@@ -811,7 +800,6 @@ Run:
 - worldspace-adversarial-reviewer
 - worldspace-visual-validator
 ```
-
 
 ---
 
@@ -879,7 +867,6 @@ Run:
 - titan-oracle-reviewer
 ```
 
-
 ---
 
 <!-- Source: goal-cards/07-mvp-7-oracle-bank-and-layer-4-report.md -->
@@ -944,7 +931,6 @@ Run:
 - worldspace-research-checker
 - titan-oracle-reviewer
 ```
-
 
 ---
 
@@ -1011,7 +997,6 @@ Run:
 - titan-oracle-reviewer
 ```
 
-
 ---
 
 <!-- Source: goal-cards/09-optional-mvp-9-titan-style-campaign-runner.md -->
@@ -1055,7 +1040,6 @@ The adapter becomes a longer-running automated playability/testing campaign syst
 
 Holistic testing. This is where TITAN influence becomes strongest: a single campaign attempts completion, exploration/coverage, and bug/friction detection together.
 
-
 ---
 
 <!-- Source: oracles/ORACLE_BANK.md -->
@@ -1078,88 +1062,87 @@ Each oracle should specify:
 
 ## Oracle 1 — Stuck / repeated no-op movement
 
-| Field | Definition |
-|---|---|
-| Inputs | Action traces, before/after poses, navProbe, replay window |
-| Trigger | Repeated movement/approach actions produce low or zero movement delta over a time/action threshold |
-| Evidence required | actionTraceRefs, frameEnvelopeRefs, optional navProbe refs, RGB replay if available |
-| Severity | medium/high depending on task blocking |
-| False positives | Intentional waiting, tight interaction zones, scripted pause |
+| Field             | Definition                                                                                         |
+| ----------------- | -------------------------------------------------------------------------------------------------- |
+| Inputs            | Action traces, before/after poses, navProbe, replay window                                         |
+| Trigger           | Repeated movement/approach actions produce low or zero movement delta over a time/action threshold |
+| Evidence required | actionTraceRefs, frameEnvelopeRefs, optional navProbe refs, RGB replay if available                |
+| Severity          | medium/high depending on task blocking                                                             |
+| False positives   | Intentional waiting, tight interaction zones, scripted pause                                       |
 
 ## Oracle 2 — Changed-region unreachable
 
-| Field | Definition |
-|---|---|
-| Inputs | Scenario result, CHANGE_SOURCE verdict/witness, action traces, final region/distance |
-| Trigger | Keystone hot/deviation region cannot be reached or reacquired within scenario budget |
-| Evidence required | scenarioResultRef, witnessRefs, actionTraceRefs, final FrameEnvelope/ref |
-| Severity | high/blocker if product core loop is blocked |
-| False positives | Target intentionally unreachable, missing nav autonomy, manual-drive blocked |
+| Field             | Definition                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| Inputs            | Scenario result, CHANGE_SOURCE verdict/witness, action traces, final region/distance |
+| Trigger           | Keystone hot/deviation region cannot be reached or reacquired within scenario budget |
+| Evidence required | scenarioResultRef, witnessRefs, actionTraceRefs, final FrameEnvelope/ref             |
+| Severity          | high/blocker if product core loop is blocked                                         |
+| False positives   | Target intentionally unreachable, missing nav autonomy, manual-drive blocked         |
 
 ## Oracle 3 — Missing feedback / action without response
 
-| Field | Definition |
-|---|---|
-| Inputs | action traces, events, RGB replay, object registry |
-| Trigger | Interact/inspect/approach/action has no visible, event, state, or telemetry response when one is expected |
-| Evidence required | actionTraceRef, before/after frame refs, event absence note, object/affordance ref if applicable |
-| Severity | medium/high depending on repetition and goal relevance |
-| False positives | Optional object, disabled affordance, response is audio-only/unobserved |
+| Field             | Definition                                                                                                |
+| ----------------- | --------------------------------------------------------------------------------------------------------- |
+| Inputs            | action traces, events, RGB replay, object registry                                                        |
+| Trigger           | Interact/inspect/approach/action has no visible, event, state, or telemetry response when one is expected |
+| Evidence required | actionTraceRef, before/after frame refs, event absence note, object/affordance ref if applicable          |
+| Severity          | medium/high depending on repetition and goal relevance                                                    |
+| False positives   | Optional object, disabled affordance, response is audio-only/unobserved                                   |
 
 ## Oracle 4 — Fog/verdict mismatch
 
-| Field | Definition |
-|---|---|
-| Inputs | FOG_STATE, CHANGE_SOURCE region verdicts, FrameEnvelope, RGB/x-ray if available |
-| Trigger | Region fog state appears inconsistent with semantic verdict or changed-region state |
-| Evidence required | regionVerdictRef, fogStateRef, frame/screenshot ref if visualized |
-| Severity | medium/high if it misdirects navigation/discovery |
-| False positives | Intentional design override, transition state, stale capture |
+| Field             | Definition                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| Inputs            | FOG_STATE, CHANGE_SOURCE region verdicts, FrameEnvelope, RGB/x-ray if available     |
+| Trigger           | Region fog state appears inconsistent with semantic verdict or changed-region state |
+| Evidence required | regionVerdictRef, fogStateRef, frame/screenshot ref if visualized                   |
+| Severity          | medium/high if it misdirects navigation/discovery                                   |
+| False positives   | Intentional design override, transition state, stale capture                        |
 
 ## Oracle 5 — Stale pin/note
 
-| Field | Definition |
-|---|---|
-| Inputs | pins/notes, region/object registry, screenshot/save refs, change-source state |
-| Trigger | Pin/note points to missing, moved, or semantically stale region/object after world changes |
-| Evidence required | pin/note ref, region/object ref, before/after or current state ref |
-| Severity | low/medium; high if it breaks navigation or learning task |
-| False positives | Historical note intentionally preserved, unresolved migration state |
+| Field             | Definition                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| Inputs            | pins/notes, region/object registry, screenshot/save refs, change-source state              |
+| Trigger           | Pin/note points to missing, moved, or semantically stale region/object after world changes |
+| Evidence required | pin/note ref, region/object ref, before/after or current state ref                         |
+| Severity          | low/medium; high if it breaks navigation or learning task                                  |
+| False positives   | Historical note intentionally preserved, unresolved migration state                        |
 
 ## Oracle 6 — Camera clip / visual obstruction
 
-| Field | Definition |
-|---|---|
-| Inputs | RGB frames, camera pose, object/depth/diagnostic view if available |
-| Trigger | Player-facing view is blocked by geometry, clips through surfaces, or loses target clarity during scenario |
-| Evidence required | RGB frame refs, timestamp window, optional depth/x-ray confirmation |
-| Severity | low/medium/high depending on recurrence and task impact |
-| False positives | Intentional close-up/cinematic moment, temporary transition |
+| Field             | Definition                                                                                                 |
+| ----------------- | ---------------------------------------------------------------------------------------------------------- |
+| Inputs            | RGB frames, camera pose, object/depth/diagnostic view if available                                         |
+| Trigger           | Player-facing view is blocked by geometry, clips through surfaces, or loses target clarity during scenario |
+| Evidence required | RGB frame refs, timestamp window, optional depth/x-ray confirmation                                        |
+| Severity          | low/medium/high depending on recurrence and task impact                                                    |
+| False positives   | Intentional close-up/cinematic moment, temporary transition                                                |
 
 ## Oracle 7 — Object/affordance inconsistency
 
-| Field | Definition |
-|---|---|
-| Inputs | object registry, action traces, RGB/diagnostic frames, events |
-| Trigger | Object appears interactable/relevant but lacks action response, or registry advertises affordance that fails repeatedly |
-| Evidence required | objectRef, actionTraceRefs, before/after frames/events |
-| Severity | medium/high depending on goal relevance |
-| False positives | Locked state, insufficient proximity, missing affordance metadata |
+| Field             | Definition                                                                                                              |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Inputs            | object registry, action traces, RGB/diagnostic frames, events                                                           |
+| Trigger           | Object appears interactable/relevant but lacks action response, or registry advertises affordance that fails repeatedly |
+| Evidence required | objectRef, actionTraceRefs, before/after frames/events                                                                  |
+| Severity          | medium/high depending on goal relevance                                                                                 |
+| False positives   | Locked state, insufficient proximity, missing affordance metadata                                                       |
 
 ## Oracle 8 — RGB/diagnostic disagreement
 
-| Field | Definition |
-|---|---|
-| Inputs | same-camera RGB, x-ray/depth/object-ID/affordance captures, object registry |
-| Trigger | Diagnostic view indicates obstacle/target/affordance/depth category that contradicts player-facing view or registry |
-| Evidence required | aligned RGB ref, diagnostic ref, camera pose ref, object/region refs |
-| Severity | medium/high if it affects navigation/evaluation claims |
-| False positives | Diagnostic pass intentionally abstracts or hides category, capture desync |
+| Field             | Definition                                                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Inputs            | same-camera RGB, x-ray/depth/object-ID/affordance captures, object registry                                         |
+| Trigger           | Diagnostic view indicates obstacle/target/affordance/depth category that contradicts player-facing view or registry |
+| Evidence required | aligned RGB ref, diagnostic ref, camera pose ref, object/region refs                                                |
+| Severity          | medium/high if it affects navigation/evaluation claims                                                              |
+| False positives   | Diagnostic pass intentionally abstracts or hides category, capture desync                                           |
 
 ## Report rule
 
 An oracle output is not a final claim. It becomes a Layer-4 finding only after the report layer attaches evidence refs, severity, confidence, suspected cause, and limitations.
-
 
 ---
 
@@ -1171,13 +1154,13 @@ The ablation harness answers whether images, render-grounded diagnostic views, s
 
 ## Arms
 
-| Arm | Name | Channels enabled | Existing/new |
-|---|---|---|---|
-| A | JSON-only | serializeXray | Existing baseline |
-| B | RGB-retina | RGB frames + minimal state | Existing capture wrapped into FrameEnvelope/replay |
-| C | Diagnostic/x-ray | render-grounded x-ray/depth/object-ID/affordance subset | New in MVP 6 |
-| D | RGB + diagnostic + JSON | RGB, diagnostic, serializeXray, FrameEnvelope | Composite |
-| E | Memory-enabled | screenshot save/load, pins, notes, fog, plus selected channels | Existing memory/state features wrapped |
+| Arm | Name                    | Channels enabled                                               | Existing/new                                       |
+| --- | ----------------------- | -------------------------------------------------------------- | -------------------------------------------------- |
+| A   | JSON-only               | serializeXray                                                  | Existing baseline                                  |
+| B   | RGB-retina              | RGB frames + minimal state                                     | Existing capture wrapped into FrameEnvelope/replay |
+| C   | Diagnostic/x-ray        | render-grounded x-ray/depth/object-ID/affordance subset        | New in MVP 6                                       |
+| D   | RGB + diagnostic + JSON | RGB, diagnostic, serializeXray, FrameEnvelope                  | Composite                                          |
+| E   | Memory-enabled          | screenshot save/load, pins, notes, fog, plus selected channels | Existing memory/state features wrapped             |
 
 ## Isolation rules
 
@@ -1249,7 +1232,6 @@ E. Memory-enabled
 - Results show differences or explicitly say no measurable difference.
 - Invalid comparisons are marked invalid.
 ```
-
 
 ---
 

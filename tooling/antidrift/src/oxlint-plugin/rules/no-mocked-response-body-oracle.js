@@ -54,7 +54,7 @@ function testBlockCallback(node) {
     node.arguments.find(
       (argument) =>
         argument.type === "ArrowFunctionExpression" ||
-        argument.type === "FunctionExpression",
+        argument.type === "FunctionExpression"
     ) ?? null
   );
 }
@@ -180,7 +180,7 @@ function resolveObjectShape(node, callback, sourceCode, depth, seen) {
       callback,
       sourceCode,
       depth + 1,
-      new Set(seen),
+      new Set(seen)
     );
     if (key === null || !value) return null;
     properties.push([key, value.shape]);
@@ -198,7 +198,7 @@ function resolveArrayShape(node, callback, sourceCode, depth, seen) {
       callback,
       sourceCode,
       depth + 1,
-      new Set(seen),
+      new Set(seen)
     );
     if (!item) return null;
     items.push(item.shape);
@@ -222,7 +222,7 @@ function resolveStaticShape(
   callback,
   sourceCode,
   depth = 0,
-  seen = new Set(),
+  seen = new Set()
 ) {
   if (depth > resolutionDepthLimit) return null;
   const node = unwrapExpression(expression);
@@ -247,7 +247,7 @@ function resolveStaticShape(
           callback,
           sourceCode,
           depth + 1,
-          seen,
+          seen
         )
       : null;
     return nested ? { ...nested, partial: true } : null;
@@ -274,7 +274,7 @@ function shapesEqual(left, right) {
     left.properties.every(
       ([key, value], index) =>
         key === right.properties[index][0] &&
-        shapesEqual(value, right.properties[index][1]),
+        shapesEqual(value, right.properties[index][1])
     )
   );
 }
@@ -288,7 +288,7 @@ function shapeIsSubset(expected, arranged) {
     return (
       expected.items.length <= arranged.items.length &&
       expected.items.every((item, index) =>
-        shapeIsSubset(item, arranged.items[index]),
+        shapeIsSubset(item, arranged.items[index])
       )
     );
   }
@@ -315,7 +315,7 @@ function derivesFromResponseJson(
   callback,
   sourceCode,
   depth = 0,
-  seen = new Set(),
+  seen = new Set()
 ) {
   if (depth > resolutionDepthLimit) return false;
   const node = unwrapExpression(expression);
@@ -336,7 +336,7 @@ function derivesFromResponseJson(
           callback,
           sourceCode,
           depth + 1,
-          seen,
+          seen
         )
       : false;
   }
@@ -346,7 +346,7 @@ function derivesFromResponseJson(
       callback,
       sourceCode,
       depth + 1,
-      seen,
+      seen
     );
   }
   return false;
@@ -356,7 +356,7 @@ function directReturnExpression(node) {
   if (!isFunction(node)) return null;
   if (node.body.type !== "BlockStatement") return node.body;
   const returns = node.body.body.filter(
-    (statement) => statement.type === "ReturnStatement" && statement.argument,
+    (statement) => statement.type === "ReturnStatement" && statement.argument
   );
   return returns.length === 1 ? returns[0].argument : null;
 }
@@ -380,21 +380,18 @@ function assertionMatchesMockedShape(
   assertion,
   mockedShapes,
   callback,
-  sourceCode,
+  sourceCode
 ) {
-  const expected = resolveStaticShape(
-    assertion.expected,
-    callback,
-    sourceCode,
-  );
+  const expected = resolveStaticShape(assertion.expected, callback, sourceCode);
   if (!expected) return false;
-  const allowsSubset = assertion.matcher === "toMatchObject" || expected.partial;
+  const allowsSubset =
+    assertion.matcher === "toMatchObject" || expected.partial;
   return mockedShapes.some((arranged) =>
     collectShapes(arranged).some((candidate) =>
       allowsSubset
         ? shapeIsSubset(expected.shape, candidate)
-        : shapesEqual(expected.shape, candidate),
-    ),
+        : shapesEqual(expected.shape, candidate)
+    )
   );
 }
 
@@ -417,7 +414,7 @@ function analyzeTestBlock(callback, context, sourceCode) {
         assertion,
         mockedShapes,
         callback,
-        sourceCode,
+        sourceCode
       ) &&
       derivesFromResponseJson(assertion.subject, callback, sourceCode)
     ) {

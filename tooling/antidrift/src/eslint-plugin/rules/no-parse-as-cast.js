@@ -40,7 +40,7 @@ export function ruleNoParseAsCast() {
             node,
             services,
             checker,
-            ZOD_VALIDATION_METHODS,
+            ZOD_VALIDATION_METHODS
           );
           if (!parts || isThrowAssertionCallbackParse(node)) {
             return;

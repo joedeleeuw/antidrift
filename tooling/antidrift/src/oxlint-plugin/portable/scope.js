@@ -9,7 +9,7 @@ export function isRuleFile(context) {
   const options = context.options[0] ?? {};
   const filename = (context.filename ?? context.getFilename()).replaceAll(
     "\\",
-    "/",
+    "/"
   );
   const cwd = context.cwd ?? process.cwd();
   const local = isAbsolute(filename)

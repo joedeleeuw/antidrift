@@ -67,11 +67,11 @@ function selectedPlans(repo) {
 function readTsconfig(repoRoot, tsconfig) {
   const configPath = resolve(repoRoot, tsconfig);
   const loaded = ts.readConfigFile(configPath, (fileName) =>
-    ts.sys.readFile(fileName),
+    ts.sys.readFile(fileName)
   );
   if (loaded.error) {
     throw new Error(
-      ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n"),
+      ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n")
     );
   }
   return ts.parseJsonConfigFileContent(loaded.config, ts.sys, repoRoot);
@@ -107,7 +107,7 @@ function targetMatches(relativePath, target) {
 function sourceMatches(repoRoot, sourceFile, targets) {
   const relativePath = relative(repoRoot, sourceFile.fileName).replace(
     /\\/gu,
-    "/",
+    "/"
   );
   return targets.some((target) => targetMatches(relativePath, target));
 }
@@ -135,7 +135,7 @@ function containerInfo(node, sourceFile) {
     const classNode = ts.isClassDeclaration(node.parent) ? node.parent : null;
     const className = classNode?.name?.text;
     const classExported = Boolean(
-      classNode && hasModifier(classNode, ts.SyntaxKind.ExportKeyword),
+      classNode && hasModifier(classNode, ts.SyntaxKind.ExportKeyword)
     );
     const privateMember =
       hasModifier(node, ts.SyntaxKind.PrivateKeyword) ||
@@ -245,7 +245,7 @@ function valueDerivesFromOwnedSource(value, ownedRoots, sourceFile) {
   }
   const root = rootPath(value, sourceFile);
   return [...ownedRoots].some(
-    (ownedRoot) => root === ownedRoot || root.startsWith(`${ownedRoot}.`),
+    (ownedRoot) => root === ownedRoot || root.startsWith(`${ownedRoot}.`)
   );
 }
 
@@ -288,7 +288,7 @@ function classifyObjectExpression(objectExpression, ownedRoots, sourceFile) {
     }
     if (!valueDerivesFromOwnedSource(value, ownedRoots, sourceFile)) {
       crossSourceProperties.push(
-        property.name?.getText(sourceFile) ?? property.getText(sourceFile),
+        property.name?.getText(sourceFile) ?? property.getText(sourceFile)
       );
     }
   }
@@ -333,10 +333,10 @@ function buildFinding({
   const classification = classifyObjectExpression(
     info.objectExpression,
     ownedRoots,
-    sourceFile,
+    sourceFile
   );
   const position = sourceFile.getLineAndCharacterOfPosition(
-    node.getStart(sourceFile),
+    node.getStart(sourceFile)
   );
   const path = relative(repoRoot, sourceFile.fileName).replace(/\\/gu, "/");
   const roundtripKind = candidateKind({
@@ -438,11 +438,11 @@ function runPlan(plan, options) {
     .filter((sourceFile) =>
       sourceFile.fileName
         .replace(/\\/gu, "/")
-        .startsWith(repoRoot.replace(/\\/gu, "/")),
+        .startsWith(repoRoot.replace(/\\/gu, "/"))
     )
     .filter((sourceFile) => sourceMatches(repoRoot, sourceFile, targets));
   const findings = sourceFiles.flatMap((sourceFile) =>
-    collectFindings(repoRoot, sourceFile, checker),
+    collectFindings(repoRoot, sourceFile, checker)
   );
 
   return {
@@ -460,9 +460,9 @@ function runPlan(plan, options) {
         ["owned-only", "cross-source"].map((classification) => [
           classification,
           findings.filter(
-            (finding) => finding.classification === classification,
+            (finding) => finding.classification === classification
           ).length,
-        ]),
+        ])
       ),
       byCandidateKind: countByCandidateKind(findings),
       exportBoundaries: findings.filter((finding) => finding.exportBoundary)
@@ -482,7 +482,7 @@ function countByCandidateKind(findings) {
     kinds.map((kind) => [
       kind,
       findings.filter((finding) => finding.candidateKind === kind).length,
-    ]),
+    ])
   );
 }
 
@@ -496,7 +496,7 @@ function summarize(results, slice) {
       : "skip",
     checkedFiles: results.reduce(
       (sum, result) => sum + (result.checkedFiles ?? 0),
-      0,
+      0
     ),
     findings: {
       total: findings.length,
@@ -504,9 +504,9 @@ function summarize(results, slice) {
         ["owned-only", "cross-source"].map((classification) => [
           classification,
           findings.filter(
-            (finding) => finding.classification === classification,
+            (finding) => finding.classification === classification
           ).length,
-        ]),
+        ])
       ),
       byCandidateKind: countByCandidateKind(findings),
       exportBoundaries: findings.filter((finding) => finding.exportBoundary)
@@ -528,11 +528,11 @@ function emit(summary, output, report) {
 export function schemaRoundtripInventory(options = {}) {
   const report = options.report ?? console.log;
   const results = selectedPlans(options.repo).map((plan) =>
-    runPlan(plan, options),
+    runPlan(plan, options)
   );
   const summary = summarize(
     results,
-    options.slice ?? "schema-roundtrip-inventory",
+    options.slice ?? "schema-roundtrip-inventory"
   );
   emit(summary, options.output, report);
   return summary;

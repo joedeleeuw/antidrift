@@ -21,7 +21,7 @@ function relativePath(root, path) {
 function codeFiles(changedFiles) {
   return changedFiles
     .filter(
-      (file) => file.operation !== "delete" && CODE_FILE_RE.test(file.path),
+      (file) => file.operation !== "delete" && CODE_FILE_RE.test(file.path)
     )
     .map((file) => file.path)
     .sort(compareStrings);
@@ -71,8 +71,8 @@ function countBy(entries, key) {
   }
   return Object.fromEntries(
     Object.entries(counts).sort(([left], [right]) =>
-      compareStrings(left, right),
-    ),
+      compareStrings(left, right)
+    )
   );
 }
 
@@ -88,7 +88,7 @@ function writeFacts(output, cwd, facts) {
   writeFileSync(
     target,
     facts.map((fact) => semanticFactToJsonLine(fact)).join(""),
-    "utf8",
+    "utf8"
   );
 }
 
@@ -170,28 +170,28 @@ export async function diffScopedAdapters({
   const allFindings = results
     .flatMap((result) =>
       result.messages.map((message) =>
-        findingFromMessage(root, result, message),
-      ),
+        findingFromMessage(root, result, message)
+      )
     )
     .sort((left, right) =>
       compareStrings(
         `${left.path}:${left.line}:${left.column}:${left.ruleId ?? ""}`,
-        `${right.path}:${right.line}:${right.column}:${right.ruleId ?? ""}`,
-      ),
+        `${right.path}:${right.line}:${right.column}:${right.ruleId ?? ""}`
+      )
     );
   const diffFindings = allFindings.filter((finding) =>
-    inPatchHunks(finding, surface.patchHunks),
+    inPatchHunks(finding, surface.patchHunks)
   );
   const allFactEntries = facts
     .map(factEntry)
     .sort((left, right) =>
       compareStrings(
         `${left.path}:${left.line}:${left.factKind}:${left.evidenceHash}`,
-        `${right.path}:${right.line}:${right.factKind}:${right.evidenceHash}`,
-      ),
+        `${right.path}:${right.line}:${right.factKind}:${right.evidenceHash}`
+      )
     );
   const diffFactEntries = allFactEntries.filter((fact) =>
-    inPatchHunks(fact, surface.patchHunks),
+    inPatchHunks(fact, surface.patchHunks)
   );
   const diffFactIds = new Set(diffFactEntries.map((fact) => fact.factId));
   const diffFacts = facts.filter((fact) => diffFactIds.has(fact.factId));

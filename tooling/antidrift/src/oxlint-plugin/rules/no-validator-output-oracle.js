@@ -142,7 +142,7 @@ function hasSchemaProvenance(
   expression,
   sourceCode,
   depth = 0,
-  seen = new Set(),
+  seen = new Set()
 ) {
   if (depth > resolutionDepthLimit) return false;
   const node = unwrapExpression(expression);
@@ -165,7 +165,7 @@ function hasSchemaProvenance(
         node.callee.object,
         sourceCode,
         depth + 1,
-        seen,
+        seen
       );
     }
     return hasSchemaProvenance(node.callee, sourceCode, depth + 1, seen);
@@ -201,7 +201,7 @@ function isValidatorFunctionIdentifier(identifier, sourceCode, depth = 0) {
     );
   }
   const initializer = unwrapExpression(
-    constInitializer(identifier, sourceCode),
+    constInitializer(identifier, sourceCode)
   );
   if (!initializer) return false;
   if (initializer.type === "Identifier") {

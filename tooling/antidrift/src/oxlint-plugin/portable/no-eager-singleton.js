@@ -77,7 +77,7 @@ export default {
         if (
           isIdentifier(callee) &&
           (context.options[0]?.factories ?? [...CALL_DENYLIST]).includes(
-            callee.name,
+            callee.name
           )
         ) {
           context.report({
@@ -95,7 +95,7 @@ export default {
         if (
           isIdentifier(callee) &&
           (context.options[0]?.constructors ?? [...NEW_DENYLIST]).includes(
-            callee.name,
+            callee.name
           )
         ) {
           context.report({

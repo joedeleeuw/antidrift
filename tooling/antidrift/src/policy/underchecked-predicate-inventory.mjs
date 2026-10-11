@@ -163,7 +163,7 @@ function lintConfig(repoRoot, tsconfig) {
         antidrift,
       },
       rules: Object.fromEntries(
-        benchmarkRuleIds.map((ruleId) => [ruleId, "error"]),
+        benchmarkRuleIds.map((ruleId) => [ruleId, "error"])
       ),
     },
   ];
@@ -188,7 +188,7 @@ function countByRule(findings) {
     benchmarkRuleIds.map((ruleId) => [
       ruleId,
       findings.filter((finding) => finding.ruleId === ruleId).length,
-    ]),
+    ])
   );
 }
 
@@ -197,14 +197,14 @@ function countByRepo(results) {
     results.map((result) => [
       `${result.repo}/${result.label}`,
       result.findingsByRule?.[customRuleId] ?? 0,
-    ]),
+    ])
   );
 }
 
 function compare(findings) {
   const custom = findings.filter((finding) => finding.ruleId === customRuleId);
   const upstream = findings.filter((finding) =>
-    upstreamRuleIds.includes(finding.ruleId),
+    upstreamRuleIds.includes(finding.ruleId)
   );
   const customKeys = new Set(custom.map(locationKey));
   const upstreamKeys = new Set(upstream.map(locationKey));
@@ -213,16 +213,16 @@ function compare(findings) {
     overlapLocations: [...customKeys].filter((key) => upstreamKeys.has(key))
       .length,
     customOnlyLocations: custom.filter(
-      (finding) => !upstreamKeys.has(locationKey(finding)),
+      (finding) => !upstreamKeys.has(locationKey(finding))
     ).length,
     upstreamOnlyLocations: upstream.filter(
-      (finding) => !customKeys.has(locationKey(finding)),
+      (finding) => !customKeys.has(locationKey(finding))
     ).length,
     customWithSameFileUpstream: custom.filter((finding) =>
-      upstreamPaths.has(finding.path),
+      upstreamPaths.has(finding.path)
     ).length,
     customWithoutSameFileUpstream: custom.filter(
-      (finding) => !upstreamPaths.has(finding.path),
+      (finding) => !upstreamPaths.has(finding.path)
     ).length,
   };
 }
@@ -238,7 +238,7 @@ export function countTypePredicateCandidates(source, fileName = "file.ts") {
     source,
     ts.ScriptTarget.Latest,
     true,
-    kind,
+    kind
   );
   let count = 0;
   function visit(node) {
@@ -264,7 +264,7 @@ function firstTypePredicateLine(source, fileName) {
     source,
     ts.ScriptTarget.Latest,
     true,
-    kind,
+    kind
   );
   let line = null;
   function visit(node) {
@@ -322,12 +322,12 @@ async function runPlan(plan) {
   const parserErrorFindings = results.flatMap((result) =>
     result.messages
       .filter((message) => message.fatal)
-      .map((message) => toFinding(repoRoot, result, message)),
+      .map((message) => toFinding(repoRoot, result, message))
   );
   const findings = results.flatMap((result) =>
     result.messages
       .filter((message) => benchmarkRuleIds.includes(message.ruleId))
-      .map((message) => toFinding(repoRoot, result, message)),
+      .map((message) => toFinding(repoRoot, result, message))
   );
   const syntaxCandidates = results
     .map((result) => syntaxCandidate(repoRoot, result.filePath))
@@ -344,7 +344,7 @@ async function runPlan(plan) {
     syntaxCandidateFiles: syntaxCandidates.length,
     syntaxCandidateCount: syntaxCandidates.reduce(
       (sum, candidate) => sum + candidate.candidateCount,
-      0,
+      0
     ),
     syntaxCandidateExamples: syntaxCandidates.slice(0, 20),
     parserErrors: parserErrorFindings.length,
@@ -362,30 +362,30 @@ function summarize({ results, slice }) {
     return {
       ...publicResult,
       customFindings: planFindings.filter(
-        (finding) => finding.ruleId === customRuleId,
+        (finding) => finding.ruleId === customRuleId
       ),
     };
   });
   const checkedFiles = results.reduce(
     (sum, result) => sum + (result.checkedFiles ?? 0),
-    0,
+    0
   );
   const parserErrors = results.reduce(
     (sum, result) => sum + (result.parserErrors ?? 0),
-    0,
+    0
   );
   const syntaxCandidateFiles = results.reduce(
     (sum, result) => sum + (result.syntaxCandidateFiles ?? 0),
-    0,
+    0
   );
   const syntaxCandidateCount = results.reduce(
     (sum, result) => sum + (result.syntaxCandidateCount ?? 0),
-    0,
+    0
   );
   const driftRepositories = new Set(
     results
       .filter((result) => (result.findingsByRule?.[customRuleId] ?? 0) > 0)
-      .map((result) => result.repo),
+      .map((result) => result.repo)
   );
   return {
     schemaVersion: 1,
@@ -430,15 +430,15 @@ export async function undercheckedPredicateInventory({
     (previous, plan) =>
       previous.then(async () => {
         progress(
-          `[underchecked-predicate-inventory] scanning ${plan.repo}/${plan.label}`,
+          `[underchecked-predicate-inventory] scanning ${plan.repo}/${plan.label}`
         );
         const result = await runPlan(plan);
         progress(
-          `[underchecked-predicate-inventory] ${plan.repo}/${plan.label}: ${result.checkedFiles ?? 0} files, ${result.syntaxCandidateFiles ?? 0} predicate candidate files, ${result.findingsByRule?.[customRuleId] ?? 0} custom findings, ${result.parserErrors ?? 0} parser errors`,
+          `[underchecked-predicate-inventory] ${plan.repo}/${plan.label}: ${result.checkedFiles ?? 0} files, ${result.syntaxCandidateFiles ?? 0} predicate candidate files, ${result.findingsByRule?.[customRuleId] ?? 0} custom findings, ${result.parserErrors ?? 0} parser errors`
         );
         results.push(result);
       }),
-    Promise.resolve(),
+    Promise.resolve()
   );
   const summary = summarize({ results, slice });
   emit(summary, output, report);

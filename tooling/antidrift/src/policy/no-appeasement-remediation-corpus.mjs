@@ -11,7 +11,11 @@ const chaskiRemediationRepoCandidates = [
 ].filter(Boolean);
 const codebaseAtlasRemediationRepoCandidates = [
   process.env.CODEBASE_ATLAS_REMEDIATION_REPO,
-  resolve(homedir(), "code", "[antidrift-no-appeasement-remediation]-codebase-atlas"),
+  resolve(
+    homedir(),
+    "code",
+    "[antidrift-no-appeasement-remediation]-codebase-atlas"
+  ),
 ].filter(Boolean);
 
 const chaskiRemediationCases = [
@@ -61,7 +65,11 @@ const codebaseAtlasRemediationCases = [
 ];
 
 function parseArgs(argv) {
-  const out = { slice: "no-appeasement-remediation-copy", output: null, require: false };
+  const out = {
+    slice: "no-appeasement-remediation-copy",
+    output: null,
+    require: false,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     const next = argv[i + 1];
@@ -131,7 +139,9 @@ export async function noAppeasementRemediationCorpus({
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const result = await noAppeasementRemediationCorpus(parseArgs(process.argv.slice(2)));
+  const result = await noAppeasementRemediationCorpus(
+    parseArgs(process.argv.slice(2))
+  );
   if (result.decision === "fail") process.exitCode = 1;
 }
 

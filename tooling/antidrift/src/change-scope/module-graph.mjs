@@ -32,7 +32,7 @@ function gitOrThrow(args, cwd) {
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(
-      `git ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`,
+      `git ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`
     );
   }
   return result.stdout;
@@ -47,7 +47,7 @@ function runOrThrow(command, args, cwd) {
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(
-      `${command} ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`,
+      `${command} ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`
     );
   }
 }
@@ -60,7 +60,7 @@ function withMaterializedGitTree({ cwd, head }, callback) {
   try {
     gitOrThrow(
       ["archive", "--format=tar", `--output=${archivePath}`, head],
-      cwd,
+      cwd
     );
     runOrThrow("tar", ["-xf", archivePath, "-C", treeRoot], cwd);
     return callback(treeRoot);
@@ -72,11 +72,11 @@ function withMaterializedGitTree({ cwd, head }, callback) {
 function readTsconfig(cwd, tsconfig) {
   const configPath = resolve(cwd, tsconfig);
   const loaded = ts.readConfigFile(configPath, (fileName) =>
-    ts.sys.readFile(fileName),
+    ts.sys.readFile(fileName)
   );
   if (loaded.error) {
     throw new Error(
-      `module-graph-radius: could not read ${tsconfig}: ${ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n")}`,
+      `module-graph-radius: could not read ${tsconfig}: ${ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n")}`
     );
   }
   const parsed = ts.parseJsonConfigFileContent(
@@ -84,11 +84,11 @@ function readTsconfig(cwd, tsconfig) {
     ts.sys,
     dirname(configPath),
     undefined,
-    configPath,
+    configPath
   );
   if (parsed.errors.length > 0) {
     throw new Error(
-      `module-graph-radius: invalid ${tsconfig}: ${parsed.errors.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")).join("; ")}`,
+      `module-graph-radius: invalid ${tsconfig}: ${parsed.errors.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")).join("; ")}`
     );
   }
   return parsed;
@@ -101,13 +101,13 @@ function sourceFilesInRepo(program, cwd) {
       (sourceFile) =>
         !sourceFile.isDeclarationFile &&
         isTsSourcePath(sourceFile.fileName) &&
-        !repoPath(cwd, sourceFile.fileName).startsWith("../"),
+        !repoPath(cwd, sourceFile.fileName).startsWith("../")
     )
     .sort((left, right) =>
       compareStrings(
         repoPath(cwd, left.fileName),
-        repoPath(cwd, right.fileName),
-      ),
+        repoPath(cwd, right.fileName)
+      )
     );
 }
 
@@ -153,12 +153,12 @@ function resolveInternalModule({
     specifier,
     sourceFile.fileName,
     options,
-    ts.sys,
+    ts.sys
   ).resolvedModule;
   if (!resolved) {
     if (specifier.startsWith(".")) {
       throw new Error(
-        `module-graph-radius: could not resolve ${specifier} from ${sourceFile.fileName}`,
+        `module-graph-radius: could not resolve ${specifier} from ${sourceFile.fileName}`
       );
     }
     return null;
@@ -235,7 +235,7 @@ function touchedEntry({ file, graph, distances, maxTouchedModuleRadius }) {
   }
   if (!graph.has(file.path)) {
     throw new Error(
-      `module-graph-radius: changed TypeScript file ${file.path} is not included by the selected tsconfig`,
+      `module-graph-radius: changed TypeScript file ${file.path} is not included by the selected tsconfig`
     );
   }
   const distance = distances.get(file.path) ?? null;
@@ -264,7 +264,7 @@ export function collectTouchedModuleGraph({
   }
   if (!tsconfig) {
     throw new Error(
-      "module-graph-radius: --tsconfig is required when scope.allowedEntrypoints is configured",
+      "module-graph-radius: --tsconfig is required when scope.allowedEntrypoints is configured"
     );
   }
   return withMaterializedGitTree({ cwd, head }, (headRoot) =>
@@ -275,7 +275,7 @@ export function collectTouchedModuleGraph({
       changedFiles,
       allowedEntrypoints,
       maxTouchedModuleRadius,
-    }),
+    })
   );
 }
 
@@ -295,7 +295,7 @@ function collectTouchedModuleGraphFromDirectory({
   const sourceFiles = sourceFilesInRepo(program, cwd);
   const graph = new Map();
   const sourcePaths = new Set(
-    sourceFiles.map((sourceFile) => repoPath(cwd, sourceFile.fileName)),
+    sourceFiles.map((sourceFile) => repoPath(cwd, sourceFile.fileName))
   );
   for (const sourcePath of sourcePaths) addNode(graph, sourcePath);
   for (const sourceFile of sourceFiles) {
@@ -313,16 +313,16 @@ function collectTouchedModuleGraphFromDirectory({
     .map((path) => path.replace(/\\/gu, "/"))
     .sort(compareStrings);
   const missingEntrypoints = entrypoints.filter(
-    (entrypoint) => !graph.has(entrypoint),
+    (entrypoint) => !graph.has(entrypoint)
   );
   if (missingEntrypoints.length > 0) {
     throw new Error(
-      `module-graph-radius: scope.allowedEntrypoints missing from selected tsconfig: ${missingEntrypoints.join(", ")}`,
+      `module-graph-radius: scope.allowedEntrypoints missing from selected tsconfig: ${missingEntrypoints.join(", ")}`
     );
   }
   const distances = shortestDistances(graph, entrypoints);
   const touchedFiles = touchedTsFiles(changedFiles).map((file) =>
-    touchedEntry({ file, graph, distances, maxTouchedModuleRadius }),
+    touchedEntry({ file, graph, distances, maxTouchedModuleRadius })
   );
   const outOfRadius =
     typeof maxTouchedModuleRadius === "number"

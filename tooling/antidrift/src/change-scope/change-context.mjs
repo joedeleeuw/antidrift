@@ -39,7 +39,7 @@ export function gitOrThrow(args, cwd) {
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(
-      `git ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`,
+      `git ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`
     );
   }
   return result.stdout;
@@ -69,7 +69,7 @@ export function changedFilesBetween({ base, head, cwd }) {
       base,
       head,
     ],
-    cwd,
+    cwd
   );
   const entries = [];
   for (const line of raw.split("\n")) {
@@ -79,7 +79,7 @@ export function changedFilesBetween({ base, head, cwd }) {
     const operation = STATUS_OPERATION[letter];
     if (operation === undefined) {
       throw new Error(
-        `unsupported git status "${parts[0]}" for path ${parts[1] ?? ""} in ${cwd}`,
+        `unsupported git status "${parts[0]}" for path ${parts[1] ?? ""} in ${cwd}`
       );
     }
     if (letter === "R" || letter === "C") {
@@ -112,7 +112,7 @@ export function patchHunksBetween({ base, head, cwd }) {
       base,
       head,
     ],
-    cwd,
+    cwd
   );
   const hunksByPath = {};
   let currentPath = null;
@@ -133,9 +133,9 @@ export function patchHunksBetween({ base, head, cwd }) {
   return Object.freeze(
     Object.fromEntries(
       Object.entries(hunksByPath).sort(([left], [right]) =>
-        compareStrings(left, right),
-      ),
-    ),
+        compareStrings(left, right)
+      )
+    )
   );
 }
 
@@ -154,7 +154,7 @@ export function fileAt({ ref, path, cwd }) {
     const stderr = (result.stderr ?? "").trim();
     if (/does not exist in|but not in/iu.test(stderr)) return null;
     throw new Error(
-      `git show ${ref}:${path} failed in ${cwd} (status ${result.status}): ${stderr}`,
+      `git show ${ref}:${path} failed in ${cwd} (status ${result.status}): ${stderr}`
     );
   }
   return result.stdout;
@@ -196,7 +196,7 @@ export function addedDependencies({ base, head, cwd, changedFiles }) {
   const manifests = changedFiles
     .map((file) => file.path)
     .filter(
-      (path) => path === "package.json" || path.endsWith("/package.json"),
+      (path) => path === "package.json" || path.endsWith("/package.json")
     );
   const runtime = new Set();
   const dev = new Set();

@@ -18,6 +18,7 @@ is a meta-layer that classifies changed files and emits impact notices; it is no
 AST-resident, single-file or cross-file graph proof. No git history required.
 
 #### pattern_fragmentation (`PATTERN_FRAGMENTATION`)
+
 - **What it detects:** Multiple incompatible implementations of the same pattern category (error
   handling, API endpoints, caching, etc.) within the same directory module. Claims to catch the
   "different AI sessions produced different conventions" failure mode.
@@ -38,6 +39,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/pattern_fragmentation.py`.
 
 #### mutant_duplicate (`MUTANT_DUPLICATE`)
+
 - **What it detects:** Near-duplicate function bodies within the codebase — structural
   copy-paste-then-modify, the "same function written twice across AI sessions" pattern.
 - **Detection approach:** Three-stage pipeline:
@@ -45,7 +47,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   2. AST Jaccard similarity on token sets — deterministic, O(n²) within LOC-buckets.
   3. Optional hybrid `0.6 × ast_jaccard + 0.4 × cosine_embedding` when
      `sentence-transformers` + FAISS are installed (opt-in via `embeddings_enabled`).
-  `incremental_scope = "cross_file"` (default `repo_wide` base).
+     `incremental_scope = "cross_file"` (default `repo_wide` base).
 - **Type:** warn / score.
 - **Adversarial note:** This is the closest drift gets to our `clone-detection` bucket. The base
   (Stage 1+2) is a genuine structural clone detector — body hash equality is exact proof; AST
@@ -57,6 +59,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/mutant_duplicates.py`.
 
 #### cohesion_deficit (`COHESION_DEFICIT`)
+
 - **What it detects:** "God files" — files whose functions/classes have low pairwise name-token
   Jaccard similarity, indicating many unrelated responsibilities in one module.
 - **Detection approach:** Tokenizes function/class names (camelCase split + stopword removal),
@@ -71,6 +74,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/cohesion_deficit.py`.
 
 #### dead_code_accumulation (`DEAD_CODE_ACCUMULATION`)
+
 - **What it detects:** Exported symbols (functions, classes) that are never imported elsewhere in
   the project — candidates for dead code left behind after AI refactors.
 - **Detection approach:** Builds a cross-file import table from all `ParseResult.imports`, then
@@ -86,6 +90,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/dead_code_accumulation.py`.
 
 #### phantom_reference (`PHANTOM_REFERENCE`)
+
 - **What it detects:** Function calls and attribute accesses referencing names that do not exist
   in the local scope or in the project-wide export table — hallucinated helpers.
 - **Detection approach:** Builds a project-wide export table from all parse results, then
@@ -101,6 +106,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/phantom_reference.py`.
 
 #### naming_contract_violation (`NAMING_CONTRACT_VIOLATION`)
+
 - **What it detects:** Functions whose name implies a behavioral contract that the AST does not
   fulfill — `validate_*` without a raise/return-False path, `is_*` without bool return,
   `try_*` without try/except, etc.
@@ -115,6 +121,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/naming_contract_violation.py`.
 
 #### guard_clause_deficit (`GUARD_CLAUSE_DEFICIT`)
+
 - **What it detects:** Modules where public functions uniformly lack input guard clauses
   (isinstance checks, early raise/return on bad input) and/or have excessive nesting depth.
 - **Detection approach:** Per-file AST walk. Checks first N statements of each public function
@@ -129,6 +136,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/guard_clause_deficit.py`.
 
 #### fan_out_explosion (`FAN_OUT_EXPLOSION`)
+
 - **What it detects:** Files importing an excessive number of unique modules (god-file coupling
   hub, indicating the file has too many responsibilities).
 - **Detection approach:** Counts unique top-level package dependencies from `ParseResult.imports`.
@@ -140,6 +148,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/fan_out_explosion.py`.
 
 #### cognitive_complexity (`COGNITIVE_COMPLEXITY`)
+
 - **What it detects:** Functions whose cognitive complexity (SonarSource model: nesting-weighted
   control-flow increments) exceeds a configurable threshold.
 - **Detection approach:** Python: `ast` recursive walk with nesting tracking. TypeScript: tree-
@@ -150,6 +159,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/cognitive_complexity.py`.
 
 #### bypass_accumulation (`BYPASS_ACCUMULATION`)
+
 - **What it detects:** Files with high density of quality-bypass markers: `# type: ignore`,
   `# noqa`, `# pragma: no cover`, `cast()`, `@ts-ignore`, `as any`, `TODO`/`FIXME`/`HACK`.
 - **Detection approach:** Regex line-scan over source text. Not AST-based — pure text pattern
@@ -162,6 +172,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/bypass_accumulation.py`.
 
 #### broad_exception_monoculture (`BROAD_EXCEPTION_MONOCULTURE`)
+
 - **What it detects:** Modules where _all_ exception handlers are uniformly broad (catching
   `Exception`, `BaseException`, bare `except`) and uniformly swallowing (pass/log/print without
   re-raise).
@@ -177,6 +188,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/broad_exception_monoculture.py`.
 
 #### test_polarity_deficit (`TEST_POLARITY_DEFICIT`)
+
 - **What it detects:** Test suites that contain only happy-path assertions and no negative tests
   (`pytest.raises`, `assertFalse`, boundary/edge test names).
 - **Detection approach:** Per-file AST walk on test files. Counts negative assertion methods,
@@ -188,6 +200,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/test_polarity_deficit.py`.
 
 #### explainability_deficit (`EXPLAINABILITY_DEFICIT`)
+
 - **What it detects:** High-complexity functions that lack documentation (no docstring) and have
   no co-located test file, especially when AI-attributed.
 - **Detection approach:** Per-file: checks `FunctionInfo.docstring`, `FunctionInfo.complexity`
@@ -199,6 +212,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/explainability_deficit.py`.
 
 #### hardcoded_secret (`HARDCODED_SECRET`)
+
 - **What it detects:** Variable assignments with security-sensitive names paired with string
   literals having known API token prefixes or high Shannon entropy.
 - **Detection approach:** Python: `ast` assignment node walk + regex on variable names + entropy
@@ -212,6 +226,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/hardcoded_secret.py`.
 
 #### insecure_default (`INSECURE_DEFAULT`)
+
 - **What it detects:** Insecure configuration defaults: `DEBUG = True`, `ALLOWED_HOSTS = ["*"]`,
   `CORS_ALLOW_ALL_ORIGINS = True`, `verify=False` in requests, `cors({ origin: '*' })`, etc.
 - **Detection approach:** Per-file AST (Python `ast` / tree-sitter for TS). Matches specific
@@ -224,6 +239,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/insecure_default.py`.
 
 #### missing_authorization (`MISSING_AUTHORIZATION`)
+
 - **What it detects:** API endpoint functions that lack any authorization check (no auth
   decorator, no auth mixin, no auth-named parameter).
 - **Detection approach:** Uses `ParseResult.patterns` (category `API_ENDPOINT`) from ingestion to
@@ -238,6 +254,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/missing_authorization.py`.
 
 #### type_safety_bypass (`TYPE_SAFETY_BYPASS`)
+
 - **What it detects:** TypeScript type-escape-hatch accumulation: `as any`, double casts
   (`as unknown as T`), non-null assertions (`!`), `@ts-ignore`, `@ts-expect-error`.
 - **Detection approach:** Tree-sitter AST walk for TS/TSX files. Counts bypass nodes. Regex
@@ -250,6 +267,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/type_safety_bypass.py`.
 
 #### doc_impl_drift (`DOC_IMPL_DRIFT`)
+
 - **What it detects:** Divergence between ADR/README documentation (referenced paths, modules,
   patterns) and what actually exists on disk — documentation that claims paths or module names
   that are gone or renamed.
@@ -265,6 +283,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/doc_impl_drift.py`.
 
 #### circular_import (`CIRCULAR_IMPORT`)
+
 - **What it detects:** Circular import chains within Python packages.
 - **Detection approach:** Builds a directed import graph from `ParseResult.imports` for all
   Python files, runs elementary cycle detection via DFS. Filters cycles to those where all
@@ -278,6 +297,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
   File: `src/drift/signals/circular_import.py`.
 
 #### ts_architecture (`TS_ARCHITECTURE`) — wrapper
+
 - **What it detects:** Orchestrates four TS/JS rules:
   1. `circular_module_detection` — cycle detection on TS import graph.
   2. `cross_package_import_ban` — forbidden cross-package imports in monorepos.
@@ -304,6 +324,7 @@ AST-resident, single-file or cross-file graph proof. No git history required.
 Signals that require git history or cross-commit comparison.
 
 #### temporal_volatility (`TEMPORAL_VOLATILITY`)
+
 - **What it detects:** Files with statistically anomalous churn, author diversity, or
   defect-correlated commit frequency over a 30-day rolling window. Boosted when AI-attributed.
 - **Detection approach:** Reads `FileHistory` objects populated by `ingestion/git_history.py`
@@ -321,6 +342,7 @@ Signals that require git history or cross-commit comparison.
   File: `src/drift/signals/temporal_volatility.py`.
 
 #### exception_contract_drift (`EXCEPTION_CONTRACT_DRIFT`)
+
 - **What it detects:** Public functions whose exception profile (raised types, caught types) has
   changed across recent commits while the signature (name + arity) remained stable — silent
   contract changes.
@@ -336,6 +358,7 @@ Signals that require git history or cross-commit comparison.
   File: `src/drift/signals/exception_contract_drift.py`.
 
 #### co_change_coupling (`CO_CHANGE_COUPLING`)
+
 - **What it detects:** File pairs that repeatedly change together in commits without having an
   explicit import relationship — hidden coupling that bypasses the module graph.
 - **Detection approach:** Reads `CommitInfo` objects from `FileHistory.commits` (populated by
@@ -352,6 +375,7 @@ Signals that require git history or cross-commit comparison.
   File: `src/drift/signals/co_change_coupling.py`.
 
 #### system_misalignment (`SYSTEM_MISALIGNMENT`)
+
 - **What it detects:** Recently modified files that introduce third-party imports not established
   in the module's baseline dependency set — "agent changed the dependency envelope."
 - **Detection approach:** Builds a per-directory import baseline from `FileHistory` for files
@@ -377,6 +401,7 @@ cycle-detection and cross-package-import-ban components. The `ARCHITECTURE_VIOLA
 is the Python-side equivalent.
 
 #### architecture_violation (`ARCHITECTURE_VIOLATION`)
+
 - **What it detects:** Python imports that violate configured layer boundaries (e.g., a route
   handler importing from a database module).
 - **Detection approach:** Builds a directed import graph from `ParseResult.imports` using
@@ -400,14 +425,14 @@ is the Python-side equivalent.
 `src/drift/blast_radius/` is an impact-classification layer invoked around PR/commit boundaries.
 It is not a signal and does not produce `Finding` objects in the main pipeline.
 
-- **_change_detector.py:** Runs `git diff --name-only <ref>..<head>` plus working-tree diff to
+- **\_change_detector.py:** Runs `git diff --name-only <ref>..<head>` plus working-tree diff to
   enumerate changed files. Deterministic, stdlib-only, no LLM.
-- **_arch_analyzer.py:** Loads `ArchGraph` (a persisted module dependency graph) and finds
+- **\_arch_analyzer.py:** Loads `ArchGraph` (a persisted module dependency graph) and finds
   transitive consumers of changed modules. Provides "module X depends on changed module Y —
   re-validate" impact notices.
-- **_policy_analyzer.py:** Glob-matches changed file paths against policy rules (e.g., changes
+- **\_policy_analyzer.py:** Glob-matches changed file paths against policy rules (e.g., changes
   to `src/drift/signals/**` require audit artifact updates). Emits `BlastImpact` notices.
-- **_adr_analyzer.py:** Detects changes near ADR decision records and flags potential doc drift.
+- **\_adr_analyzer.py:** Detects changes near ADR decision records and flags potential doc drift.
 
 **This is the most genuinely change-aware layer in drift**, but it is advisory (produces
 `BlastImpact` notices for agents/reviewers, not blocking findings in the CI gate by default).
@@ -428,9 +453,10 @@ lists, not taint.
 ### 6. clone-detection
 
 `mutant_duplicate` is the primary signal here (see semantic-ast above). The base (body-hash
-+ AST Jaccard) is genuine structural clone detection. Embedding-based semantic clone detection
-is opt-in and infrastructure-gated (requires sentence-transformers + FAISS). There is no
-cross-repo clone detection or Type-3 semantic clone detection in the deterministic tier.
+
+- AST Jaccard) is genuine structural clone detection. Embedding-based semantic clone detection
+  is opt-in and infrastructure-gated (requires sentence-transformers + FAISS). There is no
+  cross-repo clone detection or Type-3 semantic clone detection in the deterministic tier.
 
 ---
 
@@ -496,6 +522,7 @@ swallow), but does not prove that a specific caught error fails to reach any rea
 `guard_clause_deficit` detects missing input validation but not error-path destinations.
 
 Concrete example:
+
 ```typescript
 async function loadConfig(): Promise<Config> {
   try {
@@ -505,6 +532,7 @@ async function loadConfig(): Promise<Config> {
   }
 }
 ```
+
 The error is silently swallowed into a default. `broad_exception_monoculture` fires only if
 the _entire module_ uses this pattern uniformly. If one other handler in the module re-raises,
 BEM does not fire. `guard_clause_deficit` does not fire (no parameter guard issue). No drift
@@ -531,13 +559,13 @@ case where a developer simply declares a parallel type in a different file.
 
 ## Adversarial summary: claim vs. code mismatches
 
-| Claim | Reality |
-|---|---|
-| "Pattern fragmentation detects AI session inconsistency" | Fingerprint-variant grouping on ingestion-extracted AST summaries; accuracy bounded by ingestion quality, not formal equivalence. |
-| "Architecture violation detects layer violations" | True for Python with user-configured layers. For TS, import graph is regex-based (not tsc resolution); layer inference without config is embedding cosine similarity (probabilistic). |
-| "Mutant duplicate detects copy-paste drift" | Body-hash and AST Jaccard are genuine structural clone metrics. Embedding tier is opt-in, infrastructure-gated. Type declaration clones (not function bodies) are not covered. |
-| "Missing authorization maps to CWE-862" | Presence-of-auth-marker, not reachability proof. Non-standard auth frameworks, inline auth checks with novel names, or dependency-injected auth will all produce false positives or false negatives. |
-| "Hardcoded secret is deterministic" | Correct, but detection is variable-name regex + entropy threshold — the standard shallow heuristic, not taint. Assignment to non-standard variable names or indirect assignment is missed. |
-| "Exception contract drift compares commits" | True: uses `git show` subprocess for actual diff-relative comparison. Genuine diff-relative proof for exception profiles. |
-| "Co-change coupling detects hidden coupling" | Genuine association-rule mining on commit history. The coupling claim is real proof, not a heuristic. |
-| "Blast radius is change-aware" | True, but advisory only. ArchGraph must be pre-built; without it the arch impact analysis silently skips. |
+| Claim                                                    | Reality                                                                                                                                                                                              |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Pattern fragmentation detects AI session inconsistency" | Fingerprint-variant grouping on ingestion-extracted AST summaries; accuracy bounded by ingestion quality, not formal equivalence.                                                                    |
+| "Architecture violation detects layer violations"        | True for Python with user-configured layers. For TS, import graph is regex-based (not tsc resolution); layer inference without config is embedding cosine similarity (probabilistic).                |
+| "Mutant duplicate detects copy-paste drift"              | Body-hash and AST Jaccard are genuine structural clone metrics. Embedding tier is opt-in, infrastructure-gated. Type declaration clones (not function bodies) are not covered.                       |
+| "Missing authorization maps to CWE-862"                  | Presence-of-auth-marker, not reachability proof. Non-standard auth frameworks, inline auth checks with novel names, or dependency-injected auth will all produce false positives or false negatives. |
+| "Hardcoded secret is deterministic"                      | Correct, but detection is variable-name regex + entropy threshold — the standard shallow heuristic, not taint. Assignment to non-standard variable names or indirect assignment is missed.           |
+| "Exception contract drift compares commits"              | True: uses `git show` subprocess for actual diff-relative comparison. Genuine diff-relative proof for exception profiles.                                                                            |
+| "Co-change coupling detects hidden coupling"             | Genuine association-rule mining on commit history. The coupling claim is real proof, not a heuristic.                                                                                                |
+| "Blast radius is change-aware"                           | True, but advisory only. ArchGraph must be pre-built; without it the arch impact analysis silently skips.                                                                                            |

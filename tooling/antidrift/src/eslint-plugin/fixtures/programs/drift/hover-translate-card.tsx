@@ -3,5 +3,11 @@ function cn(...classes: string[]) {
 }
 
 export function ProductCard() {
-  return <article className={cn("rounded-md border border-border", "hover:-translate-y-1")}>Plan</article>;
+  return (
+    <article
+      className={cn("rounded-md border border-border", "hover:-translate-y-1")}
+    >
+      Plan
+    </article>
+  );
 }

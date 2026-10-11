@@ -11,7 +11,7 @@ const ReadonlyDefaultSchema = z
   .default({ a: "" });
 
 export const DefaultMutableCopySchema = ReadonlyDefaultSchema.transform(
-  (record) => ({ a: record.a }),
+  (record) => ({ a: record.a })
 );
 
 const ReadonlyCatchSchema = z
@@ -20,5 +20,5 @@ const ReadonlyCatchSchema = z
   .catch({ a: "" });
 
 export const CatchMutableCopySchema = ReadonlyCatchSchema.transform(
-  (record) => ({ a: record.a }),
+  (record) => ({ a: record.a })
 );

@@ -41,8 +41,8 @@ function writeProject() {
         include: ["src/**/*.ts"],
       },
       null,
-      2,
-    )}\n`,
+      2
+    )}\n`
   );
   write(
     "src/page.ts",
@@ -52,7 +52,7 @@ function writeProject() {
       'export async function loadLazy() { return import("./lazy"); }',
       "export const page = format();",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   write(
     "src/feature/format.ts",
@@ -62,7 +62,7 @@ function writeProject() {
       "  return helper();",
       "}",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   write("src/feature/deep/helper.ts", "export const helper = () => 1;\n");
   write("src/alt.ts", "export const alt = 1;\n");
@@ -103,8 +103,8 @@ describe("collectTouchedModuleGraph", () => {
     expect(result.edges).toBe(4);
     expect(
       Object.fromEntries(
-        result.touchedFiles.map((file) => [file.path, file.distance]),
-      ),
+        result.touchedFiles.map((file) => [file.path, file.distance])
+      )
     ).toEqual({
       "src/alt.ts": 1,
       "src/feature/deep/helper.ts": 2,
@@ -129,7 +129,7 @@ describe("collectTouchedModuleGraph", () => {
         'import { helper } from "./feature/deep/helper";',
         "export const page = helper();",
         "",
-      ].join("\n"),
+      ].join("\n")
     );
 
     const result = collectTouchedModuleGraph({
@@ -167,7 +167,7 @@ describe("collectTouchedModuleGraph", () => {
         tsconfig: "tsconfig.json",
         changedFiles: [],
         allowedEntrypoints: ["src/missing.ts"],
-      }),
+      })
     ).toThrow(/allowedEntrypoints missing/u);
   });
 
@@ -186,7 +186,7 @@ describe("collectTouchedModuleGraph", () => {
           { path: "other/stray.ts", operation: "modify", oldPath: null },
         ],
         allowedEntrypoints: ["src/page.ts"],
-      }),
+      })
     ).toThrow(/not included by the selected tsconfig/u);
   });
 });

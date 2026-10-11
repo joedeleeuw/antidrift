@@ -40,7 +40,7 @@ export const noTutorialCommentsRule = {
     return {
       Program() {
         for (const comment of toNodeArray(
-          context.sourceCode.getAllComments(),
+          context.sourceCode.getAllComments()
         )) {
           if (!TUTORIAL_COMMENT_PATTERN.test(getCommentText(comment))) {
             continue;

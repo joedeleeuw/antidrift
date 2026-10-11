@@ -134,18 +134,18 @@ const omittedKeysOf = (typeNode, localTypes, open = new Set()) => {
                   !supplier.removed.has(key) &&
                   members[index]?.suppliers.some(
                     (own) =>
-                      own.removed.has(key) && own.source === supplier.source,
-                  ),
-              ),
-          ),
-      ),
+                      own.removed.has(key) && own.source === supplier.source
+                  )
+              )
+          )
+      )
     );
   }
   if (typeNode.type === "TSUnionType") {
     return intersectAll(
       typeNode.types
         .filter((member) => !EMPTY_SPREAD_KEYWORDS.has(member.type))
-        .map((member) => new Set(omittedKeysOf(member, localTypes, open))),
+        .map((member) => new Set(omittedKeysOf(member, localTypes, open)))
     );
   }
   if (typeNode.type === "TSTypeReference") {
@@ -183,14 +183,14 @@ const reintroducedKeysOf = (typeNode, localTypes, open = new Set()) => {
     typeNode.type === "TSUnionType"
   ) {
     return typeNode.types.flatMap((member) =>
-      reintroducedKeysOf(member, localTypes, open),
+      reintroducedKeysOf(member, localTypes, open)
     );
   }
   if (typeNode.type === "TSTypeLiteral") {
     return (typeNode.members ?? [])
       .filter((member) => member.type === "TSPropertySignature")
       .map((member) =>
-        member.computed === true ? null : getPropertyName(member.key),
+        member.computed === true ? null : getPropertyName(member.key)
       )
       .filter((name) => name !== null);
   }
@@ -200,7 +200,7 @@ const reintroducedKeysOf = (typeNode, localTypes, open = new Set()) => {
     if (name === OMIT_TYPE) {
       const removed = new Set(literalKeysOf(args.at(1)));
       return reintroducedKeysOf(args.at(0), localTypes, open).filter(
-        (key) => !removed.has(key),
+        (key) => !removed.has(key)
       );
     }
     if (MODIFIER_UTILITIES.has(name)) {
@@ -231,7 +231,7 @@ const propsBindingOf = (param) => {
     return null;
   }
   const rest = param.properties?.find(
-    (property) => property.type === "RestElement",
+    (property) => property.type === "RestElement"
   );
   return isIdentifier(rest?.argument) ? rest.argument : null;
 };
@@ -275,7 +275,7 @@ const spreadCanDeliver = (attribute, key) => {
     (property) =>
       property.type !== "Property" ||
       property.computed === true ||
-      getPropertyName(property.key) === key,
+      getPropertyName(property.key) === key
   );
 };
 export default {
@@ -343,7 +343,7 @@ export default {
           ...reintroducedKeysOf(propsType, localTypes),
         ]);
         const keys = omittedKeysOf(propsType, localTypes).filter(
-          (key) => !carried.has(key),
+          (key) => !carried.has(key)
         );
         if (keys.length > 0) {
           omittedByBinding.set(binding.range[0], new Set(keys));
@@ -385,13 +385,13 @@ export default {
         const lastOverrideIndex = attributes.findLastIndex(
           (attribute) =>
             attribute.type === "JSXSpreadAttribute" &&
-            spreadCanDeliver(attribute, key),
+            spreadCanDeliver(attribute, key)
         );
         if (lastOverrideIndex === -1) {
           continue;
         }
         const pin = attributes.find(
-          (attribute) => attributeName(attribute) === key,
+          (attribute) => attributeName(attribute) === key
         );
         if (pin !== undefined && attributes.indexOf(pin) > lastOverrideIndex) {
           continue;
@@ -430,7 +430,7 @@ export default {
       JSXElement(node) {
         if (
           node.openingElement.attributes.some(
-            (attribute) => attribute.type === "JSXSpreadAttribute",
+            (attribute) => attribute.type === "JSXSpreadAttribute"
           )
         ) {
           spreadElements.push(node);

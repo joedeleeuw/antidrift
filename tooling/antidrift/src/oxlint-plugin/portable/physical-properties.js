@@ -10,52 +10,52 @@ const PHYSICAL_REPLACEMENTS = [
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)text-left(?=["'\s`})]|$)/gu,
-      "$1$2text-start",
+      "$1$2text-start"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)text-right(?=["'\s`})]|$)/gu,
-      "$1$2text-end",
+      "$1$2text-end"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)border-l(?=[-\s"'`})]|$)/gu,
-      "$1$2border-s",
+      "$1$2border-s"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)border-r(?=[-\s"'`})]|$)/gu,
-      "$1$2border-e",
+      "$1$2border-e"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)rounded-tl(?=[-\s"'`})]|$)/gu,
-      "$1$2rounded-ss",
+      "$1$2rounded-ss"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)rounded-tr(?=[-\s"'`})]|$)/gu,
-      "$1$2rounded-se",
+      "$1$2rounded-se"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)rounded-bl(?=[-\s"'`})]|$)/gu,
-      "$1$2rounded-es",
+      "$1$2rounded-es"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)rounded-br(?=[-\s"'`})]|$)/gu,
-      "$1$2rounded-ee",
+      "$1$2rounded-ee"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)rounded-l(?=[-\s"'`})]|$)/gu,
-      "$1$2rounded-s",
+      "$1$2rounded-s"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)rounded-r(?=[-\s"'`})]|$)/gu,
-      "$1$2rounded-e",
+      "$1$2rounded-e"
     ),
   (value) =>
     value.replace(/(^|[\s"'`{(])(-?)((?:[\w[\]:]*:)?)left-/gu, "$1$2$3start-"),
@@ -64,22 +64,22 @@ const PHYSICAL_REPLACEMENTS = [
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)scroll-ml-/gu,
-      "$1$2scroll-ms-",
+      "$1$2scroll-ms-"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)scroll-mr-/gu,
-      "$1$2scroll-me-",
+      "$1$2scroll-me-"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)scroll-pl-/gu,
-      "$1$2scroll-ps-",
+      "$1$2scroll-ps-"
     ),
   (value) =>
     value.replace(
       /(^|[\s"'`{(])((?:[\w[\]:]*:)?)scroll-pr-/gu,
-      "$1$2scroll-pe-",
+      "$1$2scroll-pe-"
     ),
 ];
 const replaceOutsideArbitraryBrackets = (value, replace) => {

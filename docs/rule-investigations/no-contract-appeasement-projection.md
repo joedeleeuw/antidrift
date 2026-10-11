@@ -16,7 +16,7 @@ It also covers cross-contract discriminant projection:
 
 ```ts
 function actionForEventKind(
-  eventKind: EventKind,
+  eventKind: EventKind
 ): MemoryResult["action"] | undefined {
   if (eventKind === "recall" || eventKind === "capture") return eventKind;
   return undefined;
@@ -43,7 +43,7 @@ The selector-wrapper branch remains covered by exact projected-type restatement.
 
 ```ts
 export function actionForEventKind(
-  eventKind: EventKind,
+  eventKind: EventKind
 ): MemoryResult["action"] | undefined {
   if (eventKind === "recall" || eventKind === "capture") return eventKind;
   return undefined;

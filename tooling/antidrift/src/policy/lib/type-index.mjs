@@ -49,13 +49,12 @@ export function typePropsDetailed(checker, type) {
     const declarations = sym.declarations ?? [];
     const method = declarations.some(
       (declaration) =>
-        ts.isMethodSignature(declaration) ||
-        ts.isMethodDeclaration(declaration),
+        ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration)
     );
     const readonly = declarations.some((declaration) =>
       (ts.getModifiers(declaration) ?? []).some(
-        (modifier) => modifier.kind === ts.SyntaxKind.ReadonlyKeyword,
-      ),
+        (modifier) => modifier.kind === ts.SyntaxKind.ReadonlyKeyword
+      )
     );
     const optional = (sym.flags & ts.SymbolFlags.Optional) !== 0;
     const str = checker.typeToString(checker.getTypeOfSymbol(sym));
@@ -145,7 +144,7 @@ function candidateFor(checker, sym, pkg, metadata = {}) {
     checker,
     declared,
     `${pkg}#${sym.getName()}`,
-    metadata,
+    metadata
   );
 }
 
@@ -154,7 +153,7 @@ function exportedObjectTypes(
   checker,
   sourceFilter,
   labelFor,
-  metadataFor,
+  metadataFor
 ) {
   const candidates = [];
   const seen = new Set();
@@ -168,7 +167,7 @@ function exportedObjectTypes(
         checker,
         sym,
         labelPrefix,
-        metadataFor(sf),
+        metadataFor(sf)
       );
       if (candidate && !seen.has(candidate.label)) {
         seen.add(candidate.label);
@@ -188,7 +187,7 @@ export function collectCanonicalTypes(program, checker) {
     checker,
     (sf) => sf.isDeclarationFile && isCanonicalSource(sf.fileName),
     (sf) => packageOf(sf.fileName),
-    () => ({ authority: "installed-package", authorityState: "proposal" }),
+    () => ({ authority: "installed-package", authorityState: "proposal" })
   );
 }
 
@@ -211,7 +210,7 @@ function packageTypeOwnerEntries(packageTypeOwners = {}) {
 
 function acceptedPackageCandidate(checker, exports, entry) {
   const sym = exports.find(
-    (candidate) => candidate.getName() === entry.exportName,
+    (candidate) => candidate.getName() === entry.exportName
   );
   const candidate = sym
     ? candidateFor(checker, sym, entry.package, {
@@ -238,7 +237,7 @@ function collectAcceptedPackageCandidates(checker, exports, entries, seen) {
 export function collectAcceptedPackageCanonicalTypes(
   program,
   checker,
-  packageTypeOwners = {},
+  packageTypeOwners = {}
 ) {
   const entries = packageTypeOwnerEntries(packageTypeOwners);
   if (entries.length === 0) return [];
@@ -247,7 +246,7 @@ export function collectAcceptedPackageCanonicalTypes(
   for (const sf of program.getSourceFiles()) {
     if (!sf.isDeclarationFile || !isCanonicalSource(sf.fileName)) continue;
     const matchingEntries = entries.filter(
-      (entry) => entry.package === packageOf(sf.fileName),
+      (entry) => entry.package === packageOf(sf.fileName)
     );
     if (matchingEntries.length === 0) continue;
     const moduleSym = checker.getSymbolAtLocation(sf);
@@ -257,8 +256,8 @@ export function collectAcceptedPackageCanonicalTypes(
         checker,
         checker.getExportsOfModule(moduleSym),
         matchingEntries,
-        seen,
-      ),
+        seen
+      )
     );
   }
   return candidates;
@@ -281,10 +280,10 @@ function matchesGeneratedSource(fileName, generated) {
 export function collectGeneratedCanonicalTypes(
   program,
   checker,
-  generatedSources = {},
+  generatedSources = {}
 ) {
   const entries = Object.entries(generatedSources).filter(
-    ([, entry]) => typeof entry?.generated === "string",
+    ([, entry]) => typeof entry?.generated === "string"
   );
   if (entries.length === 0) return [];
   return exportedObjectTypes(
@@ -292,21 +291,21 @@ export function collectGeneratedCanonicalTypes(
     checker,
     (sf) =>
       entries.some(([, entry]) =>
-        matchesGeneratedSource(sf.fileName, entry.generated),
+        matchesGeneratedSource(sf.fileName, entry.generated)
       ),
     (sf) => {
       const matched = entries.find(([, entry]) =>
-        matchesGeneratedSource(sf.fileName, entry.generated),
+        matchesGeneratedSource(sf.fileName, entry.generated)
       );
       return matched?.[0] ?? sf.fileName.replace(/\\/gu, "/");
     },
-    () => ({ authority: "generated-source", authorityState: "accepted" }),
+    () => ({ authority: "generated-source", authorityState: "accepted" })
   );
 }
 
 export function resolvesToGeneratedType(type, generatedSources = {}) {
   const entries = Object.values(generatedSources).filter(
-    (entry) => typeof entry?.generated === "string",
+    (entry) => typeof entry?.generated === "string"
   );
   if (!type || entries.length === 0) return false;
   const symbols = [
@@ -316,9 +315,9 @@ export function resolvesToGeneratedType(type, generatedSources = {}) {
   return symbols.some((sym) =>
     (sym?.getDeclarations?.() ?? sym?.declarations ?? []).some((decl) =>
       entries.some((entry) =>
-        matchesGeneratedSource(decl.getSourceFile().fileName, entry.generated),
-      ),
-    ),
+        matchesGeneratedSource(decl.getSourceFile().fileName, entry.generated)
+      )
+    )
   );
 }
 
@@ -354,7 +353,7 @@ function matchesRegistryFile(fileName, owner) {
 export function collectDomainCanonicalTypes(
   program,
   checker,
-  canonicalEntities = {},
+  canonicalEntities = {}
 ) {
   const entries = canonicalEntityEntries(canonicalEntities);
   if (entries.length === 0) return [];
@@ -362,7 +361,7 @@ export function collectDomainCanonicalTypes(
   const seen = new Set();
   for (const sf of program.getSourceFiles()) {
     const matchingEntries = entries.filter((entry) =>
-      matchesRegistryFile(sf.fileName, entry.owner),
+      matchesRegistryFile(sf.fileName, entry.owner)
     );
     if (matchingEntries.length === 0) continue;
     const moduleSym = checker.getSymbolAtLocation(sf);
@@ -370,7 +369,7 @@ export function collectDomainCanonicalTypes(
     const exports = checker.getExportsOfModule(moduleSym);
     for (const entry of matchingEntries) {
       const sym = exports.find(
-        (candidate) => candidate.getName() === entry.exportName,
+        (candidate) => candidate.getName() === entry.exportName
       );
       const candidate = sym
         ? candidateFor(checker, sym, entry.owner, {
@@ -400,9 +399,9 @@ export function resolvesToDomainCanonicalType(type, canonicalEntities = {}) {
       return entries.some(
         (entry) =>
           entry.exportName === name &&
-          matchesRegistryFile(sourceFile.fileName, entry.owner),
+          matchesRegistryFile(sourceFile.fileName, entry.owner)
       );
-    }),
+    })
   );
 }
 
@@ -471,7 +470,7 @@ function convexDocCandidates(checker, sourceFile) {
       checker,
       docType,
       `${CONVEX_DATA_MODEL_MODULE}#Doc<"${tableSym.getName()}">`,
-      convexOwnerMetadata,
+      convexOwnerMetadata
     );
     if (candidate) candidates.push(candidate);
   }
@@ -490,7 +489,7 @@ function collectFunctionReferenceCandidates(
   path,
   depth,
   seenTypes,
-  out,
+  out
 ) {
   if (!type || depth <= 0 || !isObjectType(type) || seenTypes.has(type)) {
     return;
@@ -498,10 +497,10 @@ function collectFunctionReferenceCandidates(
   seenTypes.add(type);
   const props = checker.getPropertiesOfType(type);
   const returnProp = props.find(
-    (prop) => prop.getName() === FUNCTION_REFERENCE_RETURN_PROP,
+    (prop) => prop.getName() === FUNCTION_REFERENCE_RETURN_PROP
   );
   const argsProp = props.find(
-    (prop) => prop.getName() === FUNCTION_REFERENCE_ARGS_PROP,
+    (prop) => prop.getName() === FUNCTION_REFERENCE_ARGS_PROP
   );
   if (returnProp || argsProp) {
     for (const [prop, helper] of [
@@ -513,7 +512,7 @@ function collectFunctionReferenceCandidates(
         checker,
         typeOfSymbol(checker, prop),
         `${CONVEX_API_MODULE}#${helper}<typeof api.${path}>`,
-        convexOwnerMetadata,
+        convexOwnerMetadata
       );
       if (candidate) out.push(candidate);
     }
@@ -527,7 +526,7 @@ function collectFunctionReferenceCandidates(
       path ? `${path}.${prop.getName()}` : prop.getName(),
       depth - 1,
       seenTypes,
-      out,
+      out
     );
   }
 }
@@ -542,7 +541,7 @@ function convexApiCandidates(checker, sourceFile) {
     "",
     API_WALK_MAX_DEPTH,
     new Set(),
-    candidates,
+    candidates
   );
   return candidates;
 }

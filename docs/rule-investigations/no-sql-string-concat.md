@@ -27,7 +27,7 @@ const fields = Object.keys(updates);
 const setClause = fields.map((field) => `${field} = ?`).join(", ");
 db.prepare(`UPDATE executions SET ${setClause} WHERE id = ?`).run(
   ...values,
-  id,
+  id
 );
 ```
 
@@ -63,7 +63,7 @@ setClauses.push("updated_at = ?");
 db.prepare(`UPDATE workflows SET ${setClauses.join(", ")} WHERE id = ?`).run(
   title,
   updatedAt,
-  id,
+  id
 );
 ```
 

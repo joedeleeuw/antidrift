@@ -98,7 +98,7 @@ export default {
         definition?.type === "Variable" &&
         definition.parent.kind === "const" &&
         !variable.references.some(
-          (reference) => reference.isWrite() && !reference.init,
+          (reference) => reference.isWrite() && !reference.init
         ) &&
         proven(definition.node.init, seen)
       );

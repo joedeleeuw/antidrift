@@ -113,22 +113,22 @@ export interface ReactStateSourceShardProof {
 
 export function classifyWriteValue(
   arg: unknown,
-  context: ReactStateWriteContext,
+  context: ReactStateWriteContext
 ): ReactStateWriteClass | null;
 
 export function createReactStateTracker(
-  options: ReactStateTrackerOptions,
+  options: ReactStateTrackerOptions
 ): ReactStateTracker;
 
 export function lifecycleProof(
-  frame: ReactStateFrame,
+  frame: ReactStateFrame
 ): ReactStateLifecycleProof;
 
 export function sourceShardProof(
   frame: ReactStateFrame,
-  options?: { threshold?: number },
+  options?: { threshold?: number }
 ): ReactStateSourceShardProof;
 
 export function frameStatePayload(
-  frame: ReactStateFrame,
+  frame: ReactStateFrame
 ): ReactStateFramePayload;

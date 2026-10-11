@@ -10,14 +10,14 @@ describe.each(portableCases)("portable $name", (entry) => {
       entry.name,
       entry.invalid,
       entry.filename,
-      entry.options,
+      entry.options
     );
     expect(
       messages.some((message) => message.fatal),
-      JSON.stringify(messages),
+      JSON.stringify(messages)
     ).toBe(false);
     expect(messages.map((message) => message.ruleId)).toContain(
-      `antidrift/${entry.name}`,
+      `antidrift/${entry.name}`
     );
   });
   it("accepts the owned behavior", () => {
@@ -26,8 +26,8 @@ describe.each(portableCases)("portable $name", (entry) => {
         entry.name,
         entry.valid,
         entry.validFilename ?? entry.filename,
-        entry.validOptions ?? entry.options,
-      ),
+        entry.validOptions ?? entry.options
+      )
     ).toEqual([]);
   });
 });

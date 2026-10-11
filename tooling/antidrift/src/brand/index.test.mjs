@@ -13,7 +13,7 @@ describe("brand", () => {
   it("creates a validation boundary for branded values", () => {
     const UserId = brand(
       "UserId",
-      (value) => typeof value === "string" && value.startsWith("user_"),
+      (value) => typeof value === "string" && value.startsWith("user_")
     );
 
     expect(UserId.make("user_123")).toBe("user_123");
@@ -35,7 +35,7 @@ describe("brand", () => {
           "--pretty",
           "false",
         ],
-        { cwd: repoRoot, stdio: "pipe" },
+        { cwd: repoRoot, stdio: "pipe" }
       );
     }).not.toThrow();
   });

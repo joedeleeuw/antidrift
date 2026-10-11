@@ -45,7 +45,10 @@ describe("tuple-shape nullable positional helpers", () => {
     ]);
     expect(hasNullablePositionalTuple(tuple)).toBe(true);
     expect(
-      hasNullablePositionalTuple({ type: "TSTupleType", elementTypes: [required] }),
+      hasNullablePositionalTuple({
+        type: "TSTupleType",
+        elementTypes: [required],
+      })
     ).toBe(false);
   });
 });

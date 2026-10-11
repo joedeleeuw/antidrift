@@ -73,8 +73,7 @@ function hasLiteralKeys(node) {
     source.elements.every(
       (element) =>
         element?.type === "Literal" &&
-        (typeof element.value === "string" ||
-          typeof element.value === "number"),
+        (typeof element.value === "string" || typeof element.value === "number")
     )
   );
 }

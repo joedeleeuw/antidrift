@@ -1,5 +1,8 @@
 import { useMutation, useQuery } from "convex/react";
-import { useQueryClient, useQuery as useTanstackQuery } from "@tanstack/react-query";
+import {
+  useQueryClient,
+  useQuery as useTanstackQuery,
+} from "@tanstack/react-query";
 
 import { api } from "../convex/_generated/api";
 

@@ -16,7 +16,7 @@ const allowedPathsFrom = (entry, enforcement) => {
   const allowedPaths = Array.isArray(allowed)
     ? allowed
         .map((item) =>
-          typeof item === "object" && item !== null ? item.path : undefined,
+          typeof item === "object" && item !== null ? item.path : undefined
         )
         .filter((item) => typeof item === "string")
     : [];

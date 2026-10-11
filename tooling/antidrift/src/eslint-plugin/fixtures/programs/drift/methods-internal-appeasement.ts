@@ -3,10 +3,18 @@
 // Expected — no-contract-appeasement-projection: 3 (getItemsFromBag, pickItems, firstItem)
 class ItemStore {
   #items: number[] = [];
-  getItemsFromBag(bag: { items: number[] }): number[] { return bag.items; }   // trivial selector wrapper
-  pickItems(bag: { items: number[] }): number[] { return bag.items; }         // same wrapper, no name fingerprint
-  private computeTotal(x: { a: number }): number { return x.a * 2; }           // private helper, explicit return
-  private firstItem = (xs: number[]): number => xs[0];                         // private field arrow, explicit return
-  get count(): number { return this.#items.length; }                          // getter — idiomatic, must NOT fire
-  constructor() {}                                                            // constructor — must NOT fire
+  getItemsFromBag(bag: { items: number[] }): number[] {
+    return bag.items;
+  } // trivial selector wrapper
+  pickItems(bag: { items: number[] }): number[] {
+    return bag.items;
+  } // same wrapper, no name fingerprint
+  private computeTotal(x: { a: number }): number {
+    return x.a * 2;
+  } // private helper, explicit return
+  private firstItem = (xs: number[]): number => xs[0]; // private field arrow, explicit return
+  get count(): number {
+    return this.#items.length;
+  } // getter — idiomatic, must NOT fire
+  constructor() {} // constructor — must NOT fire
 }

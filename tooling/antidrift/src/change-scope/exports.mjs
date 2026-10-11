@@ -42,7 +42,7 @@ function gitFileAt({ ref, path, cwd }) {
     const stderr = (result.stderr ?? "").trim();
     if (/does not exist in|but not in/iu.test(stderr)) return null;
     throw new Error(
-      `git show ${ref}:${path} failed in ${cwd} (status ${result.status}): ${stderr}`,
+      `git show ${ref}:${path} failed in ${cwd} (status ${result.status}): ${stderr}`
     );
   }
   return result.stdout;
@@ -57,7 +57,7 @@ function gitPathsAt({ ref, cwd }) {
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(
-      `git ls-tree ${ref} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`,
+      `git ls-tree ${ref} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`
     );
   }
   return result.stdout
@@ -102,7 +102,7 @@ function sourceCandidatesFor(moduleName, containingFile) {
     if (base.endsWith(specifierSuffix)) {
       const withoutSuffix = base.slice(0, -specifierSuffix.length);
       return sourceSuffixes.map(
-        (sourceSuffix) => `${withoutSuffix}${sourceSuffix}`,
+        (sourceSuffix) => `${withoutSuffix}${sourceSuffix}`
       );
     }
   }
@@ -115,7 +115,7 @@ function sourceCandidatesFor(moduleName, containingFile) {
 function resolveRelativeSourceModule(moduleName, containingFile, fileNameSet) {
   if (!moduleName.startsWith(".")) return undefined;
   const resolvedFileName = sourceCandidatesFor(moduleName, containingFile).find(
-    (candidate) => fileNameSet.has(candidate),
+    (candidate) => fileNameSet.has(candidate)
   );
   if (resolvedFileName === undefined) return undefined;
   return {
@@ -139,7 +139,7 @@ function compilerHostFor({ ref, cwd, fileNames, options }) {
       });
       if (sourceText === null) {
         throw new Error(
-          `git tree listed ${candidate.slice(1)} at ${ref}, but git show could not read it`,
+          `git tree listed ${candidate.slice(1)} at ${ref}, but git show could not read it`
         );
       }
       sourceCache.set(candidate, sourceText);
@@ -163,17 +163,17 @@ function compilerHostFor({ ref, cwd, fileNames, options }) {
           resolveRelativeSourceModule(
             moduleName,
             containingFile,
-            fileNameSet,
+            fileNameSet
           ) ??
           ts.resolveModuleName(moduleName, containingFile, options, defaultHost)
-            .resolvedModule,
+            .resolvedModule
       );
     },
     getSourceFile(
       candidate,
       languageVersion,
       onError,
-      shouldCreateNewSourceFile,
+      shouldCreateNewSourceFile
     ) {
       const sourceText = sourceTextFor(candidate);
       if (sourceText !== undefined) {
@@ -181,14 +181,14 @@ function compilerHostFor({ ref, cwd, fileNames, options }) {
           candidate,
           sourceText,
           languageVersion,
-          true,
+          true
         );
       }
       return defaultHost.getSourceFile(
         candidate,
         languageVersion,
         onError,
-        shouldCreateNewSourceFile,
+        shouldCreateNewSourceFile
       );
     },
   };
@@ -211,7 +211,7 @@ function isTypeOnlyExportDeclaration(declaration) {
     return Boolean(
       declaration.isTypeOnly ||
       declaration.parent?.isTypeOnly ||
-      declaration.parent?.parent?.isTypeOnly,
+      declaration.parent?.parent?.isTypeOnly
     );
   }
   if (ts.isExportDeclaration(declaration)) return declaration.isTypeOnly;
@@ -272,12 +272,12 @@ function relativeExportTargets({ ref, cwd, fileName, fileNameSet }) {
     fileName,
     sourceText,
     ts.ScriptTarget.ESNext,
-    true,
+    true
   );
   return exportModuleSpecifiers(sourceFile)
     .filter((moduleName) => moduleName.startsWith("."))
     .map((moduleName) =>
-      resolveRelativeSourceModule(moduleName, fileName, fileNameSet),
+      resolveRelativeSourceModule(moduleName, fileName, fileNameSet)
     )
     .filter((resolvedModule) => resolvedModule !== undefined)
     .map((resolvedModule) => resolvedModule.resolvedFileName);
@@ -286,7 +286,7 @@ function relativeExportTargets({ ref, cwd, fileName, fileNameSet }) {
 function affectedExportFileNames({ ref, cwd, fileNames, seedFileNames }) {
   const fileNameSet = new Set(fileNames);
   const affected = new Set(
-    seedFileNames.filter((fileName) => fileNameSet.has(fileName)),
+    seedFileNames.filter((fileName) => fileNameSet.has(fileName))
   );
   let addedAffectedFile = true;
   while (addedAffectedFile) {
@@ -312,10 +312,10 @@ function unresolvedModuleDiagnostics(program, sourceFile) {
   return ts
     .getPreEmitDiagnostics(program, sourceFile)
     .filter(
-      (diagnostic) => diagnostic.code === 2307 || diagnostic.code === 2792,
+      (diagnostic) => diagnostic.code === 2307 || diagnostic.code === 2792
     )
     .map((diagnostic) =>
-      ts.flattenDiagnosticMessageText(diagnostic.messageText, " "),
+      ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")
     );
 }
 
@@ -323,11 +323,11 @@ function throwOnUnresolvedExportModules({ program, sourceFile, file }) {
   const diagnostics = unresolvedModuleDiagnostics(program, sourceFile);
   if (diagnostics.length === 0) return;
   const unresolved = exportModuleSpecifiers(sourceFile).filter((moduleName) =>
-    diagnostics.some((message) => message.includes(moduleName)),
+    diagnostics.some((message) => message.includes(moduleName))
   );
   if (unresolved.length === 0) return;
   throw new Error(
-    `change-contract export extraction could not resolve public re-export module(s) in ${file}: ${unresolved.join(", ")}`,
+    `change-contract export extraction could not resolve public re-export module(s) in ${file}: ${unresolved.join(", ")}`
   );
 }
 
@@ -443,10 +443,10 @@ export function collectExportChanges({ base, head, cwd, changedFiles }) {
     const beforeKeys = exportSet(before);
     const afterKeys = exportSet(after);
     addedExports.push(
-      ...after.filter((entry) => !beforeKeys.has(exportKey(entry))),
+      ...after.filter((entry) => !beforeKeys.has(exportKey(entry)))
     );
     removedExports.push(
-      ...before.filter((entry) => !afterKeys.has(exportKey(entry))),
+      ...before.filter((entry) => !afterKeys.has(exportKey(entry)))
     );
   }
   return {

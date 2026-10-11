@@ -62,7 +62,7 @@ const isQueryFnProperty = (property) => {
   return objectExpression.properties.some(
     (sibling) =>
       sibling?.type === "Property" &&
-      getPropertyName(sibling.key) === "queryKey",
+      getPropertyName(sibling.key) === "queryKey"
   );
 };
 const isQueryFnFunction = (fn) => {
@@ -77,7 +77,7 @@ const signalBindingName = (fn) => {
   const signalProperty = firstParam.properties.find(
     (property) =>
       property?.type === "Property" &&
-      getPropertyName(property.key) === "signal",
+      getPropertyName(property.key) === "signal"
   );
   const value = unwrapTS(signalProperty?.value);
   if (value?.type === "Identifier") {
@@ -166,7 +166,7 @@ const getObjectPropertyValue = (node, name) => {
   }
   const property = object.properties.find(
     (candidate) =>
-      candidate?.type === "Property" && getPropertyName(candidate.key) === name,
+      candidate?.type === "Property" && getPropertyName(candidate.key) === name
   );
   return property?.value ?? null;
 };
@@ -177,17 +177,17 @@ const callThreadsSignal = ({ bindingName, kind, node }) => {
   if (kind === "fetch") {
     return containsSignalIdentifier(
       getObjectPropertyValue(argumentsList.at(1), "signal"),
-      bindingName,
+      bindingName
     );
   }
   return argumentsList.some((argument) =>
     containsSignalIdentifier(
       getObjectPropertyValue(
         getObjectPropertyValue(argument, "fetch"),
-        "signal",
+        "signal"
       ),
-      bindingName,
-    ),
+      bindingName
+    )
   );
 };
 export default {
@@ -262,8 +262,7 @@ export default {
     };
     const hasReassignment = (variable) =>
       variable.references.some(
-        (reference) =>
-          reference.init !== true && reference.isWrite?.() === true,
+        (reference) => reference.init !== true && reference.isWrite?.() === true
       );
     const resolveLocalQueryFunction = (identifier, visited = new Set()) => {
       const variable = resolveVariable(identifier);

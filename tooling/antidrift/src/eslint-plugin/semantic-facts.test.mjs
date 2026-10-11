@@ -14,7 +14,7 @@ import {
 
 const repoRoot = resolve(import.meta.dirname, "../../../..");
 const semanticFactKinds = YAML.parse(
-  readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8"),
+  readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8")
 ).semanticFactKinds;
 
 function expectFactMatchesRegistry(fact) {
@@ -140,7 +140,7 @@ async function lintIdentityTransformWithFacts(file) {
 
 it("emits an identity-schema-transform fact from the reported proof", async () => {
   const { facts, result } = await lintIdentityTransformWithFacts(
-    "programs/drift/identity-schema-transform-reconstruction.ts",
+    "programs/drift/identity-schema-transform-reconstruction.ts"
   );
 
   expect(result.messages).toHaveLength(1);
@@ -171,7 +171,7 @@ it("emits an identity-schema-transform fact from the reported proof", async () =
 
 it("emits structural proposal facts for unaccepted installed-package matches", async () => {
   const { facts, result } = await lintWithStructuralFacts(
-    "programs/drift/redeclares-full.ts",
+    "programs/drift/redeclares-full.ts"
   );
 
   expect(result.messages).toEqual([]);
@@ -197,24 +197,24 @@ it("emits structural proposal facts for unaccepted installed-package matches", a
           }),
         }),
       }),
-    ]),
+    ])
   );
 });
 
 it("emits blocking structural facts from accepted generated owners with stable ids", async () => {
   const first = await lintWithStructuralFacts(
     "programs/drift/generated-release-fork.ts",
-    generatedStructuralOptions,
+    generatedStructuralOptions
   );
   const second = await lintWithStructuralFacts(
     "programs/drift/generated-release-fork.ts",
-    generatedStructuralOptions,
+    generatedStructuralOptions
   );
 
   expect(first.result.messages).toHaveLength(1);
   expect(second.result.messages).toHaveLength(1);
   expect(first.facts.map((fact) => fact.factId)).toEqual(
-    second.facts.map((fact) => fact.factId),
+    second.facts.map((fact) => fact.factId)
   );
   expect(first.facts).toEqual(
     expect.arrayContaining([
@@ -233,14 +233,14 @@ it("emits blocking structural facts from accepted generated owners with stable i
           }),
         }),
       }),
-    ]),
+    ])
   );
 });
 
 it("emits blocking structural facts from accepted package owners", async () => {
   const { facts, result } = await lintWithStructuralFacts(
     "programs/drift/redeclares-full.ts",
-    acceptedPackageStructuralOptions,
+    acceptedPackageStructuralOptions
   );
 
   expect(result.messages).toHaveLength(1);
@@ -261,7 +261,7 @@ it("emits blocking structural facts from accepted package owners", async () => {
           }),
         }),
       }),
-    ]),
+    ])
   );
 });
 
@@ -324,7 +324,7 @@ async function lintCoupledStateCodeWithFacts(code, options = {}) {
       code,
       filename: resolve(fixturesDir, "coupled-state.ts"),
     },
-    options,
+    options
   );
 }
 
@@ -376,15 +376,15 @@ async function lintSourceShardWithFacts(code, options = {}) {
 
 it("emits a deterministic-enforcement lifecycle fact and diagnostic from one proof, with stable ids", async () => {
   const first = await lintWithCoupledStateFacts(
-    "programs/drift/handrolled-resource-lifecycle.ts",
+    "programs/drift/handrolled-resource-lifecycle.ts"
   );
   const second = await lintWithCoupledStateFacts(
-    "programs/drift/handrolled-resource-lifecycle.ts",
+    "programs/drift/handrolled-resource-lifecycle.ts"
   );
 
   expect(first.result.messages).toHaveLength(1);
   expect(first.facts.map((fact) => fact.factId)).toEqual(
-    second.facts.map((fact) => fact.factId),
+    second.facts.map((fact) => fact.factId)
   );
   expect(first.facts).toEqual(
     expect.arrayContaining([
@@ -404,19 +404,19 @@ it("emits a deterministic-enforcement lifecycle fact and diagnostic from one pro
           payloadCell: "setUsers",
         }),
       }),
-    ]),
+    ])
   );
 });
 
 it("keeps sibling payload setters inventory-only under an aggressive threshold", async () => {
   const { facts, result } = await lintWithCoupledStateFacts(
     "programs/correct/sibling-payload-setters.ts",
-    { threshold: 2 },
+    { threshold: 2 }
   );
 
   expect(result.messages).toHaveLength(0);
   expect(facts.map((fact) => fact.factKind)).not.toContain(
-    "resourceLifecycleProof",
+    "resourceLifecycleProof"
   );
   expect(facts).toEqual(
     expect.arrayContaining([
@@ -425,7 +425,7 @@ it("keeps sibling payload setters inventory-only under an aggressive threshold",
         confidence: "heuristic-inventory",
         payload: expect.objectContaining({ setterCount: 2 }),
       }),
-    ]),
+    ])
   );
 });
 
@@ -468,7 +468,7 @@ it("proves lifecycle from derived catch writes and awaited source-member payload
           payloadCell: "setRows",
         }),
       }),
-    ]),
+    ])
   );
 });
 
@@ -635,12 +635,12 @@ it("ignores imported React objects when a local binding shadows them for React-s
 
 it("downgrades a request-guarded lifecycle to heuristic-inventory with no diagnostic", async () => {
   const { facts, result } = await lintWithCoupledStateFacts(
-    "programs/correct/abort-guarded-fetch.ts",
+    "programs/correct/abort-guarded-fetch.ts"
   );
 
   expect(result.messages).toHaveLength(0);
   expect(facts.map((fact) => fact.factKind)).not.toContain(
-    "resourceLifecycleProof",
+    "resourceLifecycleProof"
   );
   expect(facts).toEqual(
     expect.arrayContaining([
@@ -649,7 +649,7 @@ it("downgrades a request-guarded lifecycle to heuristic-inventory with no diagno
         confidence: "heuristic-inventory",
         payload: expect.objectContaining({ requestGuard: true }),
       }),
-    ]),
+    ])
   );
 });
 
@@ -685,7 +685,7 @@ it("downgrades a lifecycle when the payload write is inside a positive abort-sta
 
   expect(result.messages).toHaveLength(0);
   expect(facts.map((fact) => fact.factKind)).not.toContain(
-    "resourceLifecycleProof",
+    "resourceLifecycleProof"
   );
   expect(facts).toEqual(
     expect.arrayContaining([
@@ -694,7 +694,7 @@ it("downgrades a lifecycle when the payload write is inside a positive abort-sta
         confidence: "heuristic-inventory",
         payload: expect.objectContaining({ requestGuard: true }),
       }),
-    ]),
+    ])
   );
 });
 
@@ -738,7 +738,7 @@ it("does not downgrade lifecycle proof when the abort check follows the payload 
           requestGuard: false,
         }),
       }),
-    ]),
+    ])
   );
 });
 
@@ -782,7 +782,7 @@ it("does not downgrade lifecycle proof for abort calls without an abort status g
           requestGuard: false,
         }),
       }),
-    ]),
+    ])
   );
 });
 
@@ -831,18 +831,18 @@ it("does not downgrade lifecycle proof for unrelated abort-shaped members", asyn
           requestGuard: false,
         }),
       }),
-    ]),
+    ])
   );
 });
 
 it("downgrades a useRef AbortController lifecycle to heuristic-inventory with no diagnostic", async () => {
   const { facts, result } = await lintWithCoupledStateFacts(
-    "programs/correct/abort-guarded-component-scope.ts",
+    "programs/correct/abort-guarded-component-scope.ts"
   );
 
   expect(result.messages).toHaveLength(0);
   expect(facts.map((fact) => fact.factKind)).not.toContain(
-    "resourceLifecycleProof",
+    "resourceLifecycleProof"
   );
   expect(facts).toEqual(
     expect.arrayContaining([
@@ -851,7 +851,7 @@ it("downgrades a useRef AbortController lifecycle to heuristic-inventory with no
         confidence: "heuristic-inventory",
         payload: expect.objectContaining({ requestGuard: true }),
       }),
-    ]),
+    ])
   );
 });
 
@@ -888,23 +888,23 @@ it("emits a source-member shard candidate fact (inventory-only, no diagnostic)",
           ]),
         }),
       }),
-    ]),
+    ])
   );
 });
 
 it("emits semantic facts that satisfy the registered public payload contract", async () => {
   const identityTransform = await lintIdentityTransformWithFacts(
-    "programs/drift/identity-schema-transform-reconstruction.ts",
+    "programs/drift/identity-schema-transform-reconstruction.ts"
   );
   const structural = await lintWithStructuralFacts(
-    "programs/drift/redeclares-full.ts",
+    "programs/drift/redeclares-full.ts"
   );
   const lifecycle = await lintWithCoupledStateFacts(
-    "programs/drift/handrolled-resource-lifecycle.ts",
+    "programs/drift/handrolled-resource-lifecycle.ts"
   );
   const inventory = await lintWithCoupledStateFacts(
     "programs/correct/sibling-payload-setters.ts",
-    { threshold: 2 },
+    { threshold: 2 }
   );
   const sourceShardCandidate = await lintSourceShardWithFacts(`
     import { useState } from "react";
@@ -932,7 +932,7 @@ it("emits semantic facts that satisfy the registered public payload contract", a
     .filter(([, contract]) => (contract.rules?.length ?? 0) > 0)
     .map(([kind]) => kind);
   expect(facts.map((fact) => fact.factKind)).toEqual(
-    expect.arrayContaining(pluginEmittedKinds),
+    expect.arrayContaining(pluginEmittedKinds)
   );
   for (const fact of facts) {
     expectFactMatchesRegistry(fact);

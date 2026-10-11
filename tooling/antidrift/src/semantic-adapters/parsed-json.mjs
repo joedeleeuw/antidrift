@@ -7,9 +7,9 @@ export function isGlobalJsonParse(node, services, checker) {
   return Boolean(
     symbol?.declarations?.some((declaration) =>
       /(?:^|[/\\])lib\.[^/\\]+\.d\.ts$/u.test(
-        declaration.getSourceFile().fileName,
-      ),
-    ),
+        declaration.getSourceFile().fileName
+      )
+    )
   );
 }
 
@@ -18,7 +18,7 @@ export function parsedJsonOrigin(
   context,
   services,
   checker,
-  seen = new Set(),
+  seen = new Set()
 ) {
   if (isGlobalJsonParse(node, services, checker)) return node;
   if (node?.type !== "Identifier") return null;
@@ -36,7 +36,7 @@ export function parsedJsonOrigin(
     context,
     services,
     checker,
-    seen,
+    seen
   );
 }
 

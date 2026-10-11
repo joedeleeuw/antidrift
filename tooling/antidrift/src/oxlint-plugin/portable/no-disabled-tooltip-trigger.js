@@ -37,7 +37,7 @@ const getAttribute = (openingElement, name) => {
       (attribute) =>
         isAstNode(attribute) &&
         attribute.type === "JSXAttribute" &&
-        getJsxName(attribute.name) === name,
+        getJsxName(attribute.name) === name
     ) ?? null
   );
 };

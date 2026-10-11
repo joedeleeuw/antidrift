@@ -156,7 +156,7 @@ function lintConfig(repoRoot, tsconfig) {
         antidrift,
       },
       rules: Object.fromEntries(
-        benchmarkRuleIds.map((ruleId) => [ruleId, "error"]),
+        benchmarkRuleIds.map((ruleId) => [ruleId, "error"])
       ),
     },
   ];
@@ -181,7 +181,7 @@ function countByRule(findings) {
     benchmarkRuleIds.map((ruleId) => [
       ruleId,
       findings.filter((finding) => finding.ruleId === ruleId).length,
-    ]),
+    ])
   );
 }
 
@@ -190,14 +190,14 @@ function countByRepo(results) {
     results.map((result) => [
       `${result.repo}/${result.label}`,
       result.findingsByRule?.[customRuleId] ?? 0,
-    ]),
+    ])
   );
 }
 
 function compare(findings) {
   const custom = findings.filter((finding) => finding.ruleId === customRuleId);
   const upstream = findings.filter((finding) =>
-    upstreamRuleIds.includes(finding.ruleId),
+    upstreamRuleIds.includes(finding.ruleId)
   );
   const customKeys = new Set(custom.map(locationKey));
   const upstreamKeys = new Set(upstream.map(locationKey));
@@ -206,16 +206,16 @@ function compare(findings) {
     overlapLocations: [...customKeys].filter((key) => upstreamKeys.has(key))
       .length,
     customOnlyLocations: custom.filter(
-      (finding) => !upstreamKeys.has(locationKey(finding)),
+      (finding) => !upstreamKeys.has(locationKey(finding))
     ).length,
     upstreamOnlyLocations: upstream.filter(
-      (finding) => !customKeys.has(locationKey(finding)),
+      (finding) => !customKeys.has(locationKey(finding))
     ).length,
     customWithSameFileUpstream: custom.filter((finding) =>
-      upstreamPaths.has(finding.path),
+      upstreamPaths.has(finding.path)
     ).length,
     customWithoutSameFileUpstream: custom.filter(
-      (finding) => !upstreamPaths.has(finding.path),
+      (finding) => !upstreamPaths.has(finding.path)
     ).length,
   };
 }
@@ -267,12 +267,12 @@ async function runPlan(plan) {
   const parserErrorFindings = results.flatMap((result) =>
     result.messages
       .filter((message) => message.fatal)
-      .map((message) => toFinding(repoRoot, result, message)),
+      .map((message) => toFinding(repoRoot, result, message))
   );
   const findings = results.flatMap((result) =>
     result.messages
       .filter((message) => benchmarkRuleIds.includes(message.ruleId))
-      .map((message) => toFinding(repoRoot, result, message)),
+      .map((message) => toFinding(repoRoot, result, message))
   );
   const syntaxCandidates = results
     .map((result) => syntaxCandidate(repoRoot, result.filePath))
@@ -300,20 +300,20 @@ function summarize({ results, slice }) {
   const findings = results.flatMap((result) => result.findings ?? []);
   const checkedFiles = results.reduce(
     (sum, result) => sum + (result.checkedFiles ?? 0),
-    0,
+    0
   );
   const parserErrors = results.reduce(
     (sum, result) => sum + (result.parserErrors ?? 0),
-    0,
+    0
   );
   const syntaxCandidateFiles = results.reduce(
     (sum, result) => sum + (result.syntaxCandidateFiles ?? 0),
-    0,
+    0
   );
   const driftRepositories = new Set(
     results
       .filter((result) => (result.findingsByRule?.[customRuleId] ?? 0) > 0)
-      .map((result) => result.repo),
+      .map((result) => result.repo)
   );
   return {
     schemaVersion: 1,
@@ -357,15 +357,15 @@ export async function defensiveShapeInventory({
     (previous, plan) =>
       previous.then(async () => {
         progress(
-          `[defensive-shape-inventory] scanning ${plan.repo}/${plan.label}`,
+          `[defensive-shape-inventory] scanning ${plan.repo}/${plan.label}`
         );
         const result = await runPlan(plan);
         progress(
-          `[defensive-shape-inventory] ${plan.repo}/${plan.label}: ${result.checkedFiles ?? 0} files, ${result.syntaxCandidateFiles ?? 0} syntax candidates, ${result.findingsByRule?.[customRuleId] ?? 0} custom findings, ${result.parserErrors ?? 0} parser errors`,
+          `[defensive-shape-inventory] ${plan.repo}/${plan.label}: ${result.checkedFiles ?? 0} files, ${result.syntaxCandidateFiles ?? 0} syntax candidates, ${result.findingsByRule?.[customRuleId] ?? 0} custom findings, ${result.parserErrors ?? 0} parser errors`
         );
         results.push(result);
       }),
-    Promise.resolve(),
+    Promise.resolve()
   );
   const summary = summarize({ results, slice });
   emit(summary, output, report);

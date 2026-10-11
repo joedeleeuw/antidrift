@@ -21,7 +21,7 @@ describe("oxlint wrapper", () => {
 
   it("uses explicit targets instead of the repository root", () => {
     expect(parseOxlintArgs(["src", "tests"], { cwd: "/repo" }).targets).toEqual(
-      ["src", "tests"],
+      ["src", "tests"]
     );
   });
 

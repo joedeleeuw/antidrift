@@ -144,7 +144,7 @@ const stableAliasInitializer = (context, identifier) => {
       (reference) =>
         reference.init !== true &&
         typeof reference.isWrite === "function" &&
-        reference.isWrite(),
+        reference.isWrite()
     )
   ) {
     return null;
@@ -186,7 +186,7 @@ const browserGlobalKind = (context, node, visited = new Set()) => {
     return browserGlobalKind(
       context,
       stableAliasInitializer(context, expression),
-      visited,
+      visited
     );
   }
   if (

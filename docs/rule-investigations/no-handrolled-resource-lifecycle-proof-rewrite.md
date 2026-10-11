@@ -25,15 +25,16 @@ real-corpus-first, multi-repo baseline, synthetic tests are a wiring guard not e
 `classifyWriteValue` (~:31):
 
 - **boolCell**: a setter with both `trueConst` and `falseConst` — matches real code fine.
-- **errorCell**: a *distinct* setter with both `nullConst` and `caughtError`, where `caughtError`
+- **errorCell**: a _distinct_ setter with both `nullConst` and `caughtError`, where `caughtError`
   requires the argument to be the **raw `catch` parameter identifier**. Real catch blocks call
   `setErrorCode("DATA_INVALID")` or `setErrorCode(deriveCode(err))` → classified `other` → no error cell.
-- **payloadCell**: a *distinct* setter with `awaited`, requiring the **bare awaited value**. Real code
+- **payloadCell**: a _distinct_ setter with `awaited`, requiring the **bare awaited value**. Real code
   calls `setData(resp.items)` (a member of the awaited object) → classified `other`, routed to
   `sourceMemberWrites`, never `awaited`.
 
 The only fixture that fires is the synthetic `handrolled-resource-lifecycle.ts` (`setUsers(result)`
-+ `setFailure(err)`) — exactly the shape that does not occur in the 1,533-file corpus.
+
+- `setFailure(err)`) — exactly the shape that does not occur in the 1,533-file corpus.
 
 ## 3. Implemented rewrite (local, reuses the adapter)
 
@@ -85,7 +86,7 @@ The rewrite makes the proof less synthetic, but it did **not** turn broad co-mut
    submit handlers)? Where does errorCell over-match?
 3. **payloadCell = member-of-awaited** — does reusing `sourceMemberWrites` pull in cases where the
    "payload" cells are actually independent view state seeded from one response (the envelope case
-   the shard rule deliberately ignores)? Could the lifecycle rule now fire on weekly-digest *because*
+   the shard rule deliberately ignores)? Could the lifecycle rule now fire on weekly-digest _because_
    of the envelope split, conflating two different patterns?
 4. **Multi-repo**: the fixed-proof positives now replicate in Sudocode and Cloudflare Agents. Do those positives survive review, and do Murderbox/form-like controls stay quiet for the right reason?
 5. **Contract churn**: payloadCells + schema bump ripples through the frozen contract, manifest,
@@ -99,6 +100,6 @@ The rewrite makes the proof less synthetic, but it did **not** turn broad co-mut
 ## 6. What I am asking the reviewer to decide
 
 - Is the rewrite spec in §3 correct and complete, or does it have a blind spot (esp. concerns 2/3)?
-- Is the *direction* right — fix the proof now, defer enablement to a separate 2-repo proof-out — or
+- Is the _direction_ right — fix the proof now, defer enablement to a separate 2-repo proof-out — or
   is there a cheaper/safer path (e.g. keep inventory-only, never enforce)?
 - Biggest risk we are not seeing?

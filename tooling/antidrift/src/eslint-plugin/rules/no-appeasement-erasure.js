@@ -28,7 +28,7 @@ function mergeVisitors(...visitors) {
       (node) => {
         for (const handler of selectorHandlers) handler(node);
       },
-    ]),
+    ])
   );
 }
 
@@ -58,8 +58,7 @@ function isContractFreeLiteral(expression) {
   return Boolean(
     (expression?.type === "ObjectExpression" &&
       expression.properties.length === 0) ||
-    (expression?.type === "ArrayExpression" &&
-      expression.elements.length === 0),
+    (expression?.type === "ArrayExpression" && expression.elements.length === 0)
   );
 }
 
@@ -70,7 +69,7 @@ function hasSpecificType(checker, services, expression) {
   }
   const type = checker.getTypeAtLocation(tsNode);
   return Boolean(
-    type && !(type.flags & (TS_TYPE_FLAG_ANY | TS_TYPE_FLAG_UNKNOWN)),
+    type && !(type.flags & (TS_TYPE_FLAG_ANY | TS_TYPE_FLAG_UNKNOWN))
   );
 }
 
@@ -81,7 +80,7 @@ function isParseArgument(identifier, services, checker) {
   }
   return (
     Boolean(
-      zodParseCallParts(call, services, checker, ZOD_VALIDATION_METHODS),
+      zodParseCallParts(call, services, checker, ZOD_VALIDATION_METHODS)
     ) || isEffectDecodeApplication(call, services, checker)
   );
 }
@@ -91,7 +90,7 @@ function isNamedContractCast(identifier) {
   return Boolean(
     cast?.type === "TSAsExpression" &&
     cast.expression === identifier &&
-    cast.typeAnnotation?.type === "TSTypeReference",
+    cast.typeAnnotation?.type === "TSTypeReference"
   );
 }
 
@@ -161,7 +160,7 @@ export function ruleNoAppeasementErasure() {
       return mergeVisitors(
         noKnownValueWideningRule.createOnce(context),
         noWidenThenAssertRule.createOnce(context),
-        localVisitors,
+        localVisitors
       );
     },
   };

@@ -8,7 +8,7 @@
 > agent-generated corpus).
 
 Design spec for the promotion path. The rule stays `under-proven` / default-off; this is the work
-that makes it *promotable* to `error`. Build sequence: this spec → `gpt-5.5-extra-high` review →
+that makes it _promotable_ to `error`. Build sequence: this spec → `gpt-5.5-extra-high` review →
 `gpt-5.5-medium` implementation → `gpt-5.5-high` review → gate chain.
 
 ## Problem
@@ -45,6 +45,7 @@ case emits the inventory fact and does **not** block.
 ## Loud-failure discipline (corrected — first draft had a silent-fallback bug)
 
 This rule becomes type-aware, so follow the existing typed-rule pattern, NOT silent degradation:
+
 - Missing parser services → **loud `missingTypeServicesVisitors` guard** via `requireTypeServices`
   (the pattern `no-structural-type-fork` uses, `index.js:98` / `:2739`), plus a missing-services
   guard test. Do **not** silently fall back to inventory — that was the bug the xhigh review flagged.
@@ -77,8 +78,8 @@ generated / accepted package owner — the exact set `no-structural-type-fork` /
 `no-canonical-model-fork` consume via `resolvesToDomainCanonicalType` / `resolvesToGeneratedType`),
 **and** the fanned members are `typeProps` of that owned type. This reuses owned infrastructure
 (no new heuristic — the scalar-field idea is rejected as a registry-free workaround), and makes the
-two rules siblings on one authority index: **fork rule = don't *redefine* the owned entity; shard
-rule = don't *shatter* it across state cells.**
+two rules siblings on one authority index: **fork rule = don't _redefine_ the owned entity; shard
+rule = don't _shatter_ it across state cells.**
 
 Consequence (honest): the blockable drift set is only as large as the owned-entity set (today
 `User`/`Project`) and grows with the authority index — the same growth `no-structural-type-fork`

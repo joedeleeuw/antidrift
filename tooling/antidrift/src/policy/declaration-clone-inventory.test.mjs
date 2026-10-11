@@ -36,15 +36,15 @@ function writeTsconfig(root, relativePath = "tsconfig.json") {
         include: ["src/**/*.ts"],
       },
       null,
-      2,
-    ),
+      2
+    )
   );
 }
 
 describe("declarationCloneInventory", () => {
   it("parses brace target globs without splitting inside braces", () => {
     expect(
-      parseArgs(["--targets", "src/**/*.{ts,tsx},apps/**/*.tsx"]),
+      parseArgs(["--targets", "src/**/*.{ts,tsx},apps/**/*.tsx"])
     ).toMatchObject({
       targets: ["src/**/*.{ts,tsx}", "apps/**/*.tsx"],
     });
@@ -69,7 +69,7 @@ export interface TinyUser {
   email: string;
   active: boolean;
 }
-`,
+`
     );
     writeProgram(
       root,
@@ -81,7 +81,7 @@ export type ApiUser = {
   email: string;
   id: string;
 };
-`,
+`
     );
     writeProgram(
       root,
@@ -93,7 +93,7 @@ export interface OtherUser {
   active: boolean;
   updatedAt: Date;
 }
-`,
+`
     );
     writeProgram(
       root,
@@ -105,7 +105,7 @@ export interface LooseUser {
   active: boolean;
   createdAt?: Date;
 }
-`,
+`
     );
     writeProgram(
       root,
@@ -114,7 +114,7 @@ export interface LooseUser {
 import type { DomainUser } from "./domain";
 
 export type AliasUser = DomainUser;
-`,
+`
     );
     writeProgram(
       root,
@@ -123,7 +123,7 @@ export type AliasUser = DomainUser;
 import type { DomainUser } from "./domain";
 
 export interface ExtendedAliasUser extends DomainUser {}
-`,
+`
     );
     writeProgram(
       root,
@@ -136,7 +136,7 @@ export interface MethodUser {
   createdAt: Date;
   serialize(): string;
 }
-`,
+`
     );
 
     const result = await declarationCloneInventory({
@@ -185,32 +185,26 @@ export interface MethodUser {
       }),
     ]);
     expect(
-      group.declarations.some((declaration) => declaration.name === "TinyUser"),
+      group.declarations.some((declaration) => declaration.name === "TinyUser")
+    ).toBe(false);
+    expect(
+      group.declarations.some((declaration) => declaration.name === "OtherUser")
+    ).toBe(false);
+    expect(
+      group.declarations.some((declaration) => declaration.name === "LooseUser")
+    ).toBe(false);
+    expect(
+      group.declarations.some((declaration) => declaration.name === "AliasUser")
     ).toBe(false);
     expect(
       group.declarations.some(
-        (declaration) => declaration.name === "OtherUser",
-      ),
+        (declaration) => declaration.name === "ExtendedAliasUser"
+      )
     ).toBe(false);
     expect(
       group.declarations.some(
-        (declaration) => declaration.name === "LooseUser",
-      ),
-    ).toBe(false);
-    expect(
-      group.declarations.some(
-        (declaration) => declaration.name === "AliasUser",
-      ),
-    ).toBe(false);
-    expect(
-      group.declarations.some(
-        (declaration) => declaration.name === "ExtendedAliasUser",
-      ),
-    ).toBe(false);
-    expect(
-      group.declarations.some(
-        (declaration) => declaration.name === "MethodUser",
-      ),
+        (declaration) => declaration.name === "MethodUser"
+      )
     ).toBe(false);
     expect(group.fingerprint).toMatch(/^[a-f0-9]{64}$/u);
   });
@@ -229,7 +223,7 @@ export interface DomainUser {
   active: boolean;
   createdAt: Date;
 }
-`,
+`
     );
     writeProgram(
       root,
@@ -241,7 +235,7 @@ export type ApiUser = {
   email: string;
   id: string;
 };
-`,
+`
     );
 
     const result = await declarationCloneInventory({
@@ -269,7 +263,7 @@ export type ApiUser = {
       expect.arrayContaining([
         expect.objectContaining({ label: "domain", cloneGroupCount: 0 }),
         expect.objectContaining({ label: "api", cloneGroupCount: 0 }),
-      ]),
+      ])
     );
     expect(result.cloneGroupCount).toBe(1);
     expect(result.cloneDeclarationCount).toBe(2);
@@ -292,7 +286,7 @@ export interface DomainUser {
   active: boolean;
   createdAt: Date;
 }
-`,
+`
     );
     writeProgram(
       root,
@@ -304,7 +298,7 @@ export interface ApiUser {
   active: boolean;
   createdAt: Date;
 }
-`,
+`
     );
 
     const result = await declarationCloneInventory({
@@ -356,7 +350,7 @@ export interface DefaultUser {
   active: boolean;
   createdAt: Date;
 }
-`,
+`
     );
     writeProgram(
       fleetRoot,
@@ -368,7 +362,7 @@ export interface FleetDomainUser {
   active: boolean;
   createdAt: Date;
 }
-`,
+`
     );
     writeProgram(
       fleetRoot,
@@ -380,7 +374,7 @@ export interface FleetApiUser {
   active: boolean;
   createdAt: Date;
 }
-`,
+`
     );
 
     const plans = [

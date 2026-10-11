@@ -61,7 +61,7 @@ export function ruleNoCanonicalModelFork() {
       const candidates = collectDomainCanonicalTypes(
         program,
         checker,
-        canonicalEntities,
+        canonicalEntities
       );
       if (!candidates.length) {
         return {};
@@ -69,7 +69,7 @@ export function ruleNoCanonicalModelFork() {
       const provenance = collectOwnedContractProvenance(
         program,
         checker,
-        candidates,
+        candidates
       );
       const reported = new Set();
       function checkProjection(node) {
@@ -84,7 +84,7 @@ export function ruleNoCanonicalModelFork() {
           context,
           node,
           "antidrift/no-canonical-model-fork",
-          proof,
+          proof
         );
         context.report({
           node,
@@ -125,7 +125,7 @@ export function ruleNoCanonicalModelFork() {
           local,
           localDetailed,
           candidates,
-          "canonicalModelFork",
+          "canonicalModelFork"
         );
         if (!proof) {
           return;
@@ -134,7 +134,7 @@ export function ruleNoCanonicalModelFork() {
           context,
           node,
           "antidrift/no-canonical-model-fork",
-          proof,
+          proof
         );
         if (proof.diagnostic.emitted) {
           reported.add(tsNode);

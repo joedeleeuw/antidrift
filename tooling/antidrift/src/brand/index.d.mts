@@ -9,7 +9,9 @@ export type Brand<T, Name extends string> = T & {
 
 export type Unbrand<T> = T extends {
   readonly [__antidriftBrand]: { readonly value: infer Value };
-} ? Value : T;
+}
+  ? Value
+  : T;
 
 export type BrandCheck<T> = (value: unknown) => value is T;
 
@@ -26,10 +28,10 @@ export type BrandKit<T, Name extends string> = {
 
 export function brand<const Name extends string, T>(
   name: Name,
-  check: BrandCheck<T>,
+  check: BrandCheck<T>
 ): BrandKit<T, Name>;
 
 export function brand<const Name extends string, T = unknown>(
   name: Name,
-  check: (value: unknown) => boolean,
+  check: (value: unknown) => boolean
 ): BrandKit<T, Name>;

@@ -31,7 +31,7 @@ function sameSet(left, right) {
     left &&
     right &&
     left.size === right.size &&
-    [...left].every((value) => right.has(value)),
+    [...left].every((value) => right.has(value))
   );
 }
 
@@ -105,7 +105,7 @@ function ownerProjections(checker, candidates) {
         candidate,
         `${label}[${JSON.stringify(property.name)}]`,
         depth - 1,
-        next,
+        next
       );
     }
   }
@@ -123,7 +123,7 @@ function contextualOwner(checker, owners, type) {
   if (owner) return owner;
   if (!type?.isUnion() || !boundedType(checker, type)) return null;
   const objects = type.types.filter(
-    (part) => part.flags & (ts.TypeFlags.Object | ts.TypeFlags.Intersection),
+    (part) => part.flags & (ts.TypeFlags.Object | ts.TypeFlags.Intersection)
   );
   return objects.length === 1 ? owners.get(objects[0]) : null;
 }
@@ -190,8 +190,8 @@ function stableBridge(checker, bridge) {
       !dataProperty(
         checker.getPropertyOfType(
           checker.getTypeAtLocation(node.expression),
-          node.name.text,
-        ),
+          node.name.text
+        )
       )
     );
   }
@@ -261,7 +261,7 @@ function outputTag(expression, field) {
     expression.properties.some(
       (member) =>
         ts.isSpreadAssignment(member) ||
-        (member.name && ts.isComputedPropertyName(member.name)),
+        (member.name && ts.isComputedPropertyName(member.name))
     )
   ) {
     return null;
@@ -270,7 +270,7 @@ function outputTag(expression, field) {
     (member) =>
       member.name &&
       (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) &&
-      member.name.text === field,
+      member.name.text === field
   );
   const property = properties.length === 1 ? properties[0] : null;
   return property &&
@@ -301,7 +301,7 @@ function discriminantBridge(checker, expression, owner) {
   }
   const sourceCases = finiteStrings(propertyType(checker, source, guard.field));
   const ownerCases = finiteStrings(
-    propertyType(checker, owner.type, guard.field),
+    propertyType(checker, owner.type, guard.field)
   );
   if (!sameSet(sourceCases, ownerCases) || sourceCases.size < 2) return null;
   const remaining = new Set(sourceCases);
@@ -402,10 +402,10 @@ function ownerReference(checker, node, owner, seen = new Set()) {
               original &&
               property.declarations?.length &&
               property.declarations.every((declaration) =>
-                original.declarations?.includes(declaration),
+                original.declarations?.includes(declaration)
               )
             );
-          }),
+          })
       )
     ) {
       return true;
@@ -419,7 +419,7 @@ function ownerReference(checker, node, owner, seen = new Set()) {
     return (symbol?.declarations ?? []).some(
       (declaration) =>
         ts.isTypeAliasDeclaration(declaration) &&
-        ownerReference(checker, declaration.type, owner, next),
+        ownerReference(checker, declaration.type, owner, next)
     );
   }
   return false;
@@ -438,7 +438,7 @@ function derivedComposition(checker, node, owner) {
       node.members.length > 0 &&
       node.members.every(
         (member) =>
-          member.type && derivedComposition(checker, member.type, owner),
+          member.type && derivedComposition(checker, member.type, owner)
       )
     );
   }
@@ -451,7 +451,7 @@ function handwritten(typeNode) {
   if (ts.isTypeLiteralNode(typeNode)) return true;
   if (ts.isUnionTypeNode(typeNode)) {
     return typeNode.types.every(
-      (part) => ts.isLiteralTypeNode(part) || handwritten(part),
+      (part) => ts.isLiteralTypeNode(part) || handwritten(part)
     );
   }
   return false;
@@ -491,7 +491,7 @@ function directTypeNode(type) {
     declarations.find(
       (node) =>
         ts.isTypeLiteralNode(node) ||
-        (ts.isInterfaceDeclaration(node) && !node.heritageClauses?.length),
+        (ts.isInterfaceDeclaration(node) && !node.heritageClauses?.length)
     ) ?? null
   );
 }
@@ -549,7 +549,7 @@ function collectLocalCopies(
   site,
   findings,
   onlyField,
-  depth = maxDepth,
+  depth = maxDepth
 ) {
   local = nonNullable(checker, local);
   if (!objectType(local) || depth === 0 || local === owner.type) return;
@@ -560,8 +560,8 @@ function collectLocalCopies(
       sameProperty(
         checker,
         field,
-        checker.getPropertyOfType(owner.type, field.name),
-      ),
+        checker.getPropertyOfType(owner.type, field.name)
+      )
   );
   const literal = directTypeNode(local);
   if (
@@ -574,7 +574,7 @@ function collectLocalCopies(
       (member) =>
         ts.isPropertySignature(member) &&
         member.type &&
-        !derivedComposition(checker, member.type, owner),
+        !derivedComposition(checker, member.type, owner)
     )
   ) {
     findings.set(
@@ -584,8 +584,8 @@ function collectLocalCopies(
         local,
         owner,
         fields.map((field) => field.name),
-        site,
-      ),
+        site
+      )
     );
     return;
   }
@@ -598,7 +598,7 @@ function collectLocalCopies(
     ) {
       findings.set(
         node,
-        projectionProof(checker, local, owner, [property.name], site),
+        projectionProof(checker, local, owner, [property.name], site)
       );
     }
   }
@@ -625,14 +625,14 @@ function collectLocalCopies(
       site,
       findings,
       null,
-      depth - 1,
+      depth - 1
     );
   }
 }
 
 export function collectOwnedContractProvenance(program, checker, candidates) {
   const accepted = candidates.filter(
-    (candidate) => candidate.authorityState === "accepted",
+    (candidate) => candidate.authorityState === "accepted"
   );
   let programCache = cache.get(program);
   if (!programCache) {
@@ -646,8 +646,8 @@ export function collectOwnedContractProvenance(program, checker, candidates) {
         (candidate, index) =>
           candidate.type === entry.candidates[index].type &&
           candidate.label === entry.candidates[index].label &&
-          candidate.authority === entry.candidates[index].authority,
-      ),
+          candidate.authority === entry.candidates[index].authority
+      )
   );
   if (cached) return cached.findings;
   const owners = ownerProjections(checker, candidates);
@@ -659,13 +659,13 @@ export function collectOwnedContractProvenance(program, checker, candidates) {
       (file) =>
         !file.isDeclarationFile &&
         !file.fileName.includes("/node_modules/") &&
-        !file.fileName.includes("/convex/_generated/"),
+        !file.fileName.includes("/convex/_generated/")
     );
   function anchor(node) {
     if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) return;
     if (ts.isConditionalExpression(node)) {
       const owner = owners.get(
-        nonNullable(checker, checker.getContextualType(node)),
+        nonNullable(checker, checker.getContextualType(node))
       );
       const bridge = owner && discriminantBridge(checker, node, owner);
       if (bridge) {
@@ -680,7 +680,7 @@ export function collectOwnedContractProvenance(program, checker, candidates) {
   for (const [symbol, list] of bridges) {
     bridges.set(
       symbol,
-      list.filter((bridge) => stableBridge(checker, bridge)),
+      list.filter((bridge) => stableBridge(checker, bridge))
     );
   }
   function consumer(node) {
@@ -689,7 +689,7 @@ export function collectOwnedContractProvenance(program, checker, candidates) {
     // bindings accepted by trustedSource; no lookalike return shape qualifies.
     if (ts.isCallExpression(node)) {
       const owner = owners.get(
-        nonNullable(checker, checker.getTypeAtLocation(node)),
+        nonNullable(checker, checker.getTypeAtLocation(node))
       );
       const contextual = checker.getContextualType(node);
       if (owner && contextual) {
@@ -717,7 +717,7 @@ export function collectOwnedContractProvenance(program, checker, candidates) {
               bridge.owner,
               node,
               findings,
-              bridge.field,
+              bridge.field
             );
           }
         }

@@ -33,7 +33,7 @@ export function importedOwner(context, node, owners, seen = new Set()) {
       owners
         .filter((owner) => owner.member === node.property.name)
         .map((owner) => ({ ...owner, member: undefined })),
-      seen,
+      seen
     );
   }
   const variable = findVariable(context, node);
@@ -49,14 +49,14 @@ export function importedOwner(context, node, owners, seen = new Set()) {
       (owner) =>
         !owner.member &&
         owner.module === definition.parent.source.value &&
-        owner.export === name,
+        owner.export === name
     );
   }
   if (
     definition?.type === "Variable" &&
     definition.parent.kind === "const" &&
     !variable.references.some(
-      (reference) => reference.isWrite() && !reference.init,
+      (reference) => reference.isWrite() && !reference.init
     )
   ) {
     return importedOwner(context, definition.node.init, owners, seen);

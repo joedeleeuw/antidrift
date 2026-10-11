@@ -136,7 +136,7 @@ function isDefinitelyNarrowerRecordType(type) {
   const unwrapped = unwrapTypeParentheses(type);
   if (unwrapped.type === "TSTypeLiteral") {
     return unwrapped.members.some(
-      (member) => member.type !== "TSIndexSignature",
+      (member) => member.type !== "TSIndexSignature"
     );
   }
   if (unwrapped.type !== "TSTypeReference") return false;
@@ -165,7 +165,7 @@ function resolvedVariableForIdentifier(scopes, identifier) {
     const reference = scope.references.find(
       (candidate) =>
         startOf(candidate.identifier) === startOf(identifier) &&
-        endOf(candidate.identifier) === endOf(identifier),
+        endOf(candidate.identifier) === endOf(identifier)
     );
     if (reference !== undefined) return reference.resolved;
   }
@@ -210,7 +210,7 @@ function knownValueEvidence(expression, scopes, boundary, visitedVariables) {
   const annotatedIdentifier = variable.identifiers.find(
     (identifier) =>
       identifier.typeAnnotation !== null &&
-      identifier.typeAnnotation !== undefined,
+      identifier.typeAnnotation !== undefined
   );
   const annotation = annotatedIdentifier?.typeAnnotation?.typeAnnotation;
   if (annotation !== undefined && annotatedIdentifier !== undefined) {
@@ -229,7 +229,7 @@ function knownValueEvidence(expression, scopes, boundary, visitedVariables) {
     declarator.parent.kind !== "const" ||
     declarator.init === null ||
     variable.references.some(
-      (reference) => reference.isWrite() && !reference.init,
+      (reference) => reference.isWrite() && !reference.init
     ) ||
     functionBoundary(declarator) !== boundary
   ) {
@@ -239,7 +239,7 @@ function knownValueEvidence(expression, scopes, boundary, visitedVariables) {
     declarator.init,
     scopes,
     boundary,
-    new Set([...visitedVariables, variable]),
+    new Set([...visitedVariables, variable])
   );
 }
 function widenedBinding(variable, scopes) {
@@ -251,7 +251,7 @@ function widenedBinding(variable, scopes) {
     declarator.id.type !== "Identifier" ||
     declarator.init === null ||
     variable.references.some(
-      (reference) => reference.isWrite() && !reference.init,
+      (reference) => reference.isWrite() && !reference.init
     )
   ) {
     return null;
@@ -275,7 +275,7 @@ function widenedBinding(variable, scopes) {
     originalExpression,
     scopes,
     boundary,
-    new Set([variable]),
+    new Set([variable])
   );
   return evidence === null
     ? null
@@ -317,7 +317,7 @@ export const noWidenThenAssertRule = defineRule({
           context.sourceCode.text,
           widened.broadKind,
           widened.evidence,
-          node.typeAnnotation,
+          node.typeAnnotation
         )
       ) {
         return;

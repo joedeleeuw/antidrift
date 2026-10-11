@@ -81,7 +81,7 @@ export const getCallChain = (value) => {
   if (node.type === "MemberExpression") {
     return appendCallChainMember(
       getCallChain(node.object),
-      getMemberPropertyName(node),
+      getMemberPropertyName(node)
     );
   }
   return null;
@@ -165,7 +165,7 @@ export const isDefaultFallbackNode = (value) => {
   if (node.type === "ObjectExpression") {
     return node.properties.every(
       (property) =>
-        property.type === "Property" && isDefaultFallbackNode(property.value),
+        property.type === "Property" && isDefaultFallbackNode(property.value)
     );
   }
   if (node.type === "ArrayExpression") {

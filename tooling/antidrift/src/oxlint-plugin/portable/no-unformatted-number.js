@@ -96,7 +96,7 @@ export default {
           /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(context.filename) &&
           opening?.name?.name === "output" &&
           opening.attributes.some(
-            (attribute) => attribute.name?.name === "data-testid",
+            (attribute) => attribute.name?.name === "data-testid"
           )
         ) {
           return;

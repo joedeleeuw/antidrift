@@ -107,7 +107,7 @@ const snapshotReturnsFreshReference = (fn) => {
   const returnArguments = [];
   collectReturnArguments(fn.body, returnArguments);
   return returnArguments.some((argument) =>
-    isFreshReferenceExpression(argument),
+    isFreshReferenceExpression(argument)
   );
 };
 export default {

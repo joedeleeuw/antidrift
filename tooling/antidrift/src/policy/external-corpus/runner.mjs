@@ -44,7 +44,7 @@ const valueArgHandlers = {
   "--min-drift-repositories": (out, value) => {
     out.minDriftRepositories = parsePositiveInteger(
       value,
-      out.minDriftRepositories,
+      out.minDriftRepositories
     );
   },
 };
@@ -151,11 +151,11 @@ function externalReason({
   }
   if (failed) {
     const failedRepositories = repositories.filter(
-      (result) => result.decision === "fail",
+      (result) => result.decision === "fail"
     );
     const firstFailure = failedRepositories[0];
     const firstFailedCase = firstFailure?.cases?.find(
-      (testCase) => testCase.decision === "fail",
+      (testCase) => testCase.decision === "fail"
     );
     const detail = firstFailedCase?.reason ?? firstFailure?.reason;
     const prefix = `${failedRepositories.length} external corpus ${failedRepositories.length === 1 ? "repository" : "repositories"} failed`;
@@ -175,7 +175,7 @@ function externalReason({
 function repositoryHasPassingDrift(result) {
   if (result.decision !== "pass") return false;
   return result.cases.some(
-    (testCase) => testCase.kind === "drift" && testCase.decision === "pass",
+    (testCase) => testCase.kind === "drift" && testCase.decision === "pass"
   );
 }
 
@@ -237,7 +237,7 @@ function failingCaseLines(repository) {
     .filter((testCase) => testCase.decision === "fail")
     .map(
       (testCase) =>
-        `  - ${testCase.id}: ${testCase.reason ?? "failed without a case reason"}`,
+        `  - ${testCase.id}: ${testCase.reason ?? "failed without a case reason"}`
     );
 }
 
@@ -249,13 +249,13 @@ function conciseSummary(summary, output) {
   ];
   if (output) lines.push(`report: ${output}`);
   for (const repository of summary.repositories.filter(
-    (result) => result.decision !== "pass",
+    (result) => result.decision !== "pass"
   )) {
     lines.push(
       `- ${repository.corpus}: ${repository.decision}${
         repository.reason ? ` - ${repository.reason}` : ""
       }`,
-      ...failingCaseLines(repository),
+      ...failingCaseLines(repository)
     );
   }
   return lines.join("\n");
@@ -296,10 +296,10 @@ export async function externalCorpus(options = {}) {
   }
 
   const requireIndividualRepository = Boolean(
-    sharedOptions.require && (corpus || sharedOptions.repo),
+    sharedOptions.require && (corpus || sharedOptions.repo)
   );
   const presence = corpora.map((entry) =>
-    externalRepositoryPresence(entry, sharedOptions),
+    externalRepositoryPresence(entry, sharedOptions)
   );
   const available = presence.filter((entry) => entry.repoRoot).length;
   const preconditionFailure = externalPreconditionFailure({
@@ -321,8 +321,8 @@ export async function externalCorpus(options = {}) {
         skippedRepositorySummary(
           entry,
           externalSlice(sharedOptions),
-          preconditionFailure,
-        ),
+          preconditionFailure
+        )
       ),
     };
     emitSummary(summary, output, report);
@@ -334,7 +334,7 @@ export async function externalCorpus(options = {}) {
   });
 
   const passed = repositories.filter(
-    (result) => result.decision === "pass",
+    (result) => result.decision === "pass"
   ).length;
   const driftPassed = repositories.filter(repositoryHasPassingDrift).length;
   const failed = repositories.some((result) => result.decision === "fail");

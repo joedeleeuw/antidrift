@@ -20,7 +20,10 @@ function programFor(sourceText) {
     strict: true,
     target: ts.ScriptTarget.ESNext,
   });
-  return { checker: program.getTypeChecker(), sourceFile: program.getSourceFile(fileName) };
+  return {
+    checker: program.getTypeChecker(),
+    sourceFile: program.getSourceFile(fileName),
+  };
 }
 
 function variableType(checker, sourceFile, name) {
@@ -54,11 +57,23 @@ describe("broad-input appeasement cast helpers", () => {
       declare const label: string;
     `);
 
-    expect(isAppeasementCastSourceType(variableType(checker, sourceFile, "rawAny"))).toBe(true);
-    expect(isAppeasementCastSourceType(variableType(checker, sourceFile, "rawUnknown"))).toBe(true);
-    expect(isAppeasementCastSourceType(variableType(checker, sourceFile, "label"))).toBe(false);
-    expect(isAppeasementCastTargetType(aliasType(checker, sourceFile, "UserDto"))).toBe(true);
-    expect(isAppeasementCastTargetType(aliasType(checker, sourceFile, "Empty"))).toBe(false);
+    expect(
+      isAppeasementCastSourceType(variableType(checker, sourceFile, "rawAny"))
+    ).toBe(true);
+    expect(
+      isAppeasementCastSourceType(
+        variableType(checker, sourceFile, "rawUnknown")
+      )
+    ).toBe(true);
+    expect(
+      isAppeasementCastSourceType(variableType(checker, sourceFile, "label"))
+    ).toBe(false);
+    expect(
+      isAppeasementCastTargetType(aliasType(checker, sourceFile, "UserDto"))
+    ).toBe(true);
+    expect(
+      isAppeasementCastTargetType(aliasType(checker, sourceFile, "Empty"))
+    ).toBe(false);
     expect(isNamedTypeReference({ type: "TSTypeReference" })).toBe(true);
     expect(isNamedTypeReference({ type: "TSStringKeyword" })).toBe(false);
   });

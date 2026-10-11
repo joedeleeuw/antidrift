@@ -233,7 +233,7 @@ function eslintConfig(plan, repoRoot) {
           plan.ruleOptions?.[ruleId]
             ? ["error", plan.ruleOptions[ruleId]]
             : "error",
-        ]),
+        ])
       ),
     },
   ];
@@ -258,7 +258,7 @@ function countByRule(findings) {
     benchmarkRuleIds.map((ruleId) => [
       ruleId,
       findings.filter((finding) => finding.ruleId === ruleId).length,
-    ]),
+    ])
   );
 }
 
@@ -399,7 +399,7 @@ function negativeRegexExitGuard(node) {
       ? test.argument
       : null;
   return Boolean(
-    isCallNamed(call, regexTestMethods) && statementExits(node.consequent),
+    isCallNamed(call, regexTestMethods) && statementExits(node.consequent)
   );
 }
 
@@ -455,8 +455,8 @@ function recordSqlTag({ repo, repoRoot, filePath, inventory, node }) {
       filePath,
       node,
       allowed ? "allowed-sql-tag" : "unclassified-sql-tag",
-      name,
-    ),
+      name
+    )
   );
 }
 
@@ -481,14 +481,7 @@ function recordSqlGuard({
     inventory.guardShapes.negativeRegexExit += 1;
     pushExample(
       inventory.guardShapes.examples,
-      baseExample(
-        repo,
-        repoRoot,
-        filePath,
-        node,
-        "negative-regex-exit",
-        detail,
-      ),
+      baseExample(repo, repoRoot, filePath, node, "negative-regex-exit", detail)
     );
   } else if (isCallNamed(node.test, regexTestMethods)) {
     inventory.guardShapes.positiveRegexBranch += 1;
@@ -500,20 +493,20 @@ function recordSqlGuard({
         filePath,
         node,
         "positive-regex-branch",
-        detail,
-      ),
+        detail
+      )
     );
   } else if (isCallNamed(node.test, membershipMethods)) {
     inventory.guardShapes.membershipBranch += 1;
     pushExample(
       inventory.guardShapes.examples,
-      baseExample(repo, repoRoot, filePath, node, "membership-branch", detail),
+      baseExample(repo, repoRoot, filePath, node, "membership-branch", detail)
     );
   } else if (isCallNamed(node.test, quantifierMethods)) {
     inventory.guardShapes.quantifierBranch += 1;
     pushExample(
       inventory.guardShapes.examples,
-      baseExample(repo, repoRoot, filePath, node, "quantifier-branch", detail),
+      baseExample(repo, repoRoot, filePath, node, "quantifier-branch", detail)
     );
   }
 }
@@ -546,9 +539,9 @@ function recordSqlBuilderAppend({
         filePath,
         node,
         "plus-equals-static-sql-builder",
-        detail,
+        detail
       ),
-      80,
+      80
     );
   } else if (rightText === null) {
     inventory.concatRiskShapes.plusEqualsDynamicSqlBuilder += 1;
@@ -560,9 +553,9 @@ function recordSqlBuilderAppend({
         filePath,
         node,
         "plus-equals-dynamic-sql-builder",
-        detail,
+        detail
       ),
-      80,
+      80
     );
   }
 }
@@ -576,7 +569,7 @@ function recordConcatCall({ repo, repoRoot, filePath, inventory, node }) {
   pushExample(
     inventory.concatRiskShapes.examples,
     baseExample(repo, repoRoot, filePath, node, "concat-call-sql"),
-    80,
+    80
   );
 }
 
@@ -588,7 +581,7 @@ function recordArrayJoin({ repo, repoRoot, filePath, inventory, node }) {
   pushExample(
     inventory.concatRiskShapes.examples,
     baseExample(repo, repoRoot, filePath, node, "array-join-sql"),
-    80,
+    80
   );
 }
 
@@ -610,9 +603,9 @@ function recordTemplateOutsideMainPattern({
       repoRoot,
       filePath,
       node,
-      "keyword-template-outside-main-pattern",
+      "keyword-template-outside-main-pattern"
     ),
-    80,
+    80
   );
 }
 
@@ -698,7 +691,7 @@ function inventoryForResults(repo, repoRoot, results) {
           repo,
           repoRoot,
           filePath: result.filePath,
-        }),
+        })
       );
     } catch (error) {
       pushExample(inventory.parseErrors, {
@@ -721,12 +714,12 @@ async function lintPlan(plan, repoRoot) {
   const parserErrors = results.flatMap((result) =>
     result.messages
       .filter((message) => message.fatal)
-      .map((message) => toFinding(repoRoot, result, message)),
+      .map((message) => toFinding(repoRoot, result, message))
   );
   const findings = results.flatMap((result) =>
     result.messages
       .filter((message) => benchmarkRuleIds.includes(message.ruleId))
-      .map((message) => toFinding(repoRoot, result, message)),
+      .map((message) => toFinding(repoRoot, result, message))
   );
 
   return { results, parserErrors, findings };
@@ -734,18 +727,18 @@ async function lintPlan(plan, repoRoot) {
 
 function findingLocationSet(findings, ruleId) {
   return new Set(
-    findings.filter((finding) => finding.ruleId === ruleId).map(locationKey),
+    findings.filter((finding) => finding.ruleId === ruleId).map(locationKey)
   );
 }
 
 function nonTypeAwareComparison(typeAwareFindings, nonTypeAwareFindings) {
   const typeAwareLocations = findingLocationSet(
     typeAwareFindings,
-    customRuleId,
+    customRuleId
   );
   const nonTypeAwareLocations = findingLocationSet(
     nonTypeAwareFindings,
-    customRuleId,
+    customRuleId
   );
   return {
     extraWithoutTypeServices: [...nonTypeAwareLocations]
@@ -795,12 +788,12 @@ function parserServiceLocations(probes, key) {
         repo: probe.repo,
         label: probe.label,
         location,
-      })),
+      }))
     )
     .sort((a, b) =>
       `${a.repo}:${a.label}:${a.location}`.localeCompare(
-        `${b.repo}:${b.label}:${b.location}`,
-      ),
+        `${b.repo}:${b.label}:${b.location}`
+      )
     );
 }
 
@@ -813,15 +806,15 @@ function summarizeParserServiceDeltas(results) {
     typeAwarePlans,
     probedPlans: probes.length,
     classificationCounts: countByValue(
-      probes.map((probe) => probe.parserServiceDelta),
+      probes.map((probe) => probe.parserServiceDelta)
     ),
     extraWithoutTypeServices: parserServiceLocations(
       probes,
-      "extraWithoutTypeServices",
+      "extraWithoutTypeServices"
     ),
     missingWithoutTypeServices: parserServiceLocations(
       probes,
-      "missingWithoutTypeServices",
+      "missingWithoutTypeServices"
     ),
   };
 }
@@ -832,7 +825,7 @@ async function nonTypeAwareProbe(plan, repoRoot, typeAwareFindings) {
   const { parserErrors, findings } = await lintPlan(probePlan, repoRoot);
   const comparisonWithTypeAware = nonTypeAwareComparison(
     typeAwareFindings,
-    findings,
+    findings
   );
   const probe = {
     repo: plan.repo,
@@ -885,17 +878,17 @@ async function runPlan(plan) {
 function summarize(results, slice) {
   const checkedFiles = results.reduce(
     (sum, result) => sum + (result.checkedFiles ?? 0),
-    0,
+    0
   );
   const parserErrors = results.reduce(
     (sum, result) => sum + (result.parserErrors ?? 0),
-    0,
+    0
   );
   const findings = results.flatMap((result) => result.findings ?? []);
   const coverageInventory = results.reduce(
     (inventory, result) =>
       mergeInventory(inventory, result.coverageInventory ?? emptyInventory()),
-    emptyInventory(),
+    emptyInventory()
   );
   return {
     schemaVersion: 1,
@@ -935,7 +928,7 @@ export async function sqlQueryBenchmark({
       previous.then(async () => {
         results.push(await runPlan(plan));
       }),
-    Promise.resolve(),
+    Promise.resolve()
   );
   const summary = summarize(results, slice);
   emit(summary, output, report);

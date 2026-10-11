@@ -30,14 +30,14 @@ function requireStringList(name, values) {
 
 export function isRequestParamsAccess(
   node,
-  requestParamRoots = REQUEST_PARAM_ROOTS,
+  requestParamRoots = REQUEST_PARAM_ROOTS
 ) {
   const roots = new Set(requestParamRoots);
   return Boolean(
     node?.property?.type === "Identifier" &&
     node.property.name === "params" &&
     node.object?.type === "Identifier" &&
-    roots.has(node.object.name),
+    roots.has(node.object.name)
   );
 }
 
@@ -50,7 +50,7 @@ export function isAuthzCall(callee, authzFunctions) {
 export function createAuthBoundaryTracker(options = {}) {
   const authzFunctions = requireStringList(
     "authzFunctions",
-    options.authzFunctions,
+    options.authzFunctions
   );
   const requestParamRoots = options.requestParamRoots ?? REQUEST_PARAM_ROOTS;
   const onFrameExit = options.onFrameExit ?? (() => {});

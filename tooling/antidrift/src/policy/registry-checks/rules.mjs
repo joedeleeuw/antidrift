@@ -121,7 +121,7 @@ function checkPromotionEvidenceRefs(
   label,
   repoRoot,
   errors,
-  { rejectFixtures = false } = {},
+  { rejectFixtures = false } = {}
 ) {
   const paths = stringArray(refs, label, errors);
   if (!repoRoot) {
@@ -149,34 +149,34 @@ function checkRuleExternal(external, label, errors) {
   }
   if (!allowedExternalStates.has(external.state)) {
     errors.push(
-      `${label}.external.state must be one of: ${[...allowedExternalStates].join(", ")}.`,
+      `${label}.external.state must be one of: ${[...allowedExternalStates].join(", ")}.`
     );
   }
   if (!allowedExternalSupport.has(external.support)) {
     errors.push(
-      `${label}.external.support must be one of: ${[...allowedExternalSupport].join(", ")}.`,
+      `${label}.external.support must be one of: ${[...allowedExternalSupport].join(", ")}.`
     );
   }
   if (!allowedExternalDecisions.has(external.decision)) {
     errors.push(
-      `${label}.external.decision must be one of: ${[...allowedExternalDecisions].join(", ")}.`,
+      `${label}.external.decision must be one of: ${[...allowedExternalDecisions].join(", ")}.`
     );
   }
   stringArray(
     external.candidates ?? [],
     `${label}.external.candidates`,
     errors,
-    { allowEmpty: true },
+    { allowEmpty: true }
   );
   requireString(
     external.whyThisState,
     `${label}.external.whyThisState`,
-    errors,
+    errors
   );
   requireString(
     external.whyNotOtherState,
     `${label}.external.whyNotOtherState`,
-    errors,
+    errors
   );
 }
 function checkRulePromotion(promotion, label, errors) {
@@ -186,49 +186,49 @@ function checkRulePromotion(promotion, label, errors) {
   }
   if (!allowedProofBuckets.has(promotion.proofBucket)) {
     errors.push(
-      `${label}.promotion.proofBucket must be one of: ${[...allowedProofBuckets].join(", ")}.`,
+      `${label}.promotion.proofBucket must be one of: ${[...allowedProofBuckets].join(", ")}.`
     );
   } else if (!allowedActiveRuleProofBuckets.has(promotion.proofBucket)) {
     errors.push(
-      `${label}.promotion.proofBucket contains unsupported active rule proof bucket '${promotion.proofBucket}'. Allowed values: ${[...allowedActiveRuleProofBuckets].join(", ")}.`,
+      `${label}.promotion.proofBucket contains unsupported active rule proof bucket '${promotion.proofBucket}'. Allowed values: ${[...allowedActiveRuleProofBuckets].join(", ")}.`
     );
   }
   requireString(
     promotion.association,
     `${label}.promotion.association`,
-    errors,
+    errors
   );
   requireString(
     promotion.blockingThreshold,
     `${label}.promotion.blockingThreshold`,
-    errors,
+    errors
   );
   requireString(
     promotion.ecosystemComparison,
     `${label}.promotion.ecosystemComparison`,
-    errors,
+    errors
   );
   requireString(
     promotion.corpusEvidence,
     `${label}.promotion.corpusEvidence`,
-    errors,
+    errors
   );
   requireString(
     promotion.noSinkBehavior,
     `${label}.promotion.noSinkBehavior`,
-    errors,
+    errors
   );
   requireString(
     promotion.noDeadWorkBehavior,
     `${label}.promotion.noDeadWorkBehavior`,
-    errors,
+    errors
   );
 }
 function hasNonStableBlocker(entry) {
   return ["concerns", "unproven", "openReviewConcerns"].some((field) =>
     (entry[field] ?? []).some(
-      (item) => typeof item === "string" && item.length > 0,
-    ),
+      (item) => typeof item === "string" && item.length > 0
+    )
   );
 }
 function checkStableRuleEntry(entry, label, errors) {
@@ -236,7 +236,7 @@ function checkStableRuleEntry(entry, label, errors) {
   requireString(entry.referenceDoc, `${label}.referenceDoc`, errors);
   if (entry.external?.decision !== "own-antidrift") {
     errors.push(
-      `${label}.external.decision must be own-antidrift for stable active rules.`,
+      `${label}.external.decision must be own-antidrift for stable active rules.`
     );
   }
 }
@@ -245,17 +245,17 @@ function checkNonStableRuleEntry(entry, label, errors) {
   const proofBuckets = stringArray(
     entry.proofBuckets,
     `${label}.proofBuckets`,
-    errors,
+    errors
   );
   checkAllowedValues(
     proofBuckets,
     allowedActiveRuleProofBuckets,
     `${label}.proofBuckets`,
-    errors,
+    errors
   );
   if (!hasNonStableBlocker(entry)) {
     errors.push(
-      `${label} must document at least one non-stable blocker in concerns, unproven, or openReviewConcerns.`,
+      `${label} must document at least one non-stable blocker in concerns, unproven, or openReviewConcerns.`
     );
   }
 }
@@ -266,13 +266,13 @@ function checkOptionalRuleProofBuckets(entry, label, errors, { active }) {
   const proofBuckets = stringArray(
     entry.proofBuckets,
     `${label}.proofBuckets`,
-    errors,
+    errors
   );
   checkAllowedValues(
     proofBuckets,
     active ? allowedActiveRuleProofBuckets : allowedProofBuckets,
     `${label}.proofBuckets`,
-    errors,
+    errors
   );
 }
 function checkDefaultOffRuleMetadata(entry, label, errors, { active }) {
@@ -294,7 +294,7 @@ function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
   }
   if (!allowedRuleStatuses.has(entry.status)) {
     errors.push(
-      `${label}.status must be one of: ${[...allowedRuleStatuses].join(", ")}.`,
+      `${label}.status must be one of: ${[...allowedRuleStatuses].join(", ")}.`
     );
   }
   if (active && typeof entry.stable !== "boolean") {
@@ -309,7 +309,7 @@ function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
       entry.corpusRepositories ?? [],
       `${label}.corpusRepositories`,
       errors,
-      { allowEmpty: true },
+      { allowEmpty: true }
     );
     stringArray(entry.concerns ?? [], `${label}.concerns`, errors, {
       allowEmpty: true,
@@ -324,7 +324,7 @@ function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
       entry.openReviewConcerns ?? [],
       `${label}.openReviewConcerns`,
       errors,
-      { allowEmpty: true },
+      { allowEmpty: true }
     );
     checkRuleExternal(entry.external, label, errors);
     checkRuleExamples(entry.examples, label, errors);
@@ -343,7 +343,7 @@ function checkRuleEntry(entry, label, errors, { active, repoRoot }) {
       repoRoot,
       entry.referenceDoc,
       `${label}.referenceDoc`,
-      errors,
+      errors
     );
   }
 }
@@ -376,7 +376,7 @@ function checkStableRuleRequirements(
   label,
   stableRequirements,
   repoRoot,
-  errors,
+  errors
 ) {
   if (entry?.stable !== true || !isRecord(stableRequirements)) {
     return;
@@ -390,7 +390,7 @@ function checkStableRuleRequirements(
     : [];
   if (new Set(repositories).size < minimum) {
     errors.push(
-      `${label}.corpusRepositories must list at least ${minimum} independent repositories for stable promotion.`,
+      `${label}.corpusRepositories must list at least ${minimum} independent repositories for stable promotion.`
     );
   }
   if (!isRecord(entry.promotion)) {
@@ -401,7 +401,7 @@ function checkStableRuleRequirements(
       entry.promotion.replicationsNotIntroducedForTest,
       true,
       `${label}.promotion.replicationsNotIntroducedForTest`,
-      errors,
+      errors
     );
   }
   if (stableRequirements.maxKnownFalsePositives === 0) {
@@ -409,7 +409,7 @@ function checkStableRuleRequirements(
       entry.promotion.knownFalsePositives,
       0,
       `${label}.promotion.knownFalsePositives`,
-      errors,
+      errors
     );
   }
   if (stableRequirements.maxKnownFalseNegatives === 0) {
@@ -417,13 +417,13 @@ function checkStableRuleRequirements(
       entry.promotion.knownFalseNegatives,
       0,
       `${label}.promotion.knownFalseNegatives`,
-      errors,
+      errors
     );
   }
   if (stableRequirements.productionConcerns === "none") {
     if (entry.promotion.productionConcerns !== "none") {
       errors.push(
-        `${label}.promotion.productionConcerns must be 'none' for stable promotion.`,
+        `${label}.promotion.productionConcerns must be 'none' for stable promotion.`
       );
     }
   }
@@ -431,27 +431,27 @@ function checkStableRuleRequirements(
     requireString(
       entry.promotion.claudeAdvisoryReview,
       `${label}.promotion.claudeAdvisoryReview`,
-      errors,
+      errors
     );
     checkPromotionEvidenceRefs(
       entry.promotion.claudeAdvisoryReviewRefs,
       `${label}.promotion.claudeAdvisoryReviewRefs`,
       repoRoot,
-      errors,
+      errors
     );
   }
   if (stableRequirements.requireRealCorpusInventory === true) {
     requireString(
       entry.promotion.realCorpusInventory,
       `${label}.promotion.realCorpusInventory`,
-      errors,
+      errors
     );
     checkPromotionEvidenceRefs(
       entry.promotion.realCorpusInventoryRefs,
       `${label}.promotion.realCorpusInventoryRefs`,
       repoRoot,
       errors,
-      { rejectFixtures: true },
+      { rejectFixtures: true }
     );
   }
 }
@@ -460,13 +460,13 @@ export function activeAntidriftRules() {
     [
       ...Object.keys(eslintPlugin.rules),
       ...Object.keys(oxlintPlugin.rules),
-    ].map((rule) => `antidrift/${rule}`),
+    ].map((rule) => `antidrift/${rule}`)
   );
 }
 function checkStablePromotionRequirements(stable, errors) {
   if (!isRecord(stable)) {
     errors.push(
-      "policy/registries/rules.yaml promotionRequirements.stable must be a mapping.",
+      "policy/registries/rules.yaml promotionRequirements.stable must be a mapping."
     );
     return;
   }
@@ -476,7 +476,7 @@ function checkStablePromotionRequirements(stable, errors) {
       stable.minIndependentRepositories < 2)
   ) {
     errors.push(
-      "policy/registries/rules.yaml promotionRequirements.stable.minIndependentRepositories must be an integer >= 2.",
+      "policy/registries/rules.yaml promotionRequirements.stable.minIndependentRepositories must be an integer >= 2."
     );
   }
   for (const key of [
@@ -486,30 +486,30 @@ function checkStablePromotionRequirements(stable, errors) {
   ]) {
     if (typeof stable[key] !== "boolean") {
       errors.push(
-        `policy/registries/rules.yaml promotionRequirements.stable.${key} must be a boolean.`,
+        `policy/registries/rules.yaml promotionRequirements.stable.${key} must be a boolean.`
       );
     }
   }
   if (stable.maxKnownFalsePositives !== 0) {
     errors.push(
-      "policy/registries/rules.yaml promotionRequirements.stable.maxKnownFalsePositives must be 0.",
+      "policy/registries/rules.yaml promotionRequirements.stable.maxKnownFalsePositives must be 0."
     );
   }
   if (stable.maxKnownFalseNegatives !== 0) {
     errors.push(
-      "policy/registries/rules.yaml promotionRequirements.stable.maxKnownFalseNegatives must be 0.",
+      "policy/registries/rules.yaml promotionRequirements.stable.maxKnownFalseNegatives must be 0."
     );
   }
   if (stable.productionConcerns !== "none") {
     errors.push(
-      "policy/registries/rules.yaml promotionRequirements.stable.productionConcerns must be 'none'.",
+      "policy/registries/rules.yaml promotionRequirements.stable.productionConcerns must be 'none'."
     );
   }
 }
 function checkInvestigationRequirements(investigation, errors) {
   if (!isRecord(investigation)) {
     errors.push(
-      "policy/registries/rules.yaml promotionRequirements.investigation must be a mapping.",
+      "policy/registries/rules.yaml promotionRequirements.investigation must be a mapping."
     );
     return;
   }
@@ -520,7 +520,7 @@ function checkInvestigationRequirements(investigation, errors) {
   ]) {
     if (typeof investigation[key] !== "boolean") {
       errors.push(
-        `policy/registries/rules.yaml promotionRequirements.investigation.${key} must be a boolean.`,
+        `policy/registries/rules.yaml promotionRequirements.investigation.${key} must be a boolean.`
       );
     }
   }
@@ -531,13 +531,13 @@ function checkClaudeAdvisory(advisory, repoRoot, errors) {
   }
   if (!isRecord(advisory)) {
     errors.push(
-      "policy/registries/rules.yaml claudeAdvisory must be a mapping.",
+      "policy/registries/rules.yaml claudeAdvisory must be a mapping."
     );
     return;
   }
   if (advisory.model !== "claude-opus-4-8") {
     errors.push(
-      "policy/registries/rules.yaml claudeAdvisory.model must be claude-opus-4-8.",
+      "policy/registries/rules.yaml claudeAdvisory.model must be claude-opus-4-8."
     );
   }
   if (advisory.promptProtocol !== undefined) {
@@ -545,7 +545,7 @@ function checkClaudeAdvisory(advisory, repoRoot, errors) {
       repoRoot,
       advisory.promptProtocol,
       "policy/registries/rules.yaml claudeAdvisory.promptProtocol",
-      errors,
+      errors
     );
   }
 }
@@ -553,7 +553,7 @@ function checkAllowedValues(values, allowed, label, errors) {
   for (const value of values) {
     if (!allowed.has(value)) {
       errors.push(
-        `${label} contains unsupported value '${value}'. Allowed values: ${[...allowed].join(", ")}.`,
+        `${label} contains unsupported value '${value}'. Allowed values: ${[...allowed].join(", ")}.`
       );
     }
   }
@@ -586,28 +586,28 @@ function checkActiveRuleEntries(rules, repoRoot, stableRequirements, errors) {
   for (const rule of [...activeRules].sort((a, b) => a.localeCompare(b))) {
     if (!registeredRules.has(rule)) {
       errors.push(
-        `policy/registries/rules.yaml missing active rule entry: ${rule}`,
+        `policy/registries/rules.yaml missing active rule entry: ${rule}`
       );
     }
   }
   for (const rule of [...registeredRules].sort((a, b) => a.localeCompare(b))) {
     if (!activeRules.has(rule)) {
       errors.push(
-        `policy/registries/rules.yaml rules contains non-active rule; use retiredRules or researchCandidates instead: ${rule}`,
+        `policy/registries/rules.yaml rules contains non-active rule; use retiredRules or researchCandidates instead: ${rule}`
       );
     }
     checkRuleEntry(
       rules[rule],
       `policy/registries/rules.yaml rules.${rule}`,
       errors,
-      { active: true, repoRoot },
+      { active: true, repoRoot }
     );
     checkStableRuleRequirements(
       rules[rule],
       `policy/registries/rules.yaml rules.${rule}`,
       stableRequirements,
       repoRoot,
-      errors,
+      errors
     );
   }
 }
@@ -624,17 +624,17 @@ function checkRetiredRules(retiredRules, repoRoot, errors) {
       entry,
       `policy/registries/rules.yaml retiredRules.${rule}`,
       errors,
-      { active: false, repoRoot },
+      { active: false, repoRoot }
     );
     if (entry.status !== "retired") {
       errors.push(
-        `policy/registries/rules.yaml retiredRules.${rule}.status must be retired.`,
+        `policy/registries/rules.yaml retiredRules.${rule}.status must be retired.`
       );
     }
     requireString(
       entry.reason,
       `policy/registries/rules.yaml retiredRules.${rule}.reason`,
-      errors,
+      errors
     );
   }
 }
@@ -642,14 +642,14 @@ function checkResearchCandidates(
   researchCandidates,
   repoRoot,
   commandOwnedRuleIds,
-  errors,
+  errors
 ) {
   if (researchCandidates === undefined) {
     return;
   }
   if (!isRecord(researchCandidates)) {
     errors.push(
-      "policy/registries/rules.yaml researchCandidates must be a mapping.",
+      "policy/registries/rules.yaml researchCandidates must be a mapping."
     );
     return;
   }
@@ -658,26 +658,26 @@ function checkResearchCandidates(
       entry,
       `policy/registries/rules.yaml researchCandidates.${rule}`,
       errors,
-      { active: false, repoRoot },
+      { active: false, repoRoot }
     );
     if (entry.status !== "research" && entry.status !== "ecosystem-covered") {
       errors.push(
-        `policy/registries/rules.yaml researchCandidates.${rule}.status must be research or ecosystem-covered.`,
+        `policy/registries/rules.yaml researchCandidates.${rule}.status must be research or ecosystem-covered.`
       );
     }
     requireString(
       entry.signal,
       `policy/registries/rules.yaml researchCandidates.${rule}.signal`,
-      errors,
+      errors
     );
     requireString(
       entry.solveType,
       `policy/registries/rules.yaml researchCandidates.${rule}.solveType`,
-      errors,
+      errors
     );
     if (entry.referenceDoc === undefined) {
       errors.push(
-        `policy/registries/rules.yaml researchCandidates.${rule}.referenceDoc is required.`,
+        `policy/registries/rules.yaml researchCandidates.${rule}.referenceDoc is required.`
       );
     }
     for (const proofBucket of ruleEntryProofBuckets(entry)) {
@@ -686,7 +686,7 @@ function checkResearchCandidates(
         !commandOwnedRuleIds.has(rule)
       ) {
         errors.push(
-          `policy/registries/rules.yaml researchCandidates.${rule}.proofBuckets contains command-owned proof bucket '${proofBucket}' but no command-owned semantic fact maps to ${rule}.`,
+          `policy/registries/rules.yaml researchCandidates.${rule}.proofBuckets contains command-owned proof bucket '${proofBucket}' but no command-owned semantic fact maps to ${rule}.`
         );
       }
     }
@@ -728,7 +728,7 @@ function checkRuleFamilyEntry(entry, label, repoRoot, knownRules, errors) {
       repoRoot,
       entry.referenceDoc,
       `${label}.referenceDoc`,
-      errors,
+      errors
     );
   }
   if (!isRecord(entry.subsets)) {
@@ -740,7 +740,7 @@ function checkRuleFamilyEntry(entry, label, repoRoot, knownRules, errors) {
       subsetEntry,
       `${label}.subsets.${subset}`,
       knownRules,
-      errors,
+      errors
     );
   }
 }
@@ -759,7 +759,7 @@ function checkRuleFamilies(ruleFamilies, registry, repoRoot, errors) {
       `policy/registries/rules.yaml ruleFamilies.${family}`,
       repoRoot,
       knownRules,
-      errors,
+      errors
     );
   }
 }
@@ -836,7 +836,7 @@ function checkPolicyRuleReviewEntry(entry, label, activeRules, errors) {
   }
   if (!allowedPolicyReviewStatuses.has(entry.status)) {
     errors.push(
-      `${label}.status must be one of: ${[...allowedPolicyReviewStatuses].join(", ")}.`,
+      `${label}.status must be one of: ${[...allowedPolicyReviewStatuses].join(", ")}.`
     );
   }
   if (
@@ -844,7 +844,7 @@ function checkPolicyRuleReviewEntry(entry, label, activeRules, errors) {
     !allowedAgentOpsPolicyReviewStatuses.has(entry.status)
   ) {
     errors.push(
-      `${label}.status must be hook-covered, policy-script, delegated, spec-only, research, or retired for agent-ops policy rules.`,
+      `${label}.status must be hook-covered, policy-script, delegated, spec-only, research, or retired for agent-ops policy rules.`
     );
   }
   requireString(entry.coverage, `${label}.coverage`, errors);
@@ -854,7 +854,7 @@ function checkPolicyRuleReviewEntry(entry, label, activeRules, errors) {
     requireString(entry.antidriftRule, `${label}.antidriftRule`, errors);
     if (!activeRules.has(entry.antidriftRule)) {
       errors.push(
-        `${label}.antidriftRule references unknown active custom rule: ${entry.antidriftRule}`,
+        `${label}.antidriftRule references unknown active custom rule: ${entry.antidriftRule}`
       );
     }
   }
@@ -884,7 +884,7 @@ function checkPolicyRuleReviews(registry, policySource, errors) {
   }
   if (!isRecord(registry.policyRuleReviews)) {
     errors.push(
-      "policy/registries/rules.yaml policyRuleReviews must be a mapping.",
+      "policy/registries/rules.yaml policyRuleReviews must be a mapping."
     );
     return;
   }
@@ -894,7 +894,7 @@ function checkPolicyRuleReviews(registry, policySource, errors) {
   for (const id of policyRuleIds) {
     if (reviews[id] === undefined) {
       errors.push(
-        `policy/registries/rules.yaml policyRuleReviews missing policy rule review: ${id}`,
+        `policy/registries/rules.yaml policyRuleReviews missing policy rule review: ${id}`
       );
       continue;
     }
@@ -902,13 +902,13 @@ function checkPolicyRuleReviews(registry, policySource, errors) {
       reviews[id],
       `policy/registries/rules.yaml policyRuleReviews.${id}`,
       activeRules,
-      errors,
+      errors
     );
   }
   for (const id of Object.keys(reviews).sort((a, b) => a.localeCompare(b))) {
     if (!policyRuleSet.has(id)) {
       errors.push(
-        `policy/registries/rules.yaml policyRuleReviews contains non-policy rule review: ${id}`,
+        `policy/registries/rules.yaml policyRuleReviews contains non-policy rule review: ${id}`
       );
     }
   }
@@ -923,7 +923,7 @@ function directiveEntries(registry) {
       ? Object.entries(entries)
           .filter(([, entry]) => isRecord(entry) && "directive" in entry)
           .map(([id, entry]) => [`${section}.${id}`, entry.directive])
-      : [],
+      : []
   );
 }
 function checkDirectives(registry, errors) {
@@ -934,20 +934,20 @@ function checkDirectives(registry, errors) {
   for (const [id, entry] of Object.entries(declared)) {
     if (!directiveIdPattern.test(id)) {
       errors.push(
-        `policy/registries/rules.yaml directives.${id} must be a G, W, S, L or R directive ID.`,
+        `policy/registries/rules.yaml directives.${id} must be a G, W, S, L or R directive ID.`
       );
     }
     requireString(
       entry?.directive,
       `policy/registries/rules.yaml directives.${id}.directive`,
-      errors,
+      errors
     );
   }
   const referenced = new Set();
   for (const [label, directive] of directiveEntries(registry)) {
     if (typeof directive !== "string" || !Object.hasOwn(declared, directive)) {
       errors.push(
-        `policy/registries/rules.yaml ${label}.directive must name a directive declared under directives.`,
+        `policy/registries/rules.yaml ${label}.directive must name a directive declared under directives.`
       );
       continue;
     }
@@ -956,7 +956,7 @@ function checkDirectives(registry, errors) {
   for (const id of Object.keys(declared)) {
     if (!referenced.has(id)) {
       errors.push(
-        `policy/registries/rules.yaml directives.${id} is not named by any rule or policy rule review.`,
+        `policy/registries/rules.yaml directives.${id} is not named by any rule or policy rule review.`
       );
     }
   }
@@ -964,7 +964,7 @@ function checkDirectives(registry, errors) {
 export function checkRuleRegistry(registry, repoRoot, policySource, errors) {
   if (Object.keys(registry).length === 0) {
     errors.push(
-      "policy/registries/rules.yaml must exist and contain the rule status registry.",
+      "policy/registries/rules.yaml must exist and contain the rule status registry."
     );
     return;
   }
@@ -973,25 +973,25 @@ export function checkRuleRegistry(registry, repoRoot, policySource, errors) {
   }
   checkInvestigationRequirements(
     registry.promotionRequirements?.investigation,
-    errors,
+    errors
   );
   checkStablePromotionRequirements(
     registry.promotionRequirements?.stable,
-    errors,
+    errors
   );
   checkClaudeAdvisory(registry.claudeAdvisory, repoRoot, errors);
   checkActiveRuleEntries(
     registry.rules,
     repoRoot,
     registry.promotionRequirements?.stable,
-    errors,
+    errors
   );
   checkRetiredRules(registry.retiredRules, repoRoot, errors);
   checkResearchCandidates(
     registry.researchCandidates,
     repoRoot,
     commandOwnedRuleIdsFromSemanticFactKinds(registry.semanticFactKinds),
-    errors,
+    errors
   );
   checkRuleFamilies(registry.ruleFamilies, registry, repoRoot, errors);
   checkDirectives(registry, errors);

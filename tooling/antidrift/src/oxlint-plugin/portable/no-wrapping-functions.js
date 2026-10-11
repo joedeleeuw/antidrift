@@ -50,8 +50,7 @@ export default {
         node.typeParameters ||
         node.returnType?.typeAnnotation.type === "TSTypePredicate" ||
         node.params.some(
-          (param) =>
-            param.type !== "Identifier" && param.type !== "RestElement",
+          (param) => param.type !== "Identifier" && param.type !== "RestElement"
         )
       ) {
         return;

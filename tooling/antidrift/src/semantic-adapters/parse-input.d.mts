@@ -21,13 +21,13 @@ export function typeofOperand(node: unknown): unknown | null;
 
 export function stringTypeofGuard(
   condition: unknown,
-  expression: unknown,
+  expression: unknown
 ): StringTypeofGuard | null;
 
 export function conditionEnsuresString(
   condition: unknown,
   expression: unknown,
-  whenTruthy: boolean,
+  whenTruthy: boolean
 ): boolean;
 
 export function nodeWithin(node: unknown, ancestor: unknown): boolean;
@@ -40,22 +40,22 @@ export function safeBetweenStringGuardAndParse(statement: unknown): boolean;
 
 export function previousGuardInBlockEnsuresString(
   statement: unknown,
-  expression: unknown,
+  expression: unknown
 ): boolean;
 
 export function priorGuardEnsuresString(
   node: unknown,
-  expression: unknown,
+  expression: unknown
 ): boolean;
 
 export function branchGuardEnsuresString(
   node: unknown,
-  expression: unknown,
+  expression: unknown
 ): boolean;
 
 export function hasLocalStringBoundary(
   node: unknown,
-  expression: unknown,
+  expression: unknown
 ): boolean;
 
 export function isAnyOrUnknownType(type: ts.Type | null | undefined): boolean;
@@ -67,5 +67,5 @@ export function jsonParseArgument(node: unknown): unknown | null;
 export function isUnsafeJsonParseInput(
   node: unknown,
   services: TypeScriptParserServices,
-  checker: ts.TypeChecker,
+  checker: ts.TypeChecker
 ): boolean;

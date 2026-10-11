@@ -18,7 +18,7 @@ const isSafeTemplateLiteral = (node) => {
     return false;
   }
   return SAFE_HREF_PREFIXES.some((prefix) =>
-    firstQuasi.value.raw.startsWith(prefix),
+    firstQuasi.value.raw.startsWith(prefix)
   );
 };
 
@@ -84,7 +84,7 @@ export default {
           importedOwner(
             context,
             expr.callee,
-            context.options[0]?.sanitizers ?? [],
+            context.options[0]?.sanitizers ?? []
           )
         ) {
           return;

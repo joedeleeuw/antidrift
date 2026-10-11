@@ -8,5 +8,9 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../../packages/domain" }, { "path": "../../packages/contracts" }, { "path": "../../packages/ui" }]
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/ui" }
+  ]
 }

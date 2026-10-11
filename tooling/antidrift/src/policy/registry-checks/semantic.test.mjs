@@ -26,24 +26,24 @@ describe("semantic contracts", () => {
       const rulesDirectory = join(
         root,
         "tooling/antidrift/src",
-        pluginDirectory,
+        pluginDirectory
       );
       mkdirSync(rulesDirectory, { recursive: true });
       writeFileSync(
         join(rulesDirectory, "example.js"),
-        'emitSemanticFact(context, node, { factKind: "missingFact" });\n',
+        'emitSemanticFact(context, node, { factKind: "missingFact" });\n'
       );
       const messages = [];
       expect(
         checkRegistries({
           repoRoot: root,
           report: (message) => messages.push(message),
-        }),
+        })
       ).toBe(false);
       expect(messages.join("\n")).toContain(
-        "semanticFactKinds missing emitted fact kind: missingFact",
+        "semanticFactKinds missing emitted fact kind: missingFact"
       );
-    },
+    }
   );
   it("requires shipped semantic fact contracts to be registered", () => {
     const root = workspace();
@@ -51,7 +51,7 @@ describe("semantic contracts", () => {
     const existing = join(root, "policy", "registries", "rules.yaml");
     const text = readFileSync(existing, "utf8").replace(
       /\nsemanticFactKinds:\n(?: {2}[^\n]+:\n(?: {4}[^\n]*\n)+)+/u,
-      "\n",
+      "\n"
     );
     writeFileSync(existing, text);
     const messages = [];
@@ -59,10 +59,10 @@ describe("semantic contracts", () => {
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "semanticFactKinds is required because the package ships semantic fact contracts",
+      "semanticFactKinds is required because the package ships semantic fact contracts"
     );
   });
   it("rejects malformed semantic fact kind declarations", () => {
@@ -85,31 +85,31 @@ describe("semantic contracts", () => {
     noSinkBehavior: Bad test behavior.
     payloadFields: [thing]
 rules:
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "semanticFactKinds.badFact.rules references unknown active rule: antidrift/not-real",
+      "semanticFactKinds.badFact.rules references unknown active rule: antidrift/not-real"
     );
     expect(output).toContain(
-      "semanticFactKinds.badFact.carrier must be one of",
+      "semanticFactKinds.badFact.carrier must be one of"
     );
     expect(output).toContain(
-      "semanticFactKinds.badFact.confidence contains unsupported value 'wishful-thinking'",
+      "semanticFactKinds.badFact.confidence contains unsupported value 'wishful-thinking'"
     );
     expect(output).toContain(
-      "semanticFactKinds.badFact.emission contains unsupported value 'silent-blocking'",
+      "semanticFactKinds.badFact.emission contains unsupported value 'silent-blocking'"
     );
     expect(output).toContain(
-      "semanticFactKinds contains non-shipped semantic fact contract: badFact",
+      "semanticFactKinds contains non-shipped semantic fact contract: badFact"
     );
   });
   it("rejects model-assisted semantic facts that claim blocking enforcement", () => {
@@ -132,18 +132,18 @@ rules:
     noSinkBehavior: No fact is emitted and no diagnostic is produced.
     payloadFields: [candidate]
 rules:
-`,
-      ),
+`
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "semanticFactKinds.modelSuggestion.emission must not include blocking-diagnostic when carrier is model-assisted.",
+      "semanticFactKinds.modelSuggestion.emission must not include blocking-diagnostic when carrier is model-assisted."
     );
   });
   it("rejects semantic fact kind declarations that drift from the shipped package contract", () => {
@@ -157,18 +157,18 @@ rules:
         text,
         "resourceLifecycleProof",
         "adapterId",
-        "wrong-adapter",
-      ),
+        "wrong-adapter"
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "semanticFactKinds.resourceLifecycleProof.adapterId must match the shipped semantic fact contract (react-state).",
+      "semanticFactKinds.resourceLifecycleProof.adapterId must match the shipped semantic fact contract (react-state)."
     );
   });
   it("rejects semantic fact kind declarations whose association metadata drifts from the shipped package contract", () => {
@@ -183,26 +183,26 @@ rules:
           text,
           "broadSetterCoMutation",
           "association",
-          "Wrong semantic association.",
+          "Wrong semantic association."
         ),
         "broadSetterCoMutation",
         "noSinkBehavior",
-        "Wrong no-sink behavior.",
-      ),
+        "Wrong no-sink behavior."
+      )
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "semanticFactKinds.broadSetterCoMutation.association must match the shipped semantic fact contract",
+      "semanticFactKinds.broadSetterCoMutation.association must match the shipped semantic fact contract"
     );
     expect(output).toContain(
-      "semanticFactKinds.broadSetterCoMutation.noSinkBehavior must match the shipped semantic fact contract",
+      "semanticFactKinds.broadSetterCoMutation.noSinkBehavior must match the shipped semantic fact contract"
     );
   });
   it("rejects semantic adapter contracts that drift from shipped adapters and active rules", () => {
@@ -238,35 +238,35 @@ rules:
       },
       new Set(["antidrift/no-handrolled-resource-lifecycle-cells"]),
       messages,
-      "test semantic adapter contracts",
+      "test semantic adapter contracts"
     );
     const output = messages.join("\n");
     expect(output).toContain(
-      "test semantic adapter contracts missing contract for shipped adapter: sql",
+      "test semantic adapter contracts missing contract for shipped adapter: sql"
     );
     expect(output).toContain(
-      "test semantic adapter contracts contains contract for non-exported adapter: staleAdapter",
+      "test semantic adapter contracts contains contract for non-exported adapter: staleAdapter"
     );
     expect(output).toContain(
-      "test semantic adapter contracts.reactState.exportName must match its contract key (reactState).",
+      "test semantic adapter contracts.reactState.exportName must match its contract key (reactState)."
     );
     expect(output).toContain(
-      "test semantic adapter contracts.reactState.rules references unknown active rule: antidrift/not-real",
+      "test semantic adapter contracts.reactState.rules references unknown active rule: antidrift/not-real"
     );
     expect(output).toContain(
-      "test semantic adapter contracts.reactState.proofBuckets contains unsupported value 'diff-relative'",
+      "test semantic adapter contracts.reactState.proofBuckets contains unsupported value 'diff-relative'"
     );
     expect(output).toContain(
-      "test semantic adapter contracts.reactState.semanticFactAdapterIds must be an array of strings.",
+      "test semantic adapter contracts.reactState.semanticFactAdapterIds must be an array of strings."
     );
     expect(output).toContain(
-      "test semantic adapter contracts.reactState.semanticFactKinds must be an array of strings.",
+      "test semantic adapter contracts.reactState.semanticFactKinds must be an array of strings."
     );
     expect(output).toContain(
-      "test semantic adapter contracts.reactState.associations must not be empty.",
+      "test semantic adapter contracts.reactState.associations must not be empty."
     );
     expect(output).toContain(
-      "test semantic adapter contracts.reactState.carrier must be a non-empty string.",
+      "test semantic adapter contracts.reactState.carrier must be a non-empty string."
     );
   });
   it("rejects semantic adapter contracts without an exported adapter module", () => {
@@ -288,10 +288,10 @@ rules:
       { reactState: null },
       new Set(["antidrift/no-handrolled-resource-lifecycle-cells"]),
       messages,
-      "test semantic adapter contracts",
+      "test semantic adapter contracts"
     );
     expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts.reactState exported adapter must be a mapping.",
+      "test semantic adapter contracts.reactState exported adapter must be a mapping."
     );
   });
   it("rejects semantic adapter contracts with empty exported adapter modules", () => {
@@ -313,10 +313,10 @@ rules:
       { reactState: {} },
       new Set(["antidrift/no-handrolled-resource-lifecycle-cells"]),
       messages,
-      "test semantic adapter contracts",
+      "test semantic adapter contracts"
     );
     expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts.reactState exported adapter must expose at least one runtime primitive.",
+      "test semantic adapter contracts.reactState exported adapter must expose at least one runtime primitive."
     );
   });
   it("rejects stable semantic adapter rules whose promotion proof bucket is not declared by the adapter contract", () => {
@@ -344,10 +344,10 @@ rules:
           stable: true,
           promotion: { proofBucket: "local-ast-source-shape" },
         },
-      },
+      }
     );
     expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts.schemaProvenance.proofBuckets must include stable rule antidrift/no-redundant-zod-parse promotion proofBucket (local-ast-source-shape).",
+      "test semantic adapter contracts.schemaProvenance.proofBuckets must include stable rule antidrift/no-redundant-zod-parse promotion proofBucket (local-ast-source-shape)."
     );
   });
   it("rejects stable semantic adapter rules whose promotion association is not declared by the adapter contract", () => {
@@ -378,10 +378,10 @@ rules:
             association: "Stable same-schema parse association.",
           },
         },
-      },
+      }
     );
     expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts.schemaProvenance.associations must include stable rule antidrift/no-redundant-zod-parse promotion association.",
+      "test semantic adapter contracts.schemaProvenance.associations must include stable rule antidrift/no-redundant-zod-parse promotion association."
     );
   });
   it("rejects stable semantic source rules that are not claimed by a shipped adapter contract", () => {
@@ -416,10 +416,10 @@ rules:
           stable: true,
           promotion: { proofBucket: "semantic-source-type-provenance" },
         },
-      },
+      }
     );
     expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts must claim stable semantic-source-type-provenance rule antidrift/no-unsafe-deserialize.",
+      "test semantic adapter contracts must claim stable semantic-source-type-provenance rule antidrift/no-unsafe-deserialize."
     );
   });
   it("rejects semantic adapter aggregate runtime surfaces missing contract adapters", () => {
@@ -428,7 +428,7 @@ rules:
     writePackageJson(root, { exports: semanticAdapterPackageExports() });
     touchSemanticAdapterPackageExportFiles(root);
     const keys = semanticAdapterContractKeys().filter(
-      (key) => key !== "reactState",
+      (key) => key !== "reactState"
     );
     writeFileSync(
       join(
@@ -437,26 +437,26 @@ rules:
         "antidrift",
         "src",
         "semantic-adapters",
-        "index.mjs",
+        "index.mjs"
       ),
-      semanticAdapterAggregateRuntimeSource(keys),
+      semanticAdapterAggregateRuntimeSource(keys)
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "tooling/antidrift/src/semantic-adapters/index.mjs missing adapter namespace import: reactState",
+      "tooling/antidrift/src/semantic-adapters/index.mjs missing adapter namespace import: reactState"
     );
     expect(output).toContain(
-      "tooling/antidrift/src/semantic-adapters/index.mjs missing named adapter export: reactState",
+      "tooling/antidrift/src/semantic-adapters/index.mjs missing named adapter export: reactState"
     );
     expect(output).toContain(
-      "tooling/antidrift/src/semantic-adapters/index.mjs SEMANTIC_ADAPTERS missing adapter key: reactState",
+      "tooling/antidrift/src/semantic-adapters/index.mjs SEMANTIC_ADAPTERS missing adapter key: reactState"
     );
   });
   it("rejects semantic adapter aggregate type surfaces missing contract adapters", () => {
@@ -465,7 +465,7 @@ rules:
     writePackageJson(root, { exports: semanticAdapterPackageExports() });
     touchSemanticAdapterPackageExportFiles(root);
     const keys = semanticAdapterContractKeys().filter(
-      (key) => key !== "reactState",
+      (key) => key !== "reactState"
     );
     writeFileSync(
       join(
@@ -474,29 +474,29 @@ rules:
         "antidrift",
         "src",
         "semantic-adapters",
-        "index.d.mts",
+        "index.d.mts"
       ),
-      semanticAdapterAggregateTypeSource(keys),
+      semanticAdapterAggregateTypeSource(keys)
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "tooling/antidrift/src/semantic-adapters/index.d.mts missing adapter namespace import: reactState",
+      "tooling/antidrift/src/semantic-adapters/index.d.mts missing adapter namespace import: reactState"
     );
     expect(output).toContain(
-      "tooling/antidrift/src/semantic-adapters/index.d.mts missing named adapter export: reactState",
+      "tooling/antidrift/src/semantic-adapters/index.d.mts missing named adapter export: reactState"
     );
     expect(output).toContain(
-      "tooling/antidrift/src/semantic-adapters/index.d.mts SEMANTIC_ADAPTERS declaration missing adapter key: reactState",
+      "tooling/antidrift/src/semantic-adapters/index.d.mts SEMANTIC_ADAPTERS declaration missing adapter key: reactState"
     );
     expect(output).toContain(
-      "tooling/antidrift/src/semantic-adapters/index.d.mts SemanticAdapterContractKey missing adapter key: reactState",
+      "tooling/antidrift/src/semantic-adapters/index.d.mts SemanticAdapterContractKey missing adapter key: reactState"
     );
   });
   it("rejects shipped semantic facts whose adapter id is not claimed by a matching adapter contract", () => {
@@ -525,10 +525,10 @@ rules:
           rules: ["antidrift/no-handrolled-resource-lifecycle-cells"],
           adapterId: "react-state",
         },
-      },
+      }
     );
     expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts.reactState.semanticFactAdapterIds must include shipped semantic fact resourceLifecycleProof adapterId (react-state).",
+      "test semantic adapter contracts.reactState.semanticFactAdapterIds must include shipped semantic fact resourceLifecycleProof adapterId (react-state)."
     );
   });
   it("rejects shipped semantic facts whose fact kind is not claimed by a matching adapter contract", () => {
@@ -557,10 +557,10 @@ rules:
           rules: ["antidrift/no-handrolled-resource-lifecycle-cells"],
           adapterId: "react-state",
         },
-      },
+      }
     );
     expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts.reactState.semanticFactKinds must include shipped semantic fact kind: resourceLifecycleProof.",
+      "test semantic adapter contracts.reactState.semanticFactKinds must include shipped semantic fact kind: resourceLifecycleProof."
     );
   });
 });

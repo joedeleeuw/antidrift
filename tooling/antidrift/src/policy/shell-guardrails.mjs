@@ -8,7 +8,7 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 export const DEFAULT_AST_GREP_CONFIG = join(
   packageRoot,
   "ast-grep",
-  "sgconfig.yml",
+  "sgconfig.yml"
 );
 
 export function defaultAstGrepBinary(env = process.env) {
@@ -77,7 +77,7 @@ export function shellGuardrails({
         "Runs Antidrift's packaged ast-grep shell guardrails against the current project.",
         "Default mode scans the current project. Test mode validates the packaged rule tests.",
         "",
-      ].join("\n"),
+      ].join("\n")
     );
     return 0;
   }
@@ -87,7 +87,7 @@ export function shellGuardrails({
     !exists(parsed.astGrepBinary)
   ) {
     stderr.write(
-      `antidrift shell: ast-grep binary not found: ${parsed.astGrepBinary}\n`,
+      `antidrift shell: ast-grep binary not found: ${parsed.astGrepBinary}\n`
     );
     return 1;
   }

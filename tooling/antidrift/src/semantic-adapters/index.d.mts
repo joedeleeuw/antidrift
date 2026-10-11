@@ -77,37 +77,37 @@ export const SEMANTIC_ADAPTER_CONTRACT_LIST: readonly SemanticAdapterContract[];
 export const SEMANTIC_ADAPTER_MANIFEST: readonly SemanticAdapterManifestEntry[];
 
 export function semanticAdapterContractsForRule(
-  ruleId: string,
+  ruleId: string
 ): readonly SemanticAdapterContract[];
 
 export function semanticAdapterContractsForFactAdapterId(
-  adapterId: string,
+  adapterId: string
 ): readonly SemanticAdapterContract[];
 
 export function semanticAdapterContractsForProofBucket(
-  proofBucket: string,
+  proofBucket: string
 ): readonly SemanticAdapterContract[];
 
 export function semanticAdapterContractsForFactKind(
-  factKind: string,
+  factKind: string
 ): readonly SemanticAdapterContract[];
 
 export function semanticAdapterManifestForAdapterId(
-  adapterId: string,
+  adapterId: string
 ): SemanticAdapterManifestEntry | null;
 
 export function semanticAdapterManifestForRule(
-  ruleId: string,
+  ruleId: string
 ): readonly SemanticAdapterManifestEntry[];
 
 export function semanticAdapterManifestForFactAdapterId(
-  adapterId: string,
+  adapterId: string
 ): readonly SemanticAdapterManifestEntry[];
 
 export function semanticAdapterManifestForProofBucket(
-  proofBucket: string,
+  proofBucket: string
 ): readonly SemanticAdapterManifestEntry[];
 
 export function semanticAdapterManifestForFactKind(
-  factKind: string,
+  factKind: string
 ): readonly SemanticAdapterManifestEntry[];

@@ -21,14 +21,14 @@ describe("type-owner status literal helpers", () => {
     };
     const statusLiteral = withParent(
       { type: "TSLiteralType", literal: { value: "active" } },
-      { type: "TSTypeAliasDeclaration", id: { name: "UserStatus" } },
+      { type: "TSTypeAliasDeclaration", id: { name: "UserStatus" } }
     );
     const variantLiteral = withParent(
       { type: "TSLiteralType", literal: { value: "active" } },
       {
         type: "TSPropertySignature",
         key: { type: "Identifier", name: "variant" },
-      },
+      }
     );
 
     expect(canonicalStatusLiteralOwner(statusLiteral, statuses)).toMatchObject({
@@ -50,7 +50,10 @@ describe("type-owner status literal helpers", () => {
         values: ["active", "disabled"],
       },
     };
-    const userStatusLiteral = { type: "TSLiteralType", literal: { value: "active" } };
+    const userStatusLiteral = {
+      type: "TSLiteralType",
+      literal: { value: "active" },
+    };
     userStatusLiteral.parent = {
       type: "TSPropertySignature",
       key: { type: "Identifier", name: "status" },
@@ -62,7 +65,10 @@ describe("type-owner status literal helpers", () => {
         },
       },
     };
-    const featureStatusLiteral = { type: "TSLiteralType", literal: { value: "active" } };
+    const featureStatusLiteral = {
+      type: "TSLiteralType",
+      literal: { value: "active" },
+    };
     featureStatusLiteral.parent = {
       type: "TSPropertySignature",
       key: { type: "Identifier", name: "status" },
@@ -75,10 +81,14 @@ describe("type-owner status literal helpers", () => {
       },
     };
 
-    expect(canonicalStatusLiteralOwner(userStatusLiteral, statuses)).toMatchObject({
+    expect(
+      canonicalStatusLiteralOwner(userStatusLiteral, statuses)
+    ).toMatchObject({
       name: "UserStatus",
       value: "active",
     });
-    expect(canonicalStatusLiteralOwner(featureStatusLiteral, statuses)).toBeNull();
+    expect(
+      canonicalStatusLiteralOwner(featureStatusLiteral, statuses)
+    ).toBeNull();
   });
 });

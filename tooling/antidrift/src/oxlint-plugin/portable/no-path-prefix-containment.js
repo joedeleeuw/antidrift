@@ -64,8 +64,7 @@ const stableInitializer = (variable) => {
     if (
       definition.parent.kind !== "const" &&
       variable.references.some(
-        (reference) =>
-          reference.init !== true && reference.isWrite?.() === true,
+        (reference) => reference.init !== true && reference.isWrite?.() === true
       )
     ) {
       return null;
@@ -237,7 +236,7 @@ export default {
       const expression = resolveStableExpression(node);
       if (isStringLiteral(expression)) {
         return [...PATH_SEPARATORS].some((separator) =>
-          expression.value.endsWith(separator),
+          expression.value.endsWith(separator)
         );
       }
       if (expression?.type === "ConditionalExpression") {
@@ -279,7 +278,7 @@ export default {
         trailingQuasi.value.cooked ?? trailingQuasi.value.raw;
       if (
         [...PATH_SEPARATORS].some((separator) =>
-          trailingText.endsWith(separator),
+          trailingText.endsWith(separator)
         )
       ) {
         return true;

@@ -27,7 +27,7 @@ export function ruleNoUndercheckedTypePredicate() {
       if (!services) {
         return missingTypeServicesVisitors(
           context,
-          "no-underchecked-type-predicate",
+          "no-underchecked-type-predicate"
         );
       }
       const checker = services.program.getTypeChecker();
@@ -39,7 +39,7 @@ export function ruleNoUndercheckedTypePredicate() {
         const param = functionParameterByName(fn, parts.paramName);
         const tsParam = param && services.esTreeNodeToTSNodeMap.get(param);
         const tsTargetTypeNode = services.esTreeNodeToTSNodeMap.get(
-          parts.targetTypeNode,
+          parts.targetTypeNode
         );
         if (!tsParam || !tsTargetTypeNode) {
           return;
@@ -70,7 +70,7 @@ export function ruleNoUndercheckedTypePredicate() {
         const checked = checkedTargetProperties(
           fn.body,
           parts.paramName,
-          targetProps,
+          targetProps
         );
         if ([...targetProps].every((prop) => checked.has(prop))) {
           return;

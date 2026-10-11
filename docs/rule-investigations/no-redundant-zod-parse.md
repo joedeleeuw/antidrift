@@ -35,35 +35,35 @@ The default `nonSchemaModules` list is the one heuristic in the rule, and it is 
 
 `dfine-io/dlint` ships a rule with this name whose detector is type-shape, and its four exemptions exist to suppress failure modes that shape-matching creates. Each was re-derived against the provenance gate:
 
-| Exemption | Verdict | Reasoning |
-| --- | --- | --- |
-| safeParse is always a boundary | Rejected | A shape detector cannot tell a defensive check of untrusted input from a re-check of its own output, so it must exempt the method wholesale. Under provenance, a defensive check of unknown input never reaches the gate, and `S.safeParse(ownOutput)` cannot fail — it is dead code, so it gets its own `alwaysSuccessfulSafeParse` message instead of an exemption. |
-| `.catch()` / `.default()` chain | Kept structurally | `S.catch(x).parse(v)` puts a call in the receiver chain, so `canon` produces no path. It is also a different schema instance, so unifying it would have been wrong. No exemption code exists. |
-| `"use server"` files | Rejected | It exists because a server action's typed parameters are untrusted at runtime, which only matters to a detector reading the parameter's type. A boundary parse of an argument never reaches the gate; a file that parses the same value twice is drift wherever it runs. |
-| Widely-typed veto (`any`/`unknown`) | Rejected | It is a checker query this tier does not have, and it is unnecessary: it protects against a declared type that lies about the runtime value, while the gate requires the literal result of this schema's own parse call. |
-| Throw-assertion callbacks | Kept | Carried over from the pre-migration rule. `expect(() => S.parse(v)).toThrow()` asserts a schema contract, not validation drift, and provenance cannot distinguish it. |
+| Exemption                           | Verdict           | Reasoning                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| safeParse is always a boundary      | Rejected          | A shape detector cannot tell a defensive check of untrusted input from a re-check of its own output, so it must exempt the method wholesale. Under provenance, a defensive check of unknown input never reaches the gate, and `S.safeParse(ownOutput)` cannot fail — it is dead code, so it gets its own `alwaysSuccessfulSafeParse` message instead of an exemption. |
+| `.catch()` / `.default()` chain     | Kept structurally | `S.catch(x).parse(v)` puts a call in the receiver chain, so `canon` produces no path. It is also a different schema instance, so unifying it would have been wrong. No exemption code exists.                                                                                                                                                                         |
+| `"use server"` files                | Rejected          | It exists because a server action's typed parameters are untrusted at runtime, which only matters to a detector reading the parameter's type. A boundary parse of an argument never reaches the gate; a file that parses the same value twice is drift wherever it runs.                                                                                              |
+| Widely-typed veto (`any`/`unknown`) | Rejected          | It is a checker query this tier does not have, and it is unnecessary: it protects against a declared type that lies about the runtime value, while the gate requires the literal result of this schema's own parse call.                                                                                                                                              |
+| Throw-assertion callbacks           | Kept              | Carried over from the pre-migration rule. `expect(() => S.parse(v)).toThrow()` asserts a schema contract, not validation drift, and provenance cannot distinguish it.                                                                                                                                                                                                 |
 
 ## Real-corpus validation (2026-08-13, canonical-path engine)
 
 Measured by running the shipped Oxlint plugin over seven trees with only this rule enabled, each pinned to a commit. murderbox was exported from `git archive HEAD` because its working tree changed during the run; every other tree is a shallow read-only clone. The funnel columns are the rule's own gate stages, instrumented.
 
-| Repository | Files | Validation calls | Canonical path + stable root | Passes schema origin | Value carries provenance | Same canonical path | Findings |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| murderbox @ `777dc1bf` | 896 | 788 | 579 | 578 | 1 | 0 | 0 |
-| dust-tt/dust @ `741e0fb` | 9908 | 946 | 405 | 393 | 0 | 0 | 0 |
-| elizaOS/eliza @ `15c8bc84` | 18141 | 5139 | 879 | 833 | 0 | 0 | 0 |
-| hyperdxio/hyperdx @ `69a89aa` | 1221 | 592 | 172 | 164 | 0 | 0 | 0 |
-| pranitnale/InTown @ `b79dbcb` | 264 | 91 | 53 | 53 | 0 | 0 | 0 |
-| ts-rest/ts-rest @ `dd7239b` | 316 | 17 | 8 | 8 | 0 | 0 | 0 |
-| muralibasani/streamlens @ `8b1cdd1` | 88 | 17 | 15 | 15 | 0 | 0 | 0 |
-| **total** | **30834** | **7590** | **2111** | **2044** | **1** | **0** | **0** |
+| Repository                          | Files     | Validation calls | Canonical path + stable root | Passes schema origin | Value carries provenance | Same canonical path | Findings |
+| ----------------------------------- | --------- | ---------------- | ---------------------------- | -------------------- | ------------------------ | ------------------- | -------- |
+| murderbox @ `777dc1bf`              | 896       | 788              | 579                          | 578                  | 1                        | 0                   | 0        |
+| dust-tt/dust @ `741e0fb`            | 9908      | 946              | 405                          | 393                  | 0                        | 0                   | 0        |
+| elizaOS/eliza @ `15c8bc84`          | 18141     | 5139             | 879                          | 833                  | 0                        | 0                   | 0        |
+| hyperdxio/hyperdx @ `69a89aa`       | 1221      | 592              | 172                          | 164                  | 0                        | 0                   | 0        |
+| pranitnale/InTown @ `b79dbcb`       | 264       | 91               | 53                           | 53                   | 0                        | 0                   | 0        |
+| ts-rest/ts-rest @ `dd7239b`         | 316       | 17               | 8                            | 8                    | 0                        | 0                   | 0        |
+| muralibasani/streamlens @ `8b1cdd1` | 88        | 17               | 15                           | 15                   | 0                        | 0                   | 0        |
+| **total**                           | **30834** | **7590**         | **2111**                     | **2044**             | **1**                    | **0**               | **0**    |
 
 **What the funnel actually shows.** Half the gate is well exercised and half is not, and the two must not be conflated:
 
 - The **receiver half is genuinely validated**. 2,044 of 7,590 validation calls (27%) resolve to a canonical path on a stable root and pass the schema-origin classification, so `canon`, alias expansion, object-literal collapse, literal computed keys, and the origin rules all ran against real code at scale rather than against fixtures. streamlens contributes 15 of its 17 calls here, including the nine scaffolded `api.<resource>.<op>.responses[<status>].parse(await res.json())` seams — the exact member-expression-with-literal-computed-key shape this migration adds.
-- The **provenance half is essentially unexercised**. Across 7,590 calls the value being parsed carried in-file provenance from any schema exactly **once**, and it never carried provenance from the *same* canonical path. The zero findings therefore mean "this corpus almost never re-parses a locally parsed value", not "the rule discriminated well under pressure". Recall against the canonical-path engine is unproven, which is why the rule ships default-off.
+- The **provenance half is essentially unexercised**. Across 7,590 calls the value being parsed carried in-file provenance from any schema exactly **once**, and it never carried provenance from the _same_ canonical path. The zero findings therefore mean "this corpus almost never re-parses a locally parsed value", not "the rule discriminated well under pressure". Recall against the canonical-path engine is unproven, which is why the rule ships default-off.
 
-An earlier draft of this section claimed the false-positive-capable populations "were present and stayed silent". That overstates the evidence and is corrected here: what was present in volume was *receiver* shape; what was absent was *provenance* shape. The suppression work below is real but was measured at the receiver stage, not at the report stage.
+An earlier draft of this section claimed the false-positive-capable populations "were present and stayed silent". That overstates the evidence and is corrected here: what was present in volume was _receiver_ shape; what was absent was _provenance_ shape. The suppression work below is real but was measured at the receiver stage, not at the report stage.
 
 - **Non-schema receivers.** `JSON` resolves to no binding, so `canon` yields no path at all and the module-origin veto is never reached — murderbox's `JSON.parse` sites and the genuine double-`JSON.parse` sites in eliza (`packages/cloud/shared/src/lib/types/message-content.ts`, `plugins/plugin-mcp/src/service.ts`) drop out at the canon stage. The origin veto itself rejects 67 of the 2,111 canon-resolved receivers (dust 12, eliza 46, hyperdx 8, murderbox 1), so it does measurable work — but because none of those receivers reached the provenance stage, it changed no end result on this corpus. It is insurance, not a load-bearing measured filter.
 - **hyperdx's confessed re-parse is a correct bail, twice over.** `packages/api/src/utils/zod.ts` re-parses inside a `.transform` with the comment "Safe to call `.parse()` here — superRefine already validated the data". The receiver is a const initialized from a conditional expression, so there is no static canonical path; and the value is the transform callback's parameter, so there is no in-file provenance. Reproduced on a reduced probe. It is also arguably not drift: the re-parse selects a sub-schema to strip unknown fields, which does real work.
@@ -74,15 +74,19 @@ An earlier draft of this section claimed the false-positive-capable populations 
 murderbox `apps/desktop/src/bridge.ts:23` at `777dc1bf` is the single site where the parsed value carried provenance:
 
 ```ts
-import { murderboxDesktopBridgeContract, murderboxDesktopRuntimeInfoResultSchema } from "@murderbox/shared/desktop-bridge";
+import {
+  murderboxDesktopBridgeContract,
+  murderboxDesktopRuntimeInfoResultSchema,
+} from "@murderbox/shared/desktop-bridge";
 const method = murderboxDesktopBridgeContract.getRuntimeInfo;
-const parsedRuntimeInfo = murderboxDesktopRuntimeInfoResultSchema.parse(runtimeInfo);
+const parsedRuntimeInfo =
+  murderboxDesktopRuntimeInfoResultSchema.parse(runtimeInfo);
 return method.resultSchema.parse(parsedRuntimeInfo);
 ```
 
 `murderboxDesktopBridgeContract.getRuntimeInfo.resultSchema` **is** `murderboxDesktopRuntimeInfoResultSchema` — but only the imported module says so. The two receivers root at two different import bindings, so the same-path test fails and nothing is reported. This is the documented "same root binding or nothing" boundary: a measured false negative, not a bug.
 
-A relaxation was implemented and measured before being rejected: unify two roots when both are import bindings from the *same module specifier*. Across the corpus it produced exactly one finding — this one — and no new false positives. It was still rejected, because it is unsound in a trivially constructible shape this corpus happens not to contain: `import { RequestSchema, contract } from "./contract"` would unify `RequestSchema` with `contract.route.responseSchema`, which are different schemas. The measurement argues for the *sound* version of the capability, not for this one.
+A relaxation was implemented and measured before being rejected: unify two roots when both are import bindings from the _same module specifier_. Across the corpus it produced exactly one finding — this one — and no new false positives. It was still rejected, because it is unsound in a trivially constructible shape this corpus happens not to contain: `import { RequestSchema, contract } from "./contract"` would unify `RequestSchema` with `contract.route.responseSchema`, which are different schemas. The measurement argues for the _sound_ version of the capability, not for this one.
 
 The honest reading: in-file same-root re-validation is rare, and the shape that actually occurs is cross-module contract identity. Recall for this rule lives in a registry-declared or module-graph fact, which is the recorded follow-up.
 

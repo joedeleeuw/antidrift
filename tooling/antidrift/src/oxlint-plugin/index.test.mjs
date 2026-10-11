@@ -11,12 +11,10 @@ const require = createRequire(import.meta.url);
 const oxlintPackage = require.resolve("oxlint/package.json");
 const oxlintBinary = resolve(
   dirname(oxlintPackage),
-  require(oxlintPackage).bin.oxlint,
+  require(oxlintPackage).bin.oxlint
 );
 const plugin = fileURLToPath(new URL("./index.js", import.meta.url));
-const packageTopEntry = fileURLToPath(
-  new URL("../index.mjs", import.meta.url),
-);
+const packageTopEntry = fileURLToPath(new URL("../index.mjs", import.meta.url));
 const rawTouchableImportCases = [
   {
     label: "aliased React Native Pressable import",
@@ -329,16 +327,16 @@ const capabilityTypeofReportedCases = [
   'if (typeof localStorage.token === "string") use(localStorage.token);',
   'if (typeof globalThis[key] === "string") use(globalThis[key]);',
   'function shadowedDocument(document: unknown) { return typeof document === "undefined"; }',
-  "function shadowedProcess(process: { exitCode: unknown }) { return typeof process.exitCode === \"function\"; }",
+  'function shadowedProcess(process: { exitCode: unknown }) { return typeof process.exitCode === "function"; }',
   'function shadowedSelf() { const self = this; return typeof self === "undefined"; }',
-  'const detected = typeof window;',
+  "const detected = typeof window;",
 ];
 
 function lint(
   source,
   rules = { "antidrift/require-effect-deps": "error" },
   filename = "component.tsx",
-  specifier = plugin,
+  specifier = plugin
 ) {
   const directory = mkdtempSync(join(tmpdir(), "antidrift-oxlint-plugin-"));
   const config = join(directory, ".oxlintrc.json");
@@ -349,7 +347,7 @@ function lint(
       categories: { correctness: "off" },
       jsPlugins: [{ name: "antidrift", specifier }],
       rules,
-    }),
+    })
   );
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, source);
@@ -359,7 +357,7 @@ function lint(
     {
       cwd: directory,
       encoding: "utf8",
-    },
+    }
   );
   rmSync(directory, { recursive: true, force: true });
   return result;
@@ -368,18 +366,18 @@ function lint(
 describe("Oxlint plugin", () => {
   it("reports a React effect without dependencies", () => {
     const result = lint(
-      'import { useEffect } from "react";\nuseEffect(() => {});\n',
+      'import { useEffect } from "react";\nuseEffect(() => {});\n'
     );
 
     expect(result.status).toBe(1);
     expect(`${result.stdout}${result.stderr}`).toContain(
-      "antidrift(require-effect-deps)",
+      "antidrift(require-effect-deps)"
     );
   });
 
   it("accepts a React effect with dependencies", () => {
     const result = lint(
-      'import React from "react";\nReact.useEffect(() => {}, []);\n',
+      'import React from "react";\nReact.useEffect(() => {}, []);\n'
     );
 
     expect(result.status).toBe(0);
@@ -406,7 +404,7 @@ describe("Oxlint plugin", () => {
         'import type { TouchableOpacityProps } from "react-native";',
         'export type { TouchableOpacityProps as LegacyProps } from "react-native";',
       ].join("\n"),
-      { "antidrift/no-raw-react-native-touchables": "error" },
+      { "antidrift/no-raw-react-native-touchables": "error" }
     );
 
     expect(result.status).toBe(0);
@@ -424,7 +422,7 @@ describe("Oxlint plugin", () => {
           { allowedFiles: ["apps/client/src/tw/index.tsx"] },
         ],
       },
-      "apps/client/src/tw/index.tsx",
+      "apps/client/src/tw/index.tsx"
     );
 
     expect(result.status).toBe(0);
@@ -439,24 +437,24 @@ describe("Oxlint plugin", () => {
           { allowedFiles: ["index.tsx"] },
         ],
       },
-      "index.tsx",
+      "index.tsx"
     );
 
     expect(result.status).toBe(1);
     expect(`${result.stdout}${result.stderr}`).toContain(
-      "allowedFiles entries must be exact repository-relative owner paths",
+      "allowedFiles entries must be exact repository-relative owner paths"
     );
   });
 
   it("runs an extracted syntax rule", () => {
     const result = lint(
       "function Panel() { fetch('/api/panel'); return <section />; }\n",
-      { "antidrift/no-raw-fetch-in-component": "error" },
+      { "antidrift/no-raw-fetch-in-component": "error" }
     );
 
     expect(result.status).toBe(1);
     expect(`${result.stdout}${result.stderr}`).toContain(
-      "antidrift(no-raw-fetch-in-component)",
+      "antidrift(no-raw-fetch-in-component)"
     );
   });
 
@@ -471,12 +469,12 @@ describe("Oxlint plugin", () => {
         });
       `,
       { "antidrift/no-static-property-loop": "error" },
-      "config.test.ts",
+      "config.test.ts"
     );
 
     expect(result.status).toBe(1);
     expect(`${result.stdout}${result.stderr}`).toContain(
-      "antidrift(no-static-property-loop)",
+      "antidrift(no-static-property-loop)"
     );
   });
 
@@ -485,7 +483,7 @@ describe("Oxlint plugin", () => {
       'import { useEffect } from "react";\nuseEffect(() => {});\n',
       { "antidrift/require-effect-deps": "error" },
       "component.tsx",
-      packageTopEntry,
+      packageTopEntry
     );
     expect(result.stdout).toContain("antidrift(require-effect-deps)");
   });
@@ -499,7 +497,7 @@ describe("Oxlint plugin", () => {
         });
       `,
       { "antidrift/no-static-property-loop": "error" },
-      "config.test.ts",
+      "config.test.ts"
     );
 
     expect(result.status).toBe(0);
@@ -511,14 +509,14 @@ describe("Oxlint plugin", () => {
       const result = lint(
         source,
         { "antidrift/no-schema-library-in-test": "error" },
-        "schema.test.ts",
+        "schema.test.ts"
       );
 
       expect(result.status).toBe(1);
       expect(`${result.stdout}${result.stderr}`).toContain(
-        "antidrift(no-schema-library-in-test)",
+        "antidrift(no-schema-library-in-test)"
       );
-    },
+    }
   );
 
   it.each([
@@ -530,7 +528,7 @@ describe("Oxlint plugin", () => {
     const result = lint(
       source,
       { "antidrift/no-schema-library-in-test": "error" },
-      "schema.test.ts",
+      "schema.test.ts"
     );
 
     expect(result.status).toBe(0);
@@ -540,7 +538,7 @@ describe("Oxlint plugin", () => {
     const result = lint(
       'import { z } from "zod"; export const UserSchema = z.object({ id: z.string() });',
       { "antidrift/no-schema-library-in-test": "error" },
-      "schema.ts",
+      "schema.ts"
     );
 
     expect(result.status).toBe(0);
@@ -552,16 +550,16 @@ describe("Oxlint plugin", () => {
       const result = lint(
         source,
         { "antidrift/no-validator-output-oracle": "error" },
-        "schema.test.ts",
+        "schema.test.ts"
       );
 
       expect(result.status).toBe(1);
       const output = `${result.stdout}${result.stderr}`;
       expect(output).toContain("antidrift(no-validator-output-oracle)");
       expect(output).toContain(
-        "checking parsed body or payload shapes is often a sign of a low-value test",
+        "checking parsed body or payload shapes is often a sign of a low-value test"
       );
-    },
+    }
   );
 
   it.each([
@@ -580,7 +578,7 @@ describe("Oxlint plugin", () => {
     const result = lint(
       source,
       { "antidrift/no-validator-output-oracle": "error" },
-      "schema.test.tsx",
+      "schema.test.tsx"
     );
 
     expect(result.status).toBe(0);
@@ -590,7 +588,7 @@ describe("Oxlint plugin", () => {
     const result = lint(
       "expect(UserSchema.parse(raw)).toEqual(raw);",
       { "antidrift/no-validator-output-oracle": "error" },
-      "schema.ts",
+      "schema.ts"
     );
 
     expect(result.status).toBe(0);
@@ -602,7 +600,7 @@ describe("Oxlint plugin", () => {
       const result = lint(
         source,
         { "antidrift/no-mocked-response-body-oracle": "error" },
-        "route.test.ts",
+        "route.test.ts"
       );
 
       expect(result.status).toBe(1);
@@ -610,7 +608,7 @@ describe("Oxlint plugin", () => {
       expect(output).toContain("antidrift(no-mocked-response-body-oracle)");
       expect(output).toContain("candidates for deleting the entire test block");
       expect(output).toContain("independently owned effect");
-    },
+    }
   );
 
   it.each(mockedResponseOracleCleanCases)(
@@ -619,21 +617,21 @@ describe("Oxlint plugin", () => {
       const result = lint(
         source,
         { "antidrift/no-mocked-response-body-oracle": "error" },
-        "route.test.ts",
+        "route.test.ts"
       );
 
       expect(result.status).toBe(0);
       expect(`${result.stdout}${result.stderr}`).not.toContain(
-        "antidrift(no-mocked-response-body-oracle)",
+        "antidrift(no-mocked-response-body-oracle)"
       );
-    },
+    }
   );
 
   it("does not inspect mocked response bodies outside test files", () => {
     const result = lint(
       "backend.mockResolvedValue({ id: 'user_1' }); const body = await response.json(); expect(body).toEqual({ id: 'user_1' });",
       { "antidrift/no-mocked-response-body-oracle": "error" },
-      "route.ts",
+      "route.ts"
     );
 
     expect(result.status).toBe(0);
@@ -645,14 +643,14 @@ describe("Oxlint plugin", () => {
       const result = lint(
         drift,
         { [`antidrift/${ruleId}`]: "error" },
-        filename,
+        filename
       );
 
       expect(result.status).toBe(1);
       expect(`${result.stdout}${result.stderr}`).toContain(
-        `antidrift(${ruleId})`,
+        `antidrift(${ruleId})`
       );
-    },
+    }
   );
 
   it.each(antiSlopRuleCases)(
@@ -661,14 +659,14 @@ describe("Oxlint plugin", () => {
       const result = lint(
         correct,
         { [`antidrift/${ruleId}`]: "error" },
-        filename,
+        filename
       );
 
       expect(result.status).toBe(0);
       expect(`${result.stdout}${result.stderr}`).not.toContain(
-        `antidrift(${ruleId})`,
+        `antidrift(${ruleId})`
       );
-    },
+    }
   );
 
   it.each(unknownParameterExemptCases)(
@@ -677,14 +675,14 @@ describe("Oxlint plugin", () => {
       const result = lint(
         source,
         { "antidrift/no-unknown-parameters": "error" },
-        "sample.ts",
+        "sample.ts"
       );
 
       expect(result.status).toBe(0);
       expect(`${result.stdout}${result.stderr}`).not.toContain(
-        "antidrift(no-unknown-parameters)",
+        "antidrift(no-unknown-parameters)"
       );
-    },
+    }
   );
 
   it.each(unknownParameterReportedCases)(
@@ -693,14 +691,14 @@ describe("Oxlint plugin", () => {
       const result = lint(
         source,
         { "antidrift/no-unknown-parameters": "error" },
-        "sample.ts",
+        "sample.ts"
       );
 
       expect(result.status).toBe(1);
       expect(`${result.stdout}${result.stderr}`).toContain(
-        "antidrift(no-unknown-parameters)",
+        "antidrift(no-unknown-parameters)"
       );
-    },
+    }
   );
 
   it.each(capabilityTypeofCases)(
@@ -709,14 +707,14 @@ describe("Oxlint plugin", () => {
       const result = lint(
         source,
         { "antidrift/no-runtime-typeof": "error" },
-        "sample.ts",
+        "sample.ts"
       );
 
       expect(result.status).toBe(0);
       expect(`${result.stdout}${result.stderr}`).not.toContain(
-        "antidrift(no-runtime-typeof)",
+        "antidrift(no-runtime-typeof)"
       );
-    },
+    }
   );
 
   it.each(capabilityTypeofReportedCases)(
@@ -725,14 +723,14 @@ describe("Oxlint plugin", () => {
       const result = lint(
         source,
         { "antidrift/no-runtime-typeof": "error" },
-        "sample.ts",
+        "sample.ts"
       );
 
       expect(result.status).toBe(1);
       expect(`${result.stdout}${result.stderr}`).toContain(
-        "antidrift(no-runtime-typeof)",
+        "antidrift(no-runtime-typeof)"
       );
-    },
+    }
   );
 
   it("allows runtime typeof inside type guards only with allowInTypeGuards", () => {
@@ -742,18 +740,18 @@ describe("Oxlint plugin", () => {
     const allowed = lint(
       guard,
       { "antidrift/no-runtime-typeof": ["error", { allowInTypeGuards: true }] },
-      "sample.ts",
+      "sample.ts"
     );
     expect(allowed.status).toBe(0);
 
     const rejected = lint(
       guard,
       { "antidrift/no-runtime-typeof": "error" },
-      "sample.ts",
+      "sample.ts"
     );
     expect(rejected.status).toBe(1);
     expect(`${rejected.stdout}${rejected.stderr}`).toContain(
-      "antidrift(no-runtime-typeof)",
+      "antidrift(no-runtime-typeof)"
     );
   });
 
@@ -761,12 +759,12 @@ describe("Oxlint plugin", () => {
     const result = lint(
       'if (typeof value === "string") value.length;',
       { "antidrift/no-runtime-typeof": ["error", { allowInTypeGuards: true }] },
-      "sample.ts",
+      "sample.ts"
     );
 
     expect(result.status).toBe(1);
     expect(`${result.stdout}${result.stderr}`).toContain(
-      "antidrift(no-runtime-typeof)",
+      "antidrift(no-runtime-typeof)"
     );
   });
 });

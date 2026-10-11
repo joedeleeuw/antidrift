@@ -15,7 +15,7 @@ function isRecord(value) {
 
 function invalidOptions(message) {
   throw new TypeError(
-    `antidrift/no-duplicated-object-field-blocks options: ${message}`,
+    `antidrift/no-duplicated-object-field-blocks options: ${message}`
   );
 }
 
@@ -49,19 +49,19 @@ function normalizeOptionShape(options) {
       options,
       "minSharedFields",
       (value) => Number.isInteger(value) && value >= 1,
-      "an integer greater than or equal to 1",
+      "an integer greater than or equal to 1"
     ),
     minShapes: boundedNumber(
       options,
       "minShapes",
       (value) => Number.isInteger(value) && value >= 2,
-      "an integer greater than or equal to 2",
+      "an integer greater than or equal to 2"
     ),
     minRedundantDeclarations: boundedNumber(
       options,
       "minRedundantDeclarations",
       (value) => Number.isInteger(value) && value >= 1,
-      "an integer greater than or equal to 1",
+      "an integer greater than or equal to 1"
     ),
   };
 }
@@ -177,19 +177,19 @@ function isStrictSubsetOf(candidate, reported) {
 
 function reportedCandidates(groups, options) {
   const candidates = groups.filter((candidate) =>
-    qualifies(candidate, options),
+    qualifies(candidate, options)
   );
   return candidates
     .filter(
       (candidate) =>
-        !candidates.some((other) => isStrictSubsetOf(candidate, other)),
+        !candidates.some((other) => isStrictSubsetOf(candidate, other))
     )
     .sort(
       (left, right) =>
         candidateScore(right) - candidateScore(left) ||
         right.fieldKeys.length - left.fieldKeys.length ||
         right.shapeIndices.length - left.shapeIndices.length ||
-        left.shapeIndices[0] - right.shapeIndices[0],
+        left.shapeIndices[0] - right.shapeIndices[0]
     );
 }
 

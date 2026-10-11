@@ -253,61 +253,61 @@ export const SEMANTIC_FACT_KINDS: Readonly<
 >;
 export const SEMANTIC_FACT_KIND_CONTRACT_LIST: readonly SemanticFactKindContractEntry[];
 export function semanticFactKindContractsForAdapterId(
-  adapterId: string,
+  adapterId: string
 ): readonly SemanticFactKindContractEntry[];
 export function semanticFactKindContractsForConfidence(
-  confidence: string,
+  confidence: string
 ): readonly SemanticFactKindContractEntry[];
 export function semanticFactKindContractsForEmission(
-  emission: string,
+  emission: string
 ): readonly SemanticFactKindContractEntry[];
 export function semanticFactKindContractsForRule(
-  ruleId: string,
+  ruleId: string
 ): readonly SemanticFactKindContractEntry[];
 export function semanticFact(input: SemanticFactInput): SemanticFact;
 export function createMemoryFactSink(): MemorySemanticFactSink;
 export function semanticFactToJsonLine(fact: SemanticFact): string;
 export function createJsonlFactSink(
-  writeLine: (line: string) => void,
+  writeLine: (line: string) => void
 ): SemanticFactSink;
 export function loadRuleStatusRegistrySync(
-  policyDir?: string,
+  policyDir?: string
 ): Record<string, unknown>;
 export function ruleStatusManifest(
-  registry?: Record<string, unknown>,
+  registry?: Record<string, unknown>
 ): RuleStatusManifest;
 export function ruleStatusEntriesFromRegistry(
-  registry?: Record<string, unknown>,
+  registry?: Record<string, unknown>
 ): readonly RuleStatusManifestEntry[];
 export function ruleStatusEntryForId(
   id: string,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>,
+  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
 ): RuleStatusManifestEntry | null;
 export function ruleStatusEntriesForKind(
   kind: RuleStatusEntryKind,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>,
+  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
 ): readonly RuleStatusManifestEntry[];
 export function ruleStatusEntriesForProofBucket(
   proofBucket: string,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>,
+  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
 ): readonly RuleStatusManifestEntry[];
 export function ruleStatusEntriesForSemanticAdapter(
   adapterId: string,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>,
+  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
 ): readonly RuleStatusManifestEntry[];
 export function ruleStatusEntriesForStatus(
   status: string,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>,
+  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
 ): readonly RuleStatusManifestEntry[];
 export function ruleStatusSemanticSummaryForId(
   id: string,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>,
+  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
 ): RuleStatusSemanticSummary | null;
 export function ruleStatusSemanticSummaries(
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>,
+  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
 ): readonly RuleStatusSemanticSummary[];
 export function renderPolicyArtifacts(
-  policy: AgentGuardrailsPolicy,
+  policy: AgentGuardrailsPolicy
 ): PolicyArtifacts;
 export function loadPolicy(policyPath?: string): Promise<AgentGuardrailsPolicy>;
 export function generate(): Promise<void>;
@@ -316,15 +316,15 @@ export function checkChanged(options?: PolicyCommandOptions): unknown;
 export function checkRegistries(options?: PolicyCommandOptions): unknown;
 export function checkRuleSurface(options?: PolicyCommandOptions): unknown;
 export function defensiveShapeInventory(
-  options?: PolicyCommandOptions,
+  options?: PolicyCommandOptions
 ): Promise<unknown>;
 export function declarationCloneInventory(
-  options?: PolicyCommandOptions,
+  options?: PolicyCommandOptions
 ): Promise<unknown>;
 export function repoCorpus(options?: PolicyCommandOptions): Promise<unknown>;
 export function chaskiCorpus(options?: PolicyCommandOptions): Promise<unknown>;
 export function externalCorpus(
-  options?: PolicyCommandOptions,
+  options?: PolicyCommandOptions
 ): Promise<unknown>;
 export function defaultAstGrepBinary(): string;
 export const DEFAULT_AST_GREP_CONFIG: string;
@@ -335,36 +335,36 @@ export function parseOxlintArgs(
   options?: {
     cwd?: string;
     exists?: (path: string) => boolean;
-  },
+  }
 ): OxlintArgs;
 export function runOxlint(options?: PolicyCommandOptions): number;
 export function verifySession(options?: PolicyCommandOptions): unknown;
 export function eslintJsonToSonar(
   inputPath?: string,
-  outputPath?: string,
+  outputPath?: string
 ): Promise<void>;
 export function unsafeTypeAssertionBenchmark(
-  options?: PolicyCommandOptions,
+  options?: PolicyCommandOptions
 ): Promise<unknown>;
 export function sqlQueryBenchmark(
-  options?: PolicyCommandOptions,
+  options?: PolicyCommandOptions
 ): Promise<unknown>;
 export function classifySqlParserServiceDelta(
-  probe?: SqlParserServiceDeltaInput | null,
+  probe?: SqlParserServiceDeltaInput | null
 ): SqlParserServiceDeltaClassification;
 export function sqlBroadInventory(
-  options?: PolicyCommandOptions,
+  options?: PolicyCommandOptions
 ): Promise<unknown>;
 export function reactStateInventory(
-  options?: PolicyCommandOptions,
+  options?: PolicyCommandOptions
 ): Promise<unknown>;
 export function classifyReactStateFact(fact: SemanticFact): string;
 export function schemaRoundtripInventory(
-  options?: PolicyCommandOptions,
+  options?: PolicyCommandOptions
 ): unknown;
 export function typeOwnerInventory(
-  options?: PolicyCommandOptions,
+  options?: PolicyCommandOptions
 ): Promise<unknown>;
 export function undercheckedPredicateInventory(
-  options?: PolicyCommandOptions,
+  options?: PolicyCommandOptions
 ): Promise<unknown>;

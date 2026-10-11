@@ -48,8 +48,7 @@ function capabilityRoot(argument) {
   let node = argument;
   while (node.type === "ChainExpression") node = node.expression;
   while (node.type === "MemberExpression") node = node.object;
-  return node.type === "Identifier" &&
-    CAPABILITY_GLOBAL_ROOTS.has(node.name)
+  return node.type === "Identifier" && CAPABILITY_GLOBAL_ROOTS.has(node.name)
     ? node
     : null;
 }
@@ -64,7 +63,7 @@ export const noRuntimeTypeofRule = defineRule({
     type: "problem",
     docs: {
       description:
-        "Disallow runtime typeof checks; external values must be decoded into meaningful types at their I/O boundary. Capability checks are exempt only when the operand is rooted at an unshadowed platform global (window, document, navigator, globalThis, self, global, process, localStorage, sessionStorage) and the result is compared with \"undefined\" or \"function\".",
+        'Disallow runtime typeof checks; external values must be decoded into meaningful types at their I/O boundary. Capability checks are exempt only when the operand is rooted at an unshadowed platform global (window, document, navigator, globalThis, self, global, process, localStorage, sessionStorage) and the result is compared with "undefined" or "function".',
     },
     messages: {
       runtimeTypeof:

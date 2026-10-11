@@ -75,7 +75,7 @@ function exportedDeclarations(node, sourceCode) {
     return declaration.declarations.flatMap((entry) =>
       sourceCode
         .getDeclaredVariables(entry)
-        .map((variable) => ({ node: entry, name: variable.name })),
+        .map((variable) => ({ node: entry, name: variable.name }))
     );
   }
   if (declaration && declaration.type !== "Identifier") {
@@ -95,7 +95,7 @@ function exportedDeclarations(node, sourceCode) {
     const variable = findVariable(sourceCode, specifier.local);
     return (variable?.defs ?? [])
       .filter((definition) =>
-        ["Variable", "FunctionName"].includes(definition.type),
+        ["Variable", "FunctionName"].includes(definition.type)
       )
       .map((definition) => ({
         node: definition.node,
@@ -139,7 +139,7 @@ export default function ruleNoOpenDictionaryAtBoundary() {
           for (const type of boundaryTypes(entry.node)) {
             for (const dictionary of dictionaryNodes(
               type,
-              context.sourceCode,
+              context.sourceCode
             )) {
               if (reported.has(dictionary)) continue;
               reported.add(dictionary);

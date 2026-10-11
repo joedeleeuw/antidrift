@@ -9,7 +9,7 @@ function guaranteesType(node, truthy, state) {
       node,
       state.variable,
       state.context,
-      state.cache,
+      state.cache
     );
     return truthy && Boolean(predicate) && !predicate.asserts;
   }
@@ -46,7 +46,7 @@ function exits(node) {
 function unchangedSince(node, identifier, state) {
   return !state.writes.some(
     (write) =>
-      write.range[0] >= node.range[0] && write.range[0] < identifier.range[0],
+      write.range[0] >= node.range[0] && write.range[0] < identifier.range[0]
   );
 }
 
@@ -57,8 +57,8 @@ function survivingGuard(statement, state) {
         statement.expression,
         state.variable,
         state.context,
-        state.cache,
-      )?.asserts,
+        state.cache
+      )?.asserts
     );
   }
   if (statement.type !== "IfStatement") return false;
@@ -116,7 +116,7 @@ export function isNarrowedUse(identifier, state) {
         preceding.some(
           (statement) =>
             survivingGuard(statement, state) &&
-            unchangedSince(statement, identifier, state),
+            unchangedSince(statement, identifier, state)
         )
       ) {
         return true;
@@ -132,7 +132,7 @@ export function isNarrowedUse(identifier, state) {
       ].includes(parent.type) &&
       state.writes.some(
         (write) =>
-          write.range[0] >= parent.range[0] && write.range[0] < parent.range[1],
+          write.range[0] >= parent.range[0] && write.range[0] < parent.range[1]
       )
     ) {
       return false;

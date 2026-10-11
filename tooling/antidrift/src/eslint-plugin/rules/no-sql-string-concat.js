@@ -113,7 +113,7 @@ export function ruleNoSqlStringConcat() {
     create(context) {
       const sourceCode = context.sourceCode;
       const safeIdentifierMembers = safeIdentifierMemberSpecs(
-        context.options[0] ?? {},
+        context.options[0] ?? {}
       );
       const safeTemplateTags = safeTemplateTagSpecs(context.options[0] ?? {});
       const services = requireTypeServices(context);
@@ -243,7 +243,7 @@ export function ruleNoSqlStringConcat() {
           !isSafeSqlFragmentExpressionForSummary(
             singleReturnExpression(fn),
             paramNames,
-            identifierParams,
+            identifierParams
           )
         ) {
           return null;
@@ -252,7 +252,7 @@ export function ruleNoSqlStringConcat() {
           arity: params.length,
           identifierParams: params
             .map((param, index) =>
-              identifierParams.has(param.name) ? index : null,
+              identifierParams.has(param.name) ? index : null
             )
             .filter((index) => index !== null),
         };
@@ -302,7 +302,7 @@ export function ruleNoSqlStringConcat() {
           return false;
         }
         return summary.identifierParams.every((index) =>
-          isSafeSqlIdentifierExpression(node.arguments[index]),
+          isSafeSqlIdentifierExpression(node.arguments[index])
         );
       }
       function isSqlEscaperMapJoin(node, kind, separators) {
@@ -340,7 +340,7 @@ export function ruleNoSqlStringConcat() {
       function isSafeSqlFragmentMapJoinForSummary(
         node,
         paramNames,
-        identifierParams,
+        identifierParams
       ) {
         if (node?.type !== "CallExpression") {
           return false;
@@ -386,13 +386,13 @@ export function ruleNoSqlStringConcat() {
         return isSafeSqlFragmentExpressionForSummary(
           singleReturnExpression(callback),
           paramNames,
-          identifierParams,
+          identifierParams
         );
       }
       function isSafeSqlFragmentTemplateForSummary(
         node,
         paramNames,
-        identifierParams,
+        identifierParams
       ) {
         if (node?.type !== "TemplateLiteral") {
           return false;
@@ -414,7 +414,7 @@ export function ruleNoSqlStringConcat() {
             !isSafeSqlFragmentExpressionForSummary(
               expression,
               paramNames,
-              identifierParams,
+              identifierParams
             )
           ) {
             return false;
@@ -425,7 +425,7 @@ export function ruleNoSqlStringConcat() {
       function isSafeSqlFragmentExpressionForSummary(
         node,
         paramNames,
-        identifierParams,
+        identifierParams
       ) {
         if (staticStringValue(node) !== null) {
           return true;
@@ -440,14 +440,14 @@ export function ruleNoSqlStringConcat() {
           return isSafeSqlFragmentTemplateForSummary(
             node,
             paramNames,
-            identifierParams,
+            identifierParams
           );
         }
         if (node?.type === "CallExpression") {
           return isSafeSqlFragmentMapJoinForSummary(
             node,
             paramNames,
-            identifierParams,
+            identifierParams
           );
         }
         return false;
@@ -504,7 +504,7 @@ export function ruleNoSqlStringConcat() {
         }
         return sqlTypePropertyValues(
           variableTypeNode(findVariable(sourceCode, node.object)),
-          propertyName,
+          propertyName
         );
       }
       function identifierTokenValues(node) {
@@ -517,7 +517,7 @@ export function ruleNoSqlStringConcat() {
         const variable =
           node?.type === "Identifier" ? findVariable(sourceCode, node) : null;
         return Boolean(
-          variable && safeDynamicSqlIdentifierVariables.has(variable),
+          variable && safeDynamicSqlIdentifierVariables.has(variable)
         );
       }
       function isSafeDynamicSqlIdentifierMember(node) {
@@ -546,7 +546,7 @@ export function ruleNoSqlStringConcat() {
             candidates.some(
               ({ type: typeName, source }) =>
                 owners.has(typeName) &&
-                declarationSourceMatches(declaration, source),
+                declarationSourceMatches(declaration, source)
             )
           ) {
             return true;
@@ -566,7 +566,7 @@ export function ruleNoSqlStringConcat() {
           return false;
         }
         const candidates = safeIdentifierMembers.filter(
-          ({ member }) => member === node.property.name,
+          ({ member }) => member === node.property.name
         );
         if (candidates.length === 0) {
           return false;
@@ -578,7 +578,7 @@ export function ruleNoSqlStringConcat() {
         return typeMatchesTrustedMemberSpec(
           checker.getTypeAtLocation(tsObject),
           node.property.name,
-          candidates,
+          candidates
         );
       }
       function isTrustedImportedTemplateTag(node) {
@@ -590,12 +590,12 @@ export function ruleNoSqlStringConcat() {
         }
         const variable = findVariable(sourceCode, node);
         const importDef = variable?.defs?.find(
-          (def) => def.type === "ImportBinding",
+          (def) => def.type === "ImportBinding"
         );
         const source = importSourceValue(importDef);
         const imported = importedSpecifierName(importDef);
         return safeTemplateTags.imported.some(
-          (spec) => spec.module === source && spec.exportName === imported,
+          (spec) => spec.module === source && spec.exportName === imported
         );
       }
       function isTrustedImportedBuilderMemberCall(node, member) {
@@ -625,7 +625,7 @@ export function ruleNoSqlStringConcat() {
           (isTrustedImportedBuilderMemberCall(node, "raw") ||
             isTrustedMemberBuilderMemberCall(node, "raw")) &&
           node.arguments.some(
-            (argument) => staticStringValue(argument) === null,
+            (argument) => staticStringValue(argument) === null
           )
         );
       }
@@ -638,7 +638,7 @@ export function ruleNoSqlStringConcat() {
           return true;
         }
         return unsafeTrustedRawSqlChildren(node).some(
-          isUnsafeTrustedRawSqlFragment,
+          isUnsafeTrustedRawSqlFragment
         );
       }
       function reportUnsafeTrustedRawSqlFragments(node) {
@@ -668,7 +668,7 @@ export function ruleNoSqlStringConcat() {
           return false;
         }
         const candidates = safeTemplateTags.members.filter(
-          ({ member }) => member === node.property.name,
+          ({ member }) => member === node.property.name
         );
         if (candidates.length === 0) {
           return false;
@@ -680,7 +680,7 @@ export function ruleNoSqlStringConcat() {
         return typeMatchesTrustedTemplateMemberSpec(
           checker.getTypeAtLocation(tsObject),
           node.property.name,
-          candidates,
+          candidates
         );
       }
       function isTrustedSqlTemplateTag(node) {
@@ -748,13 +748,13 @@ export function ruleNoSqlStringConcat() {
         ) {
           return unionStringValues(
             sqlTokenValues(node.left),
-            sqlTokenValues(node.right),
+            sqlTokenValues(node.right)
           );
         }
         if (node?.type === "ConditionalExpression") {
           return unionStringValues(
             sqlTokenValues(node.consequent),
-            sqlTokenValues(node.alternate),
+            sqlTokenValues(node.alternate)
           );
         }
         if (node?.type === "CallExpression") {
@@ -799,7 +799,7 @@ export function ruleNoSqlStringConcat() {
         expression,
         before,
         after,
-        previousWasIdentifier,
+        previousWasIdentifier
       ) {
         if (isSafeSqlFragmentExpression(expression)) {
           return { safe: true, previousWasIdentifier: false };
@@ -829,7 +829,7 @@ export function ruleNoSqlStringConcat() {
             expression,
             before,
             after,
-            previousWasIdentifier,
+            previousWasIdentifier
           );
           if (!state.safe) {
             return false;
@@ -847,7 +847,7 @@ export function ruleNoSqlStringConcat() {
             expression,
             before,
             after,
-            previousWasIdentifier,
+            previousWasIdentifier
           );
           if (!state.safe && isSqlInterpolationContext(before, after)) {
             return true;
@@ -916,7 +916,7 @@ export function ruleNoSqlStringConcat() {
               (element) =>
                 element &&
                 element.type !== "SpreadElement" &&
-                isSafeSqlFragmentExpression(element),
+                isSafeSqlFragmentExpression(element)
             ))
         );
       }
@@ -1035,7 +1035,7 @@ export function ruleNoSqlStringConcat() {
             [...tokenValues].every(
               (value) =>
                 isSqlIdentifierTokenValue(value) ||
-                isSqlDirectionTokenValue(value),
+                isSqlDirectionTokenValue(value)
             )
           ) {
             safeSqlIdentifierValues.set(variable, tokenValues);
@@ -1053,7 +1053,7 @@ export function ruleNoSqlStringConcat() {
             if (sqlFragmentObjectProperties && node.parent?.kind === "const") {
               safeSqlFragmentObjectValues.set(
                 variable,
-                sqlFragmentObjectProperties,
+                sqlFragmentObjectProperties
               );
             }
           }
@@ -1161,10 +1161,10 @@ export function ruleNoSqlStringConcat() {
             (side) =>
               side?.type === "Literal" &&
               typeof side.value === "string" &&
-              SQL_PREFIX_PATTERN.test(side.value),
+              SQL_PREFIX_PATTERN.test(side.value)
           );
           const hasNonLiteral = sides.some(
-            (side) => side && side.type !== "Literal",
+            (side) => side && side.type !== "Literal"
           );
           if (hasSqlLiteral && hasNonLiteral) {
             context.report({

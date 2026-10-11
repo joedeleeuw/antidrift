@@ -1094,14 +1094,14 @@ function parserOptionsFor(repoRoot, testCase) {
 function expectedFindingPresent(findings, expected) {
   return findings.some(
     (finding) =>
-      finding.path === expected.path && finding.line === expected.line,
+      finding.path === expected.path && finding.line === expected.line
   );
 }
 
 function unexpectedFindingPresent(findings, unexpected) {
   return findings.some(
     (finding) =>
-      finding.path === unexpected.path && finding.line === unexpected.line,
+      finding.path === unexpected.path && finding.line === unexpected.line
   );
 }
 
@@ -1139,7 +1139,7 @@ function evaluateCase(
   testCase,
   findings,
   missingFiles,
-  corpusLabel = "corpus",
+  corpusLabel = "corpus"
 ) {
   if (missingFiles.length > 0) {
     return {
@@ -1158,7 +1158,7 @@ function evaluateCase(
   }
 
   const infrastructureFindings = findings.filter(
-    (finding) => finding.ruleId == null,
+    (finding) => finding.ruleId == null
   );
   if (infrastructureFindings.length > 0) {
     return {
@@ -1222,8 +1222,8 @@ function lintOxlintCase(repoRoot, testCase) {
     args.push(
       "--config",
       fileURLToPath(
-        new URL("./external-corpus/oxlint.config.mts", import.meta.url),
-      ),
+        new URL("./external-corpus/oxlint.config.mts", import.meta.url)
+      )
     );
   }
   const tsconfig =
@@ -1331,7 +1331,7 @@ async function lintCase(repoRoot, testCase, corpusLabel) {
     result.messages
       .filter(
         (message) =>
-          message.ruleId === testCase.ruleId || message.ruleId == null,
+          message.ruleId === testCase.ruleId || message.ruleId == null
       )
       .map((message) => ({
         path: relativeFile(repoRoot, result.filePath),
@@ -1339,13 +1339,13 @@ async function lintCase(repoRoot, testCase, corpusLabel) {
         line: message.line,
         column: message.column,
         message: message.message,
-      })),
+      }))
   );
   const evaluation = evaluateCase(
     testCase,
     findings,
     missingFiles,
-    corpusLabel,
+    corpusLabel
   );
 
   return {
@@ -1410,7 +1410,7 @@ export async function runCorpusCases({
     return summary;
   }
   const results = await Promise.all(
-    selectedCases.map((testCase) => lintCase(repoRoot, testCase, corpusLabel)),
+    selectedCases.map((testCase) => lintCase(repoRoot, testCase, corpusLabel))
   );
 
   const summary = {

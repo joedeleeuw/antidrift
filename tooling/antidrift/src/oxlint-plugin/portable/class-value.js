@@ -9,7 +9,7 @@ export function isClassValue(node, context, seen = new Set()) {
       return variable.references.some(
         (reference) =>
           reference.isRead() &&
-          isClassValue(reference.identifier, context, new Set(seen)),
+          isClassValue(reference.identifier, context, new Set(seen))
       );
     }
     if (current.type === "JSXAttribute") {

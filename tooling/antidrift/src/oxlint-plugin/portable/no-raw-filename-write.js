@@ -88,7 +88,7 @@ export default {
         Array.isArray(expression.expressions)
       ) {
         return expression.expressions.some((part) =>
-          isRawFilenameExpression(part, seenVariables),
+          isRawFilenameExpression(part, seenVariables)
         );
       }
       if (

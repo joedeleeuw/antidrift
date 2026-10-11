@@ -62,7 +62,10 @@ function isZodToJsonSchemaCall(checker, tsCall) {
   const callee = tsCall.expression;
   if (!ts.isPropertyAccessExpression(callee)) return false;
   if (callee.name.text !== "toJSONSchema") return false;
-  const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(callee.name));
+  const symbol = resolvedSymbol(
+    checker,
+    checker.getSymbolAtLocation(callee.name)
+  );
   const rest = symbolPackagePath(symbol);
   return rest !== null && (rest === "zod" || rest.startsWith("zod/"));
 }
@@ -89,12 +92,15 @@ function isConvexRegistrationCall(checker, tsCall) {
 
 function isOpenApiDocumentationCall(checker, tsCall) {
   const rest = symbolPackagePath(resolvedCalleeSymbol(checker, tsCall));
-  return (
-    rest !== null && packageNameOf(rest).toLowerCase().includes("openapi")
-  );
+  return rest !== null && packageNameOf(rest).toLowerCase().includes("openapi");
 }
 
-function isJsonSchemaConversionResult(checker, services, estreeNode, depth = 4) {
+function isJsonSchemaConversionResult(
+  checker,
+  services,
+  estreeNode,
+  depth = 4
+) {
   if (!estreeNode || depth <= 0) return false;
   const tsNode = services.esTreeNodeToTSNodeMap.get(estreeNode);
   if (!tsNode) return false;
@@ -108,8 +114,8 @@ function isJsonSchemaConversionResult(checker, services, estreeNode, depth = 4) 
         checker,
         services,
         services.tsNodeToESTreeNodeMap.get(argument),
-        depth - 1,
-      ),
+        depth - 1
+      )
     );
   }
   if (ts.isIdentifier(tsNode)) {
@@ -122,7 +128,7 @@ function isJsonSchemaConversionResult(checker, services, estreeNode, depth = 4) 
           checker,
           services,
           services.tsNodeToESTreeNodeMap.get(declaration.initializer),
-          depth - 1,
+          depth - 1
         )
       ) {
         return true;
@@ -151,7 +157,7 @@ export function ruleNoSchemaValidatorTranscoding() {
       if (!services) {
         return missingTypeServicesVisitors(
           context,
-          "no-schema-validator-transcoding",
+          "no-schema-validator-transcoding"
         );
       }
       const checker = services.program.getTypeChecker();
@@ -168,7 +174,9 @@ export function ruleNoSchemaValidatorTranscoding() {
             const key =
               property.key.type === "Identifier" ? property.key.name : null;
             if (!convexRegistrationProperties.has(key)) continue;
-            if (isJsonSchemaConversionResult(checker, services, property.value)) {
+            if (
+              isJsonSchemaConversionResult(checker, services, property.value)
+            ) {
               context.report({
                 node: property.value,
                 messageId: "schemaValidatorTranscoding",

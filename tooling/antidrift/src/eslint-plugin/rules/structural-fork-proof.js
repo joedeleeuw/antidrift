@@ -20,7 +20,7 @@ export function classifyStructuralRelation(
   owner,
   checker,
   localType,
-  ownerType,
+  ownerType
 ) {
   if (local.size === 0 || owner.size === 0 || local.size > owner.size) {
     return null;
@@ -37,7 +37,7 @@ export function classifyStructuralRelation(
       !equivalentType(
         checker,
         checker.getTypeOfSymbol(checker.getPropertyOfType(localType, name)),
-        checker.getTypeOfSymbol(checker.getPropertyOfType(ownerType, name)),
+        checker.getTypeOfSymbol(checker.getPropertyOfType(ownerType, name))
       ) ||
       localProp.method !== ownerProp.method
     ) {
@@ -70,7 +70,7 @@ export function classifyStructuralRelation(
 }
 export function sortedProps(props) {
   return [...props.entries()].sort(([left], [right]) =>
-    left.localeCompare(right),
+    left.localeCompare(right)
   );
 }
 export function structuralCandidateRank(candidate) {
@@ -81,7 +81,7 @@ export function sortedStructuralCandidates(candidates) {
   return [...candidates].sort(
     (left, right) =>
       structuralCandidateRank(left) - structuralCandidateRank(right) ||
-      left.label.localeCompare(right.label),
+      left.label.localeCompare(right.label)
   );
 }
 export function structuralMatchProof(
@@ -89,7 +89,7 @@ export function structuralMatchProof(
   local,
   candidate,
   diagnostic,
-  relation = "exact-owner-copy",
+  relation = "exact-owner-copy"
 ) {
   const localProps = sortedProps(local);
   return {
@@ -158,7 +158,7 @@ export function findStructuralProof(
   local,
   localDetailed,
   candidates,
-  messageId,
+  messageId
 ) {
   let best = null;
   for (const candidate of sortedStructuralCandidates(candidates)) {
@@ -168,7 +168,7 @@ export function findStructuralProof(
       candidate.detailedProps,
       checker,
       declared,
-      candidate.type,
+      candidate.type
     );
     if (!relation) continue;
     if (best && relationRank[relation] >= relationRank[best.relation]) {
@@ -183,7 +183,7 @@ export function findStructuralProof(
     local,
     best.candidate,
     structuralDiagnosticFor(best.candidate, messageId, best.relation),
-    best.relation,
+    best.relation
   );
 }
 export function isAllOptionalObjectShape(node) {
@@ -197,7 +197,7 @@ export function isAllOptionalObjectShape(node) {
     members = node.body.body;
   }
   const props = members.filter(
-    (member) => member.type === "TSPropertySignature",
+    (member) => member.type === "TSPropertySignature"
   );
   return props.length > 0 && props.every((prop) => prop.optional);
 }

@@ -13,7 +13,7 @@ describe("repoCorpusDecision", () => {
         eslintRules: {
           "typed-rule": {},
         },
-      }),
+      })
     ).toEqual(["antidrift/typed-rule"]);
   });
 
@@ -37,7 +37,7 @@ describe("repoCorpusDecision", () => {
     });
 
     expect(
-      [...allowedInactiveRules].sort((a, b) => a.localeCompare(b)),
+      [...allowedInactiveRules].sort((a, b) => a.localeCompare(b))
     ).toEqual([
       "antidrift/default-off",
       "antidrift/heuristic",
@@ -49,28 +49,28 @@ describe("repoCorpusDecision", () => {
         findings: [],
         inactiveRules: ["antidrift/default-off"],
         allowedInactiveRules,
-      }),
+      })
     ).toBe("pass");
     expect(
       repoCorpusDecision({
         findings: [],
         inactiveRules: ["antidrift/under-proven"],
         allowedInactiveRules,
-      }),
+      })
     ).toBe("pass");
     expect(
       repoCorpusDecision({
         findings: [],
         inactiveRules: ["antidrift/retired"],
         allowedInactiveRules,
-      }),
+      })
     ).toBe("pass");
     expect(
       repoCorpusDecision({
         findings: [],
         inactiveRules: ["antidrift/stable"],
         allowedInactiveRules,
-      }),
+      })
     ).toBe("fail");
   });
 

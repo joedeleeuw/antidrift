@@ -5,7 +5,7 @@ type MemoryResult = {
 };
 
 export function publicActionForEventKind(
-  eventKind: EventKind,
+  eventKind: EventKind
 ): MemoryResult["action"] | undefined {
   if (eventKind === "recall" || eventKind === "capture") return eventKind;
   return undefined;

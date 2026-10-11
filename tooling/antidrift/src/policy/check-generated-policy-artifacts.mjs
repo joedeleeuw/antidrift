@@ -2,7 +2,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadPolicy, renderPolicyArtifacts } from "./generate-policy-artifacts.mjs";
+import {
+  loadPolicy,
+  renderPolicyArtifacts,
+} from "./generate-policy-artifacts.mjs";
 
 async function readOrNull(target) {
   try {
@@ -13,15 +16,25 @@ async function readOrNull(target) {
   }
 }
 
-export async function checkGenerated({ repoRoot = process.cwd(), policyPath = join(repoRoot, "policy/agent-guardrails.yaml"), report = console.error } = {}) {
+export async function checkGenerated({
+  repoRoot = process.cwd(),
+  policyPath = join(repoRoot, "policy/agent-guardrails.yaml"),
+  report = console.error,
+} = {}) {
   const artifacts = renderPolicyArtifacts(await loadPolicy(policyPath));
-  const comparisons = await Promise.all([...artifacts].map(async ([target, expected]) => ({
-    target,
-    stale: await readOrNull(join(repoRoot, target)) !== expected,
-  })));
+  const comparisons = await Promise.all(
+    [...artifacts].map(async ([target, expected]) => ({
+      target,
+      stale: (await readOrNull(join(repoRoot, target))) !== expected,
+    }))
+  );
 
-  const staleTargets = comparisons.filter(({ stale }) => stale).map(({ target }) => target);
-  for (const target of staleTargets) report(`Generated policy artifact was stale: ${target}`);
+  const staleTargets = comparisons
+    .filter(({ stale }) => stale)
+    .map(({ target }) => target);
+  for (const target of staleTargets) {
+    report(`Generated policy artifact was stale: ${target}`);
+  }
   const failed = staleTargets.length > 0;
   if (failed) {
     report("Run `pnpm policy:generate` and commit the generated files.");

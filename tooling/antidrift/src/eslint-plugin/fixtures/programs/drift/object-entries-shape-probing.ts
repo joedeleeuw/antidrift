@@ -12,5 +12,5 @@ export const normalized = Object.fromEntries(
       ];
     }
     return [key, value];
-  }),
+  })
 );

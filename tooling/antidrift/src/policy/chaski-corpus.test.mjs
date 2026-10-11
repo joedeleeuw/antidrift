@@ -34,12 +34,12 @@ describe("chaskiCorpus", () => {
     writeProgram(
       root,
       "src/frontend/bff/api/tests/project-cleanup.ts",
-      "async function close(id: string) { return id; }\nconst openedProjectIds = ['a'];\nopenedProjectIds.forEach(async (id) => close(id));\n",
+      "async function close(id: string) { return id; }\nconst openedProjectIds = ['a'];\nopenedProjectIds.forEach(async (id) => close(id));\n"
     );
     writeProgram(
       root,
       "src/frontend/bff/api/services/project-cleanup.ts",
-      "async function close(id: string) { return id; }\nconst openedProjectIds = ['a'];\nawait Promise.all(openedProjectIds.map(async (id) => close(id)));\n",
+      "async function close(id: string) { return id; }\nconst openedProjectIds = ['a'];\nawait Promise.all(openedProjectIds.map(async (id) => close(id)));\n"
     );
 
     const result = await chaskiCorpus({
@@ -73,10 +73,10 @@ describe("chaskiCorpus", () => {
 
     expect(result.decision).toBe("pass");
     expect(
-      result.cases.find((testCase) => testCase.id === "drift")?.findings,
+      result.cases.find((testCase) => testCase.id === "drift")?.findings
     ).toHaveLength(1);
     expect(
-      result.cases.find((testCase) => testCase.id === "clean")?.findings,
+      result.cases.find((testCase) => testCase.id === "clean")?.findings
     ).toHaveLength(0);
   });
 
@@ -118,7 +118,7 @@ describe("chaskiCorpus", () => {
           noEmit: true,
         },
         include: ["**/*.ts"],
-      }),
+      })
     );
     writeProgram(
       root,
@@ -139,7 +139,7 @@ export const normalized = Object.fromEntries(
     return [key, value];
   }),
 );
-`,
+`
     );
 
     const result = await chaskiCorpus({
@@ -191,7 +191,7 @@ export const normalized = Object.fromEntries(
   registeredAt: string;
   favorite: boolean;
 }
-`,
+`
     );
     writeProgram(
       root,
@@ -208,7 +208,7 @@ export const normalized = Object.fromEntries(
 export interface OpenProjectInfo extends ProjectInfo {
   openedAt: string;
 }
-`,
+`
     );
 
     const result = await chaskiCorpus({
@@ -246,10 +246,10 @@ export interface OpenProjectInfo extends ProjectInfo {
 
     expect(result.decision).toBe("pass");
     expect(
-      result.cases.find((testCase) => testCase.id === "fork")?.findings,
+      result.cases.find((testCase) => testCase.id === "fork")?.findings
     ).toHaveLength(1);
     expect(
-      result.cases.find((testCase) => testCase.id === "owner")?.findings,
+      result.cases.find((testCase) => testCase.id === "owner")?.findings
     ).toHaveLength(0);
   });
 
@@ -258,7 +258,7 @@ export interface OpenProjectInfo extends ProjectInfo {
     writeProgram(
       root,
       "src/example.ts",
-      "type Order = { id: string };\ndeclare const raw: unknown;\nconst order = raw as Order;\nvoid order;\n",
+      "type Order = { id: string };\ndeclare const raw: unknown;\nconst order = raw as Order;\nvoid order;\n"
     );
 
     const result = await chaskiCorpus({
@@ -304,7 +304,7 @@ export interface OpenProjectInfo extends ProjectInfo {
     expect(result.decision).toBe("fail");
     expect(result.cases[0]?.findings[0]?.ruleId).toBeNull();
     expect(result.cases[0]?.reason).toContain(
-      "Lint runtime could not evaluate",
+      "Lint runtime could not evaluate"
     );
   });
 });
@@ -334,7 +334,7 @@ describe("externalCorpus", () => {
     expect(result.reason).toContain("99 required");
     expect(result.repositories.length).toBeGreaterThan(0);
     expect(
-      result.repositories.every((repository) => repository.cases.length === 0),
+      result.repositories.every((repository) => repository.cases.length === 0)
     ).toBe(true);
     expect(messages.join("\n")).toContain("external-corpus fail:");
     expect(JSON.parse(readFileSync(output, "utf8")).decision).toBe("fail");
@@ -358,7 +358,7 @@ describe("externalCorpus", () => {
     writeProgram(
       root,
       "src/example.ts",
-      "async function close(id: string) { return id; }\nconst ids = ['a'];\nids.forEach(async (id) => close(id));\n",
+      "async function close(id: string) { return id; }\nconst ids = ['a'];\nids.forEach(async (id) => close(id));\n"
     );
 
     const result = await externalCorpus({
@@ -390,7 +390,7 @@ describe("externalCorpus", () => {
     writeProgram(
       root,
       "src/example.ts",
-      "async function close(id: string) { return id; }\nconst ids = ['a'];\nids.forEach(async (id) => close(id));\n",
+      "async function close(id: string) { return id; }\nconst ids = ['a'];\nids.forEach(async (id) => close(id));\n"
     );
 
     const result = await externalCorpus({

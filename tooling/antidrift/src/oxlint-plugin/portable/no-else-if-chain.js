@@ -22,7 +22,7 @@ function discriminants(test, sourceCode) {
   return new Set(
     [test.left, test.right]
       .filter((side) => !isConstant(side))
-      .map((side) => sourceCode.getText(side)),
+      .map((side) => sourceCode.getText(side))
   );
 }
 
@@ -51,7 +51,10 @@ export default {
 
     return {
       IfStatement(node) {
-        if (node.parent.type === "IfStatement" && node.parent.alternate === node) {
+        if (
+          node.parent.type === "IfStatement" &&
+          node.parent.alternate === node
+        ) {
           return;
         }
         let shared = discriminants(node.test, sourceCode);
@@ -63,7 +66,7 @@ export default {
         ) {
           const branchDiscriminants = discriminants(branch.test, sourceCode);
           shared = new Set(
-            [...shared].filter((text) => branchDiscriminants.has(text)),
+            [...shared].filter((text) => branchDiscriminants.has(text))
           );
           count += 1;
         }

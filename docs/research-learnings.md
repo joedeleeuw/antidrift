@@ -13,6 +13,7 @@ Real catch blocks store a derived error code or message (`setErrorCode("DATA_INV
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2-4; corroborated by both external reviewers (codex-out.md §2a; opencode-out.md §2a). Current fixed-proof measurement: 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; 230 broadSetterCoMutation inventory facts; and a pinned corpus covering 9 resourceLifecycleProof diagnostics across Chaski, Sudocode, and Cloudflare Agents.
 
 Applies to:
+
 - `antidrift/no-handrolled-resource-lifecycle-cells` — **proof rewrite implemented, still default-off**. Next proof work is not another adapter rewrite; it is human review of the Chaski, Sudocode, and Cloudflare positives plus clean-control pressure.
 
 ---
@@ -24,6 +25,7 @@ Applies to:
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2 bullet "errorCell"; codex-out.md §2a (`classifyWriteValue` r-s-g.js:50-52 returns `"other"` for derived values).
 
 Applies to:
+
 - `antidrift/no-handrolled-resource-lifecycle-cells` — implemented by recording catch-scope setter writes and accepting any owned catch-scope setter as the errorCell signal.
 
 ---
@@ -35,6 +37,7 @@ Applies to:
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §3 (payloadCell bullet); opencode-out.md §2b payloadCell definition; codex-out.md §2b "payloadCell — broaden to accept members."
 
 Applies to:
+
 - `antidrift/no-handrolled-resource-lifecycle-cells` — implemented by using `frame.sourceMemberWrites` in the payloadCell check, with updater setters invalidating enforcement to preserve pagination.
 - `antidrift/no-shattered-ingested-entity-state` — informational: the `sourceMemberWrites` infrastructure is shared; the shard rule already consumes it correctly. This learning confirms the adapter substrate is sound; the shard rule's problem is corpus evidence, not adapter shape.
 
@@ -47,6 +50,7 @@ A type-aware scan of 335 components (chaski) and a wider AST scan across two rep
 Basis: `docs/rule-investigations/no-shattered-ingested-entity-state.md` §Current Evidence ("No real-corpus enforcement positive yet"); `docs/rule-investigations/no-shattered-type-owner-tier-spec.md` header note ("SUPERSEDED — zero real human-authored owned-entity shatters"); `rules.yaml` antidrift/no-shattered-ingested-entity-state concerns block; codex-out.md §3a; opencode-out.md §3a.
 
 Applies to:
+
 - `antidrift/no-shattered-ingested-entity-state` — **do not promote; stay inventory-only**. The enforcement tier must not be rebuilt until a real agent-generated corpus produces ≥1 confirmed owned-entity shatter (where the awaited source resolves to an accepted domain/generated type and the members are typed props of that owner). Promotion additionally requires envelope/pagination/view-state clean controls from ≥2 repos (`rules.yaml` promotionRequirements.stable.minIndependentRepositories: 2).
 
 ---
@@ -58,6 +62,7 @@ Both React-state rules were shipped on synthetic RuleTester fixtures without mea
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §1 ("real-corpus-first, multi-repo baseline, synthetic tests are a wiring guard not evidence"). This lesson is explicit in the investigation as a committed decision (`064142a`).
 
 Applies to:
+
 - `antidrift/no-handrolled-resource-lifecycle-cells` — the rewrite is validated against Chaski, Sudocode, and Cloudflare and now pins 9 fixed-proof diagnostics, not a broad co-mutation flood. Promotion still requires review of the positives plus real clean controls, not synthetic fixtures.
 - `antidrift/no-shattered-ingested-entity-state` — the existing `nextAction` in `rules.yaml` mandates an agent-generated corpus before any enforcement tier rebuild.
 - All `under-proven` rules — the lesson is general: no rule moves from `under-proven` to `error` on synthetic fixtures alone.
@@ -71,6 +76,7 @@ Google's 2025 DORA report measured a 154% increase in PR size with 90% AI adopti
 Basis: `docs/whitepaper-agent-code-drift-proofs.md` §0 (thesis paragraph citing DORA 2025, GitClear, GitHub Jan 2026, AIDev dataset arXiv:2601.17581); `docs/solve-bucket-architecture-review.md` §2 behavior table.
 
 Applies to:
+
 - `antidrift/no-canonical-model-fork`, `antidrift/no-structural-type-fork` — these partially address duplication/one-owner-fork for declared owners, which is correctly placed. Their limit is that they cannot discover NEW duplicate owners (see Learning 7). No rule change; confirms current priority.
 - Gap `duplication` + `one-owner-fork` (solve-buckets.yaml) — these need `clone-detection` bucket tools (NiCad, SourcererCC), not semantic-AST. Do not attempt to close these gaps with new ESLint rules.
 - Gap `diff-scope-creep` (solve-buckets.yaml, n=60) — needs `diff-relative` bucket; no existing antidrift rule addresses it.
@@ -84,6 +90,7 @@ Applies to:
 Basis: `docs/solve-bucket-architecture-review.md` §2 Wall 1 (Per-file) and §3 candidate bucket (2) "promote owner discovery to a repo-graph proof"; `docs/whitepaper-agent-code-drift-proofs.md` §2.3 ("authority-index ownership today only enforces registry-declared owners, so it cannot catch the agent minting a new duplicate owner").
 
 Applies to:
+
 - `antidrift/no-canonical-model-fork` — correctly placed for registry-declared owners (solve-buckets.yaml: `fit: proven`). The note in solve-buckets.yaml is accurate: "Discovering NEW duplicate owners needs dependency-graph." No change to the rule; but net-new-bias enforcement requires a `dependency-graph` solve bucket, not an extension of this rule.
 - `antidrift/no-structural-type-fork` — same limit; correctly placed for declared/generated owners; owner discovery is outside its structural scope.
 - Gap `net-new-bias` (solve-buckets.yaml, n=25) — the correct mechanism is a whole-repo reflexion/uniqueness pass, not an extension of the per-file authority-index. Target: `dependency-graph` bucket.
@@ -97,6 +104,7 @@ Verified in code: zero rules read another file, run git, or do inter-file iterat
 Basis: `docs/solve-bucket-architecture-review.md` §2 (Three hard walls; verified cites: `git.mjs` and `changedFiles()` exist but used only in `cli.mjs:177,218`, never in a proof); `docs/whitepaper-agent-code-drift-proofs.md` §1 (table of behaviors vs walls).
 
 Applies to:
+
 - All `semantic-ast` rules — this is a statement about the whole proof layer. The semantic-AST surface is **saturating**: 6 stable, 11 stuck at `under-proven`, several default-off with zero blocking findings across thousands of files (architecture-review §5). Continued investment in new ESLint rules yields sharply diminishing returns for the measured behavior distribution.
 - Gap `silent-fallback` (n=24) — do not attempt ESLint approximation of inter-procedural error flow; delegate to CodeQL/Semgrep (Learning 9).
 - Gap `diff-scope-creep` (n=60) — do not use agent-ops hooks as a substitute; the whitepaper explicitly notes this is real proof on a diff baseline, not a hook/heuristic.
@@ -110,6 +118,7 @@ Applies to:
 Basis: `docs/whitepaper-agent-code-drift-proofs.md` §2.4 (inter-procedural dataflow/taint section; Joern F1 0.856 vs Semgrep 0.081; IRIS arXiv:2405.17238; ZeroFalse arXiv:2510.02534); `docs/solve-bucket-architecture-review.md` §3 bucket (3) and §2 table row "Injection / value-reaches-sink"; `policy/registries/solve-buckets.yaml` (antidrift/no-sql-string-concat: `fit: approximation, target: dataflow-taint`).
 
 Applies to:
+
 - `antidrift/no-sql-string-concat` — useful but no longer stable; solve-bucket target is `dataflow-taint`. Do not hand-roll SQL-builder ecosystems by tag name. The architecture review recommendation is to delegate escaper/reachability to CodeQL/Semgrep or prove SQL-builder APIs through import/declaration-source provenance while keeping antidrift as the policy/fact/governance layer.
 - `antidrift/no-unsafe-deserialize` — scoped parse-input rule: `fit: proven, target: semantic-ast` (solve-buckets.yaml). Broader interprocedural deserialization taint remains out of scope and belongs in delegated dataflow/taint research.
 - `antidrift/require-authz-check` — solve-buckets.yaml: `fit: under-proven, target: dataflow-taint`. Handler-local params plus explicit authz function config are inventory; blocking needs typed route construction or delegated dominance/taint proof.
@@ -124,6 +133,7 @@ On OWASP Benchmark, CodeQL flagged 68% and Semgrep 75% of non-vulnerable cases. 
 Basis: `docs/whitepaper-agent-code-drift-proofs.md` §2.4 ("Two caveats for our adoption: … the LLM triage is precisely the probabilistic layer that must stay triage, never the blocking proof"); §3 (market gap table: AI code review = "no — LLM-judge, not provable"); GeekWire CodeIntegrity cite; jvaneyck 2026 cite.
 
 Applies to:
+
 - All antidrift rules — the existing design (frozen semanticFact contracts, `blocking-diagnostic` vs `inventory-only` emission, registry enforcement) is correct. The `claudeAdvisory` model is already `mode: read-only` (rules.yaml:27); this learning confirms that constraint must never be relaxed to blocking.
 - Gap columns in solve-buckets.yaml — when selecting proof mechanisms for the `diff-relative`, `dependency-graph`, and `dataflow-taint` buckets, the mechanism must be deterministic (GumTree/RefactoringMiner for diff, CodeQL/Joern for taint). LLM triage is acceptable only as a post-filter on top of a deterministic engine, never as the primary gate.
 
@@ -136,6 +146,7 @@ Making owner forks untypeable (branded/nominal owner types) is the most elegant 
 Basis: `docs/whitepaper-agent-code-drift-proofs.md` §2.5 (type-driven prevention, "gated on consumer adoption"); `docs/solve-bucket-architecture-review.md` §3 bucket (4) ("your own history is a caution: no-cast-to-branded was retired for no real adoption"); `policy/registries/solve-buckets.yaml` categories.type-prevention ("GATED ON CONSUMER ADOPTION").
 
 Applies to:
+
 - `antidrift/no-structural-type-fork`, `antidrift/no-canonical-model-fork` — detection is correctly placed in `semantic-ast` and working. Do not invest in a corresponding prevention tier (making forks un-typeable) until real consumer adoption of nominal owner types is demonstrated.
 - Gap `unearned-type-authority` (solve-buckets.yaml) — the `type-prevention` bucket is `not-yet-available` but should remain opt-in, not a build target, until adoption evidence exists.
 
@@ -148,6 +159,7 @@ The lint surface has nearly saturated its proof model: the architecture review f
 Basis: `docs/solve-bucket-architecture-review.md` §5 ("Biggest Architectural Gap") and §3 bucket ranking (Rank 1: Diff/change-relative, largest measured category, partial plumbing exists in `git.mjs`/`changedFiles()`); `docs/whitepaper-agent-code-drift-proofs.md` §2.1 (cheapest first step: run existing adapters diff-scoped as a proof filter) and §3 (market gap: no production-grade refactoring-aware diff for TypeScript).
 
 Applies to:
+
 - No existing rule is changed — this is a structural gap at the proof-spine level, not a rule-level fix.
 - Gap `diff-scope-creep` (solve-buckets.yaml, n=60, needs: diff-relative) — the `diff-relative` bucket is `not-yet-available`; the seam already exists (`git.mjs`, `changedFiles()` at `cli.mjs:177,218`). The cheapest prototype: scope existing adapter findings to patch hunks, emit into the same `semanticFact` sink.
 - Gap `net-new-bias` (n=25, needs: dependency-graph) — partial overlap with diff-relative; adding a new owner via a commit is a change-relative property.
@@ -161,6 +173,7 @@ The adapter→rule→frozen-fact→enforcing-registry composition is well-design
 Basis: `docs/solve-bucket-architecture-review.md` §1 ("The fact contract is the architectural keystone") and §5 mitigating good news ("A diff/graph proof surface can emit the same frozen semanticFact shape, be governed by the same registry spine, and reuse the existing adapters as diff-scoped subroutines"); `docs/whitepaper-agent-code-drift-proofs.md` §3 ("the antidrift system already owns the two hardest non-technique assets: a bucket-agnostic fact/registry spine that can host non-AST proofs, and a real-corpus evidence + maturity discipline").
 
 Applies to:
+
 - All future rules and proof spines — when adding a `diff-relative` or `dependency-graph` proof, thread a "change context" object through a new adapter that emits `semanticFact`s into `semanticFactSink` (semantic-facts.mjs:253). The `factKind` registry, `emission` field, and `check-registries` cross-validation must govern the new surface as they govern the existing AST surface.
 - `antidrift/no-sql-string-concat` refactor target — the architecture review flags the 800-line god function as a refactor target independent of the taint-delegation direction; the pattern is: move to its own adapter module like every other proof surface.
 
@@ -173,6 +186,7 @@ The project's promotion requirements (`rules.yaml` promotionRequirements.stable)
 Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §4 ("Whether to enable the rule as blocking is a separate promotion decision requiring the must-catch/must-ignore set to hold cleanly across ≥2 repos"); `policy/registries/rules.yaml` promotionRequirements.stable block; `docs/rule-investigations/no-shattered-ingested-entity-state.md` §Validation Plan (multi-repo requirement).
 
 Applies to:
+
 - `antidrift/no-handrolled-resource-lifecycle-cells` — the proof rewrite (Learnings 1–3) is done but not sufficient for `error` severity. Promotion additionally requires the must-catch/must-ignore set to survive human/adversarial review across independent repos. The next slice is review and clean-control pressure, not another rewrite.
 - `antidrift/no-shattered-ingested-entity-state` — re-promotion needs real owned-entity shatters across more than one repo. The current corpus (two repos, zero positives) is the evidence floor, not just a gap to paper over with agent-generated synthetic fixtures.
 - All `under-proven` rules — `minIndependentRepositories: 2` is a hard gate; no `under-proven` rule should move to `error` on evidence from a single codebase.
@@ -193,6 +207,7 @@ The proof does not factor across libraries. Effect Schema needs `Schema.Schema.T
 Basis: every false positive found during the 2026-08-03 sweep came from missing library or value semantics, never from a missing surface — `z.string().min(1)` parsed on a `string` parameter (Codebase Atlas `persistenceCuration.ts:1073`), a `z.input` parameter (`extractSemanticFacts.ts:56`), a `{} as unknown` generic-default sentinel (Cloudflare Agents `index.ts:963`), and a `let` traversal cursor (Executor `openapi-utils.ts:42`). The first `no-parse-as-cast` implementation keyed on structural type identity and produced three false positives in four Codebase Atlas findings; the fix was a narrower proof (schema-derivation provenance), not a narrower surface. `docs/rule-investigations/no-thin-typed-factory-wrapper.md` is retired for the same reason at larger scale.
 
 Applies to:
+
 - Coverage gaps are closed by adding specific rules, not by generalizing existing ones. An Effect rule should know Effect as precisely as `no-redundant-zod-parse` knows Zod.
 - Escape-hatch displacement is real and argues for coverage, not looseness: Murderbox desktop carries 2 `as unknown` casts against 12 annotation erasures, so a cast-scoped rule reports zero on a codebase with the defect twelve times over.
 - The only legitimate sharing is mechanism — checker queries, symbol resolution, alias tracing in `semantic-adapters/schema-provenance.mjs`. That is deduplication, not generalization.

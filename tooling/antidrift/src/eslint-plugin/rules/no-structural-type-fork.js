@@ -123,7 +123,7 @@ export function ruleNoStructuralTypeFork() {
         candidates = collectGeneratedCanonicalTypes(
           program,
           checker,
-          generatedSources,
+          generatedSources
         );
       }
       if (Object.keys(packageTypeOwners).length > 0) {
@@ -132,7 +132,7 @@ export function ruleNoStructuralTypeFork() {
           ...collectAcceptedPackageCanonicalTypes(
             program,
             checker,
-            packageTypeOwners,
+            packageTypeOwners
           ),
         ];
       }
@@ -148,7 +148,7 @@ export function ruleNoStructuralTypeFork() {
       if (!convexCandidates) {
         convexCandidates = collectConvexGeneratedCanonicalTypes(
           program,
-          checker,
+          checker
         );
         convexOwnerCache.set(program, convexCandidates);
       }
@@ -159,7 +159,7 @@ export function ruleNoStructuralTypeFork() {
       const provenance = collectOwnedContractProvenance(
         program,
         checker,
-        candidates,
+        candidates
       );
       const reported = new Set();
       function checkProjection(node) {
@@ -174,7 +174,7 @@ export function ruleNoStructuralTypeFork() {
           context,
           node,
           "antidrift/no-structural-type-fork",
-          proof,
+          proof
         );
         context.report({
           node,
@@ -223,7 +223,7 @@ export function ruleNoStructuralTypeFork() {
           local,
           localDetailed,
           candidates,
-          "structuralTypeFork",
+          "structuralTypeFork"
         );
         if (!proof) {
           return;
@@ -232,7 +232,7 @@ export function ruleNoStructuralTypeFork() {
           context,
           node,
           "antidrift/no-structural-type-fork",
-          proof,
+          proof
         );
         if (proof.diagnostic.emitted) {
           reported.add(tsNode);

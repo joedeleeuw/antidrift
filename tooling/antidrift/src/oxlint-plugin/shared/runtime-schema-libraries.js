@@ -12,6 +12,6 @@ const runtimeSchemaLibrarySources = [
 export function isRuntimeSchemaLibrarySource(value) {
   if (typeof value !== "string") return false;
   return runtimeSchemaLibrarySources.some(
-    (source) => value === source || value.startsWith(`${source}/`),
+    (source) => value === source || value.startsWith(`${source}/`)
   );
 }

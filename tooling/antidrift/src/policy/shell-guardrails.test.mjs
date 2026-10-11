@@ -108,7 +108,7 @@ describe("shellGuardrails", () => {
         "/repo",
         "--",
         "scripts",
-      ]),
+      ])
     ).toMatchObject({
       config: "custom.yml",
       cwd: "/repo",
@@ -118,7 +118,7 @@ describe("shellGuardrails", () => {
 
   it("honors AST_GREP_BIN without requiring the npm cli package", () => {
     expect(
-      parseShellGuardrailsArgs([], { AST_GREP_BIN: "/opt/bin/sg" }),
+      parseShellGuardrailsArgs([], { AST_GREP_BIN: "/opt/bin/sg" })
     ).toMatchObject({
       astGrepBinary: "/opt/bin/sg",
     });

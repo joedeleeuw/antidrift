@@ -23,7 +23,7 @@ export function parseAnySource() {
 // not a boundary value; the cast narrows after a guard rather than appeasing.
 export function resolvePointer(
   doc: { paths: Record<string, unknown> },
-  ref: string,
+  ref: string
 ) {
   let current: unknown = doc;
   for (const segment of ref.split("/")) {

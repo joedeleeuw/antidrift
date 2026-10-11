@@ -20,7 +20,7 @@ export function readRegistry(policyDir, name, errors) {
     return parsed;
   } catch (error) {
     errors.push(
-      `policy/registries/${name}.yaml could not be parsed: ${error.message}`,
+      `policy/registries/${name}.yaml could not be parsed: ${error.message}`
     );
     return {};
   }
@@ -39,7 +39,7 @@ export function readPolicySource(policyDir, errors) {
     return parsed;
   } catch (error) {
     errors.push(
-      `policy/agent-guardrails.yaml could not be parsed: ${error.message}`,
+      `policy/agent-guardrails.yaml could not be parsed: ${error.message}`
     );
     return null;
   }
@@ -90,7 +90,7 @@ function unwrapExpression(node) {
 function findExportedConst(sourceFile, exportName) {
   for (const statement of sourceFile.statements) {
     const isExported = statement.modifiers?.some(
-      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
     );
     if (!isExported || !ts.isVariableStatement(statement)) {
       continue;
@@ -112,7 +112,7 @@ function arrayLiteralStrings(initializer, exportName, label, errors) {
   const expression = unwrapExpression(initializer);
   if (!ts.isArrayLiteralExpression(expression)) {
     errors.push(
-      `${label} valuesExport '${exportName}' must be an exported string array.`,
+      `${label} valuesExport '${exportName}' must be an exported string array.`
     );
     return null;
   }
@@ -123,7 +123,7 @@ function arrayLiteralStrings(initializer, exportName, label, errors) {
       !ts.isNoSubstitutionTemplateLiteral(element)
     ) {
       errors.push(
-        `${label} valuesExport '${exportName}' must contain only string literals.`,
+        `${label} valuesExport '${exportName}' must contain only string literals.`
       );
       return null;
     }
@@ -136,7 +136,7 @@ function exportedStringArray(
   relativePath,
   exportName,
   label,
-  errors,
+  errors
 ) {
   const target = safeRepoPath(repoRoot, relativePath);
   if (!target || !existsSync(target)) {
@@ -148,7 +148,7 @@ function exportedStringArray(
     source,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TS,
+    ts.ScriptKind.TS
   );
   const declaration = findExportedConst(sourceFile, exportName);
   if (declaration?.initializer) {
@@ -156,11 +156,11 @@ function exportedStringArray(
       declaration.initializer,
       exportName,
       label,
-      errors,
+      errors
     );
   }
   errors.push(
-    `${label} valuesExport '${exportName}' was not found in ${relativePath}.`,
+    `${label} valuesExport '${exportName}' was not found in ${relativePath}.`
   );
   return null;
 }
@@ -170,7 +170,7 @@ function requireMatchingValueExport(
   exportName,
   values,
   label,
-  errors,
+  errors
 ) {
   if (exportName === undefined) {
     return;
@@ -184,7 +184,7 @@ function requireMatchingValueExport(
     owner,
     exportName,
     label,
-    errors,
+    errors
   );
   if (!exported) {
     return;
@@ -194,7 +194,7 @@ function requireMatchingValueExport(
     values.some((value, index) => value !== exported[index])
   ) {
     errors.push(
-      `${label}.values must match exported ${exportName}: [${exported.join(", ")}]`,
+      `${label}.values must match exported ${exportName}: [${exported.join(", ")}]`
     );
   }
 }
@@ -204,7 +204,7 @@ function checkCanonicalEntities(entities, repoRoot, errors) {
   }
   if (!isRecord(entities)) {
     errors.push(
-      "policy/registries/domain.yaml canonicalEntities must be a mapping.",
+      "policy/registries/domain.yaml canonicalEntities must be a mapping."
     );
     return;
   }
@@ -213,7 +213,7 @@ function checkCanonicalEntities(entities, repoRoot, errors) {
       repoRoot,
       owner,
       `policy/registries/domain.yaml canonicalEntities.${name}`,
-      errors,
+      errors
     );
   }
 }
@@ -228,7 +228,7 @@ function checkStatuses(statuses, repoRoot, errors) {
   for (const [name, entry] of Object.entries(statuses)) {
     if (!isRecord(entry)) {
       errors.push(
-        `policy/registries/domain.yaml statuses.${name} must be a mapping.`,
+        `policy/registries/domain.yaml statuses.${name} must be a mapping.`
       );
       continue;
     }
@@ -236,12 +236,12 @@ function checkStatuses(statuses, repoRoot, errors) {
       repoRoot,
       entry.owner,
       `policy/registries/domain.yaml statuses.${name}.owner`,
-      errors,
+      errors
     );
     const values = stringArray(
       entry.values,
       `policy/registries/domain.yaml statuses.${name}.values`,
-      errors,
+      errors
     );
     requireMatchingValueExport(
       repoRoot,
@@ -249,7 +249,7 @@ function checkStatuses(statuses, repoRoot, errors) {
       entry.valuesExport,
       values,
       `policy/registries/domain.yaml statuses.${name}`,
-      errors,
+      errors
     );
   }
 }
@@ -265,12 +265,12 @@ function checkRoles(roles, repoRoot, errors) {
     repoRoot,
     roles.owner,
     "policy/registries/domain.yaml roles.owner",
-    errors,
+    errors
   );
   const values = stringArray(
     roles.values,
     "policy/registries/domain.yaml roles.values",
-    errors,
+    errors
   );
   requireMatchingValueExport(
     repoRoot,
@@ -278,7 +278,7 @@ function checkRoles(roles, repoRoot, errors) {
     roles.valuesExport,
     values,
     "policy/registries/domain.yaml roles",
-    errors,
+    errors
   );
 }
 function checkDomain(registry, repoRoot, errors) {
@@ -292,14 +292,14 @@ function checkGateways(registry, repoRoot, errors) {
   }
   if (!isRecord(registry.approvedGateways)) {
     errors.push(
-      "policy/registries/gateways.yaml approvedGateways must be a mapping.",
+      "policy/registries/gateways.yaml approvedGateways must be a mapping."
     );
     return;
   }
   for (const [name, entry] of Object.entries(registry.approvedGateways)) {
     if (!isRecord(entry)) {
       errors.push(
-        `policy/registries/gateways.yaml approvedGateways.${name} must be a mapping.`,
+        `policy/registries/gateways.yaml approvedGateways.${name} must be a mapping.`
       );
       continue;
     }
@@ -307,12 +307,12 @@ function checkGateways(registry, repoRoot, errors) {
       repoRoot,
       entry.wrapper,
       `policy/registries/gateways.yaml approvedGateways.${name}.wrapper`,
-      errors,
+      errors
     );
     stringArray(
       entry.bannedDirectImports,
       `policy/registries/gateways.yaml approvedGateways.${name}.bannedDirectImports`,
-      errors,
+      errors
     );
   }
 }
@@ -322,27 +322,27 @@ function checkGenerated(registry, repoRoot, errors) {
   }
   if (!isRecord(registry.generatedSources)) {
     errors.push(
-      "policy/registries/generated.yaml generatedSources must be a mapping.",
+      "policy/registries/generated.yaml generatedSources must be a mapping."
     );
     return;
   }
   for (const [name, entry] of Object.entries(registry.generatedSources)) {
     if (!isRecord(entry)) {
       errors.push(
-        `policy/registries/generated.yaml generatedSources.${name} must be a mapping.`,
+        `policy/registries/generated.yaml generatedSources.${name} must be a mapping.`
       );
       continue;
     }
     if (typeof entry.generated !== "string" || entry.generated.length === 0) {
       errors.push(
-        `policy/registries/generated.yaml generatedSources.${name}.generated must be a non-empty string.`,
+        `policy/registries/generated.yaml generatedSources.${name}.generated must be a non-empty string.`
       );
     } else {
       requireExistingPath(
         repoRoot,
         entry.generated,
         `policy/registries/generated.yaml generatedSources.${name}.generated`,
-        errors,
+        errors
       );
     }
     if (entry.wrapper !== undefined) {
@@ -350,7 +350,7 @@ function checkGenerated(registry, repoRoot, errors) {
         repoRoot,
         entry.wrapper,
         `policy/registries/generated.yaml generatedSources.${name}.wrapper`,
-        errors,
+        errors
       );
     }
     if (entry.bannedDirectImports !== undefined) {
@@ -358,7 +358,7 @@ function checkGenerated(registry, repoRoot, errors) {
         entry.bannedDirectImports,
         `policy/registries/generated.yaml generatedSources.${name}.bannedDirectImports`,
         errors,
-        { allowEmpty: true },
+        { allowEmpty: true }
       );
     }
   }
@@ -369,21 +369,21 @@ function checkOwnership(registry, errors) {
   }
   if (!isRecord(registry.packageTypeOwners)) {
     errors.push(
-      "policy/registries/ownership.yaml packageTypeOwners must be a mapping.",
+      "policy/registries/ownership.yaml packageTypeOwners must be a mapping."
     );
     return;
   }
   for (const [name, entry] of Object.entries(registry.packageTypeOwners)) {
     if (!isRecord(entry)) {
       errors.push(
-        `policy/registries/ownership.yaml packageTypeOwners.${name} must be a mapping.`,
+        `policy/registries/ownership.yaml packageTypeOwners.${name} must be a mapping.`
       );
       continue;
     }
     for (const key of ["package", "exportName", "reason"]) {
       if (typeof entry[key] !== "string" || entry[key].length === 0) {
         errors.push(
-          `policy/registries/ownership.yaml packageTypeOwners.${name}.${key} must be a non-empty string.`,
+          `policy/registries/ownership.yaml packageTypeOwners.${name}.${key} must be a non-empty string.`
         );
       }
     }
@@ -395,7 +395,7 @@ function checkArchitectureLayers(layers, errors) {
   }
   if (!isRecord(layers)) {
     errors.push(
-      "policy/registries/architecture.yaml layers must be a mapping.",
+      "policy/registries/architecture.yaml layers must be a mapping."
     );
     return;
   }
@@ -403,24 +403,24 @@ function checkArchitectureLayers(layers, errors) {
   for (const [name, entry] of Object.entries(layers)) {
     if (!isRecord(entry)) {
       errors.push(
-        `policy/registries/architecture.yaml layers.${name} must be a mapping.`,
+        `policy/registries/architecture.yaml layers.${name} must be a mapping.`
       );
       continue;
     }
     stringArray(
       entry.roots,
       `policy/registries/architecture.yaml layers.${name}.roots`,
-      errors,
+      errors
     );
     for (const target of stringArray(
       entry.mayImport ?? [],
       `policy/registries/architecture.yaml layers.${name}.mayImport`,
       errors,
-      { allowEmpty: true },
+      { allowEmpty: true }
     )) {
       if (!layerNames.has(target)) {
         errors.push(
-          `policy/registries/architecture.yaml layers.${name}.mayImport references unknown layer: ${target}`,
+          `policy/registries/architecture.yaml layers.${name}.mayImport references unknown layer: ${target}`
         );
       }
     }
@@ -432,7 +432,7 @@ function checkForbiddenImports(forbiddenImports, errors) {
   }
   if (!Array.isArray(forbiddenImports)) {
     errors.push(
-      "policy/registries/architecture.yaml forbiddenImports must be an array.",
+      "policy/registries/architecture.yaml forbiddenImports must be an array."
     );
     return;
   }
@@ -443,7 +443,7 @@ function checkForbiddenImports(forbiddenImports, errors) {
       typeof entry.to !== "string"
     ) {
       errors.push(
-        `policy/registries/architecture.yaml forbiddenImports.${index} must contain from and to strings.`,
+        `policy/registries/architecture.yaml forbiddenImports.${index} must contain from and to strings.`
       );
     }
   }
@@ -455,7 +455,7 @@ function checkArchitecture(registry, errors) {
       registry.publicEntrypoints,
       "policy/registries/architecture.yaml publicEntrypoints",
       errors,
-      { allowEmpty: true },
+      { allowEmpty: true }
     );
   }
   checkForbiddenImports(registry.forbiddenImports, errors);
@@ -465,7 +465,7 @@ function checkBoundaries(registry, errors) {
     stringArray(
       registry.serverBoundaryGlobs,
       "policy/registries/boundaries.yaml serverBoundaryGlobs",
-      errors,
+      errors
     );
   }
   if (registry.requiredCalls === undefined) {
@@ -473,7 +473,7 @@ function checkBoundaries(registry, errors) {
   }
   if (!isRecord(registry.requiredCalls)) {
     errors.push(
-      "policy/registries/boundaries.yaml requiredCalls must be a mapping.",
+      "policy/registries/boundaries.yaml requiredCalls must be a mapping."
     );
     return;
   }
@@ -481,7 +481,7 @@ function checkBoundaries(registry, errors) {
     stringArray(
       calls,
       `policy/registries/boundaries.yaml requiredCalls.${name}`,
-      errors,
+      errors
     );
   }
 }
@@ -492,7 +492,7 @@ function checkDependencies(registry, repoRoot, errors) {
   }
   if (!isRecord(policy)) {
     errors.push(
-      "policy/registries/dependencies.yaml runtimeDependencyPolicy must be a mapping.",
+      "policy/registries/dependencies.yaml runtimeDependencyPolicy must be a mapping."
     );
     return;
   }
@@ -501,13 +501,13 @@ function checkDependencies(registry, repoRoot, errors) {
       repoRoot,
       policy.approvalFile,
       "policy/registries/dependencies.yaml runtimeDependencyPolicy.approvalFile",
-      errors,
+      errors
     );
   }
   stringArray(
     policy.bannedVersionSpecifiers,
     "policy/registries/dependencies.yaml runtimeDependencyPolicy.bannedVersionSpecifiers",
-    errors,
+    errors
   );
 }
 function checkDesignSystem(registry, errors) {
@@ -515,7 +515,7 @@ function checkDesignSystem(registry, errors) {
     stringArray(
       registry.semanticClassPrefixes,
       "policy/registries/design-system.yaml semanticClassPrefixes",
-      errors,
+      errors
     );
   }
   for (const key of [
@@ -527,7 +527,7 @@ function checkDesignSystem(registry, errors) {
     }
     if (typeof registry[key] !== "string") {
       errors.push(
-        `policy/registries/design-system.yaml ${key} must be a string.`,
+        `policy/registries/design-system.yaml ${key} must be a string.`
       );
       continue;
     }
@@ -535,7 +535,7 @@ function checkDesignSystem(registry, errors) {
       new RegExp(registry[key], "u");
     } catch (error) {
       errors.push(
-        `policy/registries/design-system.yaml ${key} is not a valid regex: ${error.message}`,
+        `policy/registries/design-system.yaml ${key} is not a valid regex: ${error.message}`
       );
     }
   }
@@ -544,7 +544,7 @@ function checkDesignSystem(registry, errors) {
       registry.genericAiCopy,
       "policy/registries/design-system.yaml genericAiCopy",
       errors,
-      { allowEmpty: true },
+      { allowEmpty: true }
     );
   }
 }

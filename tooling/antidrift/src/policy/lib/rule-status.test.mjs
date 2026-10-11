@@ -79,7 +79,7 @@ describe("rule status manifest", () => {
       },
     });
     expect(
-      manifest.entries.map((entry) => `${entry.kind}:${entry.id}`),
+      manifest.entries.map((entry) => `${entry.kind}:${entry.id}`)
     ).toEqual([
       "active:antidrift/no-structural-type-fork",
       "retired:antidrift/no-hover-translate-card",
@@ -88,7 +88,7 @@ describe("rule status manifest", () => {
       "policy-review:agent/require-checks-before-stop",
     ]);
     expect(
-      ruleStatusEntryForId("antidrift/no-structural-type-fork", manifest),
+      ruleStatusEntryForId("antidrift/no-structural-type-fork", manifest)
     ).toMatchObject({
       kind: "active",
       stable: false,
@@ -145,30 +145,30 @@ describe("rule status manifest", () => {
 
     expect(
       ruleStatusEntriesForSemanticAdapter("react-state", registry).map(
-        (entry) => entry.id,
-      ),
+        (entry) => entry.id
+      )
     ).toEqual(["antidrift/no-handrolled-resource-lifecycle-cells"]);
     expect(
       ruleStatusEntriesForProofBucket(
         "authority-index-ownership",
-        registry,
-      ).map((entry) => entry.id),
+        registry
+      ).map((entry) => entry.id)
     ).toEqual(["antidrift/no-structural-type-fork"]);
     expect(
       ruleStatusEntriesForProofBucket("local-ast-source-shape", registry).map(
-        (entry) => entry.id,
-      ),
+        (entry) => entry.id
+      )
     ).toEqual([
       "antidrift/no-inline-structural-type-at-use-site",
       "antidrift/no-raw-fetch-in-component",
     ]);
     expect(
       ruleStatusEntriesForProofBucket("diff-relative", registry).map(
-        (entry) => entry.id,
-      ),
+        (entry) => entry.id
+      )
     ).toEqual(["antidrift/change-contract-conformance"]);
     expect(ruleStatusEntriesForSemanticAdapter("not-real", registry)).toEqual(
-      [],
+      []
     );
   });
 
@@ -195,8 +195,8 @@ describe("rule status manifest", () => {
     expect(
       ruleStatusSemanticSummaryForId(
         "antidrift/no-handrolled-resource-lifecycle-cells",
-        registry,
-      ),
+        registry
+      )
     ).toMatchObject({
       entry: { id: "antidrift/no-handrolled-resource-lifecycle-cells" },
       proofBuckets: ["semantic-source-type-provenance"],
@@ -210,8 +210,8 @@ describe("rule status manifest", () => {
     expect(
       ruleStatusSemanticSummaryForId(
         "antidrift/no-raw-fetch-in-component",
-        registry,
-      ),
+        registry
+      )
     ).toMatchObject({
       entry: { id: "antidrift/no-raw-fetch-in-component" },
       proofBuckets: ["local-ast-source-shape"],
@@ -219,10 +219,10 @@ describe("rule status manifest", () => {
       semanticFactContracts: [],
     });
     expect(ruleStatusSemanticSummaryForId("antidrift/not-real", registry)).toBe(
-      null,
+      null
     );
     expect(
-      ruleStatusSemanticSummaries(registry).map((summary) => summary.entry.id),
+      ruleStatusSemanticSummaries(registry).map((summary) => summary.entry.id)
     ).toEqual([
       "antidrift/no-handrolled-resource-lifecycle-cells",
       "antidrift/no-inline-structural-type-at-use-site",

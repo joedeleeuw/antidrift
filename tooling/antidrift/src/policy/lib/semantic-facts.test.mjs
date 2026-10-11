@@ -17,8 +17,8 @@ describe("semantic facts", () => {
   it("exports shipped fact kind contracts for consumer tooling", () => {
     expect(
       Object.keys(SEMANTIC_FACT_KINDS).sort((left, right) =>
-        left.localeCompare(right),
-      ),
+        left.localeCompare(right)
+      )
     ).toEqual([
       "broadSetterCoMutation",
       "changeContractConformance",
@@ -40,15 +40,15 @@ describe("semantic facts", () => {
       ],
     });
     expect(SEMANTIC_FACT_KINDS.structuralMatch.payloadFields).toContain(
-      "ownerType",
+      "ownerType"
     );
   });
 
   it("indexes semantic fact contracts by owning adapter and rule", () => {
     expect(
       SEMANTIC_FACT_KIND_CONTRACT_LIST.map((entry) => entry.factKind).sort(
-        (left, right) => left.localeCompare(right),
-      ),
+        (left, right) => left.localeCompare(right)
+      )
     ).toEqual([
       "broadSetterCoMutation",
       "changeContractConformance",
@@ -59,8 +59,8 @@ describe("semantic facts", () => {
     ]);
     expect(
       semanticFactKindContractsForAdapterId("react-state").map(
-        (entry) => entry.factKind,
-      ),
+        (entry) => entry.factKind
+      )
     ).toEqual([
       "broadSetterCoMutation",
       "resourceLifecycleProof",
@@ -68,13 +68,13 @@ describe("semantic facts", () => {
     ]);
     expect(
       semanticFactKindContractsForRule(
-        "antidrift/no-handrolled-resource-lifecycle-cells",
-      ).map((entry) => entry.factKind),
+        "antidrift/no-handrolled-resource-lifecycle-cells"
+      ).map((entry) => entry.factKind)
     ).toEqual(["broadSetterCoMutation", "resourceLifecycleProof"]);
     expect(
       semanticFactKindContractsForRule(
-        "antidrift/no-identity-schema-transform",
-      ).map((entry) => entry.factKind),
+        "antidrift/no-identity-schema-transform"
+      ).map((entry) => entry.factKind)
     ).toEqual(["identitySchemaTransform"]);
     expect(semanticFactKindContractsForAdapterId("not-real")).toEqual([]);
   });
@@ -82,8 +82,8 @@ describe("semantic facts", () => {
   it("indexes semantic fact contracts by emission and confidence", () => {
     expect(
       semanticFactKindContractsForEmission("inventory-only").map(
-        (entry) => entry.factKind,
-      ),
+        (entry) => entry.factKind
+      )
     ).toEqual([
       "broadSetterCoMutation",
       "sourceMemberStateShardCandidate",
@@ -91,8 +91,8 @@ describe("semantic facts", () => {
     ]);
     expect(
       semanticFactKindContractsForEmission("blocking-diagnostic").map(
-        (entry) => entry.factKind,
-      ),
+        (entry) => entry.factKind
+      )
     ).toEqual([
       "identitySchemaTransform",
       "resourceLifecycleProof",
@@ -100,8 +100,8 @@ describe("semantic facts", () => {
     ]);
     expect(
       semanticFactKindContractsForConfidence("deterministic-enforcement").map(
-        (entry) => entry.factKind,
-      ),
+        (entry) => entry.factKind
+      )
     ).toEqual([
       "identitySchemaTransform",
       "resourceLifecycleProof",
@@ -159,7 +159,7 @@ describe("semantic facts", () => {
         confidence: "deterministic-inventory",
         provenance: ["parser-services-required"],
         payload: { available: true },
-      }),
+      })
     );
 
     expect(sink.facts).toHaveLength(1);

@@ -17,7 +17,7 @@ const directory = dirname(fileURLToPath(import.meta.url));
 
 export const fixturesDir = resolve(
   directory,
-  "../../src/eslint-plugin/fixtures",
+  "../../src/eslint-plugin/fixtures"
 );
 export const plugin = {
   meta: eslintPlugin.meta,

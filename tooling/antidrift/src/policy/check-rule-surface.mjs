@@ -46,7 +46,7 @@ function collectDuplicateRuntimeOwners(runtimeConfigs) {
   const owners = new Map();
   for (const [runtime, configs] of Object.entries(runtimeConfigs ?? {})) {
     const settings = collectConfiguredRuleSettings(
-      Array.isArray(configs) ? configs : [configs],
+      Array.isArray(configs) ? configs : [configs]
     );
     for (const [ruleName, setting] of settings) {
       if (setting.severity === 0) continue;
@@ -63,7 +63,7 @@ function collectDuplicateRuntimeOwners(runtimeConfigs) {
 function readRuleRegistry(repoRoot) {
   return (
     YAML.parse(
-      readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8"),
+      readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8")
     ) ?? {}
   );
 }
@@ -123,7 +123,7 @@ function reportSorted(items, prefix, report) {
 
 function reportSortedViolations(items, report) {
   for (const { ruleName, prefix } of [...items].sort((a, b) =>
-    `${a.ruleName}:${a.prefix}`.localeCompare(`${b.ruleName}:${b.prefix}`),
+    `${a.ruleName}:${a.prefix}`.localeCompare(`${b.ruleName}:${b.prefix}`)
   )) {
     report(`${prefix}: antidrift/${ruleName}`);
   }
@@ -131,10 +131,10 @@ function reportSortedViolations(items, report) {
 
 function reportDuplicateRuntimeOwners(items, report) {
   for (const { ruleName, runtimes } of [...items].sort((left, right) =>
-    left.ruleName.localeCompare(right.ruleName),
+    left.ruleName.localeCompare(right.ruleName)
   )) {
     report(
-      `Custom rule enabled by multiple runtimes: antidrift/${ruleName} (${runtimes.sort().join(", ")})`,
+      `Custom rule enabled by multiple runtimes: antidrift/${ruleName} (${runtimes.sort().join(", ")})`
     );
   }
 }
@@ -165,30 +165,30 @@ export function checkRuleSurface({
   ruleRegistry ??= readRuleRegistry(repoRoot);
   const exported = new Set(Object.keys(pluginRules ?? {}));
   const configuredSettings = collectConfiguredRuleSettings(
-    Array.isArray(configs) ? configs : [configs],
+    Array.isArray(configs) ? configs : [configs]
   );
   const configured = new Set(configuredSettings.keys());
   const configuredButNotExported = new Set(
-    [...configured].filter((rule) => !exported.has(rule)),
+    [...configured].filter((rule) => !exported.has(rule))
   );
   const exportedButNotConfigured = new Set(
-    [...exported].filter((rule) => !configured.has(rule)),
+    [...exported].filter((rule) => !configured.has(rule))
   );
   const blockingMaturityViolations = collectBlockingMaturityViolations(
     configuredSettings,
-    ruleRegistry,
+    ruleRegistry
   );
   const duplicateRuntimeOwners = collectDuplicateRuntimeOwners(runtimeConfigs);
 
   reportSorted(
     configuredButNotExported,
     "Custom rule configured but not exported",
-    report,
+    report
   );
   reportSorted(
     exportedButNotConfigured,
     "Custom rule exported but not configured",
-    report,
+    report
   );
   reportSortedViolations(blockingMaturityViolations, report);
   reportDuplicateRuntimeOwners(duplicateRuntimeOwners, report);

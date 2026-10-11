@@ -7,7 +7,7 @@ declare function renderActivation(value: { activation: string }): string;
 declare function captureRuntimeError(): Error;
 declare function postTurn(
   url: string,
-  body: unknown,
+  body: unknown
 ): Promise<{ json(): Promise<unknown> }>;
 declare const serverUrl: string;
 declare const arrangedBody: { activation: string };

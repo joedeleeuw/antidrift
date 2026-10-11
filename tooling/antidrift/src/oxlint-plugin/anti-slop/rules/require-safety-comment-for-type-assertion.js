@@ -21,7 +21,7 @@ function hasSafetyComment(sourceCode, node) {
         .getCommentsBefore(current)
         .some(
           (comment) =>
-            comment.end <= node.start && /\bSAFETY\s*:/u.test(comment.value),
+            comment.end <= node.start && /\bSAFETY\s*:/u.test(comment.value)
         )
     ) {
       return true;

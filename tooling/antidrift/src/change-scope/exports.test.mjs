@@ -37,7 +37,7 @@ beforeAll(() => {
       "export function removedValue() { return existing; }",
       "export interface Existing { id: string }",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   writeFileSync(
     join(dir, "src/source.ts"),
@@ -45,7 +45,7 @@ beforeAll(() => {
       "export const sourceValue = 1;",
       "export interface SourceType { id: string }",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   writeFileSync(
     join(dir, "src/star.ts"),
@@ -53,13 +53,13 @@ beforeAll(() => {
       "export const starValue = 1;",
       "export type StarType = { id: string };",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   writeFileSync(join(dir, "src/index.ts"), "export * from './star';\n");
   writeFileSync(join(dir, "src/group.ts"), "export const groupedValue = 1;\n");
   writeFileSync(
     join(dir, "src/types.d.ts"),
-    "export interface Generated { id: string }\n",
+    "export interface Generated { id: string }\n"
   );
   runGitIn(dir, ["add", "-A"]);
   runGitIn(dir, ["commit", "-q", "-m", "base"]);
@@ -78,7 +78,7 @@ beforeAll(() => {
       "export namespace publicNamespace { export const x = 1; }",
       "export interface Existing { id: string }",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   writeFileSync(
     join(dir, "src/star.ts"),
@@ -87,12 +87,12 @@ beforeAll(() => {
       "export const starValue = 1;",
       "export type StarType = { id: string };",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   writeFileSync(join(dir, "src/new.ts"), "export const created = 1;\n");
   writeFileSync(
     join(dir, "src/view.tsx"),
-    "export function View() { return <div />; }\n",
+    "export function View() { return <div />; }\n"
   );
   writeFileSync(
     join(dir, "src/types.d.ts"),
@@ -100,7 +100,7 @@ beforeAll(() => {
       "export interface Generated { id: string; name: string }",
       "export interface AddedGenerated { id: string }",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   runGitIn(dir, ["add", "-A"]);
   runGitIn(dir, ["commit", "-q", "-m", "head"]);
@@ -153,15 +153,15 @@ describe("collectExportChanges", () => {
       mkdirSync(join(broken, "src"), { recursive: true });
       writeFileSync(
         join(broken, "src/public.ts"),
-        "export const existing = 1;\n",
+        "export const existing = 1;\n"
       );
       runGitIn(broken, ["add", "-A"]);
       runGitIn(broken, ["commit", "-q", "-m", "base"]);
       writeFileSync(
         join(broken, "src/public.ts"),
         ["export const existing = 1;", "export * from './missing';", ""].join(
-          "\n",
-        ),
+          "\n"
+        )
       );
       runGitIn(broken, ["add", "-A"]);
       runGitIn(broken, ["commit", "-q", "-m", "head"]);
@@ -176,7 +176,7 @@ describe("collectExportChanges", () => {
           head: HEAD,
           cwd: broken,
           changedFiles,
-        }),
+        })
       ).toThrow(/could not resolve public re-export module/u);
     } finally {
       rmSync(broken, { recursive: true, force: true });

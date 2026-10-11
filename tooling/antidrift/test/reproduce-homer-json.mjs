@@ -10,22 +10,22 @@ export function proveHomerJson(checkout) {
   const filename = join(checkout, proof.file);
   const config = ts.readConfigFile(
     join(checkout, "apps/api/tsconfig.json"),
-    ts.sys.readFile,
+    ts.sys.readFile
   );
   if (config.error) {
     throw new Error(
-      ts.flattenDiagnosticMessageText(config.error.messageText, " "),
+      ts.flattenDiagnosticMessageText(config.error.messageText, " ")
     );
   }
   const parsed = ts.parseJsonConfigFileContent(
     config.config,
     ts.sys,
-    dirname(join(checkout, "apps/api/tsconfig.json")),
+    dirname(join(checkout, "apps/api/tsconfig.json"))
   );
   const original = readFileSync(filename, "utf8");
   const repaired = original.replace(
     'store = JSON.parse((await readFile(MEMORY_FILE)).toString("utf8"));',
-    'store = z.record(z.string(), z.string()).parse(JSON.parse((await readFile(MEMORY_FILE)).toString("utf8")));',
+    'store = z.record(z.string(), z.string()).parse(JSON.parse((await readFile(MEMORY_FILE)).toString("utf8")));'
   );
   if (repaired === original) {
     throw new Error("Pinned Homer repair anchor is absent.");
@@ -51,8 +51,8 @@ export function proveHomerJson(checkout) {
               getCanonicalFileName: (file) => file,
               getCurrentDirectory: () => checkout,
               getNewLine: () => "\n",
-            },
-          )}`,
+            }
+          )}`
         );
       }
       const linter = new Linter({ cwd: checkout });
@@ -66,11 +66,11 @@ export function proveHomerJson(checkout) {
             rules: { "antidrift/no-unsafe-deserialize": "error" },
           },
         ],
-        { filename },
+        { filename }
       );
       if (JSON.stringify(messages) !== JSON.stringify(proof[phase])) {
         throw new Error(
-          `${phase}: Homer JSON diagnostics differ from the recorded proof.`,
+          `${phase}: Homer JSON diagnostics differ from the recorded proof.`
         );
       }
       result[phase] = {

@@ -82,7 +82,7 @@ export function ruleRequireConvexReturnValidator() {
       if (!services) {
         return missingTypeServicesVisitors(
           context,
-          "require-convex-return-validator",
+          "require-convex-return-validator"
         );
       }
       const checker = services.program.getTypeChecker();

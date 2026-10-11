@@ -12,5 +12,5 @@ if (element === null) {
 createRoot(element).render(
   <StrictMode>
     <App />
-  </StrictMode>,
+  </StrictMode>
 );

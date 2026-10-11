@@ -9,13 +9,15 @@ type ActiveUserEnvelope = {
 declare const candidate: unknown;
 
 function isActiveUserEnvelope(value: unknown): value is ActiveUserEnvelope {
-  return typeof value === "object"
-    && value !== null
-    && "user" in value
-    && typeof value.user === "object"
-    && value.user !== null
-    && "active" in value.user
-    && typeof value.user.active === "boolean";
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "user" in value &&
+    typeof value.user === "object" &&
+    value.user !== null &&
+    "active" in value.user &&
+    typeof value.user.active === "boolean"
+  );
 }
 
 const ActiveUserEnvelopeSchema = z.object({

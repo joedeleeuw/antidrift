@@ -176,7 +176,7 @@ ruleTester.run(
         errors,
       },
       {
-        code: "function onError(error: unknown) { console.error(error); } promise.catch(onError); onError(new Error(\"x\"));",
+        code: 'function onError(error: unknown) { console.error(error); } promise.catch(onError); onError(new Error("x"));',
         errors,
       },
       {
@@ -277,5 +277,5 @@ ruleTester.run(
         errors,
       },
     ],
-  },
+  }
 );

@@ -1,6 +1,10 @@
 import { brand, type Brand, type Unbrand } from "@joedeleeuw/antidrift/brand";
 
-const UserId = brand("UserId", (value): value is string => typeof value === "string" && value.startsWith("user_"));
+const UserId = brand(
+  "UserId",
+  (value): value is string =>
+    typeof value === "string" && value.startsWith("user_")
+);
 
 type UserId = Brand<string, "UserId">;
 type RawUserId = Unbrand<UserId>;

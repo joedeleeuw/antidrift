@@ -38,8 +38,8 @@ describe("undercheckedPredicateInventory", () => {
           include: ["src/**/*.ts"],
         },
         null,
-        2,
-      ),
+        2
+      )
     );
     writeProgram(
       root,
@@ -50,7 +50,7 @@ type User = { id: string; email: string; active: boolean };
 export function isUser(value: unknown): value is User {
   return value != null && typeof value === "object";
 }
-`,
+`
     );
     writeProgram(
       root,
@@ -67,7 +67,7 @@ export function isUser(value: unknown): value is User {
     "active" in value
   );
 }
-`,
+`
     );
 
     const result = await undercheckedPredicateInventory({
@@ -100,13 +100,13 @@ export function isUser(value: unknown): value is User {
   it("recognizes type predicate signatures as inventory pressure", () => {
     expect(
       countTypePredicateCandidates(
-        "function isUser(value: unknown): value is User { return true; }",
-      ),
+        "function isUser(value: unknown): value is User { return true; }"
+      )
     ).toBe(1);
     expect(
       countTypePredicateCandidates(
-        "function isUser(value: unknown): boolean { return true; }",
-      ),
+        "function isUser(value: unknown): boolean { return true; }"
+      )
     ).toBe(0);
   });
 });

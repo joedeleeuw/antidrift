@@ -5,14 +5,16 @@ import { loadUser } from "../../apiClient";
 
 import type { LoadUserResult } from "../../apiClient";
 
-type UserPanelState =
-  LoadUserResult | { state: "idle" } | { state: "loading" };
+type UserPanelState = LoadUserResult | { state: "idle" } | { state: "loading" };
 
 type UserPanelAction =
   | { type: "load" }
   | { type: "loaded"; result: LoadUserResult };
 
-function userPanelReducer(_state: UserPanelState, action: UserPanelAction): UserPanelState {
+function userPanelReducer(
+  _state: UserPanelState,
+  action: UserPanelAction
+): UserPanelState {
   switch (action.type) {
     case "load":
       return { state: "loading" };
@@ -36,17 +38,29 @@ export function UserPanel() {
   }, []);
 
   if (state.state === "loading" || state.state === "idle") {
-    return <section className="rounded-md border-border-subtle bg-surface-default p-4 text-fg-muted">Loading user...</section>;
+    return (
+      <section className="rounded-md border-border-subtle bg-surface-default p-4 text-fg-muted">
+        Loading user...
+      </section>
+    );
   }
 
   if (state.state === "failed") {
-    return <section className="rounded-md border-border-danger bg-surface-danger p-4 text-fg-danger">{state.message}</section>;
+    return (
+      <section className="rounded-md border-border-danger bg-surface-danger p-4 text-fg-danger">
+        {state.message}
+      </section>
+    );
   }
 
   return (
     <section className="rounded-md border-border-subtle bg-surface-default p-4 text-fg-default">
-      <h2><bdi>{state.user.displayName}</bdi></h2>
-      <p><bdi>{state.user.email}</bdi></p>
+      <h2>
+        <bdi>{state.user.displayName}</bdi>
+      </h2>
+      <p>
+        <bdi>{state.user.email}</bdi>
+      </p>
       <Button>View profile</Button>
     </section>
   );

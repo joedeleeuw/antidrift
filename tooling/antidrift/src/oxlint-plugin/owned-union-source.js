@@ -17,7 +17,7 @@ function literalValue(node) {
 export function memberSet(values) {
   if (values.length === 0 || values.includes(null)) return null;
   return JSON.stringify(
-    [...new Set(values.map((value) => JSON.stringify(value)))].sort(),
+    [...new Set(values.map((value) => JSON.stringify(value)))].sort()
   );
 }
 
@@ -42,7 +42,7 @@ export function exportedArrays(filename, text) {
     filename,
     text,
     ts.ScriptTarget.Latest,
-    true,
+    true
   );
   const bindings = new Map();
   const exports = new Map();
@@ -52,7 +52,7 @@ export function exportedArrays(filename, text) {
       statement.declarationList.flags & ts.NodeFlags.Const
     ) {
       const exported = statement.modifiers?.some(
-        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
       );
       for (const declaration of statement.declarationList.declarations) {
         if (!ts.isIdentifier(declaration.name)) continue;
@@ -96,14 +96,14 @@ export function importedArrays(filename, specifier, cache) {
       ? ts.parseJsonConfigFileContent(
           config.config,
           ts.sys,
-          dirname(configPath),
+          dirname(configPath)
         ).options
       : { moduleResolution: ts.ModuleResolutionKind.Bundler };
   const resolved = ts.resolveModuleName(
     specifier,
     filename,
     options,
-    ts.sys,
+    ts.sys
   ).resolvedModule;
   if (!resolved || resolved.resolvedFileName.endsWith(".d.ts")) return [];
   const target = resolved.resolvedFileName;

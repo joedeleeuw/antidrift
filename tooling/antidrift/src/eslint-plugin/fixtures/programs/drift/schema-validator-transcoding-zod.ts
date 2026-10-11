@@ -25,7 +25,7 @@ export const getMachine = query({
 
 // The converter result bound once, then registered.
 const converted = convexValidatorFromJsonSchema(
-  z.toJSONSchema(MachineRegistration),
+  z.toJSONSchema(MachineRegistration)
 );
 
 export const searchMachines = query({

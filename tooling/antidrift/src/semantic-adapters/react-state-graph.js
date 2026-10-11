@@ -81,7 +81,7 @@ function paramNames(params = []) {
   return new Set(
     params
       .map((param) => identifierName(param))
-      .filter((name) => name.length > 0),
+      .filter((name) => name.length > 0)
   );
 }
 
@@ -187,7 +187,7 @@ function statementExits(node) {
     return Boolean(
       node.alternate &&
       statementExits(node.consequent) &&
-      statementExits(node.alternate),
+      statementExits(node.alternate)
     );
   }
   return false;
@@ -278,7 +278,7 @@ export function createReactStateTracker({
     if (value?.type === "Identifier") {
       const variable = variableForIdentifier(value);
       return Boolean(
-        variable && reactHookBindings.get(hookName)?.has(variable),
+        variable && reactHookBindings.get(hookName)?.has(variable)
       );
     }
     if (value?.type !== "MemberExpression" || memberName(value) !== hookName) {
@@ -393,7 +393,7 @@ export function createReactStateTracker({
     frame.requestGuard = Boolean(
       proof.proven &&
       proof.payloadCell &&
-      frame.abortGuardedSetters.has(proof.payloadCell),
+      frame.abortGuardedSetters.has(proof.payloadCell)
     );
     frame.sourceMemberTransitions.push(...sourceMemberTransitions(frame));
     if (parent) {
@@ -415,7 +415,7 @@ export function createReactStateTracker({
         const bindings = new Map(
           eslintSourceCode
             .getDeclaredVariables(node)
-            .map((variable) => [variable.name, variable]),
+            .map((variable) => [variable.name, variable])
         );
         for (const specifier of node.specifiers ?? []) {
           const localName = specifier.local?.name;
@@ -514,7 +514,7 @@ export function createReactStateTracker({
       },
       CatchClause(node) {
         catchParams.push(
-          node.param?.type === "Identifier" ? node.param.name : null,
+          node.param?.type === "Identifier" ? node.param.name : null
         );
       },
       "CatchClause:exit"() {
@@ -573,7 +573,7 @@ export function createReactStateTracker({
 function payloadCellFromSourceMember(frame, owned, blocked) {
   return (
     frame.sourceMemberWrites.find(
-      (write) => owned.has(write.setter) && !blocked.has(write.setter),
+      (write) => owned.has(write.setter) && !blocked.has(write.setter)
     )?.setter ?? null
   );
 }
@@ -594,21 +594,21 @@ export function lifecycleProof(frame) {
     };
   }
   const entries = [...frame.writes.entries()].filter(([setter]) =>
-    owned.has(setter),
+    owned.has(setter)
   );
   const boolCell =
     entries.find(
-      ([, classes]) => classes.has("trueConst") && classes.has("falseConst"),
+      ([, classes]) => classes.has("trueConst") && classes.has("falseConst")
     )?.[0] ?? null;
   const errorCell = boolCell
     ? ([...frame.catchSetters].find(
-        (name) => name !== boolCell && owned.has(name),
+        (name) => name !== boolCell && owned.has(name)
       ) ?? null)
     : null;
   const blocked = new Set([boolCell, errorCell].filter(Boolean));
   const directPayloadCell = errorCell
     ? (entries.find(
-        ([name, classes]) => !blocked.has(name) && classes.has("awaited"),
+        ([name, classes]) => !blocked.has(name) && classes.has("awaited")
       )?.[0] ?? null)
     : null;
   const payloadCell =
@@ -624,8 +624,8 @@ export function lifecycleProof(frame) {
 export function sourceShardProof(frame, { threshold = 2 } = {}) {
   const editableCells = new Set(
     [...frame.eventEditedCells].filter((cell) =>
-      frame.controlledCells.has(cell),
-    ),
+      frame.controlledCells.has(cell)
+    )
   );
   for (const transition of frame.sourceMemberTransitions) {
     if (!transition.transition) continue;
@@ -641,7 +641,7 @@ export function sourceShardProof(frame, { threshold = 2 } = {}) {
         ...transition,
         entries,
         editableCells: [...editableCells].sort((left, right) =>
-          left.localeCompare(right),
+          left.localeCompare(right)
         ),
         proven: true,
       };
@@ -650,7 +650,7 @@ export function sourceShardProof(frame, { threshold = 2 } = {}) {
   return {
     entries: [],
     editableCells: [...editableCells].sort((left, right) =>
-      left.localeCompare(right),
+      left.localeCompare(right)
     ),
     proven: false,
   };

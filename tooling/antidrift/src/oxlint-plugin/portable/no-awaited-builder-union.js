@@ -90,8 +90,8 @@ const isBuilderChainUnion = (chains) =>
     chains.some(
       (other) =>
         isStrictPrefix(chain.steps, other.steps) ||
-        isStrictPrefix(other.steps, chain.steps),
-    ),
+        isStrictPrefix(other.steps, chain.steps)
+    )
   );
 export default {
   meta: {
@@ -162,7 +162,7 @@ export default {
               .some(
                 (comment) =>
                   comment.range[0] >= awaitEnd &&
-                  comment.range[0] < node.argument.range[0],
+                  comment.range[0] < node.argument.range[0]
               );
             if (hasInterveningComment) {
               return null;
@@ -174,7 +174,7 @@ export default {
             return [
               fixer.removeRange([node.range[0], removalEnd]),
               ...branches.map((branch) =>
-                fixer.insertTextBefore(branch, "await "),
+                fixer.insertTextBefore(branch, "await ")
               ),
             ];
           },

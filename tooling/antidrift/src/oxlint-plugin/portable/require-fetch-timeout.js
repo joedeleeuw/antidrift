@@ -86,8 +86,8 @@ const getBindingIdentifierNames = (node) => {
   if (value.type === "ObjectPattern") {
     return value.properties.flatMap((property) =>
       getBindingIdentifierNames(
-        property.type === "RestElement" ? property.argument : property.value,
-      ),
+        property.type === "RestElement" ? property.argument : property.value
+      )
     );
   }
   return [];
@@ -264,7 +264,7 @@ export default {
         definition.type === "Variable" &&
         definition.parent.kind === "const" &&
         !variable.references.some(
-          (reference) => reference.isWrite() && !reference.init,
+          (reference) => reference.isWrite() && !reference.init
         )
       ) {
         return fetchOrigin(definition.node.init, seen);

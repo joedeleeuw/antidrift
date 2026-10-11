@@ -63,7 +63,7 @@ export function verifySession({
         hook,
         reason: verificationReason(
           `Required verification timed out after ${STEP_TIMEOUT_MS / 60_000}m: ${text}`,
-          result,
+          result
         ),
         status: 1,
         stdout,
@@ -76,7 +76,7 @@ export function verifySession({
         hook,
         reason: verificationReason(
           `Required verification failed: ${text}`,
-          result,
+          result
         ),
         status: result.status ?? 1,
         stdout,

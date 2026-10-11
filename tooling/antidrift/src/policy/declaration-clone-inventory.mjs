@@ -198,7 +198,7 @@ function selectedPlans(repo, plans) {
 
 function sourceKind(path) {
   return /(^|\/)(?:gen|generated|__generated__)(?:\/|$)|\.generated\./u.test(
-    path,
+    path
   )
     ? "generated"
     : "source";
@@ -216,8 +216,8 @@ function expandBraces(patterns) {
     const suffix = pattern.slice(match.index + match[0].length);
     expanded.push(
       ...expandBraces(
-        match[1].split(",").map((part) => `${prefix}${part}${suffix}`),
-      ),
+        match[1].split(",").map((part) => `${prefix}${part}${suffix}`)
+      )
     );
   }
   return expanded;
@@ -254,11 +254,11 @@ function targetMatchers(targets) {
 function readTsconfig(repoRoot, tsconfig) {
   const configPath = resolve(repoRoot, tsconfig);
   const loaded = ts.readConfigFile(configPath, (fileName) =>
-    ts.sys.readFile(fileName),
+    ts.sys.readFile(fileName)
   );
   if (loaded.error) {
     throw new Error(
-      ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n"),
+      ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n")
     );
   }
   return ts.parseJsonConfigFileContent(
@@ -266,7 +266,7 @@ function readTsconfig(repoRoot, tsconfig) {
     ts.sys,
     dirname(configPath),
     undefined,
-    configPath,
+    configPath
   );
 }
 
@@ -280,7 +280,7 @@ function isTypeScriptSource(sourceFile) {
 function sourceMatches(repoRoot, sourceFile, targets) {
   const relativePath = relative(repoRoot, sourceFile.fileName).replace(
     /\\/gu,
-    "/",
+    "/"
   );
   if (relativePath.startsWith("../")) return false;
   return targetMatchers(targets).some((matcher) => matcher.test(relativePath));
@@ -317,15 +317,15 @@ function propertyDeclaration(symbol, container) {
       (ts.isPropertySignature(declaration) ||
         ts.isPropertyDeclaration(declaration) ||
         ts.isMethodSignature(declaration) ||
-        ts.isMethodDeclaration(declaration)),
+        ts.isMethodDeclaration(declaration))
   );
 }
 
 function isReadonlyProperty(declaration) {
   return Boolean(
     declaration?.modifiers?.some(
-      (modifier) => modifier.kind === ts.SyntaxKind.ReadonlyKeyword,
-    ),
+      (modifier) => modifier.kind === ts.SyntaxKind.ReadonlyKeyword
+    )
   );
 }
 
@@ -356,7 +356,7 @@ function declarationProperties(checker, type, node) {
     .sort(
       (left, right) =>
         left.name.localeCompare(right.name) ||
-        left.type.localeCompare(right.type),
+        left.type.localeCompare(right.type)
     );
 }
 
@@ -366,7 +366,7 @@ function fingerprint(properties) {
 
 function location(sourceFile, node) {
   const position = sourceFile.getLineAndCharacterOfPosition(
-    node.name.getStart(sourceFile),
+    node.name.getStart(sourceFile)
   );
   return {
     line: position.line + 1,
@@ -408,7 +408,7 @@ function collectDeclarations(repoRoot, plan, program, checker, targets) {
           plan,
           sourceFile,
           checker,
-          node,
+          node
         );
         if (declaration) declarations.push(declaration);
       }
@@ -421,7 +421,7 @@ function collectDeclarations(repoRoot, plan, program, checker, targets) {
       left.path.localeCompare(right.path) ||
       left.line - right.line ||
       left.column - right.column ||
-      left.name.localeCompare(right.name),
+      left.name.localeCompare(right.name)
   );
 }
 
@@ -439,14 +439,14 @@ function groupDeclarations(declarations) {
           left.path.localeCompare(right.path) ||
           left.line - right.line ||
           left.column - right.column ||
-          left.name.localeCompare(right.name),
+          left.name.localeCompare(right.name)
       );
       const paths = new Set(sorted.map((entry) => entry.path));
       const sourceKinds = [
         ...new Set(sorted.map((entry) => entry.sourceKind)),
       ].sort((left, right) => left.localeCompare(right));
       const generatedDeclarationCount = sorted.filter(
-        (entry) => entry.sourceKind === "generated",
+        (entry) => entry.sourceKind === "generated"
       ).length;
       const [first] = sorted;
       return {
@@ -462,7 +462,7 @@ function groupDeclarations(declarations) {
           generatedDeclarationCount < sorted.length,
         generatedDeclarationCount,
         declarations: sorted.map(
-          ({ properties: _properties, ...entry }) => entry,
+          ({ properties: _properties, ...entry }) => entry
         ),
       };
     })
@@ -472,7 +472,7 @@ function groupDeclarations(declarations) {
         Number(right.crossFile) - Number(left.crossFile) ||
         right.declarations.length - left.declarations.length ||
         left.declarations[0].path.localeCompare(right.declarations[0].path) ||
-        left.fingerprint.localeCompare(right.fingerprint),
+        left.fingerprint.localeCompare(right.fingerprint)
     );
 }
 
@@ -501,7 +501,7 @@ function cloneGroupSourceKindCounts(groups) {
     generatedOnly: groups.filter((group) => group.generatedOnly).length,
     mixedGenerated: groups.filter((group) => group.mixedGenerated).length,
     sourceOnly: groups.filter(
-      (group) => !group.generatedOnly && !group.mixedGenerated,
+      (group) => !group.generatedOnly && !group.mixedGenerated
     ).length,
   };
 }
@@ -540,18 +540,18 @@ function runPlan(plan, targetsOverride) {
     .filter(
       (sourceFile) =>
         isTypeScriptSource(sourceFile) &&
-        sourceMatches(repoRoot, sourceFile, targets),
+        sourceMatches(repoRoot, sourceFile, targets)
     );
   const declarations = collectDeclarations(
     repoRoot,
     plan,
     program,
     checker,
-    targets,
+    targets
   );
   const cloneGroups = groupDeclarations(declarations);
   const parserDiagnostics = matchedSourceFiles.flatMap((sourceFile) =>
-    program.getSyntacticDiagnostics(sourceFile),
+    program.getSyntacticDiagnostics(sourceFile)
   );
   const result = {
     repo: plan.repo,
@@ -566,12 +566,12 @@ function runPlan(plan, targetsOverride) {
     cloneGroupSourceKindCounts: cloneGroupSourceKindCounts(cloneGroups),
     cloneDeclarationCount: cloneGroups.reduce(
       (sum, group) => sum + group.declarations.length,
-      0,
+      0
     ),
     parserErrors: parserDiagnostics.length,
     parserErrorFindings: diagnosticSummary(repoRoot, parserDiagnostics).slice(
       0,
-      20,
+      20
     ),
     declarations,
     cloneGroups,
@@ -590,13 +590,13 @@ function summarize({ results, slice }) {
     checkedFiles: passed.reduce((sum, result) => sum + result.checkedFiles, 0),
     declarationCount: passed.reduce(
       (sum, result) => sum + result.declarationCount,
-      0,
+      0
     ),
     cloneGroupCount: cloneGroups.length,
     cloneGroupSourceKindCounts: cloneGroupSourceKindCounts(cloneGroups),
     cloneDeclarationCount: cloneGroups.reduce(
       (sum, group) => sum + group.declarations.length,
-      0,
+      0
     ),
     parserErrors: passed.reduce((sum, result) => sum + result.parserErrors, 0),
     cloneGroups,
@@ -626,11 +626,11 @@ export function declarationCloneInventory({
 } = {}) {
   const results = selectedPlans(repo, plans).map((plan) => {
     progress(
-      `[declaration-clone-inventory] scanning ${plan.repo}/${plan.label}`,
+      `[declaration-clone-inventory] scanning ${plan.repo}/${plan.label}`
     );
     const result = runPlan(plan, targets);
     progress(
-      `[declaration-clone-inventory] ${plan.repo}/${plan.label}: ${result.checkedFiles ?? 0} files, ${result.declarationCount ?? 0} declarations, ${result.cloneGroupCount ?? 0} clone groups, ${result.parserErrors ?? 0} parser errors`,
+      `[declaration-clone-inventory] ${plan.repo}/${plan.label}: ${result.checkedFiles ?? 0} files, ${result.declarationCount ?? 0} declarations, ${result.cloneGroupCount ?? 0} clone groups, ${result.parserErrors ?? 0} parser errors`
     );
     return result;
   });

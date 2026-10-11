@@ -38,7 +38,7 @@ export const noObjectParametersRule = defineRule({
         return resolvesToObject(type.typeAnnotation, shadowedAliases, visited);
       if (type.type === "TSUnionType") {
         return type.types.some((member) =>
-          resolvesToObject(member, shadowedAliases, visited),
+          resolvesToObject(member, shadowedAliases, visited)
         );
       }
       if (
@@ -61,7 +61,7 @@ export const noObjectParametersRule = defineRule({
     const checkParameters = (node) => {
       const shadowedAliases = lexicalTypeParameterNames(
         node,
-        context.sourceCode.visitorKeys,
+        context.sourceCode.visitorKeys
       );
       for (const parameter of node.params) {
         const annotation = parameterAnnotation(parameter);

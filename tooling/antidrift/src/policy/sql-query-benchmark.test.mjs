@@ -15,7 +15,7 @@ describe("classifySqlParserServiceDelta", () => {
           extraWithoutTypeServices: [],
           missingWithoutTypeServices: [],
         },
-      }),
+      })
     ).toBe("equivalent-without-parser-services");
   });
 
@@ -27,7 +27,7 @@ describe("classifySqlParserServiceDelta", () => {
           extraWithoutTypeServices: ["src/query.ts:10"],
           missingWithoutTypeServices: [],
         },
-      }),
+      })
     ).toBe("conservative-inventory-without-parser-services");
   });
 
@@ -39,7 +39,7 @@ describe("classifySqlParserServiceDelta", () => {
           extraWithoutTypeServices: [],
           missingWithoutTypeServices: ["src/query.ts:10"],
         },
-      }),
+      })
     ).toBe("blocking-false-negative-without-parser-services");
   });
 
@@ -51,7 +51,7 @@ describe("classifySqlParserServiceDelta", () => {
           extraWithoutTypeServices: ["src/query.ts:10"],
           missingWithoutTypeServices: ["src/query.ts:20"],
         },
-      }),
+      })
     ).toBe("mixed-parser-service-delta");
   });
 
@@ -63,7 +63,7 @@ describe("classifySqlParserServiceDelta", () => {
           extraWithoutTypeServices: ["src/query.ts:10"],
           missingWithoutTypeServices: [],
         },
-      }),
+      })
     ).toBe("parser-error");
   });
 });

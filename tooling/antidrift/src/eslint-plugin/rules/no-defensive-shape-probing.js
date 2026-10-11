@@ -32,7 +32,7 @@ export function ruleNoDefensiveShapeProbing() {
       if (!services) {
         return missingTypeServicesVisitors(
           context,
-          "no-defensive-shape-probing",
+          "no-defensive-shape-probing"
         );
       }
       const checker = services.program.getTypeChecker();

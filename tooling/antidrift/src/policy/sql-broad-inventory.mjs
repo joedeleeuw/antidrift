@@ -175,7 +175,7 @@ function lintConfig() {
         antidrift,
       },
       rules: Object.fromEntries(
-        benchmarkRuleIds.map((ruleId) => [ruleId, "error"]),
+        benchmarkRuleIds.map((ruleId) => [ruleId, "error"])
       ),
     },
   ];
@@ -196,7 +196,7 @@ function countByRule(findings) {
     benchmarkRuleIds.map((ruleId) => [
       ruleId,
       findings.filter((finding) => finding.ruleId === ruleId).length,
-    ]),
+    ])
   );
 }
 
@@ -231,12 +231,12 @@ async function lintRepository(repoRoot) {
   const parserErrors = results.flatMap((result) =>
     result.messages
       .filter((message) => message.fatal)
-      .map((message) => toFinding(repoRoot, result, message)),
+      .map((message) => toFinding(repoRoot, result, message))
   );
   const findings = results.flatMap((result) =>
     result.messages
       .filter((message) => benchmarkRuleIds.includes(message.ruleId))
-      .map((message) => toFinding(repoRoot, result, message)),
+      .map((message) => toFinding(repoRoot, result, message))
   );
 
   return {
@@ -254,7 +254,7 @@ async function lintRepository(repoRoot) {
 function summarize({ slice, codeRoot, exclude, repo, results }) {
   const findings = results.flatMap((result) => result.findings);
   const checkedRepositories = results.filter(
-    (result) => result.candidateFiles > 0,
+    (result) => result.candidateFiles > 0
   ).length;
   return {
     schemaVersion: 1,
@@ -267,7 +267,7 @@ function summarize({ slice, codeRoot, exclude, repo, results }) {
     checkedRepositories,
     candidateFiles: results.reduce(
       (sum, result) => sum + result.candidateFiles,
-      0,
+      0
     ),
     parserErrors: results.reduce((sum, result) => sum + result.parserErrors, 0),
     findingsByRule: countByRule(findings),
@@ -303,11 +303,11 @@ export async function sqlBroadInventory({
         progress(`[sql-broad-inventory] scanning ${basename(repoRoot)}`);
         const result = await lintRepository(repoRoot);
         progress(
-          `[sql-broad-inventory] ${result.repo}: ${result.candidateFiles} candidates, ${result.findingsByRule[customRuleId]} custom findings, ${result.parserErrors} parser errors`,
+          `[sql-broad-inventory] ${result.repo}: ${result.candidateFiles} candidates, ${result.findingsByRule[customRuleId]} custom findings, ${result.parserErrors} parser errors`
         );
         results.push(result);
       }),
-    Promise.resolve(),
+    Promise.resolve()
   );
   const summary = summarize({ slice, codeRoot: root, exclude, repo, results });
   emit(summary, output, report);

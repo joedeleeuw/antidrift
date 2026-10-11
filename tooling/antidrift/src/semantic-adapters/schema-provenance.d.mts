@@ -36,43 +36,43 @@ export const ZOD_THROW_ASSERTION_MATCHERS: ReadonlySet<
 
 export function isZodMethod(
   checker: ts.TypeChecker,
-  tsNameNode: ts.Node | null | undefined,
+  tsNameNode: ts.Node | null | undefined
 ): boolean;
 
 export function isThrowAssertionCallbackParse(node: unknown): boolean;
 
 export function parsedSchemaSymbol(
   checker: ts.TypeChecker,
-  tsCall: ts.CallExpression,
+  tsCall: ts.CallExpression
 ): ts.Symbol | undefined;
 
 export function declaredSchemaSymbolOfParameter(
   checker: ts.TypeChecker,
-  tsArg: ts.Node,
+  tsArg: ts.Node
 ): ts.Symbol | undefined;
 
 export function zodParseCallParts(
   node: unknown,
   services: TypeScriptParserServices,
   checker: ts.TypeChecker,
-  methods?: ReadonlySet<string>,
+  methods?: ReadonlySet<string>
 ): ZodParseCallParts | null;
 
 export function zodTransformCallParts(
   node: unknown,
   services: TypeScriptParserServices,
-  checker: ts.TypeChecker,
+  checker: ts.TypeChecker
 ): ZodTransformCallParts | null;
 
 export function closedZodTransformInputKeys(
   receiver: unknown,
   services: TypeScriptParserServices,
-  checker: ts.TypeChecker,
+  checker: ts.TypeChecker
 ): ReadonlySet<string> | null;
 
 export function recordParsedConst(
   node: unknown,
   schemaSym: ts.Symbol | undefined,
   symbolOf: (node: unknown) => ts.Symbol | undefined,
-  validatedBy: Map<ts.Symbol, ts.Symbol>,
+  validatedBy: Map<ts.Symbol, ts.Symbol>
 ): void;

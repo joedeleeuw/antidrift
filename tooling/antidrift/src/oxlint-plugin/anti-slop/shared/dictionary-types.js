@@ -157,15 +157,15 @@ function unsafeDirectValue(type, environment, substitutions, resolvingAliases) {
           member,
           environment,
           substitutions,
-          resolvingAliases,
-        ) !== null,
+          resolvingAliases
+        ) !== null
     )
       ? "union"
       : null;
   }
   if (unwrapped.type === "TSIntersectionType") {
     const unsafeMembers = unwrapped.types.map((member) =>
-      unsafeDirectValue(member, environment, substitutions, resolvingAliases),
+      unsafeDirectValue(member, environment, substitutions, resolvingAliases)
     );
     if (unsafeMembers.includes("any")) return "any";
     return unsafeMembers.length > 0 &&
@@ -184,7 +184,7 @@ function unsafeDirectValue(type, environment, substitutions, resolvingAliases) {
           wrapped,
           environment,
           substitutions,
-          resolvingAliases,
+          resolvingAliases
         );
   }
   const substitution = substitutions.get(name);
@@ -195,7 +195,7 @@ function unsafeDirectValue(type, environment, substitutions, resolvingAliases) {
           substitution,
           environment,
           substitutions,
-          resolvingAliases,
+          resolvingAliases
         );
   }
   const interfaceDeclarations = environment.interfaces.get(name);
@@ -214,21 +214,21 @@ function unsafeDirectValue(type, environment, substitutions, resolvingAliases) {
     alias.typeAnnotation,
     environment,
     nextSubstitutions,
-    nextResolving,
+    nextResolving
   );
 }
 function dictionaryValueTypes(
   type,
   environment,
   substitutions,
-  resolvingAliases,
+  resolvingAliases
 ) {
   const unwrapped = unwrapTransparentType(type);
   if (unwrapped.type === "TSTypeLiteral") {
     return unwrapped.members.flatMap((member) =>
       member.type === "TSIndexSignature" && member.typeAnnotation !== null
         ? [{ type: member.typeAnnotation.typeAnnotation, substitutions }]
-        : [],
+        : []
     );
   }
   if (unwrapped.type === "TSMappedType") {
@@ -247,7 +247,7 @@ function dictionaryValueTypes(
           substitution,
           environment,
           substitutions,
-          resolvingAliases,
+          resolvingAliases
         );
   }
   if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, environment)) {
@@ -258,7 +258,7 @@ function dictionaryValueTypes(
           wrapped,
           environment,
           substitutions,
-          resolvingAliases,
+          resolvingAliases
         );
   }
   if (name === "Record" && isBuiltIn(name, environment)) {
@@ -273,7 +273,7 @@ function dictionaryValueTypes(
           source,
           environment,
           substitutions,
-          resolvingAliases,
+          resolvingAliases
         );
   }
   const alias = environment.aliases.get(name);
@@ -286,7 +286,7 @@ function dictionaryValueTypes(
     alias.typeAnnotation,
     environment,
     nextSubstitutions,
-    nextResolving,
+    nextResolving
   );
 }
 export function classifyUnsafeDictionaryValue(valueType, environment) {
@@ -294,7 +294,7 @@ export function classifyUnsafeDictionaryValue(valueType, environment) {
     valueType,
     environment,
     new Map(),
-    new Set(),
+    new Set()
   );
   return unsafeValue === null
     ? null
@@ -305,13 +305,13 @@ export function classifyUnsafeDictionary(type, environment) {
     type,
     environment,
     new Map(),
-    new Set(),
+    new Set()
   )) {
     const unsafeValue = unsafeDirectValue(
       valueType.type,
       environment,
       valueType.substitutions,
-      new Set(),
+      new Set()
     );
     if (unsafeValue !== null) return { kind: "unsafe-dictionary", unsafeValue };
   }
@@ -321,7 +321,7 @@ function resolvesToDictionary(
   type,
   environment,
   substitutions,
-  resolvingAliases,
+  resolvingAliases
 ) {
   return (
     dictionaryValueTypes(type, environment, substitutions, resolvingAliases)
@@ -334,7 +334,7 @@ export function classifyWideningTarget(type, environment) {
   if (unwrapped.type === "TSObjectKeyword") return { kind: "object" };
   if (unwrapped.type === "TSTypeLiteral") {
     return unwrapped.members.some(
-      (member) => member.type === "TSIndexSignature",
+      (member) => member.type === "TSIndexSignature"
     )
       ? { kind: "open dictionary" }
       : unwrapped.members.length > 0
@@ -362,7 +362,7 @@ export function classifyWideningTarget(type, environment) {
         alias.typeAnnotation,
         environment,
         substitutions,
-        new Set([name]),
+        new Set([name])
       )
       ? { kind: "generic container" }
       : null;
@@ -373,7 +373,7 @@ export function classifyWideningTarget(type, environment) {
     alias.typeAnnotation,
     environment,
     substitutions,
-    new Set([name]),
+    new Set([name])
   );
   return resolved;
 }
@@ -388,7 +388,7 @@ function isBroadMappedKey(type, environment, substitutions) {
   }
   if (unwrapped.type === "TSUnionType") {
     return unwrapped.types.every((member) =>
-      isBroadMappedKey(member, environment, substitutions),
+      isBroadMappedKey(member, environment, substitutions)
     );
   }
   if (unwrapped.type !== "TSTypeReference") return false;
@@ -407,14 +407,14 @@ function classifyAliasBroadTarget(
   type,
   environment,
   substitutions,
-  resolvingAliases,
+  resolvingAliases
 ) {
   const unwrapped = unwrapTransparentType(type);
   if (unwrapped.type === "TSUnknownKeyword") return { kind: "unknown" };
   if (unwrapped.type === "TSObjectKeyword") return { kind: "object" };
   if (unwrapped.type === "TSTypeLiteral") {
     return unwrapped.members.some(
-      (member) => member.type === "TSIndexSignature",
+      (member) => member.type === "TSIndexSignature"
     )
       ? { kind: "open dictionary" }
       : null;
@@ -435,7 +435,7 @@ function classifyAliasBroadTarget(
           substitution,
           environment,
           substitutions,
-          resolvingAliases,
+          resolvingAliases
         );
   }
   if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, environment)) {
@@ -446,7 +446,7 @@ function classifyAliasBroadTarget(
           wrapped,
           environment,
           substitutions,
-          resolvingAliases,
+          resolvingAliases
         );
   }
   if (name === "Record" && isBuiltIn(name, environment)) {
@@ -462,7 +462,7 @@ function classifyAliasBroadTarget(
     alias.typeAnnotation,
     environment,
     nextSubstitutions,
-    nextResolving,
+    nextResolving
   );
 }
 export function isPopulatedObjectExpression(expression) {

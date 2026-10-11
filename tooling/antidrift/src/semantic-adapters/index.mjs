@@ -203,7 +203,7 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
 });
 
 export const SEMANTIC_ADAPTER_CONTRACT_LIST = Object.freeze(
-  Object.values(SEMANTIC_ADAPTER_CONTRACTS),
+  Object.values(SEMANTIC_ADAPTER_CONTRACTS)
 );
 
 function semanticFactContractsForAdapterContract(contract) {
@@ -211,10 +211,10 @@ function semanticFactContractsForAdapterContract(contract) {
     contract.semanticFactKinds
       .map((factKind) =>
         SEMANTIC_FACT_KIND_CONTRACT_LIST.find(
-          (factContract) => factContract.factKind === factKind,
-        ),
+          (factContract) => factContract.factKind === factKind
+        )
       )
-      .filter(Boolean),
+      .filter(Boolean)
   );
 }
 
@@ -223,39 +223,39 @@ export const SEMANTIC_ADAPTER_MANIFEST = Object.freeze(
     Object.freeze({
       ...contract,
       semanticFactContracts: semanticFactContractsForAdapterContract(contract),
-    }),
-  ),
+    })
+  )
 );
 
 export function semanticAdapterContractsForRule(ruleId) {
   return Object.freeze(
     SEMANTIC_ADAPTER_CONTRACT_LIST.filter((contract) =>
-      contract.rules.includes(ruleId),
-    ),
+      contract.rules.includes(ruleId)
+    )
   );
 }
 
 export function semanticAdapterContractsForFactAdapterId(adapterId) {
   return Object.freeze(
     SEMANTIC_ADAPTER_CONTRACT_LIST.filter((contract) =>
-      contract.semanticFactAdapterIds.includes(adapterId),
-    ),
+      contract.semanticFactAdapterIds.includes(adapterId)
+    )
   );
 }
 
 export function semanticAdapterContractsForProofBucket(proofBucket) {
   return Object.freeze(
     SEMANTIC_ADAPTER_CONTRACT_LIST.filter((contract) =>
-      contract.proofBuckets.includes(proofBucket),
-    ),
+      contract.proofBuckets.includes(proofBucket)
+    )
   );
 }
 
 export function semanticAdapterContractsForFactKind(factKind) {
   return Object.freeze(
     SEMANTIC_ADAPTER_CONTRACT_LIST.filter((contract) =>
-      contract.semanticFactKinds.includes(factKind),
-    ),
+      contract.semanticFactKinds.includes(factKind)
+    )
   );
 }
 
@@ -269,31 +269,31 @@ export function semanticAdapterManifestForAdapterId(adapterId) {
 export function semanticAdapterManifestForRule(ruleId) {
   return Object.freeze(
     SEMANTIC_ADAPTER_MANIFEST.filter((contract) =>
-      contract.rules.includes(ruleId),
-    ),
+      contract.rules.includes(ruleId)
+    )
   );
 }
 
 export function semanticAdapterManifestForFactAdapterId(adapterId) {
   return Object.freeze(
     SEMANTIC_ADAPTER_MANIFEST.filter((contract) =>
-      contract.semanticFactAdapterIds.includes(adapterId),
-    ),
+      contract.semanticFactAdapterIds.includes(adapterId)
+    )
   );
 }
 
 export function semanticAdapterManifestForProofBucket(proofBucket) {
   return Object.freeze(
     SEMANTIC_ADAPTER_MANIFEST.filter((contract) =>
-      contract.proofBuckets.includes(proofBucket),
-    ),
+      contract.proofBuckets.includes(proofBucket)
+    )
   );
 }
 
 export function semanticAdapterManifestForFactKind(factKind) {
   return Object.freeze(
     SEMANTIC_ADAPTER_MANIFEST.filter((contract) =>
-      contract.semanticFactKinds.includes(factKind),
-    ),
+      contract.semanticFactKinds.includes(factKind)
+    )
   );
 }

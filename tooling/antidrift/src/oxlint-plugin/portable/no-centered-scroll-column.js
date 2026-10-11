@@ -22,7 +22,7 @@ const isCenteredScrollColumn = (value) => {
     return false;
   }
   const exempt = classes.some(
-    (c) => c === "absolute" || c === "fixed" || c.startsWith("max-h-"),
+    (c) => c === "absolute" || c === "fixed" || c.startsWith("max-h-")
   );
   return !exempt;
 };

@@ -72,73 +72,73 @@ export function isObjectType(type: ts.Type | null | undefined): boolean;
 
 export function typeProps(
   checker: ts.TypeChecker,
-  type: ts.Type,
+  type: ts.Type
 ): Map<string, string>;
 
 export function typePropsDetailed(
   checker: ts.TypeChecker,
-  type: ts.Type,
+  type: ts.Type
 ): Map<string, StructuralProperty>;
 
 export function collectCanonicalTypes(
   program: ts.Program,
-  checker: ts.TypeChecker,
+  checker: ts.TypeChecker
 ): StructuralTypeCandidate[];
 
 export function collectAcceptedPackageCanonicalTypes(
   program: ts.Program,
   checker: ts.TypeChecker,
-  packageTypeOwners?: PackageTypeOwnerRegistry,
+  packageTypeOwners?: PackageTypeOwnerRegistry
 ): StructuralTypeCandidate[];
 
 export function collectGeneratedCanonicalTypes(
   program: ts.Program,
   checker: ts.TypeChecker,
-  generatedSources?: GeneratedSourceRegistry,
+  generatedSources?: GeneratedSourceRegistry
 ): StructuralTypeCandidate[];
 
 export function collectDomainCanonicalTypes(
   program: ts.Program,
   checker: ts.TypeChecker,
-  canonicalEntities?: DomainCanonicalEntityRegistry,
+  canonicalEntities?: DomainCanonicalEntityRegistry
 ): StructuralTypeCandidate[];
 
 export function collectConvexGeneratedCanonicalTypes(
   program: ts.Program,
-  checker: ts.TypeChecker,
+  checker: ts.TypeChecker
 ): StructuralTypeCandidate[];
 
 export function isConvexGeneratedFile(fileName: string): boolean;
 
 export function resolvesToInstalledType(
-  type: ts.Type | null | undefined,
+  type: ts.Type | null | undefined
 ): boolean;
 
 export function resolvesToGeneratedType(
   type: ts.Type | null | undefined,
-  generatedSources?: GeneratedSourceRegistry,
+  generatedSources?: GeneratedSourceRegistry
 ): boolean;
 
 export function resolvesToDomainCanonicalType(
   type: ts.Type | null | undefined,
-  canonicalEntities?: DomainCanonicalEntityRegistry,
+  canonicalEntities?: DomainCanonicalEntityRegistry
 ): boolean;
 
 export function normalizedContextName(value: unknown): string;
 
 export function isStatusContextName(
   contextName: unknown,
-  statusName: string,
+  statusName: string
 ): boolean;
 
 export function nodeKeyName(node: unknown): string;
 
 export function isStatusLiteralContext(
   node: unknown,
-  statusName: string,
+  statusName: string
 ): boolean;
 
 export function canonicalStatusLiteralOwner(
   node: unknown,
-  statuses: DomainStatusRegistry,
+  statuses: DomainStatusRegistry
 ): StatusLiteralOwner | null;

@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "../../oxlint-plugin/portable/scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../oxlint-plugin/portable/scope.js";
 
 const CALL_TYPES = new Set(["CallExpression", "NewExpression"]);
 const TYPE_WRAPPERS = new Set([
@@ -94,8 +97,7 @@ function isFirstPartyLayer(callee, sourceCode) {
   if (definition?.type === "ImportBinding") {
     return (
       FIRST_PARTY_SPECIFIER.test(definition.parent.source.value) &&
-      (callee === root ||
-        definition.node.type === "ImportNamespaceSpecifier")
+      (callee === root || definition.node.type === "ImportNamespaceSpecifier")
     );
   }
   if (callee !== root) return false;
@@ -161,8 +163,7 @@ function forwardTarget(identifier, sourceCode) {
   const node = outerExpression(identifier);
   const call = forwardingCall(node);
   if (call) {
-    return isDelegatedResult(call) &&
-      isFirstPartyLayer(call.callee, sourceCode)
+    return isDelegatedResult(call) && isFirstPartyLayer(call.callee, sourceCode)
       ? sourceCode.getText(call.callee)
       : null;
   }
@@ -205,7 +206,7 @@ export default {
         const references = variable.references.filter(
           (reference) =>
             !reference.isTypeReference &&
-            reference.identifier !== definition.name,
+            reference.identifier !== definition.name
         );
         if (
           references.length === 0 ||
@@ -214,7 +215,7 @@ export default {
           continue;
         }
         const targets = references.map((reference) =>
-          forwardTarget(reference.identifier, sourceCode),
+          forwardTarget(reference.identifier, sourceCode)
         );
         if (targets.includes(null)) continue;
         context.report({

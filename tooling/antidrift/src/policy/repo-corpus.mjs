@@ -88,7 +88,7 @@ function emptyRows(rules) {
     rules.map((ruleId) => [
       ruleId,
       { ruleId, severity: "off", activeFiles: 0, errors: 0, warnings: 0 },
-    ]),
+    ])
   );
 }
 
@@ -110,7 +110,7 @@ function readRuleRegistry(repoRoot) {
   try {
     return (
       YAML.parse(
-        readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8"),
+        readFileSync(resolve(repoRoot, "policy/registries/rules.yaml"), "utf8")
       ) ?? {}
     );
   } catch (error) {
@@ -149,7 +149,7 @@ export function repoCorpusDecision({
   allowedInactiveRules,
 }) {
   const unexpectedInactiveRules = inactiveRules.filter(
-    (ruleId) => !allowedInactiveRules.has(ruleId),
+    (ruleId) => !allowedInactiveRules.has(ruleId)
   );
   if (findings.some((finding) => finding.severity === "error")) return "fail";
   return unexpectedInactiveRules.length > 0 ? "fail" : "pass";
@@ -160,7 +160,7 @@ async function configsForResults(eslint, results) {
     results.map(async (result) => ({
       result,
       config: await eslint.calculateConfigForFile(result.filePath),
-    })),
+    }))
   );
 }
 
@@ -183,7 +183,7 @@ async function ruleRows(eslint, results, rules) {
 function readSuppressions(repoRoot) {
   try {
     return JSON.parse(
-      readFileSync(resolve(repoRoot, "eslint-suppressions.json"), "utf8"),
+      readFileSync(resolve(repoRoot, "eslint-suppressions.json"), "utf8")
     );
   } catch (error) {
     if (error.code === "ENOENT") return {};
@@ -200,7 +200,7 @@ function withSuppressions(repoRoot, results) {
     const messages = result.messages.filter((message) => {
       const allowed = fileSuppressions[message.ruleId]?.count ?? 0;
       const actual = result.messages.filter(
-        (candidate) => candidate.ruleId === message.ruleId,
+        (candidate) => candidate.ruleId === message.ruleId
       ).length;
       return actual > allowed;
     });
@@ -217,10 +217,7 @@ export async function repoCorpus({
   report = console.log,
 } = {}) {
   const eslint = new ESLint({ cwd: repoRoot });
-  const results = withSuppressions(
-    repoRoot,
-    await eslint.lintFiles(targets),
-  );
+  const results = withSuppressions(repoRoot, await eslint.lintFiles(targets));
   const checkedByTop = {};
   for (const result of results) {
     const top = topOf(repoRoot, result.filePath);
@@ -238,19 +235,19 @@ export async function repoCorpus({
         line: message.line,
         column: message.column,
         message: message.message,
-      })),
+      }))
   );
   const inactiveRules = ruleReports
     .filter((rule) => rule.activeFiles === 0)
     .map((rule) => rule.ruleId);
   const allowedInactiveRules = allowedInactiveRulesFromRegistry(
-    readRuleRegistry(repoRoot),
+    readRuleRegistry(repoRoot)
   );
   const allowedInactiveRuleIds = inactiveRules.filter((ruleId) =>
-    allowedInactiveRules.has(ruleId),
+    allowedInactiveRules.has(ruleId)
   );
   const unexpectedInactiveRules = inactiveRules.filter(
-    (ruleId) => !allowedInactiveRules.has(ruleId),
+    (ruleId) => !allowedInactiveRules.has(ruleId)
   );
   const decision = repoCorpusDecision({
     findings,

@@ -42,7 +42,7 @@ function unwrapExpression(node) {
 function findExportedConst(sourceFile, exportName) {
   for (const statement of sourceFile.statements) {
     const isExported = statement.modifiers?.some(
-      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
     );
     if (!isExported || !ts.isVariableStatement(statement)) {
       continue;
@@ -100,7 +100,7 @@ function requireString(value, label, errors) {
 }
 function factKindLiteralsIn(source) {
   return [...source.matchAll(/\bfactKind:\s*["']([^"']+)["']/gu)].map(
-    (match) => match[1],
+    (match) => match[1]
   );
 }
 function addFactKindsFromDirectory(kinds, repoRoot, relativeDir, extension) {
@@ -113,7 +113,7 @@ function addFactKindsFromDirectory(kinds, repoRoot, relativeDir, extension) {
       continue;
     }
     for (const kind of factKindLiteralsIn(
-      readFileSync(join(directory, file), "utf8"),
+      readFileSync(join(directory, file), "utf8")
     )) {
       kinds.add(kind);
     }
@@ -123,7 +123,7 @@ function emittedSemanticFactKinds(repoRoot) {
   const kinds = new Set();
   const pluginSource = safeRepoPath(
     repoRoot,
-    "tooling/antidrift/src/eslint-plugin/index.js",
+    "tooling/antidrift/src/eslint-plugin/index.js"
   );
   if (pluginSource && existsSync(pluginSource)) {
     for (const kind of factKindLiteralsIn(readFileSync(pluginSource, "utf8"))) {
@@ -144,7 +144,7 @@ function checkAllowedValues(values, allowed, label, errors) {
   for (const value of values) {
     if (!allowed.has(value)) {
       errors.push(
-        `${label} contains unsupported value '${value}'. Allowed values: ${[...allowed].join(", ")}.`,
+        `${label} contains unsupported value '${value}'. Allowed values: ${[...allowed].join(", ")}.`
       );
     }
   }
@@ -166,20 +166,20 @@ function checkShippedSemanticFactKindContract(entry, shipped, label, errors) {
   for (const key of ["adapterId", "carrier", "association", "noSinkBehavior"]) {
     if (entry[key] !== shipped[key]) {
       errors.push(
-        `${label}.${key} must match the shipped semantic fact contract (${shipped[key]}).`,
+        `${label}.${key} must match the shipped semantic fact contract (${shipped[key]}).`
       );
     }
   }
   for (const key of ["rules", "confidence", "emission", "payloadFields"]) {
     if (!equalStringSets(entry[key], shipped[key])) {
       errors.push(
-        `${label}.${key} must match the shipped semantic fact contract: ${sortedStrings(shipped[key]).join(", ")}.`,
+        `${label}.${key} must match the shipped semantic fact contract: ${sortedStrings(shipped[key]).join(", ")}.`
       );
     }
   }
   if (!equalStringSets(entry.commandIds ?? [], shipped.commandIds ?? [])) {
     errors.push(
-      `${label}.commandIds must match the shipped semantic fact contract: ${sortedStrings(shipped.commandIds ?? []).join(", ")}.`,
+      `${label}.commandIds must match the shipped semantic fact contract: ${sortedStrings(shipped.commandIds ?? []).join(", ")}.`
     );
   }
 }
@@ -202,7 +202,7 @@ function checkSemanticFactKindEntry(entry, label, activeRules, errors) {
       : stringArray(entry.commandIds, `${label}.commandIds`, errors);
   if (rules.length === 0 && commandIds.length === 0) {
     errors.push(
-      `${label} must declare at least one rule or commandId (command-owned facts require commandIds).`,
+      `${label} must declare at least one rule or commandId (command-owned facts require commandIds).`
     );
   }
   requireString(entry.adapterId, `${label}.adapterId`, errors);
@@ -212,33 +212,33 @@ function checkSemanticFactKindEntry(entry, label, activeRules, errors) {
     !allowedSemanticFactCarriers.has(entry.carrier)
   ) {
     errors.push(
-      `${label}.carrier must be one of: ${[...allowedSemanticFactCarriers].join(", ")}.`,
+      `${label}.carrier must be one of: ${[...allowedSemanticFactCarriers].join(", ")}.`
     );
   }
   const confidence = stringArray(
     entry.confidence,
     `${label}.confidence`,
-    errors,
+    errors
   );
   checkAllowedValues(
     confidence,
     allowedSemanticFactConfidences,
     `${label}.confidence`,
-    errors,
+    errors
   );
   const emission = stringArray(entry.emission, `${label}.emission`, errors);
   checkAllowedValues(
     emission,
     allowedSemanticFactEmissions,
     `${label}.emission`,
-    errors,
+    errors
   );
   if (
     entry.carrier === "model-assisted" &&
     emission.includes("blocking-diagnostic")
   ) {
     errors.push(
-      `${label}.emission must not include blocking-diagnostic when carrier is model-assisted.`,
+      `${label}.emission must not include blocking-diagnostic when carrier is model-assisted.`
     );
   }
   requireString(entry.association, `${label}.association`, errors);
@@ -251,18 +251,18 @@ function requireSemanticFactKindsSection(registry, emitted, errors) {
     if (emitted.size > 0) {
       const emittedKinds = sortedStrings(emitted);
       errors.push(
-        `policy/registries/rules.yaml semanticFactKinds is required because the plugin emits semantic facts: ${emittedKinds.join(", ")}`,
+        `policy/registries/rules.yaml semanticFactKinds is required because the plugin emits semantic facts: ${emittedKinds.join(", ")}`
       );
     } else if (shipped.length > 0) {
       errors.push(
-        `policy/registries/rules.yaml semanticFactKinds is required because the package ships semantic fact contracts: ${shipped.join(", ")}`,
+        `policy/registries/rules.yaml semanticFactKinds is required because the package ships semantic fact contracts: ${shipped.join(", ")}`
       );
     }
     return false;
   }
   if (!isRecord(registry.semanticFactKinds)) {
     errors.push(
-      "policy/registries/rules.yaml semanticFactKinds must be a mapping.",
+      "policy/registries/rules.yaml semanticFactKinds must be a mapping."
     );
     return false;
   }
@@ -272,7 +272,7 @@ function checkEmittedSemanticFactKindCoverage(entries, emitted, errors) {
   for (const factKind of sortedStrings(emitted)) {
     if (entries[factKind] === undefined) {
       errors.push(
-        `policy/registries/rules.yaml semanticFactKinds missing emitted fact kind: ${factKind}`,
+        `policy/registries/rules.yaml semanticFactKinds missing emitted fact kind: ${factKind}`
       );
     }
   }
@@ -280,7 +280,7 @@ function checkEmittedSemanticFactKindCoverage(entries, emitted, errors) {
     for (const factKind of sortedStrings(Object.keys(entries))) {
       if (!emitted.has(factKind)) {
         errors.push(
-          `policy/registries/rules.yaml semanticFactKinds contains non-emitted fact kind: ${factKind}`,
+          `policy/registries/rules.yaml semanticFactKinds contains non-emitted fact kind: ${factKind}`
         );
       }
     }
@@ -292,7 +292,7 @@ function checkSemanticFactKindEntries(entries, activeRules, errors) {
       entry,
       `policy/registries/rules.yaml semanticFactKinds.${factKind}`,
       activeRules,
-      errors,
+      errors
     );
   }
 }
@@ -300,7 +300,7 @@ function checkShippedSemanticFactKindCoverage(entries, errors) {
   for (const factKind of sortedStrings(Object.keys(SEMANTIC_FACT_KINDS))) {
     if (entries[factKind] === undefined) {
       errors.push(
-        `policy/registries/rules.yaml semanticFactKinds missing shipped semantic fact contract: ${factKind}`,
+        `policy/registries/rules.yaml semanticFactKinds missing shipped semantic fact contract: ${factKind}`
       );
       continue;
     }
@@ -308,13 +308,13 @@ function checkShippedSemanticFactKindCoverage(entries, errors) {
       entries[factKind],
       SEMANTIC_FACT_KINDS[factKind],
       `policy/registries/rules.yaml semanticFactKinds.${factKind}`,
-      errors,
+      errors
     );
   }
   for (const factKind of sortedStrings(Object.keys(entries))) {
     if (SEMANTIC_FACT_KINDS[factKind] === undefined) {
       errors.push(
-        `policy/registries/rules.yaml semanticFactKinds contains non-shipped semantic fact contract: ${factKind}`,
+        `policy/registries/rules.yaml semanticFactKinds contains non-shipped semantic fact contract: ${factKind}`
       );
     }
   }
@@ -324,7 +324,7 @@ function checkUniqueSemanticAdapterContractValue(
   value,
   valueLabel,
   key,
-  errors,
+  errors
 ) {
   if (typeof value !== "string" || value.length === 0) {
     return;
@@ -332,7 +332,7 @@ function checkUniqueSemanticAdapterContractValue(
   const previous = seen.get(value);
   if (previous !== undefined) {
     errors.push(
-      `${valueLabel} duplicates ${previous}; semantic adapter contracts must be unique.`,
+      `${valueLabel} duplicates ${previous}; semantic adapter contracts must be unique.`
     );
     return;
   }
@@ -342,7 +342,7 @@ function checkSemanticAdapterContractMembership(
   contractKeys,
   adapterKeys,
   errors,
-  label,
+  label
 ) {
   for (const key of sortedStrings(adapterKeys)) {
     if (!contractKeys.has(key)) {
@@ -352,7 +352,7 @@ function checkSemanticAdapterContractMembership(
   for (const key of sortedStrings(contractKeys)) {
     if (!adapterKeys.has(key)) {
       errors.push(
-        `${label} contains contract for non-exported adapter: ${key}`,
+        `${label} contains contract for non-exported adapter: ${key}`
       );
     }
   }
@@ -365,7 +365,7 @@ function checkSemanticAdapterExports(adapters, errors, label) {
     }
     if (Object.keys(adapters[key]).length === 0) {
       errors.push(
-        `${label}.${key} exported adapter must expose at least one runtime primitive.`,
+        `${label}.${key} exported adapter must expose at least one runtime primitive.`
       );
     }
   }
@@ -382,7 +382,7 @@ function checkSemanticAdapterContractSubpath(contract, contractLabel, errors) {
   const expectedSubpath = `@joedeleeuw/antidrift/semantic-adapters/${contract.id}`;
   if (contract.subpath !== expectedSubpath) {
     errors.push(
-      `${contractLabel}.subpath must match its id (${expectedSubpath}).`,
+      `${contractLabel}.subpath must match its id (${expectedSubpath}).`
     );
   }
 }
@@ -390,12 +390,12 @@ function checkSemanticAdapterContractRules(
   rules,
   activeRules,
   contractLabel,
-  errors,
+  errors
 ) {
   for (const rule of rules) {
     if (!activeRules.has(rule)) {
       errors.push(
-        `${contractLabel}.rules references unknown active rule: ${rule}`,
+        `${contractLabel}.rules references unknown active rule: ${rule}`
       );
     }
   }
@@ -405,7 +405,7 @@ function checkSemanticAdapterStableRuleProofBuckets(
   proofBuckets,
   ruleEntries,
   contractLabel,
-  errors,
+  errors
 ) {
   for (const rule of rules) {
     const entry = ruleEntries?.[rule];
@@ -418,7 +418,7 @@ function checkSemanticAdapterStableRuleProofBuckets(
     }
     if (!proofBuckets.includes(proofBucket)) {
       errors.push(
-        `${contractLabel}.proofBuckets must include stable rule ${rule} promotion proofBucket (${proofBucket}).`,
+        `${contractLabel}.proofBuckets must include stable rule ${rule} promotion proofBucket (${proofBucket}).`
       );
     }
   }
@@ -428,7 +428,7 @@ function checkSemanticAdapterStableRuleAssociations(
   associations,
   ruleEntries,
   contractLabel,
-  errors,
+  errors
 ) {
   for (const rule of rules) {
     const entry = ruleEntries?.[rule];
@@ -445,7 +445,7 @@ function checkSemanticAdapterStableRuleAssociations(
     }
     if (!associations.includes(association)) {
       errors.push(
-        `${contractLabel}.associations must include stable rule ${rule} promotion association.`,
+        `${contractLabel}.associations must include stable rule ${rule} promotion association.`
       );
     }
   }
@@ -468,7 +468,7 @@ function checkStableSemanticAdapterRuleClaims(
   contracts,
   ruleEntries,
   label,
-  errors,
+  errors
 ) {
   if (!isRecord(ruleEntries)) {
     return;
@@ -510,7 +510,7 @@ function checkRuleSemanticAdapterStatus(status, label, errors, { required }) {
   if (status === undefined) {
     if (required) {
       errors.push(
-        `${label}.semanticAdapterStatus is required when non-local proof buckets are not claimed by a shipped semantic adapter.`,
+        `${label}.semanticAdapterStatus is required when non-local proof buckets are not claimed by a shipped semantic adapter.`
       );
     }
     return;
@@ -521,7 +521,7 @@ function checkRuleSemanticAdapterStatus(status, label, errors, { required }) {
   }
   if (!allowedSemanticAdapterStatuses.has(status.status)) {
     errors.push(
-      `${label}.semanticAdapterStatus.status must be one of: ${[...allowedSemanticAdapterStatuses].join(", ")}.`,
+      `${label}.semanticAdapterStatus.status must be one of: ${[...allowedSemanticAdapterStatuses].join(", ")}.`
     );
   }
   requireString(status.reason, `${label}.semanticAdapterStatus.reason`, errors);
@@ -529,7 +529,7 @@ function checkRuleSemanticAdapterStatus(status, label, errors, { required }) {
 function checkUnclaimedNonStableSemanticAdapterStatuses(
   ruleEntries,
   contracts,
-  errors,
+  errors
 ) {
   if (!isRecord(ruleEntries)) {
     return;
@@ -541,7 +541,7 @@ function checkUnclaimedNonStableSemanticAdapterStatuses(
       continue;
     }
     const hasNonLocalBucket = ruleEntryProofBuckets(entry).some((bucket) =>
-      stableProofBucketsRequiringSemanticAdapterClaim.has(bucket),
+      stableProofBucketsRequiringSemanticAdapterClaim.has(bucket)
     );
     const required = hasNonLocalBucket && !claimedRules.has(rule);
     if (!required && entry.semanticAdapterStatus === undefined) {
@@ -551,7 +551,7 @@ function checkUnclaimedNonStableSemanticAdapterStatuses(
       entry.semanticAdapterStatus,
       `policy/registries/rules.yaml rules.${rule}`,
       errors,
-      { required },
+      { required }
     );
   }
 }
@@ -570,7 +570,7 @@ function checkSemanticAdapterFactAdapterIdClaims(
   semanticFactAdapterIds,
   semanticFactKinds,
   contractLabel,
-  errors,
+  errors
 ) {
   if (
     !isRecord(semanticFactKinds) ||
@@ -588,7 +588,7 @@ function checkSemanticAdapterFactAdapterIdClaims(
     }
     if (!semanticFactAdapterIds.includes(adapterId)) {
       errors.push(
-        `${contractLabel}.semanticFactAdapterIds must include shipped semantic fact ${factKind} adapterId (${adapterId}).`,
+        `${contractLabel}.semanticFactAdapterIds must include shipped semantic fact ${factKind} adapterId (${adapterId}).`
       );
     }
   }
@@ -598,7 +598,7 @@ function checkSemanticAdapterClaimedFactAdapterIds(
   semanticFactAdapterIds,
   semanticFactKinds,
   contractLabel,
-  errors,
+  errors
 ) {
   if (
     !isRecord(semanticFactKinds) ||
@@ -611,11 +611,11 @@ function checkSemanticAdapterClaimedFactAdapterIds(
       (factContract) =>
         isRecord(factContract) &&
         factContract.adapterId === adapterId &&
-        semanticFactRulesMatchAdapter(factContract, rules),
+        semanticFactRulesMatchAdapter(factContract, rules)
     );
     if (matchingFact === undefined) {
       errors.push(
-        `${contractLabel}.semanticFactAdapterIds contains unclaimed shipped semantic fact adapterId: ${adapterId}`,
+        `${contractLabel}.semanticFactAdapterIds contains unclaimed shipped semantic fact adapterId: ${adapterId}`
       );
     }
   }
@@ -626,7 +626,7 @@ function checkSemanticAdapterFactKindClaims(
   semanticFactKindNames,
   semanticFactKinds,
   contractLabel,
-  errors,
+  errors
 ) {
   if (
     !isRecord(semanticFactKinds) ||
@@ -643,7 +643,7 @@ function checkSemanticAdapterFactKindClaims(
     }
     if (!semanticFactKindNames.includes(factKind)) {
       errors.push(
-        `${contractLabel}.semanticFactKinds must include shipped semantic fact kind: ${factKind}.`,
+        `${contractLabel}.semanticFactKinds must include shipped semantic fact kind: ${factKind}.`
       );
     }
   }
@@ -654,7 +654,7 @@ function checkSemanticAdapterClaimedFactKinds(
   semanticFactKindNames,
   semanticFactKinds,
   contractLabel,
-  errors,
+  errors
 ) {
   if (
     !isRecord(semanticFactKinds) ||
@@ -670,7 +670,7 @@ function checkSemanticAdapterClaimedFactKinds(
       !semanticFactAdapterIds.includes(factContract.adapterId)
     ) {
       errors.push(
-        `${contractLabel}.semanticFactKinds contains unclaimed shipped semantic fact kind: ${factKind}`,
+        `${contractLabel}.semanticFactKinds contains unclaimed shipped semantic fact kind: ${factKind}`
       );
     }
   }
@@ -698,7 +698,7 @@ function checkSemanticAdapterContractEntry(key, contract, context) {
   requireString(contract.carrier, `${contractLabel}.carrier`, errors);
   if (contract.exportName !== key) {
     errors.push(
-      `${contractLabel}.exportName must match its contract key (${key}).`,
+      `${contractLabel}.exportName must match its contract key (${key}).`
     );
   }
   const rules = stringArray(contract.rules, `${contractLabel}.rules`, errors);
@@ -706,58 +706,58 @@ function checkSemanticAdapterContractEntry(key, contract, context) {
   const proofBuckets = stringArray(
     contract.proofBuckets,
     `${contractLabel}.proofBuckets`,
-    errors,
+    errors
   );
   checkAllowedValues(
     proofBuckets,
     allowedSemanticAdapterProofBuckets,
     `${contractLabel}.proofBuckets`,
-    errors,
+    errors
   );
   const associations = stringArray(
     contract.associations,
     `${contractLabel}.associations`,
-    errors,
+    errors
   );
   checkSemanticAdapterStableRuleProofBuckets(
     rules,
     proofBuckets,
     ruleEntries,
     contractLabel,
-    errors,
+    errors
   );
   checkSemanticAdapterStableRuleAssociations(
     rules,
     associations,
     ruleEntries,
     contractLabel,
-    errors,
+    errors
   );
   const semanticFactAdapterIds = stringArray(
     contract.semanticFactAdapterIds,
     `${contractLabel}.semanticFactAdapterIds`,
     errors,
-    { allowEmpty: true },
+    { allowEmpty: true }
   );
   checkSemanticAdapterFactAdapterIdClaims(
     rules,
     semanticFactAdapterIds,
     semanticFactKinds,
     contractLabel,
-    errors,
+    errors
   );
   checkSemanticAdapterClaimedFactAdapterIds(
     rules,
     semanticFactAdapterIds,
     semanticFactKinds,
     contractLabel,
-    errors,
+    errors
   );
   const semanticFactKindNames = stringArray(
     contract.semanticFactKinds,
     `${contractLabel}.semanticFactKinds`,
     errors,
-    { allowEmpty: true },
+    { allowEmpty: true }
   );
   checkSemanticAdapterFactKindClaims(
     rules,
@@ -765,7 +765,7 @@ function checkSemanticAdapterContractEntry(key, contract, context) {
     semanticFactKindNames,
     semanticFactKinds,
     contractLabel,
-    errors,
+    errors
   );
   checkSemanticAdapterClaimedFactKinds(
     rules,
@@ -773,7 +773,7 @@ function checkSemanticAdapterContractEntry(key, contract, context) {
     semanticFactKindNames,
     semanticFactKinds,
     contractLabel,
-    errors,
+    errors
   );
   checkSemanticAdapterContractSubpath(contract, contractLabel, errors);
   checkUniqueSemanticAdapterContractValue(
@@ -781,7 +781,7 @@ function checkSemanticAdapterContractEntry(key, contract, context) {
     contract.id,
     `${contractLabel}.id`,
     key,
-    errors,
+    errors
   );
   for (const semanticFactAdapterId of semanticFactAdapterIds) {
     checkUniqueSemanticAdapterContractValue(
@@ -789,7 +789,7 @@ function checkSemanticAdapterContractEntry(key, contract, context) {
       semanticFactAdapterId,
       `${contractLabel}.semanticFactAdapterIds`,
       key,
-      errors,
+      errors
     );
   }
   for (const semanticFactKind of semanticFactKindNames) {
@@ -798,7 +798,7 @@ function checkSemanticAdapterContractEntry(key, contract, context) {
       semanticFactKind,
       `${contractLabel}.semanticFactKinds`,
       key,
-      errors,
+      errors
     );
   }
   checkUniqueSemanticAdapterContractValue(
@@ -806,7 +806,7 @@ function checkSemanticAdapterContractEntry(key, contract, context) {
     contract.subpath,
     `${contractLabel}.subpath`,
     key,
-    errors,
+    errors
   );
 }
 export function checkSemanticAdapterContracts(
@@ -816,7 +816,7 @@ export function checkSemanticAdapterContracts(
   errors,
   label = "shipped semantic adapter contracts",
   ruleEntries = {},
-  semanticFactKinds = {},
+  semanticFactKinds = {}
 ) {
   if (!isRecord(contracts)) {
     errors.push(`${label} must be a mapping.`);
@@ -832,7 +832,7 @@ export function checkSemanticAdapterContracts(
     contractKeys,
     adapterKeys,
     errors,
-    label,
+    label
   );
   checkSemanticAdapterExports(adapters, errors, label);
   const seenIds = new Map();
@@ -922,7 +922,7 @@ function packageExportedValueNames(sourceText, fileName, scriptKind) {
     sourceText,
     ts.ScriptTarget.Latest,
     false,
-    scriptKind,
+    scriptKind
   );
   const names = new Set();
   for (const statement of source.statements) {
@@ -945,7 +945,7 @@ function semanticAdapterAggregateSource(repoRoot, relativePath, scriptKind) {
     readFileSync(target, "utf8"),
     ts.ScriptTarget.Latest,
     false,
-    scriptKind,
+    scriptKind
   );
 }
 function moduleSpecifierText(statement) {
@@ -1023,7 +1023,7 @@ function exportedConstObjectKeys(sourceFile, exportName) {
 function findExportedVariableDeclaration(sourceFile, exportName) {
   for (const statement of sourceFile.statements) {
     const isExported = statement.modifiers?.some(
-      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
     );
     if (!isExported || !ts.isVariableStatement(statement)) {
       continue;
@@ -1079,7 +1079,7 @@ function exportedConstTypePropertyNames(sourceFile, exportName) {
 function findExportedTypeAlias(sourceFile, typeName) {
   for (const statement of sourceFile.statements) {
     const isExported = statement.modifiers?.some(
-      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
     );
     if (
       isExported &&
@@ -1124,7 +1124,7 @@ function checkExpectedSemanticAdapterNames(
   label,
   errors,
   missing,
-  unexpected,
+  unexpected
 ) {
   if (!actual) {
     errors.push(`${label} must declare semantic adapter names.`);
@@ -1149,7 +1149,7 @@ function checkSemanticAdapterRuntimeAggregate(contracts, repoRoot, errors) {
   const source = semanticAdapterAggregateSource(
     repoRoot,
     relativePath,
-    ts.ScriptKind.JS,
+    ts.ScriptKind.JS
   );
   if (!source) {
     return;
@@ -1158,7 +1158,7 @@ function checkSemanticAdapterRuntimeAggregate(contracts, repoRoot, errors) {
   const namedExports = packageExportedValueNames(
     readFileSync(safeRepoPath(repoRoot, relativePath), "utf8"),
     relativePath,
-    ts.ScriptKind.JS,
+    ts.ScriptKind.JS
   );
   checkExpectedSemanticAdapterNames(
     semanticAdapterNamespaceImports(source),
@@ -1166,7 +1166,7 @@ function checkSemanticAdapterRuntimeAggregate(contracts, repoRoot, errors) {
     relativePath,
     errors,
     "missing adapter namespace import",
-    "imports unclaimed adapter namespace",
+    "imports unclaimed adapter namespace"
   );
   checkExpectedSemanticAdapterNames(
     namedExports,
@@ -1174,7 +1174,7 @@ function checkSemanticAdapterRuntimeAggregate(contracts, repoRoot, errors) {
     relativePath,
     errors,
     "missing named adapter export",
-    null,
+    null
   );
   checkExpectedSemanticAdapterNames(
     exportedConstObjectKeys(source, "SEMANTIC_ADAPTERS"),
@@ -1182,7 +1182,7 @@ function checkSemanticAdapterRuntimeAggregate(contracts, repoRoot, errors) {
     `${relativePath} SEMANTIC_ADAPTERS`,
     errors,
     "missing adapter key",
-    "contains unclaimed adapter key",
+    "contains unclaimed adapter key"
   );
 }
 function checkSemanticAdapterTypeAggregate(contracts, repoRoot, errors) {
@@ -1190,7 +1190,7 @@ function checkSemanticAdapterTypeAggregate(contracts, repoRoot, errors) {
   const source = semanticAdapterAggregateSource(
     repoRoot,
     relativePath,
-    ts.ScriptKind.TS,
+    ts.ScriptKind.TS
   );
   if (!source) {
     return;
@@ -1199,7 +1199,7 @@ function checkSemanticAdapterTypeAggregate(contracts, repoRoot, errors) {
   const namedExports = packageExportedValueNames(
     readFileSync(safeRepoPath(repoRoot, relativePath), "utf8"),
     relativePath,
-    ts.ScriptKind.TS,
+    ts.ScriptKind.TS
   );
   checkExpectedSemanticAdapterNames(
     semanticAdapterNamespaceImports(source),
@@ -1207,7 +1207,7 @@ function checkSemanticAdapterTypeAggregate(contracts, repoRoot, errors) {
     relativePath,
     errors,
     "missing adapter namespace import",
-    "imports unclaimed adapter namespace",
+    "imports unclaimed adapter namespace"
   );
   checkExpectedSemanticAdapterNames(
     namedExports,
@@ -1215,7 +1215,7 @@ function checkSemanticAdapterTypeAggregate(contracts, repoRoot, errors) {
     relativePath,
     errors,
     "missing named adapter export",
-    null,
+    null
   );
   checkExpectedSemanticAdapterNames(
     exportedConstTypePropertyNames(source, "SEMANTIC_ADAPTERS"),
@@ -1223,7 +1223,7 @@ function checkSemanticAdapterTypeAggregate(contracts, repoRoot, errors) {
     `${relativePath} SEMANTIC_ADAPTERS declaration`,
     errors,
     "missing adapter key",
-    "contains unclaimed adapter key",
+    "contains unclaimed adapter key"
   );
   checkExpectedSemanticAdapterNames(
     exportedStringUnionValues(source, "SemanticAdapterContractKey"),
@@ -1231,7 +1231,7 @@ function checkSemanticAdapterTypeAggregate(contracts, repoRoot, errors) {
     `${relativePath} SemanticAdapterContractKey`,
     errors,
     "missing adapter key",
-    "contains unclaimed adapter key",
+    "contains unclaimed adapter key"
   );
 }
 function checkSemanticAdapterAggregateSources(contracts, repoRoot, errors) {
@@ -1257,17 +1257,17 @@ export function checkSemanticContracts(registry, repoRoot, errors) {
     errors,
     "shipped semantic adapter contracts",
     registry.rules,
-    SEMANTIC_FACT_KINDS,
+    SEMANTIC_FACT_KINDS
   );
   checkUnclaimedNonStableSemanticAdapterStatuses(
     registry.rules,
     SEMANTIC_ADAPTER_CONTRACTS,
-    errors,
+    errors
   );
   checkSemanticAdapterAggregateSources(
     SEMANTIC_ADAPTER_CONTRACTS,
     repoRoot,
-    errors,
+    errors
   );
   checkSemanticFactKinds(registry, repoRoot, errors);
 }

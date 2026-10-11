@@ -187,7 +187,7 @@ function symbolAtIdentifier(checker, node) {
   ) {
     return canonicalSymbol(
       checker,
-      checker.getShorthandAssignmentValueSymbol(node.parent),
+      checker.getShorthandAssignmentValueSymbol(node.parent)
     );
   }
   return canonicalSymbol(checker, checker.getSymbolAtLocation(node));
@@ -198,7 +198,7 @@ function declarationDependsOnSymbol(
   declaration,
   target,
   sourceFile,
-  seen,
+  seen
 ) {
   let found = false;
   function visit(node) {
@@ -216,7 +216,7 @@ function declarationDependsOnSymbol(
       }
       if (symbol && !seen.has(symbol)) {
         const localDeclarations = (symbol.declarations ?? []).filter(
-          (candidate) => candidate.getSourceFile() === sourceFile,
+          (candidate) => candidate.getSourceFile() === sourceFile
         );
         if (localDeclarations.length > 0) {
           seen.add(symbol);
@@ -226,8 +226,8 @@ function declarationDependsOnSymbol(
               candidate,
               target,
               sourceFile,
-              seen,
-            ),
+              seen
+            )
           );
           if (found) return;
         }
@@ -257,7 +257,7 @@ function isPubliclyExposed(checker, declaration, symbol) {
       modifiers?.some(
         (modifier) =>
           modifier.kind === ts.SyntaxKind.ExportKeyword ||
-          modifier.kind === ts.SyntaxKind.DefaultKeyword,
+          modifier.kind === ts.SyntaxKind.DefaultKeyword
       );
     if (
       exported &&
@@ -266,7 +266,7 @@ function isPubliclyExposed(checker, declaration, symbol) {
         statement,
         target,
         sourceFile,
-        new Set(),
+        new Set()
       )
     ) {
       return true;
@@ -282,13 +282,7 @@ function isPubliclyExposed(checker, declaration, symbol) {
     const seen = new Set([exported, exportedTarget].filter(Boolean));
     if (
       [...declarations].some((candidate) =>
-        declarationDependsOnSymbol(
-          checker,
-          candidate,
-          target,
-          sourceFile,
-          seen,
-        ),
+        declarationDependsOnSymbol(checker, candidate, target, sourceFile, seen)
       )
     ) {
       return true;
@@ -304,7 +298,7 @@ function escapesThroughBoundary(checker, services, candidate) {
   const outerSymbol = symbolForNode(
     checker,
     services,
-    outerOwner.id ?? outerOwner.key,
+    outerOwner.id ?? outerOwner.key
   );
   if (
     !outer ||
@@ -367,7 +361,7 @@ function hasTypedOwnerProof(
   services,
   candidate,
   symbol,
-  declaredType,
+  declaredType
 ) {
   const outer = enclosingFunction(candidate.owner);
   const tsOuter = services.esTreeNodeToTSNodeMap.get(outer);
@@ -436,7 +430,7 @@ function exactPropertyTypes({
     const expressionType = checker.getTypeAtLocation(tsExpression);
     const propertyType = checker.getTypeOfSymbolAtLocation(
       declaredProperty,
-      typeProperty,
+      typeProperty
     );
     if (
       expressionType !== propertyType ||
@@ -468,7 +462,7 @@ export function ruleNoRedundantLocalReturnType() {
       if (!services) {
         return missingTypeServicesVisitors(
           context,
-          "no-redundant-local-return-type",
+          "no-redundant-local-return-type"
         );
       }
       const checker = services.program.getTypeChecker();
@@ -492,7 +486,7 @@ export function ruleNoRedundantLocalReturnType() {
           : null;
         if (!objectProperties) return;
         const tsReturnType = services.esTreeNodeToTSNodeMap.get(
-          candidate.fn.returnType.typeAnnotation,
+          candidate.fn.returnType.typeAnnotation
         );
         const tsBody = services.esTreeNodeToTSNodeMap.get(candidate.fn.body);
         const symbol = symbolForNode(checker, services, candidate.name);
@@ -515,7 +509,7 @@ export function ruleNoRedundantLocalReturnType() {
             services,
             candidate,
             symbol,
-            declaredType,
+            declaredType
           ) ||
           !exactPropertyTypes({
             checker,

@@ -17,14 +17,14 @@ Real anchor:
 ```ts
 export function markExplorationTileUnderstood(
   exploration: ExplorationState,
-  terrainNodeId: TerrainNodeId,
+  terrainNodeId: TerrainNodeId
 ): ExplorationState {
   return ExplorationStateSchema.parse({
     ...exploration,
     tiles: exploration.tiles.map((tile) =>
       tile.terrainNodeId === terrainNodeId
         ? { ...tile, seen: true, understood: true }
-        : tile,
+        : tile
     ),
   });
 }

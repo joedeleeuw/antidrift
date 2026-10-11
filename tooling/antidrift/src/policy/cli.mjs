@@ -128,11 +128,11 @@ function parseRuleStatusArgs(argv) {
 function ruleStatusCommand(argv) {
   const parsed = parseRuleStatusArgs(argv);
   const manifest = ruleStatusManifest(
-    loadRuleStatusRegistrySync(parsed.policyDir),
+    loadRuleStatusRegistrySync(parsed.policyDir)
   );
   const filteredManifest = parsed.filters.reduce(
     (current, filter) => Object.freeze(filter(current)),
-    manifest,
+    manifest
   );
   if (!parsed.semanticSummary) return filteredManifest;
   return Object.freeze({
@@ -213,7 +213,7 @@ const commands = {
   },
   "no-appeasement-remediation-corpus": async () => {
     const result = await noAppeasementRemediationCorpus(
-      parseNoAppeasementRemediationArgs(args),
+      parseNoAppeasementRemediationArgs(args)
     );
     if (result.decision === "fail") process.exitCode = 1;
   },
@@ -233,7 +233,7 @@ const commands = {
     schemaRoundtripInventory(parseSchemaRoundtripInventoryArgs(args)),
   "inventory-underchecked-predicate": () =>
     undercheckedPredicateInventory(
-      parseUndercheckedPredicateInventoryArgs(args),
+      parseUndercheckedPredicateInventoryArgs(args)
     ),
   "inventory-type-owner": () =>
     typeOwnerInventory(parseTypeOwnerInventoryArgs(args)),
@@ -252,12 +252,12 @@ const commands = {
   },
   "semantic-manifest": () => {
     process.stdout.write(
-      `${JSON.stringify(semanticManifestCommand(args), null, 2)}\n`,
+      `${JSON.stringify(semanticManifestCommand(args), null, 2)}\n`
     );
   },
   "rule-status": () => {
     process.stdout.write(
-      `${JSON.stringify(ruleStatusCommand(args), null, 2)}\n`,
+      `${JSON.stringify(ruleStatusCommand(args), null, 2)}\n`
     );
   },
   sonar: () => eslintJsonToSonar(args[0], args[1]),

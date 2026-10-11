@@ -1,6 +1,6 @@
 declare function useQuery<T>(
   key: string,
-  fn: () => Promise<T>,
+  fn: () => Promise<T>
 ): { data: T | undefined; isLoading: boolean; error: Error | null };
 declare function fetchUsers(): Promise<string[]>;
 

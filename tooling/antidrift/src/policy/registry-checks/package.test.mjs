@@ -55,10 +55,10 @@ describe("package surface", () => {
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json exports missing semantic adapter subpath: ./semantic-adapters/parse-input",
+      "tooling/antidrift/package.json exports missing semantic adapter subpath: ./semantic-adapters/parse-input"
     );
   });
   it("rejects shipped semantic adapter package exports whose files are missing", () => {
@@ -73,7 +73,7 @@ describe("package surface", () => {
       }
       touch(
         root,
-        `tooling/antidrift/src/semantic-adapters/${contract.id}.d.mts`,
+        `tooling/antidrift/src/semantic-adapters/${contract.id}.d.mts`
       );
       touch(root, `tooling/antidrift/src/semantic-adapters/${contract.id}.mjs`);
     }
@@ -82,10 +82,10 @@ describe("package surface", () => {
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json exports./semantic-adapters/parse-input.import path does not exist: ./src/semantic-adapters/parse-input.mjs",
+      "tooling/antidrift/package.json exports./semantic-adapters/parse-input.import path does not exist: ./src/semantic-adapters/parse-input.mjs"
     );
   });
   it("rejects semantic adapter runtime exports missing type declarations", () => {
@@ -100,9 +100,9 @@ describe("package surface", () => {
         "antidrift",
         "src",
         "semantic-adapters",
-        "parse-input.mjs",
+        "parse-input.mjs"
       ),
-      "export function runtimeOnly() {}\n",
+      "export function runtimeOnly() {}\n"
     );
     writeFileSync(
       join(
@@ -111,19 +111,19 @@ describe("package surface", () => {
         "antidrift",
         "src",
         "semantic-adapters",
-        "parse-input.d.mts",
+        "parse-input.d.mts"
       ),
-      "export function declaredOnly(): void;\n",
+      "export function declaredOnly(): void;\n"
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json exports./semantic-adapters/parse-input.import runtime export runtimeOnly is missing from types path ./src/semantic-adapters/parse-input.d.mts",
+      "tooling/antidrift/package.json exports./semantic-adapters/parse-input.import runtime export runtimeOnly is missing from types path ./src/semantic-adapters/parse-input.d.mts"
     );
   });
   it("rejects semantic adapter type declarations missing runtime exports", () => {
@@ -138,9 +138,9 @@ describe("package surface", () => {
         "antidrift",
         "src",
         "semantic-adapters",
-        "parse-input.mjs",
+        "parse-input.mjs"
       ),
-      "export function runtimeOnly() {}\n",
+      "export function runtimeOnly() {}\n"
     );
     writeFileSync(
       join(
@@ -149,24 +149,24 @@ describe("package surface", () => {
         "antidrift",
         "src",
         "semantic-adapters",
-        "parse-input.d.mts",
+        "parse-input.d.mts"
       ),
       [
         "export function runtimeOnly(): void;",
         "export function declaredOnly(): void;",
         "export interface TypeOnlyDeclaration {}",
         "",
-      ].join("\n"),
+      ].join("\n")
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json exports./semantic-adapters/parse-input.types declaration declaredOnly is missing from runtime import path ./src/semantic-adapters/parse-input.mjs",
+      "tooling/antidrift/package.json exports./semantic-adapters/parse-input.types declaration declaredOnly is missing from runtime import path ./src/semantic-adapters/parse-input.mjs"
     );
     expect(messages.join("\n")).not.toContain("TypeOnlyDeclaration");
   });
@@ -189,10 +189,10 @@ describe("package surface", () => {
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json exports./policy.import path does not exist: ./src/policy/missing.mjs",
+      "tooling/antidrift/package.json exports./policy.import path does not exist: ./src/policy/missing.mjs"
     );
   });
   it("rejects non-adapter default type declarations missing runtime exports", () => {
@@ -213,21 +213,21 @@ describe("package surface", () => {
     });
     writeFileSync(
       join(root, "tooling", "antidrift", "src", "eslint-plugin", "index.js"),
-      "export const plugin = {};\n",
+      "export const plugin = {};\n"
     );
     writeFileSync(
       join(root, "tooling", "antidrift", "src", "eslint-plugin", "index.d.ts"),
-      "declare const plugin: unknown;\nexport default plugin;\n",
+      "declare const plugin: unknown;\nexport default plugin;\n"
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json exports./eslint-plugin.types declaration default is missing from runtime import path ./src/eslint-plugin/index.js",
+      "tooling/antidrift/package.json exports./eslint-plugin.types declaration default is missing from runtime import path ./src/eslint-plugin/index.js"
     );
   });
   it("rejects package CLI binary targets whose files are missing", () => {
@@ -245,10 +245,10 @@ describe("package surface", () => {
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json bin.antidrift path does not exist: src/policy/missing-cli.mjs",
+      "tooling/antidrift/package.json bin.antidrift path does not exist: src/policy/missing-cli.mjs"
     );
   });
   it("rejects package CLI binary targets without a Node shebang", () => {
@@ -266,17 +266,17 @@ describe("package surface", () => {
     });
     writeFileSync(
       join(root, "tooling", "antidrift", "src", "policy", "cli.mjs"),
-      "console.log('not a direct cli');\n",
+      "console.log('not a direct cli');\n"
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json bin.antidrift must start with #!/usr/bin/env node.",
+      "tooling/antidrift/package.json bin.antidrift must start with #!/usr/bin/env node."
     );
   });
   it("requires the package README public entry points to mention shipped exports", () => {
@@ -294,19 +294,19 @@ describe("package surface", () => {
         .map((exportKey) =>
           exportKey === "."
             ? "- `@joedeleeuw/antidrift`"
-            : `- \`@joedeleeuw/antidrift/${exportKey.slice(2)}\``,
+            : `- \`@joedeleeuw/antidrift/${exportKey.slice(2)}\``
         )
-        .join("\n"),
+        .join("\n")
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/README.md public entry points missing package export: @joedeleeuw/antidrift/semantic-adapters/parse-input",
+      "tooling/antidrift/README.md public entry points missing package export: @joedeleeuw/antidrift/semantic-adapters/parse-input"
     );
   });
   it("rejects stale package README public entry points that are not shipped exports", () => {
@@ -323,20 +323,20 @@ describe("package surface", () => {
         ...Object.keys(semanticAdapterPackageExports()).map((exportKey) =>
           exportKey === "."
             ? "- `@joedeleeuw/antidrift`"
-            : `- \`@joedeleeuw/antidrift/${exportKey.slice(2)}\``,
+            : `- \`@joedeleeuw/antidrift/${exportKey.slice(2)}\``
         ),
         "- `@joedeleeuw/antidrift/semantic-adapters/not-real`",
-      ].join("\n"),
+      ].join("\n")
     );
     const messages = [];
     expect(
       checkRegistries({
         repoRoot: root,
         report: (message) => messages.push(message),
-      }),
+      })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/README.md public entry points lists non-exported package specifier: @joedeleeuw/antidrift/semantic-adapters/not-real",
+      "tooling/antidrift/README.md public entry points lists non-exported package specifier: @joedeleeuw/antidrift/semantic-adapters/not-real"
     );
   });
 });

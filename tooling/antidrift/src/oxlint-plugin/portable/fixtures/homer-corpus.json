@@ -71,9 +71,7 @@
         {
           "rule": "docs-source-policy",
           "options": {
-            "dependencies": [
-              "react"
-            ],
+            "dependencies": ["react"],
             "sources": {},
             "policyFile": "docs-sources.mjs"
           },
@@ -419,9 +417,7 @@
         {
           "rule": "docs-source-policy",
           "options": {
-            "dependencies": [
-              "react"
-            ],
+            "dependencies": ["react"],
             "sources": {},
             "policyFile": "docs-sources.mjs"
           },
@@ -1064,9 +1060,7 @@
         {
           "rule": "require-safe-window-open",
           "options": {
-            "excludeFiles": [
-              "apps/desktop/scripts/smoke.ts"
-            ]
+            "excludeFiles": ["apps/desktop/scripts/smoke.ts"]
           },
           "messages": [
             {
@@ -1129,9 +1123,7 @@
         {
           "rule": "docs-source-policy",
           "options": {
-            "dependencies": [
-              "react"
-            ],
+            "dependencies": ["react"],
             "sources": {},
             "policyFile": "docs-sources.mjs"
           },
@@ -1458,9 +1450,7 @@
         {
           "rule": "docs-source-policy",
           "options": {
-            "dependencies": [
-              "react"
-            ],
+            "dependencies": ["react"],
             "sources": {},
             "policyFile": "docs-sources.mjs"
           },
@@ -1628,9 +1618,7 @@
         {
           "rule": "require-safe-window-open",
           "options": {
-            "excludeFiles": [
-              "apps/desktop/scripts/smoke.ts"
-            ]
+            "excludeFiles": ["apps/desktop/scripts/smoke.ts"]
           },
           "messages": []
         }
@@ -1841,9 +1829,7 @@
         {
           "rule": "docs-source-policy",
           "options": {
-            "dependencies": [
-              "react"
-            ],
+            "dependencies": ["react"],
             "sources": {},
             "policyFile": "docs-sources.mjs"
           },
@@ -2032,10 +2018,7 @@
       "expo": {
         "autolinking": {
           "apple": {
-            "buildFromSource": [
-              "expo-camera",
-              "expo-video"
-            ]
+            "buildFromSource": ["expo-camera", "expo-video"]
           }
         },
         "doctor": {

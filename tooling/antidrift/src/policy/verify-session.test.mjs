@@ -37,7 +37,7 @@ describe("verifySession", () => {
     expect(stderr.chunks).toEqual([]);
     expect(payload.decision).toBe("block");
     expect(payload.reason).toContain(
-      "Required verification failed: pnpm verify:release",
+      "Required verification failed: pnpm verify:release"
     );
     expect(payload.reason).toContain("release verification failed");
     expect(payload.reason).toContain("typecheck reported an error");

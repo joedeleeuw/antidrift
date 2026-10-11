@@ -6,7 +6,10 @@ function severity(eslintSeverity) {
   return eslintSeverity === 2 ? "MAJOR" : "MINOR";
 }
 
-export async function eslintJsonToSonar(inputPath = "reports/eslint-antidrift.json", outputPath = "reports/antidrift-sonar.json") {
+export async function eslintJsonToSonar(
+  inputPath = "reports/eslint-antidrift.json",
+  outputPath = "reports/antidrift-sonar.json"
+) {
   let report = [];
   try {
     report = JSON.parse(await readFile(inputPath, "utf8"));
@@ -37,8 +40,14 @@ export async function eslintJsonToSonar(inputPath = "reports/eslint-antidrift.js
   }
 
   await mkdir(dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, JSON.stringify({ issues }, null, 2) + "\n", "utf8");
-  console.log(`Wrote ${issues.length} Sonar generic external issues to ${outputPath}`);
+  await writeFile(
+    outputPath,
+    JSON.stringify({ issues }, null, 2) + "\n",
+    "utf8"
+  );
+  console.log(
+    `Wrote ${issues.length} Sonar generic external issues to ${outputPath}`
+  );
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

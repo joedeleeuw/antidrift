@@ -19,7 +19,7 @@ export function requireTenant(context: RequestContext): string {
 
 export function authorize(
   principal: Principal,
-  action: "project:update",
+  action: "project:update"
 ): void {
   if (!canManageProject(principal)) {
     throw new Error("Forbidden", {
@@ -30,7 +30,7 @@ export function authorize(
 
 export function validateInput<TOutput>(
   schema: z.ZodSchema<TOutput>,
-  input: unknown,
+  input: unknown
 ): TOutput {
   return schema.parse(input);
 }

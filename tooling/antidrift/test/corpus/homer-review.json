@@ -2910,9 +2910,7 @@
       "reason": "The terminal embedding adapter owns a fixed black surface contract; this excludes that concrete platform boundary, not ordinary display colors."
     },
     "require-safe-window-open": {
-      "excludeFiles": [
-        "apps/desktop/scripts/smoke.ts"
-      ],
+      "excludeFiles": ["apps/desktop/scripts/smoke.ts"],
       "reason": "This harness deliberately exercises the browser popup policy. Its sole call is a negative boundary probe, not a production open action."
     },
     "require-fetch-timeout": {
@@ -2938,9 +2936,7 @@
     "no-placeholder-tests": {},
     "confine-owner": {},
     "docs-source-policy": {
-      "dependencies": [
-        "react"
-      ],
+      "dependencies": ["react"],
       "sources": {},
       "policyFile": "docs-sources.mjs"
     },
@@ -2982,9 +2978,7 @@
     "require-query-key-factory": {},
     "require-query-signal": {},
     "require-safe-window-open": {
-      "excludeFiles": [
-        "apps/desktop/scripts/smoke.ts"
-      ]
+      "excludeFiles": ["apps/desktop/scripts/smoke.ts"]
     },
     "require-stable-snapshot": {},
     "require-stream-reader-disposal": {},

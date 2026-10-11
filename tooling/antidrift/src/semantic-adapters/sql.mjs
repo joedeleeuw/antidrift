@@ -47,7 +47,7 @@ export function isSqlDirectionTokenValue(value) {
 export function isSqlIdentifierContext(before, after) {
   return (
     /(?:ORDER\s+BY|GROUP\s+BY|PARTITION\s+BY|FROM|JOIN|UPDATE|INTO|TABLE)\s*$/iu.test(
-      before,
+      before
     ) || /^\s*=/.test(after)
   );
 }
@@ -70,13 +70,13 @@ export function endsWithSqlInterpolationKeyword(value) {
     (keyword) =>
       normalized === keyword ||
       normalized.endsWith(` ${keyword}`) ||
-      normalized.endsWith(` ${keyword} (`),
+      normalized.endsWith(` ${keyword} (`)
   );
 }
 
 export function containsSqlStatementContext(value) {
   return /\b(?:SELECT|FROM|JOIN|WHERE|VALUES|UPDATE|INSERT|DELETE|ORDER BY|GROUP BY|HAVING)\b/u.test(
-    normalizedSqlContext(value),
+    normalizedSqlContext(value)
   );
 }
 
@@ -100,7 +100,7 @@ export function startsWithSqlInterpolationKeyword(value) {
     normalized.startsWith(")") ||
     normalized.startsWith(",") ||
     SQL_INTERPOLATION_AFTER_KEYWORDS.some((keyword) =>
-      normalized.startsWith(keyword),
+      normalized.startsWith(keyword)
     )
   );
 }
@@ -134,7 +134,7 @@ export function safeIdentifierMemberSpecs(options) {
   return (options.safeIdentifierMembers ?? [])
     .filter(
       ({ type, member }) =>
-        typeof type === "string" && typeof member === "string",
+        typeof type === "string" && typeof member === "string"
     )
     .map(({ type, member }) => ({ type, member }));
 }

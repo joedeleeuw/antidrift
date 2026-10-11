@@ -161,7 +161,7 @@ function typedPropCountForCallableNode(node, services, checker) {
   const annotationCount = typedPropCountForReactTypeAnnotation(
     node,
     services,
-    checker,
+    checker
   );
   if (annotationCount > 0) {
     return annotationCount;
@@ -242,7 +242,7 @@ function componentAcceptedPropCount(param, services, checker) {
   const implementation = implementationParam(param);
   return Math.max(
     objectPatternPropCount(implementation),
-    typedPropCountForParam(implementation, services, checker),
+    typedPropCountForParam(implementation, services, checker)
   );
 }
 function reportLargeComponentProps(node, context, services, checker, max) {
@@ -257,7 +257,7 @@ function reportLargeComponentProps(node, context, services, checker, max) {
   const implementation = implementationParam(param);
   const count = Math.max(
     componentAcceptedPropCount(implementation, services, checker),
-    typedPropCountForCallableNode(node, services, checker),
+    typedPropCountForCallableNode(node, services, checker)
   );
   if (count <= max || forwardsPropsAsSpread(fn, implementation, max)) {
     return;
@@ -299,13 +299,13 @@ export function ruleReactMaxComponentProps() {
       if (!services) {
         return missingTypeServicesVisitors(
           context,
-          "react-max-component-props",
+          "react-max-component-props"
         );
       }
       const checker = services.program.getTypeChecker();
       const max = context.options[0]?.max ?? DEFAULT_REACT_COMPONENT_PROPS_MAX;
       return callableVisitors((node) =>
-        reportLargeComponentProps(node, context, services, checker, max),
+        reportLargeComponentProps(node, context, services, checker, max)
       );
     },
   };

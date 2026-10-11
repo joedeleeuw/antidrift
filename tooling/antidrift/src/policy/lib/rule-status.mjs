@@ -12,7 +12,7 @@ function isRecord(value) {
 function sortedEntries(record) {
   if (!isRecord(record)) return [];
   return Object.entries(record).sort(([left], [right]) =>
-    left.localeCompare(right),
+    left.localeCompare(right)
   );
 }
 
@@ -47,7 +47,7 @@ function statusEntry(id, kind, entry) {
       "solveType",
       "status",
     ],
-    normalized,
+    normalized
   );
   if (typeof entry.stable === "boolean") normalized.stable = entry.stable;
   const proofBuckets = stringArray(entry.proofBuckets);
@@ -70,7 +70,7 @@ export function loadRuleStatusRegistrySync(policyDir = "policy") {
   try {
     return (
       YAML.parse(
-        readFileSync(join(policyDir, "registries", "rules.yaml"), "utf8"),
+        readFileSync(join(policyDir, "registries", "rules.yaml"), "utf8")
       ) ?? { schemaVersion: 1 }
     );
   } catch (error) {
@@ -82,20 +82,16 @@ export function loadRuleStatusRegistrySync(policyDir = "policy") {
 export function ruleStatusEntriesFromRegistry(registry = {}) {
   return Object.freeze([
     ...sortedEntries(registry.rules).map(([id, entry]) =>
-      statusEntry(
-        id,
-        entry?.status === "retired" ? "retired" : "active",
-        entry,
-      ),
+      statusEntry(id, entry?.status === "retired" ? "retired" : "active", entry)
     ),
     ...sortedEntries(registry.retiredRules).map(([id, entry]) =>
-      statusEntry(id, "retired", entry),
+      statusEntry(id, "retired", entry)
     ),
     ...sortedEntries(registry.researchCandidates).map(([id, entry]) =>
-      statusEntry(id, "research", entry),
+      statusEntry(id, "research", entry)
     ),
     ...sortedEntries(registry.policyRuleReviews).map(([id, entry]) =>
-      statusEntry(id, "policy-review", entry),
+      statusEntry(id, "policy-review", entry)
     ),
   ]);
 }
@@ -125,33 +121,33 @@ export function ruleStatusEntryForId(id, manifestOrRegistry = {}) {
 
 export function ruleStatusEntriesForKind(kind, manifestOrRegistry = {}) {
   return Object.freeze(
-    manifestEntries(manifestOrRegistry).filter((entry) => entry.kind === kind),
+    manifestEntries(manifestOrRegistry).filter((entry) => entry.kind === kind)
   );
 }
 
 function ruleStatusEntriesForRuleIds(ruleIds, manifestOrRegistry) {
   const ids = new Set(ruleIds);
   return Object.freeze(
-    manifestEntries(manifestOrRegistry).filter((entry) => ids.has(entry.id)),
+    manifestEntries(manifestOrRegistry).filter((entry) => ids.has(entry.id))
   );
 }
 
 export function ruleStatusEntriesForSemanticAdapter(
   adapterId,
-  manifestOrRegistry = {},
+  manifestOrRegistry = {}
 ) {
   const adapter = SEMANTIC_ADAPTER_MANIFEST.find(
-    (entry) => entry.id === adapterId,
+    (entry) => entry.id === adapterId
   );
   return ruleStatusEntriesForRuleIds(adapter?.rules ?? [], manifestOrRegistry);
 }
 
 export function ruleStatusEntriesForProofBucket(
   proofBucket,
-  manifestOrRegistry = {},
+  manifestOrRegistry = {}
 ) {
   const adapterRuleIds = SEMANTIC_ADAPTER_MANIFEST.filter((entry) =>
-    entry.proofBuckets.includes(proofBucket),
+    entry.proofBuckets.includes(proofBucket)
   ).flatMap((entry) => entry.rules);
   const promotionRuleIds = manifestEntries(manifestOrRegistry)
     .filter((entry) => entry.promotion?.proofBucket === proofBucket)
@@ -161,23 +157,23 @@ export function ruleStatusEntriesForProofBucket(
     .map((entry) => entry.id);
   return ruleStatusEntriesForRuleIds(
     [...adapterRuleIds, ...promotionRuleIds, ...entryRuleIds],
-    manifestOrRegistry,
+    manifestOrRegistry
   );
 }
 
 export function ruleStatusEntriesForStatus(status, manifestOrRegistry = {}) {
   return Object.freeze(
     manifestEntries(manifestOrRegistry).filter(
-      (entry) => entry.status === status,
-    ),
+      (entry) => entry.status === status
+    )
   );
 }
 
 function semanticAdaptersForRuleId(ruleId) {
   return Object.freeze(
     SEMANTIC_ADAPTER_MANIFEST.filter((adapter) =>
-      adapter.rules.includes(ruleId),
-    ),
+      adapter.rules.includes(ruleId)
+    )
   );
 }
 
@@ -224,7 +220,7 @@ export function ruleStatusSemanticSummaryForId(id, manifestOrRegistry = {}) {
 export function ruleStatusSemanticSummaries(manifestOrRegistry = {}) {
   return Object.freeze(
     manifestEntries(manifestOrRegistry).map((entry) =>
-      ruleStatusSemanticSummary(entry),
-    ),
+      ruleStatusSemanticSummary(entry)
+    )
   );
 }

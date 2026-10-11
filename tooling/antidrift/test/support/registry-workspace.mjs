@@ -32,7 +32,7 @@ export function writePolicySource(root, ruleIds) {
         severity: error
         detector: testDetector
         message: Test message.
-`,
+`
     )
     .join("");
   writeFileSync(
@@ -43,14 +43,14 @@ clusters:
     owner: test-owner
     rules:
 ${rules}
-`,
+`
   );
 }
 export function writePackageJson(root, contents) {
   mkdirSync(join(root, "tooling", "antidrift"), { recursive: true });
   writeFileSync(
     join(root, "tooling", "antidrift", "package.json"),
-    `${JSON.stringify(contents, null, 2)}\n`,
+    `${JSON.stringify(contents, null, 2)}\n`
   );
 }
 export function semanticAdapterPackageExports() {
@@ -70,11 +70,11 @@ export function semanticAdapterPackageExports() {
 }
 export function semanticAdapterContractKeys() {
   return Object.keys(SEMANTIC_ADAPTER_CONTRACTS).sort((a, b) =>
-    a.localeCompare(b),
+    a.localeCompare(b)
   );
 }
 export function semanticAdapterAggregateRuntimeSource(
-  keys = semanticAdapterContractKeys(),
+  keys = semanticAdapterContractKeys()
 ) {
   return [
     ...keys.map((key) => {
@@ -95,7 +95,7 @@ export function semanticAdapterAggregateRuntimeSource(
   ].join("\n");
 }
 export function semanticAdapterAggregateTypeSource(
-  keys = semanticAdapterContractKeys(),
+  keys = semanticAdapterContractKeys()
 ) {
   return [
     ...keys.map((key) => {
@@ -114,7 +114,7 @@ export function semanticAdapterAggregateTypeSource(
     "export type SemanticAdapterContractKey =",
     ...keys.map(
       (key, index) =>
-        `  | ${JSON.stringify(key)}${index === keys.length - 1 ? ";" : ""}`,
+        `  | ${JSON.stringify(key)}${index === keys.length - 1 ? ";" : ""}`
     ),
     "",
     "export const SEMANTIC_ADAPTER_CONTRACTS: Readonly<Record<SemanticAdapterContractKey, unknown>>;",
@@ -127,7 +127,7 @@ export function writeSemanticAdapterAggregateFiles(root) {
   });
   writeFileSync(
     join(root, "tooling", "antidrift", "src", "semantic-adapters", "index.mjs"),
-    semanticAdapterAggregateRuntimeSource(),
+    semanticAdapterAggregateRuntimeSource()
   );
   writeFileSync(
     join(
@@ -136,9 +136,9 @@ export function writeSemanticAdapterAggregateFiles(root) {
       "antidrift",
       "src",
       "semantic-adapters",
-      "index.d.mts",
+      "index.d.mts"
     ),
-    semanticAdapterAggregateTypeSource(),
+    semanticAdapterAggregateTypeSource()
   );
 }
 export function touchSemanticAdapterPackageExportFiles(root) {
@@ -220,7 +220,7 @@ export function lockedRuleSections(root) {
       (rule) => `  ${rule}:
     status: retired
     reason: Test retired decision.
-`,
+`
     )
     .join("");
   const researchCandidates = lockedEcosystemCandidates
@@ -231,7 +231,7 @@ export function lockedRuleSections(root) {
     solveType: test-solve
     referenceDoc: docs/locked-rule.md
     nextAction: Test action.
-`,
+`
     )
     .join("");
   return `
@@ -268,7 +268,7 @@ export function writeValidRulesRegistry(root) {
       allows:
         - good()
     nextAction: Test action.
-`,
+`
     )
     .join("");
   writeRegistry(
@@ -295,6 +295,6 @@ ${semanticFactKindSections()}
 rules:
 ${rules}
 ${lockedRuleSections(root)}
-`,
+`
   );
 }

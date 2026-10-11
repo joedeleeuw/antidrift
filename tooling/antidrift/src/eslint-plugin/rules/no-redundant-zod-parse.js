@@ -37,7 +37,7 @@ export function ruleNoRedundantZodParse() {
             node,
             services,
             checker,
-            ZOD_VALIDATION_METHODS,
+            ZOD_VALIDATION_METHODS
           );
           if (!parts) {
             return;

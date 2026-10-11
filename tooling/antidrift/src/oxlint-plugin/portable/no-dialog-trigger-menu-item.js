@@ -45,7 +45,7 @@ const getAttribute = (openingElement, name) => {
       (attribute) =>
         isAstNode(attribute) &&
         attribute.type === "JSXAttribute" &&
-        jsxElementName(attribute.name) === name,
+        jsxElementName(attribute.name) === name
     ) ?? null
   );
 };
@@ -65,7 +65,7 @@ const getChildElements = (element) => {
     return [];
   }
   return element.children.filter(
-    (child) => isAstNode(child) && child.type === "JSXElement",
+    (child) => isAstNode(child) && child.type === "JSXElement"
   );
 };
 const mountsMenuItem = (triggerElement) => {

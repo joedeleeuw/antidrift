@@ -43,7 +43,11 @@ function writeProgram(root, relativePath, source) {
 function writeFixtureRepo() {
   const root = tempRepo();
   mkdirSync(join(root, "node_modules"), { recursive: true });
-  symlinkSync(firebasePackageDir, join(root, "node_modules", "firebase"), "dir");
+  symlinkSync(
+    firebasePackageDir,
+    join(root, "node_modules", "firebase"),
+    "dir"
+  );
   writeProgram(
     root,
     "tsconfig.json",
@@ -61,8 +65,8 @@ function writeFixtureRepo() {
         include: ["src/**/*.ts"],
       },
       null,
-      2,
-    ),
+      2
+    )
   );
   writeProgram(
     root,
@@ -95,7 +99,7 @@ export interface UnrelatedDraft {
 }
 
 export type UserInfoReference = UserInfo;
-`,
+`
   );
   writeProgram(
     root,
@@ -108,7 +112,7 @@ export type UserInfoReference = UserInfo;
   readonly providerId: string;
   readonly phoneNumber: string | null;
 };
-`,
+`
   );
   return root;
 }
@@ -146,7 +150,7 @@ describe("parseTypeOwnerInventoryArgs", () => {
         "upstream-delta",
         "--output",
         "out.json",
-      ]),
+      ])
     ).toEqual({
       repo: ["murderbox", "agent-guardrails-monorepo-template"],
       slice: "upstream-delta",
@@ -233,11 +237,11 @@ describe("typeOwnerInventory", () => {
         test: false,
       },
     ]);
+    expect(result.rows.some((row) => row.localName === "UnrelatedDraft")).toBe(
+      false
+    );
     expect(
-      result.rows.some((row) => row.localName === "UnrelatedDraft"),
-    ).toBe(false);
-    expect(
-      result.rows.some((row) => row.localName === "UserInfoReference"),
+      result.rows.some((row) => row.localName === "UserInfoReference")
     ).toBe(false);
 
     expect(result.proposalCount).toBe(1);

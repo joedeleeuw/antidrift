@@ -24,7 +24,7 @@ const blocked = explicitPolicyChange ? null : protectedTarget(target);
 if (blocked) {
   console.error(`Blocked edit to protected policy/config file: ${blocked}`);
   console.error(
-    "Edit policy/agent-guardrails.yaml and run pnpm policy:generate, or mark an explicit [policy-change] task.",
+    "Edit policy/agent-guardrails.yaml and run pnpm policy:generate, or mark an explicit [policy-change] task."
   );
   process.exit(2);
 }

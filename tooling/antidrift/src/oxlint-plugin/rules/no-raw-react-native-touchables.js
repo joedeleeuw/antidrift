@@ -47,7 +47,7 @@ function normalizedOwnerPath(value) {
     /[!*?{}()[\]]/u.test(normalized)
   ) {
     throw new TypeError(
-      "allowedFiles entries must be exact repository-relative owner paths containing at least one directory",
+      "allowedFiles entries must be exact repository-relative owner paths containing at least one directory"
     );
   }
   return normalized;
@@ -68,7 +68,7 @@ function normalizedOptions(value) {
 function isAllowedFile(filename, allowedFiles) {
   const normalized = normalizedPath(filename);
   return allowedFiles.some(
-    (allowed) => normalized === allowed || normalized.endsWith(`/${allowed}`),
+    (allowed) => normalized === allowed || normalized.endsWith(`/${allowed}`)
   );
 }
 
@@ -121,7 +121,7 @@ function report(
   source,
   imported,
   replacementImport,
-  broad = false,
+  broad = false
 ) {
   context.report({
     node,
@@ -185,7 +185,7 @@ export default function ruleNoRawReactNativeTouchables() {
                 source,
                 result.imported,
                 options.replacementImport,
-                result.broad,
+                result.broad
               );
             }
           }
@@ -200,7 +200,7 @@ export default function ruleNoRawReactNativeTouchables() {
             source,
             "namespace re-export",
             options.replacementImport,
-            true,
+            true
           );
         },
         ExportNamedDeclaration(node) {
@@ -218,7 +218,7 @@ export default function ruleNoRawReactNativeTouchables() {
                 source,
                 result.imported,
                 options.replacementImport,
-                result.broad,
+                result.broad
               );
             }
           }

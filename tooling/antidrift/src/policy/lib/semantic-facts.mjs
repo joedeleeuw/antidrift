@@ -123,39 +123,39 @@ export const SEMANTIC_FACT_KINDS = Object.freeze({
 
 export const SEMANTIC_FACT_KIND_CONTRACT_LIST = Object.freeze(
   Object.entries(SEMANTIC_FACT_KINDS).map(([factKind, contract]) =>
-    Object.freeze({ factKind, ...contract }),
-  ),
+    Object.freeze({ factKind, ...contract })
+  )
 );
 
 export function semanticFactKindContractsForAdapterId(adapterId) {
   return Object.freeze(
     SEMANTIC_FACT_KIND_CONTRACT_LIST.filter(
-      (contract) => contract.adapterId === adapterId,
-    ),
+      (contract) => contract.adapterId === adapterId
+    )
   );
 }
 
 export function semanticFactKindContractsForRule(ruleId) {
   return Object.freeze(
     SEMANTIC_FACT_KIND_CONTRACT_LIST.filter((contract) =>
-      contract.rules.includes(ruleId),
-    ),
+      contract.rules.includes(ruleId)
+    )
   );
 }
 
 export function semanticFactKindContractsForEmission(emission) {
   return Object.freeze(
     SEMANTIC_FACT_KIND_CONTRACT_LIST.filter((contract) =>
-      contract.emission.includes(emission),
-    ),
+      contract.emission.includes(emission)
+    )
   );
 }
 
 export function semanticFactKindContractsForConfidence(confidence) {
   return Object.freeze(
     SEMANTIC_FACT_KIND_CONTRACT_LIST.filter((contract) =>
-      contract.confidence.includes(confidence),
-    ),
+      contract.confidence.includes(confidence)
+    )
   );
 }
 
@@ -181,7 +181,7 @@ function normalized(value) {
   if (!value || typeof value !== "object") return value;
   const out = {};
   for (const key of Object.keys(value).sort((left, right) =>
-    left.localeCompare(right),
+    left.localeCompare(right)
   )) {
     if (droppedPayloadKeys.has(key)) continue;
     out[key] = normalized(value[key]);
@@ -232,7 +232,7 @@ export function semanticFact(input) {
     adapterId: input.adapterId,
     confidence: input.confidence,
     provenance: [...(input.provenance ?? [])].sort((left, right) =>
-      left.localeCompare(right),
+      left.localeCompare(right)
     ),
     filePath: input.filePath,
     location: input.location,

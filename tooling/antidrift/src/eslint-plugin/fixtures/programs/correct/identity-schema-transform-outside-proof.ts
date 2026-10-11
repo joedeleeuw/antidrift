@@ -23,7 +23,7 @@ export const MethodSchema = SingleFieldSchema.transform((record) => ({
 }));
 
 export const ContextCallbackSchema = SingleFieldSchema.transform(
-  (record, _context) => ({ a: record.a }),
+  (record, _context) => ({ a: record.a })
 );
 
 export const MultiStatementSchema = SingleFieldSchema.transform((record) => {
@@ -34,7 +34,7 @@ export const MultiStatementSchema = SingleFieldSchema.transform((record) => {
 export const GeneratorTransformSchema = SingleFieldSchema.transform(
   function* transform(record) {
     return { a: record.a };
-  },
+  }
 );
 
 export const CustomObjectSchema = z

@@ -54,19 +54,19 @@ describe("react-state-graph adapter", () => {
     expect(classifyWriteValue(literal(false), ctx)).toBe("falseConst");
     expect(classifyWriteValue(literal(null), ctx)).toBe("nullConst");
     expect(
-      classifyWriteValue({ type: "Identifier", name: "undefined" }, ctx),
+      classifyWriteValue({ type: "Identifier", name: "undefined" }, ctx)
     ).toBe("nullConst");
     expect(classifyWriteValue({ type: "AwaitExpression" }, ctx)).toBe(
-      "awaited",
+      "awaited"
     );
     expect(
-      classifyWriteValue({ type: "Identifier", name: "result" }, ctx),
+      classifyWriteValue({ type: "Identifier", name: "result" }, ctx)
     ).toBe("awaited");
     expect(classifyWriteValue({ type: "Identifier", name: "err" }, ctx)).toBe(
-      "caughtError",
+      "caughtError"
     );
     expect(classifyWriteValue({ type: "ArrowFunctionExpression" }, ctx)).toBe(
-      "updater",
+      "updater"
     );
     // Numeric/string literals are domain values, not lifecycle constants.
     expect(classifyWriteValue(literal(0), ctx)).toBe("other");
@@ -145,7 +145,7 @@ describe("react-state-graph adapter", () => {
     `);
     expect(frames.some((frame) => frame.proof.proven)).toBe(false);
     expect(
-      frames.every((frame) => Object.keys(frame.state.cells).length === 0),
+      frames.every((frame) => Object.keys(frame.state.cells).length === 0)
     ).toBe(true);
   });
 
@@ -174,7 +174,7 @@ describe("react-state-graph adapter", () => {
     `);
     expect(frames.some((frame) => frame.proof.proven)).toBe(false);
     expect(
-      frames.every((frame) => Object.keys(frame.state.cells).length === 0),
+      frames.every((frame) => Object.keys(frame.state.cells).length === 0)
     ).toBe(true);
   });
 
@@ -200,7 +200,7 @@ describe("react-state-graph adapter", () => {
     `);
     expect(frames.some((frame) => frame.proof.proven)).toBe(false);
     expect(
-      frames.every((frame) => Object.keys(frame.state.cells).length === 0),
+      frames.every((frame) => Object.keys(frame.state.cells).length === 0)
     ).toBe(true);
   });
 

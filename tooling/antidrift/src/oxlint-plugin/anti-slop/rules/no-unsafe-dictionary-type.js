@@ -121,7 +121,7 @@ export const noUnsafeDictionaryTypeRule = defineRule({
           return;
         const unsafe = classifyUnsafeDictionaryValue(
           node.typeAnnotation.typeAnnotation,
-          environment,
+          environment
         );
         if (unsafe !== null) report(node, unsafe.unsafeValue);
       },

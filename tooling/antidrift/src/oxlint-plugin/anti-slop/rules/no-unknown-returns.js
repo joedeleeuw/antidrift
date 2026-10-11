@@ -33,7 +33,7 @@ export const noUnknownReturnsRule = defineRule({
       }
       if (type.type === "TSUnionType") {
         return type.types.some((member) =>
-          resolvesToUnknown(member, shadowedAliases, visited),
+          resolvesToUnknown(member, shadowedAliases, visited)
         );
       }
       if (
@@ -63,7 +63,7 @@ export const noUnknownReturnsRule = defineRule({
       return resolvesToUnknown(
         alias.typeAnnotation,
         shadowedAliases,
-        nextVisited,
+        nextVisited
       );
     };
     const checkReturnType = (node) => {
@@ -72,7 +72,7 @@ export const noUnknownReturnsRule = defineRule({
       if (
         !resolvesToUnknown(
           annotation.typeAnnotation,
-          lexicalTypeParameterNames(node, context.sourceCode.visitorKeys),
+          lexicalTypeParameterNames(node, context.sourceCode.visitorKeys)
         )
       ) {
         return;
