@@ -2268,7 +2268,7 @@ rules:
     stable: false
     defaultOff: false
     directive: G4
-    signal: Explicit unknown parameters and locals read outside decoding or successful type-predicate control flow
+    signal: Explicit unknown parameters and locals used (member reads, casts, coercions, returns) outside decoding, type-predicate or structural-guard control flow
     solveType: unknown-input-decoding
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/unknown-input-must-be-decoded.md
@@ -2276,7 +2276,9 @@ rules:
     concerns:
       - Decoder names are a syntax convention; AST evidence cannot certify runtime validation behavior.
       - Predicate signatures must be directly visible; re-export chains and complex control-flow joins remain unproven.
-      - Decoders own their unknown parameter. Type predicates and assertion functions (`x is T`, `asserts x is T`) are exempt, as are helpers whose single returned expression only narrows the parameter with typeof, `in`, instanceof, Array.isArray and null checks joined by && or ||, plus a final property comparison. Casts and unnarrowed reads still report.
+      - Decoders own their unknown parameter. Type predicates and assertion functions (`x is T`, `asserts x is T`) are exempt, as are helpers whose single returned expression only narrows the parameter with typeof, `in`, instanceof, Array.isArray and null checks joined by && or ||, plus a final property comparison.
+      - Forwarding the whole value as a call argument is not use; the receiving function owns the decoding and is checked there when it is first-party. Built-in coercions and serializers (String, Number, Boolean, BigInt, JSON.stringify, Response.json) and template interpolation remain use.
+      - Branch and if-exit guards (typeof, instanceof, `in`, Array.isArray) narrow later reads in the same block; guard operands, truthiness tests and null comparisons are not use. Casts report even behind a guard.
     external:
       state: net-antidrift
       support: low
@@ -2294,10 +2296,12 @@ rules:
         - "promise.catch((e: unknown) => log((e as Error).message));"
       allows:
         - "function receive(input: unknown) { return messageSchema.parse(input); }"
+        - "function warn(error: unknown) { logger.warn(error); }"
+        - "function isEditable(node: unknown) { if (!(node instanceof HTMLElement)) return false; return node.isContentEditable; }"
         - "try { work(); } catch (error: unknown) { report(error); }"
         - 'const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;'
         - 'function hasName(error: unknown, name: string): boolean { return typeof error === "object" && error !== null && "name" in error && error.name === name; }'
-    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). Exempting type predicates, assertion functions and pure narrowing helpers dropped the sushi corpus from 4,350 to 3,785 findings in 34 repositories; the remainder mixes casts and unnarrowed reads with forwarding and logging helpers."
+    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). Exempting decoders took the sushi corpus from 4,350 to 3,785 findings; treating whole-value forwarding and if-exit guards as decoding boundaries took it to 1,974 findings in 31 repositories, dominated by casts and coercions of unknown values."
 
   antidrift/no-convex-return-widening:
     status: ready

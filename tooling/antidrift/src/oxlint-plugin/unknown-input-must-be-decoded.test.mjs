@@ -145,6 +145,61 @@ ruleTester.run(
       {
         code: 'function isCode(error: unknown, code: string) { return !!error && typeof error === "object" && "code" in error && typeof error.code === "string" && error.code === code; }',
       },
+      // Forwarding the whole value hands decoding to the receiving function.
+      { code: "const input: unknown = read(); use(input);" },
+      {
+        code: "function receive(input: unknown) { use(input); schema.parse(input); }",
+      },
+      { code: "function receive(input: unknown = read()) { use(input); }" },
+      { code: "promise.then((value: unknown) => use(value));" },
+      {
+        code: 'function onError(error: unknown) { console.error(error); } promise.catch(onError); onError(new Error("x"));',
+      },
+      {
+        code: "function onError(error: unknown) { report(error); } use(onError);",
+      },
+      {
+        code: 'function receive(body: unknown) { const JSON = { stringify: (v: unknown) => "" }; return JSON.stringify(body); }',
+      },
+      {
+        code: 'import { Response } from "./responses"; function receive(body: unknown) { return Response.json(body); }',
+      },
+      {
+        code: "function warn(err: unknown) { logger.warn(err); }",
+      },
+      // Corpus false positives: forwarding to a logger, a record decoder or a
+      // formatter, and reads behind an exiting instanceof guard.
+      {
+        code: "class FileRenderer { public onHighlightError(error: unknown): void { console.error(error); } }",
+      },
+      {
+        code: 'function parseReadMcpResourceArgs(value: unknown) { const args = toRecord(value); return { server: requiredString(args, "server"), uri: requiredString(args, "uri") }; }',
+      },
+      {
+        code: 'function isEditable(node: unknown): boolean { if (!(node instanceof HTMLElement)) return false; if (node.closest("[data-prevent-autofocus]")) return true; if (node.isContentEditable) return true; return /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(node.tagName); }',
+      },
+      {
+        code: "function formatCommandProbeError(error: unknown): string { return toDiagnosticErrorMessage(error); }",
+      },
+      // If-exit and branch guards narrow later reads.
+      {
+        code: 'function receive(x: unknown) { if (typeof x !== "object" || x === null) throw new Error("invalid"); return x.toString(); }',
+      },
+      {
+        code: "function receive(x: unknown) { if (!Array.isArray(x)) return; use(x.length); }",
+      },
+      {
+        code: 'function receive(x: unknown) { if (typeof x !== "object" || x === null) return; if (!("k" in x)) return; use(x.k); }',
+      },
+      {
+        code: 'function receive(payload: unknown) { if (typeof payload === "object" && payload !== null && "error" in payload) return payload.error; return null; }',
+      },
+      {
+        code: 'function titleOf(value: unknown) { return typeof value === "object" && value !== null && "title" in value && value.title; }',
+      },
+      {
+        code: 'promise.catch((error: unknown) => { if (typeof error === "object" && error !== null && "status" in error) report(error.status); });',
+      },
     ],
     invalid: [
       {
@@ -154,9 +209,13 @@ ruleTester.run(
       { code: "function receive({ title }: unknown) { use(title); }", errors },
       { code: "const [value]: unknown = read(); use(value);", errors },
       { ...fixture("unknown-input/flags.ts"), errors },
-      { code: "const input: unknown = read(); use(input);", errors },
+      { code: "const input: unknown = read(); use(input.id);", errors },
       {
         code: "function receive(input: unknown) { return input as Message; }",
+        errors,
+      },
+      {
+        code: 'function rewriteRefs(input: unknown, from: string, to: string): void { if (!input || typeof input !== "object") return; const schema = input as OpenApiSchema; if (schema.$ref === from) schema.$ref = to; }',
         errors,
       },
       {
@@ -164,11 +223,11 @@ ruleTester.run(
         errors,
       },
       {
-        code: "function receive(input: unknown) { use(input); schema.parse(input); }",
+        code: "function receive(input: unknown) { use(input.id); schema.parse(input); }",
         errors,
       },
       {
-        code: "function receive(input: unknown) { if (input) use(input); }",
+        code: "function receive(input: unknown) { if (input) use(input.id); }",
         errors,
       },
       {
@@ -176,19 +235,40 @@ ruleTester.run(
         errors,
       },
       {
-        code: "function receive(input: unknown = read()) { use(input); }",
+        code: "function receive(input: unknown = read()) { use(input.id); }",
         errors,
       },
       {
-        code: "promise.then((value: unknown) => use(value));",
+        code: "promise.then((value: unknown) => use(value.id));",
+        errors,
+      },
+      // Built-in coercions and interpolation are use, not forwarding.
+      {
+        code: "function receive(input: unknown) { return String(input); }",
+        errors,
+      },
+      {
+        code: "function receive(input: unknown) { return Number(input); }",
+        errors,
+      },
+      {
+        code: "function receive(input: unknown) { return Boolean(input); }",
+        errors,
+      },
+      {
+        code: "function receive(input: unknown) { log(input); send(JSON.stringify(input)); }",
+        errors,
+      },
+      {
+        code: "function receive(input: unknown) { return `value: ${input}`; }",
+        errors,
+      },
+      {
+        code: "function receive(x: unknown) { if (x === null) return; use(x.k); }",
         errors,
       },
       {
         code: "promise.catch((error: unknown) => setStatus((error as { status: number }).status));",
-        errors,
-      },
-      {
-        code: 'promise.catch((error: unknown) => { if (typeof error === "object" && error !== null && "status" in error) report(error.status); });',
         errors,
       },
       {
@@ -208,18 +288,6 @@ ruleTester.run(
         errors,
       },
       {
-        code: 'function titleOf(value: unknown) { return typeof value === "object" && value !== null && "title" in value && value.title; }',
-        errors,
-      },
-      {
-        code: 'function onError(error: unknown) { console.error(error); } promise.catch(onError); onError(new Error("x"));',
-        errors,
-      },
-      {
-        code: "function onError(error: unknown) { report(error); } use(onError);",
-        errors,
-      },
-      {
         code: "class Logger { constructor(private body: unknown) { log(JSON.stringify(body)); } }",
         errors,
       },
@@ -232,19 +300,7 @@ ruleTester.run(
         errors,
       },
       {
-        code: 'function receive(body: unknown) { const JSON = { stringify: (v: unknown) => "" }; return JSON.stringify(body); }',
-        errors,
-      },
-      {
         code: "function receive(body: unknown) { return JSON.stringify(body, (key, value) => value); }",
-        errors,
-      },
-      {
-        code: 'import { Response } from "./responses"; function receive(body: unknown) { return Response.json(body); }',
-        errors,
-      },
-      {
-        code: 'function receive(payload: unknown) { if (typeof payload === "object" && payload !== null && "error" in payload) return payload.error; return null; }',
         errors,
       },
       {
@@ -256,60 +312,60 @@ ruleTester.run(
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { isMessage(input); use(input); }`,
+        code: `${predicate} function receive(input: unknown) { isMessage(input); use(input.title); }`,
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { if (isMessage(input)) {} use(input); }`,
+        code: `${predicate} function receive(input: unknown) { if (isMessage(input)) {} use(input.title); }`,
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { if (isMessage(input)) {} else use(input); }`,
+        code: `${predicate} function receive(input: unknown) { if (isMessage(input)) {} else use(input.title); }`,
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { if (isMessage(input) || ready()) use(input); }`,
+        code: `${predicate} function receive(input: unknown) { if (isMessage(input) || ready()) use(input.title); }`,
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { if (!isMessage(input)) report(); use(input); }`,
+        code: `${predicate} function receive(input: unknown) { if (!isMessage(input)) report(); use(input.title); }`,
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { if (isMessage(input)) { input = read(); use(input); } }`,
+        code: `${predicate} function receive(input: unknown) { if (isMessage(input)) { input = read(); use(input.title); } }`,
         errors,
       },
       {
-        code: `${assertion} function receive(input: unknown) { assertMessage(input); input = read(); use(input); }`,
+        code: `${assertion} function receive(input: unknown) { assertMessage(input); input = read(); use(input.title); }`,
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { if (isMessage(input)) { while (ready()) { use(input); input = read(); } } }`,
+        code: `${predicate} function receive(input: unknown) { if (isMessage(input)) { while (ready()) { use(input.title); input = read(); } } }`,
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { if (isMessage(input)) { run(() => use(input)); input = read(); } }`,
+        code: `${predicate} function receive(input: unknown) { if (isMessage(input)) { run(() => use(input.title)); input = read(); } }`,
         errors,
       },
       {
-        code: "declare function looksValid(input: unknown): boolean; function receive(input: unknown) { if (looksValid(input)) use(input); }",
+        code: "declare function looksValid(input: unknown): boolean; function receive(input: unknown) { if (looksValid(input)) use(input.title); }",
         errors,
       },
       {
-        code: 'import { looksValid } from "./predicates"; function receive(input: unknown) { if (looksValid(input)) use(input); }',
+        code: 'import { looksValid } from "./predicates"; function receive(input: unknown) { if (looksValid(input)) use(input.title); }',
         filename,
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { use(input); if (isMessage(input)) use(input); }`,
+        code: `${predicate} function receive(input: unknown) { use(input.title); if (isMessage(input)) use(input); }`,
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { if (isMessage?.(input)) use(input); }`,
+        code: `${predicate} function receive(input: unknown) { if (isMessage?.(input)) use(input.title); }`,
         errors,
       },
       {
-        code: `${predicate} function receive(input: unknown) { if (isMessage(other)) use(input); }`,
+        code: `${predicate} function receive(input: unknown) { if (isMessage(other)) use(input.title); }`,
         errors,
       },
     ],

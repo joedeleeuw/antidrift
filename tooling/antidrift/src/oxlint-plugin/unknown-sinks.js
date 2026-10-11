@@ -177,6 +177,27 @@ export function variableReadsOnlySinks(sourceCode, variable) {
   );
 }
 
+const COERCIONS = new Set(["BigInt", "Boolean", "Number", "String"]);
+
+// Built-in coercions and serializers read the whole value into a typed one:
+// unshadowed-global `String(x)`, `Number(x)`, `Boolean(x)`, `BigInt(x)`,
+// `JSON.stringify(x)` and `Response.json(x)`. Passing an unknown to them is
+// use, not forwarding to a function that owns the decoding.
+export function isBuiltinCoercionCall(sourceCode, call) {
+  const callee = call.callee;
+  if (callee?.type === "Identifier") {
+    return COERCIONS.has(callee.name) && isUnshadowedGlobal(sourceCode, callee);
+  }
+  return (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object?.type === "Identifier" &&
+    SERIALIZATION_SINKS.get(callee.object.name)?.has(calledMethodName(call)) ===
+      true &&
+    isUnshadowedGlobal(sourceCode, callee.object)
+  );
+}
+
 // A read that inspects an unknown rejection reason instead of forwarding it:
 // an assertion (`as`, `!`, angle-bracket casts), member access, a `typeof`
 // operand, or the right side of `in`. Forwarding reads — call arguments,

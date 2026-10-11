@@ -1,9 +1,47 @@
+import { findVariable } from "../semantic-adapters/async-control-flow.mjs";
 import { predicateCall } from "./unknown-predicates.js";
+
+function isTrackedVariable(node, state) {
+  return (
+    node?.type === "Identifier" &&
+    findVariable(state.context.sourceCode, node) === state.variable
+  );
+}
+
+// A structural guard narrows the variable when it evaluates to the returned
+// truth value: `typeof x === "t"` and `x instanceof T`, `"k" in x` and
+// `Array.isArray(x)` when true; `typeof x !== "t"` when false. Null checks
+// alone narrow to no owned shape and are neutral.
+function structuralNarrowing(node, state) {
+  if (
+    node.type === "CallExpression" &&
+    isArrayIsArray(node.callee) &&
+    node.arguments.length === 1 &&
+    isTrackedVariable(node.arguments[0], state)
+  ) {
+    return true;
+  }
+  if (node.type !== "BinaryExpression") return null;
+  if (node.operator === "instanceof") {
+    return isTrackedVariable(node.left, state) ? true : null;
+  }
+  if (node.operator === "in") {
+    return isTrackedVariable(node.right, state) ? true : null;
+  }
+  if (!equalityOperators.has(node.operator)) return null;
+  const typeofOperand = [node.left, node.right].find(
+    (side) => side.type === "UnaryExpression" && side.operator === "typeof"
+  );
+  if (!isTrackedVariable(typeofOperand?.argument, state)) return null;
+  return node.operator === "===" || node.operator === "==";
+}
 
 function guaranteesType(node, truthy, state) {
   if (node.type === "UnaryExpression" && node.operator === "!") {
     return guaranteesType(node.argument, !truthy, state);
   }
+  const narrowsWhen = structuralNarrowing(node, state);
+  if (narrowsWhen !== null) return narrowsWhen === truthy;
   if (node.type === "CallExpression") {
     const predicate = predicateCall(
       node,
@@ -249,4 +287,43 @@ function returnedExpression(owner) {
 export function returnsOnlyNarrowing(owner, name) {
   const returned = returnedExpression(owner);
   return returned?.type !== "Identifier" && isNarrowing(returned, name);
+}
+
+const testOwners = new Set([
+  "IfStatement",
+  "ConditionalExpression",
+  "WhileStatement",
+  "DoWhileStatement",
+  "ForStatement",
+]);
+
+// The node is a truthiness test: the test of a branch or loop, possibly
+// through `!` and `&&`/`||` chains.
+function isTruthinessTest(node) {
+  let child = node;
+  let parent = node.parent;
+  while (
+    parent?.type === "LogicalExpression" ||
+    (parent?.type === "UnaryExpression" && parent.operator === "!")
+  ) {
+    child = parent;
+    parent = parent.parent;
+  }
+  return testOwners.has(parent?.type) && parent.test === child;
+}
+
+// The read is a guard operand that inspects the value without using it as a
+// typed thing: the operand of `typeof` or `!`, the left of `instanceof`, the
+// right of `in`, a side of an equality comparison, or a truthiness test.
+export function isGuardOperand(identifier) {
+  const parent = identifier.parent;
+  if (parent.type === "UnaryExpression") {
+    return parent.operator === "typeof" || parent.operator === "!";
+  }
+  if (parent.type === "BinaryExpression") {
+    if (parent.operator === "instanceof") return parent.left === identifier;
+    if (parent.operator === "in") return parent.right === identifier;
+    return equalityOperators.has(parent.operator);
+  }
+  return isTruthinessTest(identifier);
 }

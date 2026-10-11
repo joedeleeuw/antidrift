@@ -1,13 +1,32 @@
 import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
-import { isNarrowedUse, returnsOnlyNarrowing } from "../unknown-narrowing.js";
+import {
+  isGuardOperand,
+  isNarrowedUse,
+  returnsOnlyNarrowing,
+} from "../unknown-narrowing.js";
 import { isDecoderArgument, predicateCall } from "../unknown-predicates.js";
 import {
+  isBuiltinCoercionCall,
   isErrorInspectionRead,
   isParameterProperty,
   isRejectionHandlerFunction,
   owningBinding,
   variableReadsOnlySinks,
 } from "../unknown-sinks.js";
+
+// Passing the whole unknown value as a call argument forwards it: the
+// receiving function owns the decoding (and is checked there when it is
+// first-party). Built-in coercions and serializers are use, not forwarding.
+function isForwardedWhole(identifier, sourceCode) {
+  const call = identifier.parent;
+  return (
+    call?.type === "CallExpression" &&
+    call.arguments.includes(identifier) &&
+    !isBuiltinCoercionCall(sourceCode, call)
+  );
+}
+
+const castTypes = new Set(["TSAsExpression", "TSTypeAssertion"]);
 
 function unknownBinding(node) {
   if (node.typeAnnotation?.typeAnnotation.type !== "TSUnknownKeyword") {
@@ -113,13 +132,21 @@ export default function ruleUnknownInputMustBeDecoded() {
           if (isDecoderParameter(node)) return;
           const variable = findVariable(context.sourceCode, node);
           if (!variable) return;
+          const writes = variable.references
+            .filter((reference) => reference.isWrite() && !reference.init)
+            .map((reference) => reference.identifier);
+          const state = { variable, context, cache, writes };
+          const reads = variable.references.filter(
+            (reference) => reference.isRead() && !reference.isTypeReference
+          );
           if (rejectionHandlerOwner(node, context.sourceCode)) {
-            const inspected = variable.references.some((reference) => {
-              if (!reference.isRead() || reference.isTypeReference) {
-                return false;
-              }
-              return isErrorInspectionRead(reference.identifier);
-            });
+            const inspected = reads.some(
+              ({ identifier }) =>
+                isErrorInspectionRead(identifier) &&
+                !isGuardOperand(identifier) &&
+                (castTypes.has(identifier.parent.type) ||
+                  !isNarrowedUse(identifier, state))
+            );
             if (inspected) {
               context.report({
                 node: node.typeAnnotation,
@@ -128,22 +155,27 @@ export default function ruleUnknownInputMustBeDecoded() {
             }
             return;
           }
+          const parameterProperty = isParameterProperty(node);
           if (
-            !isParameterProperty(node) &&
+            !parameterProperty &&
             variableReadsOnlySinks(context.sourceCode, variable)
           ) {
             return;
           }
-          const writes = variable.references
-            .filter((reference) => reference.isWrite() && !reference.init)
-            .map((reference) => reference.identifier);
-          const state = { variable, context, cache, writes };
-          const unsafe = variable.references.some((reference) => {
-            if (!reference.isRead() || reference.isTypeReference) return false;
-            const identifier = reference.identifier;
+          const unsafe = reads.some(({ identifier }) => {
             if (identifier.parent.type === "TSTypePredicate") return false;
+            // A cast asserts a type the value was never decoded to, even
+            // behind a structural guard.
+            if (castTypes.has(identifier.parent.type)) return true;
+            if (isGuardOperand(identifier)) return false;
             if (isDecoderArgument(identifier)) return false;
             if (predicateCall(identifier.parent, variable, context, cache)) {
+              return false;
+            }
+            if (
+              !parameterProperty &&
+              isForwardedWhole(identifier, context.sourceCode)
+            ) {
               return false;
             }
             return !isNarrowedUse(identifier, state);
