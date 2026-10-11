@@ -200,6 +200,12 @@ ruleTester.run(
       {
         code: 'promise.catch((error: unknown) => { if (typeof error === "object" && error !== null && "status" in error) report(error.status); });',
       },
+      {
+        code: 'function kind(input: unknown) { switch (typeof input) { case "string": return 1; default: return 0; } }',
+      },
+      {
+        code: 'function receive(input: unknown) { typeof input === "string" && log("text"); }',
+      },
     ],
     invalid: [
       {
@@ -210,6 +216,18 @@ ruleTester.run(
       { code: "const [value]: unknown = read(); use(value);", errors },
       { ...fixture("unknown-input/flags.ts"), errors },
       { code: "const input: unknown = read(); use(input.id);", errors },
+      {
+        code: "function receive(input: unknown) { return typeof input; }",
+        errors,
+      },
+      {
+        code: "function receive(input: unknown) { return { missing: !input }; }",
+        errors,
+      },
+      {
+        code: "function receive(input: unknown) { const empty = input === undefined; return empty; }",
+        errors,
+      },
       {
         code: "function receive(input: unknown) { return input as Message; }",
         errors,

@@ -6,16 +6,32 @@ const FUNCTION_TYPES = new Set([
   "FunctionExpression",
 ]);
 
+const WRAPPER_TYPES = new Set([
+  "ChainExpression",
+  "ParenthesizedExpression",
+  "TSAsExpression",
+  "TSNonNullExpression",
+  "TSSatisfiesExpression",
+  "TSTypeAssertion",
+]);
+
 function isEmptyCollection(node) {
+  let current = node;
+  while (WRAPPER_TYPES.has(current?.type)) current = current.expression;
   return (
-    (node?.type === "ArrayExpression" && node.elements.length === 0) ||
-    (node?.type === "ObjectExpression" && node.properties.length === 0)
+    (current?.type === "ArrayExpression" && current.elements.length === 0) ||
+    (current?.type === "ObjectExpression" && current.properties.length === 0)
   );
 }
 
-function enclosingCatch(node) {
+// The failure path that owns a return: the nearest catch clause, or the
+// promise `.catch` handler whose own body holds the return. Returns inside
+// any other nested function belong to that function.
+function enclosingFailurePath(node) {
   for (let current = node.parent; current; current = current.parent) {
-    if (FUNCTION_TYPES.has(current.type)) return null;
+    if (FUNCTION_TYPES.has(current.type)) {
+      return isPromiseCatchHandler(current) ? current : null;
+    }
     if (current.type === "CatchClause") return current;
   }
   return null;
@@ -81,7 +97,7 @@ export default {
     return {
       ReturnStatement(node) {
         if (!isEmptyCollection(node.argument)) return;
-        const handler = enclosingCatch(node);
+        const handler = enclosingFailurePath(node);
         if (handler && isSilent(handler, sourceCode)) {
           context.report({ node, messageId: "fallback" });
         }

@@ -312,18 +312,71 @@ function isTruthinessTest(node) {
   return testOwners.has(parent?.type) && parent.test === child;
 }
 
+function isPredicateFunction(node) {
+  return (
+    (node?.type === "FunctionDeclaration" ||
+      node?.type === "FunctionExpression" ||
+      node?.type === "ArrowFunctionExpression") &&
+    node.returnType?.typeAnnotation?.type === "TSTypePredicate"
+  );
+}
+
+// The guard expression participates in control flow: the test of a branch,
+// loop, conditional or switch, the short-circuiting left operand of `&&`,
+// `||` or `??`, or the returned expression of a type predicate. Guards may
+// compose through `!`, equality comparisons and logical chains on the way.
+function isControlFlowGuard(guard) {
+  let child = guard;
+  let parent = guard.parent;
+  for (;;) {
+    if (parent?.type === "LogicalExpression") {
+      if (parent.left === child) return true;
+    } else if (
+      !(parent?.type === "UnaryExpression" && parent.operator === "!") &&
+      !(
+        parent?.type === "BinaryExpression" &&
+        equalityOperators.has(parent.operator)
+      )
+    ) {
+      break;
+    }
+    child = parent;
+    parent = parent.parent;
+  }
+  if (testOwners.has(parent?.type)) return parent.test === child;
+  if (parent?.type === "SwitchStatement") return parent.discriminant === child;
+  if (parent?.type === "SwitchCase") return parent.test === child;
+  if (parent?.type === "ReturnStatement") {
+    let owner = parent.parent;
+    while (owner && !owner.type.includes("Function")) owner = owner.parent;
+    return isPredicateFunction(owner);
+  }
+  return isPredicateFunction(parent) && parent.body === child;
+}
+
 // The read is a guard operand that inspects the value without using it as a
 // typed thing: the operand of `typeof` or `!`, the left of `instanceof`, the
-// right of `in`, a side of an equality comparison, or a truthiness test.
+// right of `in`, a side of an equality comparison, or a truthiness test. The
+// guard only counts when it steers control flow; `return typeof x` or
+// `{ missing: !x }` hands the undecoded value to application logic.
+function isBinaryGuardOperand(parent, identifier) {
+  if (parent.operator === "instanceof") return parent.left === identifier;
+  if (parent.operator === "in") return parent.right === identifier;
+  return equalityOperators.has(parent.operator);
+}
+
 export function isGuardOperand(identifier) {
   const parent = identifier.parent;
   if (parent.type === "UnaryExpression") {
-    return parent.operator === "typeof" || parent.operator === "!";
+    return (
+      (parent.operator === "typeof" || parent.operator === "!") &&
+      isControlFlowGuard(parent)
+    );
   }
   if (parent.type === "BinaryExpression") {
-    if (parent.operator === "instanceof") return parent.left === identifier;
-    if (parent.operator === "in") return parent.right === identifier;
-    return equalityOperators.has(parent.operator);
+    return (
+      isBinaryGuardOperand(parent, identifier) && isControlFlowGuard(parent)
+    );
   }
   return isTruthinessTest(identifier);
 }

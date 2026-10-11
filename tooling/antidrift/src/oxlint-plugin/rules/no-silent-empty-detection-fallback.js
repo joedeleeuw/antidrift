@@ -2,6 +2,7 @@ const detectionNameTokens = new Set([
   "detect",
   "discover",
   "host",
+  "hostname",
   "identity",
   "lookup",
   "machine",
@@ -11,6 +12,10 @@ const detectionNameTokens = new Set([
   "uuid",
   "device",
 ]);
+
+// Display helpers turn a value into text for people; an empty string there is
+// ordinary formatting even when the name mentions a detection subject.
+const formatterNameTokens = new Set(["display", "format", "render"]);
 
 const memberNodeTypes = new Set([
   "MethodDefinition",
@@ -175,6 +180,7 @@ function astRecoverySource(node, expression) {
   if (!containsEmptyString(expression)) return "";
   if (isInsideCatchClause(node)) return "ast-catch-recovery";
   if (isFailureBranchReturn(node)) return "ast-failure-branch";
+  if (isEmptyString(unwrapExpression(expression))) return "ast-direct-empty";
   return "";
 }
 
@@ -184,7 +190,10 @@ function isDetectionHelper(name) {
     .split(/[^A-Za-z\d]+/u)
     .map((token) => token.toLowerCase())
     .filter(Boolean);
-  return tokens.some((token) => detectionNameTokens.has(token));
+  return (
+    !tokens.some((token) => formatterNameTokens.has(token)) &&
+    tokens.some((token) => detectionNameTokens.has(token))
+  );
 }
 
 export default function ruleNoSilentEmptyDetectionFallback() {
