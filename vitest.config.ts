@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { defineConfig } from "vitest/config";
 
 for (const key of [
@@ -10,6 +14,14 @@ for (const key of [
 ]) {
   delete process.env[key];
 }
+
+// Tests create their scratch directories with os.tmpdir(); point it at one run
+// directory and remove that when the run ends, so no test leaves files behind.
+const runScratch = mkdtempSync(join(tmpdir(), "antidrift-vitest-"));
+process.env.TMPDIR = runScratch;
+process.on("exit", () => {
+  rmSync(runScratch, { recursive: true, force: true });
+});
 
 export default defineConfig({
   test: {
