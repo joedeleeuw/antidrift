@@ -55,30 +55,90 @@ function buildJsxFix(fixer, node, name, arg, sourceCode) {
 
 const COMPONENT_WRAPPERS = new Set(["forwardRef", "memo"]);
 
-function isComponentWrapperCall(node) {
+// JSX in these files belongs to another framework, where calling a
+// JSX-returning function is ordinary. JSX with no framework import stays in
+// scope because React's automatic runtime needs no import.
+const NON_REACT_JSX_SOURCE = /^(?:solid-js|@builder\.io\/qwik|vue)(?:\/|$)/u;
+
+function isNonReactJsxFile(program) {
+  let importsPreact = false;
+  let importsPreactCompat = false;
+  for (const statement of program.body) {
+    if (statement.type !== "ImportDeclaration") continue;
+    const source = statement.source.value;
+    if (NON_REACT_JSX_SOURCE.test(source)) return true;
+    if (/^preact\/compat(?:\/|$)/u.test(source)) importsPreactCompat = true;
+    else if (/^preact(?:\/|$)/u.test(source)) importsPreact = true;
+  }
+  return importsPreact && !importsPreactCompat;
+}
+
+function moduleExportName(node) {
+  if (node?.type === "Identifier") return node.name;
+  return typeof node?.value === "string" ? node.value : null;
+}
+
+function reactImportSpecifier(sourceCode, identifier) {
+  const definition = findVariable(sourceCode, identifier)?.defs?.[0];
+  if (definition?.type !== "ImportBinding") return null;
+  return definition.parent?.source?.value === "react" ? definition.node : null;
+}
+
+function isReactNamespace(sourceCode, node) {
+  const specifier = reactImportSpecifier(sourceCode, node);
+  return (
+    specifier?.type === "ImportDefaultSpecifier" ||
+    specifier?.type === "ImportNamespaceSpecifier" ||
+    (specifier?.type === "ImportSpecifier" &&
+      moduleExportName(specifier.imported) === "default")
+  );
+}
+
+// Only React's own forwardRef/memo (named, aliased, default or namespace
+// import) prove a component; a local helper spelled `memo` does not.
+function isComponentWrapperCall(sourceCode, node) {
   if (node?.type !== "CallExpression") return false;
   const callee = node.callee;
-  if (callee.type === "Identifier") return COMPONENT_WRAPPERS.has(callee.name);
+  if (callee.type === "Identifier") {
+    const specifier = reactImportSpecifier(sourceCode, callee);
+    return (
+      specifier?.type === "ImportSpecifier" &&
+      COMPONENT_WRAPPERS.has(moduleExportName(specifier.imported))
+    );
+  }
   return (
     callee.type === "MemberExpression" &&
     !callee.computed &&
     callee.property.type === "Identifier" &&
-    COMPONENT_WRAPPERS.has(callee.property.name)
+    COMPONENT_WRAPPERS.has(callee.property.name) &&
+    isReactNamespace(sourceCode, callee.object)
   );
 }
 
-// A callee is a component only when its binding resolves in scope to a
-// function that lexically returns JSX, or to a forwardRef/memo wrapper.
-// Imported and otherwise unresolvable callees are not reported.
-function resolvesToComponent(sourceCode, callee) {
-  const definition = findVariable(sourceCode, callee)?.defs?.[0];
+// A callee is a component only when its binding resolves in scope, through
+// local aliases, to a function that lexically returns JSX, or to a React
+// forwardRef/memo wrapper. Imported and otherwise unresolvable callees are not
+// reported.
+function resolvesToComponent(sourceCode, identifier, seen = new Set()) {
+  const variable = findVariable(sourceCode, identifier);
+  if (!variable || seen.has(variable)) return false;
+  seen.add(variable);
+  const definition = variable.defs?.[0];
   if (definition?.type === "FunctionName") {
     return functionReturnsJsx(definition.node);
   }
-  if (definition?.type !== "Variable") return false;
+  if (
+    definition?.type !== "Variable" ||
+    definition.node.id?.type !== "Identifier"
+  ) {
+    return false;
+  }
   const init = unwrapExpression(definition.node.init);
+  if (init?.type === "Identifier") {
+    return resolvesToComponent(sourceCode, init, seen);
+  }
   if (isFunctionLike(init)) return functionReturnsJsx(init);
-  return isComponentWrapperCall(init);
+  return isComponentWrapperCall(sourceCode, init);
 }
 
 export default function ruleNoCallingComponentsAsFunctions() {
@@ -97,9 +157,13 @@ export default function ruleNoCallingComponentsAsFunctions() {
       },
     },
     create(context) {
+      let nonReactJsx = false;
       return {
+        Program(node) {
+          nonReactJsx = isNonReactJsxFile(node);
+        },
         CallExpression(node) {
-          if (node.callee.type !== "Identifier") return;
+          if (nonReactJsx || node.callee.type !== "Identifier") return;
           const name = node.callee.name;
           if (!/^[A-Z]/u.test(name) || shouldSkip(name)) return;
           if (!resolvesToComponent(context.sourceCode, node.callee)) return;

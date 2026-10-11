@@ -5,7 +5,11 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import tsParser from "@typescript-eslint/parser";
+import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
+
+import eslintPlugin from "../eslint-plugin/index.js";
 
 const require = createRequire(import.meta.url);
 const oxlintPackage = require.resolve("oxlint/package.json");
@@ -15,6 +19,9 @@ const oxlintBinary = resolve(
 );
 const plugin = fileURLToPath(new URL("./index.js", import.meta.url));
 const packageTopEntry = fileURLToPath(new URL("../index.mjs", import.meta.url));
+const typedFixturesDir = fileURLToPath(
+  new URL("../eslint-plugin/fixtures", import.meta.url)
+);
 const rawTouchableImportCases = [
   {
     label: "aliased React Native Pressable import",
@@ -36,6 +43,18 @@ const rawTouchableImportCases = [
     label: "RNGH namespace re-export",
     source: 'export * from "react-native-gesture-handler";',
   },
+  {
+    label: "React Native Button import",
+    source: 'import { Button } from "react-native";',
+  },
+  {
+    label: "RNGH RectButton import",
+    source: 'import { RectButton } from "react-native-gesture-handler";',
+  },
+  {
+    label: "React Native default re-export",
+    source: 'export { default as RN } from "react-native";',
+  },
 ];
 
 const schemaLibraryImportCases = [
@@ -44,7 +63,15 @@ const schemaLibraryImportCases = [
   'const { object } = require("valibot"); object({});',
   'async function load() { return import("@effect/schema/Schema"); }',
   'import Superstruct = require("superstruct"); Superstruct.string();',
+  'import { z } from "zod"; const LocalSchema = z.object({ id: z.string() });',
+  'import { z } from "zod"; const UserSchema = z.object({ id: z.string() }); expect(renderUser(UserSchema.parse(raw))).toBe("User u1");',
+  'import { z } from "zod"; expect(Object.keys(z.object({ id: z.string() }).shape)).toEqual(["id"]);',
+  'import { object, parse } from "valibot"; expect(renderUser(parse(object({}), raw))).toBe("User u1");',
+  'import { ZodError } from "zod"; expect(() => submit(raw)).toThrow(ZodError);',
 ];
+
+const runtimeSchemaBinding =
+  'import { z } from "zod"; const UserSchema = z.object({ id: z.string() });';
 
 const validatorOracleCases = [
   'expect(UserSchema.parse(raw).id).toBe("user_1");',
@@ -65,6 +92,9 @@ const validatorOracleCases = [
   'import { assert } from "superstruct"; expect(() => assert(raw, UserSchema)).not.toThrow();',
   "assert.deepEqual(UserSchema.parse(raw), expected);",
   "assert.throws(() => UserSchema.parse(raw));",
+  'const JSON = UserSchema; expect(JSON.parse(raw).id).toBe("u1");',
+  'const path = UserSchema; expect(path.parse(raw).id).toBe("u1");',
+  "const yaml = UserSchema; expect(yaml.safeParse(raw).success).toBe(true);",
 ];
 
 const mockedResponseOracleCases = [
@@ -547,15 +577,22 @@ describe("Oxlint plugin", () => {
     'import { type ZodType } from "zod"; declare const schema: ZodType;',
     'import { UserSchema } from "./contracts"; UserSchema.parse(raw);',
     'function require(name) { return fixtures[name]; } const z = require("zod");',
-  ])("allows type-only, project, or shadowed imports in tests", (source) => {
-    const result = lint(
-      source,
-      { "antidrift/no-schema-library-in-test": "error" },
-      "schema.test.ts"
-    );
+    'import { z } from "zod"; it("renders schema fields", () => expect(generateForm(z.object({ name: z.string() })).fields).toEqual(["name"]));',
+    'import { z } from "zod"; const tool = defineTool({ name: "lookup", inputSchema: z.object({ id: z.string() }) }); it("runs", async () => expect(await tool.run({ id: "u1" })).toEqual({ found: true }));',
+    'import { ZodError } from "zod"; it("formats", () => expect(new FormError(new ZodError([])).message).toBe("Invalid form"));',
+    'import { z } from "zod"; const schema = z.object({ id: z.string() }); it("renders", () => expect(render(<Form schema={schema} />).getByRole("form")).toBeVisible());',
+  ])(
+    "allows type-only, project, shadowed, or application-input schema imports in tests",
+    (source) => {
+      const result = lint(
+        source,
+        { "antidrift/no-schema-library-in-test": "error" },
+        "schema.test.tsx"
+      );
 
-    expect(result.status).toBe(0);
-  });
+      expect(result.status).toBe(0);
+    }
+  );
 
   it("allows runtime-schema libraries in production files", () => {
     const result = lint(
@@ -571,7 +608,7 @@ describe("Oxlint plugin", () => {
     "rejects runtime-validator output as the assertion oracle: %s",
     (source) => {
       const result = lint(
-        source,
+        `${runtimeSchemaBinding}\n${source}`,
         { "antidrift/no-validator-output-oracle": "error" },
         "schema.test.ts"
       );
@@ -597,9 +634,12 @@ describe("Oxlint plugin", () => {
     "UserSchema.parse(raw); expect(handler).toHaveBeenCalledTimes(1);",
     "function parseFixture(value) { return UserSchema.parse(value); } expect(parseFixture(raw)).toEqual(expected);",
     'expect(() => startApplication(UserSchema.parse(raw))).toThrow("startup failed");',
+    'const command = commandParser.parse(["deploy", "--dry-run"]); expect(command.action).toBe("deploy");',
+    'expect(markdownForm.parse(text).title).toBe("Notes");',
+    'expect(routePattern.parse("/users/u1").id).toBe("u1");',
   ])("allows non-validator application and parser assertions", (source) => {
     const result = lint(
-      source,
+      `${runtimeSchemaBinding}\n${source}`,
       { "antidrift/no-validator-output-oracle": "error" },
       "schema.test.tsx"
     );
@@ -609,12 +649,54 @@ describe("Oxlint plugin", () => {
 
   it("does not inspect validator assertions outside test files", () => {
     const result = lint(
-      "expect(UserSchema.parse(raw)).toEqual(raw);",
+      `${runtimeSchemaBinding}\nexpect(UserSchema.parse(raw)).toEqual(raw);`,
       { "antidrift/no-validator-output-oracle": "error" },
       "schema.ts"
     );
 
     expect(result.status).toBe(0);
+  });
+
+  it("proves validator receivers from types in the typed ESLint pass", async () => {
+    const eslint = new ESLint({
+      cwd: typedFixturesDir,
+      overrideConfigFile: true,
+      overrideConfig: [
+        {
+          files: ["**/*.ts"],
+          languageOptions: {
+            parser: tsParser,
+            parserOptions: {
+              projectService: {
+                allowDefaultProject: ["*.ts"],
+                defaultProject: resolve(typedFixturesDir, "tsconfig.json"),
+              },
+              tsconfigRootDir: typedFixturesDir,
+            },
+          },
+          plugins: { antidrift: eslintPlugin },
+          rules: { "antidrift/no-validator-output-oracle": "error" },
+        },
+      ],
+    });
+    const source = [
+      'import type { ZodType } from "zod";',
+      "declare const UserSchema: ZodType<{ id: string }>;",
+      "declare const commandParser: { parse(argv: string[]): { action: string } };",
+      "declare const raw: unknown;",
+      "const JSON = UserSchema;",
+      'expect(JSON.parse(raw).id).toBe("u1");',
+      'const command = commandParser.parse(["deploy", "--dry-run"]);',
+      'expect(command.action).toBe("deploy");',
+    ].join("\n");
+
+    const [result] = await eslint.lintText(source, {
+      filePath: resolve(typedFixturesDir, "validator-oracle.test.ts"),
+    });
+
+    expect(
+      result.messages.map((message) => [message.ruleId, message.line])
+    ).toEqual([["antidrift/no-validator-output-oracle", 6]]);
   });
 
   it.each(mockedResponseOracleCases)(

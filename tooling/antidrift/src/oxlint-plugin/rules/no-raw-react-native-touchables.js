@@ -2,6 +2,7 @@ const forbiddenImports = new Map([
   [
     "react-native",
     new Set([
+      "Button",
       "Pressable",
       "TouchableHighlight",
       "TouchableNativeFeedback",
@@ -12,12 +13,16 @@ const forbiddenImports = new Map([
   [
     "react-native-gesture-handler",
     new Set([
+      "BaseButton",
+      "BorderlessButton",
       "LegacyBaseButton",
       "LegacyBorderlessButton",
       "LegacyPressable",
       "LegacyRawButton",
       "LegacyRectButton",
       "Pressable",
+      "RawButton",
+      "RectButton",
       "Touchable",
       "TouchableHighlight",
       "TouchableNativeFeedback",
@@ -76,6 +81,13 @@ function sourceName(node) {
   return typeof node.source?.value === "string" ? node.source.value : null;
 }
 
+function sourceSideName(specifier) {
+  const name = specifier.imported ?? specifier.local;
+  if (name?.type === "Identifier") return name.name;
+  if (typeof name?.value === "string") return name.value;
+  return null;
+}
+
 function importedName(specifier) {
   if (specifier.type === "ImportNamespaceSpecifier") return "namespace import";
   if (specifier.type === "ImportDefaultSpecifier") return "default import";
@@ -85,13 +97,11 @@ function importedName(specifier) {
   ) {
     return null;
   }
-  if (specifier.imported?.type === "Identifier") return specifier.imported.name;
-  if (typeof specifier.imported?.value === "string") {
-    return specifier.imported.value;
-  }
-  if (specifier.local?.type === "Identifier") return specifier.local.name;
-  if (typeof specifier.local?.value === "string") return specifier.local.value;
-  return null;
+  const name = sourceSideName(specifier);
+  if (name !== "default") return name;
+  return specifier.type === "ExportSpecifier"
+    ? "default re-export"
+    : "default import";
 }
 
 function isTypeOnly(node, specifier) {
@@ -103,15 +113,19 @@ function isTypeOnly(node, specifier) {
   );
 }
 
+const broadNames = new Set([
+  "default import",
+  "default re-export",
+  "namespace import",
+]);
+
 function shouldReportSpecifier(specifier, forbidden) {
   const name = importedName(specifier);
+  const broad = broadNames.has(name);
   return {
-    broad: name === "namespace import" || name === "default import",
+    broad,
     imported: name,
-    report:
-      name === "namespace import" ||
-      name === "default import" ||
-      (name !== null && forbidden.has(name)),
+    report: broad || (name !== null && forbidden.has(name)),
   };
 }
 

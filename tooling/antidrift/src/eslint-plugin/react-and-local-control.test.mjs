@@ -121,6 +121,21 @@ ruleTester.run(
       'import { Card } from "./c"; Card();',
       "function Widget() { return null; } Widget({ label: 'x' });",
       "const Box = () => null; Box({ a: 1 });",
+      // Solid, Qwik, Vue and compat-less Preact JSX is not React.
+      {
+        code: 'import { createSignal } from "solid-js"; const Fallback = () => <span />; const value = Fallback();',
+        filename: "component.tsx",
+      },
+      {
+        code: 'import { component$ } from "@builder.io/qwik"; const Box = () => <span />; Box();',
+        filename: "component.tsx",
+      },
+      {
+        code: 'import { h } from "preact"; const Box = () => <span />; Box();',
+        filename: "component.tsx",
+      },
+      // A local helper spelled `memo` is not React's wrapper.
+      "function memo(fn) { return fn; } const Format = memo(value => value.name); Format(record);",
     ],
     invalid: [
       {
@@ -144,6 +159,26 @@ ruleTester.run(
         code: 'import React from "react"; const Row = React.memo(Item); Row({ id });',
         output:
           'import React from "react"; const Row = React.memo(Item); <Row id={id} />;',
+      },
+      {
+        code: 'import { memo as cache } from "react"; const Widget = cache(() => <div />); Widget(props);',
+        output:
+          'import { memo as cache } from "react"; const Widget = cache(() => <div />); <Widget {...props} />;',
+      },
+      {
+        code: "function Widget(ok) { if (ok) return <div />; throw new Error(); } Widget(props);",
+        output:
+          "function Widget(ok) { if (ok) return <div />; throw new Error(); } <Widget {...props} />;",
+      },
+      {
+        code: "const Widget = () => <div />; const Alias = Widget; Alias(props);",
+        output:
+          "const Widget = () => <div />; const Alias = Widget; <Alias {...props} />;",
+      },
+      {
+        code: 'import { h } from "preact"; import { memo } from "preact/compat"; const Box = () => <span />; Box();',
+        output:
+          'import { h } from "preact"; import { memo } from "preact/compat"; const Box = () => <span />; <Box />;',
       },
     ].map((testCase) => ({
       ...testCase,
@@ -269,6 +304,12 @@ ruleTester.run(
         `,
         filename: "new-thread.tsx",
         options: [{ ...duplicatedClassnameControls, helpers: ["cx"] }],
+        errors: [{ messageId: "duplicatedConditionalClassnames" }],
+      },
+      {
+        code: 'cn([ok ? "a b c d e" : "a b c d f"]);',
+        filename: "new-thread.tsx",
+        options: [{ ...duplicatedClassnameControls, helpers: ["cn"] }],
         errors: [{ messageId: "duplicatedConditionalClassnames" }],
       },
     ],
@@ -444,6 +485,36 @@ ruleTester.run(
       },
       {
         code: `
+          type E =
+            | { kind: "a"; id: string; at: number }
+            | { kind: "b"; id: string; at: number }
+            | { kind: "c"; id: string; at: number }
+            | { kind: "id"; id: string };
+        `,
+        errors: [
+          {
+            messageId: "duplicatedObjectFieldBlocks",
+            data: { shapes: "3", count: "2", fields: "at, id" },
+          },
+        ],
+      },
+      {
+        code: `
+          type A = { kind: "a"; id: string; at: number };
+          type B = { kind: "b"; id: string; at: number };
+          type C = { kind: "c"; id: string; at: number };
+          type D = { kind: "d"; id: string; label: string };
+          type F = { kind: "f"; at: number; label: number };
+        `,
+        errors: [
+          {
+            messageId: "duplicatedObjectFieldBlocks",
+            data: { shapes: "3", count: "2", fields: "at, id" },
+          },
+        ],
+      },
+      {
+        code: `
           z.object({ kind: z.literal("a"), id: z.string(), at: z.number(), tenant: z.string(), source: z.string(), region: z.string(), locale: z.string() });
           z.object({ kind: z.literal("b"), id: z.string(), at: z.number(), tenant: z.string(), source: z.string(), region: z.string(), locale: z.string() });
           z.object({ kind: z.literal("c"), id: z.string(), at: z.number() });
@@ -594,6 +665,16 @@ ruleTester.run(
           });
         `,
         filename: "codec.test.ts",
+      },
+      {
+        code: `
+          it("normalizes row order", () => {
+            const rows = normalize([{ id: 2 }, { id: 1 }]);
+            expect(rows).toHaveLength(2);
+            expect(rows).toEqual([{ id: 1 }, { id: 2 }]);
+          });
+        `,
+        filename: "rows.test.ts",
       },
     ],
     invalid: [
@@ -746,6 +827,17 @@ ruleTester.run(
       },
       {
         code: `
+          it("keeps rows in arranged order", () => {
+            const rows = normalize([{ id: 1 }, { id: 2 }]);
+            expect(rows).toHaveLength(2);
+            expect(rows).toEqual([{ id: 1 }, { id: 2 }]);
+          });
+        `,
+        filename: "rows.test.ts",
+        errors: [{ messageId: "lengthEcho" }, { messageId: "inputEcho" }],
+      },
+      {
+        code: `
           it("checks runtime servers", () => {
             const connections = toRuntimeConnections(registry);
             expect(connections.map((server) => server.name)).toEqual(["needle", "context7"]);
@@ -880,6 +972,7 @@ ruleTester.run(
       "const deviceId = () => process.env.AGENT_TRACE_DEVICE_ID ?? readMachineId();",
       "function getDisplayName() { return ''; }",
       "function isValid() { return ''; }",
+      "function formatDeviceName(device) { return device.name ?? ''; }",
     ],
     invalid: [
       {
@@ -931,6 +1024,33 @@ ruleTester.run(
           {
             message:
               "Do not return an empty string from traceDevice (source: ast-logical-fallback). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
+          },
+        ],
+      },
+      {
+        code: "function deviceId() { return ''; }",
+        errors: [
+          {
+            message:
+              "Do not return an empty string from deviceId (source: ast-direct-empty). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
+          },
+        ],
+      },
+      {
+        code: "const deviceId = () => '';",
+        errors: [
+          {
+            message:
+              "Do not return an empty string from deviceId (source: ast-direct-empty). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
+          },
+        ],
+      },
+      {
+        code: "function readHostname() { try { return read(); } catch { return ''; } }",
+        errors: [
+          {
+            message:
+              "Do not return an empty string from readHostname (source: ast-catch-recovery). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
           },
         ],
       },
@@ -1094,6 +1214,16 @@ ruleTester.run(
       "type Props = { onConfirm: (date: { year: number; month: number; day: number }) => void }; void ({} as Props);",
       "const formatDate = (date: { year: number; month: number; day: number }) => String(date.year); void formatDate;",
       "function local({ id }: { id: string }) { return id; } void local;",
+      {
+        filename: "panel.tsx",
+        code: "export function Panel(props: { id: string; title: string }) { if (props.id) { return <div>{props.title}</div>; } return null; }",
+      },
+      {
+        filename: "panel-local.tsx",
+        code: "export function Panel(props: { id: string; title: string }) { switch (props.id) { case 'a': { const view = <div>{props.title}</div>; return view; } default: return null; } }",
+      },
+      "class Local { constructor(input: { id: string; title: string }) { void input; } } void Local;",
+      "class Local { set value(input: { id: string; title: string }) { void input; } } void Local;",
     ],
     invalid: [
       {
@@ -1123,6 +1253,31 @@ ruleTester.run(
       {
         filename: "loader.tsx",
         code: "export function loadUser(input: { id: string }) { const view = <div />; void view; return input.id; }",
+        errors: 1,
+      },
+      {
+        filename: "loader-nested.tsx",
+        code: "export function loadUser(input: { id: string }) { const render = () => { return <div />; }; void render; return input.id; }",
+        errors: 1,
+      },
+      {
+        code: "export const api = { save(req: { id: string; email: string }) { return req.email; } } satisfies Api;",
+        errors: 1,
+      },
+      {
+        code: "export const api = { save(req: { id: string; email: string }) { return req.email; } } as const;",
+        errors: 1,
+      },
+      {
+        code: "export const receive = ((input: { id: string; email: string }) => input.email) satisfies Handler;",
+        errors: 1,
+      },
+      {
+        code: "export class Api { constructor(input: { id: string; title: string }) { void input; } }",
+        errors: 1,
+      },
+      {
+        code: "class Api { set value(input: { id: string; title: string }) { void input; } }\nexport { Api };",
         errors: 1,
       },
     ],
@@ -1315,44 +1470,3 @@ ruleTester.run(
     ],
   }
 );
-
-const authzRuleOptions = [{ authzFunctions: ["authorize"] }];
-
-ruleTester.run("require-authz-check", rule("require-authz-check"), {
-  valid: [
-    {
-      ...fixture("programs/correct/authz-before-params.ts"),
-      options: authzRuleOptions,
-    },
-    {
-      code: "function handler(req) { const body = req.body; return body; }",
-      options: authzRuleOptions,
-    },
-    {
-      code: "function outer(req) { authorize(req.user); }",
-      options: authzRuleOptions,
-    },
-  ],
-  invalid: [
-    {
-      ...fixture("programs/drift/params-without-authz.ts"),
-      options: authzRuleOptions,
-      errors: 1,
-    },
-    {
-      ...fixture("programs/drift/nested-params-without-local-authz.ts"),
-      options: authzRuleOptions,
-      errors: 1,
-    },
-    {
-      code: `
-        function handler(req) {
-          authorize(req.user);
-          return req.params.projectId;
-        }
-      `,
-      options: [{ authzFunctions: ["approvedAuthorize"] }],
-      errors: 1,
-    },
-  ],
-});

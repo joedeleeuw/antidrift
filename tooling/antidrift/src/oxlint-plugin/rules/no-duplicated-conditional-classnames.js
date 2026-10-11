@@ -168,11 +168,33 @@ function isWithinClassAttributeExpression(node, options) {
   return false;
 }
 
-function isClassHelperArgument(node, options) {
+// Class helpers accept nested arrays, objects and spreads (`cn([a, { b: c }])`),
+// so climb through those wrappers to the enclosing call's argument list.
+function classValueWrapperParent(node) {
   const parent = node.parent;
+  if (parent?.type === "ArrayExpression") return parent;
+  if (parent?.type === "SpreadElement") return parent;
+  if (
+    parent?.type === "Property" &&
+    (parent.value === node || (parent.computed && parent.key === node)) &&
+    parent.parent?.type === "ObjectExpression"
+  ) {
+    return parent.parent;
+  }
+  return null;
+}
+
+function isClassHelperArgument(node, options) {
+  let current = node;
+  let wrapper = classValueWrapperParent(current);
+  while (wrapper) {
+    current = wrapper;
+    wrapper = classValueWrapperParent(current);
+  }
+  const parent = current.parent;
   if (parent?.type !== "CallExpression") return false;
   return (
-    parent.arguments.includes(node) &&
+    parent.arguments.includes(current) &&
     options.helperNames.has(calleeName(parent.callee))
   );
 }

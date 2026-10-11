@@ -943,3 +943,44 @@ typedRuleTester.run(
     ],
   }
 );
+
+const authzRuleOptions = [{ authzFunctions: ["authorize"] }];
+
+ruleTester.run("require-authz-check", rule("require-authz-check"), {
+  valid: [
+    {
+      ...fixture("programs/correct/authz-before-params.ts"),
+      options: authzRuleOptions,
+    },
+    {
+      code: "function handler(req) { const body = req.body; return body; }",
+      options: authzRuleOptions,
+    },
+    {
+      code: "function outer(req) { authorize(req.user); }",
+      options: authzRuleOptions,
+    },
+  ],
+  invalid: [
+    {
+      ...fixture("programs/drift/params-without-authz.ts"),
+      options: authzRuleOptions,
+      errors: 1,
+    },
+    {
+      ...fixture("programs/drift/nested-params-without-local-authz.ts"),
+      options: authzRuleOptions,
+      errors: 1,
+    },
+    {
+      code: `
+        function handler(req) {
+          authorize(req.user);
+          return req.params.projectId;
+        }
+      `,
+      options: [{ authzFunctions: ["approvedAuthorize"] }],
+      errors: 1,
+    },
+  ],
+});
