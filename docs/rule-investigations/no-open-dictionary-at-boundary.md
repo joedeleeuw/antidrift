@@ -26,11 +26,11 @@ Restricted-type rules can ban `Record` globally but do not express this exact ex
 
 The local Antidrift corpus runs the checked-in `fixtures/open-dictionary/allows.ts` owner-typed boundary. Its flags companion and unit cases exercise all four dictionary forms, nested annotations, export styles, internal controls, and public-name exemptions. No independently pinned external corpus evidence is claimed.
 
-October 12 2026 precision, on 79 deduplicated TypeScript roots (35 local, 44 on sushi; vendored, generated, build, dot and fixture trees excluded). A hit is true when the open dictionary erases a shape the code knows or an owner type that exists.
+October 12 2026 precision, on 84 deduplicated TypeScript roots (40 local, 44 on sushi; vendored, build, generated, fixture, mock and snapshot trees and analyzer test inputs excluded before sampling). A hit is true when the open dictionary erases a shape the code knows or an owner type that exists. The after sample was drawn after the implementation was committed, from hits no earlier lane had inspected, and its labels were frozen before scoring.
 
 | Version                         | Hits | Repositories | Top 5                                                             | Sample |
 | ------------------------------- | ---- | ------------ | ----------------------------------------------------------------- | ------ |
-| Before                          | 410  | 31           | LibreChat 68, executor 55, claude-code 51, sentry 50, opencode 45 | 11/20  |
-| After excluding type parameters | 324  | 29           | LibreChat 63, executor 51, claude-code 48, opencode 39, paseo 22  | 6/20   |
+| Before                          | 403  | 30           | LibreChat 68, executor 55, sentry 50, claude-code 50, opencode 40 | 11/20  |
+| After excluding type parameters | 356  | 29           | LibreChat 63, executor 51, claude-code 47, sentry 39, opencode 34 | 10/20  |
 
-The after run covers 78 roots (sentry did not finish; on those roots the before count is 360 in 30). The remaining false positives are decoder and validator inputs, generic record helpers, and protocol or logging bags (MCP arguments and metadata, logger context, CLI telemetry); only exact-name `allows` separates those, so the rule stays below the 70% bar.
+The remaining false positives are parser and decoder inputs, generic record helpers and guards, and protocol or logging bags (tool arguments, custom claims, logger data); only exact-name `allows` separates those, so the rule stays below the 70% bar.

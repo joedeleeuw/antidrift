@@ -36,11 +36,11 @@ Unsafe-any rules address a different type and do not require decoding unknown bo
 
 The local Antidrift corpus runs `fixtures/unknown-input/allows.ts`, which decodes an unknown parameter with a real Zod schema. The flags companion returns an unknown through application logic. Unit cases cover predicate dominance, imported signatures, catches, exemptions, shadowing, and invalidation. Independently pinned external evidence remains outstanding.
 
-October 12 2026 precision, on 79 deduplicated TypeScript roots (35 local, 44 on sushi; vendored, generated, build, dot and fixture trees excluded). A hit is true when an unknown value is cast or consumed as domain data without decoding.
+October 12 2026 precision, on 84 deduplicated TypeScript roots (40 local, 44 on sushi; vendored, build, generated, fixture, mock and snapshot trees and analyzer test inputs excluded before sampling). A hit is true when an unknown value is cast or consumed as domain data without decoding. The after sample was drawn after the implementation was committed, from hits no earlier lane had inspected, and its labels were frozen before scoring.
 
-| Version                                                            | Hits  | Repositories | Top 5                                                                       | Sample |
-| ------------------------------------------------------------------ | ----- | ------------ | --------------------------------------------------------------------------- | ------ |
-| Before                                                             | 1,767 | 46           | paseo 307, opencode 251, cloudflare-agents 245, executor 233, LibreChat 144 | 8/20   |
-| After thrown-value, object-field and test-and-serialize exemptions | 1,285 | 43           | paseo 197, opencode 195, executor 170, cloudflare-agents 169, LibreChat 122 | 11/20  |
+| Version                                   | Hits  | Repositories | Top 5                                                                       | Sample |
+| ----------------------------------------- | ----- | ------------ | --------------------------------------------------------------------------- | ------ |
+| Before                                    | 1,793 | 46           | paseo 307, opencode 250, cloudflare-agents 245, executor 233, LibreChat 140 | 8/20   |
+| After object-field and test-and-serialize | 1,526 | 45           | paseo 253, opencode 216, cloudflare-agents 195, executor 184, LibreChat 126 | 10/20  |
 
-The after run covers 78 roots (sentry did not finish; on those roots the before count is 1,734 in 45). Before, the false positives were mostly error-normalisation helpers. After, they are generic walkers and formatters over arbitrary values, test spies and identity mocks, and stored thrown values without an `instanceof` test. The rule stays below the 70% bar.
+The before sample's mocks-tree hit was replaced by an unseen eligible one (7/19 plus 1/1). A binding-wide `instanceof Error` exemption was tried and removed: a single guard does not make every other read of the binding a thrown value, and reads the guard narrows are already clean. Before, the false positives were mostly error-normalisation helpers. After, they are generic walkers and formatters over arbitrary values, error formatting, decoders that narrow by literal equality, and stored thrown values. The rule stays below the 70% bar.
