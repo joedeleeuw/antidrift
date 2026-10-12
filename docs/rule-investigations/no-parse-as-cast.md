@@ -1,6 +1,6 @@
 # no-parse-as-cast Investigation
 
-Status: `under-proven`, default-off. Do not enable at error severity until the contested class below is decided.
+Status: `ready`, enabled at error in the ESLint config. Next.js server actions (exported from a `"use server"` module, or carrying the directive in their body) are exempt: they are network endpoints. On a 54-repository corpus the rule reports 15 findings in 5 repositories, all true positives.
 
 ## Problem Statement
 

@@ -29,7 +29,9 @@ The ESLint pass also enforces these syntax rules at error, exported by both plug
 
 `antidrift/no-raw-react-native-touchables` reports every raw React Native or gesture-handler touchable import until a repository creates one shared Touchable module and registers it as the rule's owner (`allowedFiles`); the owner file alone may then import the raw primitives.
 
-Every ESLint-pass rule above is ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
+The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-parse-as-cast`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api` and `antidrift/no-schema-validator-transcoding` at error. `antidrift/no-underchecked-type-predicate` stays at warn.
+
+Every ESLint-pass rule above, typed rules included, is ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
 
 ```sh
 eslint . \
@@ -49,7 +51,13 @@ eslint . \
   --suppress-rule antidrift/no-raw-fetch-in-component \
   --suppress-rule antidrift/no-raw-react-native-touchables \
   --suppress-rule antidrift/no-calling-components-as-functions \
-  --suppress-rule antidrift/no-duplicated-conditional-classnames
+  --suppress-rule antidrift/no-duplicated-conditional-classnames \
+  --suppress-rule antidrift/no-parse-as-cast \
+  --suppress-rule antidrift/no-defensive-shape-probing \
+  --suppress-rule antidrift/no-identity-schema-transform \
+  --suppress-rule antidrift/require-convex-return-validator \
+  --suppress-rule antidrift/no-explicit-type-arguments-on-owned-api \
+  --suppress-rule antidrift/no-schema-validator-transcoding
 ```
 
 See `docs/rule-investigations/directive-rules.md` in the repository for scope and corpus evidence.
@@ -312,15 +320,15 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-contract-appeasement-projection` — internal helpers that project one owned value contract into another explicit return contract without construction or validation
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning
 - `no-appeasement-cast` — `any` / `unknown` casts that paper over missing validation
-- `no-underchecked-type-predicate` — default-off inventory for broad-input type predicates that assert object contracts without checking required asserted fields
+- `no-underchecked-type-predicate` — warn-level inventory for broad-input type predicates that assert object contracts without checking required asserted fields; `instanceof`, delegated type predicates, and literal discriminant checks count as proof
 - `no-canonical-model-fork` — configured first-party model redeclarations that should import or derive from the canonical owner
 - `no-handrolled-resource-lifecycle-cells` — behavior-based detection for hand-rolled async resource lifecycle state machines, with broad multi-setter co-mutation emitted as inventory only
 - `no-unsafe-deserialize` — broad `JSON.parse` inputs and unvalidated parsed results assigned into declared domain contracts
 - `no-defensive-shape-probing` — deterministic broad-value extractor cases backed by real corpus evidence, not ordinary boolean predicates
-- `no-identity-schema-transform` — default-off TypeChecker proof for Zod transforms that reconstruct every input field unchanged
-- `no-explicit-type-arguments-on-owned-api` — default-off symbol-resolved proof against caller-supplied type arguments on Convex generated references and TanStack registrations
-- `require-convex-return-validator` — default-off symbol-resolved proof that every registered Convex function declares an explicit `returns` validator
-- `no-schema-validator-transcoding` — default-off proof against an Effect `JSONSchema.make` result registered as a Convex validator instead of keeping one runtime owner
+- `no-identity-schema-transform` — TypeChecker proof for Zod transforms that reconstruct every input field unchanged
+- `no-explicit-type-arguments-on-owned-api` — symbol-resolved proof against caller-supplied type arguments on Convex generated references and TanStack registrations
+- `require-convex-return-validator` — symbol-resolved proof that every registered Convex function declares an explicit `returns` validator
+- `no-schema-validator-transcoding` — proof against an Effect `JSONSchema.make` or zod `toJSONSchema` result registered as a Convex validator instead of keeping one runtime owner
 - `no-redundant-local-return-type` — default-off TypeChecker identity proof for a nested implementation whose shorthand-object inference repeats a direct named type literal while every call remains constrained by the enclosing function's explicit return contract
 - `import/no-cycle` — import cycles caught by Oxlint's native import graph
 

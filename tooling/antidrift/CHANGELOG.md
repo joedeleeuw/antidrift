@@ -4,6 +4,12 @@
 
 - `no-nonindependent-test-oracle`: the registry's input, outcome, error-shape and mock-call echo `flags` examples now sit inside an `it(...)` callback. The rule bounds arrangement to the enclosing test callback, so the bare snippets never reported; rule behavior is unchanged
 
+- enable `no-parse-as-cast`, `no-defensive-shape-probing`, `no-identity-schema-transform`, `require-convex-return-validator`, `no-explicit-type-arguments-on-owned-api` and `no-schema-validator-transcoding` at error in the ESLint config. Across a 54-repository TypeScript corpus the last five report no real findings; existing violations belong in the bulk-suppression baseline (`eslint . --suppress-rule antidrift/<rule>`)
+
+- `no-parse-as-cast`: Next.js server actions are exempt. A function exported from a module with a top-level `"use server"` directive, or carrying the directive in its own body, is a network endpoint, so parsing its declared input decodes untrusted client data. Corpus precision went from 15/25 to 15/15
+
+- `no-underchecked-type-predicate`: an `instanceof` whose instance type satisfies the asserted type, a delegated type predicate (e.g. Effect `Schema.is`, `Predicate.isTagged`), a `Reflect.get` read, and a literal equality on a literal-typed (discriminant) property of the asserted type count as proof. A typed record with declared fields or typed index values is no longer broad input. Corpus precision went from 18/110 to 18/25; the rule stays at warn
+
 ## 0.15.0
 
 - `no-schema-library-in-test`: schema-library value imports report only for test-owned validation, reads or sanitizing. Schema values and errors that flow straight into application APIs (call or constructor arguments, JSX props), e.g. `generateForm(z.object(...))` or `new FormError(new ZodError([]))`, are allowed; dynamic `import()` and side-effect imports still report

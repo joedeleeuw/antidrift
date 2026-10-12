@@ -883,6 +883,7 @@ rules:
       - "pnpm policy:inventory-defensive-shape now makes the sunset sweep reproducible: 1,680 type-aware files, 72 Object.entries transform syntax candidates, 1 custom finding, 0 parser errors, and 1 drift repository."
       - Stable promotion remains blocked; the reproducible sweep found no second drift repository and the one Chaski finding has same-file upstream unsafe-rule overlap.
       - Claude Opus 4.8 advisory review recommends demoting to inventory/off or retiring if no second drift appears beyond upstream unsafe-member coverage.
+      - "Wide corpus sweep (54 TypeScript repositories, 26,379 type-checked files, 725 Object.entries iteration callbacks in 36 repositories): 0 findings, 0 false positives. Enabled at error with the bulk-suppression baseline; the rule has no second drift repository yet."
     external:
       state: partial-overlap
       support: medium
@@ -899,7 +900,7 @@ rules:
       allows:
         - "const parsed = schema.parse(raw);"
         - "Object.entries(typedMap).map(([id, value]) => value.name)"
-    nextAction: Keep as explicit default-off package inventory after the parser-clean sunset sweep; do not promote unless a second real drift repository appears, preferably with unknown-typed broad values not already explained by upstream unsafe-member rules.
+    nextAction: Blocking at error in the ESLint pass. Retire if no second real drift repository appears beyond upstream unsafe-member coverage; do not promote to stable until one does.
   antidrift/no-inline-structural-type-at-use-site:
     status: ready
     stable: false
@@ -1242,7 +1243,9 @@ rules:
     concerns:
       - "Structural type identity was rejected as the signal: a first pass keyed on mutual assignability produced three false positives in Codebase Atlas because Zod refinements (.min, .int, .strict) and z.input contracts are invisible to TypeScript. The shipped rule requires the parameter type to be a z.infer/z.output alias of the same schema symbol."
       - "The Codebase Atlas class (validateSpine/markGeneratedStateManifestValidated: a parameter typed as the schema output, immediately parsed, with *Input naming that says the authors meant it defensively) is accepted as drift, not defensive practice. The remedy is to type the parameter as the unvalidated input so the parse is honest. Decision recorded 2026-08-03."
-      - "Test contract oracles are not yet exempted. sceneContractOracle.test.ts:53 re-parses a typed value to assert an adapter emits schema-valid output; the throw-assertion-callback exemption does not cover a bare parse in a test body."
+      - "Test contract oracles are exempt: files matching the taxonomy test pattern are skipped, so a bare parse in a test body is a schema-conformance oracle."
+      - 'Next.js server actions are exempt: a function exported from a module with a top-level "use server" directive, or carrying the directive in its own body, is a network endpoint whose declared parameter type the client never satisfied. The first wide sweep flagged ten chatbiz-webapp server actions (src/server-actions/*.actions.ts) before this exemption.'
+      - "Wide corpus sweep (54 TypeScript repositories, 26,379 type-checked files): 25 findings in 5 repositories before the server-action exemption (15 TP / 10 FP, 60%); 15 findings in 5 repositories after it (codebase-atlas 4, dotfiles 4, paseo 4, rubber 2, chatbiz-webapp 1), all true positives."
     external:
       state: net-antidrift
       support: none
@@ -1257,7 +1260,8 @@ rules:
         - "function save(user: unknown) { return UserSchema.parse(user); }"
         - "type AstFactsInput = z.input<typeof AstFactsSchema>; function run(facts: AstFactsInput) { return AstFactsSchema.parse(facts); }"
         - "function validateProjectId(id: string) { return z.string().min(1).parse(id); }"
-    nextAction: "Test-context exemption landed 2026-08-03: files matching the taxonomy test pattern are skipped, closing the sceneContractOracle.test.ts false positive; known false positives now zero. Next: promotion block for stable: true. Corpus is 10 positives across Murderbox desktop (6) and Codebase Atlas (4 accepted-drift), zero known FPs."
+        - '"use server"; type Input = z.infer<typeof InputSchema>; export async function save(input: Input) { return InputSchema.parse(input); }'
+    nextAction: "Blocking at error with the bulk-suppression baseline. Next: promotion block for stable: true once Murderbox, Codebase Atlas, paseo, dotfiles and rubber drift is remediated or baselined."
   antidrift/no-appeasement-erasure:
     directive: G2
     status: ready
@@ -1302,7 +1306,6 @@ rules:
   antidrift/no-identity-schema-transform:
     status: ready
     stable: false
-    defaultOff: true
     referenceDoc: docs/rule-investigations/no-identity-schema-transform.md
     signal: TypeChecker-proven Zod transform ownership plus closed input shape and exact AST pass-through reconstruction
     solveType: type-contract-shape
@@ -1311,6 +1314,7 @@ rules:
     concerns:
       - The first evidence set includes synthetic identity drift and a real Murderbox clean decoder, but no independently replicated real drift.
       - Generic schemas, indexed input shapes, readonly receivers, async or aliased callbacks, computed properties, spreads, and noncanonical destructuring intentionally remain false negatives.
+      - "Wide corpus sweep (54 TypeScript repositories, 384 .transform calls in 9 repositories, led by opencode 177, paseo 132 and homer-production 44): 0 findings, 0 false positives. The closed-shape proof holds; real identity drift is still unreplicated."
     external:
       state: net-antidrift
       support: none
@@ -1326,11 +1330,10 @@ rules:
         - "z.object({ a: z.string(), b: z.string() }).transform((value) => ({ a: value.a }))"
         - "z.object({ a: z.string() }).transform((value) => ({ a: value.a, createdAt: nowIso() }))"
         - "ConversationIndexSchema.transform((raw) => ({ id: raw.id || deriveId(raw), title: raw.title?.trim() || 'New conversation' }))"
-    nextAction: Keep default-off until a real identity-transform drift is independently replicated and broader Zod corpus inventory confirms the closed-shape proof has no false positives.
+    nextAction: Blocking at error with the bulk-suppression baseline. Promote to stable once a real identity-transform drift is independently replicated.
   antidrift/no-explicit-type-arguments-on-owned-api:
     status: ready
     stable: false
-    defaultOff: true
     semanticAdapterStatus:
       status: inline-pending
       reason: Convex hook and TanStack registration symbol resolution live inline with one consumer. Extract to a shared adapter when a second rule needs owned-API provenance.
@@ -1343,6 +1346,7 @@ rules:
       - "The first evidence set is synthetic drift plus Murderbox clean-run controls; no independently replicated real drift yet."
       - "Only registered owners are proven: Convex generated api references and queryOptions/mutationOptions results. Ad-hoc TanStack key arrays, inline options objects, and wrapper hooks around useQuery intentionally stay silent because no owner can be resolved."
       - "Aliased or re-exported hook names resolve through the checker; a locally declared function that merely shares the useQuery name is not flagged even when handed a generated api reference."
+      - "Wide corpus sweep (54 TypeScript repositories, 151 explicit type arguments on TanStack/Convex calls in 6 repositories, led by sentry 81 and paseo 48): 0 findings, 0 false positives. Every one of those calls passes inline options, an ad-hoc key, or a query-cache result, so none has a provable owner."
     external:
       state: net-antidrift
       support: none
@@ -1359,11 +1363,10 @@ rules:
         - "useQuery(api.machines.list)"
         - 'queryClient.getQueryData<HandwrittenMachine[]>(["machines"])'
         - 'useQuery<HandwrittenMachine[]>({ queryKey: ["machines"], queryFn: fetchMachines })'
-    nextAction: Keep default-off until a real explicit-type-argument fork is independently replicated and Murderbox plus one more Convex or TanStack consumer confirm zero false positives on clean-run.
+    nextAction: Blocking at error with the bulk-suppression baseline. Promote to stable once a real explicit-type-argument fork is independently replicated.
   antidrift/require-convex-return-validator:
     status: ready
     stable: false
-    defaultOff: true
     semanticAdapterStatus:
       status: inline-pending
       reason: Convex registrar symbol and builder-type provenance resolution live inline with one consumer. Extract to a shared adapter when a second rule needs registered-function provenance.
@@ -1376,6 +1379,7 @@ rules:
       - "The first evidence set is synthetic fixtures plus real Murderbox drift: 18 registered functions across conversations.ts, littleBird.ts, machines.ts, and health.ts, all missing returns validators, all flagged with zero false positives on ctx.db query calls."
       - "Custom function builders (customFn-wrapped registrars) and non-object-literal first arguments intentionally stay silent because no static registration object can be proven; httpAction is out of scope because it has no validator concept."
       - "Object arguments carrying spread or computed properties stay silent because a static scan cannot prove the returns key is absent."
+      - "Wide corpus sweep: mrp (155 registrations) and homer-production (89) declare returns on every registration and report 0 findings. A recall probe that renamed every returns key in memory reported 155/155 and 89/89, both through the project-local _generated/server builders."
     external:
       state: net-antidrift
       support: none
@@ -1390,11 +1394,10 @@ rules:
       allows:
         - 'query({ args: { id: v.id("machines") }, returns: v.union(machineResult, v.null()), handler: async (ctx, args) => findMachine(ctx, args.id) })'
         - "mutation({ args: {}, returns: v.null(), handler: async () => null })"
-    nextAction: Keep default-off until the Murderbox drift is remediated or accepted and one more Convex consumer confirms zero false positives on validator-covered code.
+    nextAction: Blocking at error with the bulk-suppression baseline; consumers baseline existing registrations (Murderbox's 18) and prune as returns validators land.
   antidrift/no-schema-validator-transcoding:
     status: ready
     stable: false
-    defaultOff: true
     semanticAdapterStatus:
       status: inline-pending
       reason: Effect JSONSchema.make and Convex registration symbol resolution live inline with one consumer. Extract to a shared adapter when a second rule needs schema-representation provenance.
@@ -1407,6 +1410,7 @@ rules:
       - "The first evidence set is synthetic drift plus a Murderbox clean-run control. Murderbox's one real transcoder (convex/zodToConvex.ts, zod-sourced) was remediated in murderbox@3a030ff4; the zod source branch added on 2026-08-10 guards against reintroduction."
       - "Only the effect JSONSchema.make and zod toJSONSchema sources and the Convex args/returns registration sink are proven, with one converter wrapper allowed in the chain. Ajv or other JSON-Schema-consumer sinks and flows through more than one converter or binding intentionally stay silent."
       - "Registrations imported through a project-local _generated/server wrapper resolve to the project file, not the convex package; only direct convex/server builder imports are proven in v1."
+      - "Wide corpus sweep (54 TypeScript repositories): 0 findings. The 10 JSONSchema.make/toJSONSchema calls (chatbiz-webapp, homer-production, paseo, dotfiles, executor, opencode) never reach a Convex registration, and both Convex consumers (mrp, homer-production) register through _generated/server, so precision is untested beyond fixtures."
     external:
       state: net-antidrift
       support: none
@@ -1422,7 +1426,7 @@ rules:
       allows:
         - "buildApiDocumentation(JSONSchema.make(MachineRegistration))"
         - "query({ returns: v.array(v.object({ machineId: v.string() })), handler })"
-    nextAction: Keep default-off until a real Effect-to-Convex transcoding is independently replicated and Murderbox plus one more effect-bearing Convex consumer confirm zero false positives on clean-run.
+    nextAction: Blocking at error with the bulk-suppression baseline. Extend the sink proof to project-local _generated/server builders before claiming coverage on real Convex consumers.
   antidrift/no-sql-string-concat:
     status: ecosystem-covered
     stable: false
@@ -1721,6 +1725,9 @@ rules:
       - "pnpm policy:inventory-underchecked-predicate now makes the broad predicate sweep reproducible: 1,353 type-aware files, 64 type-predicate candidate files, 112 type-predicate signatures, 0 custom findings, 0 parser errors, and 0 drift repositories."
       - Validator delegation is allowed, so stable promotion should classify schema-backed predicate inventories.
       - Discriminant guards over already-typed unions stay outside the report path.
+      - "Nominal and discriminant evidence counts as proof: an instanceof whose instance type is assignable to the asserted type, a delegated type predicate (including Effect Schema.is and Predicate.isTagged) whose asserted type is assignable or whose fields cover the required ones, and a literal equality (member, element, Reflect.get, or a local bound to one) against a literal-typed property of the asserted type. Equality against a property typed string is not a discriminant."
+      - "Typed records are not broad input: an index-signature type is broad only when it has no declared properties and its index values are any or unknown."
+      - 'Wide corpus sweep (54 TypeScript repositories, 26,379 type-checked files): 110 findings in 18 repositories before the evidence change (18 TP / 92 FP, 16%); 25 findings in 6 repositories after it (sentry 11, opencode 6, executor 4, paseo 2, figma-console-mcp 1, pi-smart-compact 1; 18 TP / 7 FP, 72%). Per-repository precision stays uneven (sentry 11/11, opencode 3/6, executor 2/4, paseo 0/2). Remaining false-positive classes: boolean brand helpers such as NamedError.hasName, capability probes on in-process objects (typeof value.safeParse === "function"), a library brand "_zod" in value, a symbol-keyed required field read, and a null filter over an any-typed array.'
       - The verdict layer is heuristic; validator-looking helper names and incidental member reads can cause false negatives.
     external:
       state: net-antidrift
@@ -1732,9 +1739,13 @@ rules:
     examples:
       flags:
         - 'const isUser = (value: unknown): value is User => value != null && typeof value === "object";'
+        - 'type FsError = { code: string; path: string }; const isFsError = (value: unknown): value is FsError => typeof value === "object" && value !== null && "code" in value && value.code === "ENOENT";'
       allows:
         - 'function isDateMessage(value: unknown): value is DateMessage { return !!value && typeof value === "object" && "year" in value && "month" in value && "day" in value; }'
-    nextAction: Keep default-off; find real broad-input predicate drift that misses required asserted fields before re-enabling or promoting.
+        - "function isApiError(error: unknown): error is ApiError { return error instanceof ApiError; }"
+        - 'const isConflictError = (value: unknown): value is ConflictError => typeof value === "object" && value !== null && "_tag" in value && value._tag === "ConflictError";'
+        - "const isToolFile = (value: unknown): value is ToolFile => Schema.is(ToolFileSchema)(value);"
+    nextAction: Keep at warn. Enable at error only after precision holds at or above 80% in every repository with findings; the remaining classes need a trusted brand-helper or capability-probe model, not a looser field count.
   antidrift/no-unsafe-deserialize:
     status: ready
     stable: true

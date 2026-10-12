@@ -2,7 +2,7 @@
 
 ## Current Rule
 
-`antidrift/no-defensive-shape-probing` is implemented but default-off. It is `under-proven`, not `stable`.
+`antidrift/no-defensive-shape-probing` is enabled at error in the ESLint config. It is `ready`, not `stable`. A 54-repository corpus (725 `Object.entries` iteration callbacks) reports 0 findings.
 
 The real-corpus-backed signal is the `Object.entries(...).map` extractor branch: broad object normalization that repeatedly inspects entry values instead of using an owned schema or converter.
 
@@ -67,7 +67,7 @@ Current result:
 - 0 additional custom findings across Chaski Portal, Codebase Atlas, Sudocode CLI/server, and Opencode console app.
 - Same-line overlap with upstream unsafe rules: 0. Same-file upstream overlap for custom findings: 1.
 
-Decision: keep the rule as explicit default-off package inventory. It should not move toward stable promotion without a second real drift repository, preferably an `unknown`-typed broad-value mini-parser that upstream unsafe rules do not already explain.
+Decision: block at error with the bulk-suppression baseline. It should not move toward stable promotion without a second real drift repository, preferably an `unknown`-typed broad-value mini-parser that upstream unsafe rules do not already explain.
 
 ## Earlier Corpus Sweep 2026-06-09
 
@@ -85,7 +85,7 @@ The 2026-06-15 reproducible sweep above supersedes this ad hoc sweep as the curr
 2. Kept only `CallExpression` handling for `Object.entries(...).map`/`flatMap`/related transforms.
 3. Added TypeChecker evidence: the entry value binding must be broad (`any`/`unknown`) before the shape-probe count matters.
 4. Added external clean corpus pressure for typed entries maps in Sudocode and Codebase Atlas.
-5. Kept the rule under-proven/default-off; it remains `stable: false`.
+5. Kept the rule `stable: false`.
 6. Added clean real-program controls for Chaski typed patch application and Opencode provider payload rewriting after a broad syntax sweep found no second drift repo.
 
 ## Known Risks
@@ -112,5 +112,5 @@ Not allowed as syntax-only violations:
 ## Entry Conditions For Re-expansion
 
 - A future expansion would need a distinct real repository case that is not already covered by `no-underchecked-type-predicate`.
-- Stable promotion needs a second real drift repository plus no false positives in broad inventory. Prefer a real `unknown`-typed broad-value mini-parser or benchmark evidence showing findings that upstream unsafe rules do not already explain. Without that evidence, keep the rule explicitly default-off/inventory; retire only if future package inventory stops producing useful discovery value.
+- Stable promotion needs a second real drift repository plus no false positives in broad inventory. Prefer a real `unknown`-typed broad-value mini-parser or benchmark evidence showing findings that upstream unsafe rules do not already explain. Without that evidence, keep it at error with no stable promotion; retire only if future package inventory stops producing useful discovery value.
 - Predicate/type-guard expansions stay in `no-underchecked-type-predicate`, not here.

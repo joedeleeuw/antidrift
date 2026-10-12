@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented as `antidrift/no-underchecked-type-predicate`, currently default-off and under-proven.
+Implemented as `antidrift/no-underchecked-type-predicate`, at warn in the ESLint config. On a 54-repository corpus it reports 25 findings in 6 repositories at 18/25 precision after `instanceof`, delegated type predicates, `Reflect.get` reads and literal discriminants on the asserted type started counting as proof (before: 18/110). It stays at warn until precision holds at or above 80% in every repository with findings.
 
 ## Scope
 
@@ -25,7 +25,7 @@ Known adjacent rules:
 - `@typescript-eslint/no-unnecessary-condition` can flag impossible or redundant conditions.
 - `@typescript-eslint/no-redundant-type-constituents` catches useless union/intersection constituents.
 
-These do not prove that a custom type predicate actually validates the asserted target type. No ecosystem replacement has been found; keep the custom rule default-off until corpus evidence proves the required-field drift threshold.
+These do not prove that a custom type predicate actually validates the asserted target type. No ecosystem replacement has been found; keep the custom rule at warn until corpus evidence proves the required-field drift threshold.
 
 ## Custom Solve
 

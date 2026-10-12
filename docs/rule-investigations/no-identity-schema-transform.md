@@ -38,4 +38,4 @@ Generic syntax selectors provide only partial coverage because they cannot prove
 
 The regression fixtures preserve the three supplied identity cases and every supplied clean case. The Murderbox decoder is the strongest false-positive control. An indexed Zod input fixture confirms that unresolved shapes remain clean.
 
-The rule is ready as default-off inventory. It is not stable because the current evidence has no independently replicated real identity-transform drift.
+The rule is enabled at error; a 54-repository corpus with 384 `.transform` calls reports 0 findings. It is not stable because the current evidence has no independently replicated real identity-transform drift.
