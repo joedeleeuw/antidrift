@@ -1796,7 +1796,7 @@ rules:
         - "rows.filter((row) => row !== null);"
         - "export function isRow(value: Row | null): value is Row { return value !== null; }"
         - 'items.filter((item): item is TextItem => item.kind === "text" && item.text.length > 0);'
-    nextAction: "Warn while corpus precision is measured; enable at error once type-checked precision holds at or above 80% in at least three repositories."
+    nextAction: "Blocking at error since type-checked precision held at 177/177 across six repositories; stable promotion needs replication outside the October 2026 local corpus and a Claude advisory review."
   antidrift/no-unsafe-deserialize:
     status: ready
     stable: true

@@ -29,7 +29,7 @@ The ESLint pass also enforces these syntax rules at error, exported by both plug
 
 `antidrift/no-raw-react-native-touchables` reports every raw React Native or gesture-handler touchable import until a repository creates one shared Touchable module and registers it as the rule's owner (`allowedFiles`); the owner file alone may then import the raw primitives.
 
-The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-parse-as-cast`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api` and `antidrift/no-schema-validator-transcoding` at error. `antidrift/no-underchecked-type-predicate` and `antidrift/no-redundant-type-predicate` stay at warn.
+The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-parse-as-cast`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding` and `antidrift/no-redundant-type-predicate` at error. `antidrift/no-underchecked-type-predicate` stays at warn.
 
 Every ESLint-pass rule above, typed rules included, is ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
 
