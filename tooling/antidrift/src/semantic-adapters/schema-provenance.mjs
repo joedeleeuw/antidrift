@@ -180,16 +180,17 @@ function aliasDeclarationOfTypeNode(checker, typeNode) {
   );
 }
 
-export function declaredSchemaSymbolOfParameter(checker, tsArg) {
+export function declaredSchemaParameter(checker, tsArg) {
   const symbol = checker.getSymbolAtLocation(tsArg);
-  const parameter = (symbol?.declarations ?? []).find(
-    (declaration) => ts.isParameter(declaration) && declaration.type
+  const declaration = (symbol?.declarations ?? []).find(
+    (candidate) => ts.isParameter(candidate) && candidate.type
   );
-  if (!parameter) {
+  if (!declaration) {
     return undefined;
   }
-  const alias = aliasDeclarationOfTypeNode(checker, parameter.type);
-  return alias && schemaSymbolOfOutputAlias(checker, alias.type);
+  const alias = aliasDeclarationOfTypeNode(checker, declaration.type);
+  const schema = alias && schemaSymbolOfOutputAlias(checker, alias.type);
+  return schema ? { declaration, schema } : undefined;
 }
 
 export function zodParseCallParts(

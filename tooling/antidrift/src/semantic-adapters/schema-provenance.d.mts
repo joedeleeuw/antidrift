@@ -46,10 +46,10 @@ export function parsedSchemaSymbol(
   tsCall: ts.CallExpression
 ): ts.Symbol | undefined;
 
-export function declaredSchemaSymbolOfParameter(
+export function declaredSchemaParameter(
   checker: ts.TypeChecker,
   tsArg: ts.Node
-): ts.Symbol | undefined;
+): { declaration: ts.ParameterDeclaration; schema: ts.Symbol } | undefined;
 
 export function zodParseCallParts(
   node: unknown,

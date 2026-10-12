@@ -1,5 +1,7 @@
+import ts from "typescript";
+
 import {
-  declaredSchemaSymbolOfParameter,
+  declaredSchemaParameter,
   isThrowAssertionCallbackParse,
   parsedSchemaSymbol,
   ZOD_VALIDATION_METHODS,
@@ -15,6 +17,50 @@ import {
 const testFilenamePattern =
   /(?:(?:^|[/\\])(?:test|tests|__tests__)(?:[/\\])|[.](?:test|spec)[.][cm]?[jt]sx?$)/u;
 
+function hasUseServerDirective(statements) {
+  for (const statement of statements ?? []) {
+    if (
+      !ts.isExpressionStatement(statement) ||
+      !ts.isStringLiteral(statement.expression)
+    ) {
+      return false;
+    }
+    if (statement.expression.text === "use server") return true;
+  }
+  return false;
+}
+
+function moduleExportsFunction(checker, declaringFunction) {
+  const moduleSymbol = checker.getSymbolAtLocation(
+    declaringFunction.getSourceFile()
+  );
+  if (!moduleSymbol) return false;
+  const declaration = ts.isVariableDeclaration(declaringFunction.parent)
+    ? declaringFunction.parent
+    : declaringFunction;
+  return checker.getExportsOfModule(moduleSymbol).some((exported) => {
+    const target =
+      exported.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(exported)
+        : exported;
+    return (target.declarations ?? []).includes(declaration);
+  });
+}
+
+// A Next.js server action is a network endpoint: the client can send any value,
+// so parsing its declared input decodes an untrusted boundary instead of
+// coercing a contract the caller already satisfied.
+function isServerAction(checker, parameter) {
+  const declaringFunction = parameter.parent;
+  const body = declaringFunction.body;
+  if (body && ts.isBlock(body) && hasUseServerDirective(body.statements)) {
+    return true;
+  }
+  return (
+    hasUseServerDirective(declaringFunction.getSourceFile().statements) &&
+    moduleExportsFunction(checker, declaringFunction)
+  );
+}
 export function ruleNoParseAsCast() {
   return {
     meta: {
@@ -50,11 +96,11 @@ export function ruleNoParseAsCast() {
             return;
           }
           const tsArg = services.esTreeNodeToTSNodeMap.get(arg);
-          const declaredSchema =
-            tsArg && declaredSchemaSymbolOfParameter(checker, tsArg);
+          const parameter = tsArg && declaredSchemaParameter(checker, tsArg);
           if (
-            !declaredSchema ||
-            declaredSchema !== parsedSchemaSymbol(checker, tsCall)
+            !parameter ||
+            parameter.schema !== parsedSchemaSymbol(checker, tsCall) ||
+            isServerAction(checker, parameter.declaration)
           ) {
             return;
           }
