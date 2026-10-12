@@ -519,12 +519,40 @@ export function checkedTargetProperties(node, paramName, targetProps) {
       if (targetProps.has(reflected.name)) checked.add(reflected.name);
       return;
     }
+    const keyed = keyedHelperCheck(current, (argument) =>
+      hasParamRoot(argument, paramNames) &&
+      unwrapExpression(argument)?.type === "Identifier"
+        ? []
+        : null
+    );
+    if (keyed) {
+      if (targetProps.has(keyed[0])) checked.add(keyed[0]);
+      return;
+    }
     if (current.type === "Identifier" && !isBindingIdentifier(current)) {
       const prop = propertyAliases.get(current.name);
       if (targetProps.has(prop)) checked.add(prop);
     }
   });
   return checked;
+}
+
+// A helper called with the predicate value and a literal key, e.g.
+// `hasString(value, "id")` or `hasNumber(value.size, "width")`, checks that
+// key. Returns the checked path, given the path of the value argument.
+function keyedHelperCheck(node, valuePath) {
+  if (node?.type !== "CallExpression") return null;
+  const key = node.arguments.find(
+    (argument) =>
+      argument.type === "Literal" && typeof argument.value === "string"
+  );
+  if (!key) return null;
+  for (const argument of node.arguments) {
+    if (argument === key || argument.type === "SpreadElement") continue;
+    const base = valuePath(argument);
+    if (base) return [...base, key.value];
+  }
+  return null;
 }
 
 export function callUsesPredicateParam(node, paramName) {
@@ -684,13 +712,73 @@ function delegatedPredicateType(
   }
   const argument = node.arguments?.[predicate.parameterIndex];
   return paramPropertyPath(argument, paramNames, aliasPaths)?.length === 0
-    ? predicate.type
+    ? { type: predicate.type, argument }
     : null;
+}
+
+function isTypeAssertion(node) {
+  if (node?.type !== "TSAsExpression" && node?.type !== "TSTypeAssertion") {
+    return false;
+  }
+  const target = node.typeAnnotation;
+  return !(
+    target?.type === "TSTypeReference" &&
+    target.typeName?.type === "Identifier" &&
+    target.typeName.name === "const"
+  );
+}
+
+function containsTypeAssertion(expression, assertedNames) {
+  if (!expression) return false;
+  let found = false;
+  walkNode(expression, (current) => {
+    if (
+      isTypeAssertion(current) ||
+      (current.type === "Identifier" && assertedNames.has(current.name))
+    ) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+function tagRead(side, aliasInits) {
+  let node = side;
+  while (
+    node?.type === "ChainExpression" ||
+    node?.type === "TSNonNullExpression"
+  ) {
+    node = node.expression;
+  }
+  if (node?.type === "Identifier" && aliasInits.has(node.name)) {
+    return tagRead(aliasInits.get(node.name), aliasInits);
+  }
+  if (node?.type === "MemberExpression") {
+    const name = staticMemberName(node);
+    return name === null ? null : { base: node.object, name };
+  }
+  const reflected = reflectGetParts(node);
+  return reflected && { base: reflected.target, name: reflected.name };
+}
+
+// A literal tag identifies a variant, and so its payload, only when the value
+// it is read from is already a closed union to TypeScript. Read from raw
+// any/unknown/open-record input, or through a type assertion, the tag proves
+// the tag and nothing else.
+function isClosedTagSource(base, name, assertedNames, services, checker) {
+  if (containsTypeAssertion(base, assertedNames)) return false;
+  const tsBase = services.esTreeNodeToTSNodeMap.get(base);
+  if (!tsBase) return false;
+  const baseType = checker.getTypeAtLocation(tsBase);
+  if (isBroadPredicateInputType(checker, baseType)) return false;
+  const tagType = propertyTypeAtPath(checker, baseType, [name]);
+  return Boolean(tagType && isDiscriminantType(tagType));
 }
 
 // Nominal and discriminant evidence a field count cannot see: an `instanceof`
 // whose instance type satisfies the asserted type, a delegated type predicate,
-// or a literal equality on a discriminant property of the asserted type.
+// or a literal equality on a discriminant property of the asserted type read
+// from a value that is already a closed union.
 export function predicateContractEvidence(
   node,
   paramName,
@@ -699,7 +787,11 @@ export function predicateContractEvidence(
   checker
 ) {
   const paramNames = predicateValueNames(node, paramName);
+  // Locals bound to the predicate value through a type assertion, e.g.
+  // `const candidate = data as { source?: unknown }`.
+  const assertedNames = new Set();
   const aliasPaths = new Map();
+  const aliasInits = new Map();
   const checked = new Set();
   let proven = false;
   walkNode(node, (current) => {
@@ -708,8 +800,17 @@ export function predicateContractEvidence(
       current.type === "VariableDeclarator" &&
       current.id?.type === "Identifier"
     ) {
+      if (
+        paramNames.has(current.id.name) &&
+        containsTypeAssertion(current.init, assertedNames)
+      ) {
+        assertedNames.add(current.id.name);
+      }
       const path = paramPropertyPath(current.init, paramNames, aliasPaths);
-      if (path?.length) aliasPaths.set(current.id.name, path);
+      if (path?.length) {
+        aliasPaths.set(current.id.name, path);
+        aliasInits.set(current.id.name, current.init);
+      }
       return;
     }
     if (current.type === "BinaryExpression") {
@@ -730,14 +831,22 @@ export function predicateContractEvidence(
       ].some(([side, other]) => {
         const path = paramPropertyPath(side, paramNames, aliasPaths);
         const tsOther = services.esTreeNodeToTSNodeMap.get(other);
+        const tag = path && tagRead(side, aliasInits);
         return Boolean(
-          path &&
+          tag &&
           tsOther &&
           matchesTargetDiscriminant(
             checker,
             targetType,
             path,
             checker.getTypeAtLocation(tsOther)
+          ) &&
+          isClosedTagSource(
+            tag.base,
+            tag.name,
+            assertedNames,
+            services,
+            checker
           )
         );
       });
@@ -752,11 +861,11 @@ export function predicateContractEvidence(
       checker
     );
     if (!delegated) return;
-    if (checker.isTypeAssignableTo(delegated, targetType)) {
+    if (checker.isTypeAssignableTo(delegated.type, targetType)) {
       proven = true;
       return;
     }
-    for (const property of checker.getPropertiesOfType(delegated)) {
+    for (const property of checker.getPropertiesOfType(delegated.type)) {
       checked.add(property.name);
       const propertyType = checker.getNonNullableType(
         checker.getTypeOfSymbol(property)
@@ -767,6 +876,13 @@ export function predicateContractEvidence(
           targetType,
           [property.name],
           propertyType
+        ) &&
+        isClosedTagSource(
+          delegated.argument,
+          property.name,
+          assertedNames,
+          services,
+          checker
         )
       ) {
         proven = true;
@@ -774,4 +890,103 @@ export function predicateContractEvidence(
     }
   });
   return { proven, checked };
+}
+
+// Dotted property paths the body reads or `in`-checks on the predicate value,
+// e.g. `function.name` for `typeof value.function?.name === "string"`.
+export function checkedPropertyPaths(node, paramName) {
+  const paramNames = predicateValueNames(node, paramName);
+  const aliasPaths = new Map();
+  const paths = new Set();
+  walkNode(node, (current) => {
+    let path = null;
+    if (
+      current.type === "VariableDeclarator" &&
+      current.id?.type === "Identifier"
+    ) {
+      const aliased = paramPropertyPath(current.init, paramNames, aliasPaths);
+      if (aliased?.length) aliasPaths.set(current.id.name, aliased);
+    } else if (
+      current.type === "BinaryExpression" &&
+      current.operator === "in"
+    ) {
+      const base = paramPropertyPath(current.right, paramNames, aliasPaths);
+      const name = staticPropertyName(current.left);
+      path = base && name !== null ? [...base, name] : null;
+    } else if (current.type === "MemberExpression") {
+      path = paramPropertyPath(current, paramNames, aliasPaths);
+    } else if (current.type === "CallExpression") {
+      path =
+        paramPropertyPath(current, paramNames, aliasPaths) ??
+        keyedHelperCheck(current, (argument) =>
+          paramPropertyPath(argument, paramNames, aliasPaths)
+        );
+    }
+    if (path?.length) paths.add(path.join("."));
+  });
+  return paths;
+}
+
+function literalOfUnitType(type) {
+  if (type.isStringLiteral() || type.isNumberLiteral()) return type.value;
+  if (type.flags & ts.TypeFlags.BooleanLiteral) {
+    return type.intrinsicName === "true";
+  }
+  return undefined;
+}
+
+// The variants of a union target the body can accept. The body's literal
+// comparisons on each top-level field (`===`/`!==` or `switch` cases) are
+// collected; a variant whose literal tag the body never compares against,
+// while it does compare that field to other literals, is excluded, e.g.
+// `type === "addRules"` excludes the `setMode` variant.
+export function claimedTargetVariants(
+  node,
+  paramName,
+  variants,
+  services,
+  checker
+) {
+  const paramNames = predicateValueNames(node, paramName);
+  const aliasPaths = new Map();
+  const comparedLiterals = new Map();
+  const recordComparison = (side, other) => {
+    const path = paramPropertyPath(side, paramNames, aliasPaths);
+    const tsOther = services.esTreeNodeToTSNodeMap.get(other);
+    if (path?.length !== 1 || !tsOther) return;
+    const literal = literalOfUnitType(checker.getTypeAtLocation(tsOther));
+    if (literal === undefined) return;
+    const fieldLiterals = comparedLiterals.get(path[0]) ?? new Set();
+    fieldLiterals.add(literal);
+    comparedLiterals.set(path[0], fieldLiterals);
+  };
+  walkNode(node, (current) => {
+    if (
+      current.type === "VariableDeclarator" &&
+      current.id?.type === "Identifier"
+    ) {
+      const path = paramPropertyPath(current.init, paramNames, aliasPaths);
+      if (path?.length) aliasPaths.set(current.id.name, path);
+    } else if (
+      current.type === "BinaryExpression" &&
+      ["===", "==", "!==", "!="].includes(current.operator)
+    ) {
+      recordComparison(current.left, current.right);
+      recordComparison(current.right, current.left);
+    } else if (current.type === "SwitchStatement") {
+      for (const switchCase of current.cases) {
+        if (switchCase.test) {
+          recordComparison(current.discriminant, switchCase.test);
+        }
+      }
+    }
+  });
+  return variants.filter((variant) =>
+    [...comparedLiterals].every(([field, fieldLiterals]) => {
+      const property = checker.getPropertyOfType(variant, field);
+      const tag =
+        property && literalOfUnitType(checker.getTypeOfSymbol(property));
+      return tag === undefined || fieldLiterals.has(tag);
+    })
+  );
 }

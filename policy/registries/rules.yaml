@@ -1718,6 +1718,7 @@ rules:
         - "function parseAction(raw: unknown): MemoryResult['action'] { return ActionSchema.parse(raw); }"
     nextAction: Mine real Chaski, Codebase Atlas, Murderbox, and session-derived examples for cross-contract projections such as EventKind-to-result-action before restoring stable status.
   antidrift/no-underchecked-type-predicate:
+    directive: G2
     status: ready
     stable: false
     signal: TypeChecker plus AST/control-flow checks
@@ -1739,6 +1740,10 @@ rules:
       - "Typed records are not broad input: an index-signature type is broad only when it has no declared properties and its index values are any or unknown."
       - 'Wide corpus sweep (54 TypeScript repositories, 26,379 type-checked files): 110 findings in 18 repositories before the evidence change (18 TP / 92 FP, 16%); 25 findings in 6 repositories after it (sentry 11, opencode 6, executor 4, paseo 2, figma-console-mcp 1, pi-smart-compact 1; 18 TP / 7 FP, 72%). Per-repository precision stays uneven (sentry 11/11, opencode 3/6, executor 2/4, paseo 0/2). Remaining false-positive classes: boolean brand helpers such as NamedError.hasName, capability probes on in-process objects (typeof value.safeParse === "function"), a library brand "_zod" in value, a symbol-keyed required field read, and a null filter over an any-typed array.'
       - The verdict layer is heuristic; validator-looking helper names and incidental member reads can cause false negatives.
+      - "Tag checks on raw input (October 2026): a literal equality proves a variant only when the value the tag is read from is a closed union to the TypeChecker and the read does not pass through a type assertion. On raw any/unknown/open-record input the asserted payload fields must be checked too. Union targets are checked against the variants the body's tag comparisons accept; reading into a required object field requires that field's required properties; keyed helpers such as hasString(value, 'id') count as checks; a parameter whose declared type does not resolve (error type) is not raw input."
+      - "Witnesses the previous version missed: chatbiz-webapp src/embed/protocol.ts:94 (resize message without height) and deep-seek tools/server/webui/src/lib/stores/tools.svelte.ts:67 (function.parameters unchecked)."
+      - "October 2026 local corpus (70 roots, 473 predicate files) with resolved dependencies (frozen-lockfile copies of chatbiz-webapp, fungible, sandcastle, codebase-atlas, paseo, homer-production and the deep-seek and llama.cpp-rocmfpx web UIs, plus mrp): before 2 findings in 1 repository (1/2); after 10 findings in 5 repositories (paseo 6, chatbiz-webapp 1, deep-seek 1, llama.cpp-rocmfpx 1, mrp 1), 9/10 true positives, every repository at or above 80% (paseo 5/6). The false positive is paseo agent-response-loop.ts:108, a typeof value.safeParse === 'function' capability probe."
+      - "Without installed dependencies an unresolved import turns contextual callback types into any: the same scan reports 25 findings before (0 true positives) and 18 after (6 true positives). Lint on a program whose dependencies resolve."
     external:
       state: net-antidrift
       support: none
@@ -1750,12 +1755,16 @@ rules:
       flags:
         - 'const isUser = (value: unknown): value is User => value != null && typeof value === "object";'
         - 'type FsError = { code: string; path: string }; const isFsError = (value: unknown): value is FsError => typeof value === "object" && value !== null && "code" in value && value.code === "ENOENT";'
+        - 'const isConflictError = (value: unknown): value is ConflictError => typeof value === "object" && value !== null && "_tag" in value && value._tag === "ConflictError";'
+        - 'type Resize = { source: "embed"; type: "resize"; height: number }; type Message = Resize | Session; function isMessage(data: unknown): data is Message { if (typeof data !== "object" || data === null) return false; const candidate = data as { source?: unknown; type?: unknown }; return candidate.source === "embed" && typeof candidate.type === "string"; }'
+        - 'type Tool = { type: "function"; function: { name: string; parameters: Record<string, unknown> } }; const isTool = (value: unknown): value is Tool => typeof value === "object" && value !== null && "type" in value && (value as Tool).type === "function" && "function" in value && typeof (value as Tool).function?.name === "string";'
       allows:
         - 'function isDateMessage(value: unknown): value is DateMessage { return !!value && typeof value === "object" && "year" in value && "month" in value && "day" in value; }'
         - "function isApiError(error: unknown): error is ApiError { return error instanceof ApiError; }"
-        - 'const isConflictError = (value: unknown): value is ConflictError => typeof value === "object" && value !== null && "_tag" in value && value._tag === "ConflictError";'
+        - 'const isConflictError = (value: unknown): value is ConflictError => typeof value === "object" && value !== null && "_tag" in value && value._tag === "ConflictError" && "message" in value && typeof value.message === "string";'
         - "const isToolFile = (value: unknown): value is ToolFile => Schema.is(ToolFileSchema)(value);"
-    nextAction: Keep at warn. Enable at error only after precision holds at or above 80% in every repository with findings; the remaining classes need a trusted brand-helper or capability-probe model, not a looser field count.
+        - 'function isTextItem(item: Item): item is TextItem { return item.kind === "text"; }'
+    nextAction: Blocking at error since the October 2026 local corpus measured 9/10 with every repository at or above 80%. Capability probes on in-process objects remain the known false-positive class; model them before stable promotion.
   antidrift/no-redundant-type-predicate:
     directive: G2
     status: ready
@@ -2499,6 +2508,7 @@ rules:
         - "operation.apply(owner, args);"
     nextAction: "Keep default-off until reflective invocation can be separated from avoidable type-evidence escape."
   antidrift/no-reflect-get:
+    directive: G4
     status: false-positive-prone
     stable: false
     defaultOff: true
@@ -2510,6 +2520,8 @@ rules:
     concerns:
       - The implementation intentionally treats every global Reflect.get call as a type-evidence escape.
       - Runtime adapters can intentionally inspect an injected untyped global or protocol object whose property names are discovered dynamically.
+      - "Exempt since October 2026: reads from unshadowed platform globals (globalThis, window, self, global, document, navigator, location, process) and typeof Reflect.get(x, k) === 'function' capability probes."
+      - "October 2026 local corpus (70 roots; 23 files mention Reflect.get): 81 findings in 2 repositories before the exemptions (63 true positives, 78%); 71 after (paseo 67, homer-production 4; 63 true positives, 89%). Per repository after: paseo 62/67, homer-production 1/4. Top files after: paseo omp/history.ts 13, ui/tooltip.tsx 11, omp/advisor-message.ts 7, ui/context-menu.tsx 7, root-error-details.ts 6. Remaining false positives: a Proxy handler forwarding Reflect.get(target, prop, receiver), three dynamic-key reads, and four reads of platform objects reached through a local (location from globalThis, Electron File.path, window.process.versions)."
     external:
       state: equivalent
       support: high
@@ -2522,7 +2534,7 @@ rules:
         - "Reflect.get(owner, key);"
       allows:
         - "owner.typedProperty;"
-    nextAction: "Keep default-off until reflective boundary access can be separated from avoidable type-evidence escape."
+    nextAction: "Keep default-off: findings come from only two repositories and homer-production stays at 1/4. Revisit when a third repository supplies findings."
   antidrift/no-runtime-typeof:
     status: false-positive-prone
     stable: false

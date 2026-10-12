@@ -1,4 +1,6 @@
 import {
+  checkedPropertyPaths,
+  claimedTargetVariants,
   checkedTargetProperties,
   functionParameterByName,
   hasValidatorDelegation,
@@ -12,6 +14,33 @@ import {
   missingTypeServicesVisitors,
   requireTypeServices,
 } from "./type-services.js";
+
+function isObjectContract(checker, type) {
+  return (
+    isPredicateObjectContract(type) &&
+    !checker.isArrayType(type) &&
+    !checker.isTupleType(type)
+  );
+}
+
+// A body that reads into a required object field claims that field's shape,
+// so it must check the field's own required properties too.
+function uncheckedProbedPayload(checker, variants, paths) {
+  for (const variant of variants) {
+    for (const property of checker.getPropertiesOfType(variant)) {
+      const prefix = `${property.name}.`;
+      if (![...paths].some((path) => path.startsWith(prefix))) continue;
+      const payloadType = checker.getNonNullableType(
+        checker.getTypeOfSymbol(property)
+      );
+      if (!isObjectContract(checker, payloadType)) continue;
+      for (const nested of requiredTypeProps(checker, payloadType)) {
+        if (!paths.has(`${prefix}${nested}`)) return true;
+      }
+    }
+  }
+  return false;
+}
 
 export function ruleNoUndercheckedTypePredicate() {
   return {
@@ -46,20 +75,33 @@ export function ruleNoUndercheckedTypePredicate() {
           return;
         }
         const paramType = checker.getTypeAtLocation(tsParam);
-        if (!isBroadPredicateInputType(checker, paramType)) {
-          return;
-        }
-        const targetType = checker.getTypeFromTypeNode(tsTargetTypeNode);
+        // An unresolved declared type (TypeScript's error type) is a broken
+        // import or global, not raw input the predicate has to validate.
         if (
-          checker.isArrayType(targetType) ||
-          checker.isTupleType(targetType)
+          paramType.intrinsicName === "error" ||
+          !isBroadPredicateInputType(checker, paramType)
         ) {
           return;
         }
-        if (!isPredicateObjectContract(targetType)) {
+        const targetType = checker.getTypeFromTypeNode(tsTargetTypeNode);
+        // The object variants the predicate asserts: the target itself, or
+        // every member of a union of object contracts.
+        const variants = targetType.isUnion() ? targetType.types : [targetType];
+        if (!variants.every((variant) => isObjectContract(checker, variant))) {
           return;
         }
-        const targetProps = requiredTypeProps(checker, targetType);
+        // Of a union, only the variants the body's literal tag comparisons
+        // can still accept are claimed.
+        const claimed = claimedTargetVariants(
+          fn.body,
+          parts.paramName,
+          variants,
+          services,
+          checker
+        );
+        const targetProps = new Set(
+          claimed.flatMap((variant) => [...requiredTypeProps(checker, variant)])
+        );
         if (targetProps.size === 0) {
           return;
         }
@@ -86,6 +128,11 @@ export function ruleNoUndercheckedTypePredicate() {
         if (
           [...targetProps].every(
             (prop) => checked.has(prop) || evidence.checked.has(prop)
+          ) &&
+          !uncheckedProbedPayload(
+            checker,
+            variants,
+            checkedPropertyPaths(fn.body, parts.paramName)
           )
         ) {
           return;

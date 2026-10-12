@@ -170,3 +170,14 @@ export function predicateContractEvidence(
   services: TypeScriptParserServices,
   checker: ts.TypeChecker
 ): { proven: boolean; checked: Set<string> };
+export function checkedPropertyPaths(
+  node: unknown,
+  paramName: string
+): Set<string>;
+export function claimedTargetVariants(
+  node: unknown,
+  paramName: string,
+  variants: readonly ts.Type[],
+  services: TypeScriptParserServices,
+  checker: ts.TypeChecker
+): ts.Type[];

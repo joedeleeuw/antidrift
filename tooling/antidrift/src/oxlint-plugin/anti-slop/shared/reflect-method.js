@@ -7,12 +7,17 @@ function resolveVariable(sourceCode, identifier) {
   }
   return null;
 }
-function isGlobalReflect(sourceCode, expression) {
-  if (expression.type !== "Identifier" || expression.name !== "Reflect")
-    return false;
+/** Reports whether an identifier names a global binding no local declaration shadows. */
+export function isUnshadowedGlobal(sourceCode, expression) {
+  if (expression?.type !== "Identifier") return false;
   if (sourceCode.isGlobalReference(expression)) return true;
   const variable = resolveVariable(sourceCode, expression);
   return variable === null || variable.defs.length === 0;
+}
+function isGlobalReflect(sourceCode, expression) {
+  return (
+    expression.name === "Reflect" && isUnshadowedGlobal(sourceCode, expression)
+  );
 }
 /** Reports whether a call target names one method on the global Reflect object. */
 export function isGlobalReflectMethodCall(sourceCode, callee, methodName) {

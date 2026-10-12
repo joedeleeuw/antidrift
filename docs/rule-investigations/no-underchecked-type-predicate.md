@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented as `antidrift/no-underchecked-type-predicate`, at warn in the ESLint config. On a 54-repository corpus it reports 25 findings in 6 repositories at 18/25 precision after `instanceof`, delegated type predicates, `Reflect.get` reads and literal discriminants on the asserted type started counting as proof (before: 18/110). It stays at warn until precision holds at or above 80% in every repository with findings.
+Implemented as `antidrift/no-underchecked-type-predicate`, enabled at error in the ESLint config (directive G2). A literal tag proves a variant, and so its payload, only when the value it is read from is already a closed union; read from raw `any`/`unknown`/open-record input, or through a type assertion, the predicate must also check the asserted payload fields. On the 70 local roots of the October 2026 rules review it reports 9 findings in 4 repositories with resolved dependencies, 8 true positives, plus 1 true positive in mrp (89%, every repository at or above 80%). See [Tag checks on raw input](#tag-checks-on-raw-input).
 
 ## Scope
 
@@ -12,10 +12,44 @@ This is not a general boolean-predicate rule. Ordinary predicates and valid disc
 
 The implemented v1 reports only when all of these are true:
 
-1. The predicate input is broad (`any`, `unknown`, `object`, `{}`, or `Record<string, unknown>`).
-2. The asserted target is a nontrivial object contract with at least two required properties.
+1. The predicate input is broad (`any`, `unknown`, `object`, `{}`, or `Record<string, unknown>`), and its declared type resolves.
+2. The asserted target is an object contract, or a union of object contracts, with at least one required non-method property.
 3. The body does not delegate to a validator/schema.
-4. The body checks fewer than two required asserted target properties.
+4. The body checks fewer than all required asserted target properties.
+
+## Tag checks on raw input
+
+The September 2026 evidence change counted a literal equality on a discriminant property of the asserted type as proof. That is sound for a closed union: `item.kind === "text"` on an `Item` proves the `TextItem` payload because TypeScript already knows every variant. On raw input it proves only the tag. Codex's October 2026 review found two missed true positives:
+
+- `chatbiz-webapp/src/embed/protocol.ts:94-100`: `isEmbedMessage(data: unknown): data is EmbedMessage` checks `source` and that `type` is a string, through `data as { source?: unknown; type?: unknown }`. `{ source: "chatbiz-embed", type: "resize" }` passes as a resize message without its required `height`.
+- `deep-seek/tools/server/webui/src/lib/stores/tools.svelte.ts:67-73`: `(t: unknown): t is OpenAIToolDefinition` checks `type === "function"` and `function.name`, but not the required `function.parameters`. The `llama.cpp-rocmfpx` fork carries the same guard.
+
+Changes:
+
+1. A literal equality counts as discriminant proof only when the value the tag is read from is not broad input to the TypeChecker, the tag is a unit or union-of-units property there, and the read does not pass through a type assertion (`(value as Tool).type`, or a local bound to `data as {...}`).
+2. A union of object contracts is checked, not skipped: the required fields are those of the variants the body's literal tag comparisons (`===`, `!==`, `switch` cases) can still accept.
+3. When the body reads into a required object field (`value.function.name`), that field's own required properties must be checked too.
+4. A helper called with the predicate value and a literal key (`hasString(value, "text")`) checks that key.
+5. A parameter whose declared type does not resolve (TypeScript's error type, e.g. a broken global re-export) is not raw input.
+
+The other proof exemptions are unchanged: `instanceof`, delegated type predicates (Effect `Schema.is`, `Predicate.isTagged`), schema validator delegation, `Reflect.get` reads, `in` checks and destructured field checks.
+
+### Measurement
+
+Corpus: the 70 local roots in `/tmp/rules-review/corpus-local.txt`, with cloud-rl-train `tasks/*/*`, `configs/eval-panel-qwen36.json` and `tasks/grader_process.py` excluded before parsing; 473 files containing a type predicate, 464 type-checked.
+
+Dependencies matter for this rule: in a checkout without `node_modules` an unresolved import turns a callback's contextual type into `any`, which then reads as raw input. Precision was therefore measured on frozen-lockfile copies of chatbiz-webapp, fungible, sandcastle, codebase-atlas, paseo, homer-production and the deep-seek and llama.cpp-rocmfpx web UIs, plus the explicit-`unknown` finding in mrp.
+
+| Version | Hits | Repositories | Top 5                                                              | Precision |
+| ------- | ---: | -----------: | ------------------------------------------------------------------ | --------- |
+| Before  |    2 |            1 | paseo 2                                                            | 1/2       |
+| After   |   10 |            5 | paseo 6, chatbiz-webapp 1, deep-seek 1, llama.cpp-rocmfpx 1, mrp 1 | 9/10      |
+
+After, true positives: `chatbiz-webapp src/embed/protocol.ts:94`, `deep-seek .../stores/tools.svelte.ts:67` and its rocmfpx fork, `mrp src/domain/notifications.ts:217` (tag-only check of a three-variant failure union whose payloads go unchecked), paseo `split-container.tsx:142,146` (drag data narrowed by `kind` without `paneId`/`tabId`), `snapshot-engine.ts:157` (`ok: false` never checked), `session-stubs.ts:120` (`"type" in m` claims the whole outbound-message union), `terminal-emulator.tsx:134` (`scrollback` and `cursor` unchecked). False positive: paseo `agent-response-loop.ts:108`, a `typeof value.safeParse === "function"` capability probe asserting `z.ZodType`.
+
+Per repository: paseo 5/6, chatbiz-webapp 1/1, deep-seek 1/1, llama.cpp-rocmfpx 1/1, mrp 1/1. Before the change the two copies of the deep-seek UI also reported two `DatabaseMessageExtra` filters whose parameter type is the error type (the global re-export in `app.d.ts` does not resolve); the error-type exemption removed them.
+
+The same scan without installed dependencies reports 25 findings in 11 repositories before (0 true positives: all 25 are `any` from unresolved imports) and 18 in 6 after (6 true positives). Lint the rule only on a program whose dependencies resolve.
 
 ## Ecosystem Check
 

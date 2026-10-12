@@ -80,7 +80,7 @@ export function createConfig({
         "antidrift/no-unsafe-deserialize": "error",
         "antidrift/no-appeasement-cast": "error",
         "antidrift/no-nullable-positional-tuple": "error",
-        "antidrift/no-underchecked-type-predicate": "warn",
+        "antidrift/no-underchecked-type-predicate": "error",
         "antidrift/no-redundant-type-predicate": "error",
         "antidrift/no-defensive-shape-probing": "error",
         "antidrift/no-parse-as-cast": "error",
