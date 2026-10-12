@@ -8,10 +8,6 @@ const EXAMPLE = /@example|```/;
 const QUOTED_OR_URL =
   /"[^"\n]*"|`[^`\n]*`|(?<![A-Za-z])'[^'\n]*'(?![A-Za-z])|\b[a-z][\w+.-]*:\/\/\S+/gi;
 
-function provenanceText(comment) {
-  return comment.value.replace(QUOTED_OR_URL, " ");
-}
-
 function trailsCode(comment, text) {
   const lineStart = text.lastIndexOf("\n", comment.range[0] - 1) + 1;
   return text.slice(lineStart, comment.range[0]).trim() !== "";
@@ -43,7 +39,7 @@ export default {
       Program() {
         for (const comment of sourceCode.getAllComments()) {
           if (
-            DATE.test(provenanceText(comment)) &&
+            DATE.test(comment.value.replace(QUOTED_OR_URL, " ")) &&
             !EXAMPLE.test(comment.value) &&
             !trailsCode(comment, sourceCode.text)
           ) {
