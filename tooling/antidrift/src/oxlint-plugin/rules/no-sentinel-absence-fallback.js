@@ -43,6 +43,67 @@ function sentinelValue(node) {
   return "";
 }
 
+const transparentParents = new Set([
+  "ChainExpression",
+  "TSAsExpression",
+  "TSSatisfiesExpression",
+  "TSNonNullExpression",
+  "TSTypeAssertion",
+]);
+
+function calleeName(callee) {
+  if (callee.type === "Identifier") return callee.name;
+  if (callee.type === "MemberExpression" && !callee.computed) {
+    return callee.property.name;
+  }
+  return "";
+}
+
+function isConsoleCall(callee) {
+  return (
+    callee.type === "MemberExpression" &&
+    callee.object.type === "Identifier" &&
+    callee.object.name === "console"
+  );
+}
+
+// Text shown to a person (interpolated, concatenated, rendered as a JSX child,
+// stringified or logged) cannot be mistaken for a stored value, so a
+// placeholder there is formatting, not an absence sentinel.
+function isDisplayText(node) {
+  let current = node;
+  let parent = current.parent;
+  while (
+    transparentParents.has(parent?.type) ||
+    (parent?.type === "ConditionalExpression" && parent.test !== current)
+  ) {
+    current = parent;
+    parent = current.parent;
+  }
+  switch (parent?.type) {
+    case "TemplateLiteral":
+      return true;
+    case "BinaryExpression":
+      return parent.operator === "+";
+    case "JSXExpressionContainer":
+      return (
+        parent.parent?.type === "JSXElement" ||
+        parent.parent?.type === "JSXFragment"
+      );
+    case "CallExpression": {
+      if (parent.callee === current) return false;
+      const name = calleeName(parent.callee);
+      return (
+        name === "String" ||
+        isConsoleCall(parent.callee) ||
+        (name === "createElement" && parent.arguments.indexOf(current) >= 2)
+      );
+    }
+    default:
+      return false;
+  }
+}
+
 export default function ruleNoSentinelAbsenceFallback() {
   return {
     meta: {
@@ -63,7 +124,7 @@ export default function ruleNoSentinelAbsenceFallback() {
           if (node.operator !== "??") return;
           if (unwrapExpression(node.left)?.type !== "MemberExpression") return;
           const sentinel = sentinelValue(node.right);
-          if (!sentinel) return;
+          if (!sentinel || isDisplayText(node)) return;
           context.report({
             node,
             messageId: "sentinelAbsenceFallback",

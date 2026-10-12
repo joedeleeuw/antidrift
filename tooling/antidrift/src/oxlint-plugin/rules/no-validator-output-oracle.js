@@ -337,16 +337,78 @@ function functionValidatorOrigin(subject, sourceCode) {
   return origin;
 }
 
+const projectionRoots = new Set(["Array", "JSON", "Object"]);
+
+function isLocalFunction(identifier, sourceCode) {
+  const definition = findVariable(sourceCode, identifier)?.defs?.[0];
+  if (definition?.type === "FunctionName") return true;
+  const initializer = unwrapExpression(
+    constInitializer(identifier, sourceCode)
+  );
+  return (
+    initializer?.type === "ArrowFunctionExpression" ||
+    initializer?.type === "FunctionExpression"
+  );
+}
+
+function bindingSource(identifier, sourceCode) {
+  const definition = findVariable(sourceCode, identifier)?.defs?.[0];
+  if (definition?.type !== "Variable") return null;
+  if (definition.node.init) return definition.node.init;
+  const loop = definition.parent?.parent;
+  return loop?.type === "ForOfStatement" ? loop.right : null;
+}
+
+// Data an act produced: the result of a call into application or library code
+// (a response body, a signed token, a mock's recorded calls), or a binding or
+// projection of one. A schema that only reads such output leaves the assertion
+// about application behaviour.
+function isActOutput(expression, sourceCode, depth = 0) {
+  const node = unwrapExpression(expression);
+  if (!node || depth > resolutionDepthLimit) return false;
+  if (node.type === "Identifier") {
+    const source = bindingSource(node, sourceCode);
+    return Boolean(source) && isActOutput(source, sourceCode, depth + 1);
+  }
+  if (node.type === "MemberExpression") {
+    return isActOutput(node.object, sourceCode, depth + 1);
+  }
+  if (node.type !== "CallExpression") return false;
+  const callee = unwrapExpression(node.callee);
+  const forwardsArguments =
+    (callee?.type === "MemberExpression" &&
+      projectionRoots.has(rootIdentifier(callee)?.name)) ||
+    (callee?.type === "Identifier" && isLocalFunction(callee, sourceCode));
+  return forwardsArguments
+    ? node.arguments.some((argument) =>
+        isActOutput(argument, sourceCode, depth + 1)
+      )
+    : true;
+}
+
+// The validated value is whichever argument is not the schema: `parse(raw)`,
+// valibot's `parse(Schema, raw)` and superstruct's `assert(raw, Schema)`.
+function validatesArrangedInput(origin, sourceCode) {
+  return (
+    Boolean(origin) &&
+    origin.arguments
+      .filter((argument) => !hasRuntimeSchemaProvenance(argument, sourceCode))
+      .every((argument) => !isActOutput(argument, sourceCode))
+  );
+}
+
 function assertionFinding(record, sourceCode) {
   if (!record.subject) return null;
   if (throwMatchers.has(record.matcher)) {
-    return (functionValidatorOrigin(record.subject, sourceCode) ??
-      validatorOrigin(record.subject, sourceCode))
+    const origin =
+      functionValidatorOrigin(record.subject, sourceCode) ??
+      validatorOrigin(record.subject, sourceCode);
+    return validatesArrangedInput(origin, sourceCode)
       ? "validatorThrowOracle"
       : null;
   }
   const origin = validatorOrigin(record.subject, sourceCode);
-  if (!origin) return null;
+  if (!validatesArrangedInput(origin, sourceCode)) return null;
   return record.modifiers.has("rejects")
     ? "validatorThrowOracle"
     : "validatorOutputOracle";

@@ -2,6 +2,9 @@ import { isRuleFile, scopeProperties } from "./scope.js";
 import { isTestFilename } from "./syntax.js";
 
 const HOST_PATH = /^\/(?:Users|home)\/(?!linuxbrew\/)[^/]+\//;
+// Stories, module mocks and end-to-end guests hold sample data and paths
+// inside provisioned machines, not the developer's host.
+const SAMPLE_DATA_PATH = /\.stories\.[cm]?[jt]sx?$|(?:^|\/)(?:__mocks__|e2e)\//;
 
 function staticPrefix(node) {
   if (node.type === "Literal") {
@@ -31,7 +34,14 @@ export default {
     },
   },
   create(context) {
-    if (!isRuleFile(context) || isTestFilename(context.filename)) return {};
+    const filename = (context.filename ?? "").replaceAll("\\", "/");
+    if (
+      !isRuleFile(context) ||
+      isTestFilename(filename) ||
+      SAMPLE_DATA_PATH.test(filename)
+    ) {
+      return {};
+    }
 
     function check(node) {
       const text = staticPrefix(node);

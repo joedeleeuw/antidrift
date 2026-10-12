@@ -228,6 +228,18 @@ function argumentFlowsIntoApplication(call, sourceCode) {
   return isApplicationCallee(call.callee);
 }
 
+// `expect(output).toBeInstanceOf(z.ZodObject)` checks the class of what the
+// application produced; it builds and reads no data.
+function isInstanceMatcherCall(call) {
+  return (
+    call.callee.type === "MemberExpression" &&
+    staticPropertyName(call.callee) === "toBeInstanceOf" &&
+    calleeRoot(call.callee)?.name === "expect"
+  );
+}
+
+const endToEndPath = /(?:^|[/\\.-])e2e[/\\.]/u;
+
 function flowsIntoApplication(start, sourceCode, seen) {
   let current = start;
   for (;;) {
@@ -249,6 +261,7 @@ function flowsIntoApplication(start, sourceCode, seen) {
       case "CallExpression":
       case "NewExpression":
         if (parent.callee !== current) {
+          if (isInstanceMatcherCall(parent)) return true;
           const application = argumentFlowsIntoApplication(parent, sourceCode);
           if (application !== null) return application;
         }
@@ -277,6 +290,8 @@ function flowsIntoApplication(start, sourceCode, seen) {
         );
       case "JSXExpressionContainer":
         return parent.parent?.type === "JSXAttribute";
+      case "BinaryExpression":
+        return parent.operator === "instanceof" && parent.right === current;
       default:
         return false;
     }
@@ -323,7 +338,9 @@ export default function ruleNoSchemaLibraryInTest() {
       },
     },
     create(context) {
-      if (!isTestFilename(contextFilename(context))) return {};
+      const filename = contextFilename(context);
+      // End-to-end smokes decode real responses at the boundary they cross.
+      if (!isTestFilename(filename) || endToEndPath.test(filename)) return {};
       const sourceCode = context.sourceCode ?? context.getSourceCode();
       return {
         ImportDeclaration(node) {

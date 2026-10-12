@@ -10,13 +10,25 @@ function isReference(node) {
   );
 }
 
-function isForwardedArgument(node) {
+function referenceRoot(node) {
+  return node.type === "MemberExpression" ? referenceRoot(node.object) : node;
+}
+
+// A hop only forwards its own inputs. An argument that is a string, number or
+// regex literal, or a value the function reaches from its scope, is something
+// the function owns: a format, a key, or a binding a callback needs.
+function isForwardedArgument(node, parameterNames) {
+  if (node.type === "SpreadElement") {
+    return (
+      node.argument.type === "Identifier" &&
+      parameterNames.has(node.argument.name)
+    );
+  }
   return (
-    isReference(node) ||
-    node.type === "Literal" ||
+    (isReference(node) && parameterNames.has(referenceRoot(node).name)) ||
+    (node.type === "Literal" && node.value === null && !node.regex) ||
     (node.type === "ObjectExpression" && node.properties.length === 0) ||
-    (node.type === "ArrayExpression" && node.elements.length === 0) ||
-    (node.type === "SpreadElement" && node.argument.type === "Identifier")
+    (node.type === "ArrayExpression" && node.elements.length === 0)
   );
 }
 
@@ -65,6 +77,13 @@ export default {
           call = statement.expression;
         } else return;
       }
+      const parameterNames = new Set(
+        node.params.map((parameter) =>
+          parameter.type === "RestElement"
+            ? parameter.argument.name
+            : parameter.name
+        )
+      );
       if (
         call?.type !== "CallExpression" ||
         call.optional ||
@@ -72,7 +91,9 @@ export default {
         (call.callee.type === "Identifier" &&
           call.callee.name === identifier.name) ||
         !isReference(call.callee) ||
-        !call.arguments.every(isForwardedArgument)
+        !call.arguments.every((argument) =>
+          isForwardedArgument(argument, parameterNames)
+        )
       ) {
         return;
       }

@@ -82,7 +82,9 @@ export const noPlaceholderTestsRule = {
           return;
         }
         const testBody = getTestBody(node);
-        if (!testBody) {
+        // A concise arrow body is an expression the test runs, never a
+        // placeholder.
+        if (!testBody || getNode(testBody, "body")?.type !== "BlockStatement") {
           return;
         }
         if (

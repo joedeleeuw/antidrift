@@ -1,4 +1,5 @@
 import { isRuleFile, scopeProperties } from "./scope.js";
+import { isTestFilename } from "./syntax.js";
 
 const HASH = /^[0-9a-fA-F]{64}$/;
 const HASH_NAME = /hash|sha\d*|digest|checksum|integrity/i;
@@ -49,6 +50,21 @@ function bindingName(node) {
   }
 }
 
+const DOWNLOAD_KEY = /^(?:url|href|downloadUrl|download_url)$/i;
+
+// A digest beside the URL it was fetched from is the integrity of a remote
+// artifact the record describes, not a pin of a tracked file.
+function describesDownload(literal) {
+  let node = literal;
+  while (TYPE_WRAPPERS.has(node.parent?.type)) node = node.parent;
+  const property = node.parent;
+  if (property?.type !== "Property" || property.value !== node) return false;
+  return property.parent.properties.some(
+    (sibling) =>
+      sibling.type === "Property" && DOWNLOAD_KEY.test(nameOf(sibling.key))
+  );
+}
+
 export default {
   meta: {
     type: "problem",
@@ -69,13 +85,14 @@ export default {
     },
   },
   create(context) {
-    if (!isRuleFile(context)) return {};
+    // A test's expected digest is an oracle, not a pin of repository content.
+    if (!isRuleFile(context) || isTestFilename(context.filename)) return {};
 
     function check(node) {
       const text = staticText(node);
       if (text === null || !HASH.test(text)) return;
       const name = bindingName(node);
-      if (HASH_NAME.test(name)) {
+      if (HASH_NAME.test(name) && !describesDownload(node)) {
         context.report({ node, messageId: "hashLiteral", data: { name } });
       }
     }

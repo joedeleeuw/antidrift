@@ -1064,6 +1064,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-raw-react-native-touchables.md
     corpusRepositories: [murderbox]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 deduplicated TypeScript roots, 40 local and 44 sushi, parser-only, hand-checked round-robin samples): 780 hits in 16 repositories, 6/20 true. False positives were library example and repro apps, the libraries' own primitive wrappers, and owner modules no corpus run can configure. Example and test trees are now skipped: 513 hits in 13 repositories, a fresh frozen sample 13/23 (57%), true only in application repositories (paseo, chaski, charging-monitor, ai-chat-demo). Below the 70% bar."
       - Murderbox is the first real drift and clean corpus. Every React Native repository routes presses through one shared Touchable; with no allowedFiles owner configured, every raw import reports with advice to create that module and register it as the owner.
       - Namespace and default imports from React Native or RNGH are intentionally rejected because they bypass named-import ownership even when their current member usage is clean; their diagnostic first directs clean code to named non-interaction imports.
       - Type-only imports and re-exports remain clean because they cannot expose a runtime interaction primitive.
@@ -1117,6 +1118,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-raw-fetch-in-component.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main, murderbox]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 78 hits in 20 repositories, 16/20 true across 16 repositories. False positives were a Storybook playground, a fetch inside a react-query queryFn, and two media reads of image URLs."
       - Scope decision resolved on June 4, 2026; keep this rule fetch-specific and put broader raw transport ownership in a separate registry-backed rule if real non-fetch drift justifies it.
       - Enforcement now requires JSX-return proof in the lexical component frame. File extension, PascalCase names, and JSX elsewhere in the module are not component proof.
       - The rule models unshadowed global fetch, globalThis.fetch, window.fetch, and self.fetch. Aliased or destructured fetch is out of scope until real corpus evidence appears.
@@ -2001,6 +2003,7 @@ rules:
     referenceDoc: docs/test-quality-taxonomy.md
     corpusRepositories: [dotfiles, agent-guardrails-monorepo-template]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 19,826 hits in 50 repositories, 10/20 then 18/30 true on a second sample. False positives: absence assertions such as a redacted secret's not.toContain, identity results such as truncate('hello', 5) equal to its input, and CLI-help containment. The rule's own cases flag absence and literal identity on purpose, so no narrowing was applied; below the 70% bar until that intent is decided."
       - This rule subsumes the earlier bare membership assertion guard. Bare membership, key existence, dependency outcome flags and error shapes, arranged-input echoes, arranged-length echoes, vacuous existence checks, and mock call-through echoes are branches of the same non-independent oracle smell.
       - The rule is intentionally test-file scoped and AST/source-shape based. It proves the assertion restates arranged data or a dependency-level result, not that every replacement assertion is sufficient.
       - Test helpers with assertion-shaped matcher names can be reported because the rule treats matcher chains in test files as assertion syntax.
@@ -2037,6 +2040,7 @@ rules:
     referenceDoc: docs/rule-investigations/test-validator-oracles.md
     corpusRepositories: [murderbox]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 24 hits in 8 repositories, 9/20 true. False positives: end-to-end smokes that decode real responses, and toBeInstanceOf/instanceof checks on schema classes a converter returns. Both now stay clean: 16 hits in 7 repositories, every hit labelled before the re-run, 12/16 (75%), holding in paseo 10/10, figma-console-mcp and executor; 2/6 without paseo."
       - The runtime-schema library set is deliberately finite and evidence-backed; do not expand it to parser or serialization packages merely because they expose parse or decode functions.
       - Type-only imports stay clean, and so do schema values and errors whose every read flows into an application API (a call or constructor argument, or a JSX prop). Test-owned validation, reads and sanitizing, dynamic imports, side-effect imports, TypeScript import-equals declarations, and unshadowed CommonJS require calls report, only in test/spec files.
       - The cleaned Murderbox corpus supplies motivating real drift; the sushi corpus replicates it in 11 repositories.
@@ -2068,6 +2072,7 @@ rules:
     referenceDoc: docs/rule-investigations/test-validator-oracles.md
     corpusRepositories: [murderbox]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 61 hits in 3 repositories, 9/20 true. False positives read application output (a signed JWT, tool results, HTTP bodies, a mock's recorded calls) through a schema. The validated argument must now not be act output: 29 hits in 2 repositories (opencode 18, paseo 11), fresh frozen sample 12/15 (80%). It holds in opencode only (10/10; paseo 2/5), so it misses the three-repository bar."
       - The rule follows assertion subjects through local const bindings and transparent built-in projections, but stops at substantive outer calls and never guesses from application helper names or cross-file wrapper bodies.
       - parse/safeParse/assert/decode/validate count as validator calls only when the receiver is proven to be a runtime schema, by TypeScript types in the typed ESLint pass or by binding provenance to a schema-library import; application parsers with the same method names stay clean without receiver-name exemptions.
       - The cleaned Murderbox corpus supplies motivating direct validator-oracle drift but no current drift path; reduced programs are regression locks only.
@@ -2195,6 +2200,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-silent-empty-detection-fallback.md
     corpusRepositories: [dotfiles]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 15 hits in 7 repositories, 4/15 true. A plain empty return nested in an if or switch case is now a not-applicable case: 11 hits in 7 repositories, 4/11 on the same frozen labels (every hit was already labelled). Remaining false positives are helpers whose names hit the detection tokens (Discover URL builders, display hosts, class names). Below the 70% bar."
       - The rule is intentionally name-scoped to identity, host, probe, and detection helpers; keep broad display/name utilities like identifier out of scope unless corpus evidence supports them.
       - Empty strings can be valid UI text, so the rule does not apply to general formatting helpers.
     external:
@@ -2223,6 +2229,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-sentinel-absence-fallback.md
     corpusRepositories: [murderbox]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 286 hits in 29 repositories, 6/20 true. Most false positives were text shown to a person. Interpolated, concatenated, JSX-child, String(), console and createElement-child placements are now skipped: 177 hits in 19 repositories, fresh frozen sample 12/18 (67%), first sample 6/8. Below the 70% bar; the remaining false positives are display values stored before rendering and declared 'unknown' union members."
       - "Only the ?? operator is in scope; || falsy coercion of a member read to a sentinel is a different doctrine and stays out."
       - "Numeric sentinels such as Number(props.ExecMainStatus ?? 0) stay silent: proving drift there needs property-name semantics (systemd exit code 0 meaning success), and name-trust is rejected."
       - 'Call-expression and plain-identifier left-hand sides stay silent: the murderbox corpus shows display-only fallbacks like score ?? "unknown" and branch ?? "unknown" on locals whose provenance is not visible at the expression.'
@@ -2442,6 +2449,7 @@ rules:
     referenceDoc: docs/rule-investigations/anti-slop-import.md
     corpusRepositories: [agent-guardrails-monorepo-template, murderbox]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 2,254 hits in 25 repositories (LibreChat 893, sentry 440, sudocode 307), 19/20 true across 19 repositories; the one false positive was a vi.mock returning the actual module."
       - The implementation is pinned to the imported anti-slop source; upstream changes require an explicit source resync.
       - Module mocking is a consumer test-architecture choice; Murderbox legitimately mocks Electron, Clerk, and preload module boundaries.
     external:
@@ -2940,6 +2948,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-wrapping-functions.md
     corpusRepositories: [homer, chatbiz-webapp]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 2,358 hits in 59 repositories, 10/20 true. False positives owned a literal (a regex, selector, locale or prefix) or were callbacks binding values from the enclosing scope. The rule now reports only when every argument forwards the function's own parameters: 1,157 hits in 50 repositories, first sample 8/8, fresh frozen sample 8/13 (62%). Below the 70% bar; the remaining false positives are listeners that need a stable identity, accessors over module-private storage, and analyzer test inputs."
       - A matching wrapper can be a legitimate adapter or boundary. This is a style diagnostic, not proof that deleting the function preserves semantics. No automatic fix is provided.
       - The shared governance preset enables this owner-chosen style policy at error severity. Exceptions need a concrete, documented boundary requirement.
     external:
@@ -3020,6 +3029,7 @@ rules:
     referenceDoc: docs/rule-investigations/portable-rules.md
     corpusRepositories: [homer]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 62 hits in 9 repositories, 3/20 true, because a concise arrow body (`it(name, () => expect(x).toBe(y))`) counted as empty. Concise bodies are now real test bodies: 5 hits in 4 repositories, all true (4 labelled before the re-run, 1 after)."
       - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
     external:
       state: partial-overlap
@@ -4085,6 +4095,7 @@ rules:
         mrp,
       ]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 10,238 hits in 64 repositories (paseo 2,033, sentry 1,662), 17/20 true across 17 repositories. False positives: a registry render callback whose signature the interface fixes, a seed for the function's own retry closure, and an internal token consumed by an assertion guard."
       - Runs in the ESLint pass so existing debt is pinned in eslint-suppressions.json; Oxlint has no baseline.
       - Only same-module functions, classes and components, relative or root-alias imports, and `this` methods count as layers, so library calls and intrinsic JSX elements are consumption, not forwarding.
       - A forwarding call must be discarded or returned; a helper whose result this function uses counts as a read.
@@ -4124,6 +4135,7 @@ rules:
         mrp,
       ]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 113,638 hits in 83 repositories (sentry 26,408), 14/20 (70%) true across 14 repositories. Five of the six false positives were analyzer or mock fixture inputs (CodeQL query tests, semgrep patterns, __mocks__, synthetic fixture projects); the sixth was a component props variable."
       - Runs in the ESLint pass so existing debt is pinned in eslint-suppressions.json; Oxlint has no baseline.
       - The first `props` parameter of a component or JSX-returning function is React's defined role and stays allowed.
       - Imports, property keys and type names are not declarations this rule owns.
@@ -4165,6 +4177,7 @@ rules:
         pi-smart-compact,
       ]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 1,165 hits in 32 repositories (paseo 253, opencode 167), 15/20 true across 15 repositories. False positives: compatibility as a platform, model or Workers setting, and a React Native legacy-architecture fixture helper."
       - Runs in the ESLint pass so existing debt is pinned in eslint-suppressions.json.
       - "`compatible` is excluded: an OpenAI-compatible protocol is a shape, not a compatibility path."
       - Antidrift's own retiredRules ledger is G16 debt held in the suppressions file.
@@ -4196,6 +4209,7 @@ rules:
     corpusRepositories:
       [opencode, sudocode-main, executor, chatbiz-webapp, homer, agent-browser]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 219 hits in 31 repositories, 16/20 true across 16 repositories. False positives: a poll retry inside a deadline loop, a {} fed to a schema that rejects it, and two error-body parse fallbacks on paths that still throw."
       - Only silent failure paths report; a catch that reads its error or rethrows keeps empty as an explicit contract.
       - The governance preset excludes `**/fixtures/**`, where failure behavior is modeled on purpose, matching the ESLint pass ignores.
     external:
@@ -4230,6 +4244,7 @@ rules:
     corpusRepositories:
       [chatbiz-webapp, pierre, executor, opencode, sudocode-main, hunk, codiff]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 122 hits in 28 repositories, 19/20 true across 19 repositories; the false positive picks list positions in a demo screen."
       - Four or more branches matches the dotfiles g9-elif-chain threshold of an if plus three elifs.
     external:
       state: partial-overlap
@@ -4256,6 +4271,7 @@ rules:
     referenceDoc: docs/rule-investigations/directive-rules.md
     corpusRepositories: [homer]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 19 hits in 5 repositories, 1/19 true. Release-download checksums beside their URL, fetched-source pins and test expectations dominated. Test files and digests in an object with a url or href are now skipped: 2 hits, both homer scripts/actionlint.ts (patchSha256 true, sourceSha256 an upstream tarball). Too few hits to measure."
       - Unnamed 64-hex literals such as test keys and OAuth client IDs are not hash pins and stay out.
     external:
       state: net-antidrift
@@ -4282,6 +4298,7 @@ rules:
     referenceDoc: docs/rule-investigations/directive-rules.md
     corpusRepositories: [opencode, executor]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 30 hits in 6 repositories, 2/20 true; only opencode's two developer-home paths couple to a host. Story files, __mocks__ and e2e trees are now skipped: 18 hits in 4 repositories, 2/11 on the first labels, 0/7 on a fresh frozen sample. The rest are container and guest image homes (/home/agent, /home/claude) and a device service user. Below the 70% bar."
       - Test fixture paths and the /home/linuxbrew/ Homebrew prefix do not couple code to a developer host and stay out.
     external:
       state: net-antidrift
@@ -4308,6 +4325,7 @@ rules:
     referenceDoc: docs/rule-investigations/directive-rules.md
     corpusRepositories: [executor, chatbiz-webapp, homer, opencode]
     concerns:
+      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 277 hits in 18 repositories (paseo 179), 10/20 true, 8/18 without paseo. Dates inside quotes, backticks or URLs (format examples, version strings, specification links) are now skipped: 255 hits in 16 repositories, fresh frozen sample 20/27 (74%), holding in 6 of 9 sampled repositories, 16/23 without paseo. Specification revision citations still match."
       - Comments trailing code on the same line annotate data, and timestamps followed by a time of day are format examples; both stay out.
       - Dated specification revisions such as "MCP Authorization 2025-06-18" still match.
     external:
