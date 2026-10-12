@@ -162,3 +162,11 @@ export function hasValidatorDelegation(
   services: TypeScriptParserServices,
   checker: ts.TypeChecker
 ): boolean;
+
+export function predicateContractEvidence(
+  node: unknown,
+  paramName: string,
+  targetType: ts.Type,
+  services: TypeScriptParserServices,
+  checker: ts.TypeChecker
+): { proven: boolean; checked: Set<string> };

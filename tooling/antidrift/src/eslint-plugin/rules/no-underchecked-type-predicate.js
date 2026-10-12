@@ -4,6 +4,7 @@ import {
   hasValidatorDelegation,
   isBroadPredicateInputType,
   isPredicateObjectContract,
+  predicateContractEvidence,
   requiredTypeProps,
   typePredicateParts,
 } from "../../semantic-adapters/broad-input.mjs";
@@ -67,12 +68,26 @@ export function ruleNoUndercheckedTypePredicate() {
         ) {
           return;
         }
+        const evidence = predicateContractEvidence(
+          fn.body,
+          parts.paramName,
+          targetType,
+          services,
+          checker
+        );
+        if (evidence.proven) {
+          return;
+        }
         const checked = checkedTargetProperties(
           fn.body,
           parts.paramName,
           targetProps
         );
-        if ([...targetProps].every((prop) => checked.has(prop))) {
+        if (
+          [...targetProps].every(
+            (prop) => checked.has(prop) || evidence.checked.has(prop)
+          )
+        ) {
           return;
         }
         context.report({

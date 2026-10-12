@@ -294,15 +294,18 @@ export function functionParameterByName(fn, name) {
   );
 }
 
+// A typed record is not broad input: only `any`/`unknown`, the empty object
+// type, or a dictionary whose values are `any`/`unknown` with no declared fields.
 export function isBroadPredicateInputType(checker, type) {
   if (isAppeasementCastSourceType(type)) return true;
-  const stringIndexType = type.getStringIndexType?.();
-  if (isAppeasementCastSourceType(stringIndexType)) return true;
-  const numberIndexType = type.getNumberIndexType?.();
-  if (isAppeasementCastSourceType(numberIndexType)) return true;
+  if ((type.flags & TS_TYPE_FLAG_OBJECT) === 0) return false;
+  if (checker.getPropertiesOfType(type).length > 0) return false;
+  const indexTypes = [
+    type.getStringIndexType?.(),
+    type.getNumberIndexType?.(),
+  ].filter(Boolean);
   return (
-    (type.flags & TS_TYPE_FLAG_OBJECT) !== 0 &&
-    checker.getPropertiesOfType(type).length === 0
+    indexTypes.length === 0 || indexTypes.some(isAppeasementCastSourceType)
   );
 }
 
@@ -511,6 +514,11 @@ export function checkedTargetProperties(node, paramName, targetProps) {
       if (targetProps.has(prop)) checked.add(prop);
       return;
     }
+    const reflected = reflectGetParts(current);
+    if (reflected && hasParamRoot(reflected.target, paramNames)) {
+      if (targetProps.has(reflected.name)) checked.add(reflected.name);
+      return;
+    }
     if (current.type === "Identifier" && !isBindingIdentifier(current)) {
       const prop = propertyAliases.get(current.name);
       if (targetProps.has(prop)) checked.add(prop);
@@ -550,4 +558,220 @@ export function hasValidatorDelegation(node, paramName, services, checker) {
     }
   });
   return sawDelegation;
+}
+
+function reflectGetParts(node) {
+  if (node?.type !== "CallExpression") return null;
+  const callee = node.callee;
+  if (
+    callee?.type !== "MemberExpression" ||
+    callee.object?.type !== "Identifier" ||
+    callee.object.name !== "Reflect" ||
+    staticPropertyName(callee.property) !== "get"
+  ) {
+    return null;
+  }
+  const name = staticPropertyName(node.arguments?.[1]);
+  return name === null ? null : { target: node.arguments[0], name };
+}
+
+function staticMemberName(node) {
+  if (!node.computed) return staticPropertyName(node.property);
+  return node.property?.type === "Literal" &&
+    typeof node.property.value === "string"
+    ? node.property.value
+    : null;
+}
+
+// Property path from the predicate parameter: `value.data.tag`,
+// `value["_tag"]`, `Reflect.get(value, "kind")`, or a local bound to one.
+function paramPropertyPath(expression, paramNames, aliasPaths) {
+  const node = unwrapExpression(expression);
+  if (node?.type === "Identifier") {
+    return paramNames.has(node.name) ? [] : (aliasPaths.get(node.name) ?? null);
+  }
+  if (node?.type === "MemberExpression") {
+    const name = staticMemberName(node);
+    const base =
+      name === null
+        ? null
+        : paramPropertyPath(node.object, paramNames, aliasPaths);
+    return base && [...base, name];
+  }
+  const reflected = reflectGetParts(node);
+  if (!reflected) return null;
+  const base = paramPropertyPath(reflected.target, paramNames, aliasPaths);
+  return base && [...base, reflected.name];
+}
+
+const UNIT_TYPE_FLAGS =
+  ts.TypeFlags.StringLiteral |
+  ts.TypeFlags.NumberLiteral |
+  ts.TypeFlags.BigIntLiteral |
+  ts.TypeFlags.BooleanLiteral |
+  ts.TypeFlags.EnumLiteral;
+
+function isUnitType(type) {
+  return (
+    (type.flags & UNIT_TYPE_FLAGS) !== 0 &&
+    (type.flags & ts.TypeFlags.Union) === 0
+  );
+}
+
+function isDiscriminantType(type) {
+  return type.isUnion() ? type.types.every(isUnitType) : isUnitType(type);
+}
+
+function propertyTypeAtPath(checker, type, path) {
+  let current = type;
+  for (const name of path) {
+    const property = checker.getPropertyOfType(
+      checker.getNonNullableType(current),
+      name
+    );
+    if (!property) return null;
+    current = checker.getTypeOfSymbol(property);
+  }
+  return checker.getNonNullableType(current);
+}
+
+function matchesTargetDiscriminant(checker, targetType, path, valueType) {
+  if (path.length === 0 || !isUnitType(valueType)) return false;
+  const propertyType = propertyTypeAtPath(checker, targetType, path);
+  return Boolean(
+    propertyType &&
+    isDiscriminantType(propertyType) &&
+    checker.isTypeAssignableTo(valueType, propertyType)
+  );
+}
+
+function instanceofProvesTarget(
+  node,
+  paramPath,
+  services,
+  checker,
+  targetType
+) {
+  if (paramPath?.length !== 0) return false;
+  const tsConstructor = services.esTreeNodeToTSNodeMap.get(node.right);
+  if (!tsConstructor) return false;
+  return checker
+    .getTypeAtLocation(tsConstructor)
+    .getConstructSignatures()
+    .some((signature) =>
+      checker.isTypeAssignableTo(
+        checker.getReturnTypeOfSignature(signature),
+        targetType
+      )
+    );
+}
+
+function delegatedPredicateType(
+  node,
+  paramNames,
+  aliasPaths,
+  services,
+  checker
+) {
+  const tsCall = services.esTreeNodeToTSNodeMap.get(node);
+  const signature = tsCall && checker.getResolvedSignature(tsCall);
+  const predicate = signature && checker.getTypePredicateOfSignature(signature);
+  if (
+    !predicate?.type ||
+    predicate.type.flags & (TS_TYPE_FLAG_ANY | TS_TYPE_FLAG_UNKNOWN)
+  ) {
+    return null;
+  }
+  const argument = node.arguments?.[predicate.parameterIndex];
+  return paramPropertyPath(argument, paramNames, aliasPaths)?.length === 0
+    ? predicate.type
+    : null;
+}
+
+// Nominal and discriminant evidence a field count cannot see: an `instanceof`
+// whose instance type satisfies the asserted type, a delegated type predicate,
+// or a literal equality on a discriminant property of the asserted type.
+export function predicateContractEvidence(
+  node,
+  paramName,
+  targetType,
+  services,
+  checker
+) {
+  const paramNames = predicateValueNames(node, paramName);
+  const aliasPaths = new Map();
+  const checked = new Set();
+  let proven = false;
+  walkNode(node, (current) => {
+    if (proven) return;
+    if (
+      current.type === "VariableDeclarator" &&
+      current.id?.type === "Identifier"
+    ) {
+      const path = paramPropertyPath(current.init, paramNames, aliasPaths);
+      if (path?.length) aliasPaths.set(current.id.name, path);
+      return;
+    }
+    if (current.type === "BinaryExpression") {
+      if (current.operator === "instanceof") {
+        proven = instanceofProvesTarget(
+          current,
+          paramPropertyPath(current.left, paramNames, aliasPaths),
+          services,
+          checker,
+          targetType
+        );
+        return;
+      }
+      if (current.operator !== "===" && current.operator !== "==") return;
+      proven = [
+        [current.left, current.right],
+        [current.right, current.left],
+      ].some(([side, other]) => {
+        const path = paramPropertyPath(side, paramNames, aliasPaths);
+        const tsOther = services.esTreeNodeToTSNodeMap.get(other);
+        return Boolean(
+          path &&
+          tsOther &&
+          matchesTargetDiscriminant(
+            checker,
+            targetType,
+            path,
+            checker.getTypeAtLocation(tsOther)
+          )
+        );
+      });
+      return;
+    }
+    if (current.type !== "CallExpression") return;
+    const delegated = delegatedPredicateType(
+      current,
+      paramNames,
+      aliasPaths,
+      services,
+      checker
+    );
+    if (!delegated) return;
+    if (checker.isTypeAssignableTo(delegated, targetType)) {
+      proven = true;
+      return;
+    }
+    for (const property of checker.getPropertiesOfType(delegated)) {
+      checked.add(property.name);
+      const propertyType = checker.getNonNullableType(
+        checker.getTypeOfSymbol(property)
+      );
+      if (
+        matchesTargetDiscriminant(
+          checker,
+          targetType,
+          [property.name],
+          propertyType
+        )
+      ) {
+        proven = true;
+      }
+    }
+  });
+  return { proven, checked };
 }
