@@ -35,12 +35,10 @@ function annotation(node) {
   return node.typeAnnotation;
 }
 
+// Type-parameter constraints and defaults bound a caller-chosen type rather
+// than erase one, so only parameter and return annotations count.
 function signatureTypes(node) {
-  return [
-    node.typeParameters,
-    ...node.params.map(annotation),
-    node.returnType,
-  ].filter(Boolean);
+  return [...node.params.map(annotation), node.returnType].filter(Boolean);
 }
 
 const functionTypes = new Set([

@@ -266,7 +266,7 @@ ruleFamilies:
           - antidrift/no-nullable-positional-tuple
         flags:
           - "type UserFork = { id: string; email: string; status: UserStatus };"
-          - "export function load(input: { userId: string }) {}"
+          - "export function load(input: { userId: string; orgId: string }) {}"
           - "type CustomRange = [Date | null, Date | null];"
           - "type LocalUser = Pick<User, 'id' | 'email'> & { status: UserStatus };"
         allows:
@@ -748,6 +748,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-appeasement-cast.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main, opencode]
     concerns:
+      - "October 12 2026 precision (79 deduplicated TypeScript roots, 35 local and 44 on sushi; vendored, generated, build, dot and fixture trees excluded; type-checked after frozen installs, sampled from the 49 roots whose install resolved): 1,838 hits in 52 repositories (pool 1,372 in 35: LibreChat 329, cloudflare-agents 277, reanimated 170, executor 128, chatbiz-webapp 117). Hand-checked 20 round-robin across 20 repositories: 20/20 true positives, mostly caught-error, JSON.parse and response.json() casts into named contracts."
       - Broad inventory classified all current Chaski, Codebase Atlas, and Sudocode findings as real boundary/type-escape drift or in-scope test setup.
       - Copy-backed remediation evidence now covers caught-error guards, serialized browser storage validation, schema-backed object-contract checks, and third-party bag guards; do not add more copy-only remediation before the next promotion review.
       - Test-file casts remain in scope and should report, but test-only findings do not count as production drift evidence for stable promotion.
@@ -941,6 +942,8 @@ rules:
     corpusRepositories: [chaski, sudocode-main]
     concerns:
       - Local UI props and callback payloads require careful exclusions.
+      - "A one-member literal is not a shape another declaration can restate, so only literals with two or more members report (October 12 2026)."
+      - "October 12 2026 precision against W4 (79 deduplicated TypeScript roots, local and sushi; a hit is true when the inline literal restates a shape already declared elsewhere): before 3,154 hits in 45 repositories, sample 5/20; the one-member exemption took the 78 roots with an after-run (sentry unfinished) from 2,665 hits in 44 repositories to 2,087 in 36 (paseo 694, LibreChat 241, claude-code 228, opencode 226, cloudflare-agents 112); a fresh sample measured 11/20. The rule stays below the 70% bar: most remaining hits are a function's own new options or named-arguments contract, which W4 does not forbid."
     external:
       state: partial-overlap
       support: medium
@@ -950,7 +953,7 @@ rules:
       whyNotOtherState: "Not equivalent because a raw syntax ban would report legitimate local props, callbacks, and small internal shapes."
     examples:
       flags:
-        - "export function load(input: { userId: string }) {}"
+        - "export function load(input: { userId: string; orgId: string }) {}"
       allows:
         - "export function load(input: LoadInput) {}"
     nextAction: Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus (31,557 tracked TS/JS files, 53 repositories) reports 3,443 findings in 29 repositories; prune suppressions as exported inline contracts are named.
@@ -1223,6 +1226,7 @@ rules:
       noDeadWorkBehavior: First boundary parses, different storage schemas, and assertion-callback contract checks stay clean.
     corpusRepositories: [chaski, codebase-atlas, murderbox]
     concerns:
+      - "October 12 2026 sweep of 79 deduplicated TypeScript roots (local and sushi, type-checked after frozen installs) found 0 hits; the harness reports the rule's own flagged example, so the rule is unmeasurable on this corpus and has no sampled precision."
       - "Test assertion scope is decided: Zod parses inside throw assertion callbacks are schema-contract checks, not validation-boundary drift."
       - "A June 4, 2026 real-test scan found no consumed assertion-callback reparse case across Codebase Atlas, Murderbox, Sudocode, and Chaski; that missing negative gate is accepted as unrepresented in the current corpus."
       - "Call-result type-equivalence branches were removed on 2026-08-10: bidirectional assignability between a helper's declared return type and the schema output never proves that schema validated the value, because refinements (.min, .positive, .refine, .transform) are invisible to TypeScript. The false-positive shape is NonEmpty.parse(readName()) with readName(): string. Same-binding decoder provenance remains blocking; call-result coverage may return through producer provenance in the schema-provenance adapter."
@@ -1251,6 +1255,7 @@ rules:
     solveType: validation-boundary-drift
     corpusRepositories: [murderbox, codebase-atlas]
     concerns:
+      - "October 12 2026 sweep of the combined local and sushi corpus: 13 hits in 6 repositories (codebase-atlas 4, paseo 4, rubber 2, chaski 1, chatbiz-webapp 1, LibreChat 1). The 15/15 figure above was measured after the server-action exemption, the rule's last change, and is reused."
       - "Structural type identity was rejected as the signal: a first pass keyed on mutual assignability produced three false positives in Codebase Atlas because Zod refinements (.min, .int, .strict) and z.input contracts are invisible to TypeScript. The shipped rule requires the parameter type to be a z.infer/z.output alias of the same schema symbol."
       - "The Codebase Atlas class (validateSpine/markGeneratedStateManifestValidated: a parameter typed as the schema output, immediately parsed, with *Input naming that says the authors meant it defensively) is accepted as drift, not defensive practice. The remedy is to type the parameter as the unvalidated input so the parse is honest. Decision recorded 2026-08-03."
       - "Test contract oracles are exempt: files matching the taxonomy test pattern are skipped, so a bare parse in a test body is a schema-conformance oracle."
@@ -1285,6 +1290,7 @@ rules:
     solveType: validation-boundary-drift
     corpusRepositories: [murderbox, cloudflare-agents, codebase-atlas, executor]
     concerns:
+      - "October 12 2026 precision (same 79-root corpus, typed sample pool of 49 resolved roots): 4,729 hits in 57 repositories (pool 3,124 in 36: paseo 724, LibreChat 577, executor 340, chatbiz-webapp 301). Hand-checked 20 across 20 repositories: 19/20. The false positive is a `let` accumulator (hunk src/core/cli.ts:817) whose later assignment needs the declared type."
       - "This is the upstream gate for the rest of the contract family. In Murderbox desktop apps/desktop, no-redundant-zod-parse, no-appeasement-cast, no-contract-appeasement-projection, no-unsafe-deserialize, and no-defensive-shape-probing all report zero across 38 files while bridge.ts alone holds 21 parse calls; the erased bindings declare unknown, so no type comparison can fire. Measured 2026-08-03 on branch desktop-erasure-remediation: removing the twelve annotations took no-redundant-zod-parse from 0 to 8 findings (six bridge.ts, two machine-workflows.ts) with no rule changes; the other four rules stayed at zero, so the erasures were masking redundant parses specifically."
       - "The local TypeChecker branch retains schema and Effect decoder provenance. Vendored anti-slop branches additionally reject syntactically known values widened into broad targets and local widen-then-assert flows, including bare widening that the previous implementation allowed."
       - "The 12 Murderbox positives include erasures of `boolean` (bridge.ts:151) and `string | null` (bridge.ts:100), which is why this reads as a uniform edge reflex rather than deliberate defensive validation of complex payloads."
@@ -1697,6 +1703,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-contract-appeasement-projection.md
     corpusRepositories: [chaski, codebase-atlas, murderbox]
     concerns:
+      - "October 12 2026 precision (same corpus, typed pool): 87 hits in 14 repositories (pool 70 in 10: paseo 26, executor 12, LibreChat 10, cloudflare-agents 10, pierre 6). Hand-checked 20: 14/20 (13/17 without paseo), holding at or above 70% in pierre, chaski, LibreChat, codebase-atlas and chatbiz-webapp. False positives are real remaps or dispatch (a sentinel-string option to undefined, entity-kind to player id, status to label, union variant to id), an overridable hook's identity default and a typeof decoder over an open JSON schema."
       - The inherited selector-wrapper branch has real corpus coverage, but the widened cross-contract projection branch still needs real source findings outside reduced fixtures before stable promotion.
       - Local variable indirection is a known false negative; future real corpus may justify tracking readonly locals derived from parameters.
       - The first implementation treats any call/new expression in the helper body as construction or validation pressure and leaves it clean; future real corpus may justify a narrower parser/validator recognizer so unrelated side-effect calls do not mask projection returns.
@@ -1727,6 +1734,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-underchecked-type-predicate.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main, opencode]
     concerns:
+      - "October 12 2026 precision on the combined local and sushi corpus (typed pool of 49 resolved roots): 103 hits in 15 repositories (pool 61 in 12: cloudflare-agents 22, LibreChat 8, executor 8, reanimated 8, paseo 6). Hand-checked 20 across 12 repositories: 17/20. False positives: reanimated isSerializableRef and isWorkletFunction (brand and capability probes on in-process objects) and a typed paseo timeline entry narrowed by its own kind."
       - The rule is intentionally limited to broad-input predicates that assert nontrivial object contracts.
       - Codebase Atlas supplies clean controls for primitive predicates, alias-based field checks, and third-party union predicates.
       - Chaski supplies a destructured-field clean control for object predicates.
@@ -1783,6 +1791,7 @@ rules:
         codebase-atlas,
       ]
     concerns:
+      - "October 12 2026 sweep of the combined local and sushi corpus: 421 hits in 30 repositories (paseo 115, opencode 105, chatbiz-webapp 30, pi-smart-compact 21, executor 17). The 177/177 type-checked figure was measured after the rule's last change and is reused."
       - "Only callbacks passed as call or new arguments are checked; a named or exported guard's annotation is part of its signature."
       - "Skipped when the TypeScript running the lint is older than 5.5, for generic classes, type-parameter inputs and an asserted any."
       - "A tag check reports only when every union member has a unit-typed tag, because a member whose tag could take another value keeps TypeScript from inferring the predicate."
@@ -2162,6 +2171,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-duplicated-object-field-blocks.md
     corpusRepositories: [murderbox]
     concerns:
+      - "October 12 2026 precision (79 deduplicated TypeScript roots, local and sushi): 3,704 hits in 63 repositories (paseo 868, sentry 420, LibreChat 347, cloudflare-agents 319, opencode 291). Hand-checked 20 across 20 repositories: 17/20. False positives: a Nitro HybridObject platform literal required by the spec format, and coincidental generic fields (name/type, id/label/score) across distinct entities."
       - The rule targets repeated schema and type declaration fields, not ordinary runtime object literals, where repeated keys frequently represent unrelated data rather than a shared contract.
       - Field identity includes normalized source text as well as the field name, so semantically equivalent types written through different aliases remain distinct without TypeScript services.
       - "Alert controls fail loudly: omitted options use the default shape, while provided option objects must include minSharedFields, minShapes, and minRedundantDeclarations."
@@ -2288,6 +2298,7 @@ rules:
     referenceDoc: docs/rule-investigations/no-redeclared-owned-union.md
     corpusRepositories: [antidrift]
     concerns:
+      - "October 12 2026 precision (79 deduplicated TypeScript roots, local and sushi): 5 hits in 5 repositories (athena-crisis, claude-code, executor, chatbiz-webapp, LibreChat), all labelled, 5/5; each union restates an exported runtime array in the same module."
       - Re-export chains and computed arrays remain unproven; ownership requires a directly inspectable exported constant array.
       - Equal member sets can represent distinct concepts; explicit name exemptions preserve consumer control.
     external:
@@ -2316,6 +2327,8 @@ rules:
     corpusRepositories: [antidrift]
     concerns:
       - Genuine protocol bags need explicit exported-name exemptions.
+      - "Type-parameter constraints and defaults (`<T extends Record<string, unknown>>`) bound a caller-chosen type rather than erase one, so only parameter and return annotations count (October 12 2026)."
+      - "October 12 2026 precision (79 deduplicated TypeScript roots, local and sushi): before 410 hits in 31 repositories, sample 11/20 (false positives: type-parameter constraints and defaults, MCP and logger protocol bags, a validator's input, arbitrary component props). Excluding type parameters took the 78 roots with an after-run (sentry unfinished) from 360 hits in 30 repositories to 324 in 29 (LibreChat 63, executor 51, claude-code 48, opencode 39, paseo 22); a fresh sample measured 6/20. Remaining false positives are decoder inputs, generic record helpers and protocol or logging bags that only exact-name `allows` can separate; the rule stays below the 70% bar."
       - Named types and inferred signatures are not expanded without type services.
     external:
       state: net-antidrift
@@ -2350,7 +2363,9 @@ rules:
       - Decoder names are a syntax convention; AST evidence cannot certify runtime validation behavior.
       - Predicate signatures must be directly visible; re-export chains and complex control-flow joins remain unproven.
       - Decoders own their unknown parameter. Type predicates and assertion functions (`x is T`, `asserts x is T`) are exempt, as are helpers whose single returned expression only narrows the parameter with typeof, `in`, instanceof, Array.isArray and null checks joined by && or ||, plus a final property comparison.
-      - Forwarding the whole value as a call argument is not use; the receiving function owns the decoding and is checked there when it is first-party. Built-in coercions and serializers (String, Number, Boolean, BigInt, JSON.stringify, Response.json) and template interpolation remain use.
+      - Forwarding the whole value as a call argument, or placing it in an object literal field (which TypeScript only accepts when the field is unknown), is not use; the receiver owns the decoding and is checked there when it is first-party. Built-in coercions (String, Number, Boolean, BigInt) and template interpolation remain use; a value that is never reassigned, is serialized by JSON.stringify or Response.json, and is otherwise only tested is output formatting.
+      - "A binding discriminated with `instanceof Error` (or another `*Error` class) holds a thrown value and is analysed like a rejection-handler parameter: casts, unnarrowed member reads, typeof operands and `in` right sides still report; String() formatting and forwarding do not (October 12 2026)."
+      - "October 12 2026 precision (79 deduplicated TypeScript roots, local and sushi; a hit is true when an unknown value is cast or consumed as domain data without decoding): before 1,767 hits in 46 repositories, sample 8/20, false positives dominated by error-normalisation helpers (`error instanceof Error ? error.message : String(error)`). The thrown-value, object-field and test-and-serialize exemptions took the 78 roots with an after-run (sentry unfinished) from 1,734 hits in 45 repositories to 1,285 in 43 (paseo 197, opencode 195, executor 170, cloudflare-agents 169, LibreChat 122); a fresh sample measured 11/20. Remaining false positives are generic walkers and formatters over arbitrary values, test spies and identity mocks, and stored thrown values without an instanceof test; the rule stays below the 70% bar."
       - Branch and if-exit guards (typeof, instanceof, `in`, Array.isArray) narrow later reads in the same block. Guard operands (typeof, `!`, instanceof, `in`, equality) are not use only when the guard steers control flow (a branch, loop, conditional or switch test, a short-circuit left operand, or a type-predicate return); `return typeof input` is use. Casts report even behind a guard.
     external:
       state: net-antidrift
@@ -2689,6 +2704,7 @@ rules:
     referenceDoc: docs/rule-investigations/anti-slop-import.md
     corpusRepositories: [agent-guardrails-monorepo-template]
     concerns:
+      - "October 12 2026 precision (79 deduplicated TypeScript roots, local and sushi, parser-only): 3,485 hits in 45 repositories (LibreChat 1,029, cloudflare-agents 814, paseo 505, opencode 201, sentry 173). Hand-checked 20 across 20 repositories: 20/20; every hit is an `as unknown as T` or `as object as T` tunnel, most of them test mocks."
       - The revived owner intentionally matches every upstream assertion chain rather than only unknown tunnels.
     external:
       state: equivalent
@@ -2814,6 +2830,7 @@ rules:
     referenceDoc: docs/rule-investigations/portable-rules.md
     corpusRepositories: [homer]
     concerns:
+      - "October 12 2026 precision (79 deduplicated TypeScript roots, local and sushi): 675 hits in 24 repositories (LibreChat 169, remote-pi 86, paseo 70, executor 67, opencode 66). Hand-checked 20 across 20 repositories: 20/20; AGENT.md forbids `as never` outright."
       - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
     external:
       state: partial-overlap
@@ -3446,6 +3463,7 @@ rules:
     referenceDoc: docs/rule-investigations/portable-rules.md
     corpusRepositories: [homer]
     concerns:
+      - "October 12 2026 precision (79 deduplicated TypeScript roots, local and sushi): 12 hits in 3 repositories (opencode 10, sentry 1, paseo 1); all 12 labelled, 10/12. Every opencode hit is an i18n dictionary that already covers every key, so Partial only hides future omissions; the sentry FIELD_ALIASES map and a paseo test override are genuinely sparse. Without opencode 0/2: the rule holds in one repository, below the three-repository bar."
       - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
     external:
       state: partial-overlap
@@ -3748,6 +3766,7 @@ rules:
     referenceDoc: docs/rule-investigations/portable-rules.md
     corpusRepositories: [homer]
     concerns:
+      - "October 12 2026 precision (79 deduplicated TypeScript roots, local and sushi): 22 hits in 10 repositories (claude-code 6, two each in LibreChat, athena-crisis, cloudflare-agents, sentry, codeql, homer-production, sudocode). Hand-checked 20: 16/20, holding in 8 repositories. False positives: declaration-only `var x: never;` in codeql extractor test inputs and two type-only `.test-d.ts` files in cloudflare-agents."
       - Scope ownership is explicit; zero-hit rules have no positive corpus precision claim.
     external:
       state: partial-overlap

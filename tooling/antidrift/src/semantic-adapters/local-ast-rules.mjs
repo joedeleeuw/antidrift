@@ -441,10 +441,13 @@ function memberOfExportedClass(memberNode) {
   );
 }
 
+// A single field is not a shape another declaration can restate, so only
+// literals with two or more members count as parallel contracts.
 function inlineStructuralTypeAtBoundary(node) {
   const parent = node.parent;
   const param = parent?.parent;
   if (parent?.type !== "TSTypeAnnotation" || !param) return false;
+  if (node.members.length < 2) return false;
 
   const fn = functionForImplementationParameter(param);
   if (!fn) return false;

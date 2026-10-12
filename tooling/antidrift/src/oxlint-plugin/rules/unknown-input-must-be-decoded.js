@@ -10,8 +10,8 @@ import {
   isErrorInspectionRead,
   isParameterProperty,
   isRejectionHandlerFunction,
+  isSerializerSinkUse,
   owningBinding,
-  variableReadsOnlySinks,
 } from "../unknown-sinks.js";
 
 // Passing the whole unknown value as a call argument forwards it: the
@@ -24,6 +24,34 @@ function isForwardedWhole(identifier, sourceCode) {
     call.arguments.includes(identifier) &&
     !isBuiltinCoercionCall(sourceCode, call)
   );
+}
+
+// Placing the whole value in an object literal field forwards it: TypeScript
+// only accepts an unknown there when the field itself is unknown, so the
+// field's reader owns the decoding.
+function fillsObjectLiteralField(identifier) {
+  const property = identifier.parent;
+  return (
+    property?.type === "Property" &&
+    property.value === identifier &&
+    property.parent?.type === "ObjectExpression"
+  );
+}
+
+// A binding discriminated with `instanceof Error` (or another `*Error`
+// class) holds a thrown value: like a rejection reason, it has no decodable
+// contract, so only its inspection reads are analysed.
+function isThrownValueBinding(reads) {
+  return reads.some(({ identifier }) => {
+    const test = identifier.parent;
+    return (
+      test.type === "BinaryExpression" &&
+      test.operator === "instanceof" &&
+      test.left === identifier &&
+      test.right.type === "Identifier" &&
+      test.right.name.endsWith("Error")
+    );
+  });
 }
 
 const castTypes = new Set(["TSAsExpression", "TSTypeAssertion"]);
@@ -139,7 +167,11 @@ export default function ruleUnknownInputMustBeDecoded() {
           const reads = variable.references.filter(
             (reference) => reference.isRead() && !reference.isTypeReference
           );
-          if (rejectionHandlerOwner(node, context.sourceCode)) {
+          const parameterProperty = isParameterProperty(node);
+          if (
+            rejectionHandlerOwner(node, context.sourceCode) ||
+            (!parameterProperty && isThrownValueBinding(reads))
+          ) {
             const inspected = reads.some(
               ({ identifier }) =>
                 isErrorInspectionRead(identifier) &&
@@ -155,10 +187,19 @@ export default function ruleUnknownInputMustBeDecoded() {
             }
             return;
           }
-          const parameterProperty = isParameterProperty(node);
+          // Never reassigned, serialized at least once, and otherwise only
+          // tested: the value is formatted as output, not consumed as data.
+          const sinkReads = reads.filter(({ identifier }) =>
+            isSerializerSinkUse(context.sourceCode, identifier)
+          );
           if (
             !parameterProperty &&
-            variableReadsOnlySinks(context.sourceCode, variable)
+            writes.length === 0 &&
+            sinkReads.length > 0 &&
+            reads.every(
+              (read) =>
+                sinkReads.includes(read) || isGuardOperand(read.identifier)
+            )
           ) {
             return;
           }
@@ -174,7 +215,8 @@ export default function ruleUnknownInputMustBeDecoded() {
             }
             if (
               !parameterProperty &&
-              isForwardedWhole(identifier, context.sourceCode)
+              (isForwardedWhole(identifier, context.sourceCode) ||
+                fillsObjectLiteralField(identifier))
             ) {
               return false;
             }

@@ -1224,6 +1224,8 @@ ruleTester.run(
       },
       "class Local { constructor(input: { id: string; title: string }) { void input; } } void Local;",
       "class Local { set value(input: { id: string; title: string }) { void input; } } void Local;",
+      "export function LoadUser(input: { id: string }) { return input.id; }",
+      "export function loadUser({ id }: { id: string }) { return id; }",
     ],
     invalid: [
       {
@@ -1232,14 +1234,6 @@ ruleTester.run(
       },
       {
         code: "export const createApi = () => ({ saveUser: async (req: { id: string; email: string }) => req.email });",
-        errors: 1,
-      },
-      {
-        code: "export function LoadUser(input: { id: string }) { return input.id; }",
-        errors: 1,
-      },
-      {
-        code: "export function loadUser({ id }: { id: string }) { return id; }",
         errors: 1,
       },
       {
@@ -1252,12 +1246,12 @@ ruleTester.run(
       },
       {
         filename: "loader.tsx",
-        code: "export function loadUser(input: { id: string }) { const view = <div />; void view; return input.id; }",
+        code: "export function loadUser(input: { id: string; name: string }) { const view = <div />; void view; return input.id; }",
         errors: 1,
       },
       {
         filename: "loader-nested.tsx",
-        code: "export function loadUser(input: { id: string }) { const render = () => { return <div />; }; void render; return input.id; }",
+        code: "export function loadUser(input: { id: string; name: string }) { const render = () => { return <div />; }; void render; return input.id; }",
         errors: 1,
       },
       {
