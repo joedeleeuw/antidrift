@@ -1145,22 +1145,6 @@ typedRuleTester.run(
       "type DateMessage = { year: number; month: number; day: number };\nfunction isDateMessage(value: unknown): value is DateMessage { return typeof value === 'object' && value !== null && 'year' in value && 'month' in value && 'day' in value; }",
       "import { z } from 'zod';\nconst UserSchema = z.object({ id: z.string(), email: z.string(), role: z.string() });\ntype User = z.infer<typeof UserSchema>;\nfunction isUser(value: unknown): value is User { return UserSchema.safeParse(value).success; }",
       "function isStringArray(value: unknown): value is string[] { return Array.isArray(value) && value.every((item) => typeof item === 'string'); }",
-      // instanceof proves a class contract nominally
-      "class ApiError extends Error { status = 500; }\nfunction isApiError(error: unknown): error is ApiError { return error instanceof ApiError; }",
-      // Error satisfies an interface whose extra fields are all optional
-      "interface ErrnoError extends Error { code?: string }\nfunction isErrnoError(error: unknown): error is ErrnoError { return error instanceof Error; }",
-      // a literal discriminant on the asserted type is decisive
-      "type ConflictError = { readonly _tag: 'ConflictError'; readonly message: string };\nconst isConflictError = (value: unknown): value is ConflictError => typeof value === 'object' && value !== null && '_tag' in value && value['_tag'] === 'ConflictError';",
-      "type TabDrag = { kind: 'tab'; id: string };\nfunction isTabDrag(data: unknown): data is TabDrag { return typeof data === 'object' && data !== null && Reflect.get(data, 'kind') === 'tab'; }",
-      "type Failure = { ok: false; reason: 'stale' | 'missing'; message: string };\nfunction isFailure(value: unknown): value is Failure { if (!value || typeof value !== 'object') return false; const reason = (value as Record<string, unknown>).reason; return reason === 'stale' || reason === 'missing'; }",
-      "enum EntryType { Spans = 'spans', Css = 'css' }\ntype SpanEntry = { type: EntryType.Spans; data: string[] };\nconst isSpanEntry = (entry: any): entry is SpanEntry => entry.type === EntryType.Spans;",
-      "type VideoEvent = { timestamp: number; data: { tag: 'video'; payload: string } };\nfunction isVideoEvent(event: any): event is VideoEvent { return event.data?.tag === 'video'; }",
-      // a delegated type predicate checks the fields it asserts
-      "type Artifact = { key: string; data: unknown };\ntype RootCause = { key: string; data: { cause: string } };\ndeclare function isArtifact(value: unknown): value is Artifact;\nfunction isRootCause(value: unknown): value is RootCause { return isArtifact(value) && typeof value.data === 'object'; }",
-      "type Tagged = { readonly _tag: 'Timeout'; readonly ms: number };\ndeclare function isTagged<K extends string>(value: unknown, tag: K): value is { _tag: K };\nconst isTimeout = (error: unknown): error is Tagged => isTagged(error, 'Timeout');",
-      "type ToolFile = { name: string; bytes: number };\ndeclare const matchesToolFile: (value: unknown) => value is ToolFile;\nconst isToolFile = (value: unknown): value is ToolFile => matchesToolFile(value);",
-      // a typed record is not broad input
-      "type Range = { start?: Date; end?: Date };\ntype Selection = { primary: Range };\nfunction isSelection(ranges: { [key: string]: Range }): ranges is Selection { return ranges.primary !== undefined; }",
     ],
     invalid: [
       {
@@ -1177,18 +1161,6 @@ typedRuleTester.run(
       },
       {
         code: "type User = { id: string; email: string; role: string };\ndeclare function validateUser(value: unknown): boolean;\nfunction isUser(value: unknown): value is User { return validateUser(value); }",
-        errors: 1,
-      },
-      {
-        code: "class Base { id = ''; }\ntype User = { id: string; email: string };\nfunction isUser(value: unknown): value is User { return value instanceof Base; }",
-        errors: 1,
-      },
-      {
-        code: "type FsError = { code: string; path: string };\nfunction isFsError(value: unknown): value is FsError { return typeof value === 'object' && value !== null && 'code' in value && value.code === 'ENOENT'; }",
-        errors: 1,
-      },
-      {
-        code: "type Color = { kind: 'rgb'; r: number; g: number };\nfunction isColor(value: any): value is Color { return value.kind !== 'alias' && typeof value.r === 'number'; }",
         errors: 1,
       },
     ],

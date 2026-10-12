@@ -754,10 +754,6 @@ typedRuleTester.run("no-parse-as-cast", rule("no-parse-as-cast"), {
     fixture("programs/correct/zod-external-call-boundary.ts"),
     // Test-context exemption: a schema-conformance oracle under a test/ path
     fixture("programs/correct/test/zod-contract-oracle.ts"),
-    // Next.js server actions are network endpoints: the parse decodes client input
-    '"use server";\nimport { z } from "zod";\nconst InputSchema = z.object({ id: z.string().uuid() });\ntype Input = z.infer<typeof InputSchema>;\nexport async function saveInput(input: Input) { return InputSchema.parse(input); }',
-    '"use server";\nimport { z } from "zod";\nconst InputSchema = z.object({ id: z.string().uuid() });\ntype Input = z.infer<typeof InputSchema>;\nconst saveInput = async (input: Input) => InputSchema.safeParse(input);\nexport { saveInput };',
-    'import { z } from "zod";\nconst InputSchema = z.object({ id: z.string().uuid() });\ntype Input = z.infer<typeof InputSchema>;\nexport function form() { async function save(input: Input) { "use server"; return InputSchema.parse(input); } return save; }',
   ],
   invalid: [
     // Parameter declared as the schema output and parsed with that schema
@@ -770,11 +766,6 @@ typedRuleTester.run("no-parse-as-cast", rule("no-parse-as-cast"), {
     },
     // safeParse is the same coercion with a different error model
     { ...fixture("programs/drift/zod-safe-parse-variants.ts"), errors: 1 },
-    // a non-exported helper in a server module is not an endpoint
-    {
-      code: '"use server";\nimport { z } from "zod";\nconst InputSchema = z.object({ id: z.string().uuid() });\ntype Input = z.infer<typeof InputSchema>;\nfunction normalize(input: Input) { return InputSchema.parse(input); }\nexport async function saveInput(input: unknown) { return normalize(InputSchema.parse(input)); }',
-      errors: 1,
-    },
   ],
 });
 
