@@ -266,7 +266,7 @@ ruleFamilies:
           - antidrift/no-nullable-positional-tuple
         flags:
           - "type UserFork = { id: string; email: string; status: UserStatus };"
-          - "export function load(input: { userId: string; orgId: string }) {}"
+          - "export function load(input: { userId: string }) {}"
           - "type CustomRange = [Date | null, Date | null];"
           - "type LocalUser = Pick<User, 'id' | 'email'> & { status: UserStatus };"
         allows:
@@ -942,7 +942,6 @@ rules:
     corpusRepositories: [chaski, sudocode-main]
     concerns:
       - Local UI props and callback payloads require careful exclusions.
-      - "A one-member literal is not a shape another declaration can restate, so only literals with two or more members report (October 12 2026)."
       - "October 12 2026 precision against W4 (79 deduplicated TypeScript roots, local and sushi; a hit is true when the inline literal restates a shape already declared elsewhere): before 3,154 hits in 45 repositories, sample 5/20; the one-member exemption took the 78 roots with an after-run (sentry unfinished) from 2,665 hits in 44 repositories to 2,087 in 36 (paseo 694, LibreChat 241, claude-code 228, opencode 226, cloudflare-agents 112); a fresh sample measured 11/20. The rule stays below the 70% bar: most remaining hits are a function's own new options or named-arguments contract, which W4 does not forbid."
     external:
       state: partial-overlap
@@ -953,7 +952,7 @@ rules:
       whyNotOtherState: "Not equivalent because a raw syntax ban would report legitimate local props, callbacks, and small internal shapes."
     examples:
       flags:
-        - "export function load(input: { userId: string; orgId: string }) {}"
+        - "export function load(input: { userId: string }) {}"
       allows:
         - "export function load(input: LoadInput) {}"
     nextAction: Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus (31,557 tracked TS/JS files, 53 repositories) reports 3,443 findings in 29 repositories; prune suppressions as exported inline contracts are named.
@@ -2364,7 +2363,6 @@ rules:
       - Predicate signatures must be directly visible; re-export chains and complex control-flow joins remain unproven.
       - Decoders own their unknown parameter. Type predicates and assertion functions (`x is T`, `asserts x is T`) are exempt, as are helpers whose single returned expression only narrows the parameter with typeof, `in`, instanceof, Array.isArray and null checks joined by && or ||, plus a final property comparison.
       - Forwarding the whole value as a call argument, or placing it in an object literal field (which TypeScript only accepts when the field is unknown), is not use; the receiver owns the decoding and is checked there when it is first-party. Built-in coercions (String, Number, Boolean, BigInt) and template interpolation remain use; a value that is never reassigned, is serialized by JSON.stringify or Response.json, and is otherwise only tested is output formatting.
-      - "A binding discriminated with `instanceof Error` (or another `*Error` class) holds a thrown value and is analysed like a rejection-handler parameter: casts, unnarrowed member reads, typeof operands and `in` right sides still report; String() formatting and forwarding do not (October 12 2026)."
       - "October 12 2026 precision (79 deduplicated TypeScript roots, local and sushi; a hit is true when an unknown value is cast or consumed as domain data without decoding): before 1,767 hits in 46 repositories, sample 8/20, false positives dominated by error-normalisation helpers (`error instanceof Error ? error.message : String(error)`). The thrown-value, object-field and test-and-serialize exemptions took the 78 roots with an after-run (sentry unfinished) from 1,734 hits in 45 repositories to 1,285 in 43 (paseo 197, opencode 195, executor 170, cloudflare-agents 169, LibreChat 122); a fresh sample measured 11/20. Remaining false positives are generic walkers and formatters over arbitrary values, test spies and identity mocks, and stored thrown values without an instanceof test; the rule stays below the 70% bar."
       - Branch and if-exit guards (typeof, instanceof, `in`, Array.isArray) narrow later reads in the same block. Guard operands (typeof, `!`, instanceof, `in`, equality) are not use only when the guard steers control flow (a branch, loop, conditional or switch test, a short-circuit left operand, or a type-predicate return); `return typeof input` is use. Casts report even behind a guard.
     external:

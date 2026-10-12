@@ -38,22 +38,6 @@ function fillsObjectLiteralField(identifier) {
   );
 }
 
-// A binding discriminated with `instanceof Error` (or another `*Error`
-// class) holds a thrown value: like a rejection reason, it has no decodable
-// contract, so only its inspection reads are analysed.
-function isThrownValueBinding(reads) {
-  return reads.some(({ identifier }) => {
-    const test = identifier.parent;
-    return (
-      test.type === "BinaryExpression" &&
-      test.operator === "instanceof" &&
-      test.left === identifier &&
-      test.right.type === "Identifier" &&
-      test.right.name.endsWith("Error")
-    );
-  });
-}
-
 const castTypes = new Set(["TSAsExpression", "TSTypeAssertion"]);
 
 function unknownBinding(node) {
@@ -168,10 +152,7 @@ export default function ruleUnknownInputMustBeDecoded() {
             (reference) => reference.isRead() && !reference.isTypeReference
           );
           const parameterProperty = isParameterProperty(node);
-          if (
-            rejectionHandlerOwner(node, context.sourceCode) ||
-            (!parameterProperty && isThrownValueBinding(reads))
-          ) {
+          if (rejectionHandlerOwner(node, context.sourceCode)) {
             const inspected = reads.some(
               ({ identifier }) =>
                 isErrorInspectionRead(identifier) &&

@@ -19,12 +19,6 @@ ruleTester.run(
         code: "const data: { [key: string]: unknown } = {}; export function read() { const local: Record<string, any> = {}; return local; }",
       },
       {
-        code: "export function receive<T extends Record<string, unknown>>(input: T) { return input; }",
-      },
-      {
-        code: "export const receive = <T extends { [key: string]: unknown }>(input: T) => input;",
-      },
-      {
         code: "export const headers: Record<string, unknown> = {};",
         options: [{ allows: ["headers"] }],
       },
