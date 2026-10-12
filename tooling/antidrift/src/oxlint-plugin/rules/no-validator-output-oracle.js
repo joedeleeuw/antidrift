@@ -291,6 +291,7 @@ function parseAssertAssertion(node) {
   if (!matcher || root?.name !== "assert") return null;
   return {
     node,
+    kind: "assert",
     matcher,
     modifiers: new Set(),
     subject: node.arguments[0] ? unwrapExpression(node.arguments[0]) : null,
@@ -386,32 +387,85 @@ function isActOutput(expression, sourceCode, depth = 0) {
     : true;
 }
 
+function validatedArguments(origin, sourceCode) {
+  return origin.arguments.filter(
+    (argument) => !hasRuntimeSchemaProvenance(argument, sourceCode)
+  );
+}
+
 // The validated value is whichever argument is not the schema: `parse(raw)`,
 // valibot's `parse(Schema, raw)` and superstruct's `assert(raw, Schema)`.
 function validatesArrangedInput(origin, sourceCode) {
-  return (
-    Boolean(origin) &&
-    origin.arguments
-      .filter((argument) => !hasRuntimeSchemaProvenance(argument, sourceCode))
-      .every((argument) => !isActOutput(argument, sourceCode))
+  return validatedArguments(origin, sourceCode).every(
+    (argument) => !isActOutput(argument, sourceCode)
+  );
+}
+
+function identifierNames(node, names = new Set()) {
+  if (!node || typeof node.type !== "string") return names;
+  if (node.type === "Identifier") names.add(node.name);
+  for (const [key, child] of Object.entries(node)) {
+    if (key === "parent") continue;
+    if (Array.isArray(child)) {
+      for (const element of child) identifierNames(element, names);
+    } else if (child && typeof child.type === "string") {
+      identifierNames(child, names);
+    }
+  }
+  return names;
+}
+
+const acceptanceFields = new Set(["error", "issues", "success"]);
+
+function readsAcceptanceField(subject, origin) {
+  for (let node = unwrapExpression(subject); node && node !== origin; ) {
+    if (node.type !== "MemberExpression") return false;
+    if (acceptanceFields.has(staticPropertyName(node))) return true;
+    node = unwrapExpression(node.object);
+  }
+  return false;
+}
+
+// A schema that reads act output leaves an assertion about application
+// behaviour only when the assertion compares the parsed output with an
+// expected value of its own. A matcher with no expected value, a read of the
+// validator's success or error result, or an expected value built from the
+// validated input only proves that the schema accepts or round-trips it.
+function comparesWithOwnExpectation(record, origin, sourceCode) {
+  const expected =
+    record.kind === "assert"
+      ? record.node.arguments.slice(1)
+      : record.node.arguments;
+  if (expected.length === 0 || readsAcceptanceField(record.subject, origin)) {
+    return false;
+  }
+  const validatedNames = new Set();
+  for (const argument of validatedArguments(origin, sourceCode)) {
+    identifierNames(argument, validatedNames);
+  }
+  return expected.every((argument) =>
+    [...identifierNames(argument)].every((name) => !validatedNames.has(name))
   );
 }
 
 function assertionFinding(record, sourceCode) {
   if (!record.subject) return null;
   if (throwMatchers.has(record.matcher)) {
-    const origin =
-      functionValidatorOrigin(record.subject, sourceCode) ??
-      validatorOrigin(record.subject, sourceCode);
-    return validatesArrangedInput(origin, sourceCode)
+    return (functionValidatorOrigin(record.subject, sourceCode) ??
+      validatorOrigin(record.subject, sourceCode))
       ? "validatorThrowOracle"
       : null;
   }
   const origin = validatorOrigin(record.subject, sourceCode);
-  if (!validatesArrangedInput(origin, sourceCode)) return null;
-  return record.modifiers.has("rejects")
-    ? "validatorThrowOracle"
-    : "validatorOutputOracle";
+  if (!origin) return null;
+  if (record.modifiers.has("rejects")) return "validatorThrowOracle";
+  if (
+    !validatesArrangedInput(origin, sourceCode) &&
+    comparesWithOwnExpectation(record, origin, sourceCode)
+  ) {
+    return null;
+  }
+  return "validatorOutputOracle";
 }
 
 export default function ruleNoValidatorOutputOracle() {

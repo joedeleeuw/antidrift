@@ -67,38 +67,60 @@ function isConsoleCall(callee) {
   );
 }
 
-// Text shown to a person (interpolated, concatenated, rendered as a JSX child,
-// stringified or logged) cannot be mistaken for a stored value, so a
-// placeholder there is formatting, not an absence sentinel.
-function isDisplayText(node) {
+function climbTransparent(node) {
   let current = node;
-  let parent = current.parent;
   while (
-    transparentParents.has(parent?.type) ||
-    (parent?.type === "ConditionalExpression" && parent.test !== current)
+    transparentParents.has(current.parent?.type) ||
+    (current.parent?.type === "ConditionalExpression" &&
+      current.parent.test !== current)
   ) {
-    current = parent;
-    parent = current.parent;
+    current = current.parent;
   }
+  return current;
+}
+
+// Interpolation, concatenation and String() only compose text; they establish
+// nothing about where the text goes.
+function composedText(node) {
+  const parent = node.parent;
+  if (parent?.type === "TemplateLiteral") return parent;
+  if (parent?.type === "BinaryExpression" && parent.operator === "+") {
+    return parent;
+  }
+  if (
+    parent?.type === "CallExpression" &&
+    parent.callee !== node &&
+    calleeName(parent.callee) === "String"
+  ) {
+    return parent;
+  }
+  return null;
+}
+
+// Text shown to a person (rendered as a JSX or createElement child, or
+// logged to the console), directly or through the text it is composed into,
+// cannot be mistaken for a stored value, so a placeholder there is formatting,
+// not an absence sentinel.
+function isDisplayText(node) {
+  let current = climbTransparent(node);
+  for (let composed = composedText(current); composed; ) {
+    current = climbTransparent(composed);
+    composed = composedText(current);
+  }
+  const parent = current.parent;
   switch (parent?.type) {
-    case "TemplateLiteral":
-      return true;
-    case "BinaryExpression":
-      return parent.operator === "+";
     case "JSXExpressionContainer":
       return (
         parent.parent?.type === "JSXElement" ||
         parent.parent?.type === "JSXFragment"
       );
-    case "CallExpression": {
-      if (parent.callee === current) return false;
-      const name = calleeName(parent.callee);
+    case "CallExpression":
       return (
-        name === "String" ||
-        isConsoleCall(parent.callee) ||
-        (name === "createElement" && parent.arguments.indexOf(current) >= 2)
+        parent.callee !== current &&
+        (isConsoleCall(parent.callee) ||
+          (calleeName(parent.callee) === "createElement" &&
+            parent.arguments.indexOf(current) >= 2))
       );
-    }
     default:
       return false;
   }
