@@ -207,6 +207,16 @@ ruleFamilies:
         allows:
           - "function selectedData() { const selectedFor = (id: Id): Selection => { const selected = configs[0]; return { configs, id, selected }; }; return selectedFor('default'); }"
           - "function createApi(): Api { const build = (): Result => { return { value }; }; return { build }; } export const api = { createApi };"
+      inferred-type-predicate:
+        intent: Let TypeScript infer a callback's type predicate from its single native check instead of restating it as an unchecked assertion.
+        rules:
+          - antidrift/no-redundant-type-predicate
+        flags:
+          - "rows.filter((row): row is Row => row !== null);"
+          - 'items.filter((item): item is TextItem => item.kind === "text");'
+        allows:
+          - "rows.filter((row) => row !== null);"
+          - "export function isRow(value: Row | null): value is Row { return value !== null; }"
       type-escape-casts:
         intent: Prevent casts from manufacturing named, narrowed, or branded contracts without a guard, parser, or brand constructor.
         rules:
@@ -1746,6 +1756,47 @@ rules:
         - 'const isConflictError = (value: unknown): value is ConflictError => typeof value === "object" && value !== null && "_tag" in value && value._tag === "ConflictError";'
         - "const isToolFile = (value: unknown): value is ToolFile => Schema.is(ToolFileSchema)(value);"
     nextAction: Keep at warn. Enable at error only after precision holds at or above 80% in every repository with findings; the remaining classes need a trusted brand-helper or capability-probe model, not a looser field count.
+  antidrift/no-redundant-type-predicate:
+    directive: G2
+    status: ready
+    stable: false
+    proofBuckets: [semantic-source-type-provenance]
+    referenceDoc: docs/rule-investigations/no-redundant-type-predicate.md
+    signal: TypeChecker model of TypeScript 5.5 inferred type predicates for single-check callbacks, compared with the explicit predicate by constituent-wise mutual assignability
+    solveType: type-guard-laundering
+    corpusRepositories:
+      [
+        paseo,
+        chatbiz-webapp,
+        homer-production,
+        fungible,
+        sandcastle,
+        codebase-atlas,
+      ]
+    concerns:
+      - "Only callbacks passed as call or new arguments are checked; a named or exported guard's annotation is part of its signature."
+      - "Skipped when the TypeScript running the lint is older than 5.5, for generic classes, type-parameter inputs and an asserted any."
+      - "A tag check reports only when every union member has a unit-typed tag, because a member whose tag could take another value keeps TypeScript from inferring the predicate."
+      - "The autofix deletes the return annotation and any import specifier whose only references were inside it. The first corpus pass without the import cleanup left one TS6133 in paseo acp-agent.ts."
+      - "Wide sweep of the 70 local roots (473 predicate files, dependencies as checked out): 146 findings in 10 repositories (paseo 103, chatbiz-webapp 24, homer-production 7, fungible 3, ProRL-Agent-Server 2)."
+      - "Frozen-lockfile copies of chatbiz-webapp, fungible, sandcastle, codebase-atlas, paseo and homer-production: 177 findings in 100 files, all fixed; each repository's own type check reported the same errors before and after (0, 0, 0, 20 pre-existing, 19 pre-existing, 0). Type-checked precision 177/177 across six repositories."
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "@typescript-eslint/no-unnecessary-type-assertion covers as and non-null assertions, not explicit return-type predicates that TypeScript 5.5 would infer."
+      whyNotOtherState: "Not covered by return-type style rules because the redundancy is decided by TypeScript's predicate inference for the specific check and input type."
+    examples:
+      flags:
+        - "rows.filter((row): row is Row => row !== null);"
+        - 'values.filter((value): value is string => typeof value === "string");'
+        - 'items.filter((item): item is Extract<Item, { kind: "text" }> => item.kind === "text");'
+      allows:
+        - "rows.filter((row) => row !== null);"
+        - "export function isRow(value: Row | null): value is Row { return value !== null; }"
+        - 'items.filter((item): item is TextItem => item.kind === "text" && item.text.length > 0);'
+    nextAction: "Warn while corpus precision is measured; enable at error once type-checked precision holds at or above 80% in at least three repositories."
   antidrift/no-unsafe-deserialize:
     status: ready
     stable: true

@@ -5,6 +5,7 @@ import { ruleNoContractAppeasementProjection } from "./rules/no-contract-appease
 import { ruleNoAppeasementCast } from "./rules/no-appeasement-cast.js";
 import { ruleNoNullablePositionalTuple } from "./rules/no-nullable-positional-tuple.js";
 import { ruleNoUndercheckedTypePredicate } from "./rules/no-underchecked-type-predicate.js";
+import { ruleNoRedundantTypePredicate } from "./rules/no-redundant-type-predicate.js";
 import { ruleNoDefensiveShapeProbing } from "./rules/no-defensive-shape-probing.js";
 import { ruleNoSqlStringConcat } from "./rules/no-sql-string-concat.js";
 import { ruleNoUnsafeDeserialize } from "./rules/no-unsafe-deserialize.js";
@@ -46,6 +47,7 @@ const rules = {
   "no-appeasement-cast": ruleNoAppeasementCast(),
   "no-nullable-positional-tuple": ruleNoNullablePositionalTuple(),
   "no-underchecked-type-predicate": ruleNoUndercheckedTypePredicate(),
+  "no-redundant-type-predicate": ruleNoRedundantTypePredicate(),
   "no-defensive-shape-probing": ruleNoDefensiveShapeProbing(),
   "no-sql-string-concat": ruleNoSqlStringConcat(),
   "no-unsafe-deserialize": ruleNoUnsafeDeserialize(),

@@ -29,7 +29,7 @@ The ESLint pass also enforces these syntax rules at error, exported by both plug
 
 `antidrift/no-raw-react-native-touchables` reports every raw React Native or gesture-handler touchable import until a repository creates one shared Touchable module and registers it as the rule's owner (`allowedFiles`); the owner file alone may then import the raw primitives.
 
-The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-parse-as-cast`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api` and `antidrift/no-schema-validator-transcoding` at error. `antidrift/no-underchecked-type-predicate` stays at warn.
+The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-parse-as-cast`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api` and `antidrift/no-schema-validator-transcoding` at error. `antidrift/no-underchecked-type-predicate` and `antidrift/no-redundant-type-predicate` stay at warn.
 
 Every ESLint-pass rule above, typed rules included, is ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
 
@@ -321,6 +321,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning
 - `no-appeasement-cast` — `any` / `unknown` casts that paper over missing validation
 - `no-underchecked-type-predicate` — warn-level inventory for broad-input type predicates that assert object contracts without checking required asserted fields; `instanceof`, delegated type predicates, and literal discriminant checks count as proof
+- `no-redundant-type-predicate` — callbacks whose explicit `x is T` restates the predicate TypeScript 5.5+ infers from a single `instanceof`, `typeof`, literal-tag or null/undefined check; the autofix deletes the annotation and any import only it used
 - `no-canonical-model-fork` — configured first-party model redeclarations that should import or derive from the canonical owner
 - `no-handrolled-resource-lifecycle-cells` — behavior-based detection for hand-rolled async resource lifecycle state machines, with broad multi-setter co-mutation emitted as inventory only
 - `no-unsafe-deserialize` — broad `JSON.parse` inputs and unvalidated parsed results assigned into declared domain contracts

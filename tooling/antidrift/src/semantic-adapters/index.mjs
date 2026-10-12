@@ -75,6 +75,7 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     rules: Object.freeze([
       "antidrift/no-appeasement-cast",
       "antidrift/no-defensive-shape-probing",
+      "antidrift/no-redundant-type-predicate",
       "antidrift/no-underchecked-type-predicate",
     ]),
     proofBuckets: Object.freeze(["semantic-source-type-provenance"]),

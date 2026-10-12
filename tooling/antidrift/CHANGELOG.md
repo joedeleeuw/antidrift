@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- add `no-redundant-type-predicate` at warn in the ESLint config: a callback whose explicit `x is T` restates the predicate TypeScript 5.5+ infers from its single `instanceof`, `typeof`, literal-tag or null/undefined check. The TypeChecker models the inferred predicate and compares it with the annotation; the autofix deletes the annotation and any import only it used. On the October 2026 local corpus it reports 146 findings in 10 repositories; applied to 177 findings in frozen-lockfile copies of six repositories, each repository's type check reported the same errors before and after
+
 - `no-nonindependent-test-oracle`: the registry's input, outcome, error-shape and mock-call echo `flags` examples now sit inside an `it(...)` callback. The rule bounds arrangement to the enclosing test callback, so the bare snippets never reported; rule behavior is unchanged
 
 - enable `no-parse-as-cast`, `no-defensive-shape-probing`, `no-identity-schema-transform`, `require-convex-return-validator`, `no-explicit-type-arguments-on-owned-api` and `no-schema-validator-transcoding` at error in the ESLint config. Across a 54-repository TypeScript corpus the last five report no real findings; existing violations belong in the bulk-suppression baseline (`eslint . --suppress-rule antidrift/<rule>`)
