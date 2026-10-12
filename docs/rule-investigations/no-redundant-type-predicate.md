@@ -56,7 +56,7 @@ The first pass left one new error in paseo: `acp-agent.ts` imported `AgentPrompt
 
 Precision: 177/177 type-checked through the autofix across six repositories, plus a hand check of 32 findings (25 sampled from the copies and the 7 findings outside them in mrp, ProRL-Agent-Server, joe-heavy-sleep and two llama.cpp forks, whose TypeScript versions are all 5.6 or newer).
 
-The rule started at warn and moved to error: the type-checked precision held at 100% in all six repositories, above the 80%-in-three-repositories bar.
+The rule started at warn and moved to error: the type-checked precision held at 100% in all six repositories, above the promotion bar of 70% hand-checked precision in at least three repositories (80% until 2026-10-12).
 
 ## Ecosystem Check
 
