@@ -7,18 +7,6 @@ const diagnosticBaselines = new WeakMap();
 
 const TYPE_FORMAT =
   ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseFullyQualifiedType;
-const TOOL_ENTRY_PATHS = {
-  tsup: [["entry"]],
-  tsdown: [["entry"]],
-  vite: [
-    ["build", "lib", "entry"],
-    ["build", "rollupOptions", "input"],
-  ],
-  rollup: [["input"]],
-  unbuild: [["entries"]],
-  rslib: [["source", "entry"]],
-  webpack: [["entry"]],
-};
 const PRIMITIVE_TYPES =
   ts.TypeFlags.StringLike |
   ts.TypeFlags.NumberLike |
@@ -32,7 +20,6 @@ const NULLISH_OR_UNKNOWN =
   ts.TypeFlags.Undefined |
   ts.TypeFlags.Any |
   ts.TypeFlags.Unknown;
-const STEP_RANK = { immutable: 0, read: 1, effect: 2 };
 const LITERAL_KINDS = new Set([
   ts.SyntaxKind.StringLiteral,
   ts.SyntaxKind.NumericLiteral,
@@ -281,181 +268,32 @@ function compilerCommandLines(configFiles) {
   }));
 }
 
-function propertyKey(property, sourceFile) {
-  return property.name.getText(sourceFile).replace(/^["']|["']$/gu, "");
+function isTransparentWrapper(node) {
+  return (
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isSatisfiesExpression(node) ||
+    ts.isNonNullExpression(node) ||
+    ts.isTypeAssertionExpression(node)
+  );
 }
 
-function unwrapped(node) {
+export function unwrapped(node) {
   let current = node;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isNonNullExpression(current) ||
-    ts.isTypeAssertionExpression(current)
-  ) {
-    current = current.expression;
-  }
+  while (isTransparentWrapper(current)) current = current.expression;
   return current;
 }
 
-function constInitializer(sourceFile, name) {
-  for (const statement of sourceFile.statements) {
-    if (!ts.isVariableStatement(statement)) continue;
-    if (!(statement.declarationList.flags & ts.NodeFlags.Const)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (ts.isIdentifier(declaration.name) && declaration.name.text === name) {
-        return declaration.initializer;
-      }
-    }
-  }
-  return undefined;
-}
-
-function configObjects(sourceFile, node, seen = new Set()) {
-  const configNode = node && unwrapped(node);
-  if (!configNode || seen.has(configNode)) return null;
-  seen.add(configNode);
-  if (ts.isObjectLiteralExpression(configNode)) return [configNode];
-  if (ts.isArrayLiteralExpression(configNode)) {
-    const configurations = configNode.elements.map((element) =>
-      configObjects(sourceFile, element, seen)
-    );
-    return configurations.includes(null) ? null : configurations.flat();
-  }
-  if (ts.isIdentifier(configNode)) {
-    return configObjects(
-      sourceFile,
-      constInitializer(sourceFile, configNode.text),
-      seen
-    );
-  }
-  if (
-    ts.isCallExpression(configNode) &&
-    ts.isIdentifier(configNode.expression) &&
-    configNode.expression.text === "defineConfig" &&
-    configNode.arguments.length === 1
+export function outermostWrapper(node) {
+  let current = node;
+  while (
+    current.parent &&
+    isTransparentWrapper(current.parent) &&
+    current.parent.expression === current
   ) {
-    return configObjects(sourceFile, configNode.arguments[0], seen);
+    current = current.parent;
   }
-  if (
-    (ts.isArrowFunction(configNode) || ts.isFunctionExpression(configNode)) &&
-    !ts.isBlock(configNode.body)
-  ) {
-    return configObjects(sourceFile, configNode.body, seen);
-  }
-  return null;
-}
-
-function exportedConfiguration(sourceFile) {
-  for (const statement of sourceFile.statements) {
-    if (ts.isExportAssignment(statement)) return statement.expression;
-    if (
-      ts.isExpressionStatement(statement) &&
-      ts.isBinaryExpression(statement.expression) &&
-      statement.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-      statement.expression.left.getText(sourceFile) === "module.exports"
-    ) {
-      return statement.expression.right;
-    }
-  }
-  return undefined;
-}
-
-function propertyInitializer(sourceFile, object, key) {
-  for (const property of object.properties) {
-    if (
-      (ts.isPropertyAssignment(property) ||
-        ts.isShorthandPropertyAssignment(property)) &&
-      !ts.isComputedPropertyName(property.name) &&
-      propertyKey(property, sourceFile) === key
-    ) {
-      return ts.isShorthandPropertyAssignment(property)
-        ? constInitializer(sourceFile, property.name.text)
-        : property.initializer;
-    }
-  }
-  return undefined;
-}
-
-function entryInputs(sourceFile, node, name) {
-  const entryNode = node && unwrapped(node);
-  if (!entryNode) return null;
-  if (ts.isStringLiteralLike(entryNode)) {
-    return [{ name, input: entryNode.text }];
-  }
-  if (ts.isIdentifier(entryNode)) {
-    return entryInputs(
-      sourceFile,
-      constInitializer(sourceFile, entryNode.text),
-      name
-    );
-  }
-  if (ts.isArrayLiteralExpression(entryNode)) {
-    const inputs = entryNode.elements.map((element) =>
-      entryInputs(sourceFile, element, undefined)
-    );
-    return inputs.includes(null) ? null : inputs.flat();
-  }
-  if (ts.isObjectLiteralExpression(entryNode)) {
-    const nested =
-      propertyInitializer(sourceFile, entryNode, "input") ??
-      propertyInitializer(sourceFile, entryNode, "import");
-    if (nested) return entryInputs(sourceFile, nested, name);
-    const inputs = entryNode.properties.map((property) =>
-      ts.isPropertyAssignment(property) &&
-      !ts.isComputedPropertyName(property.name)
-        ? entryInputs(
-            sourceFile,
-            property.initializer,
-            propertyKey(property, sourceFile)
-          )
-        : null
-    );
-    return inputs.includes(null) ? null : inputs.flat();
-  }
-  return null;
-}
-
-export function declaredBuildInputs(configFile, tool) {
-  const sourceFile = ts.createSourceFile(
-    configFile,
-    ts.sys.readFile(configFile),
-    ts.ScriptTarget.Latest,
-    true
-  );
-  const relativeName = posix.basename(configFile);
-  const exported = exportedConfiguration(sourceFile);
-  if (!exported) {
-    return { unresolved: `${relativeName} has no default export for ${tool}` };
-  }
-  const configurations = configObjects(sourceFile, exported);
-  if (!configurations) {
-    return {
-      unresolved: `${relativeName} exports a ${tool} configuration that is not a literal object`,
-    };
-  }
-  const inputs = [];
-  for (const object of configurations) {
-    for (const path of TOOL_ENTRY_PATHS[tool] ?? []) {
-      let entryNode = object;
-      for (const key of path) {
-        entryNode =
-          entryNode && ts.isObjectLiteralExpression(unwrapped(entryNode))
-            ? propertyInitializer(sourceFile, unwrapped(entryNode), key)
-            : undefined;
-      }
-      if (!entryNode) continue;
-      const found = entryInputs(sourceFile, entryNode, undefined);
-      if (!found) {
-        return {
-          unresolved: `${relativeName} sets ${path.join(".")} to a value that is not a literal entry`,
-        };
-      }
-      inputs.push(...found);
-    }
-  }
-  return { inputs };
+  return current;
 }
 
 export function packageSources(program, directory) {
@@ -765,6 +603,86 @@ export function editedProgramHazard(program, files, sites) {
   return null;
 }
 
+const assignedSymbolSets = new WeakMap();
+const writtenMembers = new WeakMap();
+
+function assignmentTargets(target, found) {
+  const node = unwrapped(target);
+  if (ts.isIdentifier(node)) found.push(node);
+  else if (ts.isArrayLiteralExpression(node)) {
+    for (const element of node.elements) {
+      assignmentTargets(
+        ts.isSpreadElement(element) ? element.expression : element,
+        found
+      );
+    }
+  } else if (ts.isObjectLiteralExpression(node)) {
+    for (const property of node.properties) {
+      if (ts.isPropertyAssignment(property)) {
+        assignmentTargets(property.initializer, found);
+      } else if (ts.isShorthandPropertyAssignment(property)) {
+        found.push(property.name);
+      } else if (ts.isSpreadAssignment(property)) {
+        assignmentTargets(property.expression, found);
+      }
+    }
+  } else if (ts.isBinaryExpression(node)) {
+    assignmentTargets(node.left, found);
+  }
+}
+
+function isAssignmentOperator(kind) {
+  return (
+    kind >= ts.SyntaxKind.FirstAssignment &&
+    kind <= ts.SyntaxKind.LastAssignment
+  );
+}
+
+function assignedSymbols(checker, sourceFile) {
+  const byFile = assignedSymbolSets.get(checker) ?? new WeakMap();
+  assignedSymbolSets.set(checker, byFile);
+  if (byFile.has(sourceFile)) return byFile.get(sourceFile);
+  const targets = [];
+  function visit(node) {
+    if (
+      ts.isBinaryExpression(node) &&
+      isAssignmentOperator(node.operatorToken.kind)
+    ) {
+      assignmentTargets(node.left, targets);
+    } else if (
+      (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+      (node.operator === ts.SyntaxKind.PlusPlusToken ||
+        node.operator === ts.SyntaxKind.MinusMinusToken)
+    ) {
+      assignmentTargets(node.operand, targets);
+    } else if (
+      (ts.isForInStatement(node) || ts.isForOfStatement(node)) &&
+      !ts.isVariableDeclarationList(node.initializer)
+    ) {
+      assignmentTargets(node.initializer, targets);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  const symbols = new Set(
+    targets.map((identifier) =>
+      ts.isShorthandPropertyAssignment(identifier.parent)
+        ? checker.getShorthandAssignmentValueSymbol(identifier.parent)
+        : checker.getSymbolAtLocation(identifier)
+    )
+  );
+  byFile.set(sourceFile, symbols);
+  return symbols;
+}
+
+function isNeverReassigned(checker, symbol) {
+  const declaration = symbol.valueDeclaration;
+  if (!declaration || declaration.getSourceFile().isDeclarationFile) {
+    return false;
+  }
+  return !assignedSymbols(checker, declaration.getSourceFile()).has(symbol);
+}
+
 function stableBinding(checker, symbol) {
   if (!symbol) return false;
   const target = targetOf(checker, symbol);
@@ -779,11 +697,16 @@ function stableBinding(checker, symbol) {
     return true;
   }
   const declaration = target.valueDeclaration;
-  if (!declaration && symbol.escapedName === "undefined") return true;
-  return Boolean(
-    declaration &&
+  if (!declaration) return symbol.escapedName === "undefined";
+  if (
     ts.isVariableDeclaration(declaration) &&
     ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const
+  ) {
+    return true;
+  }
+  return (
+    (ts.isVariableDeclaration(declaration) || ts.isParameter(declaration)) &&
+    isNeverReassigned(checker, target)
   );
 }
 
@@ -800,31 +723,89 @@ function isPrimitive(checker, node) {
     : Boolean(type.flags & PRIMITIVE_TYPES);
 }
 
-function memberStep(checker, node) {
+function isDataFieldDeclaration(declaration) {
+  const modifiers = ts.getCombinedModifierFlags(declaration);
+  if (ts.isPropertyDeclaration(declaration)) {
+    return (
+      ts.isClassLike(declaration.parent) &&
+      !(modifiers & (ts.ModifierFlags.Abstract | ts.ModifierFlags.Accessor))
+    );
+  }
+  return (
+    (ts.isPropertyAssignment(declaration) ||
+      ts.isShorthandPropertyAssignment(declaration) ||
+      ts.isMethodDeclaration(declaration)) &&
+    ts.isObjectLiteralExpression(declaration.parent)
+  );
+}
+
+function isMemberWritten(program, declaration) {
+  const byDeclaration = writtenMembers.get(program) ?? new Map();
+  writtenMembers.set(program, byDeclaration);
+  if (!byDeclaration.has(declaration)) {
+    const sourceFile = declaration.getSourceFile();
+    const referenced = languageServiceOf(program).findReferences(
+      sourceFile.fileName,
+      declaration.name.getStart(sourceFile)
+    );
+    byDeclaration.set(
+      declaration,
+      (referenced ?? []).some(({ references }) =>
+        references.some(
+          (reference) => reference.isWriteAccess && !reference.isDefinition
+        )
+      )
+    );
+  }
+  return byDeclaration.get(declaration);
+}
+
+function memberStep(program, node) {
+  const checker = program.getTypeChecker();
   const object = checker.getTypeAtLocation(node.expression);
   if (typeHasFlag(object, NULLISH_OR_UNKNOWN)) return "effect";
+  if (
+    ts.isElementAccessExpression(node) &&
+    !ts.isStringLiteralLike(node.argumentExpression) &&
+    !ts.isNumericLiteral(node.argumentExpression)
+  ) {
+    return "effect";
+  }
   const symbol = checker.getSymbolAtLocation(
     ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression
   );
   const declarations = symbol?.declarations ?? [];
-  if (
-    declarations.length === 0 ||
-    symbol.flags & ts.SymbolFlags.Accessor ||
-    declarations.some(
-      (declaration) =>
-        ts.isGetAccessorDeclaration(declaration) ||
-        ts.isSetAccessorDeclaration(declaration)
-    )
-  ) {
-    return "effect";
-  }
-  return "read";
+  const receiver = unwrapped(node.expression);
+  const stableReceiver = ts.isIdentifier(receiver)
+    ? stableBinding(checker, checker.getSymbolAtLocation(receiver))
+    : (ts.isPropertyAccessExpression(receiver) ||
+        ts.isElementAccessExpression(receiver)) &&
+      memberStep(program, receiver) === "read";
+  return declarations.length > 0 &&
+    stableReceiver &&
+    declarations.every(isDataFieldDeclaration) &&
+    !declarations.some((declaration) => isMemberWritten(program, declaration))
+    ? "read"
+    : "effect";
+}
+
+const STEP_RANK = { immutable: 0, read: 1, effect: 2 };
+
+export function strongerStep(left, right) {
+  return STEP_RANK[right] > STEP_RANK[left] ? right : left;
+}
+
+export function stepsCommute(preceding, following) {
+  return (
+    preceding === "immutable" ||
+    following === "immutable" ||
+    (preceding === "read" && following === "read")
+  );
 }
 
 function isImmutableNode(node) {
   return (
     (LITERAL_KINDS.has(node.kind) && !ts.isTemplateExpression(node)) ||
-    node.kind === ts.SyntaxKind.ThisKeyword ||
     ts.isArrowFunction(node) ||
     ts.isFunctionExpression(node)
   );
@@ -850,7 +831,7 @@ function evaluationStepper(program, parameterSymbols) {
   function visitMember(node) {
     visit(node.expression);
     if (ts.isElementAccessExpression(node)) visit(node.argumentExpression);
-    steps.order.push({ step: memberStep(checker, node), node });
+    steps.order.push({ step: memberStep(program, node), node });
   }
   function visitCall(node) {
     visit(node.expression);
@@ -947,12 +928,11 @@ export function argumentEffect(program, functionNode, call, index) {
     stepper.visit(argument);
     const effect = stepper.steps.modelled
       ? stepper.steps.order.reduce(
-          (current, { step }) =>
-            STEP_RANK[step] > STEP_RANK[current] ? step : current,
+          (current, { step }) => strongerStep(current, step),
           "immutable"
         )
       : "effect";
-    if (STEP_RANK[effect] > STEP_RANK[strongest]) strongest = effect;
+    strongest = strongerStep(strongest, effect);
   }
   return strongest;
 }

@@ -12,10 +12,13 @@ import {
   editedProgramHazard,
   importOfFile,
   locationOf,
+  outermostWrapper,
   programReferences,
+  stepsCommute,
+  strongerStep,
+  unwrapped,
 } from "./typescript-engine.js";
 
-const STEP_RANK = { immutable: 0, read: 1, effect: 2 };
 const BARE_ARGUMENT_KINDS = new Set([
   ts.SyntaxKind.Identifier,
   ts.SyntaxKind.PropertyAccessExpression,
@@ -74,25 +77,13 @@ function parameterHazard(functionNode, uses) {
   return "parameters are evaluated in a different order";
 }
 
-function unwrapped(node) {
-  let current = node;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isNonNullExpression(current) ||
-    ts.isTypeAssertionExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
-
 function orderHazard(program, context, call) {
   let preceding = { step: "immutable" };
   for (const entry of context.order) {
     if (entry.slot === undefined) {
-      if (STEP_RANK[entry.step] > STEP_RANK[preceding.step]) preceding = entry;
+      if (strongerStep(preceding.step, entry.step) !== preceding.step) {
+        preceding = entry;
+      }
       continue;
     }
     const argument = argumentEffect(
@@ -101,11 +92,7 @@ function orderHazard(program, context, call) {
       call,
       entry.slot
     );
-    const commutes =
-      preceding.step === "immutable" ||
-      argument === "immutable" ||
-      (preceding.step === "read" && argument === "read");
-    if (!commutes) {
+    if (!stepsCommute(preceding.step, argument)) {
       return `argument ${entry.slot + 1} at ${locationOf(call)} would be evaluated after ${preceding.node.getText()} instead of before it`;
     }
   }
@@ -141,10 +128,10 @@ function siteHazard(functionNode, call) {
   return null;
 }
 
-function calleeArgument(use, argumentText, argument) {
-  const parent = use.node.parent;
+function calleeArgument(parameterUse, argumentText, argument) {
+  const use = outermostWrapper(parameterUse.node);
   const isCallee =
-    ts.isCallExpression(parent) && parent.expression === use.node;
+    ts.isCallExpression(use.parent) && use.parent.expression === use;
   const target = argument && unwrapped(argument);
   return isCallee &&
     target &&
@@ -465,9 +452,8 @@ export function verifyHop(program, candidate) {
   if (contract) return rejected(contract);
   const references = programReferences(program, nameNode);
   const bindings = bodyBindings(program, functionNode, call);
-  const surface = isExported(declaration, references)
-    ? publicSurface(program, nameNode)
-    : {};
+  const exported = isExported(declaration, references);
+  const surface = exported ? publicSurface(program, nameNode) : {};
   const owner = ownerReason(references, bindings, surface);
   if (owner) return rejected(owner);
   const { order, modelled } = bodyEvaluationOrder(program, functionNode);
@@ -485,7 +471,11 @@ export function verifyHop(program, candidate) {
     references,
     functionFile: nameNode.getSourceFile(),
     order,
-    incomplete: surface.incomplete,
+    incomplete:
+      surface.incomplete ??
+      (exported && references.call.length === 0
+        ? "it is exported and has no caller in this TypeScript program, so its consumers (other programs or loaders that resolve exports by name) are unknown"
+        : undefined),
     edits: editSet(),
     sites: [],
   });

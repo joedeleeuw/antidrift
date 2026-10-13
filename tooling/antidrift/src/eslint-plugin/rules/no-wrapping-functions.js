@@ -46,7 +46,7 @@ export default {
       unusedHop:
         "'{{name}}' is a hop to '{{callee}}' with no call site; deleting it type-checks. Delete '{{name}}'.",
       incomplete:
-        "Incomplete analysis: '{{name}}' would be a verified hop to '{{callee}}', but its export cannot be checked against the package's public surface because {{cause}}.",
+        "Incomplete analysis for '{{name}}', a candidate hop to '{{callee}}': {{cause}}.",
     },
   },
   create(context) {
@@ -58,7 +58,12 @@ export default {
     return namedFunctionVisitors((node, identifier) => {
       const candidate = hopCandidate(services, node, identifier);
       if (!candidate) return;
-      const verdict = verifyHop(services.program, candidate);
+      let verdict;
+      try {
+        verdict = verifyHop(services.program, candidate);
+      } catch (error) {
+        verdict = { incomplete: `the analysis failed with ${error}` };
+      }
       const hopNames = {
         name: identifier.name,
         callee: context.sourceCode.getText(candidate.callee),
