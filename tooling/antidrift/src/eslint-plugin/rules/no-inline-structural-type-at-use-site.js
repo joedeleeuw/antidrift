@@ -1,5 +1,10 @@
-import { dirname, join, relative, resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import ts from "typescript";
+import {
+  declaresGenerated,
+  packageDirectory,
+  sameObjectShape,
+} from "../../semantic-adapters/shape-identity.mjs";
 import { inlineStructuralTypeAtBoundary } from "../../semantic-adapters/local-ast-rules.mjs";
 import {
   missingTypeServicesVisitors,
@@ -8,16 +13,6 @@ import {
 
 const declarationsByProgram = new WeakMap();
 const dependencySources = /(?:^|[/\\])node_modules(?:[/\\]|$)/u;
-
-function packageDirectory(filename) {
-  let directory = dirname(filename);
-  while (!ts.sys.fileExists(join(directory, "package.json"))) {
-    const parent = dirname(directory);
-    if (parent === directory) return null;
-    directory = parent;
-  }
-  return directory;
-}
 
 function propertyKey(type, checker) {
   const properties = checker.getPropertiesOfType(type);
@@ -96,7 +91,8 @@ function programDeclarations(program) {
     if (
       program.isSourceFileDefaultLibrary(source) ||
       compiledCopies.has(source) ||
-      dependencySources.test(source.fileName)
+      dependencySources.test(source.fileName) ||
+      declaresGenerated(source)
     ) {
       continue;
     }
@@ -126,117 +122,6 @@ function programDeclarations(program) {
   }
   declarationsByProgram.set(program, declarations);
   return declarations;
-}
-
-function matchingTypes(type, ownedType, checker, compared) {
-  if (type === ownedType) return true;
-  const unchecked = ts.TypeFlags.Any | ts.TypeFlags.Unknown;
-  if (
-    (type.flags & unchecked) !== (ownedType.flags & unchecked) ||
-    !checker.isTypeAssignableTo(type, ownedType) ||
-    !checker.isTypeAssignableTo(ownedType, type)
-  ) {
-    return false;
-  }
-  if (compared.get(type)?.has(ownedType)) return true;
-  const comparisons = new Map(compared);
-  comparisons.set(type, new Set([...(compared.get(type) ?? []), ownedType]));
-  if (type.isUnionOrIntersection() || ownedType.isUnionOrIntersection()) {
-    if (type.flags !== ownedType.flags) return false;
-    return (
-      type.types.every((member) =>
-        ownedType.types.some((ownedMember) =>
-          matchingTypes(member, ownedMember, checker, comparisons)
-        )
-      ) &&
-      ownedType.types.every((ownedMember) =>
-        type.types.some((member) =>
-          matchingTypes(member, ownedMember, checker, comparisons)
-        )
-      )
-    );
-  }
-  if (checker.isArrayType(type) || checker.isTupleType(type)) {
-    if (!checker.isArrayType(ownedType) && !checker.isTupleType(ownedType)) {
-      return false;
-    }
-    const elements = checker.getTypeArguments(type);
-    const ownedElements = checker.getTypeArguments(ownedType);
-    return (
-      elements.length === ownedElements.length &&
-      elements.every((element, index) =>
-        matchingTypes(element, ownedElements[index], checker, comparisons)
-      )
-    );
-  }
-  const propertiesMatch = checker
-    .getPropertiesOfType(type)
-    .every((property) => {
-      const owned = checker.getPropertyOfType(ownedType, property.name);
-      if (!owned) return true;
-      return matchingTypes(
-        checker.getTypeOfSymbol(property),
-        checker.getTypeOfSymbol(owned),
-        checker,
-        comparisons
-      );
-    });
-  if (!propertiesMatch) return false;
-  const indexesMatch = checker.getIndexInfosOfType(type).every((index) => {
-    const owned = checker
-      .getIndexInfosOfType(ownedType)
-      .find(
-        (ownedIndex) =>
-          checker.isTypeAssignableTo(index.keyType, ownedIndex.keyType) &&
-          checker.isTypeAssignableTo(ownedIndex.keyType, index.keyType)
-      );
-    return (
-      !owned || matchingTypes(index.type, owned.type, checker, comparisons)
-    );
-  });
-  if (!indexesMatch) return false;
-  return [ts.SignatureKind.Call, ts.SignatureKind.Construct].every((kind) => {
-    const signatures = checker.getSignaturesOfType(type, kind);
-    const ownedSignatures = checker.getSignaturesOfType(ownedType, kind);
-    return signatures.every((signature, index) => {
-      const owned = ownedSignatures[index];
-      if (!owned) return false;
-      return (
-        matchingTypes(
-          checker.getReturnTypeOfSignature(signature),
-          checker.getReturnTypeOfSignature(owned),
-          checker,
-          comparisons
-        ) &&
-        signature.parameters.every((parameter, parameterIndex) => {
-          const ownedParameter = owned.parameters[parameterIndex];
-          return Boolean(
-            ownedParameter &&
-            matchingTypes(
-              checker.getTypeOfSymbol(parameter),
-              checker.getTypeOfSymbol(ownedParameter),
-              checker,
-              comparisons
-            )
-          );
-        })
-      );
-    });
-  });
-}
-
-function matchingProperties(candidate, type, checker) {
-  return (
-    matchingTypes(type, candidate.type, checker, new Map()) &&
-    checker.getPropertiesOfType(type).every((property) => {
-      const owned = checker.getPropertyOfType(candidate.type, property.name);
-      return (
-        owned &&
-        (property.flags & ts.SymbolFlags.Optional) ===
-          (owned.flags & ts.SymbolFlags.Optional)
-      );
-    })
-  );
 }
 
 export function ruleNoInlineStructuralTypeAtUseSite() {
@@ -284,7 +169,12 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
       );
       return {
         TSTypeLiteral(node) {
-          if (!inlineStructuralTypeAtBoundary(node)) return;
+          if (
+            node.members.length < 3 ||
+            !inlineStructuralTypeAtBoundary(node)
+          ) {
+            return;
+          }
           const declaration = services.esTreeNodeToTSNodeMap.get(node);
           const type = checker.getTypeAtLocation(declaration);
           const key = propertyKey(type, checker);
@@ -303,7 +193,7 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
               (candidate.name ||
                 (packageRoot !== null &&
                   candidate.packageRoot === packageRoot)) &&
-              matchingProperties(candidate, type, checker)
+              sameObjectShape(type, candidate.type, checker)
           );
           const existing =
             matches.find((candidate) => candidate.name) ?? matches[0];

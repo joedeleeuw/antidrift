@@ -4,13 +4,15 @@ Reuse an existing object type instead of repeating its properties in a boundary 
 
 The rule checks parameters of exported functions, public methods of exported classes, and methods of exported or returned objects. Component props and callback type declarations remain outside scope.
 
-A named type alias or interface must have the same property names and optional properties. TypeScript must accept the property types in both directions. Matching any properties and matching unknown properties count as the same shape. The comparison checks broad types recursively through nested properties, index values, union members, and function signatures. Identical any types match, as do identical unknown types. Broad and specific types do not match merely because TypeScript permits assignment. The rule also reports a repeated inline shape within one package. The message names the existing declaration and its repository-relative file and line.
+A matching type must be identical at every depth: the same property names, optional, readonly and visibility flags, index signatures and call signatures, with no any or error type on either side. The matcher is `tooling/antidrift/src/semantic-adapters/shape-identity.mjs`, shared with `no-restated-dependency-type`. The inline type needs at least three members. The rule also reports a repeated inline shape within one package. The message names the existing declaration and its repository-relative file and line.
 
-The rule searches source files in the TypeScript program. Generated, vendored, shared, and local declarations can supply named types. The search excludes node_modules, TypeScript library files, explicitly identified fixture files, and declaration files whose output paths TypeScript maps from sources in the program. A matching file name alone does not prove that a declaration is compiled. A package is the nearest directory with a package.json file. A missing package prevents a repeated-inline match.
+The rule searches source files in the TypeScript program. The search excludes node_modules, TypeScript library files, explicitly identified fixture files, declaration files whose output paths TypeScript maps from sources in the program, and files whose leading comment declares them generated. A package is the nearest directory with a package.json file.
 
-The rule requires TypeScript parser services. Missing services produce an error. It runs in the typed ESLint pass. Unique inline contracts stay allowed.
+The rule requires TypeScript parser services. Missing services produce an error.
 
-Structural equality does not prove that two types describe the same concept. Review the reported declaration before replacing a parameter type. Fresh measurements and their limits belong in the field notes.
+## Fresh measurement of the combined rule on October 13, 2026
+
+The shipped lint population of 39 installed oss-corpus repositories gives 852 hits in 21 repositories, against 4,401 for the previous rule. The 20 agent-written repositories add 19 hits in 8. A hit-weighted sample capped at 3 per repository, seed 2026101319, excluding every earlier sampled location, holds 24 reports from 12 repositories. Source review labels all 24 true. Label file `labels-no-inline-structural-type-at-use-site.tsv`, SHA256 `432681cc4108c9235a49e9413631241af60e6df11bef8ba1cb350376d96df928`. Evidence remains at `/home/joedeleeuw/.local/state/lanes/shape-attempts/claude-combined`. The measurements below are superseded.
 
 The optional `fixtureFiles` list names fixture files relative to the ESLint working directory, or by absolute path. Supply it only when repository evidence identifies those files as fixtures. Directory names alone do not establish that category. An unlisted file remains eligible as a type owner.
 

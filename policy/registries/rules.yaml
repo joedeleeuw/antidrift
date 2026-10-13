@@ -263,6 +263,7 @@ ruleFamilies:
           - antidrift/no-structural-type-fork
           - antidrift/no-canonical-model-fork
           - antidrift/no-inline-structural-type-at-use-site
+          - antidrift/no-restated-dependency-type
           - antidrift/no-nullable-positional-tuple
         flags:
           - "type UserFork = { id: string; email: string; status: UserStatus };"
@@ -350,9 +351,9 @@ policyRuleReviews:
   ts/no-inline-structural-type-at-use-site:
     status: active-custom
     antidriftRule: antidrift/no-inline-structural-type-at-use-site
-    coverage: Implemented as a structural AST rule for exported and boundary use-site object contracts.
-    reason: Generic syntax bans are too broad; the custom rule narrows to public/boundary contract drift.
-    nextAction: Seek independent boundary-function replication and JSX-backed prop clean pressure before stable promotion.
+    coverage: Implemented as a TypeChecker identity rule for boundary-parameter object contracts that repeat a first-party shape; antidrift/no-restated-dependency-type covers declared dependency exports with the same matcher.
+    reason: Generic syntax bans are too broad; the custom rule reports only proven repeats of an existing shape.
+    nextAction: Keep the boundary scope and the generated-owner exclusion; review new false reports before stable promotion.
   ts/no-nullable-positional-tuple:
     status: active-custom
     antidriftRule: antidrift/no-nullable-positional-tuple
@@ -919,48 +920,86 @@ rules:
     stable: false
     defaultOff: false
     directive: W4
-    signal: TypeScript finds an existing object type with the same properties and compatible property types.
+    signal: TypeScript identity, from semantic-adapters/shape-identity.mjs, between a boundary-parameter inline object type with at least three members and an existing first-party object type.
     solveType: type-contract-shape
     proofBuckets: [local-ast-source-shape]
     promotion:
       proofBucket: local-ast-source-shape
-      association: Boundary parameter types match declarations in the TypeScript program.
-      blockingThreshold: A named object type matches, or the same inline shape appears twice in one package.
+      association: Boundary parameter types match first-party declarations in the TypeScript program.
+      blockingThreshold: A named object type or a same-package inline shape is identical at every depth, with no any or error type on either side, and its file does not declare itself generated.
       ecosystemComparison: Syntax selectors cannot compare property types across declarations.
-      corpusEvidence: Earlier syntax-only samples include unique parameter contracts. They do not prove the narrowed rule.
-      realCorpusInventory: The fresh sample has 13 true reports out of 20. The rule reports in 30 repositories.
+      corpusEvidence: "October 13, 2026 fresh hit-weighted sample, capped at 3 per repository: 24 of 24 true across 12 repositories of oss-corpus and oss-corpus-agents."
+      realCorpusInventory: "852 hits in 21 oss-corpus repositories (4,401 before) and 19 in 8 agent-written repositories. Labels SHA256 432681cc4108c9235a49e9413631241af60e6df11bef8ba1cb350376d96df928."
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-inline-structural-type-at-use-site.md
       replicationsNotIntroducedForTest: true
-      knownFalsePositives: 7
-      knownFalseNegatives: Function-type parameters, component props, and return annotations remain outside scope.
-      productionConcerns: Matching types may still describe different concepts. Review the reported declaration.
+      knownFalsePositives: 0
+      knownFalseNegatives: Return annotations, variables, properties and component props stay outside the boundary-parameter scope.
+      productionConcerns: Generated owners without a generator header still count as first-party.
       noSinkBehavior: Diagnostics do not require a separate output file.
-      noDeadWorkBehavior: Unique inline shapes and named parameter types stay clean.
+      noDeadWorkBehavior: Unique inline shapes, named parameter types and owners in self-declared generated files stay clean.
     referenceDoc: docs/rule-investigations/no-inline-structural-type-at-use-site.md
-    corpusRepositories: [chaski, sudocode-main]
+    corpusRepositories: [oss-corpus, oss-corpus-agents]
     concerns:
-      - "Superseded October 12, 2026 study. The syntax rule reported 3,152 hits in 45 repositories. Its first frozen sample scored 5/20. A fresh sample scored 11/20. A one-property exemption was tried and removed because W4 has no property-count exception. The current rule requires a matching owner or repeated shape."
       - TypeScript services are required. Missing services produce an error.
-      - Generated, vendored, shared, and local types can supply matches. Dependencies, TypeScript library files, explicitly identified fixture files, and compiler-mapped declaration copies do not.
-      - Property names, optional properties, and assignability in both directions must match.
-      - Identical any types and identical unknown types match. Nested properties, index values, union members, and function signatures also reject broad-to-specific assignment.
+      - Dependencies, TypeScript library files, explicitly identified fixture files, compiler-mapped declaration copies and files whose leading comment declares them generated do not supply owners.
       - Repeated unnamed shapes must belong to the same package.
     external:
       state: partial-overlap
       support: medium
       candidates: ["ESLint no-restricted-syntax"]
       decision: own-antidrift
-      whyThisState: "Core selectors can find inline type literals, but the custom rule narrows the violation to exported non-JSX functions, exported-class methods, and boundary object methods."
-      whyNotOtherState: "Not equivalent because a raw syntax ban would report legitimate local props, callbacks, and small internal shapes."
+      whyThisState: "Core selectors can find inline type literals, but only the TypeChecker can prove that one repeats an existing shape."
+      whyNotOtherState: "Not equivalent because a raw syntax ban would report every unique inline shape."
     examples:
       flags:
-        - "type LoadInput = { userId: string }; export function load(input: { userId: string }) {}"
-        - "export function load(input: { userId: string }) {} export function save(input: { userId: string }) {}"
+        - "type LoadInput = { userId: string; tenantId: string; limit: number }; export function load(input: { userId: string; tenantId: string; limit: number }) {}"
       allows:
         - "export function load(input: LoadInput) {}"
-        - "export function load(input: { uniqueOption: string }) {}"
-    nextAction: The fresh sample scores 13/20. Review unrelated owners and unresolved imported types before using a suggested declaration. This sample does not meet 70%.
+        - "export function load(input: { uniqueOption: string; other: number; third: boolean }) {}"
+    nextAction: Blocking at error. Review new false reports before stable promotion.
+  antidrift/no-restated-dependency-type:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: W4
+    signal: TypeScript identity, from semantic-adapters/shape-identity.mjs, between a first-party interface or type literal with at least three members and an interface or type alias exported from the public entry points of a declared dependency, including workspace packages.
+    solveType: type-contract-shape
+    proofBuckets: [local-ast-source-shape]
+    promotion:
+      proofBucket: local-ast-source-shape
+      association: First-party object types matched against interfaces and type aliases exported, directly or through exported namespaces, from the root and subpath exports of packages named in the nearest package.json dependencies, devDependencies and peerDependencies.
+      blockingThreshold: The types are identical at every depth with no any or error type; classes are not owners; a declaration inside a declare module block for the owner's package, or one whose type is the owner's own merged type, does not report.
+      ecosystemComparison: No maintained lint rule compares first-party types with installed package exports.
+      corpusEvidence: "October 13, 2026 fresh hit-weighted sample, capped at 3 per repository: 18 of 24 true across 14 repositories with coincidental library matches counted false, 22 of 24 with them counted true. Agreement with the dependency corpus detector: 62 of 65 positives, 0 of 47 negatives."
+      realCorpusInventory: "233 hits in 21 oss-corpus repositories and 86 in 18 agent-written repositories. Labels SHA256 c110a830e0cf7102a71691f58b75d7da1c35742eddc89f5eb220e6d7fff44d89."
+      realCorpusInventoryRefs:
+        - docs/rule-investigations/no-restated-dependency-type.md
+      replicationsNotIntroducedForTest: true
+      knownFalsePositives: 2
+      knownFalseNegatives: Class exports, generic-only matches across checkers and dependencies that are declared but not installed are not compared.
+      productionConcerns: Small coordinate shapes coincide with unrelated libraries, and vendored declaration copies and data-migration snapshots still report. A declared dependency that is not installed produces one coverage-gap report per checked file.
+      noSinkBehavior: Diagnostics do not require a separate output file.
+      noDeadWorkBehavior: Types that differ in any field, flag or nested type, module augmentation and class owners stay clean.
+    referenceDoc: docs/rule-investigations/no-restated-dependency-type.md
+    corpusRepositories: [oss-corpus, oss-corpus-agents]
+    concerns:
+      - TypeScript services are required. Missing services produce an error.
+      - Entry points missing from the linted program are added to one second program that reuses the linted program's source files, so twentyhq-twenty finishes inside an 8 GB heap.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "Maintained rules do not inspect dependency exports when checking first-party type declarations."
+      whyNotOtherState: "Not partial overlap because no-structural-type-fork reports installed packages only for owners accepted in ownership.yaml."
+    examples:
+      flags:
+        - "interface ApiError { code: string | null; message: string; param: string | null; type: string } // restates openai ErrorObject"
+      allows:
+        - "import type { ErrorObject } from 'openai/resources';"
+        - "declare module 'vitest' { interface ProvidedContext { db: Database; client: Client; server: Server } }"
+    nextAction: Blocking at error. Decide whether coincidental matches with unrelated libraries count before stable promotion.
 
   antidrift/no-nullable-positional-tuple:
     status: ready

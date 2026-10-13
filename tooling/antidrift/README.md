@@ -21,7 +21,7 @@ The presets also enforce one rule per shared AGENT.md directive, each recorded w
 The ESLint pass also enforces these syntax rules at error, exported by both plugins but configured only in ESLint:
 
 - G15 test independence: `antidrift/no-nonindependent-test-oracle`, `antidrift/no-validator-output-oracle`, `antidrift/no-schema-library-in-test`
-- W4 type reuse: `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-duplicated-object-field-blocks`, `antidrift/no-redeclared-owned-union`
+- W4 type reuse: `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-restated-dependency-type`, `antidrift/no-duplicated-object-field-blocks`, `antidrift/no-redeclared-owned-union`
 - G4 boundary decoding: `antidrift/no-open-dictionary-at-boundary`, `antidrift/unknown-input-must-be-decoded`
 - G7 loud failure: `antidrift/no-sentinel-absence-fallback`, `antidrift/no-silent-empty-detection-fallback`
 - G11 one owner per concern: `antidrift/no-raw-fetch-in-component`, `antidrift/no-raw-react-native-touchables`
@@ -57,7 +57,8 @@ eslint . \
   --suppress-rule antidrift/no-identity-schema-transform \
   --suppress-rule antidrift/require-convex-return-validator \
   --suppress-rule antidrift/no-explicit-type-arguments-on-owned-api \
-  --suppress-rule antidrift/no-schema-validator-transcoding
+  --suppress-rule antidrift/no-schema-validator-transcoding \
+  --suppress-rule antidrift/no-restated-dependency-type
 ```
 
 See `docs/rule-investigations/directive-rules.md` in the repository for scope and corpus evidence.
