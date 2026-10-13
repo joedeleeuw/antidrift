@@ -449,7 +449,7 @@ export function declaredBuildInputs(configFile, tool) {
       const found = entryInputs(sourceFile, entryNode, undefined);
       if (!found) {
         return {
-          unresolved: `${relativeName} sets ${path.join(".")} to a entryNode that is not a literal entry`,
+          unresolved: `${relativeName} sets ${path.join(".")} to a value that is not a literal entry`,
         };
       }
       inputs.push(...found);

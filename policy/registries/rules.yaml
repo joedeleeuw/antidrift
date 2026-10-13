@@ -2969,7 +2969,7 @@ rules:
     concerns:
       - "Two-corpus precision check (October 2026; 84 TypeScript roots): 2,256 hits in 52 repositories, 9/18 on the first frozen sample once an artifact-snapshot hit and a semgrep test input are removed. A narrowing to calls that forward only the function's own parameters (1,118 hits, a fresh sample 12/20) was reverted: it dropped partial applications and thunks over module values, which the directive names as hops and the frozen labels marked true. A fresh sample of the rule as it stands measured 7/20. False positives are handlers and listeners that bind a value or need a stable identity, accessors over module-owned state, functions that own a format, message or predicate, and a framework-required export. Below the 70% bar."
       - "Two stages (October 13, 2026): the portable syntax rule supplies candidates, including composed calls and bound literals; the typed ESLint rule inlines each candidate in memory at every reference, applies the owner table (contracts, identity references, package entry exports resolved per entry through the declared build, literals bound across two or more modules), checks argument order and duplication, call-site type identity and binding identity, re-checks only the edited files, and reports only verified hops."
-      - "Fresh measurement on commit 8cf0d0a over 59 repositories: 10,081 stage-1 candidates, 4,496 verified hops in 50 repositories; a capped sample of 30 scored 29/30 with 16 repositories at 70% or better (labels sha256 05a17c54f32a85e569e118f3507bae92d09f865e638d04cf890a2c524631f577). The false report is a write accessor that owns module-private state. An earlier round of 27/30 is superseded."
+      - "Fresh measurement on commit a73c1f2 over every tracked TypeScript file in 59 repositories, skipping only self-declared generated files: 13,043 stage-1 candidates, 5,216 verified hops in 51 repositories and 462 incomplete-analysis diagnostics; a capped sample of 30 scored 27/30 with 18 repositories at 70% or better (labels sha256 aaa0c02bfed504424edf469b3b132c8f96feb8cd3d0b4ed1119785d83a03ea47). All three false reports are hops without an in-program call site. Earlier rounds of 27/30 and 29/30 are superseded."
       - The Oxlint preset does not run the syntax stage, because Oxlint has no types and its report would restore the false positives the typed stage rejects.
     external:
       state: net-antidrift
@@ -2986,7 +2986,7 @@ rules:
       allows:
         - "const area = (radius) => Math.PI * radius ** 2;"
         - "button.onClick(() => owner.load(id));"
-    nextAction: Keep the typed stage at error in the typed preset. Known gaps are module mocks that replace an export by name and fixtures whose module identity a test asserts.
+    nextAction: Keep the typed stage at error in the typed preset. Known gaps are hops without an in-program call site (exports used from another program or by name, type tests), module mocks that replace an export by name, and fixtures whose module identity a test asserts.
 
   antidrift/no-tutorial-comments:
     status: ready
