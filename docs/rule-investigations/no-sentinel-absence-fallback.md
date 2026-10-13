@@ -1,33 +1,49 @@
 # no-sentinel-absence-fallback
 
-## Intent
+## Rule
 
-Flag `?? "<sentinel>"` on a member read, where the sentinel is one of a small in-band absence vocabulary: `unknown`, `n/a`, `none`, `unavailable`, `error`, `missing` (case-insensitive). Coercing a missing property to an in-band string makes absence indistinguishable from a real state — a service that never reported its `ActiveState` reads exactly like a service whose state genuinely is the string `"unknown"`. Absence should be modeled as absence: an optional field, `null`, or a parsed enum with an explicit unavailable member.
+Directive G7 requires absence to stay distinct from a reported value. The rule reports a member read followed by `??` and one of these strings: `unknown`, `n/a`, `none`, `unavailable`, `error`, or `missing`. Letter case does not matter. A template literal without substitutions also counts.
 
-Motivation anchor: the Murderbox `docs/type-authority` audit (entry point `SOURCE-AUDIT.md`, Finding 8 — provider/wire values surviving into application readers; live evidence in `evidence/LIVE-AUTHORITY-MAP.md` — "Systemd state strings reinterpreted in client code" — and `evidence/PHASE-0-API-PROVIDER-AUDIT.md` — systemd wire values must terminate in the receiving adapter). The concrete site is `apps/api/lib/server/chat-runtime.ts`, which reads systemd D-Bus properties as `props.ActiveState ?? "unknown"` and, worse, `Number(props.ExecMainStatus ?? 0)` — exit code 0 means success, so a missing property reads as "exited cleanly".
+The owner ruling on October 12, 2026 applies to text shown to people. A log, console message, spinner, or status label must distinguish a missing report from a real value. For example, `props.ActiveState ?? "unknown"` hides that distinction. Display use is not an exemption.
 
-## Detection
+The rule does not check numeric fallbacks, other strings, the `||` operator, or a left operand that is a call or a plain identifier. These limits describe the current match. They do not make those forms valid under G7.
 
-The rule is AST-only, syntax-rule family, single definition in `tooling/antidrift/src/syntax-rules.mjs` (no TypeChecker is available to the Oxlint JS plugin by design — see `docs/lint-rule-parity.md`). It reports a `LogicalExpression` when all of the following hold:
+## Change
 
-- the operator is `??` (never `||` — falsy coercion is a different doctrine);
-- the left side, after unwrapping chain/TS as-expression wrappers, is a `MemberExpression` read, including optional chaining (`props.ExecMainStatus`, `row?.state`, `result.statuses[id]?.safeStatus`);
-- the right side is a string literal or no-substitution template literal whose lowercase value is in the sentinel set, so `"N/A"` is caught by the same comparison.
+The previous implementation exempts console calls and rendered children. This change removes that exemption to follow the owner ruling. It keeps the member-read and fallback checks. No existing test case changes its expected result. No test case or fixture is added.
 
-## Boundaries (deliberate false negatives)
+## Earlier evidence
 
-- `||` operator: falsy coercion doctrine, out of scope.
-- Numeric sentinels (`?? 0`, `Number(x ?? 0)`): proving drift there needs property-name semantics (exit code 0 meaning success), and name-trust is rejected. The `ExecMainStatus ?? 0` half of the anchor site therefore stays silent in v1.
-- Call-expression LHS (`get(key) ?? "unknown"`): v1 stays member-read-only; the murderbox corpus did not surface a call-LHS drift site, so there is no evidence to justify the extra surface and its false-positive risk is unmeasured.
-- Plain-identifier LHS (`maybeName ?? "unknown"`): the corpus shows these are locals whose provenance is not visible at the expression — display-only fallbacks like `score ?? "unknown"` in an accessibility label would flag without evidence the identifier carries wire state.
-- Sentinels outside the fixed set (display strings like `?? "Untitled"` or `?? "Loading…"`) never fire.
+The earlier two-corpus study reports 286 hits in 29 repositories and 6 true hits in a sample of 20. A display exemption reduces the population to 265 hits in 25 repositories. A later sample labels 8 of 20 hits true. Those labels treat display-only fallbacks as allowed. The October 12 owner ruling supersedes that interpretation. The fresh measurement below uses G7 and the owner ruling.
 
-## Ecosystem
+The first recorded examples come from the murderbox runtime status readers. The rule is enabled in the ESLint pass. Its match depends on syntax and a fixed set of strings; it does not prove whether a fallback can run.
 
-Checked 2026-08-10. `no-null` and `@typescript-eslint/prefer-nullish-coalescing` police which operator a codebase uses, not the value the operator produces; neither carries a sentinel vocabulary or an absence doctrine. No maintained rule models absence coerced to an in-band sentinel string on a member read. State: net-antidrift.
+## Superseded measurement on October 13, 2026: no-sentinel-absence-fallback
 
-## Corpus
+The corpus contains 39 installed repositories from 44 fresh shallow clones. The old and new rules use the same eligible files and TypeScript programs. Repository evidence determines exclusions. Directory names alone do not. Missing or invalid compiler configurations exclude 618 files from both versions. No scanned file fails.
 
-Drift anchor (murderbox, `apps/api/lib/server/chat-runtime.ts:379-381`): three systemd D-Bus reads (`ActiveState`, `SubState`, `Result`) coerced to `"unknown"`, validated as the `murderbox-systemd-service-sentinel-fallback` external corpus drift case. Sibling sites in `apps/api/lib/server/runtime-status.ts:162-163` and `runtime-load-progress.ts:88` repeat the pattern. Murderbox member-read sites also land on diagnostics display surfaces (`apps/client/app/runtime-diagnostics.tsx`, `apps/client/app/_debug.tsx` — `active?.chatModel ?? "unknown"`), which is the false-positive pressure a promotion review must measure. dotfiles has zero `?? "<sentinel>"` sites and remains the clean control repository.
+The old rule reports 499 hits in 21 repositories. The new rule reports 549 hits in 21 repositories. A round-robin sample with seed 2026101201 contains 20 hits. Source review labels 19 true, for 95% precision. Labels freeze before scoring.
 
-Keep the rule default-off until that display-surface pressure is inventoried in at least one more repository.
+Sampled repositories at 70% or more: payloadcms-payload, withastro-astro, arktypeio-arktype, documenso-documenso, trpc-trpc, vitejs-vite, mastra-ai-mastra, formbricks-formbricks, mikro-orm-mikro-orm, triggerdotdev-trigger.dev, vercel-ai, TanStack-router, calcom-cal.com, microsoft-playwright, TanStack-query, Effect-TS-effect, twentyhq-twenty, pingdotgg-t3code, better-auth-better-auth. Each percentage describes only the sampled hits, usually one per repository. It is not a repository-wide estimate.
+
+The dropped-hit sample contains 0 true reports out of 0. There are no dropped hits. Display-only fallbacks remain violations under the owner ruling of October 12, 2026. The implementation removes its earlier display exemption. It makes no other pattern change. The false report has a preceding guard that makes the fallback unreachable; the rule does not prove that control flow.
+
+This superseded evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix/superseded-owner-fix-round`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+
+- Label file: `new-no-sentinel-absence-fallback.labels.tsv`. SHA256: `d73ba8cc2c68d71be8cde0667646876263fe1b0b374e8c4e23ed8a0e2867ea64`. Frozen at 2026-10-13T05:07:01.009228+00:00.
+- Label file: `dropped-no-sentinel-absence-fallback.labels.tsv`. SHA256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. Frozen at 2026-10-13T05:07:17.062187+00:00.
+
+## Fresh measurement on October 13, 2026: no-sentinel-absence-fallback
+
+The corpus contains 39 installed repositories from 44 fresh shallow clones. The old and new rules use the same eligible files and TypeScript programs. Both versions follow the shipped lint ignore list, including declaration files. Repository evidence establishes the other exclusions. Missing or invalid compiler configurations exclude 583 files from both versions. No scanned file fails.
+
+The old rule reports 499 hits in 21 repositories. The new rule reports 549 hits in 21 repositories. A round-robin sample with seed 2026101302 contains 20 hits. Source review labels 16 true, for 80% precision. Labels freeze before scoring.
+
+Sampled repositories at 70% or more: twentyhq-twenty, payloadcms-payload, formbricks-formbricks, pingdotgg-t3code, mikro-orm-mikro-orm, vercel-ai, inngest-inngest-js, TanStack-query, calcom-cal.com, openstatusHQ-openstatus, withastro-astro, TanStack-router, trpc-trpc, documenso-documenso, mastra-ai-mastra, triggerdotdev-trigger.dev. Each percentage describes only the sampled hits, usually one per repository. It is not a repository-wide estimate.
+
+The dropped-hit sample contains 0 true reports out of 0. There are no dropped hits. G7 requires absence to stay absence. Display-only fallbacks remain violations. The earlier display exemption is removed; no other sentinel match changes. False reports include declared domain modes and an unreachable fallback on a required expression. These are not display exemptions. No further source change is made in this round.
+
+Evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+
+- Label file: `new-no-sentinel-absence-fallback.labels.tsv`. SHA256: `4ff282f6e0ec44ff73174bdf3d4902a1119b70ceff7d62acf95ec6b6f6b4292e`. Frozen at 2026-10-13T07:14:23.636400+00:00.
+- Label file: `dropped-no-sentinel-absence-fallback.labels.tsv`. SHA256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. Frozen at 2026-10-13T07:15:30.228969+00:00.

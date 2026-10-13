@@ -2066,16 +2066,17 @@ rules:
     stable: false
     defaultOff: false
     directive: G15
-    signal: deterministic AST plus local const-binding and projection flow; validator receivers proven by TypeScript types in the typed pass or by schema-library binding provenance
+    signal: Local data flow connects expected values to validator input and application output.
     solveType: test-quality-validator-output-oracle
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/test-validator-oracles.md
     corpusRepositories: [murderbox]
     concerns:
-      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 61 hits in 3 repositories, 9/20 true. A parse of act output (a signed JWT, tool results, HTTP bodies, a mock's recorded calls) is exempt only when the assertion compares it with an expected value of its own; throw matchers, `rejects`, matchers without an expected value, reads of success/error/issues and expected values built from the validated input still report, so `expect(schema.parse(output)).toEqual(output)` is a finding. 34 hits in 2 repositories (opencode 23, paseo 11). Only 6 hits were uninspected; they measured 4/6, too few to measure. Earlier frozen labels on the other 28 give 23/28 (descriptive). Two frozen true hits drop: paseo wire-compat tests whose payload comes from an imported builder the rule cannot tell from act output. It holds in two repositories, below the three-repository bar."
-      - The rule follows assertion subjects through local const bindings and transparent built-in projections, but stops at substantive outer calls and never guesses from application helper names or cross-file wrapper bodies.
-      - parse/safeParse/assert/decode/validate count as validator calls only when the receiver is proven to be a runtime schema, by TypeScript types in the typed ESLint pass or by binding provenance to a schema-library import; application parsers with the same method names stay clean without receiver-name exemptions.
-      - The cleaned Murderbox corpus supplies motivating direct validator-oracle drift but no current drift path; reduced programs are regression locks only.
+      - Renaming a binding does not make an expected value independent.
+      - A separate literal that equals a validated input or an input to the application call is an echo.
+      - The rule follows local bindings, writes, property reads, calls, and local function bodies.
+      - Imported helper bodies and mutations through external functions remain outside scope.
+      - Validator methods need a known schema receiver. Application parsers with the same method names stay allowed.
     external:
       state: net-antidrift
       support: low
@@ -2086,17 +2087,14 @@ rules:
       whyNotOtherState: "Not partial-overlap because syntax selectors can match direct calls but cannot express the local dataflow and application-call stop boundary that defines this rule."
     examples:
       flags:
-        - 'import { z } from "zod"; const UserSchema = z.object({ id: z.string() }); const parsed = UserSchema.parse(raw); expect(parsed.id).toBe("user_1");'
-        - 'import { z } from "zod"; const UserSchema = z.object({ id: z.string() }); expect(UserSchema.safeParse(raw).success).toBe(true);'
-        - 'import * as v from "valibot"; const UserSchema = v.object({ id: v.string() }); expect(Object.keys(v.parse(UserSchema, raw))).toEqual(["id"]);'
-        - 'import { z } from "zod"; const UserSchema = z.object({ id: z.string() }); expect(() => UserSchema.parse(raw)).toThrow();'
+        - "const output = await run(); const expected = output.id; expect(UserSchema.parse(output).id).toBe(expected);"
+        - "const output = await run(); const { id: expected } = output; expect(UserSchema.parse(output).id).toBe(expected);"
+        - "expect(UserSchema.safeParse(input).success).toBe(true);"
       allows:
-        - 'import { parseCommand } from "./commands"; const commandParser = { parse: parseCommand }; expect(commandParser.parse("ls").name).toBe("ls");'
-        - 'expect(renderUser(UserSchema.parse(raw))).toBe("User user_1");'
-        - 'const user = UserSchema.parse(raw); expect(renderUser(user)).toBe("User user_1");'
-        - 'expect(JSON.parse(text)).toEqual({ id: "user_1" });'
-        - "expect(YAML.parse(text).version).toBe(2);"
-    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 1,656 direct validator-output assertions in 11 repositories."
+        - 'const output = await run(); expect(UserSchema.parse(output).id).toBe("user_1");'
+        - 'expect(renderUser(UserSchema.parse(input))).toBe("User user_1");'
+    nextAction: The fresh sample scores 20/20. All ten sampled dropped reports remain violations. Review builder calls and transformed contract expectations without claiming full independence proof.
+
   antidrift/no-static-property-loop:
     status: ready
     stable: false
@@ -2223,17 +2221,16 @@ rules:
     stable: false
     defaultOff: false
     directive: G7
-    signal: AST nullish coalescing of a member read to an in-band absence sentinel string
+    signal: A member read uses a fixed string to hide a missing value.
     solveType: absence-sentinel-coercion
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/no-sentinel-absence-fallback.md
     corpusRepositories: [murderbox]
     concerns:
-      - 'Two-corpus precision check (October 2026; 84 TypeScript roots): 286 hits in 29 repositories, 6/20 true. A placeholder is display formatting only when it reaches a JSX or createElement child or a console call, directly or through interpolation, concatenation or String(); composition alone proves nothing, so a returned key such as `tenant:${config.tenant ?? "unknown"}` reports. 265 hits in 25 repositories; a fresh sample measured 8/20, holding in 7 of 17 sampled repositories. The remaining false positives are text handed to loggers, spinners, stdout, UI status setters and exported report cells, which the rule cannot tell from stored values. Below the 70% bar.'
-      - "Only the ?? operator is in scope; || falsy coercion of a member read to a sentinel is a different doctrine and stays out."
-      - "Numeric sentinels such as Number(props.ExecMainStatus ?? 0) stay silent: proving drift there needs property-name semantics (systemd exit code 0 meaning success), and name-trust is rejected."
-      - 'Call-expression and plain-identifier left-hand sides stay silent: the murderbox corpus shows display-only fallbacks like score ?? "unknown" and branch ?? "unknown" on locals whose provenance is not visible at the expression.'
-      - "Debug and diagnostics display surfaces (apps/client/app/runtime-diagnostics.tsx, apps/client/app/_debug.tsx) flag on member reads of optional runtime data; that pressure is pinned in eslint-suppressions.json where it exists."
+      - A display-only fallback still hides a missing value. Logs and status labels are not exempt.
+      - The rule checks only member reads with the ?? operator and its fixed set of strings.
+      - Numeric fallbacks, other strings, calls, and plain identifiers stay outside the current match.
+      - Earlier precision labels allow display fallbacks. The October 12 owner ruling supersedes those labels. The investigation document keeps that history.
     external:
       state: net-antidrift
       support: low
@@ -2246,10 +2243,11 @@ rules:
       flags:
         - 'activeState: props.ActiveState ?? "unknown"'
         - 'const state = row?.state ?? "unavailable";'
+        - 'console.log(props.ActiveState ?? "unknown");'
       allows:
         - 'const title = doc.title ?? "Untitled";'
         - "const exit = Number(props.ExecMainStatus ?? 0);"
-    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 2 findings in 2 files). The sushi corpus reports 250 findings in 20 repositories."
+    nextAction: "The fresh sample scores 16/20. Preserve missing reports in display text. Review declared domain modes and unreachable fallbacks."
 
   antidrift/no-repo-state-mirror-assertion:
     status: ready

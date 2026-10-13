@@ -1,3 +1,4 @@
+import { hasIndependentExpectation } from "../shared/oracle-dependencies.js";
 import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
 import {
   hasRuntimeSchemaProvenance,
@@ -401,20 +402,6 @@ function validatesArrangedInput(origin, sourceCode) {
   );
 }
 
-function identifierNames(node, names = new Set()) {
-  if (!node || typeof node.type !== "string") return names;
-  if (node.type === "Identifier") names.add(node.name);
-  for (const [key, child] of Object.entries(node)) {
-    if (key === "parent") continue;
-    if (Array.isArray(child)) {
-      for (const element of child) identifierNames(element, names);
-    } else if (child && typeof child.type === "string") {
-      identifierNames(child, names);
-    }
-  }
-  return names;
-}
-
 const acceptanceFields = new Set(["error", "issues", "success"]);
 
 function readsAcceptanceField(subject, origin) {
@@ -439,12 +426,10 @@ function comparesWithOwnExpectation(record, origin, sourceCode) {
   if (expected.length === 0 || readsAcceptanceField(record.subject, origin)) {
     return false;
   }
-  const validatedNames = new Set();
-  for (const argument of validatedArguments(origin, sourceCode)) {
-    identifierNames(argument, validatedNames);
-  }
-  return expected.every((argument) =>
-    [...identifierNames(argument)].every((name) => !validatedNames.has(name))
+  return hasIndependentExpectation(
+    validatedArguments(origin, sourceCode),
+    expected,
+    sourceCode
   );
 }
 
@@ -474,14 +459,14 @@ export default function ruleNoValidatorOutputOracle() {
       type: "problem",
       docs: {
         description:
-          "Disallow assertions whose oracle is runtime-validator output",
+          "Require expected values that do not come from the validated input or application output.",
       },
       schema: [],
       messages: {
         validatorOutputOracle:
-          "This assertion targets runtime-validator output rather than application behavior. Tip: checking parsed body or payload shapes is often a sign of a low-value test. Assert observable application behavior or remove the test.",
+          "This assertion checks validator output without an independent expected value. Assert application behavior against a value that does not come from the input or output.",
         validatorThrowOracle:
-          "This assertion only proves that a runtime validator accepts or rejects input. Tip: checking parsed body or payload shapes is often a sign of a low-value test. Assert observable application behavior or remove the test.",
+          "This assertion only checks whether a validator accepts input. Assert application behavior or remove the test.",
       },
     },
     create(context) {
