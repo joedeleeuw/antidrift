@@ -1,6 +1,12 @@
 # no-wrapping-functions
 
-Status: implemented; default error in the shared governance preset. Stable semantic-redundancy detection is not claimed.
+Status: implemented as two stages; registered off in both presets until a fresh measurement on the current engine reaches 70% in three repositories.
+
+## Two-stage design (October 13, 2026)
+
+Stage 1 is the portable syntax rule (`src/oxlint-plugin/portable/no-wrapping-functions.js`). It now also treats composed calls, template literals and object or array literals built from forwarded values as candidates, as the owner's ruling states. Stage 2 is the typed ESLint rule (`src/eslint-plugin/rules/no-wrapping-functions.js`). For each candidate it inlines the body at every reference in memory, deletes the function and its import specifiers, adds the imports the body needs, re-checks only the edited files with the TypeScript checker, and reports only verified hops. A candidate is kept as an owner when a declared type, overload or default export needs the function, when any reference is not a direct call, when the package entry points export it, or when it binds a literal and is called from two or more modules. A package entry that does not map to a source through the package's declared build leaves the surface unresolved, so exported functions in that package are not reported. Hazards reject the candidate: a parameter used other than exactly once in order, spread or extra call arguments, a call type that changes, a free name that resolves to another binding at a call site, and any diagnostic the edit introduces. `typescript-engine.js` owns every program, checker and language-service call; `package-entry-points.js` reads package manifests and build declarations; `hop-inline-verification.js` holds the owner table and the edit plan. The raw TypeScript checker and language service are sufficient, so no ts-morph dependency is added.
+
+The Oxlint preset turns the syntax stage off: Oxlint has no types and sees one file, so its report would restore the false positives the typed stage rejects. The first engine round measured 27/30 on 4,433 verified hops (9,423 stage-1 candidates) in 59 repositories; the engine changed after that round, so that score is superseded.
 
 ## Policy decision
 
@@ -59,7 +65,7 @@ These are style-policy matches, not a claim that all reported functions are sema
 
 ESLint's [no-useless-call](https://eslint.org/docs/latest/rules/no-useless-call) checks redundant `.call()` and `.apply()`. Unicorn's [prefer-native-coercion-functions](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/prefer-native-coercion-functions.md) targets native coercion functions. The existing Antidrift `no-trivial-property-helpers` targets named property access and fallback helpers. None catches general named delegation.
 
-One implementation is exported from both plugin entrypoints. The shared governance preset enables it at error severity through Oxlint. The reduced typed ESLint pass does not run it a second time. Consumers using ESLint alone can enable `antidrift/no-wrapping-functions` with the same implementation.
+The Oxlint plugin exports the syntax stage and the ESLint plugin exports the typed stage under the same rule name. Both presets register it off until a fresh measurement clears the bar.
 
 ## Validation
 
