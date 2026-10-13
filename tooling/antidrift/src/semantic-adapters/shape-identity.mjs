@@ -11,7 +11,80 @@ function readonlyProperty(property) {
   );
 }
 
-export function sameObjectShape(type, owner, checker) {
+const cleanTypes = new WeakSet();
+const uncheckedTypes = new WeakSet();
+
+function defaultLibraryType(type, program) {
+  const declarations = type.symbol?.declarations ?? [];
+  return (
+    declarations.length > 0 &&
+    declarations.every((declaration) =>
+      program.isSourceFileDefaultLibrary(declaration.getSourceFile())
+    )
+  );
+}
+
+function referencedTypes(type, program) {
+  const checker = program.getTypeChecker();
+  const referenced = [...(type.aliasTypeArguments ?? [])];
+  if (type.isUnionOrIntersection()) referenced.push(...type.types);
+  if (type.flags & ts.TypeFlags.TypeParameter) {
+    const constraint = type.getConstraint();
+    if (constraint) referenced.push(constraint);
+  }
+  if (!(type.flags & ts.TypeFlags.Object)) return referenced;
+  if (type.objectFlags & ts.ObjectFlags.Reference) {
+    referenced.push(...checker.getTypeArguments(type));
+  }
+  if (defaultLibraryType(type, program)) return referenced;
+  for (const property of checker.getPropertiesOfType(type)) {
+    referenced.push(checker.getTypeOfSymbol(property));
+  }
+  for (const index of checker.getIndexInfosOfType(type)) {
+    referenced.push(index.keyType, index.type);
+  }
+  for (const kind of [ts.SignatureKind.Call, ts.SignatureKind.Construct]) {
+    for (const signature of checker.getSignaturesOfType(type, kind)) {
+      referenced.push(checker.getReturnTypeOfSignature(signature));
+      const predicate = checker.getTypePredicateOfSignature(signature);
+      if (predicate?.type) referenced.push(predicate.type);
+      for (const parameter of [
+        ...(signature.thisParameter ? [signature.thisParameter] : []),
+        ...signature.parameters,
+      ]) {
+        referenced.push(checker.getTypeOfSymbol(parameter));
+      }
+      for (const parameter of signature.typeParameters ?? []) {
+        referenced.push(parameter);
+      }
+    }
+  }
+  return referenced;
+}
+
+function reachesUncheckedType(type, program) {
+  const visited = new Set();
+  const pending = [type];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (uncheckedTypes.has(current)) {
+      uncheckedTypes.add(type);
+      return true;
+    }
+    if (cleanTypes.has(current) || visited.has(current)) continue;
+    if (current.flags & ts.TypeFlags.Any) {
+      uncheckedTypes.add(type);
+      return true;
+    }
+    visited.add(current);
+    pending.push(...referencedTypes(current, program));
+  }
+  for (const clean of visited) cleanTypes.add(clean);
+  return false;
+}
+
+export function sameObjectShape(type, owner, program) {
+  const checker = program.getTypeChecker();
   let compared = new Map();
   function samePredicate(signature, owner) {
     const predicate = checker.getTypePredicateOfSignature(signature);
@@ -111,23 +184,6 @@ export function sameObjectShape(type, owner, checker) {
     );
   }
 
-  function sameKnownType(type) {
-    if (type.isUnionOrIntersection()) {
-      return type.types.every((member) => sameType(member, member));
-    }
-    if (
-      type.aliasTypeArguments?.some((argument) => !sameType(argument, argument))
-    ) {
-      return false;
-    }
-    if (type.objectFlags & ts.ObjectFlags.Reference) {
-      return checker
-        .getTypeArguments(type)
-        .every((argument) => sameType(argument, argument));
-    }
-    return true;
-  }
-
   function sameReferenceTarget(type, owner) {
     return Boolean(
       type.objectFlags & ts.ObjectFlags.Reference &&
@@ -136,10 +192,12 @@ export function sameObjectShape(type, owner, checker) {
     );
   }
 
-  function sameReferenceArguments(type, owner) {
+  function sameReference(type, owner) {
     const typeArguments = checker.getTypeArguments(type);
     const ownedArguments = checker.getTypeArguments(owner);
     return (
+      !reachesUncheckedType(type, program) &&
+      !reachesUncheckedType(owner, program) &&
       typeArguments.length === ownedArguments.length &&
       typeArguments.every((argument, index) =>
         sameType(argument, ownedArguments[index])
@@ -168,10 +226,8 @@ export function sameObjectShape(type, owner, checker) {
     compared = new Map(compared);
     try {
       compared.set(type, new Set([...(compared.get(type) ?? []), owner]));
-      if (type === owner) return sameKnownType(type);
-      if (sameReferenceTarget(type, owner)) {
-        return sameReferenceArguments(type, owner);
-      }
+      if (type === owner) return !reachesUncheckedType(type, program);
+      if (sameReferenceTarget(type, owner)) return sameReference(type, owner);
       if (type.isUnionOrIntersection() || owner.isUnionOrIntersection()) {
         if (
           type.flags !== owner.flags ||
@@ -268,11 +324,23 @@ export function packageDirectory(filename) {
   return directory;
 }
 
-const generatorHeader =
-  /@generated\b|\bthis file (?:is|was) (?:auto-?)?generated\b|\b(?:auto|automatically)[- ]?generated\b|\bcode generated by\b|\bdo not edit\b/iu;
+const generationDeclarations = [
+  /@generated\b/u,
+  /^code generated\b.*\bdo not edit\.?$/iu,
+  /^(?:this (?:file|module) (?:is|was|has been) )?(?:auto(?:matically)?[- ]?)?generated (?:by|from|with|using) \S/iu,
+];
+
+function commentLines(text) {
+  return text
+    .replace(/^\/\*+|\*+\/$/gu, "")
+    .split("\n")
+    .map((line) => line.replace(/^\s*(?:\/\/+|\*+)?\s*/u, "").trim());
+}
 
 export function declaresGenerated(source) {
   return (ts.getLeadingCommentRanges(source.text, 0) ?? []).some((range) =>
-    generatorHeader.test(source.text.slice(range.pos, range.end))
+    commentLines(source.text.slice(range.pos, range.end)).some((line) =>
+      generationDeclarations.some((declaration) => declaration.test(line))
+    )
   );
 }

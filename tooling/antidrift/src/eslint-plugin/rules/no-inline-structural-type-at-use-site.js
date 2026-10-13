@@ -193,7 +193,7 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
               (candidate.name ||
                 (packageRoot !== null &&
                   candidate.packageRoot === packageRoot)) &&
-              sameObjectShape(type, candidate.type, checker)
+              sameObjectShape(type, candidate.type, services.program)
           );
           const existing =
             matches.find((candidate) => candidate.name) ?? matches[0];

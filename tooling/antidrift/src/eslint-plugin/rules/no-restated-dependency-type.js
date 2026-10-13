@@ -1,4 +1,4 @@
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import ts from "typescript";
 import {
   packageDirectory,
@@ -25,6 +25,19 @@ function readManifest(filename) {
       cause: error,
     });
   }
+}
+
+function resolvedManifest(directory, name, options) {
+  const resolved = ts.resolveModuleName(
+    name,
+    join(directory, "package.json"),
+    options,
+    ts.sys
+  ).resolvedModule;
+  const resolvedRoot = resolved && packageDirectory(resolved.resolvedFileName);
+  if (!resolvedRoot) return null;
+  const manifestPath = join(resolvedRoot, "package.json");
+  return readManifest(manifestPath).name === name ? manifestPath : null;
 }
 
 function dependencyManifest(directory, name) {
@@ -95,7 +108,9 @@ function packageEntries(packageRoot, modes, options, entriesByManifest) {
   const uninstalled = [];
   const entries = [];
   for (const dependency of dependencies) {
-    const manifestPath = dependencyManifest(packageRoot, dependency);
+    const manifestPath =
+      dependencyManifest(packageRoot, dependency) ??
+      resolvedManifest(packageRoot, dependency, options);
     if (!manifestPath) {
       uninstalled.push(dependency);
       continue;
@@ -187,6 +202,7 @@ function exportedOwners(checker, sourceFile, entry) {
             ...entry,
             name,
             type,
+            symbol: checker.getMergedSymbol(symbol),
             key: propertyKey(type, checker),
           });
         }
@@ -260,23 +276,14 @@ function dependencyInventory(program) {
         );
       }
     }
-    ownersByScope.set(packageRoot, { scopes, uninstalled });
+    ownersByScope.set(packageRoot, {
+      scopes,
+      ...coverageGaps(program, packageRoot, uninstalled),
+    });
   }
-  const inventory = { checker, ownersByScope };
+  const inventory = { program: expanded, checker, ownersByScope };
   inventoryByProgram.set(program, inventory);
   return inventory;
-}
-
-function augmentedPackage(declaration) {
-  for (let node = declaration.parent; node; node = node.parent) {
-    if (ts.isModuleDeclaration(node) && ts.isStringLiteral(node.name)) {
-      const segments = node.name.text.split("/");
-      return segments
-        .slice(0, node.name.text.startsWith("@") ? 2 : 1)
-        .join("/");
-    }
-  }
-  return null;
 }
 
 function importedName(packageName) {
@@ -284,6 +291,99 @@ function importedName(packageName) {
   if (!typesPackage) return packageName;
   const [scope, name] = typesPackage[1].split("__");
   return name ? `@${scope}/${name}` : scope;
+}
+
+function specifierPackage(specifier) {
+  if (/^(?:\.|\/|[a-z]+:)/u.test(specifier)) return null;
+  return specifier
+    .split("/")
+    .slice(0, specifier.startsWith("@") ? 2 : 1)
+    .join("/");
+}
+
+function moduleSpecifiers(node, specifiers = []) {
+  if (
+    (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+    node.moduleSpecifier &&
+    ts.isStringLiteral(node.moduleSpecifier)
+  ) {
+    specifiers.push(node.moduleSpecifier);
+  } else if (
+    ts.isExternalModuleReference(node) &&
+    ts.isStringLiteral(node.expression)
+  ) {
+    specifiers.push(node.expression);
+  } else if (
+    ts.isCallExpression(node) &&
+    (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+      (ts.isIdentifier(node.expression) &&
+        node.expression.text === "require")) &&
+    node.arguments[0] &&
+    ts.isStringLiteralLike(node.arguments[0])
+  ) {
+    specifiers.push(node.arguments[0]);
+  } else if (
+    ts.isImportTypeNode(node) &&
+    ts.isLiteralTypeNode(node.argument) &&
+    ts.isStringLiteral(node.argument.literal)
+  ) {
+    specifiers.push(node.argument.literal);
+  }
+  ts.forEachChild(node, (child) => {
+    moduleSpecifiers(child, specifiers);
+  });
+  return specifiers;
+}
+
+function missingDependencyNames(uninstalled) {
+  return new Map(
+    uninstalled.flatMap((packageName) => [
+      [packageName, packageName],
+      [importedName(packageName), packageName],
+    ])
+  );
+}
+
+function packageGapFile(packageRoot) {
+  return ts.sys
+    .readDirectory(
+      packageRoot,
+      [".ts", ".tsx", ".mts", ".cts"],
+      ["**/node_modules"]
+    )
+    .filter(
+      (fileName) =>
+        !/\.d\.[cm]?ts$/u.test(fileName) &&
+        packageDirectory(fileName) === packageRoot
+    )
+    .sort()[0];
+}
+
+function coverageGaps(program, packageRoot, uninstalled) {
+  if (uninstalled.length === 0) {
+    return { missingByName: new Map(), unimported: [], gapFile: null };
+  }
+  const missingByName = missingDependencyNames(uninstalled);
+  const imported = new Set();
+  for (const source of program.getSourceFiles()) {
+    if (
+      program.isSourceFileDefaultLibrary(source) ||
+      program.isSourceFileFromExternalLibrary(source) ||
+      packageDirectory(source.fileName) !== packageRoot
+    ) {
+      continue;
+    }
+    for (const specifier of moduleSpecifiers(source)) {
+      const missing = missingByName.get(specifierPackage(specifier.text));
+      if (missing) imported.add(missing);
+    }
+  }
+  const unimported = uninstalled.filter((name) => !imported.has(name));
+  return {
+    missingByName,
+    unimported,
+    gapFile: unimported.length > 0 ? packageGapFile(packageRoot) : null,
+  };
 }
 
 export function ruleNoRestatedDependencyType() {
@@ -298,8 +398,10 @@ export function ruleNoRestatedDependencyType() {
       messages: {
         restated:
           "This type restates {{name}} exported by the dependency {{packageName}}. Import it from '{{specifier}}' instead of redeclaring it.",
-        uninstalled:
-          "{{packages}} declared in {{manifest}} are not installed, so this file's object types were not compared with their exports.",
+        uninstalledImport:
+          "{{packageName}} is declared in {{manifest}} but not installed, so object types are not compared with its exports.",
+        uninstalledPackage:
+          "{{packages}} declared in {{manifest}} are not installed and not imported in this package, so object types are not compared with their exports.",
       },
     },
     create(context) {
@@ -310,43 +412,81 @@ export function ruleNoRestatedDependencyType() {
           "no-restated-dependency-type"
         );
       }
-      let gapReported = false;
+      function packageScope() {
+        const source = services.program.getSourceFile(context.filename);
+        const packageRoot = source && packageDirectory(source.fileName);
+        if (!packageRoot) return null;
+        const inventory = dependencyInventory(services.program);
+        return {
+          source,
+          packageRoot,
+          inventory,
+          scope: inventory.ownersByScope.get(packageRoot),
+        };
+      }
+      function reportCoverageGaps() {
+        const located = packageScope();
+        if (!located || located.scope.missingByName.size === 0) return;
+        const { source, packageRoot, scope } = located;
+        const manifest = relative(
+          context.cwd,
+          join(packageRoot, "package.json")
+        );
+        for (const specifier of moduleSpecifiers(source)) {
+          const packageName = scope.missingByName.get(
+            specifierPackage(specifier.text)
+          );
+          if (!packageName) continue;
+          const start = source.getLineAndCharacterOfPosition(
+            specifier.getStart(source)
+          );
+          const end = source.getLineAndCharacterOfPosition(specifier.end);
+          context.report({
+            loc: {
+              start: { line: start.line + 1, column: start.character },
+              end: { line: end.line + 1, column: end.character },
+            },
+            messageId: "uninstalledImport",
+            data: { packageName, manifest },
+          });
+        }
+        if (scope.gapFile === source.fileName) {
+          context.report({
+            loc: { line: 1, column: 0 },
+            messageId: "uninstalledPackage",
+            data: { packages: scope.unimported.join(", "), manifest },
+          });
+        }
+      }
       function check(node) {
         const members =
           node.type === "TSInterfaceDeclaration"
             ? node.body.body
             : node.members;
         if (members.length < 3) return;
+        const located = packageScope();
+        if (!located) return;
+        const { source, packageRoot, inventory, scope } = located;
+        const { checker } = inventory;
         const declaration = services.esTreeNodeToTSNodeMap.get(node);
-        const source = declaration.getSourceFile();
-        const packageRoot = packageDirectory(source.fileName);
-        if (packageRoot === null) return;
-        const { checker, ownersByScope } = dependencyInventory(
-          services.program
-        );
-        const { scopes, uninstalled } = ownersByScope.get(packageRoot);
-        if (uninstalled.length > 0 && !gapReported) {
-          gapReported = true;
-          context.report({
-            loc: { line: 1, column: 0 },
-            messageId: "uninstalled",
-            data: {
-              packages: uninstalled.join(", "),
-              manifest: join(packageRoot, "package.json"),
-            },
-          });
-        }
         const type = checker.getTypeAtLocation(declaration);
-        const augmented = augmentedPackage(declaration);
-        const owner = scopes
+        const declared =
+          ts.isInterfaceDeclaration(declaration) &&
+          checker.getSymbolAtLocation(declaration.name);
+        const merged = declared && checker.getMergedSymbol(declared);
+        const owner = scope.scopes
           .get(source.impliedNodeFormat)
           ?.get(propertyKey(type, checker))
           ?.find(
             (candidate) =>
-              candidate.type !== type &&
-              augmented !== candidate.packageName &&
-              augmented !== importedName(candidate.packageName) &&
-              sameObjectShape(type, candidate.type, checker)
+              candidate.symbol !== merged &&
+              candidate.symbol.declarations?.some(
+                (ownerDeclaration) =>
+                  packageDirectory(
+                    ownerDeclaration.getSourceFile().fileName
+                  ) !== packageRoot
+              ) &&
+              sameObjectShape(type, candidate.type, inventory.program)
           );
         if (!owner) return;
         context.report({
@@ -360,6 +500,7 @@ export function ruleNoRestatedDependencyType() {
         });
       }
       return {
+        Program: reportCoverageGaps,
         TSInterfaceDeclaration: check,
         TSTypeLiteral: check,
       };
