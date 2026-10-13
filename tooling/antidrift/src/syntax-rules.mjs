@@ -1,7 +1,6 @@
 import {
   ruleNoAsyncArrayMethod,
   ruleNoHandrolledResourceLifecycleCells,
-  ruleNoInlineStructuralTypeAtUseSite,
   ruleNoRawFetchInComponent,
   ruleNoShatteredIngestedEntityState,
   ruleNoStatusLiteralInType,
@@ -22,7 +21,6 @@ import ruleNoConvexReturnWidening from "./oxlint-plugin/rules/no-convex-return-w
 import ruleNoOpenDictionaryAtBoundary from "./oxlint-plugin/rules/no-open-dictionary-at-boundary.js";
 import ruleNoRedeclaredOwnedUnion from "./oxlint-plugin/rules/no-redeclared-owned-union.js";
 import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-mirror-assertion.js";
-import ruleUnknownInputMustBeDecoded from "./oxlint-plugin/rules/unknown-input-must-be-decoded.js";
 
 // Rules that need no type information. Single-owned by the Oxlint plugin
 // entry point per docs/lint-rule-parity.md; selected portable rules may also
@@ -37,8 +35,6 @@ export function createSyntaxRules() {
     "no-duplicated-object-field-blocks": ruleNoDuplicatedObjectFieldBlocks(),
     "no-handrolled-resource-lifecycle-cells":
       ruleNoHandrolledResourceLifecycleCells(),
-    "no-inline-structural-type-at-use-site":
-      ruleNoInlineStructuralTypeAtUseSite(),
     "no-mocked-response-body-oracle": ruleNoMockedResponseBodyOracle(),
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
     "no-open-dictionary-at-boundary": ruleNoOpenDictionaryAtBoundary(),
@@ -54,6 +50,5 @@ export function createSyntaxRules() {
     "no-validator-output-oracle": ruleNoValidatorOutputOracle(),
     "require-authz-check": ruleRequireAuthzCheck(),
     "require-effect-deps": ruleRequireEffectDeps,
-    "unknown-input-must-be-decoded": ruleUnknownInputMustBeDecoded(),
   };
 }

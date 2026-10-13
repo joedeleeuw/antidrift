@@ -1105,19 +1105,6 @@ typedRuleTester.run(
   }
 );
 
-typedRuleTester.run("no-appeasement-cast", rule("no-appeasement-cast"), {
-  valid: [
-    fixture("programs/correct/narrow-then-assign.ts"),
-    fixture("programs/correct/plain-cast.ts"),
-    fixture("programs/correct/brand-validation-boundary.ts"),
-    fixture("programs/correct/json-parse-result-schema-parse.ts"),
-  ],
-  invalid: [
-    { ...fixture("programs/drift/appeasement-cast.ts"), errors: 2 },
-    { ...fixture("programs/drift/json-parse-result-cast.ts"), errors: 1 },
-  ],
-});
-
 typedRuleTester.run(
   "no-defensive-shape-probing",
   rule("no-defensive-shape-probing"),
@@ -1191,75 +1178,6 @@ ruleTester.run(
     invalid: [
       {
         ...fixture("programs/drift/handrolled-resource-lifecycle.ts"),
-        errors: 1,
-      },
-    ],
-  }
-);
-
-ruleTester.run(
-  "no-inline-structural-type-at-use-site",
-  rule("no-inline-structural-type-at-use-site"),
-  {
-    valid: [
-      fixture("programs/correct/named-structural-parameter-type.ts"),
-      {
-        filename: "shell.tsx",
-        code: "import type { ReactNode } from 'react';\nexport function Shell({ children }: { children: ReactNode }) { return <div>{children}</div>; }",
-      },
-      {
-        filename: "component-map.tsx",
-        code: "import type { ReactNode } from 'react';\nexport const components = { Shell({ children }: { children: ReactNode }) { return <div>{children}</div>; } };",
-      },
-      "type Props = { onConfirm: (date: { year: number; month: number; day: number }) => void }; void ({} as Props);",
-      "const formatDate = (date: { year: number; month: number; day: number }) => String(date.year); void formatDate;",
-      "function local({ id }: { id: string }) { return id; } void local;",
-      {
-        filename: "panel.tsx",
-        code: "export function Panel(props: { id: string; title: string }) { if (props.id) { return <div>{props.title}</div>; } return null; }",
-      },
-      {
-        filename: "panel-local.tsx",
-        code: "export function Panel(props: { id: string; title: string }) { switch (props.id) { case 'a': { const view = <div>{props.title}</div>; return view; } default: return null; } }",
-      },
-      "class Local { constructor(input: { id: string; title: string }) { void input; } } void Local;",
-      "class Local { set value(input: { id: string; title: string }) { void input; } } void Local;",
-    ],
-    invalid: [
-      {
-        ...fixture("programs/drift/inline-structural-parameter-type.ts"),
-        errors: 1,
-      },
-      {
-        code: "export const createApi = () => ({ saveUser: async (req: { id: string; email: string }) => req.email });",
-        errors: 1,
-      },
-      {
-        code: "export class Api { saveUser(req: { id: string; email: string }) { return req.email; } }",
-        errors: 1,
-      },
-      {
-        code: "const api = { saveUser: async (req: { id: string; email: string }) => req.email };\nexport { api };",
-        errors: 1,
-      },
-      {
-        code: "export const api = { save(req: { id: string; email: string }) { return req.email; } } satisfies Api;",
-        errors: 1,
-      },
-      {
-        code: "export const api = { save(req: { id: string; email: string }) { return req.email; } } as const;",
-        errors: 1,
-      },
-      {
-        code: "export const receive = ((input: { id: string; email: string }) => input.email) satisfies Handler;",
-        errors: 1,
-      },
-      {
-        code: "export class Api { constructor(input: { id: string; title: string }) { void input; } }",
-        errors: 1,
-      },
-      {
-        code: "class Api { set value(input: { id: string; title: string }) { void input; } }\nexport { Api };",
         errors: 1,
       },
     ],

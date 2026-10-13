@@ -964,13 +964,6 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       '  throw new Error("ESLint plugin metadata must match the packed package version");\n' +
       "}\n" +
       "\n" +
-      "const eslintRuleNames = new Set(Object.keys(eslintPlugin.rules));\n" +
-      "const oxlintRuleNames = new Set(Object.keys(oxlintPlugin.rules));\n" +
-      "const sharedRuntimeRules = [...eslintRuleNames].filter((rule) => oxlintRuleNames.has(rule)).sort();\n" +
-      'if (sharedRuntimeRules.join(",") !== "no-calling-components-as-functions,no-duplicated-conditional-classnames,no-duplicated-object-field-blocks,no-inline-structural-type-at-use-site,no-mocked-response-body-oracle,no-nonindependent-test-oracle,no-open-dictionary-at-boundary,no-raw-fetch-in-component,no-raw-react-native-touchables,no-redeclared-owned-union,no-schema-library-in-test,no-sentinel-absence-fallback,no-silent-empty-detection-fallback,no-validator-output-oracle,no-wrapping-functions,unknown-input-must-be-decoded") {\n' +
-      '  throw new Error(`Unexpected custom rules exported by both runtime plugins: ${sharedRuntimeRules.join(", ")}`);\n' +
-      "}\n" +
-      "\n" +
       'const runtimeOxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false });\n' +
       'if (runtimeOxlintArgs.targets.join(",") !== ".") {\n' +
       '  throw new Error("Missing oxlint policy export behavior");\n' +

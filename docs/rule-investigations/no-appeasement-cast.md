@@ -2,13 +2,15 @@
 
 ## Current Rule
 
-`antidrift/no-appeasement-cast` is implemented, exported, and default-on in the distributable TypeChecker config. It is `ready`, but not `stable`.
+`antidrift/no-appeasement-cast` is exported and enabled in the typed ESLint configuration. Its registry status is `ready`, with `stable: false`.
 
 The rule is type-aware. It reports a plain `as T` assertion when the source expression is `any` or `unknown` and the target is a named object contract with at least one resolved property.
 
-The rule deliberately excludes branded targets because the package-specific brand-cast rule is retired until real non-test forgery evidence exists. It also skips `as unknown as T` tunnels because maintained `@typescript-eslint/no-unsafe-type-assertion` owns the broad/double assertion surface. There is no explicit SDK/API allowlist: typed SDK conversions stay clean only when the source type is not `any` or `unknown`.
+The rule excludes types with a brand, a marker that distinguishes otherwise similar types. It now reports `as unknown as T` when T is a named object type with properties. The owner assigns these double casts to this rule because they force a type the source does not declare. Library conversions stay clean only when the source type is neither any nor unknown.
 
 This is different from `no-unsafe-cast-chain`, which now exposes the vendored anti-slop rule for explicit nested assertion chains such as `value as unknown as User`.
+
+The measurements and promotion notes below predate the inline double-cast change. They remain as historical evidence. The fresh measurement appears at the end of this document.
 
 ## Ecosystem Check
 
@@ -26,7 +28,7 @@ Run:
 pnpm policy:benchmark-unsafe-type-assertion
 ```
 
-The benchmark runs `@typescript-eslint/no-unsafe-type-assertion` beside `antidrift/no-appeasement-cast` over real Chaski, Codebase Atlas, and Sudocode TypeScript programs. The current live-corpus source-only run checked 2,585 files, with 274 parser errors recorded separately, and produced:
+The benchmark runs `@typescript-eslint/no-unsafe-type-assertion` beside `antidrift/no-appeasement-cast` over real Chaski, Codebase Atlas, and Sudocode TypeScript programs. An earlier source scan checked 2,585 files, with 274 parser errors recorded separately, and produced:
 
 | Rule                                          | Findings |
 | --------------------------------------------- | -------: |
@@ -176,3 +178,18 @@ Remaining gates:
 2. Keep test files in scope, but do not count test-only findings as production drift replication.
 3. Rerun the broad inventory after any real consumer cleanup and confirm no new false-positive category appears.
 4. Keep `stable: false` until the registry has no unresolved productionization concerns.
+
+## Fresh measurement on October 13, 2026: no-appeasement-cast
+
+The corpus contains 39 installed repositories from 44 fresh shallow clones. The old and new rules use the same eligible files and TypeScript programs. Both versions follow the shipped lint ignore list, including declaration files. Repository evidence establishes the other exclusions. Missing or invalid compiler configurations exclude 583 files from both versions. No scanned file fails.
+
+The old rule reports 5695 hits in 37 repositories. The new rule reports 12042 hits in 37 repositories. A round-robin sample with seed 2026101302 contains 20 hits. Source review labels 19 true, for 95% precision. Labels freeze before scoring.
+
+Sampled repositories at 70% or more: vitejs-vite, TanStack-router, edmundhung-conform, vitest-dev-vitest, mastra-ai-mastra, samchungy-zod-openapi, honojs-hono, trpc-trpc, vuejs-core, anatine-zod-plugins, payloadcms-payload, fabian-hiller-valibot, excalidraw-excalidraw, microsoft-playwright, vercel-ai, triggerdotdev-trigger.dev, calcom-cal.com, asteasolutions-zod-to-openapi, formbricks-formbricks. Each percentage describes only the sampled hits, usually one per repository. It is not a repository-wide estimate.
+
+The dropped-hit sample contains 0 true reports out of 0. There are no dropped hits. The rule reports named object targets from any or unknown sources, including inline double casts. It does not check angle-bracket assertions or unnamed targets. Both cast identifiers remain. Combining them is an open owner decision.
+
+Evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+
+- Label file: `new-no-appeasement-cast.labels.tsv`. SHA256: `22499c2e4221e7994a57f04947be5a5443d067ff10d86fc612c9342783edd898`. Frozen at 2026-10-13T07:14:23.635701+00:00.
+- Label file: `dropped-no-appeasement-cast.labels.tsv`. SHA256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. Frozen at 2026-10-13T07:15:30.228681+00:00.

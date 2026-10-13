@@ -343,12 +343,6 @@ export function isAppeasementCastTargetType(type) {
 
 export function isAppeasementContractCast(node, services, checker) {
   if (!isNamedTypeReference(node?.typeAnnotation)) return false;
-  if (
-    node.expression?.type === "TSAsExpression" &&
-    node.expression.typeAnnotation?.type === "TSUnknownKeyword"
-  ) {
-    return false;
-  }
 
   const tsExpression = services.esTreeNodeToTSNodeMap.get(node.expression);
   const tsTypeNode = services.esTreeNodeToTSNodeMap.get(node.typeAnnotation);

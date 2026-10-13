@@ -720,7 +720,7 @@ rules:
     directive: G2
     status: ready
     stable: false
-    signal: TypeChecker
+    signal: TypeScript finds an any or unknown value asserted as a named object type.
     solveType: type-escape-hatch
     proofBuckets: [semantic-source-type-provenance]
     promotion:
@@ -740,14 +740,15 @@ rules:
       claudeAdvisoryReviewRefs:
         - reports/claude-rule-review-no-appeasement-cast-20260603-205832.md
       replicationsNotIntroducedForTest: true
-      knownFalsePositives: 0
+      knownFalsePositives: 1
       knownFalseNegatives: Angle-bracket assertions, source laundering hidden behind an intermediate typed value, and some generic-helper boundaries are outside the current single-expression proof.
       productionConcerns: Broad inventory still needs rerun/classification after real consumer cleanup; test-file casts remain in scope but do not count as production drift evidence; Cloudflare parse-output contract casts remain parked on external tsconfig resolution.
       noSinkBehavior: This rule emits no semantic facts; diagnostics depend on parser services and TypeChecker source/target proof, not sink availability.
-      noDeadWorkBehavior: Typed-source SDK conversions, typed DOM event casts, guards, schema parses, brand constructors, and maintained upstream double-cast coverage stay clean or delegated.
+      noDeadWorkBehavior: Typed-source conversions, guards, schema parses, and brand constructors stay clean. Inline double casts through unknown now report when the outer target is a named object type.
     referenceDoc: docs/rule-investigations/no-appeasement-cast.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main, opencode]
     concerns:
+      - Inline double casts through unknown belong to this rule under the owner’s G2 ruling. The unknown-input rule skips their manufactured unknown operand.
       - "October 12 2026 precision (79 deduplicated TypeScript roots, 35 local and 44 on sushi; vendored, generated, build, dot and fixture trees excluded; type-checked after frozen installs, sampled from the 49 roots whose install resolved): 1,838 hits in 52 repositories (pool 1,372 in 35: LibreChat 329, cloudflare-agents 277, reanimated 170, executor 128, chatbiz-webapp 117). Hand-checked 20 round-robin across 20 repositories: 20/20 true positives, mostly caught-error, JSON.parse and response.json() casts into named contracts."
       - Broad inventory classified all current Chaski, Codebase Atlas, and Sudocode findings as real boundary/type-escape drift or in-scope test setup.
       - Copy-backed remediation evidence now covers caught-error guards, serialized browser storage validation, schema-backed object-contract checks, and third-party bag guards; do not add more copy-only remediation before the next promotion review.
@@ -765,9 +766,10 @@ rules:
     examples:
       flags:
         - "const err = caught as AxiosError;"
+        - "const message = source as unknown as Message;"
       allows:
         - "if (axios.isAxiosError(caught)) return caught.response?.status;"
-    nextAction: Keep default-off inventory; stop copy-only remediation for this phase and rerun broad inventory after real consumer cleanup before blocking promotion.
+    nextAction: The fresh sample scores 19/20 on 12,042 hits in 37 repositories. Review guarded key assertions before stable promotion. Keep both cast identifiers while the owner decides whether to combine them.
   antidrift/no-async-array-method:
     status: ready
     stable: false
@@ -917,32 +919,33 @@ rules:
     stable: false
     defaultOff: false
     directive: W4
-    signal: AST
+    signal: TypeScript finds an existing object type with the same properties and compatible property types.
     solveType: type-contract-shape
     proofBuckets: [local-ast-source-shape]
     promotion:
       proofBucket: local-ast-source-shape
-      association: Inline object type literals to implementation parameters on exported non-JSX functions, public methods of exported classes, or boundary object methods returned from exported factories.
-      blockingThreshold: A diagnostic emits only for a `TSTypeLiteral` directly annotating an implementation parameter whose function is an exported non-JSX boundary, a public exported-class method, or a method of an exported/returned boundary object.
-      ecosystemComparison: ESLint no-restricted-syntax can ban `TSTypeLiteral`, but cannot express the current exported non-JSX, exported-class-method, and boundary-object narrowing without also reporting local UI props, callback payloads, and small internal shapes.
-      corpusEvidence: Chaski supplies boundary inline-contract drift in BFF service surfaces and exported hooks/helpers, plus clean controls for local React props and function-type callback payloads. Sudocode remains replication pressure, not enough for blocking promotion.
-      realCorpusInventory: docs/real-corpus-validation.md records Chaski drift at `scenarios-service.ts` with 15 current findings, plus local UI/callback clean controls after local UI/callback exclusions.
+      association: Boundary parameter types match declarations in the TypeScript program.
+      blockingThreshold: A named object type matches, or the same inline shape appears twice in one package.
+      ecosystemComparison: Syntax selectors cannot compare property types across declarations.
+      corpusEvidence: Earlier syntax-only samples include unique parameter contracts. They do not prove the narrowed rule.
+      realCorpusInventory: The fresh sample has 13 true reports out of 20. The rule reports in 30 repositories.
       realCorpusInventoryRefs:
-        - docs/real-corpus-validation.md
-        - docs/rule-roadmap.md
-        - docs/rule-status-registry.md
-        - docs/rule-equivalence-audit.md
+        - docs/rule-investigations/no-inline-structural-type-at-use-site.md
       replicationsNotIntroducedForTest: true
-      knownFalsePositives: 0
-      knownFalseNegatives: Interface/type-call signatures, return-type object literals, and exported JSX-returning functions are outside the current implementation-parameter proof.
-      productionConcerns: Enabled at error in the ESLint pass; existing debt is pinned in eslint-suppressions.json rather than gated on further replication.
-      noSinkBehavior: This rule emits no semantic facts; diagnostics depend only on local AST boundary shape.
-      noDeadWorkBehavior: Named parameter contracts, local unexported helpers, JSX-returning React components, local React props, callback payload types, and non-parameter object literals stay clean.
-    referenceDoc: docs/rule-roadmap.md
+      knownFalsePositives: 7
+      knownFalseNegatives: Function-type parameters, component props, and return annotations remain outside scope.
+      productionConcerns: Matching types may still describe different concepts. Review the reported declaration.
+      noSinkBehavior: Diagnostics do not require a separate output file.
+      noDeadWorkBehavior: Unique inline shapes and named parameter types stay clean.
+    referenceDoc: docs/rule-investigations/no-inline-structural-type-at-use-site.md
     corpusRepositories: [chaski, sudocode-main]
     concerns:
-      - Local UI props and callback payloads require careful exclusions.
-      - "October 12 2026 precision against W4 (84 deduplicated TypeScript roots, 40 local and 44 sushi, parser-only; vendored, build, generated, fixture, mock and snapshot trees and analyzer test inputs excluded; a hit is true when the inline literal restates a shape already declared elsewhere): 3,152 hits in 45 repositories (paseo 845, sentry 487, claude-code 297, LibreChat 276, opencode 254), first frozen sample 5/20. A one-member exemption tried in 4289c22 was removed, because W4 has no field-count exception. A fresh sample of the rule as it stands, drawn from hits no earlier lane had inspected, measured 11/20. Below the 70% bar: the false positives are a function's own new options, dependency or named-arguments contract and one-field options that coincide with unrelated ones."
+      - "Superseded October 12, 2026 study. The syntax rule reported 3,152 hits in 45 repositories. Its first frozen sample scored 5/20. A fresh sample scored 11/20. A one-property exemption was tried and removed because W4 has no property-count exception. The current rule requires a matching owner or repeated shape."
+      - TypeScript services are required. Missing services produce an error.
+      - Generated, vendored, shared, and local types can supply matches. Dependencies, TypeScript library files, explicitly identified fixture files, and compiler-mapped declaration copies do not.
+      - Property names, optional properties, and assignability in both directions must match.
+      - Identical any types and identical unknown types match. Nested properties, index values, union members, and function signatures also reject broad-to-specific assignment.
+      - Repeated unnamed shapes must belong to the same package.
     external:
       state: partial-overlap
       support: medium
@@ -952,10 +955,13 @@ rules:
       whyNotOtherState: "Not equivalent because a raw syntax ban would report legitimate local props, callbacks, and small internal shapes."
     examples:
       flags:
-        - "export function load(input: { userId: string }) {}"
+        - "type LoadInput = { userId: string }; export function load(input: { userId: string }) {}"
+        - "export function load(input: { userId: string }) {} export function save(input: { userId: string }) {}"
       allows:
         - "export function load(input: LoadInput) {}"
-    nextAction: Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus (31,557 tracked TS/JS files, 53 repositories) reports 3,443 findings in 29 repositories; prune suppressions as exported inline contracts are named.
+        - "export function load(input: { uniqueOption: string }) {}"
+    nextAction: The fresh sample scores 13/20. Review unrelated owners and unresolved imported types before using a suggested declaration. This sample does not meet 70%.
+
   antidrift/no-nullable-positional-tuple:
     status: ready
     stable: false
@@ -2319,16 +2325,16 @@ rules:
     stable: false
     defaultOff: false
     directive: G4
-    signal: Open string-keyed any or unknown dictionary annotations in exported function signatures and variable declarations
+    signal: String-keyed dictionaries of any in exported signatures and variable annotations.
     solveType: open-dictionary-at-boundary
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/no-open-dictionary-at-boundary.md
     corpusRepositories: [antidrift]
     concerns:
-      - Genuine protocol bags need explicit exported-name exemptions.
-      - "Type-parameter constraints and defaults (`<T extends Record<string, unknown>>`) bound a caller-chosen type rather than erase one, so only parameter and return annotations count (October 12 2026)."
-      - "October 12 2026 precision (84 deduplicated TypeScript roots, local and sushi; vendored, build, generated, fixture, mock and snapshot trees excluded): before 403 hits in 30 repositories, first frozen sample 11/20 (false positives: type-parameter constraints and defaults, MCP and logger protocol bags, a validator's input, arbitrary component props). Excluding type parameters: 356 hits in 29 repositories (LibreChat 63, executor 51, claude-code 47, sentry 39, opencode 34); a fresh sample drawn from hits no earlier lane had inspected measured 10/20. Remaining false positives are parser and decoder inputs, generic record helpers and guards, and protocol or logging bags (tool arguments, custom claims, logger data); the rule stays below the 70% bar."
-      - Named types and inferred signatures are not expanded without type services.
+      - "Superseded October 12, 2026 study. Before excluding type parameters, 403 hits in 30 repositories scored 11/20. After that change, 356 hits in 29 repositories scored 10/20. Both samples fell below 70%. The current rule checks only dictionaries of any."
+      - Unknown values remain unchecked input and stay allowed.
+      - Generic constraints and defaults stay allowed.
+      - The rule does not expand named types or inferred signatures.
     external:
       state: net-antidrift
       support: low
@@ -2342,29 +2348,32 @@ rules:
       whyNotOtherState: "Not ecosystem-covered because type bans cannot scope an open dictionary to exported boundaries."
     examples:
       flags:
-        - "export function receive(input: Record<string, unknown>) {}"
+        - "export function receive(input: Record<string, any>) {}"
+        - "export const headers: { [key: string]: any } = {};"
       allows:
         - "export function receive(input: Message) {}"
-        - "function internal(input: Record<string, unknown>) {}"
-    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 355 findings in 19 repositories; genuine protocol bags take exact-name exemptions."
+        - "export function decode(input: Record<string, unknown>) {}"
+        - "function internal(input: Record<string, any>) {}"
+    nextAction: Keep the 18-of-20 measurement in the investigation document. Review hidden implementation annotations and nested generic constraints.
 
   antidrift/unknown-input-must-be-decoded:
-    status: ready
+    status: false-positive-prone
     stable: false
-    defaultOff: false
+    defaultOff: true
     directive: G4
-    signal: Explicit unknown parameters and locals used (member reads, casts, coercions, returns) outside decoding, type-predicate or structural-guard control flow
+    signal: TypeScript traces an asserted unknown value to an explicitly unknown receiving declaration.
     solveType: unknown-input-decoding
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/unknown-input-must-be-decoded.md
     corpusRepositories: [antidrift]
     concerns:
-      - Decoder names are a syntax convention; AST evidence cannot certify runtime validation behavior.
-      - Predicate signatures must be directly visible; re-export chains and complex control-flow joins remain unproven.
-      - Decoders own their unknown parameter. Type predicates and assertion functions (`x is T`, `asserts x is T`) are exempt, as are helpers whose single returned expression only narrows the parameter with typeof, `in`, instanceof, Array.isArray and null checks joined by && or ||, plus a final property comparison.
-      - Forwarding the whole value as a call argument, or placing it in an object literal field (which TypeScript only accepts when the field is unknown), is not use; the receiver owns the decoding and is checked there when it is first-party. Built-in coercions (String, Number, Boolean, BigInt) and template interpolation remain use; a value that is never reassigned, is serialized by JSON.stringify or Response.json, and is otherwise only tested is output formatting.
-      - "October 12 2026 precision (84 deduplicated TypeScript roots, local and sushi; vendored, build, generated, fixture, mock and snapshot trees excluded; a hit is true when an unknown value is cast or consumed as domain data without decoding): before 1,793 hits in 46 repositories, first frozen sample 8/20 (7/19 once a mocks-tree hit is removed, plus 1/1 unseen replacement), false positives dominated by error-normalisation helpers. The object-field and test-and-serialize exemptions: 1,526 hits in 45 repositories (paseo 253, opencode 216, cloudflare-agents 195, executor 184, LibreChat 126); a fresh sample drawn from hits no earlier lane had inspected measured 10/20. A binding-wide `instanceof Error` exemption tried in 4289c22 was removed: one guard does not make every other read of the binding a thrown value. Remaining false positives are generic walkers and formatters over arbitrary values, error formatting, decoders that narrow by literal equality, and stored thrown values; the rule stays below the 70% bar."
-      - Branch and if-exit guards (typeof, instanceof, `in`, Array.isArray) narrow later reads in the same block. Guard operands (typeof, `!`, instanceof, `in`, equality) are not use only when the guard steers control flow (a branch, loop, conditional or switch test, a short-circuit left operand, or a type-predicate return); `return typeof input` is use. Casts report even behind a guard.
+      - "Superseded October 12, 2026 study. Before narrowing, 1,793 hits in 46 repositories scored 8/20. After the object-field and serialization changes, 1,526 hits in 45 repositories scored 10/20. Both samples fell below 70%. The later assertion-only rule regressed on the fresh corpus to 19,903 hits and 0/20, compared with 4,238 old-rule hits. The owner now requires input provenance."
+      - TypeScript services are required. Missing services produce an error.
+      - The root must be an explicitly unknown parameter, catch binding, or declared reader result. Local aliases retain that root.
+      - A type predicate or assertion function on the same parameter counts as the decoder. Values narrowed by guards stay clean.
+      - Inline casts that manufacture unknown belong to no-appeasement-cast.
+      - All assertion targets count, including primitive types and inline object types.
+      - The rule overlaps with no-appeasement-cast but also covers unnamed targets and angle-bracket assertions.
     external:
       state: net-antidrift
       support: low
@@ -2378,16 +2387,13 @@ rules:
       whyNotOtherState: "Not ecosystem-covered because no maintained rule requires an explicitly unknown input to flow through a decoder before use."
     examples:
       flags:
-        - "function receive(input: unknown) { return String(input); }"
-        - "promise.catch((e: unknown) => log((e as Error).message));"
+        - "function receive(input: unknown) { return input as Message; }"
+        - "function receive(input: unknown) { return <string>input; }"
       allows:
         - "function receive(input: unknown) { return messageSchema.parse(input); }"
-        - "function warn(error: unknown) { logger.warn(error); }"
-        - "function isEditable(node: unknown) { if (!(node instanceof HTMLElement)) return false; return node.isContentEditable; }"
-        - "try { work(); } catch (error: unknown) { report(error); }"
-        - 'const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;'
-        - 'function hasName(error: unknown, name: string): boolean { return typeof error === "object" && error !== null && "name" in error && error.name === name; }'
-    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). Exempting decoders took the sushi corpus from 4,350 to 3,785 findings; treating whole-value forwarding and if-exit guards as decoding boundaries took it to 1,974 findings in 31 repositories, dominated by casts and coercions of unknown values."
+        - 'function receive(input: unknown) { if (typeof input === "string") return input; }'
+        - "function format(error: unknown) { return String(error); }"
+    nextAction: Keep this rule default-off. The provenance fix scores 7/20 on 1,920 hits in 29 repositories. Internal unknown parameters still cause false reports. Combining the cast rules remains an open owner decision.
 
   antidrift/no-convex-return-widening:
     status: ready

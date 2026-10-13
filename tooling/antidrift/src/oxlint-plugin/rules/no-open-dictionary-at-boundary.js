@@ -2,7 +2,7 @@ import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
 import { unwrapExpression } from "../../semantic-adapters/local-ast-rules.mjs";
 
 function isOpenValue(node) {
-  return node?.type === "TSUnknownKeyword" || node?.type === "TSAnyKeyword";
+  return node?.type === "TSAnyKeyword";
 }
 
 function isOpenDictionary(node, sourceCode) {
@@ -114,7 +114,7 @@ export default function ruleNoOpenDictionaryAtBoundary() {
       type: "problem",
       docs: {
         description:
-          "Disallow open any/unknown dictionaries in exported signatures and variable annotations.",
+          "Disallow string-keyed dictionaries of any in exported signatures and variable annotations.",
       },
       schema: [
         {
@@ -131,7 +131,7 @@ export default function ruleNoOpenDictionaryAtBoundary() {
       ],
       messages: {
         openBoundary:
-          "Open dictionary at the module boundary erases the owned type; name the owner type instead.",
+          "This exported dictionary uses any and skips type checks. Use the owner type, or use unknown and decode each value.",
       },
     },
     create(context) {

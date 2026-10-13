@@ -8,5 +8,11 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["src/**/*.js", "src/**/*.mjs", "test/**/*.mjs"]
+  "include": [
+    "src/**/*.js",
+    "src/**/*.mjs",
+    "src/**/*.mts",
+    "src/**/*.cts",
+    "test/**/*.mjs"
+  ]
 }

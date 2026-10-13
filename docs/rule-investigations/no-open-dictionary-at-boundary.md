@@ -1,36 +1,47 @@
 # no-open-dictionary-at-boundary
 
-## Intent
+An exported dictionary of `any` lets callers skip type checks. Use the owner type when one exists. Use `unknown` for input that still needs decoding.
 
-Keep module boundaries connected to named owner types instead of accepting or returning arbitrary dictionaries.
+The rule reports `Record<string, any>` and `{ [key: string]: any }` in exported function parameters, returns, and variable annotations. It includes nested annotations and separately exported declarations. Private declarations and generic constraints stay allowed. The rule does not expand named aliases or inferred types.
 
-## Detection
+`Record<string, unknown>` stays allowed. TypeScript requires callers to narrow its values before using them.
 
-AST-only. Reports `Record<string, unknown>`, `Record<string, any>`, and equivalent string index signatures inside exported function parameter/return types or exported variable annotations. Nested inline types, exported arrow/function expressions, export lists, aliases, default exports, and declaration-only functions are included. Private functions, private locals inside exported functions, type alias declarations, interfaces, classes, and inferred types are outside this rule's scope. Type-parameter constraints and defaults (`<T extends Record<string, unknown>>`) bound a caller-chosen type rather than erase one, so they do not report. Named types are not expanded. A locally declared or imported `Record` is not assumed to be the built-in utility type.
+The rule runs in the ESLint pass. The `allows` option exempts exact exported names. There is no automatic fix because the caller must choose the right contract.
 
-## Controls
+Earlier measurements included unknown-valued dictionaries. Those measurements do not describe the narrowed rule. Fresh measurements and their limits belong in the field notes.
 
-Default-off. `allows` lists exported names; export aliases use their public names. Anonymous default declarations use `default`. An exemption for one alias does not exempt a second public export of the same binding.
+## Superseded measurement on October 13, 2026: no-open-dictionary-at-boundary
 
-```js
-"antidrift/no-open-dictionary-at-boundary": ["error", { allows: ["headers"] }]
-```
+The corpus contains 39 installed repositories from 44 fresh shallow clones. The old and new rules use the same eligible files and TypeScript programs. Repository evidence determines exclusions. Directory names alone do not. Missing or invalid compiler configurations exclude 618 files from both versions. No scanned file fails.
 
-Use the owning type explicitly. There is no autofix because the syntax alone cannot identify the intended owner.
+The old rule reports 1550 hits in 34 repositories. The new rule reports 440 hits in 24 repositories. A round-robin sample with seed 2026101201 contains 20 hits. Source review labels 18 true, for 90% precision. Labels freeze before scoring.
 
-## Ecosystem
+Sampled repositories at 70% or more: sveltejs-kit, calcom-cal.com, vitest-dev-vitest, payloadcms-payload, TanStack-router, mastra-ai-mastra, edmundhung-conform, triggerdotdev-trigger.dev, microsoft-playwright, mikro-orm-mikro-orm, excalidraw-excalidraw, elysiajs-elysia, twentyhq-twenty, formbricks-formbricks, better-auth-better-auth, vitejs-vite, anatine-zod-plugins, withastro-astro. Each percentage describes only the sampled hits, usually one per repository. It is not a repository-wide estimate.
 
-Restricted-type rules can ban `Record` globally but do not express this exact exported-boundary policy. `no-appeasement-erasure` requires type information and a known value erased to unknown before its contract is re-established; this rule addresses declaration surfaces independently of initializer provenance. Extending that existing rule would change its behavior and service requirements, so this remains a separate opt-in syntax rule.
+The dropped-hit sample contains 0 true reports out of 10. The two false reports are a hidden implementation annotation behind a named exported signature and a generic constraint nested in a variable annotation. These remain limitations.
 
-## Corpus
+This superseded evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix/superseded-owner-fix-round`. The measurement report lists every sampled location, repository result, and dropped-hit label.
 
-The local Antidrift corpus runs the checked-in `fixtures/open-dictionary/allows.ts` owner-typed boundary. Its flags companion and unit cases exercise all four dictionary forms, nested annotations, export styles, internal controls, and public-name exemptions. No independently pinned external corpus evidence is claimed.
+- Label file: `new-no-open-dictionary-at-boundary.labels.tsv`. SHA256: `0e803349e71f37f9e8c4533109cec7b6e091cd8ac13c9532582b209f582d27cc`. Frozen at 2026-10-13T05:07:01.008738+00:00.
+- Label file: `dropped-no-open-dictionary-at-boundary.labels.tsv`. SHA256: `a464755f9945d2910dca3e5185f53251d2df679e2aff015b7398d340727cc6c6`. Frozen at 2026-10-13T05:07:17.061958+00:00.
 
-October 12 2026 precision, on 84 deduplicated TypeScript roots (40 local, 44 on sushi; vendored, build, generated, fixture, mock and snapshot trees and analyzer test inputs excluded before sampling). A hit is true when the open dictionary erases a shape the code knows or an owner type that exists. The after sample was drawn after the implementation was committed, from hits no earlier lane had inspected, and its labels were frozen before scoring.
+## Superseded precision history
 
-| Version                         | Hits | Repositories | Top 5                                                             | Sample |
-| ------------------------------- | ---- | ------------ | ----------------------------------------------------------------- | ------ |
-| Before                          | 403  | 30           | LibreChat 68, executor 55, sentry 50, claude-code 50, opencode 40 | 11/20  |
-| After excluding type parameters | 356  | 29           | LibreChat 63, executor 51, claude-code 47, sentry 39, opencode 34 | 10/20  |
+Superseded October 12, 2026 study. Before excluding type parameters, 403 hits in 30 repositories scored 11/20. After that change, 356 hits in 29 repositories scored 10/20. Both samples fell below 70%. The current rule checks only dictionaries of any.
 
-The remaining false positives are parser and decoder inputs, generic record helpers and guards, and protocol or logging bags (tool arguments, custom claims, logger data); only exact-name `allows` separates those, so the rule stays below the 70% bar.
+The October 12 study uses 84 TypeScript roots: 40 local roots and 44 on sushi. It excludes vendor, build, generated, fixture, mock, snapshot, and analyzer input trees. The October 13 fix round uses a different fresh corpus and the shipped lint population. These studies are not interchangeable.
+
+## Fresh measurement on October 13, 2026: no-open-dictionary-at-boundary
+
+The corpus contains 39 installed repositories from 44 fresh shallow clones. The old and new rules use the same eligible files and TypeScript programs. Both versions follow the shipped lint ignore list, including declaration files. Repository evidence establishes the other exclusions. Missing or invalid compiler configurations exclude 583 files from both versions. No scanned file fails.
+
+The old rule reports 1539 hits in 32 repositories. The new rule reports 434 hits in 22 repositories. A round-robin sample with seed 2026101302 contains 20 hits. Source review labels 18 true, for 90% precision. Labels freeze before scoring.
+
+Sampled repositories at 70% or more: TanStack-router, formbricks-formbricks, TanStack-query, vuejs-core, triggerdotdev-trigger.dev, calcom-cal.com, twentyhq-twenty, better-auth-better-auth, vitest-dev-vitest, Effect-TS-effect, vercel-ai, withastro-astro, edmundhung-conform, vitejs-vite, microsoft-playwright, mastra-ai-mastra, payloadcms-payload. Each percentage describes only the sampled hits, usually one per repository. It is not a repository-wide estimate.
+
+The dropped-hit sample contains 0 true reports out of 10. The rule checks explicit any-valued dictionaries at exported signatures and variable annotations. It does not resolve the intended owner type.
+
+Evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+
+- Label file: `new-no-open-dictionary-at-boundary.labels.tsv`. SHA256: `1123ca2d59ead782e0da1f5556cdf05ecc9ad213f7783578e194c96619ed2f17`. Frozen at 2026-10-13T07:14:23.635868+00:00.
+- Label file: `dropped-no-open-dictionary-at-boundary.labels.tsv`. SHA256: `e177e52a401adaa0cc7de4c4bad685b806988b754ddcfd92d47187e0e4de17c9`. Frozen at 2026-10-13T07:15:30.228746+00:00.

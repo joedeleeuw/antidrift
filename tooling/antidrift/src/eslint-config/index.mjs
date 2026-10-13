@@ -11,7 +11,6 @@ const ratchetedRules = {
   "antidrift/no-compat-names": "error",
   "antidrift/no-duplicated-conditional-classnames": "error",
   "antidrift/no-duplicated-object-field-blocks": "error",
-  "antidrift/no-inline-structural-type-at-use-site": "error",
   "antidrift/no-nonindependent-test-oracle": "error",
   "antidrift/no-open-dictionary-at-boundary": "error",
   "antidrift/no-pass-through-parameters": "error",
@@ -23,7 +22,6 @@ const ratchetedRules = {
   "antidrift/no-silent-empty-detection-fallback": "error",
   "antidrift/no-vague-names": "error",
   "antidrift/no-validator-output-oracle": "error",
-  "antidrift/unknown-input-must-be-decoded": "error",
 };
 
 export function createConfig({
@@ -52,7 +50,7 @@ export function createConfig({
       ],
     },
     {
-      files: ["**/*.{ts,tsx}"],
+      files: ["**/*.{ts,tsx,mts,cts}"],
       languageOptions: {
         parser,
         parserOptions: {
@@ -78,6 +76,8 @@ export function createConfig({
         "antidrift/no-redundant-zod-parse": "error",
         "antidrift/react-max-component-props": ["error", { max: 12 }],
         "antidrift/no-unsafe-deserialize": "error",
+        "antidrift/no-inline-structural-type-at-use-site": "error",
+        "antidrift/unknown-input-must-be-decoded": "off",
         "antidrift/no-appeasement-cast": "error",
         "antidrift/no-nullable-positional-tuple": "error",
         "antidrift/no-underchecked-type-predicate": "error",
@@ -100,7 +100,7 @@ export function createConfig({
       },
     },
     {
-      files: ["**/*.{js,jsx,mjs,cjs,mts,cts}"],
+      files: ["**/*.{js,jsx,mjs,cjs}"],
       ignores: ["**/*.min.{js,mjs,cjs}"],
       languageOptions: {
         parser,

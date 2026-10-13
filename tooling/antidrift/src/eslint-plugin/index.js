@@ -1,3 +1,4 @@
+import { ruleNoInlineStructuralTypeAtUseSite } from "./rules/no-inline-structural-type-at-use-site.js";
 import packageMetadata from "../../package.json" with { type: "json" };
 
 import { ruleReactMaxComponentProps } from "./rules/react-max-component-props.js";
@@ -24,10 +25,7 @@ import noWrappingFunctionsRule from "../oxlint-plugin/portable/no-wrapping-funct
 import noPassThroughParametersRule from "./rules/no-pass-through-parameters.js";
 import noVagueNamesRule from "./rules/no-vague-names.js";
 import noCompatNamesRule from "./rules/no-compat-names.js";
-import {
-  ruleNoInlineStructuralTypeAtUseSite,
-  ruleNoRawFetchInComponent,
-} from "../semantic-adapters/local-ast-rules.mjs";
+import { ruleNoRawFetchInComponent } from "../semantic-adapters/local-ast-rules.mjs";
 import ruleNoCallingComponentsAsFunctions from "../oxlint-plugin/rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "../oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "../oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
@@ -39,7 +37,7 @@ import ruleNoSchemaLibraryInTest from "../oxlint-plugin/rules/no-schema-library-
 import ruleNoSentinelAbsenceFallback from "../oxlint-plugin/rules/no-sentinel-absence-fallback.js";
 import ruleNoSilentEmptyDetectionFallback from "../oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
 import ruleNoValidatorOutputOracle from "../oxlint-plugin/rules/no-validator-output-oracle.js";
-import ruleUnknownInputMustBeDecoded from "../oxlint-plugin/rules/unknown-input-must-be-decoded.js";
+import ruleUnknownInputMustBeDecoded from "./rules/unknown-input-must-be-decoded.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),

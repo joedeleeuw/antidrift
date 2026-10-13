@@ -1,10 +1,3 @@
-// Positions where `unknown` is the honest annotation for the unknown-input
-// rules (`unknown-input-must-be-decoded`, `no-unknown-parameters`):
-// rejection-handler parameters, whose value is the promise rejection reason,
-// and output parameters whose every read goes straight into a serialization
-// sink. Both exemptions require names to resolve to unshadowed globals, so a
-// local binding that reuses a global's name is still checked.
-
 import { findVariable } from "../semantic-adapters/async-control-flow.mjs";
 
 function calledMethodName(call) {

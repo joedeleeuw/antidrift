@@ -64,3 +64,33 @@ One implementation is exported from both plugin entrypoints. The shared governan
 ## Validation
 
 The packed consumer must report both a named declaration and a named arrow as errors through its ordinary default configuration, without any rule opt-in. It also exercises the portable plugin directly. Real-source inventory and the required `pnpm policy:verify-session` gate provide additional evidence. Final gate receipts and advisory findings are recorded with the completed change.
+
+## Superseded measurement on October 13, 2026: no-wrapping-functions
+
+The corpus contains 39 installed repositories from 44 fresh shallow clones. The old and new rules use the same eligible files and TypeScript programs. Repository evidence determines exclusions. Directory names alone do not. Missing or invalid compiler configurations exclude 618 files from both versions. No scanned file fails.
+
+The old rule reports 3883 hits in 37 repositories. The new rule reports 3883 hits in 37 repositories. A round-robin sample with seed 2026101201 contains 20 hits. Source review labels 17 true, for 85% precision. Labels freeze before scoring.
+
+Sampled repositories at 70% or more: vitejs-vite, StefanTerdell-zod-to-json-schema, fabian-hiller-valibot, microsoft-playwright, edmundhung-conform, pingdotgg-t3code, openstatusHQ-openstatus, triggerdotdev-trigger.dev, arktypeio-arktype, calcom-cal.com, asteasolutions-zod-to-openapi, payloadcms-payload, twentyhq-twenty, trpc-trpc, TanStack-router, better-auth-better-auth, mastra-ai-mastra. Each percentage describes only the sampled hits, usually one per repository. It is not a repository-wide estimate.
+
+The dropped-hit sample contains 0 true reports out of 0. There are no dropped hits. The false reports preserve a named receiving decoder or listener identity needed for cleanup. A short name alone does not justify a one-call function. The implementation is unchanged.
+
+This superseded evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix/superseded-owner-fix-round`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+
+- Label file: `new-no-wrapping-functions.labels.tsv`. SHA256: `3c2690900414cdb5938d7ab4a297c4465990b4fb3309566107ff18ef3bfa1c95`. Frozen at 2026-10-13T05:07:01.009109+00:00.
+- Label file: `dropped-no-wrapping-functions.labels.tsv`. SHA256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. Frozen at 2026-10-13T05:07:17.062133+00:00.
+
+## Fresh measurement on October 13, 2026: no-wrapping-functions
+
+The corpus contains 39 installed repositories from 44 fresh shallow clones. The old and new rules use the same eligible files and TypeScript programs. Both versions follow the shipped lint ignore list, including declaration files. Repository evidence establishes the other exclusions. Missing or invalid compiler configurations exclude 583 files from both versions. No scanned file fails.
+
+The old rule reports 3823 hits in 37 repositories. The new rule reports 3823 hits in 37 repositories. A round-robin sample with seed 2026101302 contains 20 hits. Source review labels 14 true, for 70% precision. Labels freeze before scoring.
+
+Sampled repositories at 70% or more: StefanTerdell-zod-to-json-schema, elysiajs-elysia, calcom-cal.com, vitest-dev-vitest, mastra-ai-mastra, formbricks-formbricks, fabian-hiller-valibot, anatine-zod-plugins, arktypeio-arktype, openstatusHQ-openstatus, ts-rest-ts-rest, trpc-trpc, inngest-inngest-js, excalidraw-excalidraw. Each percentage describes only the sampled hits, usually one per repository. It is not a repository-wide estimate.
+
+The dropped-hit sample contains 0 true reports out of 0. There are no dropped hits. G10 treats a function whose body is one call as a hop unless it preserves a stated capability. The implementation is unchanged. The six false reports preserve a callback convention, deferred execution, callback identity, or a bound compiler interface.
+
+Evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+
+- Label file: `new-no-wrapping-functions.labels.tsv`. SHA256: `d7de530f417ffcca03b65b8ae46e1555b6cf0f91f54f7b8bea8c77938e3714b1`. Frozen at 2026-10-13T07:14:23.636270+00:00.
+- Label file: `dropped-no-wrapping-functions.labels.tsv`. SHA256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. Frozen at 2026-10-13T07:15:30.228917+00:00.

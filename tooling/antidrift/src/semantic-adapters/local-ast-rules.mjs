@@ -441,7 +441,7 @@ function memberOfExportedClass(memberNode) {
   );
 }
 
-function inlineStructuralTypeAtBoundary(node) {
+export function inlineStructuralTypeAtBoundary(node) {
   const parent = node.parent;
   const param = parent?.parent;
   if (parent?.type !== "TSTypeAnnotation" || !param) return false;
@@ -451,31 +451,6 @@ function inlineStructuralTypeAtBoundary(node) {
   if (functionReturnsJsx(fn)) return false;
 
   return isBoundaryObjectMethod(fn) || isExportedFunctionBoundary(fn);
-}
-
-export function ruleNoInlineStructuralTypeAtUseSite() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description: "Disallow inline object type literals at use sites.",
-      },
-      schema: [],
-    },
-    create(context) {
-      return {
-        TSTypeLiteral(node) {
-          if (inlineStructuralTypeAtBoundary(node)) {
-            context.report({
-              node,
-              message:
-                "Do not define structural contracts at use sites. Import or create the owned named type.",
-            });
-          }
-        },
-      };
-    },
-  };
 }
 
 export function ruleNoHandrolledResourceLifecycleCells() {
