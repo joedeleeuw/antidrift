@@ -12,7 +12,7 @@ import {
   requireTypeServices,
 } from "./type-services.js";
 
-export function hopCandidate(services, node, identifier) {
+function hopCandidate(services, node, identifier) {
   const call = delegatedCall(node, identifier);
   if (!call) return null;
   const nodes = services.esTreeNodeToTSNodeMap;
@@ -42,7 +42,11 @@ export default {
       },
     ],
     messages: {
-      hop: "'{{name}}' is a hop to '{{callee}}': inlining it at its {{calls}} call site(s) type-checks and keeps each call's type and bindings. Call the owner directly and delete '{{name}}'.",
+      hop: "'{{name}}' is a hop to '{{callee}}': inlining it at its {{calls}} call site(s) type-checks and keeps each call's type, bindings and evaluation order. Call the owner directly and delete '{{name}}'.",
+      unusedHop:
+        "'{{name}}' is a hop to '{{callee}}' with no call site; deleting it type-checks. Delete '{{name}}'.",
+      incomplete:
+        "Incomplete analysis: '{{name}}' would be a verified hop to '{{callee}}', but its export cannot be checked against the package's public surface because {{cause}}.",
     },
   },
   create(context) {
@@ -55,16 +59,23 @@ export default {
       const candidate = hopCandidate(services, node, identifier);
       if (!candidate) return;
       const verdict = verifyHop(services.program, candidate);
-      if (!verdict.hop) return;
-      context.report({
-        node: identifier,
-        messageId: "hop",
-        data: {
-          name: identifier.name,
-          callee: context.sourceCode.getText(candidate.callee),
-          calls: verdict.calls,
-        },
-      });
+      const hopNames = {
+        name: identifier.name,
+        callee: context.sourceCode.getText(candidate.callee),
+      };
+      if (verdict.incomplete) {
+        context.report({
+          node: identifier,
+          messageId: "incomplete",
+          data: { ...hopNames, cause: verdict.incomplete },
+        });
+      } else if (verdict.hop) {
+        context.report({
+          node: identifier,
+          messageId: verdict.calls === 0 ? "unusedHop" : "hop",
+          data: { ...hopNames, calls: verdict.calls },
+        });
+      }
     });
   },
 };

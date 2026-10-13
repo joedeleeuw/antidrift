@@ -148,6 +148,7 @@ function commandBuild(directory, words) {
         .concat(project || projects.length ? [] : ["tsconfig.json"])
         .map((config) => posix.join(directory, config)),
       inputs: [],
+      issues: [],
     };
   }
   const bundler = tool === "bun" && words[1] === "build" ? "esbuild" : tool;
@@ -157,21 +158,24 @@ function commandBuild(directory, words) {
   const configFile = TOOL_CONFIG_STEMS[bundler]
     ? toolConfigFile(directory, bundler, words)
     : undefined;
+  const declared = configFile
+    ? declaredBuildInputs(configFile, bundler)
+    : { inputs: [] };
   return {
     compilerConfigs: [],
-    inputs: configFile
-      ? inputs.concat(declaredBuildInputs(configFile))
-      : inputs,
+    inputs: inputs.concat(declared.inputs ?? []),
+    issues: declared.unresolved ? [declared.unresolved] : [],
   };
 }
 
 function declaredBuild(manifest, directory) {
   const commands = buildCommands(manifest.scripts ?? {}, "build", new Set());
-  const build = { compilerConfigs: [], inputs: [] };
+  const build = { compilerConfigs: [], inputs: [], issues: [] };
   for (const words of commands) {
     const step = commandBuild(directory, words);
     build.compilerConfigs.push(...step.compilerConfigs);
     build.inputs.push(...step.inputs);
+    build.issues.push(...(step.issues ?? []));
   }
   build.inputs.push(
     ...entryStrings(manifest.source).map((input) => ({ input }))
@@ -214,7 +218,9 @@ function surfaceOf(program, directory) {
     readFileSync(posix.join(directory, "package.json"), "utf8")
   );
   const entries = packageEntries(manifest, directory);
-  if (entries.length === 0) return { targets: new Set(), unresolved: [] };
+  if (entries.length === 0) {
+    return { targets: new Set(), unresolved: [], issues: [] };
+  }
   const build = declaredBuild(manifest, directory);
   const sources = packageSources(program, directory);
   const outputs = compilerOutputs(sources, build.compilerConfigs);
@@ -231,12 +237,16 @@ function surfaceOf(program, directory) {
     if (matched.length === 0) unresolved.push(entry);
     for (const sourceFile of matched) resolved.add(sourceFile);
   }
-  return { targets: moduleExportTargets(program, resolved), unresolved };
+  return {
+    targets: moduleExportTargets(program, resolved),
+    unresolved,
+    issues: build.issues,
+  };
 }
 
-export function publicSurfaceReason(program, nameNode) {
+export function publicSurface(program, nameNode) {
   const directory = packageDirectoryOf(nameNode.getSourceFile().fileName);
-  if (!directory) return null;
+  if (!directory) return {};
   const surfaces = packageSurfaces.get(program) ?? new Map();
   packageSurfaces.set(program, surfaces);
   if (!surfaces.has(directory)) {
@@ -244,9 +254,12 @@ export function publicSurfaceReason(program, nameNode) {
   }
   const surface = surfaces.get(directory);
   if (surface.targets.has(exportTarget(program, nameNode))) {
-    return "exported from the package entry points";
+    return { owner: "exported from the package entry points" };
   }
-  return surface.unresolved.length > 0
-    ? `public surface unresolved: entry ${surface.unresolved[0]} maps to no source through the package build`
-    : null;
+  if (surface.unresolved.length === 0) return {};
+  const cause =
+    surface.issues[0] ?? "the package build declares no input for it";
+  return {
+    incomplete: `package entry ${posix.relative(directory, surface.unresolved[0])} maps to no source file: ${cause}`,
+  };
 }

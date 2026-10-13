@@ -2,10 +2,12 @@ import { posix } from "node:path";
 
 import ts from "typescript";
 
-import { publicSurfaceReason } from "./package-entry-points.js";
+import { publicSurface } from "./package-entry-points.js";
 import {
   bindingAtSite,
   bodyBindings,
+  argumentEffect,
+  bodyEvaluationOrder,
   declaredContract,
   editedProgramHazard,
   importOfFile,
@@ -13,6 +15,7 @@ import {
   programReferences,
 } from "./typescript-engine.js";
 
+const STEP_RANK = { immutable: 0, read: 1, effect: 2 };
 const BARE_ARGUMENT_KINDS = new Set([
   ts.SyntaxKind.Identifier,
   ts.SyntaxKind.PropertyAccessExpression,
@@ -42,16 +45,12 @@ function isExported(declaration, references) {
   );
 }
 
-function ownerReason(program, candidate, references, bindings) {
+function ownerReason(references, bindings, surface) {
   const identity = references.identity[0];
   if (identity) {
     return `referenced by identity (${identity.use}) at ${locationOf(identity.node)}`;
   }
-  const exported =
-    isExported(candidate.declaration, references) &&
-    publicSurfaceReason(program, candidate.nameNode);
-  if (exported) return exported;
-  if (references.call.length === 0) return "no call site in the program";
+  if (surface.owner) return surface.owner;
   const callerModules = new Set(
     references.call.map(({ node }) => node.getSourceFile())
   );
@@ -73,6 +72,44 @@ function parameterHazard(functionNode, uses) {
     return `parameter ${functionNode.parameters[misused].name.getText()} is used ${counts[misused]} times`;
   }
   return "parameters are evaluated in a different order";
+}
+
+function unwrapped(node) {
+  let current = node;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isNonNullExpression(current) ||
+    ts.isTypeAssertionExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function orderHazard(program, context, call) {
+  let preceding = { step: "immutable" };
+  for (const entry of context.order) {
+    if (entry.slot === undefined) {
+      if (STEP_RANK[entry.step] > STEP_RANK[preceding.step]) preceding = entry;
+      continue;
+    }
+    const argument = argumentEffect(
+      program,
+      context.functionNode,
+      call,
+      entry.slot
+    );
+    const commutes =
+      preceding.step === "immutable" ||
+      argument === "immutable" ||
+      (preceding.step === "read" && argument === "read");
+    if (!commutes) {
+      return `argument ${entry.slot + 1} at ${locationOf(call)} would be evaluated after ${preceding.node.getText()} instead of before it`;
+    }
+  }
+  return null;
 }
 
 function argumentTexts(functionNode, call) {
@@ -108,10 +145,11 @@ function calleeArgument(use, argumentText, argument) {
   const parent = use.node.parent;
   const isCallee =
     ts.isCallExpression(parent) && parent.expression === use.node;
+  const target = argument && unwrapped(argument);
   return isCallee &&
-    argument &&
-    (ts.isPropertyAccessExpression(argument) ||
-      ts.isElementAccessExpression(argument))
+    target &&
+    (ts.isPropertyAccessExpression(target) ||
+      ts.isElementAccessExpression(target))
     ? `(0, ${argumentText})`
     : argumentText;
 }
@@ -387,7 +425,9 @@ function planSites(context) {
   const { functionNode, call, bindings, references, edits } = context;
   for (const { node: siteCall } of references.call) {
     const hazard =
-      siteHazard(functionNode, siteCall) ?? siteImports(context, siteCall);
+      siteHazard(functionNode, siteCall) ??
+      orderHazard(context.program, context, siteCall) ??
+      siteImports(context, siteCall);
     if (hazard) return hazard;
     const inlined = inlinedText(call, bindings, siteCall, functionNode);
     const edit = edits.add(
@@ -411,6 +451,7 @@ function verifyEdits(context) {
   if (!files) return rejected("call sites overlap");
   const introduced = editedProgramHazard(context.program, files, context.sites);
   if (introduced) return rejected(introduced);
+  if (context.incomplete) return { hop: false, incomplete: context.incomplete };
   return {
     hop: true,
     calls: context.sites.length,
@@ -424,10 +465,16 @@ export function verifyHop(program, candidate) {
   if (contract) return rejected(contract);
   const references = programReferences(program, nameNode);
   const bindings = bodyBindings(program, functionNode, call);
-  const owner = ownerReason(program, candidate, references, bindings);
+  const surface = isExported(declaration, references)
+    ? publicSurface(program, nameNode)
+    : {};
+  const owner = ownerReason(references, bindings, surface);
   if (owner) return rejected(owner);
+  const { order, modelled } = bodyEvaluationOrder(program, functionNode);
   const hazard =
-    bindings.hazards[0] ?? parameterHazard(functionNode, bindings.uses);
+    bindings.hazards[0] ??
+    parameterHazard(functionNode, bindings.uses) ??
+    (modelled ? null : "the body's evaluation order is not modelled");
   if (hazard) return rejected(hazard);
   return verifyEdits({
     program,
@@ -437,6 +484,8 @@ export function verifyHop(program, candidate) {
     bindings,
     references,
     functionFile: nameNode.getSourceFile(),
+    order,
+    incomplete: surface.incomplete,
     edits: editSet(),
     sites: [],
   });

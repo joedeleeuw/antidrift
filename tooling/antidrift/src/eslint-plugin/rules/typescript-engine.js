@@ -7,7 +7,32 @@ const diagnosticBaselines = new WeakMap();
 
 const TYPE_FORMAT =
   ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseFullyQualifiedType;
-const BUILD_INPUT_KEYS = new Set(["entry", "entries", "entryPoints", "input"]);
+const TOOL_ENTRY_PATHS = {
+  tsup: [["entry"]],
+  tsdown: [["entry"]],
+  vite: [
+    ["build", "lib", "entry"],
+    ["build", "rollupOptions", "input"],
+  ],
+  rollup: [["input"]],
+  unbuild: [["entries"]],
+  rslib: [["source", "entry"]],
+  webpack: [["entry"]],
+};
+const PRIMITIVE_TYPES =
+  ts.TypeFlags.StringLike |
+  ts.TypeFlags.NumberLike |
+  ts.TypeFlags.BooleanLike |
+  ts.TypeFlags.BigIntLike |
+  ts.TypeFlags.EnumLike |
+  ts.TypeFlags.Null |
+  ts.TypeFlags.Undefined;
+const NULLISH_OR_UNKNOWN =
+  ts.TypeFlags.Null |
+  ts.TypeFlags.Undefined |
+  ts.TypeFlags.Any |
+  ts.TypeFlags.Unknown;
+const STEP_RANK = { immutable: 0, read: 1, effect: 2 };
 const LITERAL_KINDS = new Set([
   ts.SyntaxKind.StringLiteral,
   ts.SyntaxKind.NumericLiteral,
@@ -172,9 +197,6 @@ export function programReferences(program, nameNode) {
 }
 
 export function declaredContract(program, declaration, nameNode) {
-  if (ts.isVariableDeclaration(declaration) && declaration.type) {
-    return `typed binding ${declaration.type.getText()}`;
-  }
   const flags = ts.getCombinedModifierFlags(declaration);
   if (flags & ts.ModifierFlags.Default) return "default export";
   if (flags & ts.ModifierFlags.Ambient) return "ambient declaration";
@@ -263,39 +285,177 @@ function propertyKey(property, sourceFile) {
   return property.name.getText(sourceFile).replace(/^["']|["']$/gu, "");
 }
 
-export function declaredBuildInputs(configFile) {
+function unwrapped(node) {
+  let current = node;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isNonNullExpression(current) ||
+    ts.isTypeAssertionExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function constInitializer(sourceFile, name) {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    if (!(statement.declarationList.flags & ts.NodeFlags.Const)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === name) {
+        return declaration.initializer;
+      }
+    }
+  }
+  return undefined;
+}
+
+function configObjects(sourceFile, node, seen = new Set()) {
+  const configNode = node && unwrapped(node);
+  if (!configNode || seen.has(configNode)) return null;
+  seen.add(configNode);
+  if (ts.isObjectLiteralExpression(configNode)) return [configNode];
+  if (ts.isArrayLiteralExpression(configNode)) {
+    const configurations = configNode.elements.map((element) =>
+      configObjects(sourceFile, element, seen)
+    );
+    return configurations.includes(null) ? null : configurations.flat();
+  }
+  if (ts.isIdentifier(configNode)) {
+    return configObjects(
+      sourceFile,
+      constInitializer(sourceFile, configNode.text),
+      seen
+    );
+  }
+  if (
+    ts.isCallExpression(configNode) &&
+    ts.isIdentifier(configNode.expression) &&
+    configNode.expression.text === "defineConfig" &&
+    configNode.arguments.length === 1
+  ) {
+    return configObjects(sourceFile, configNode.arguments[0], seen);
+  }
+  if (
+    (ts.isArrowFunction(configNode) || ts.isFunctionExpression(configNode)) &&
+    !ts.isBlock(configNode.body)
+  ) {
+    return configObjects(sourceFile, configNode.body, seen);
+  }
+  return null;
+}
+
+function exportedConfiguration(sourceFile) {
+  for (const statement of sourceFile.statements) {
+    if (ts.isExportAssignment(statement)) return statement.expression;
+    if (
+      ts.isExpressionStatement(statement) &&
+      ts.isBinaryExpression(statement.expression) &&
+      statement.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      statement.expression.left.getText(sourceFile) === "module.exports"
+    ) {
+      return statement.expression.right;
+    }
+  }
+  return undefined;
+}
+
+function propertyInitializer(sourceFile, object, key) {
+  for (const property of object.properties) {
+    if (
+      (ts.isPropertyAssignment(property) ||
+        ts.isShorthandPropertyAssignment(property)) &&
+      !ts.isComputedPropertyName(property.name) &&
+      propertyKey(property, sourceFile) === key
+    ) {
+      return ts.isShorthandPropertyAssignment(property)
+        ? constInitializer(sourceFile, property.name.text)
+        : property.initializer;
+    }
+  }
+  return undefined;
+}
+
+function entryInputs(sourceFile, node, name) {
+  const entryNode = node && unwrapped(node);
+  if (!entryNode) return null;
+  if (ts.isStringLiteralLike(entryNode)) {
+    return [{ name, input: entryNode.text }];
+  }
+  if (ts.isIdentifier(entryNode)) {
+    return entryInputs(
+      sourceFile,
+      constInitializer(sourceFile, entryNode.text),
+      name
+    );
+  }
+  if (ts.isArrayLiteralExpression(entryNode)) {
+    const inputs = entryNode.elements.map((element) =>
+      entryInputs(sourceFile, element, undefined)
+    );
+    return inputs.includes(null) ? null : inputs.flat();
+  }
+  if (ts.isObjectLiteralExpression(entryNode)) {
+    const nested =
+      propertyInitializer(sourceFile, entryNode, "input") ??
+      propertyInitializer(sourceFile, entryNode, "import");
+    if (nested) return entryInputs(sourceFile, nested, name);
+    const inputs = entryNode.properties.map((property) =>
+      ts.isPropertyAssignment(property) &&
+      !ts.isComputedPropertyName(property.name)
+        ? entryInputs(
+            sourceFile,
+            property.initializer,
+            propertyKey(property, sourceFile)
+          )
+        : null
+    );
+    return inputs.includes(null) ? null : inputs.flat();
+  }
+  return null;
+}
+
+export function declaredBuildInputs(configFile, tool) {
   const sourceFile = ts.createSourceFile(
     configFile,
     ts.sys.readFile(configFile),
     ts.ScriptTarget.Latest,
     true
   );
+  const relativeName = posix.basename(configFile);
+  const exported = exportedConfiguration(sourceFile);
+  if (!exported) {
+    return { unresolved: `${relativeName} has no default export for ${tool}` };
+  }
+  const configurations = configObjects(sourceFile, exported);
+  if (!configurations) {
+    return {
+      unresolved: `${relativeName} exports a ${tool} configuration that is not a literal object`,
+    };
+  }
   const inputs = [];
-  function collect(node, name) {
-    if (ts.isStringLiteralLike(node)) {
-      inputs.push({ name, input: node.text });
-    } else if (ts.isArrayLiteralExpression(node)) {
-      for (const element of node.elements) collect(element, undefined);
-    } else if (ts.isObjectLiteralExpression(node)) {
-      for (const property of node.properties) {
-        if (ts.isPropertyAssignment(property)) {
-          collect(property.initializer, propertyKey(property, sourceFile));
-        }
+  for (const object of configurations) {
+    for (const path of TOOL_ENTRY_PATHS[tool] ?? []) {
+      let entryNode = object;
+      for (const key of path) {
+        entryNode =
+          entryNode && ts.isObjectLiteralExpression(unwrapped(entryNode))
+            ? propertyInitializer(sourceFile, unwrapped(entryNode), key)
+            : undefined;
       }
+      if (!entryNode) continue;
+      const found = entryInputs(sourceFile, entryNode, undefined);
+      if (!found) {
+        return {
+          unresolved: `${relativeName} sets ${path.join(".")} to a entryNode that is not a literal entry`,
+        };
+      }
+      inputs.push(...found);
     }
   }
-  function visit(node) {
-    if (
-      ts.isPropertyAssignment(node) &&
-      BUILD_INPUT_KEYS.has(propertyKey(node, sourceFile))
-    ) {
-      collect(node.initializer, undefined);
-      return;
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(sourceFile);
-  return inputs;
+  return { inputs };
 }
 
 export function packageSources(program, directory) {
@@ -603,4 +763,196 @@ export function editedProgramHazard(program, files, sites) {
     if (hazard) return hazard;
   }
   return null;
+}
+
+function stableBinding(checker, symbol) {
+  if (!symbol) return false;
+  const target = targetOf(checker, symbol);
+  if (
+    target.flags &
+    (ts.SymbolFlags.Function |
+      ts.SymbolFlags.Class |
+      ts.SymbolFlags.Enum |
+      ts.SymbolFlags.EnumMember |
+      ts.SymbolFlags.ValueModule)
+  ) {
+    return true;
+  }
+  const declaration = target.valueDeclaration;
+  if (!declaration && symbol.escapedName === "undefined") return true;
+  return Boolean(
+    declaration &&
+    ts.isVariableDeclaration(declaration) &&
+    ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const
+  );
+}
+
+function typeHasFlag(type, flags) {
+  return type.isUnion()
+    ? type.types.some((member) => member.flags & flags)
+    : Boolean(type.flags & flags);
+}
+
+function isPrimitive(checker, node) {
+  const type = checker.getTypeAtLocation(node);
+  return type.isUnion()
+    ? type.types.every((member) => member.flags & PRIMITIVE_TYPES)
+    : Boolean(type.flags & PRIMITIVE_TYPES);
+}
+
+function memberStep(checker, node) {
+  const object = checker.getTypeAtLocation(node.expression);
+  if (typeHasFlag(object, NULLISH_OR_UNKNOWN)) return "effect";
+  const symbol = checker.getSymbolAtLocation(
+    ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression
+  );
+  const declarations = symbol?.declarations ?? [];
+  if (
+    declarations.length === 0 ||
+    symbol.flags & ts.SymbolFlags.Accessor ||
+    declarations.some(
+      (declaration) =>
+        ts.isGetAccessorDeclaration(declaration) ||
+        ts.isSetAccessorDeclaration(declaration)
+    )
+  ) {
+    return "effect";
+  }
+  return "read";
+}
+
+function isImmutableNode(node) {
+  return (
+    (LITERAL_KINDS.has(node.kind) && !ts.isTemplateExpression(node)) ||
+    node.kind === ts.SyntaxKind.ThisKeyword ||
+    ts.isArrowFunction(node) ||
+    ts.isFunctionExpression(node)
+  );
+}
+
+function evaluationStepper(program, parameterSymbols) {
+  const checker = program.getTypeChecker();
+  const steps = { order: [], modelled: true };
+  function name(node, symbol) {
+    const index = parameterSymbols.indexOf(symbol);
+    if (index >= 0) steps.order.push({ slot: index, node });
+    else {
+      steps.order.push({
+        step: stableBinding(checker, symbol) ? "immutable" : "read",
+        node,
+      });
+    }
+  }
+  function spread(node) {
+    visit(node.expression);
+    steps.order.push({ step: "effect", node });
+  }
+  function visitMember(node) {
+    visit(node.expression);
+    if (ts.isElementAccessExpression(node)) visit(node.argumentExpression);
+    steps.order.push({ step: memberStep(checker, node), node });
+  }
+  function visitCall(node) {
+    visit(node.expression);
+    for (const argument of node.arguments) {
+      if (ts.isSpreadElement(argument)) spread(argument);
+      else visit(argument);
+    }
+    steps.order.push({ step: "effect", node });
+  }
+  function visitTemplate(node) {
+    for (const span of node.templateSpans) {
+      visit(span.expression);
+      steps.order.push({
+        step: isPrimitive(checker, span.expression) ? "immutable" : "effect",
+        node: span.expression,
+      });
+    }
+  }
+  function visitArray(node) {
+    for (const element of node.elements) {
+      if (ts.isSpreadElement(element)) spread(element);
+      else if (!ts.isOmittedExpression(element)) visit(element);
+    }
+  }
+  function visitProperty(property) {
+    if (ts.isPropertyAssignment(property)) {
+      if (ts.isComputedPropertyName(property.name)) {
+        visit(property.name.expression);
+      }
+      visit(property.initializer);
+    } else if (ts.isShorthandPropertyAssignment(property)) {
+      name(property.name, checker.getShorthandAssignmentValueSymbol(property));
+    } else if (ts.isSpreadAssignment(property)) {
+      spread(property);
+    } else {
+      steps.order.push({ step: "immutable", node: property });
+    }
+  }
+  function visit(node) {
+    const expression = unwrapped(node);
+    if (ts.isIdentifier(expression)) {
+      name(expression, checker.getSymbolAtLocation(expression));
+    } else if (isImmutableNode(expression)) {
+      steps.order.push({ step: "immutable", node: expression });
+    } else if (
+      (ts.isPropertyAccessExpression(expression) ||
+        ts.isElementAccessExpression(expression)) &&
+      !expression.questionDotToken
+    ) {
+      visitMember(expression);
+    } else if (
+      ts.isCallExpression(expression) &&
+      !expression.questionDotToken
+    ) {
+      visitCall(expression);
+    } else if (ts.isTemplateExpression(expression)) {
+      visitTemplate(expression);
+    } else if (ts.isArrayLiteralExpression(expression)) {
+      visitArray(expression);
+    } else if (ts.isObjectLiteralExpression(expression)) {
+      expression.properties.forEach(visitProperty);
+    } else {
+      steps.modelled = false;
+      steps.order.push({ step: "effect", node: expression });
+    }
+  }
+  return { steps, visit };
+}
+
+function parameterSymbolsOf(program, functionNode) {
+  const checker = program.getTypeChecker();
+  return functionNode.parameters.map((parameter) =>
+    checker.getSymbolAtLocation(parameter.name)
+  );
+}
+
+export function bodyEvaluationOrder(program, functionNode) {
+  const { body } = functionNode;
+  const stepper = evaluationStepper(
+    program,
+    parameterSymbolsOf(program, functionNode)
+  );
+  stepper.visit(ts.isBlock(body) ? body.statements[0].expression : body);
+  return stepper.steps;
+}
+
+export function argumentEffect(program, functionNode, call, index) {
+  const argumentsForSlot = functionNode.parameters[index].dotDotDotToken
+    ? call.arguments.slice(index)
+    : call.arguments.slice(index, index + 1);
+  let strongest = "immutable";
+  for (const argument of argumentsForSlot) {
+    const stepper = evaluationStepper(program, []);
+    stepper.visit(argument);
+    const effect = stepper.steps.modelled
+      ? stepper.steps.order.reduce(
+          (current, { step }) =>
+            STEP_RANK[step] > STEP_RANK[current] ? step : current,
+          "immutable"
+        )
+      : "effect";
+    if (STEP_RANK[effect] > STEP_RANK[strongest]) strongest = effect;
+  }
+  return strongest;
 }
