@@ -174,13 +174,36 @@ function isFailureBranchReturn(node) {
   return false;
 }
 
+const functionTypes = new Set([
+  "FunctionDeclaration",
+  "FunctionExpression",
+  "ArrowFunctionExpression",
+]);
+
+// An empty return nested in an if or switch case answers a declared
+// not-applicable case (a CI skip, a platform with no prefix). Only the
+// function's own unconditional result, or a concise arrow body, stands in for
+// a detection that produced nothing.
+function isUnconditionalResult(node) {
+  return (
+    functionTypes.has(node.type) ||
+    (node.parent?.type === "BlockStatement" &&
+      functionTypes.has(node.parent.parent?.type))
+  );
+}
+
 function astRecoverySource(node, expression) {
   const fallbackSource = fallbackExpressionSource(expression);
   if (fallbackSource) return fallbackSource;
   if (!containsEmptyString(expression)) return "";
   if (isInsideCatchClause(node)) return "ast-catch-recovery";
   if (isFailureBranchReturn(node)) return "ast-failure-branch";
-  if (isEmptyString(unwrapExpression(expression))) return "ast-direct-empty";
+  if (
+    isEmptyString(unwrapExpression(expression)) &&
+    isUnconditionalResult(node)
+  ) {
+    return "ast-direct-empty";
+  }
   return "";
 }
 

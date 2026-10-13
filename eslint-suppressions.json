@@ -280,10 +280,10 @@
   },
   "tooling/antidrift/src/oxlint-plugin/index.test.mjs": {
     "antidrift/no-nonindependent-test-oracle": {
-      "count": 24
+      "count": 22
     },
     "antidrift/no-vague-names": {
-      "count": 28
+      "count": 24
     }
   },
   "tooling/antidrift/src/oxlint-plugin/owned-union-source.js": {

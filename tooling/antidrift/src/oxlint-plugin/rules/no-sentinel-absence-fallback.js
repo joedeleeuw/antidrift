@@ -48,13 +48,12 @@ export default function ruleNoSentinelAbsenceFallback() {
     meta: {
       type: "problem",
       docs: {
-        description:
-          "Disallow nullish-coalescing a member read to an in-band absence sentinel string",
+        description: "Keep missing member values distinct from real values.",
       },
       schema: [],
       messages: {
         sentinelAbsenceFallback:
-          'Do not coerce a missing member value to the "{{sentinel}}" sentinel: absence becomes indistinguishable from a real value. Model absence as absence — an optional field, null, or a parsed enum with an explicit unavailable member.',
+          'This fallback hides a missing member behind "{{sentinel}}". Keep the missing value distinct from a reported value.',
       },
     },
     create(context) {

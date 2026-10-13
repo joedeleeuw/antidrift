@@ -58,11 +58,13 @@ The broader set comes from the same runtime-schema API family reviewed during th
 
 ### `antidrift/no-validator-output-oracle`
 
-The assertion subject is the policy surface. The rule follows local const bindings, member projections, array iteration/projection methods, `Object.keys`/`values`/`entries`, `Array.from`, `JSON.stringify`, primitive conversions, and `Set`/`Map` construction back to validator calls. It also recognizes bound validator methods, imported schema-library validator functions, curried decoder calls, async validator assertions, and validator-only throw callbacks.
+An expected value must not come from the application output or the input passed to its validator. A different variable name does not establish independence.
 
-An outer application call terminates the trace. That is a deliberate proof boundary, not a claim that every intervening helper is substantive. The rule uses no project names, application-function name patterns, or guesses about wrapper bodies.
+The rule follows expected values through local bindings, assignments, destructuring, property reads, calls, and local function bodies. It compares their dependencies with those of the validated arguments. The schema receiver and schema-builder arguments do not seed that comparison. Shared bindings and expressions prevent the independent-value exemption. A separate literal also fails when it equals an input passed to the application call. Object property order does not make a literal independent.
 
-Broad `.parse(...)` assertion tracing excludes known JSON, YAML, path, URL, query-string, and TOML parsers. This branch remains default-off until broader corpus pressure confirms that application parsers with the same method name do not create unacceptable noise.
+A parse of application output stays allowed when the assertion compares it with an independent expected value. Validator acceptance fields, missing expected values, and validator-only throw checks still report. Validator methods need a known schema receiver.
+
+Imported helper bodies and writes made inside external functions remain outside scope. The rule does not prove independence across those boundaries.
 
 ### `antidrift/no-mocked-response-body-oracle`
 
@@ -84,4 +86,34 @@ The import rule therefore has partial configuration overlap; both oracle rules a
 
 The motivating real corpus was the Murderbox cleanup and its accompanying high-effort advisory review: direct schema assertions, test-authored schema readers, safe-parse outcome checks, issue projections, and validator-only throw tests were removed. The current Murderbox checkout is intentionally clean after that removal, so no stale external-corpus drift path is registered. Reduced Oxlint programs lock the accepted syntax boundaries but are not promotion evidence.
 
-All three rules ship default-off and unstable. Promotion requires a pinned real drift source plus clean controls for document parsers, application parser APIs, parsed fixtures passed into application behavior, type-only schema imports, unmocked responses, response metadata, scalar assertions, and independently owned effects.
+The validator-output rule is enabled and remains unstable. Its fresh measurement must judge independent application behavior. A different binding name or a separate copy of the input does not supply that evidence. The other two rules keep their own registry settings.
+
+## Superseded measurement on October 13, 2026: no-validator-output-oracle
+
+The corpus contains 39 installed repositories from 44 fresh shallow clones. The old and new rules use the same eligible files and TypeScript programs. Repository evidence determines exclusions. Directory names alone do not. Missing or invalid compiler configurations exclude 618 files from both versions. No scanned file fails.
+
+The old rule reports 3215 hits in 18 repositories. The new rule reports 3253 hits in 18 repositories. A round-robin sample with seed 2026101201 contains 20 hits. Source review labels 19 true, for 95% precision. Labels freeze before scoring.
+
+Sampled repositories at 70% or more: anatine-zod-plugins, vercel-ai, drizzle-team-drizzle-orm, payloadcms-payload, ts-rest-ts-rest, triggerdotdev-trigger.dev, calcom-cal.com, formbricks-formbricks, pingdotgg-t3code, inngest-inngest-js, Effect-TS-effect, twentyhq-twenty, edmundhung-conform, better-auth-better-auth, dmmulroy-herdr-ts-sdk, mastra-ai-mastra, documenso-documenso. Each percentage describes only the sampled hits, usually one per repository. It is not a repository-wide estimate.
+
+The dropped-hit sample contains 10 true reports out of 10. The false report occurs in a real database-backed request test with an independently arranged page ID. Dropped-hit labels expose missed contract tests and factory or constructor echoes. Imported function bodies remain outside the local analysis. Direct literal inputs and literal act arguments are compared by value. Schema receivers and schema-builder arguments do not seed validated input dependencies.
+
+This superseded evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix/superseded-owner-fix-round`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+
+- Label file: `new-no-validator-output-oracle.labels.tsv`. SHA256: `e6ff4d3789ffb334db711e56e418dbd89ee7e99627b5a85fe4b2a68ba70e48a0`. Frozen at 2026-10-13T05:07:01.008990+00:00.
+- Label file: `dropped-no-validator-output-oracle.labels.tsv`. SHA256: `f85df55980285c478ffecafba1ec3e53b3ec5f64ae0b250b4251da96bca48cbe`. Frozen at 2026-10-13T05:07:17.062079+00:00.
+
+## Fresh measurement on October 13, 2026: no-validator-output-oracle
+
+The corpus contains 39 installed repositories from 44 fresh shallow clones. The old and new rules use the same eligible files and TypeScript programs. Both versions follow the shipped lint ignore list, including declaration files. Repository evidence establishes the other exclusions. Missing or invalid compiler configurations exclude 583 files from both versions. No scanned file fails.
+
+The old rule reports 3215 hits in 18 repositories. The new rule reports 3253 hits in 18 repositories. A round-robin sample with seed 2026101302 contains 20 hits. Source review labels 20 true, for 100% precision. Labels freeze before scoring.
+
+Sampled repositories at 70% or more: inngest-inngest-js, Effect-TS-effect, payloadcms-payload, better-auth-better-auth, triggerdotdev-trigger.dev, pingdotgg-t3code, edmundhung-conform, dmmulroy-herdr-ts-sdk, mastra-ai-mastra, formbricks-formbricks, vercel-ai, twentyhq-twenty, drizzle-team-drizzle-orm, calcom-cal.com, ts-rest-ts-rest, documenso-documenso, openstatusHQ-openstatus. Each percentage describes only the sampled hits, usually one per repository. It is not a repository-wide estimate.
+
+The dropped-hit sample contains 10 true reports out of 10. The rule follows local dependencies and compares literal input echoes. Only validated arguments count as input. Schema receivers and builder arguments do not. Imported helper bodies remain outside the analysis. Absence-only assertions, injected fakes, property tests, and contract tests are violations under the owner ruling. All ten sampled dropped reports remain violations. This exposes incomplete analysis of builder calls and transformed contract expectations.
+
+Evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+
+- Label file: `new-no-validator-output-oracle.labels.tsv`. SHA256: `6fb1a039eb42426af74985fa7b1539f6b0722a5bde430572244da51c931b6fa0`. Frozen at 2026-10-13T07:14:23.636138+00:00.
+- Label file: `dropped-no-validator-output-oracle.labels.tsv`. SHA256: `0b0572fe3c39c923a90fb93c0861f978bb49a635752e4135dea47ef16630c7a9`. Frozen at 2026-10-13T07:15:30.228863+00:00.

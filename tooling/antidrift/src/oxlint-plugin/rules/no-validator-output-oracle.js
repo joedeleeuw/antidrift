@@ -1,3 +1,4 @@
+import { hasIndependentExpectation } from "../shared/oracle-dependencies.js";
 import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
 import {
   hasRuntimeSchemaProvenance,
@@ -291,6 +292,7 @@ function parseAssertAssertion(node) {
   if (!matcher || root?.name !== "assert") return null;
   return {
     node,
+    kind: "assert",
     matcher,
     modifiers: new Set(),
     subject: node.arguments[0] ? unwrapExpression(node.arguments[0]) : null,
@@ -337,6 +339,100 @@ function functionValidatorOrigin(subject, sourceCode) {
   return origin;
 }
 
+const projectionRoots = new Set(["Array", "JSON", "Object"]);
+
+function isLocalFunction(identifier, sourceCode) {
+  const definition = findVariable(sourceCode, identifier)?.defs?.[0];
+  if (definition?.type === "FunctionName") return true;
+  const initializer = unwrapExpression(
+    constInitializer(identifier, sourceCode)
+  );
+  return (
+    initializer?.type === "ArrowFunctionExpression" ||
+    initializer?.type === "FunctionExpression"
+  );
+}
+
+function bindingSource(identifier, sourceCode) {
+  const definition = findVariable(sourceCode, identifier)?.defs?.[0];
+  if (definition?.type !== "Variable") return null;
+  if (definition.node.init) return definition.node.init;
+  const loop = definition.parent?.parent;
+  return loop?.type === "ForOfStatement" ? loop.right : null;
+}
+
+// Data an act produced: the result of a call into application or library code
+// (a response body, a signed token, a mock's recorded calls), or a binding or
+// projection of one. A schema that only reads such output leaves the assertion
+// about application behaviour.
+function isActOutput(expression, sourceCode, depth = 0) {
+  const node = unwrapExpression(expression);
+  if (!node || depth > resolutionDepthLimit) return false;
+  if (node.type === "Identifier") {
+    const source = bindingSource(node, sourceCode);
+    return Boolean(source) && isActOutput(source, sourceCode, depth + 1);
+  }
+  if (node.type === "MemberExpression") {
+    return isActOutput(node.object, sourceCode, depth + 1);
+  }
+  if (node.type !== "CallExpression") return false;
+  const callee = unwrapExpression(node.callee);
+  const forwardsArguments =
+    (callee?.type === "MemberExpression" &&
+      projectionRoots.has(rootIdentifier(callee)?.name)) ||
+    (callee?.type === "Identifier" && isLocalFunction(callee, sourceCode));
+  return forwardsArguments
+    ? node.arguments.some((argument) =>
+        isActOutput(argument, sourceCode, depth + 1)
+      )
+    : true;
+}
+
+function validatedArguments(origin, sourceCode) {
+  return origin.arguments.filter(
+    (argument) => !hasRuntimeSchemaProvenance(argument, sourceCode)
+  );
+}
+
+// The validated value is whichever argument is not the schema: `parse(raw)`,
+// valibot's `parse(Schema, raw)` and superstruct's `assert(raw, Schema)`.
+function validatesArrangedInput(origin, sourceCode) {
+  return validatedArguments(origin, sourceCode).every(
+    (argument) => !isActOutput(argument, sourceCode)
+  );
+}
+
+const acceptanceFields = new Set(["error", "issues", "success"]);
+
+function readsAcceptanceField(subject, origin) {
+  for (let node = unwrapExpression(subject); node && node !== origin; ) {
+    if (node.type !== "MemberExpression") return false;
+    if (acceptanceFields.has(staticPropertyName(node))) return true;
+    node = unwrapExpression(node.object);
+  }
+  return false;
+}
+
+// A schema that reads act output leaves an assertion about application
+// behaviour only when the assertion compares the parsed output with an
+// expected value of its own. A matcher with no expected value, a read of the
+// validator's success or error result, or an expected value built from the
+// validated input only proves that the schema accepts or round-trips it.
+function comparesWithOwnExpectation(record, origin, sourceCode) {
+  const expected =
+    record.kind === "assert"
+      ? record.node.arguments.slice(1)
+      : record.node.arguments;
+  if (expected.length === 0 || readsAcceptanceField(record.subject, origin)) {
+    return false;
+  }
+  return hasIndependentExpectation(
+    validatedArguments(origin, sourceCode),
+    expected,
+    sourceCode
+  );
+}
+
 function assertionFinding(record, sourceCode) {
   if (!record.subject) return null;
   if (throwMatchers.has(record.matcher)) {
@@ -347,9 +443,14 @@ function assertionFinding(record, sourceCode) {
   }
   const origin = validatorOrigin(record.subject, sourceCode);
   if (!origin) return null;
-  return record.modifiers.has("rejects")
-    ? "validatorThrowOracle"
-    : "validatorOutputOracle";
+  if (record.modifiers.has("rejects")) return "validatorThrowOracle";
+  if (
+    !validatesArrangedInput(origin, sourceCode) &&
+    comparesWithOwnExpectation(record, origin, sourceCode)
+  ) {
+    return null;
+  }
+  return "validatorOutputOracle";
 }
 
 export default function ruleNoValidatorOutputOracle() {
@@ -358,14 +459,14 @@ export default function ruleNoValidatorOutputOracle() {
       type: "problem",
       docs: {
         description:
-          "Disallow assertions whose oracle is runtime-validator output",
+          "Require expected values that do not come from the validated input or application output.",
       },
       schema: [],
       messages: {
         validatorOutputOracle:
-          "This assertion targets runtime-validator output rather than application behavior. Tip: checking parsed body or payload shapes is often a sign of a low-value test. Assert observable application behavior or remove the test.",
+          "This assertion checks validator output without an independent expected value. Assert application behavior against a value that does not come from the input or output.",
         validatorThrowOracle:
-          "This assertion only proves that a runtime validator accepts or rejects input. Tip: checking parsed body or payload shapes is often a sign of a low-value test. Assert observable application behavior or remove the test.",
+          "This assertion only checks whether a validator accepts input. Assert application behavior or remove the test.",
       },
     },
     create(context) {

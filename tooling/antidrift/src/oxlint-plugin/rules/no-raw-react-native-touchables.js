@@ -77,6 +77,11 @@ function isAllowedFile(filename, allowedFiles) {
   );
 }
 
+// Example apps and tests exercise the raw primitives on purpose; the shared
+// Touchable is an application's concern.
+const outsideApplicationPath =
+  /(?:^|\/)(?:examples?|__tests__)\/|\.(?:test|spec)\.[cm]?[jt]sx?$/u;
+
 function sourceName(node) {
   return typeof node.source?.value === "string" ? node.source.value : null;
 }
@@ -183,7 +188,11 @@ export default function ruleNoRawReactNativeTouchables() {
     },
     create(context) {
       const options = normalizedOptions(context.options?.[0]);
-      if (isAllowedFile(contextFilename(context), options.allowedFiles)) {
+      const filename = contextFilename(context);
+      if (
+        isAllowedFile(filename, options.allowedFiles) ||
+        outsideApplicationPath.test(normalizedPath(filename))
+      ) {
         return {};
       }
 
