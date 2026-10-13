@@ -78,6 +78,7 @@ export function delegatedCall(node, identifier) {
     } else return null;
   }
   if (
+    !call ||
     !isComposedCall(call) ||
     (call.callee.type === "Identifier" && call.callee.name === identifier.name)
   ) {
