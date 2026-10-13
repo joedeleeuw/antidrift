@@ -1,12 +1,16 @@
 # no-wrapping-functions
 
-Status: implemented as two stages; registered off in both presets until a fresh measurement on the current engine reaches 70% in three repositories.
+Status: implemented as two stages; the typed stage is an error in the typed ESLint preset and the Oxlint preset does not run the syntax stage.
 
 ## Two-stage design (October 13, 2026)
 
 Stage 1 is the portable syntax rule (`src/oxlint-plugin/portable/no-wrapping-functions.js`). It now also treats composed calls, template literals and object or array literals built from forwarded values as candidates, as the owner's ruling states. Stage 2 is the typed ESLint rule (`src/eslint-plugin/rules/no-wrapping-functions.js`). For each candidate it inlines the body at every reference in memory, deletes the function and its import specifiers, adds the imports the body needs, re-checks only the edited files with the TypeScript checker, and reports only verified hops. A candidate is kept as an owner when a declared type, overload or default export needs the function, when any reference is not a direct call, when the package entry points export it, or when it binds a literal and is called from two or more modules. A package entry that does not map to a source through the package's declared build leaves the surface unresolved, so exported functions in that package are not reported. Hazards reject the candidate: a parameter used other than exactly once in order, spread or extra call arguments, a call type that changes, a free name that resolves to another binding at a call site, and any diagnostic the edit introduces. `typescript-engine.js` owns every program, checker and language-service call; `package-entry-points.js` reads package manifests and build declarations; `hop-inline-verification.js` holds the owner table and the edit plan. The raw TypeScript checker and language service are sufficient, so no ts-morph dependency is added.
 
-The Oxlint preset turns the syntax stage off: Oxlint has no types and sees one file, so its report would restore the false positives the typed stage rejects. The first engine round measured 27/30 on 4,433 verified hops (9,423 stage-1 candidates) in 59 repositories; the engine changed after that round, so that score is superseded.
+The Oxlint preset turns the syntax stage off: Oxlint has no types and sees one file, so its report would restore the false positives the typed stage rejects.
+
+## Fresh engine measurement on October 13, 2026
+
+The scan covers commit `8cf0d0a` over 59 repositories: 39 installed oss-corpus repositories and 20 agent-written applications. Files are grouped by the tsconfig that includes them. Stage 1 alone reports 10,081 candidates in 54 repositories; stages 1 and 2 report 4,496 verified hops in 50 repositories. A hit-weighted sample (seed 2026101322, at most 3 per repository, every earlier sampled location excluded) contains 30 hits from 17 repositories. Source review labels 29 true, for 97% precision, with 16 repositories at 70% or more. Labels froze before scoring (`labels.tsv`, SHA256 `05a17c54f32a85e569e118f3507bae92d09f865e638d04cf890a2c524631f577`). The false report is a write accessor that owns a module-private Set paired with its reader. Of 31 earlier true labels, stage 2 reports 14 and drops 17: package entry exports, identity references, literals bound across modules, an overload, unresolved surfaces and missing call sites, as the owner table directs. It reports none of the 9 earlier false labels. Verification takes a median of 36.7 ms per candidate (p90 375 ms, maximum 20.2 s); the largest repository peaks at 7.2 GB resident. An earlier engine round of 27/30 is superseded. Evidence remains in the shape-attempts hop-engine lane directory.
 
 ## Policy decision
 

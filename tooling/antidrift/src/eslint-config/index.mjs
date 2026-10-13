@@ -94,7 +94,7 @@ export function createConfig({
         "antidrift/require-convex-return-validator": "error",
         "antidrift/no-explicit-type-arguments-on-owned-api": "error",
         "antidrift/no-schema-validator-transcoding": "error",
-        "antidrift/no-wrapping-functions": "off",
+        "antidrift/no-wrapping-functions": "error",
         "antidrift/no-redundant-local-return-type": "off",
         "antidrift/no-sql-string-concat": "off",
         ...ratchetedRules,

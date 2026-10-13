@@ -108,7 +108,7 @@ Current default-off custom rules:
 
 Ready rules can be default-on while remaining `stable: false`. The current non-stable default-on set includes `antidrift/no-appeasement-cast`, `antidrift/no-nullable-positional-tuple`, `antidrift/no-structural-type-fork`, `antidrift/no-canonical-model-fork`, and `antidrift/no-static-property-loop`. Their remaining evidence work gates stable promotion, not present blocking severity.
 
-`antidrift/no-wrapping-functions` is `under-proven` and default-off: the typed stage reports only hops whose inline the TypeScript program verifies, and it stays off until a fresh measurement on the current engine reaches 70% in three repositories. Exports and named arrows are included; anonymous inline callbacks and computations are outside the rule. See [the scope and evidence](rule-investigations/no-wrapping-functions.md). This does not reopen the retired typed-return rule.
+`antidrift/no-wrapping-functions` is `ready` and an error in the typed ESLint preset: it reports only hops whose inline the TypeScript program verifies, and a fresh frozen sample scored 29/30 with 16 repositories at 70% or more. Exports and named arrows are included; anonymous inline callbacks and computations are outside the rule. See [the scope and evidence](rule-investigations/no-wrapping-functions.md). This does not reopen the retired typed-return rule.
 
 ## External Ownership States
 

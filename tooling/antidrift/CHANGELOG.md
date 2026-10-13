@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `no-wrapping-functions` becomes two stages. The portable syntax rule supplies candidates, now including composed calls and bound literals. A typed ESLint rule inlines each candidate at every reference in memory, applies the owner table and hazard checks, re-checks the edited files, and reports only verified hops. The Oxlint preset no longer runs the syntax stage, and the typed preset registers the rule off until a fresh measurement on the current engine reaches 70% in three repositories.
+- `no-wrapping-functions` becomes two stages. The portable syntax rule supplies candidates, now including composed calls and bound literals. A typed ESLint rule inlines each candidate at every reference in memory, applies the owner table and hazard checks, re-checks the edited files, and reports only verified hops. The Oxlint preset no longer runs the syntax stage. A fresh frozen sample on the current engine scored 29/30 with 16 repositories at 70% or more, so the typed preset enables the rule at error.
 
 - `unknown-input-must-be-decoded` now requires a declared unknown receiving point. It skips casts that manufacture unknown and decoder functions that assert a type for the same parameter. The assertion-only version regressed to 19,903 hits and 0/20 precision. The provenance fix scores 7/20 on 1,920 hits. The rule is now default-off and marked false-positive-prone. The investigation retains the regression as superseded history.
 - `no-appeasement-cast` now reports inline double casts through unknown when the target is a named object type.

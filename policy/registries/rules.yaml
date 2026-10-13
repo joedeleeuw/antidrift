@@ -374,7 +374,7 @@ policyRuleReviews:
     directive: G10
     status: active-custom
     antidriftRule: antidrift/no-wrapping-functions
-    coverage: Typed ESLint rule that reports only engine-verified hops; registered off until a fresh measurement on current code clears the bar. The Oxlint preset does not run the syntax stage.
+    coverage: Typed ESLint rule at error that reports only engine-verified hops. The Oxlint preset does not run the syntax stage.
     reason: The owner explicitly chose this as a style policy on September 8, 2026. Exporting or naming a wrapper does not exempt it.
     nextAction: Keep enabled by default and preserve actual callback timing and boundary contracts when removing wrappers.
   arch/max-function-lines:
@@ -2958,9 +2958,9 @@ rules:
 
   antidrift/no-wrapping-functions:
     directive: G10
-    status: under-proven
+    status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     signal: Portable AST candidates verified by executing the inline at every reference in the TypeScript program
     solveType: no-wrapping-functions
     proofBuckets: [local-ast-source-shape]
@@ -2968,8 +2968,9 @@ rules:
     corpusRepositories: [homer, chatbiz-webapp]
     concerns:
       - "Two-corpus precision check (October 2026; 84 TypeScript roots): 2,256 hits in 52 repositories, 9/18 on the first frozen sample once an artifact-snapshot hit and a semgrep test input are removed. A narrowing to calls that forward only the function's own parameters (1,118 hits, a fresh sample 12/20) was reverted: it dropped partial applications and thunks over module values, which the directive names as hops and the frozen labels marked true. A fresh sample of the rule as it stands measured 7/20. False positives are handlers and listeners that bind a value or need a stable identity, accessors over module-owned state, functions that own a format, message or predicate, and a framework-required export. Below the 70% bar."
-      - "Two stages (October 13, 2026): the portable syntax rule supplies candidates, including composed calls and bound literals; the typed ESLint rule inlines each candidate in memory at every reference, applies the owner table (contracts, identity references, package entry exports, literals bound across two or more modules), checks argument order and duplication, call-site type identity and binding identity, re-checks only the edited files, and reports only verified hops. A first engine round scored 27/30 on 4,433 verified hops in 47 repositories; the engine changed after that round, so the score is superseded and no fresh score exists for the current code."
-      - The Oxlint preset no longer runs the syntax stage, because Oxlint has no types and its report would restore the false positives the typed stage rejects. The typed preset registers the rule off until a fresh frozen sample on current code reaches 70% in three repositories.
+      - "Two stages (October 13, 2026): the portable syntax rule supplies candidates, including composed calls and bound literals; the typed ESLint rule inlines each candidate in memory at every reference, applies the owner table (contracts, identity references, package entry exports resolved per entry through the declared build, literals bound across two or more modules), checks argument order and duplication, call-site type identity and binding identity, re-checks only the edited files, and reports only verified hops."
+      - "Fresh measurement on commit 8cf0d0a over 59 repositories: 10,081 stage-1 candidates, 4,496 verified hops in 50 repositories; a capped sample of 30 scored 29/30 with 16 repositories at 70% or better (labels sha256 05a17c54f32a85e569e118f3507bae92d09f865e638d04cf890a2c524631f577). The false report is a write accessor that owns module-private state. An earlier round of 27/30 is superseded."
+      - The Oxlint preset does not run the syntax stage, because Oxlint has no types and its report would restore the false positives the typed stage rejects.
     external:
       state: net-antidrift
       support: none
@@ -2985,7 +2986,7 @@ rules:
       allows:
         - "const area = (radius) => Math.PI * radius ** 2;"
         - "button.onClick(() => owner.load(id));"
-    nextAction: Rescan the corpus on the current engine, label a fresh capped sample from printed source, freeze it, and enable the typed stage at error only if it reaches 70% in three repositories.
+    nextAction: Keep the typed stage at error in the typed preset. Known gaps are module mocks that replace an export by name and fixtures whose module identity a test asserts.
 
   antidrift/no-tutorial-comments:
     status: ready
