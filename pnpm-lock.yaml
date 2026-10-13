@@ -247,6 +247,9 @@ importers:
       yaml:
         specifier: ^2.6.1
         version: 2.9.0
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
     devDependencies:
       "@tanstack/react-query":
         specifier: ^5.101.4
@@ -278,9 +281,6 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.19)
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
 
 packages:
   "@babel/code-frame@7.29.7":

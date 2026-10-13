@@ -2366,17 +2366,20 @@ rules:
     stable: false
     defaultOff: true
     directive: G4
-    signal: TypeScript traces an asserted unknown value to an explicitly unknown receiving declaration.
+    signal: Checker provenance and local flow connect untrusted platform, dependency, and exported contract input to an unchecked cast or typed use.
     solveType: unknown-input-decoding
-    proofBuckets: [local-ast-source-shape]
+    proofBuckets: [semantic-source-type-provenance]
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: The shared boundary-model.mjs owner is an internal checker adapter. Its public adapter manifest registration remains pending while corpus precision is below the readiness threshold; both future parse-rule consumers can import the same owner directly.
     referenceDoc: docs/rule-investigations/unknown-input-must-be-decoded.md
     corpusRepositories: [antidrift]
     concerns:
       - "Superseded October 12, 2026 study. Before narrowing, 1,793 hits in 46 repositories scored 8/20. After the object-field and serialization changes, 1,526 hits in 45 repositories scored 10/20. Both samples fell below 70%. The later assertion-only rule regressed on the fresh corpus to 19,903 hits and 0/20, compared with 4,238 old-rule hits. The owner now requires input provenance."
       - TypeScript services are required. Missing services produce an error.
-      - The root must be an explicitly unknown parameter, catch binding, or declared reader result. Local aliases retain that root.
-      - A type predicate or assertion function on the same parameter counts as the decoder. Values narrowed by guards stay clean.
-      - Inline casts that manufacture unknown belong to no-appeasement-cast.
+      - Roots combine declaration ownership with any/unknown payload signatures; exported unknown parameters supply explicit first-party contracts.
+      - Decoder signatures accept unknown/any and return typed output, a checked Result, or a predicate/assertion over that argument. Explicit self-decoder contracts are exempt; inferred casts are not evidence.
+      - Aliases, assignments, destructuring, property access and await retain roots. Constant inputs, round trips and expect matchers have no exemptions.
       - All assertion targets count, including primitive types and inline object types.
       - The rule overlaps with no-appeasement-cast but also covers unnamed targets and angle-bracket assertions.
     external:
@@ -2392,13 +2395,13 @@ rules:
       whyNotOtherState: "Not ecosystem-covered because no maintained rule requires an explicitly unknown input to flow through a decoder before use."
     examples:
       flags:
-        - "function receive(input: unknown) { return input as Message; }"
-        - "function receive(input: unknown) { return <string>input; }"
+        - "export function receive(input: unknown) { return input as Message; }"
+        - "export function receive(input: unknown) { return <string>input; }"
       allows:
         - "function receive(input: unknown) { return messageSchema.parse(input); }"
         - 'function receive(input: unknown) { if (typeof input === "string") return input; }'
         - "function format(error: unknown) { return String(error); }"
-    nextAction: Keep this rule default-off. The provenance fix scores 7/20 on 1,920 hits in 29 repositories. Internal unknown parameters still cause false reports. Combining the cast rules remains an open owner decision.
+    nextAction: Keep this rule default-off. The shared boundary model passes package controls but scores 16/30 (53.3%) on a fresh frozen sample across 11 repositories. Resolve local construction, broad callback and rest signatures, and checked generic decode provenance before remeasurement.
 
   antidrift/no-convex-return-widening:
     status: ready

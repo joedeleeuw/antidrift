@@ -1,64 +1,9 @@
 import ts from "typescript";
+import { boundaryModel } from "../../semantic-adapters/boundary-model.mjs";
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
 } from "./type-services.js";
-
-function declaresUnknown(annotation, checker) {
-  return Boolean(
-    annotation &&
-    checker.getTypeFromTypeNode(annotation).flags & ts.TypeFlags.Unknown
-  );
-}
-
-function decodesParameter(parameter) {
-  const predicate = parameter.parent.type;
-  return Boolean(
-    predicate &&
-    ts.isTypePredicateNode(predicate) &&
-    ts.isIdentifier(predicate.parameterName) &&
-    ts.isIdentifier(parameter.name) &&
-    predicate.parameterName.text === parameter.name.text
-  );
-}
-
-function receivesUnknown(expression, checker, visited) {
-  if (visited.has(expression)) return false;
-  visited.add(expression);
-  if (
-    ts.isParenthesizedExpression(expression) ||
-    ts.isAwaitExpression(expression)
-  ) {
-    return receivesUnknown(expression.expression, checker, visited);
-  }
-  if (ts.isCallExpression(expression)) {
-    const declaration = checker.getResolvedSignature(expression)?.declaration;
-    if (!declaration?.type) return false;
-    const declared = checker.getTypeFromTypeNode(declaration.type);
-    const received = checker.getAwaitedType(declared);
-    return Boolean(received && received.flags & ts.TypeFlags.Unknown);
-  }
-  if (!ts.isIdentifier(expression)) return false;
-  const declarations = checker.getSymbolAtLocation(expression)?.declarations;
-  return Boolean(
-    declarations?.some((declaration) => {
-      if (ts.isParameter(declaration)) {
-        return (
-          declaresUnknown(declaration.type, checker) &&
-          !decodesParameter(declaration)
-        );
-      }
-      if (!ts.isVariableDeclaration(declaration)) return false;
-      if (ts.isCatchClause(declaration.parent)) {
-        return declaresUnknown(declaration.type, checker);
-      }
-      return Boolean(
-        declaration.initializer &&
-        receivesUnknown(declaration.initializer, checker, visited)
-      );
-    })
-  );
-}
 
 export default function ruleUnknownInputMustBeDecoded() {
   return {
@@ -66,12 +11,12 @@ export default function ruleUnknownInputMustBeDecoded() {
       type: "problem",
       docs: {
         description:
-          "Require decoding before a type assertion replaces a declared unknown input.",
+          "Require decoding before untrusted input reaches a cast or typed use.",
       },
       schema: [],
       messages: {
         decodeUnknown:
-          "This assertion gives a declared unknown input an unchecked type. Decode or narrow the input first.",
+          "Untrusted input reaches a typed use without a dominating decode. Decode it at the receiving boundary.",
       },
     },
     create(context) {
@@ -83,16 +28,72 @@ export default function ruleUnknownInputMustBeDecoded() {
         );
       }
       const checker = services.program.getTypeChecker();
-      function check(node) {
-        const operand = services.esTreeNodeToTSNodeMap.get(node.expression);
-        if (
-          checker.getTypeAtLocation(operand).flags & ts.TypeFlags.Unknown &&
-          receivesUnknown(operand, checker, new Set())
-        ) {
-          context.report({ node, messageId: "decodeUnknown" });
+      const model = boundaryModel(services.program);
+      const reported = new Set();
+      function check(node, expression, target) {
+        if (reported.has(node) || !model.unchecked(expression, target).length) {
+          return;
         }
+        reported.add(node);
+        context.report({ node, messageId: "decodeUnknown" });
       }
-      return { TSAsExpression: check, TSTypeAssertion: check };
+      function assertion(node) {
+        const expression = services.esTreeNodeToTSNodeMap.get(node);
+        check(
+          node,
+          expression.expression,
+          checker.getTypeAtLocation(expression)
+        );
+      }
+      return {
+        TSAsExpression: assertion,
+        TSTypeAssertion: assertion,
+        VariableDeclarator(node) {
+          const declaration = services.esTreeNodeToTSNodeMap.get(node);
+          if (declaration.type && declaration.initializer) {
+            check(
+              node,
+              declaration.initializer,
+              checker.getTypeFromTypeNode(declaration.type)
+            );
+          }
+        },
+        AssignmentExpression(node) {
+          const assignment = services.esTreeNodeToTSNodeMap.get(node);
+          check(
+            node,
+            assignment.right,
+            checker.getTypeAtLocation(assignment.left)
+          );
+        },
+        CallExpression(node) {
+          const call = services.esTreeNodeToTSNodeMap.get(node);
+          const signature = checker.getResolvedSignature(call);
+          if (!signature || model.decode(call)) return;
+          for (const [index, argument] of call.arguments.entries()) {
+            const parameter = signature.parameters[index];
+            if (parameter) {
+              check(
+                node.arguments[index],
+                argument,
+                checker.getTypeOfSymbolAtLocation(parameter, call)
+              );
+            }
+          }
+        },
+        ReturnStatement(node) {
+          if (!node.argument) return;
+          const statement = services.esTreeNodeToTSNodeMap.get(node);
+          let owner = statement.parent;
+          while (owner && !ts.isFunctionLike(owner)) owner = owner.parent;
+          if (!owner?.type) return;
+          check(
+            node,
+            statement.expression,
+            checker.getAwaitedType(checker.getTypeFromTypeNode(owner.type))
+          );
+        },
+      };
     },
   };
 }
