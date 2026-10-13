@@ -214,11 +214,12 @@ function surfaceOf(program, directory) {
     readFileSync(posix.join(directory, "package.json"), "utf8")
   );
   const entries = packageEntries(manifest, directory);
-  if (entries.length === 0) return { targets: new Set() };
+  if (entries.length === 0) return { targets: new Set(), unresolved: [] };
   const build = declaredBuild(manifest, directory);
   const sources = packageSources(program, directory);
   const outputs = compilerOutputs(sources, build.compilerConfigs);
   const resolved = new Set();
+  const unresolved = [];
   for (const entry of entries) {
     const matched = entrySources(
       entry,
@@ -227,10 +228,10 @@ function surfaceOf(program, directory) {
       build.inputs,
       directory
     );
-    if (matched.length === 0) return { unresolved: entry };
+    if (matched.length === 0) unresolved.push(entry);
     for (const sourceFile of matched) resolved.add(sourceFile);
   }
-  return { targets: moduleExportTargets(program, resolved) };
+  return { targets: moduleExportTargets(program, resolved), unresolved };
 }
 
 export function publicSurfaceReason(program, nameNode) {
@@ -242,10 +243,10 @@ export function publicSurfaceReason(program, nameNode) {
     surfaces.set(directory, surfaceOf(program, directory));
   }
   const surface = surfaces.get(directory);
-  if (surface.unresolved) {
-    return `public surface unresolved: entry ${surface.unresolved} maps to no source through the package build`;
+  if (surface.targets.has(exportTarget(program, nameNode))) {
+    return "exported from the package entry points";
   }
-  return surface.targets.has(exportTarget(program, nameNode))
-    ? "exported from the package entry points"
+  return surface.unresolved.length > 0
+    ? `public surface unresolved: entry ${surface.unresolved[0]} maps to no source through the package build`
     : null;
 }
