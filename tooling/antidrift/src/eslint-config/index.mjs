@@ -95,7 +95,8 @@ export function createConfig({
         "antidrift/require-convex-return-validator": "error",
         "antidrift/no-explicit-type-arguments-on-owned-api": "error",
         "antidrift/no-schema-validator-transcoding": "error",
-        "antidrift/no-restated-dependency-type": "off",
+        "antidrift/no-restated-dependency-type": "error",
+        "antidrift/no-unresolved-dependency-types": "error",
         "antidrift/no-wrapping-functions": "error",
         "antidrift/no-redundant-local-return-type": "off",
         "antidrift/no-sql-string-concat": "off",
@@ -116,7 +117,7 @@ export function createConfig({
       files: ["**/package.json"],
       language: "json/json",
       plugins: { json, antidrift: aiPolicy },
-      rules: { "antidrift/no-restated-dependency-type": "off" },
+      rules: { "antidrift/no-unresolved-dependency-types": "error" },
     }
   );
 }

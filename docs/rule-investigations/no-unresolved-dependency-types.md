@@ -1,0 +1,24 @@
+# no-unresolved-dependency-types
+
+Report declared dependencies and imports whose type declarations do not resolve, because their exported types cannot be compared with first-party types.
+
+`no-restated-dependency-type` compares first-party object types with the exports of declared dependencies. Where those exports cannot be read, that comparison is silently incomplete. This rule owns the gap and runs on its own, so a consumer of `createConfig()` gets every gap report whether or not the restatement rule is enabled. The preset enables it at error in the TypeScript block and in a `**/package.json` block that uses ESLint's JSON language from `@eslint/json`.
+
+Dependencies are the keys of `dependencies`, `devDependencies` and `peerDependencies`. A dependency is found in node_modules or, failing that, through module resolution under the governing tsconfig when the resolved package's manifest has the dependency's name.
+
+On a `package.json`, the rule reports a dependency key, once per declaring manifest, when:
+
+- the dependency is found by neither lookup; or
+- the dependency is a workspace or linked package, whose real path lies outside node_modules, and one of its public entries is not decided. Each entry of the `exports` map whose targets include a script module (an extension of `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts`, or none) must resolve to type declarations from the declaring package; a plain JavaScript target with no adjacent declarations, or an unbuilt `dist`, does not. A wildcard entry is decided when its script targets match files in the package that the entry governs under Node's pattern precedence, so subpaths a more specific `null` pattern blocks, such as `./internal/*`, are not entries; a wildcard that matches no file, such as `./*` → `./dist/*.js` before a build, is reported. Without an `exports` map, the root entry exists when `types`, `typings` or `main` is declared or an `index` script file exists, and must resolve the same way. Entries whose targets are all non-script assets, such as `./styles.css`, or `null`, publish no type owners and are decided.
+
+An installed registry artifact, whose real path lies under node_modules (the pnpm store included), is immutable published output. A dangling types target there publishes no owners at that entry, so its key is not reported (owner ruling); effect@3.22.1's `./.index` export, whose `dist/dts/.index.d.ts` is absent, is the recorded case.
+
+On TypeScript files, the rule reports the module specifier of each import, export, require, dynamic import and import type of a declared package when the package is not installed, or when the package is installed and a script-module specifier does not resolve to type declarations. Binding imports are checked through the checker's module symbol, and `require` in TypeScript files through module resolution to type declarations. A side-effect import such as `import "pkg/extra"` binds nothing, so it is satisfied by any module the subpath resolves to and reported when the subpath is dangling; `import "server-only"`, a JavaScript-only marker, is not reported. An import of an asset subpath such as `pkg/styles.css` carries no type owners and is not checked.
+
+The rule requires TypeScript parser services on TypeScript files. Missing services produce an error.
+
+## Measurement on October 14, 2026
+
+The shipped lint population of 39 installed oss-corpus repositories, with 3,157 `package.json` files linted, gives 4,499 missing-package reports on manifest keys, 3,961 at import sites, 3,635 unresolved workspace-entry reports on manifest keys and 52,344 unresolved imports of installed packages, most of them imports of unbuilt workspace packages such as `twenty-shared/utils`. The 20 agent-written repositories give 8, 18, 6 and 7. The preset's `**/fixtures/**` ignore hides 4,377 further gap reports.
+
+A hit-weighted sample capped at 3 per repository, seed 2026101408, holds 24 reports from 12 repositories. Source review labels 22 real gaps: missing packages, unbuilt workspace `dist` or `build` output, and a workspace `main` that points at an unbuilt file. The two false reports listed Effect's subpaths that `null` export patterns block as entries, and reported `import "server-only"`, a side-effect import of an existing JavaScript-only marker. Both were fixed after the labels were frozen; a rescan drops exactly those two sampled reports and keeps the other 22, and the counts above are from that rescan. Label file `labels-no-unresolved-dependency-types.tsv`, SHA256 `4d87452d3338aa32b27076c1035f7fa0041505afdf795ed587e6cf71574a893f`. Evidence is at `/home/joedeleeuw/.local/state/lanes/shape-attempts/claude-combined/round4`.

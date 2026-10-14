@@ -3,7 +3,7 @@ import ts from "typescript";
 import {
   declaresGenerated,
   packageDirectory,
-  sameObjectShape,
+  shapeComparison,
 } from "../../semantic-adapters/shape-identity.mjs";
 import { inlineStructuralTypeAtBoundary } from "../../semantic-adapters/local-ast-rules.mjs";
 import {
@@ -81,6 +81,44 @@ function compiledDeclarations(program) {
   );
 }
 
+function derivesFrom(owner, declaration, checker) {
+  const target = declaration.getSourceFile();
+  const visited = new Set([owner]);
+  const pending = [owner];
+  while (pending.length > 0) {
+    const node = pending.pop();
+    const symbol = ts.isIdentifier(node)
+      ? checker.getSymbolAtLocation(node)
+      : undefined;
+    const referenced =
+      symbol && symbol.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(symbol)
+        : symbol;
+    for (const reference of referenced?.declarations ?? []) {
+      if (
+        reference.getSourceFile() === target &&
+        reference.pos <= declaration.pos &&
+        declaration.end <= reference.end
+      ) {
+        return true;
+      }
+      if (
+        (ts.isTypeAliasDeclaration(reference) ||
+          ts.isInterfaceDeclaration(reference)) &&
+        !reference.getSourceFile().isDeclarationFile &&
+        !visited.has(reference)
+      ) {
+        visited.add(reference);
+        pending.push(reference);
+      }
+    }
+    ts.forEachChild(node, (child) => {
+      pending.push(child);
+    });
+  }
+  return false;
+}
+
 function programDeclarations(program) {
   const cached = declarationsByProgram.get(program);
   if (cached) return cached;
@@ -132,25 +170,14 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
         description:
           "Require reuse when a boundary parameter repeats an existing object type.",
       },
-      schema: [
-        {
-          type: "object",
-          properties: {
-            fixtureFiles: {
-              type: "array",
-              items: { type: "string" },
-              uniqueItems: true,
-            },
-          },
-          required: ["fixtureFiles"],
-          additionalProperties: false,
-        },
-      ],
+      schema: [],
       messages: {
         named:
           "This parameter repeats {{name}} at {{location}}. Use that named type.",
         repeated:
           "This parameter repeats the inline type at {{location}}. Give the shared type one name and reuse it.",
+        undecided:
+          "Whether this parameter repeats the type at {{location}} is undecided because the comparison reached an unresolved type.",
       },
     },
     create(context) {
@@ -162,11 +189,7 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
         );
       }
       const checker = services.program.getTypeChecker();
-      const fixtureFiles = new Set(
-        context.options
-          .flatMap((options) => options.fixtureFiles)
-          .map((filename) => resolve(context.cwd, filename))
-      );
+      const sameShape = shapeComparison(services.program);
       return {
         TSTypeLiteral(node) {
           if (
@@ -184,27 +207,41 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
           );
           const candidates =
             programDeclarations(services.program).get(key) ?? [];
-          const matches = candidates.filter(
-            (candidate) =>
-              candidate.node !== declaration &&
-              !fixtureFiles.has(
-                resolve(candidate.node.getSourceFile().fileName)
-              ) &&
-              (candidate.name ||
-                (packageRoot !== null &&
-                  candidate.packageRoot === packageRoot)) &&
-              sameObjectShape(type, candidate.type, services.program)
-          );
+          const verdicts = candidates
+            .filter(
+              (candidate) =>
+                candidate.node !== declaration &&
+                (candidate.name ||
+                  (packageRoot !== null &&
+                    candidate.packageRoot === packageRoot))
+            )
+            .map((candidate) => ({
+              candidate,
+              verdict: sameShape(type, candidate.type),
+            }))
+            .filter(
+              ({ candidate, verdict }) =>
+                verdict !== false &&
+                !derivesFrom(candidate.node, declaration, checker)
+            );
+          const matches = verdicts
+            .filter(({ verdict }) => verdict === true)
+            .map(({ candidate }) => candidate);
           const existing =
-            matches.find((candidate) => candidate.name) ?? matches[0];
+            matches.find((candidate) => candidate.name) ??
+            matches[0] ??
+            verdicts.find(({ verdict }) => verdict === null)?.candidate;
           if (!existing) return;
           const source = existing.node.getSourceFile();
           const line =
             source.getLineAndCharacterOfPosition(existing.node.getStart(source))
               .line + 1;
+          let messageId = "repeated";
+          if (matches.length === 0) messageId = "undecided";
+          else if (existing.name) messageId = "named";
           context.report({
             node,
-            messageId: existing.name ? "named" : "repeated",
+            messageId,
             data: {
               name: existing.name,
               location: `${relative(context.cwd, source.fileName)}:${line}`,

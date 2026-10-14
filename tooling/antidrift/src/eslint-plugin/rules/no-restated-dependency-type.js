@@ -1,8 +1,14 @@
-import { dirname, join, relative } from "node:path";
+import { join } from "node:path";
 import ts from "typescript";
 import {
+  declaredDependencies,
+  dependencyManifest,
+  importedName,
+  publicEntries,
+} from "../../semantic-adapters/declared-dependencies.mjs";
+import {
   packageDirectory,
-  sameObjectShape,
+  shapeComparison,
 } from "../../semantic-adapters/shape-identity.mjs";
 import {
   missingTypeServicesVisitors,
@@ -10,185 +16,17 @@ import {
 } from "./type-services.js";
 
 const inventoryByProgram = new WeakMap();
-const manifestDependencyFields = [
-  "dependencies",
-  "devDependencies",
-  "peerDependencies",
-];
-const installedArtifact = /(?:^|[/\\])node_modules[/\\]/u;
 const ownerSymbols = ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias;
-const typedExtensions = new Set([
-  ts.Extension.Dts,
-  ts.Extension.Dmts,
-  ts.Extension.Dcts,
-  ts.Extension.Ts,
-  ts.Extension.Tsx,
-  ts.Extension.Mts,
-  ts.Extension.Cts,
-]);
-
-function readManifest(filename) {
-  try {
-    return JSON.parse(ts.sys.readFile(filename));
-  } catch (error) {
-    throw new Error(`${filename} is not a readable JSON package manifest`, {
-      cause: error,
-    });
-  }
-}
-
-function resolvedManifest(directory, name, options) {
-  const resolved = ts.resolveModuleName(
-    name,
-    join(directory, "package.json"),
-    options,
-    ts.sys
-  ).resolvedModule;
-  const resolvedRoot = resolved && packageDirectory(resolved.resolvedFileName);
-  if (!resolvedRoot) return null;
-  const manifestPath = join(resolvedRoot, "package.json");
-  return readManifest(manifestPath).name === name ? manifestPath : null;
-}
-
-function dependencyManifest(directory, name) {
-  let current = directory;
-  while (
-    !ts.sys.fileExists(join(current, "node_modules", name, "package.json"))
-  ) {
-    const parent = dirname(current);
-    if (parent === current) return null;
-    current = parent;
-  }
-  return join(current, "node_modules", name, "package.json");
-}
-
-function exportTargets(entry) {
-  if (typeof entry === "string") return [entry];
-  if (!entry || typeof entry !== "object") return [];
-  return Object.values(entry).flatMap(exportTargets);
-}
-
-function publicEntries(name, manifestPath) {
-  const manifest = readManifest(manifestPath);
-  if (!manifest.exports) return [name];
-  const exports =
-    typeof manifest.exports === "object" &&
-    !Array.isArray(manifest.exports) &&
-    Object.keys(manifest.exports).some((key) => key.startsWith("."))
-      ? manifest.exports
-      : { ".": manifest.exports };
-  const entries = new Set();
-  const packageRoot = dirname(manifestPath);
-  for (const [entry, target] of Object.entries(exports)) {
-    if (!target) continue;
-    if (!entry.includes("*")) {
-      entries.add(entry === "." ? name : name + entry.slice(1));
-      continue;
-    }
-    for (const filename of ts.sys.readDirectory(
-      packageRoot,
-      [".ts", ".mts", ".cts"],
-      ["node_modules"]
-    )) {
-      for (const pattern of exportTargets(target)) {
-        if (!pattern.includes("*")) continue;
-        const [prefix, suffix] = join(packageRoot, pattern).split("*");
-        if (filename.startsWith(prefix) && filename.endsWith(suffix)) {
-          const replacement = filename.slice(
-            prefix.length,
-            filename.length - suffix.length
-          );
-          entries.add(name + entry.slice(1).replace("*", () => replacement));
-        }
-      }
-    }
-  }
-  return [...entries];
-}
-
-function declaresTypes(target) {
-  if (!target || typeof target !== "object") return false;
-  return Object.entries(target).some(
-    ([condition, conditionTarget]) =>
-      condition === "types" ||
-      condition === "typings" ||
-      declaresTypes(conditionTarget)
-  );
-}
-
-function typedEntries(name, manifest) {
-  if (!manifest.exports) {
-    return manifest.types || manifest.typings ? [name] : [];
-  }
-  const exports =
-    typeof manifest.exports === "object" &&
-    !Array.isArray(manifest.exports) &&
-    Object.keys(manifest.exports).some((key) => key.startsWith("."))
-      ? manifest.exports
-      : { ".": manifest.exports };
-  return Object.entries(exports)
-    .filter(([entry, target]) => !entry.includes("*") && declaresTypes(target))
-    .map(([entry]) => (entry === "." ? name : name + entry.slice(1)));
-}
-
-function resolvesToTypes(specifier, containingFile, options, mode) {
-  const resolved = ts.resolveModuleName(
-    specifier,
-    containingFile,
-    options,
-    ts.sys,
-    undefined,
-    undefined,
-    mode
-  ).resolvedModule;
-  return Boolean(resolved) && typedExtensions.has(resolved.extension);
-}
-
-function dependencyStatus(packageRoot, dependency, options) {
-  const manifestPath =
-    dependencyManifest(packageRoot, dependency) ??
-    resolvedManifest(packageRoot, dependency, options);
-  if (!manifestPath) return { dependency, manifestPath, unresolvedEntries: [] };
-  const manifest = readManifest(manifestPath);
-  if (installedArtifact.test(ts.sys.realpath(dirname(manifestPath)))) {
-    return { dependency, manifestPath, unresolvedEntries: [] };
-  }
-  return {
-    dependency,
-    manifestPath,
-    unresolvedEntries: typedEntries(dependency, manifest).filter(
-      (specifier) =>
-        !resolvesToTypes(specifier, join(packageRoot, "package.json"), options)
-    ),
-  };
-}
-
-function declaredDependencies(packageRoot) {
-  const manifest = readManifest(join(packageRoot, "package.json"));
-  return [
-    ...new Set(
-      manifestDependencyFields.flatMap((field) =>
-        Object.keys(manifest[field] ?? {})
-      )
-    ),
-  ];
-}
 
 function packageEntries(packageRoot, modes, options, entriesByManifest) {
-  const uninstalled = [];
-  const installed = [];
   const entries = [];
   for (const dependency of declaredDependencies(packageRoot)) {
-    const { manifestPath } = dependencyStatus(packageRoot, dependency, options);
-    if (!manifestPath) {
-      uninstalled.push(dependency);
-      continue;
-    }
-    installed.push(dependency);
+    const manifestPath = dependencyManifest(packageRoot, dependency, options);
+    if (!manifestPath) continue;
     if (!entriesByManifest.has(manifestPath)) {
       entriesByManifest.set(
         manifestPath,
-        publicEntries(dependency, manifestPath)
+        publicEntries(dependency, manifestPath).specifiers
       );
     }
     for (const mode of modes) {
@@ -213,7 +51,7 @@ function packageEntries(packageRoot, modes, options, entriesByManifest) {
       }
     }
   }
-  return { entries, uninstalled, installed };
+  return entries;
 }
 
 function programWithEntries(program, fileNames) {
@@ -313,14 +151,14 @@ function dependencyInventory(program) {
   );
   const expanded = programWithEntries(
     program,
-    [...packages.values()].flatMap(({ entries }) =>
+    [...packages.values()].flatMap((entries) =>
       entries.map((entry) => entry.fileName)
     )
   );
   const checker = expanded.getTypeChecker();
   const ownersByEntry = new Map();
   const ownersByScope = new Map();
-  for (const [packageRoot, { entries, uninstalled, installed }] of packages) {
+  for (const [packageRoot, entries] of packages) {
     const scopes = new Map();
     for (const entry of entries) {
       const entryKey = `${entry.packageName}\0${entry.specifier}\0${entry.fileName}`;
@@ -346,131 +184,11 @@ function dependencyInventory(program) {
         );
       }
     }
-    ownersByScope.set(packageRoot, {
-      scopes,
-      missingByName: dependencyNames(uninstalled),
-      installedByName: dependencyNames(installed),
-    });
+    ownersByScope.set(packageRoot, scopes);
   }
   const inventory = { program: expanded, checker, ownersByScope };
   inventoryByProgram.set(program, inventory);
   return inventory;
-}
-
-function importedName(packageName) {
-  const typesPackage = /^@types\/(.+)$/u.exec(packageName);
-  if (!typesPackage) return packageName;
-  const [scope, name] = typesPackage[1].split("__");
-  return name ? `@${scope}/${name}` : scope;
-}
-
-function specifierPackage(specifier) {
-  if (/^(?:\.|\/|[a-z]+:)/u.test(specifier)) return null;
-  return specifier
-    .split("/")
-    .slice(0, specifier.startsWith("@") ? 2 : 1)
-    .join("/");
-}
-
-function moduleSpecifiers(node, specifiers = []) {
-  if (
-    (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
-    node.moduleSpecifier &&
-    ts.isStringLiteral(node.moduleSpecifier)
-  ) {
-    specifiers.push(node.moduleSpecifier);
-  } else if (
-    ts.isExternalModuleReference(node) &&
-    ts.isStringLiteral(node.expression)
-  ) {
-    specifiers.push(node.expression);
-  } else if (
-    ts.isCallExpression(node) &&
-    (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-      (ts.isIdentifier(node.expression) &&
-        node.expression.text === "require")) &&
-    node.arguments[0] &&
-    ts.isStringLiteralLike(node.arguments[0])
-  ) {
-    specifiers.push(node.arguments[0]);
-  } else if (
-    ts.isImportTypeNode(node) &&
-    ts.isLiteralTypeNode(node.argument) &&
-    ts.isStringLiteral(node.argument.literal)
-  ) {
-    specifiers.push(node.argument.literal);
-  }
-  ts.forEachChild(node, (child) => {
-    moduleSpecifiers(child, specifiers);
-  });
-  return specifiers;
-}
-
-function dependencyNames(packageNames) {
-  return new Map(
-    packageNames.flatMap((packageName) => [
-      [packageName, packageName],
-      [importedName(packageName), packageName],
-    ])
-  );
-}
-
-function bindsModule(specifier) {
-  const holder = specifier.parent;
-  return !(ts.isImportDeclaration(holder) && !holder.importClause);
-}
-
-function governingOptions(packageRoot) {
-  const configPath = ts.findConfigFile(packageRoot, ts.sys.fileExists);
-  if (!configPath) return {};
-  return ts.parseJsonConfigFileContent(
-    ts.readConfigFile(configPath, ts.sys.readFile).config,
-    ts.sys,
-    dirname(configPath),
-    undefined,
-    configPath
-  ).options;
-}
-
-function manifestVisitors(context) {
-  const packageRoot = dirname(context.filename);
-  const options = governingOptions(packageRoot);
-  return {
-    Document(node) {
-      if (node.body.type !== "Object") return;
-      for (const field of node.body.members) {
-        if (
-          !manifestDependencyFields.includes(field.name.value) ||
-          field.value.type !== "Object"
-        ) {
-          continue;
-        }
-        for (const member of field.value.members) {
-          const status = dependencyStatus(
-            packageRoot,
-            member.name.value,
-            options
-          );
-          if (!status.manifestPath) {
-            context.report({
-              node: member.name,
-              messageId: "uninstalledManifest",
-              data: { packageName: status.dependency },
-            });
-          } else if (status.unresolvedEntries.length > 0) {
-            context.report({
-              node: member.name,
-              messageId: "unresolvedEntry",
-              data: {
-                packageName: status.dependency,
-                entries: status.unresolvedEntries.join(", "),
-              },
-            });
-          }
-        }
-      }
-    },
-  };
 }
 
 export function ruleNoRestatedDependencyType() {
@@ -485,20 +203,11 @@ export function ruleNoRestatedDependencyType() {
       messages: {
         restated:
           "This type restates {{name}} exported by the dependency {{packageName}}. Import it from '{{specifier}}' instead of redeclaring it.",
-        uninstalledImport:
-          "{{packageName}} is declared in {{manifest}} but not installed, so object types are not compared with its exports.",
-        unresolvedImport:
-          "{{packageName}} is installed but '{{specifier}}' does not resolve to type declarations, so object types are not compared with its exports.",
-        uninstalledManifest:
-          "{{packageName}} is declared here but not installed, so object types in this package are not compared with its exports.",
-        unresolvedEntry:
-          "{{packageName}} is a workspace or linked package whose declared type entries {{entries}} do not resolve, so object types in this package are not compared with their exports.",
+        undecided:
+          "Whether this type restates {{name}} exported by the dependency {{packageName}} is undecided because the comparison reached an unresolved type.",
       },
     },
     create(context) {
-      if (context.sourceCode.ast.type === "Document") {
-        return manifestVisitors(context);
-      }
       const services = requireTypeServices(context);
       if (!services) {
         return missingTypeServicesVisitors(
@@ -515,69 +224,8 @@ export function ruleNoRestatedDependencyType() {
           source,
           packageRoot,
           inventory,
-          scope: inventory.ownersByScope.get(packageRoot),
+          scopes: inventory.ownersByScope.get(packageRoot),
         };
-      }
-      function moduleResolves(specifier, source) {
-        const holder = specifier.parent;
-        if (
-          ts.isCallExpression(holder) &&
-          ts.isIdentifier(holder.expression) &&
-          holder.expression.text === "require" &&
-          !ts.isInJSFile(holder)
-        ) {
-          return resolvesToTypes(
-            specifier.text,
-            source.fileName,
-            services.program.getCompilerOptions(),
-            source.impliedNodeFormat
-          );
-        }
-        return Boolean(
-          services.program.getTypeChecker().getSymbolAtLocation(specifier)
-        );
-      }
-      function reportCoverageGaps() {
-        const located = packageScope();
-        if (!located) return;
-        const { source, packageRoot, scope } = located;
-        const manifest = relative(
-          context.cwd,
-          join(packageRoot, "package.json")
-        );
-        for (const specifier of moduleSpecifiers(source)) {
-          const imported = specifierPackage(specifier.text);
-          const missing = scope.missingByName.get(imported);
-          const installed = scope.installedByName.get(imported);
-          let report = null;
-          if (missing) {
-            report = {
-              messageId: "uninstalledImport",
-              data: { packageName: missing, manifest },
-            };
-          } else if (
-            installed &&
-            bindsModule(specifier) &&
-            !moduleResolves(specifier, source)
-          ) {
-            report = {
-              messageId: "unresolvedImport",
-              data: { packageName: installed, specifier: specifier.text },
-            };
-          }
-          if (!report) continue;
-          const start = source.getLineAndCharacterOfPosition(
-            specifier.getStart(source)
-          );
-          const end = source.getLineAndCharacterOfPosition(specifier.end);
-          context.report({
-            loc: {
-              start: { line: start.line + 1, column: start.character },
-              end: { line: end.line + 1, column: end.character },
-            },
-            ...report,
-          });
-        }
       }
       function check(node) {
         const members =
@@ -587,7 +235,7 @@ export function ruleNoRestatedDependencyType() {
         if (members.length < 3) return;
         const located = packageScope();
         if (!located) return;
-        const { source, packageRoot, inventory, scope } = located;
+        const { source, packageRoot, inventory, scopes } = located;
         const { checker } = inventory;
         const declaration = services.esTreeNodeToTSNodeMap.get(node);
         const type = checker.getTypeAtLocation(declaration);
@@ -595,10 +243,13 @@ export function ruleNoRestatedDependencyType() {
           ts.isInterfaceDeclaration(declaration) &&
           checker.getSymbolAtLocation(declaration.name);
         const merged = declared && checker.getMergedSymbol(declared);
-        const owner = scope.scopes
-          .get(source.impliedNodeFormat)
-          ?.get(propertyKey(type, checker))
-          ?.find(
+        const sameShape = shapeComparison(inventory.program);
+        const verdicts = (
+          scopes
+            .get(source.impliedNodeFormat)
+            ?.get(propertyKey(type, checker)) ?? []
+        )
+          .filter(
             (candidate) =>
               candidate.symbol !== merged &&
               candidate.symbol.declarations?.some(
@@ -606,13 +257,20 @@ export function ruleNoRestatedDependencyType() {
                   packageDirectory(
                     ownerDeclaration.getSourceFile().fileName
                   ) !== packageRoot
-              ) &&
-              sameObjectShape(type, candidate.type, inventory.program)
-          );
-        if (!owner) return;
+              )
+          )
+          .map((candidate) => ({
+            owner: candidate,
+            verdict: sameShape(type, candidate.type),
+          }));
+        const decided =
+          verdicts.find(({ verdict }) => verdict === true) ??
+          verdicts.find(({ verdict }) => verdict === null);
+        if (!decided) return;
+        const { owner, verdict } = decided;
         context.report({
           node,
-          messageId: "restated",
+          messageId: verdict ? "restated" : "undecided",
           data: {
             name: owner.name,
             packageName: owner.packageName,
@@ -621,7 +279,6 @@ export function ruleNoRestatedDependencyType() {
         });
       }
       return {
-        Program: reportCoverageGaps,
         TSInterfaceDeclaration: check,
         TSTypeLiteral: check,
       };

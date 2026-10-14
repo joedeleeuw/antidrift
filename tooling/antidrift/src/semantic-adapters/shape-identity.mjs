@@ -11,166 +11,77 @@ function readonlyProperty(property) {
   );
 }
 
-const walkedTypes = new Map([
-  [true, { clean: new WeakSet(), unchecked: new WeakSet() }],
-  [false, { clean: new WeakSet(), unchecked: new WeakSet() }],
-]);
-
-function runtimeImplemented(type, program) {
-  const declarations = type.symbol?.declarations ?? [];
-  return (
-    Boolean(type.objectFlags & ts.ObjectFlags.Tuple) ||
-    declarations.some((declaration) =>
-      program.isSourceFileDefaultLibrary(declaration.getSourceFile())
-    )
-  );
-}
-
-function memberSource(type) {
-  return type.objectFlags & ts.ObjectFlags.Reference && type.target
-    ? type.target
-    : type;
-}
-
-function signatureTypes(signature, output, checker) {
-  const predicate = checker.getTypePredicateOfSignature(signature);
-  return [
-    [checker.getReturnTypeOfSignature(signature), output],
-    ...(predicate?.type ? [[predicate.type, output]] : []),
-    ...[
-      ...(signature.thisParameter ? [signature.thisParameter] : []),
-      ...signature.parameters,
-    ].map((parameter) => [checker.getTypeOfSymbol(parameter), !output]),
-    ...(signature.typeParameters ?? []).flatMap((parameter) =>
-      [
-        parameter.getConstraint(),
-        checker.getDefaultFromTypeParameter(parameter),
-      ]
-        .filter(Boolean)
-        .map((bound) => [bound, output])
-    ),
-  ];
-}
-
-function referencedTypes(type, output, program) {
-  const checker = program.getTypeChecker();
-  const referenced = (type.aliasTypeArguments ?? []).map((argument) => [
-    argument,
-    output,
-  ]);
-  if (type.isUnionOrIntersection()) {
-    referenced.push(...type.types.map((member) => [member, output]));
+function everyComparison(comparands, compare) {
+  let undecided = false;
+  for (const [index, comparand] of comparands.entries()) {
+    const verdict = compare(comparand, index);
+    if (verdict === false) return false;
+    if (verdict === null) undecided = true;
   }
-  const constraint =
-    type.flags & ts.TypeFlags.TypeParameter && type.getConstraint();
-  if (constraint) referenced.push([constraint, output]);
-  if (!(type.flags & ts.TypeFlags.Object)) return referenced;
-  if (type.objectFlags & ts.ObjectFlags.Reference) {
-    referenced.push(
-      ...checker.getTypeArguments(type).map((argument) => [argument, output])
+  return undecided ? null : true;
+}
+
+function anyComparison(comparands, compare) {
+  let undecided = false;
+  for (const [index, comparand] of comparands.entries()) {
+    const verdict = compare(comparand, index);
+    if (verdict === true) return true;
+    if (verdict === null) undecided = true;
+  }
+  return undecided ? null : false;
+}
+
+export function shapeComparison(program) {
+  const checker = program.getTypeChecker();
+  let compared = new Map();
+  function instantiated(type) {
+    return Boolean(
+      type.aliasTypeArguments?.length ||
+      (type.objectFlags & ts.ObjectFlags.Reference &&
+        checker.getTypeArguments(type).length > 0)
     );
   }
-  const source = memberSource(type);
-  const suppliedToRuntime = !output && runtimeImplemented(source, program);
-  for (const property of suppliedToRuntime
-    ? []
-    : checker.getPropertiesOfType(source)) {
-    referenced.push([checker.getTypeOfSymbol(property), output]);
-  }
-  for (const index of suppliedToRuntime
-    ? []
-    : checker.getIndexInfosOfType(source)) {
-    referenced.push([index.keyType, !output], [index.type, output]);
-  }
-  for (const kind of [ts.SignatureKind.Call, ts.SignatureKind.Construct]) {
-    for (const signature of checker.getSignaturesOfType(source, kind)) {
-      referenced.push(...signatureTypes(signature, output, checker));
-    }
-  }
-  return referenced;
-}
-
-function unchecked(type, output) {
-  return (
-    type.intrinsicName === "error" ||
-    Boolean(output && type.flags & ts.TypeFlags.Any)
-  );
-}
-
-function reachesUncheckedType(type, output, program) {
-  const visited = new Map([
-    [true, new Set()],
-    [false, new Set()],
-  ]);
-  const pending = [[type, output]];
-  while (pending.length > 0) {
-    const [current, currentOutput] = pending.pop();
-    const known = walkedTypes.get(currentOutput);
-    if (known.unchecked.has(current) || unchecked(current, currentOutput)) {
-      walkedTypes.get(output).unchecked.add(type);
-      return true;
-    }
-    if (known.clean.has(current) || visited.get(currentOutput).has(current)) {
-      continue;
-    }
-    visited.get(currentOutput).add(current);
-    pending.push(...referencedTypes(current, currentOutput, program));
-  }
-  for (const [polarity, types] of visited) {
-    for (const clean of types) walkedTypes.get(polarity).clean.add(clean);
-  }
-  return false;
-}
-
-export function sameObjectShape(type, owner, program) {
-  const checker = program.getTypeChecker();
-  let compared = new Map([
-    [true, new Map()],
-    [false, new Map()],
-  ]);
   function scopedComparisons() {
     const previousComparisons = compared;
     compared = new Map(
-      [...compared].map(([polarity, pairs]) => [polarity, new Map(pairs)])
+      [...compared].map(([left, rights]) => [left, new Set(rights)])
     );
     return previousComparisons;
   }
-  function samePredicate(signature, owner, output) {
+
+  function samePredicate(signature, owner) {
     const predicate = checker.getTypePredicateOfSignature(signature);
     const ownedPredicate = checker.getTypePredicateOfSignature(owner);
     if (!predicate || !ownedPredicate) return predicate === ownedPredicate;
-    return (
-      predicate.kind === ownedPredicate.kind &&
-      predicate.parameterIndex === ownedPredicate.parameterIndex &&
-      (predicate.type && ownedPredicate.type
-        ? sameType(predicate.type, ownedPredicate.type, output)
-        : predicate.type === ownedPredicate.type)
-    );
+    if (
+      predicate.kind !== ownedPredicate.kind ||
+      predicate.parameterIndex !== ownedPredicate.parameterIndex
+    ) {
+      return false;
+    }
+    return predicate.type && ownedPredicate.type
+      ? sameType(predicate.type, ownedPredicate.type)
+      : predicate.type === ownedPredicate.type;
   }
 
-  function sameTypeParameters(signature, owner, output) {
+  function sameTypeParameters(signature, owner) {
     const ownedParameters = owner.typeParameters ?? [];
-    for (const [index, parameter] of (
-      signature.typeParameters ?? []
-    ).entries()) {
-      for (const polarity of [true, false]) {
-        compared
-          .get(polarity)
-          .set(parameter, new Set([ownedParameters[index]]));
-      }
+    const typeParameters = signature.typeParameters ?? [];
+    for (const [index, parameter] of typeParameters.entries()) {
+      compared.set(parameter, new Set([ownedParameters[index]]));
     }
-    return (signature.typeParameters ?? []).every((parameter, index) =>
-      ["getConstraint", "getDefault"].every((field) => {
+    return everyComparison(typeParameters, (parameter, index) =>
+      everyComparison(["getConstraint", "getDefault"], (field) => {
         const contract = parameter[field]();
         const ownedContract = ownedParameters[index][field]();
         return contract && ownedContract
-          ? sameType(contract, ownedContract, output)
+          ? sameType(contract, ownedContract)
           : contract === ownedContract;
       })
     );
   }
 
-  function sameSignature(signature, owner, output) {
+  function sameSignature(signature, owner) {
     if (
       signature.parameters.length !== owner.parameters.length ||
       signature.minArgumentCount !== owner.minArgumentCount ||
@@ -183,27 +94,30 @@ export function sameObjectShape(type, owner, program) {
     }
     const previousComparisons = scopedComparisons();
     try {
-      return (
-        sameTypeParameters(signature, owner, output) &&
-        samePredicate(signature, owner, output) &&
-        (!signature.thisParameter ||
-          sameType(
-            checker.getTypeOfSymbol(signature.thisParameter),
-            checker.getTypeOfSymbol(owner.thisParameter),
-            !output
-          )) &&
-        sameType(
-          checker.getReturnTypeOfSignature(signature),
-          checker.getReturnTypeOfSignature(owner),
-          output
-        ) &&
-        signature.parameters.every((parameter, index) =>
-          sameType(
-            checker.getTypeOfSymbol(parameter),
-            checker.getTypeOfSymbol(owner.parameters[index]),
-            !output
-          )
-        )
+      return everyComparison(
+        [
+          () => sameTypeParameters(signature, owner),
+          () => samePredicate(signature, owner),
+          () =>
+            !signature.thisParameter ||
+            sameType(
+              checker.getTypeOfSymbol(signature.thisParameter),
+              checker.getTypeOfSymbol(owner.thisParameter)
+            ),
+          () =>
+            sameType(
+              checker.getReturnTypeOfSignature(signature),
+              checker.getReturnTypeOfSignature(owner)
+            ),
+          () =>
+            everyComparison(signature.parameters, (parameter, index) =>
+              sameType(
+                checker.getTypeOfSymbol(parameter),
+                checker.getTypeOfSymbol(owner.parameters[index])
+              )
+            ),
+        ],
+        (compare) => compare()
       );
     } finally {
       compared = previousComparisons;
@@ -225,17 +139,6 @@ export function sameObjectShape(type, owner, program) {
     );
   }
 
-  function argumentPairs(type, owner) {
-    const typeArguments = checker.getTypeArguments(type);
-    const ownedArguments = checker.getTypeArguments(owner);
-    return typeArguments.length === ownedArguments.length
-      ? typeArguments.map((argument, index) => [
-          argument,
-          ownedArguments[index],
-        ])
-      : null;
-  }
-
   function sameReferenceTarget(type, owner) {
     return Boolean(
       type.objectFlags & ts.ObjectFlags.Reference &&
@@ -244,86 +147,121 @@ export function sameObjectShape(type, owner, program) {
     );
   }
 
-  function sameMembers(type, owner, output) {
+  function sameMembers(type, owner) {
     const properties = checker.getPropertiesOfType(type);
     if (properties.length !== checker.getPropertiesOfType(owner).length) {
       return false;
     }
     const indexes = checker.getIndexInfosOfType(type);
     const ownedIndexes = checker.getIndexInfosOfType(owner);
-    return (
-      properties.every((property) => {
-        const ownedProperty = checker.getPropertyOfType(owner, property.name);
-        return (
-          ownedProperty &&
-          (property.flags & ts.SymbolFlags.Optional) ===
-            (ownedProperty.flags & ts.SymbolFlags.Optional) &&
-          readonlyProperty(property) === readonlyProperty(ownedProperty) &&
-          sameType(
-            checker.getTypeOfSymbol(property),
-            checker.getTypeOfSymbol(ownedProperty),
-            output
+    if (indexes.length !== ownedIndexes.length) return false;
+    const kinds = [ts.SignatureKind.Call, ts.SignatureKind.Construct];
+    if (
+      kinds.some(
+        (kind) =>
+          checker.getSignaturesOfType(type, kind).length !==
+          checker.getSignaturesOfType(owner, kind).length
+      )
+    ) {
+      return false;
+    }
+    return everyComparison(
+      [
+        () =>
+          everyComparison(properties, (property) => {
+            const ownedProperty = checker.getPropertyOfType(
+              owner,
+              property.name
+            );
+            if (
+              !ownedProperty ||
+              (property.flags & ts.SymbolFlags.Optional) !==
+                (ownedProperty.flags & ts.SymbolFlags.Optional) ||
+              readonlyProperty(property) !== readonlyProperty(ownedProperty)
+            ) {
+              return false;
+            }
+            return sameType(
+              checker.getTypeOfSymbol(property),
+              checker.getTypeOfSymbol(ownedProperty)
+            );
+          }),
+        () =>
+          everyComparison(indexes, (index) =>
+            anyComparison(
+              ownedIndexes,
+              (ownedIndex) =>
+                index.isReadonly === ownedIndex.isReadonly &&
+                everyComparison(
+                  [
+                    [index.keyType, ownedIndex.keyType],
+                    [index.type, ownedIndex.type],
+                  ],
+                  ([left, right]) => sameType(left, right)
+                )
+            )
+          ),
+        () =>
+          everyComparison(kinds, (kind) => {
+            const ownedSignatures = checker.getSignaturesOfType(owner, kind);
+            return everyComparison(
+              checker.getSignaturesOfType(type, kind),
+              (signature, index) =>
+                sameSignature(signature, ownedSignatures[index])
+            );
+          }),
+      ],
+      (compare) => compare()
+    );
+  }
+
+  function everyMemberMatched(type, owner) {
+    return everyComparison(
+      [
+        [type.types, owner.types],
+        [owner.types, type.types],
+      ],
+      ([members, candidates]) =>
+        everyComparison(members, (member) =>
+          anyComparison(candidates, (candidate) =>
+            members === type.types
+              ? sameType(member, candidate)
+              : sameType(candidate, member)
           )
-        );
-      }) &&
-      indexes.length === ownedIndexes.length &&
-      indexes.every((index) =>
-        ownedIndexes.some(
-          (ownedIndex) =>
-            index.isReadonly === ownedIndex.isReadonly &&
-            sameType(index.keyType, ownedIndex.keyType, !output) &&
-            sameType(index.type, ownedIndex.type, output)
         )
-      ) &&
-      [ts.SignatureKind.Call, ts.SignatureKind.Construct].every((kind) => {
-        const signatures = checker.getSignaturesOfType(type, kind);
-        const ownedSignatures = checker.getSignaturesOfType(owner, kind);
-        return (
-          signatures.length === ownedSignatures.length &&
-          signatures.every((signature, index) =>
-            sameSignature(signature, ownedSignatures[index], output)
-          )
-        );
-      })
     );
   }
 
-  function everyMemberMatched(matches) {
-    return (
-      matches.every((row) => row.some(Boolean)) &&
-      matches.every((row, index) => matches.some((otherRow) => otherRow[index]))
-    );
-  }
-
-  function sameStructure(type, owner, output) {
-    if (type === owner) return !reachesUncheckedType(type, output, program);
+  function sameStructure(type, owner) {
+    const aliasArguments = type.aliasTypeArguments ?? [];
+    if (
+      aliasArguments.length > 0 &&
+      type.aliasSymbol === owner.aliasSymbol &&
+      aliasArguments.length === (owner.aliasTypeArguments?.length ?? 0)
+    ) {
+      return everyComparison(aliasArguments, (argument, index) =>
+        sameType(argument, owner.aliasTypeArguments[index])
+      );
+    }
     const array = checker.isArrayType(type) || checker.isTupleType(type);
     const ownedArray = checker.isArrayType(owner) || checker.isTupleType(owner);
     const reference = sameReferenceTarget(type, owner);
     if (reference || array || ownedArray) {
-      const pairs =
-        (reference || (array === ownedArray && sameArrayKind(type, owner))) &&
-        argumentPairs(type, owner);
-      return Boolean(
-        pairs &&
-        !reachesUncheckedType(type, output, program) &&
-        !reachesUncheckedType(owner, output, program) &&
-        pairs.every(([argument, ownedArgument]) =>
-          sameType(argument, ownedArgument, output)
-        )
+      if (!reference && !(array === ownedArray && sameArrayKind(type, owner))) {
+        return false;
+      }
+      const typeArguments = checker.getTypeArguments(type);
+      const ownedArguments = checker.getTypeArguments(owner);
+      if (typeArguments.length !== ownedArguments.length) return false;
+      return everyComparison(typeArguments, (argument, index) =>
+        sameType(argument, ownedArguments[index])
       );
     }
     if (type.isUnionOrIntersection() || owner.isUnionOrIntersection()) {
       return (
         type.flags === owner.flags &&
         type.types.length === owner.types.length &&
-        everyMemberMatched(
-          type.types.map((member) =>
-            owner.types.map((ownedMember) =>
-              sameType(member, ownedMember, output)
-            )
-          )
-        )
+        everyMemberMatched(type, owner)
       );
     }
     if (
@@ -332,14 +270,18 @@ export function sameObjectShape(type, owner, program) {
     ) {
       return false;
     }
-    return sameMembers(type, owner, output);
+    return sameMembers(type, owner);
   }
 
-  function sameType(type, owner, output) {
-    if ([type, owner].some((candidate) => unchecked(candidate, output))) {
+  function sameType(type, owner) {
+    if ([type, owner].some((side) => side.intrinsicName === "error")) {
+      return null;
+    }
+    if ([type, owner].some((side) => side.flags & ts.TypeFlags.Any)) {
       return false;
     }
-    if (compared.get(output).get(type)?.has(owner)) return true;
+    if (compared.get(type)?.has(owner)) return true;
+    if (type === owner && !instantiated(type)) return true;
     if (
       !checker.isTypeAssignableTo(type, owner) ||
       !checker.isTypeAssignableTo(owner, type)
@@ -348,19 +290,13 @@ export function sameObjectShape(type, owner, program) {
     }
     const previousComparisons = scopedComparisons();
     try {
-      compared
-        .get(output)
-        .set(type, new Set([...(compared.get(output).get(type) ?? []), owner]));
-      return sameStructure(type, owner, output);
+      compared.set(type, new Set([...(compared.get(type) ?? []), owner]));
+      return sameStructure(type, owner);
     } finally {
       compared = previousComparisons;
     }
   }
-  return (
-    checker.isTypeAssignableTo(type, owner) &&
-    checker.isTypeAssignableTo(owner, type) &&
-    sameType(type, owner, true)
-  );
+  return sameType;
 }
 
 export function packageDirectory(filename) {
