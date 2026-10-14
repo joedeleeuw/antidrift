@@ -336,9 +336,21 @@ export function isNamedTypeReference(typeNode) {
   return typeNode?.type === "TSTypeReference";
 }
 
+function hasObjectContractProperties(type, seen = new Set()) {
+  if (!type || seen.has(type)) return false;
+  seen.add(type);
+  if (type.types) {
+    return type.types.some((part) => hasObjectContractProperties(part, seen));
+  }
+  return (
+    Boolean(type.flags & TS_TYPE_FLAG_OBJECT) &&
+    (type.getProperties?.() ?? []).length > 0
+  );
+}
+
 export function isAppeasementCastTargetType(type) {
   if (isAntidriftBrandedType(type)) return false;
-  return (type?.getProperties?.() ?? []).length > 0;
+  return hasObjectContractProperties(type);
 }
 
 export function isAppeasementContractCast(node, services, checker) {

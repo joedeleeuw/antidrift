@@ -720,7 +720,7 @@ rules:
     directive: G2
     status: ready
     stable: false
-    signal: TypeScript finds an any or unknown value asserted as a named object type.
+    signal: A cast forces an unproven any or unknown value into a named object type.
     solveType: type-escape-hatch
     proofBuckets: [semantic-source-type-provenance]
     promotion:
@@ -744,16 +744,16 @@ rules:
       knownFalseNegatives: Angle-bracket assertions, source laundering hidden behind an intermediate typed value, and some generic-helper boundaries are outside the current single-expression proof.
       productionConcerns: Broad inventory still needs rerun/classification after real consumer cleanup; test-file casts remain in scope but do not count as production drift evidence; Cloudflare parse-output contract casts remain parked on external tsconfig resolution.
       noSinkBehavior: This rule emits no semantic facts; diagnostics depend on parser services and TypeChecker source/target proof, not sink availability.
-      noDeadWorkBehavior: Typed-source conversions, guards, schema parses, and brand constructors stay clean. Inline double casts through unknown now report when the outer target is a named object type.
+      noDeadWorkBehavior: Typed-source conversions, dominating runtime guards, schema parses, and brand constructors stay clean. Inline double casts through unknown belong to no-unsafe-cast-chain alone.
     referenceDoc: docs/rule-investigations/no-appeasement-cast.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main, opencode]
     concerns:
-      - Inline double casts through unknown belong to this rule under the owner’s G2 ruling. The unknown-input rule skips their manufactured unknown operand.
+      - Inline double casts through unknown belong to no-unsafe-cast-chain alone. This rule and unknown-input skip them.
       - "October 12 2026 precision (79 deduplicated TypeScript roots, 35 local and 44 on sushi; vendored, generated, build, dot and fixture trees excluded; type-checked after frozen installs, sampled from the 49 roots whose install resolved): 1,838 hits in 52 repositories (pool 1,372 in 35: LibreChat 329, cloudflare-agents 277, reanimated 170, executor 128, chatbiz-webapp 117). Hand-checked 20 round-robin across 20 repositories: 20/20 true positives, mostly caught-error, JSON.parse and response.json() casts into named contracts."
       - Broad inventory classified all current Chaski, Codebase Atlas, and Sudocode findings as real boundary/type-escape drift or in-scope test setup.
       - Copy-backed remediation evidence now covers caught-error guards, serialized browser storage validation, schema-backed object-contract checks, and third-party bag guards; do not add more copy-only remediation before the next promotion review.
-      - Test-file casts remain in scope and should report, but test-only findings do not count as production drift evidence for stable promotion.
-      - The rule has no explicit SDK/API allowlist; typed conversions stay clean only when the source is not any or unknown.
+      - Test-file casts remain in scope and report unless an earlier assertion in the same flow proves the target type checker-visibly.
+      - The rule has no explicit SDK/API allowlist; typed conversions stay clean only when the source is not any or unknown or when a dominating runtime check or schema decode proves the target type.
       - The upstream @typescript-eslint/no-unsafe-type-assertion benchmark checked 2,585 real files and reported every no-appeasement-cast location, but also produced 1,517 upstream-only locations; keep upstream as an optional strict benchmark rather than the default replacement.
       - Cloudflare Agents has production WebSocket JSON parse-output contract assertions in packages/ai-chat/src/ws-chat-transport.ts, but that external checkout cannot currently resolve agents/tsconfig for type-aware evaluation.
     external:
@@ -766,10 +766,10 @@ rules:
     examples:
       flags:
         - "const err = caught as AxiosError;"
-        - "const message = source as unknown as Message;"
+        - "const message = JSON.parse(text) as Message;"
       allows:
         - "if (axios.isAxiosError(caught)) return caught.response?.status;"
-    nextAction: The fresh sample scores 19/20 on 12,042 hits in 37 repositories. Review guarded key assertions before stable promotion. Keep both cast identifiers while the owner decides whether to combine them.
+    nextAction: The fresh 24-hit sample scores 23/24 (95.83%) on 3,992 hits in 51 repositories across 58 scanned repositories. Keep ready and enabled at error.
   antidrift/no-async-array-method:
     status: ready
     stable: false
