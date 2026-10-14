@@ -174,6 +174,14 @@ const CAST_DECISION_TABLE = [
     matches: isConstAssertion,
   },
   {
+    decisionKind: "non_narrowing_target",
+    action: "clear",
+    rationale:
+      "The target is any or unknown and claims nothing beyond the source.",
+    matches: (castContext) =>
+      isAppeasementCastSourceType(castContext.targetType),
+  },
+  {
     decisionKind: "double_cast_chain",
     action: "clear",
     rationale:
@@ -197,14 +205,6 @@ const CAST_DECISION_TABLE = [
       "The operand's declared type, before control-flow narrowing, is neither any, unknown nor an unconstrained type parameter, so the cast does not force a broad value.",
     matches: ({ typeChecker, declaredType }) =>
       !isBroadSourceType(typeChecker, declaredType),
-  },
-  {
-    decisionKind: "non_narrowing_target",
-    action: "clear",
-    rationale:
-      "The target is any or unknown and claims nothing beyond the source.",
-    matches: (castContext) =>
-      isAppeasementCastSourceType(castContext.targetType),
   },
   unresolvedTypeRow("unresolved_target_type", "target", (castContext) =>
     castContext.targetProvenance()

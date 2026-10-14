@@ -498,11 +498,8 @@ function receivesReference(typeChecker, call, chain) {
   const operands = ts.isPropertyAccessExpression(call.expression)
     ? [...call.arguments, call.expression.expression]
     : call.arguments;
-  return operands.some(
-    (operand) =>
-      referenceChain(operand)?.memberNames.length ===
-        chain.memberNames.length &&
-      isChainPrefixSpelling(typeChecker, operand, chain)
+  return operands.some((operand) =>
+    isChainPrefixSpelling(typeChecker, operand, chain)
   );
 }
 
@@ -533,73 +530,93 @@ function mutatesChainMember(typeChecker, node, chain) {
   );
 }
 
-function governsCast(testNode, castNode) {
-  const governing = ts.findAncestor(testNode, (ancestor) => {
+const GOVERNING_CONDITION = {
+  [ts.SyntaxKind.IfStatement]: (statement) => statement.expression,
+  [ts.SyntaxKind.WhileStatement]: (statement) => statement.expression,
+  [ts.SyntaxKind.DoStatement]: (statement) => statement.expression,
+  [ts.SyntaxKind.ForStatement]: (statement) => statement.condition,
+  [ts.SyntaxKind.ConditionalExpression]: (expression) => expression.condition,
+  [ts.SyntaxKind.SwitchStatement]: (statement) => statement.expression,
+};
+
+function governingConstruct(testNode) {
+  return ts.findAncestor(testNode, (ancestor) => {
     if (ts.isFunctionLike(ancestor) || ts.isSourceFile(ancestor)) {
       return "quit";
     }
-    if (
-      ts.isIfStatement(ancestor) ||
-      ts.isWhileStatement(ancestor) ||
-      ts.isForStatement(ancestor) ||
-      ts.isConditionalExpression(ancestor) ||
-      ts.isSwitchStatement(ancestor)
-    ) {
-      return true;
-    }
-    if (ts.isExpressionStatement(ancestor)) {
-      return true;
-    }
-    return false;
-  });
-  if (!governing) {
-    return false;
-  }
-  if (ts.isExpressionStatement(governing)) {
     return (
-      ts.isCallExpression(skipTransparentExpressions(governing.expression)) &&
-      governing.end <= castNode.getStart() &&
-      ts.findAncestor(castNode, (ancestor) => ancestor === governing.parent) !==
-        undefined
+      ancestor.kind in GOVERNING_CONDITION || ts.isExpressionStatement(ancestor)
     );
+  });
+}
+
+function alwaysExits(statement) {
+  if (ts.isBlock(statement)) {
+    const last = statement.statements[statement.statements.length - 1];
+    return Boolean(last) && alwaysExits(last);
   }
   return (
-    governing.pos <= castNode.pos &&
-    governing.end >= castNode.end &&
-    testNode.end <= castNode.getStart()
+    ts.isReturnStatement(statement) ||
+    ts.isThrowStatement(statement) ||
+    ts.isBreakStatement(statement) ||
+    ts.isContinueStatement(statement)
   );
 }
 
-function establishesProof(typeChecker, occurrence) {
-  const reference = skipOuterParents(occurrence);
-  const parent = reference.parent;
-  if (ts.isCallExpression(parent) && parent.arguments.includes(reference)) {
-    return callHasTypePredicate(typeChecker, parent);
-  }
-  if (ts.isPropertyAccessExpression(parent) && parent.expression === reference) {
+function isWithin(node, container) {
+  return (
+    Boolean(container) &&
+    ts.findAncestor(node, (ancestor) => ancestor === container) !== undefined
+  );
+}
+
+function isEarlyExitGuard(statement, castNode) {
+  return (
+    ts.isIfStatement(statement) &&
+    !statement.elseStatement &&
+    alwaysExits(statement.thenStatement) &&
+    statement.end <= castNode.getStart() &&
+    isWithin(castNode, statement.parent)
+  );
+}
+
+function establishesProof(typeChecker, tested, governing, castNode) {
+  if (ts.isExpressionStatement(governing)) {
+    const call = skipTransparentExpressions(governing.expression);
     return (
-      ts.isCallExpression(parent.parent) &&
-      parent.parent.expression === parent &&
-      callHasTypePredicate(typeChecker, parent.parent)
+      ts.isCallExpression(call) &&
+      callHasTypePredicate(typeChecker, call) &&
+      governing.end <= castNode.getStart() &&
+      isWithin(castNode, governing.parent)
     );
   }
-  return testConsumers(occurrence).length > 0;
+  const condition = GOVERNING_CONDITION[governing.kind](governing);
+  if (!isWithin(tested, condition) || tested.end > castNode.getStart()) {
+    return false;
+  }
+  return (
+    (governing.pos <= castNode.pos && governing.end >= castNode.end) ||
+    isEarlyExitGuard(governing, castNode)
+  );
 }
 
 function proofPoint(typeChecker, chain, castNode, body) {
   let latest = null;
   for (const occurrence of referenceOccurrences(typeChecker, chain)) {
     const tested = skipOuterParents(occurrence);
+    const governing = governingConstruct(tested);
     if (
-      tested.end > castNode.getStart() ||
+      !governing ||
       enclosingContainer(tested) !== body ||
-      !establishesProof(typeChecker, occurrence) ||
-      !governsCast(tested, castNode)
+      !establishesProof(typeChecker, tested, governing, castNode)
     ) {
       continue;
     }
-    if (!latest || tested.end > latest.end) {
-      latest = tested;
+    const proof = ts.isExpressionStatement(governing)
+      ? governing
+      : GOVERNING_CONDITION[governing.kind](governing);
+    if (!latest || proof.end > latest.end) {
+      latest = proof;
     }
   }
   return latest;

@@ -458,6 +458,9 @@ function callArgumentsMatter(typeChecker, call) {
 }
 
 function expressionEdges(typeChecker, node) {
+  if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
+    return [node.type];
+  }
   if (
     (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
     node.expression.kind !== ts.SyntaxKind.ImportKeyword &&
