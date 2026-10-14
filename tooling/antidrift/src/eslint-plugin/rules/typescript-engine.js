@@ -387,13 +387,19 @@ export function bodyBindings(program, functionNode, call) {
   const parameterSymbols = functionNode.parameters.map((parameter) =>
     checker.getSymbolAtLocation(parameter.name)
   );
-  const bindings = { uses: [], free: [], boundLiterals: 0, hazards: [] };
+  const bindings = {
+    uses: [],
+    free: [],
+    boundLiterals: 0,
+    hazards: [],
+    unresolved: [],
+  };
   function record(identifier, symbol, shorthand) {
     const index = parameterSymbols.indexOf(symbol);
     if (index >= 0) {
       bindings.uses.push({ node: identifier, index, shorthand });
     } else if (!symbol) {
-      bindings.hazards.push(`unresolved name ${identifier.text}`);
+      bindings.unresolved.push(`the name ${identifier.text} does not resolve`);
     } else if (identifier.text === "arguments" && !symbol.declarations) {
       bindings.hazards.push("reads the arguments object");
     } else {

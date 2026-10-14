@@ -435,7 +435,13 @@ function verifyEdits(context) {
   const hazard = planSites(context);
   if (hazard) return rejected(hazard);
   const files = orderedEdits(context.edits);
-  if (!files) return rejected("call sites overlap");
+  if (!files) {
+    return {
+      hop: false,
+      incomplete:
+        "its call sites overlap, so the inline edits cannot be planned",
+    };
+  }
   const introduced = editedProgramHazard(context.program, files, context.sites);
   if (introduced) return rejected(introduced);
   if (context.incomplete) return { hop: false, incomplete: context.incomplete };
@@ -458,10 +464,12 @@ export function verifyHop(program, candidate) {
   if (owner) return rejected(owner);
   const { order, modelled } = bodyEvaluationOrder(program, functionNode);
   const hazard =
-    bindings.hazards[0] ??
-    parameterHazard(functionNode, bindings.uses) ??
-    (modelled ? null : "the body's evaluation order is not modelled");
+    bindings.hazards[0] ?? parameterHazard(functionNode, bindings.uses);
   if (hazard) return rejected(hazard);
+  const unknown =
+    bindings.unresolved[0] ??
+    (modelled ? null : "the body's evaluation order is not modelled");
+  if (unknown) return { hop: false, incomplete: unknown };
   return verifyEdits({
     program,
     declaration,
