@@ -402,9 +402,12 @@ function variableEdges(node) {
 }
 
 function valueHolderEdges(node) {
+  const declaredType = node.type ?? ts.getJSDocType(node);
+  if (declaredType) {
+    return [...(node.typeParameters ?? []), declaredType];
+  }
   return [
     ...(node.typeParameters ?? []),
-    node.type ?? ts.getJSDocType(node),
     node.initializer,
     node.constraint,
     node.default,

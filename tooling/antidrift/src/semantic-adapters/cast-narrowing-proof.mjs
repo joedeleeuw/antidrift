@@ -167,22 +167,78 @@ function indexTypesOf(typeChecker, type) {
     .map((signature) => [signature.keyType, signature.type]);
 }
 
-function elementTypeOf(typeChecker, type) {
+function elementTypesOf(typeChecker, type) {
   if (isReferenceType(type) && typeChecker.isArrayLikeType(type)) {
-    return typeChecker.getTypeArguments(type)[0] ?? null;
+    return typeChecker.getTypeArguments(type);
   }
-  return typeChecker.getIndexTypeOfType(type, ts.IndexKind.Number) ?? null;
+  const indexed = typeChecker.getIndexTypeOfType(type, ts.IndexKind.Number);
+  return indexed ? [indexed] : [];
+}
+
+function anyProvesElements(typeChecker, flowType, targetType, seen) {
+  const flowElements = elementTypesOf(typeChecker, flowType);
+  const targetElements = elementTypesOf(typeChecker, targetType);
+  if (!flowElements.length || !targetElements.length) {
+    return false;
+  }
+  if (typeChecker.isTupleType(targetType)) {
+    const flowIsTuple = typeChecker.isTupleType(flowType);
+    return targetElements.some((targetElement, index) => {
+      const flowElement = flowIsTuple ? flowElements[index] : flowElements[0];
+      return (
+        Boolean(flowElement) &&
+        anyProvesDifferent(typeChecker, flowElement, targetElement, seen)
+      );
+    });
+  }
+  return flowElements.some((flowElement) =>
+    anyProvesDifferent(typeChecker, flowElement, targetElements[0], seen)
+  );
+}
+
+function anyProvesSignatures(typeChecker, flowType, targetType, seen) {
+  return ["getCallSignatures", "getConstructSignatures"].some((method) => {
+    const flowSignatures = flowType[method]();
+    return targetType[method]().some((targetSignature, index) => {
+      const flowSignature = flowSignatures[index] ?? flowSignatures[0];
+      if (!flowSignature) {
+        return false;
+      }
+      if (
+        anyProvesDifferent(
+          typeChecker,
+          typeChecker.getReturnTypeOfSignature(flowSignature),
+          typeChecker.getReturnTypeOfSignature(targetSignature),
+          seen
+        )
+      ) {
+        return true;
+      }
+      return targetSignature.parameters.some((parameter, parameterIndex) => {
+        const flowParameter = flowSignature.parameters[parameterIndex];
+        return (
+          Boolean(flowParameter) &&
+          anyProvesDifferent(
+            typeChecker,
+            typeChecker.getTypeOfSymbol(flowParameter),
+            typeChecker.getTypeOfSymbol(parameter),
+            seen
+          )
+        );
+      });
+    });
+  });
 }
 
 function anyProvesStructure(typeChecker, flowType, targetType, seen) {
-  if (typeChecker.isArrayLikeType(targetType)) {
-    const flowElement = elementTypeOf(typeChecker, flowType);
-    const targetElement = elementTypeOf(typeChecker, targetType);
-    return Boolean(
-      flowElement &&
-      targetElement &&
-      anyProvesDifferent(typeChecker, flowElement, targetElement, seen)
-    );
+  if (
+    typeChecker.isArrayLikeType(targetType) &&
+    anyProvesElements(typeChecker, flowType, targetType, seen)
+  ) {
+    return true;
+  }
+  if (anyProvesSignatures(typeChecker, flowType, targetType, seen)) {
+    return true;
   }
   if (
     isReferenceType(flowType) &&
@@ -377,8 +433,8 @@ function rootOccurrences(typeChecker, chain) {
 
 function chainOccurrence(rootOccurrence, memberNames) {
   let occurrence = rootOccurrence;
-  const occurrences = [rootOccurrence];
-  for (const memberName of memberNames) {
+  const occurrences = [{ node: rootOccurrence, remainder: memberNames }];
+  for (const [index, memberName] of memberNames.entries()) {
     const parent = occurrence.parent;
     const extendsChain =
       (ts.isPropertyAccessExpression(parent) ||
@@ -389,7 +445,10 @@ function chainOccurrence(rootOccurrence, memberNames) {
       break;
     }
     occurrence = parent;
-    occurrences.push(occurrence);
+    occurrences.push({
+      node: occurrence,
+      remainder: memberNames.slice(index + 1),
+    });
   }
   return occurrences;
 }
@@ -576,57 +635,217 @@ function isEarlyExitGuard(statement, castNode) {
   );
 }
 
-function establishesProof(typeChecker, tested, governing, castNode) {
-  if (ts.isExpressionStatement(governing)) {
-    const call = skipTransparentExpressions(governing.expression);
-    return (
-      ts.isCallExpression(call) &&
-      callHasTypePredicate(typeChecker, call) &&
-      governing.end <= castNode.getStart() &&
-      isWithin(castNode, governing.parent)
-    );
+const OBJECT_YIELD = Symbol("object");
+
+const TYPEOF_YIELDS = {
+  string: (typeChecker) => typeChecker.getStringType(),
+  number: (typeChecker) => typeChecker.getNumberType(),
+  boolean: (typeChecker) => typeChecker.getBooleanType(),
+  bigint: (typeChecker) => typeChecker.getBigIntType(),
+  symbol: (typeChecker) => typeChecker.getESSymbolType(),
+  undefined: (typeChecker) => typeChecker.getUndefinedType(),
+  object: () => OBJECT_YIELD,
+};
+
+function navigateMembers(typeChecker, type, remainder) {
+  let current = type;
+  for (const memberName of remainder) {
+    if (!current || current === OBJECT_YIELD) {
+      return null;
+    }
+    const property = typeChecker.getPropertyOfType(current, memberName);
+    current = property
+      ? typeChecker.getTypeOfSymbol(property)
+      : (typeChecker.getIndexTypeOfType(current, ts.IndexKind.String) ?? null);
   }
-  const condition = GOVERNING_CONDITION[governing.kind](governing);
-  if (!isWithin(tested, condition) || tested.end > castNode.getStart()) {
-    return false;
+  return current;
+}
+
+function predicateYield(typeChecker, call, tested) {
+  const signature = typeChecker.getResolvedSignature(call);
+  const predicate =
+    signature && typeChecker.getTypePredicateOfSignature(signature);
+  if (!predicate || !predicate.type) {
+    return null;
   }
-  return (
-    (governing.pos <= castNode.pos && governing.end >= castNode.end) ||
-    isEarlyExitGuard(governing, castNode)
+  const subject =
+    predicate.kind === ts.TypePredicateKind.Identifier ||
+    predicate.kind === ts.TypePredicateKind.AssertsIdentifier
+      ? call.arguments[predicate.parameterIndex]
+      : ts.isPropertyAccessExpression(call.expression) &&
+        call.expression.expression;
+  return subject &&
+    skipOuterParents(skipTransparentExpressions(subject)) === tested
+    ? predicate.type
+    : null;
+}
+
+function nonNullableDeclaredType(typeChecker, tested) {
+  return typeChecker.getNonNullableType(
+    declaredOperandType(
+      typeChecker,
+      tested,
+      typeChecker.getTypeAtLocation(tested)
+    )
   );
 }
 
-function proofPoint(typeChecker, chain, castNode, body) {
+function isNullishLiteral(node) {
+  return (
+    node.kind === ts.SyntaxKind.NullKeyword ||
+    (ts.isIdentifier(node) && node.text === "undefined")
+  );
+}
+
+function testOf(typeChecker, tested) {
+  const parent = tested.parent;
+  if (ts.isCallExpression(parent)) {
+    const yielded = predicateYield(typeChecker, parent, tested);
+    return yielded ? { node: parent, yielded } : null;
+  }
+  if (ts.isTypeOfExpression(parent) && ts.isBinaryExpression(parent.parent)) {
+    const comparison = parent.parent;
+    const other =
+      comparison.left === parent ? comparison.right : comparison.left;
+    const form =
+      EQUALITY_OPERATOR_KINDS.has(comparison.operatorToken.kind) &&
+      ts.isStringLiteralLike(other) &&
+      TYPEOF_YIELDS[other.text];
+    return form ? { node: comparison, yielded: form(typeChecker) } : null;
+  }
+  if (ts.isBinaryExpression(parent)) {
+    const operatorKind = parent.operatorToken.kind;
+    if (
+      operatorKind === ts.SyntaxKind.InstanceOfKeyword &&
+      parent.left === tested
+    ) {
+      const constructSignature = typeChecker
+        .getTypeAtLocation(parent.right)
+        .getConstructSignatures()[0];
+      return constructSignature
+        ? {
+            node: parent,
+            yielded: typeChecker.getReturnTypeOfSignature(constructSignature),
+          }
+        : null;
+    }
+    if (operatorKind === ts.SyntaxKind.InKeyword && parent.right === tested) {
+      return { node: parent, yielded: OBJECT_YIELD };
+    }
+    if (EQUALITY_OPERATOR_KINDS.has(operatorKind)) {
+      const other = parent.left === tested ? parent.right : parent.left;
+      return isNullishLiteral(other)
+        ? {
+            node: parent,
+            yielded: nonNullableDeclaredType(typeChecker, tested),
+          }
+        : null;
+    }
+    if (
+      operatorKind === ts.SyntaxKind.AmpersandAmpersandToken ||
+      operatorKind === ts.SyntaxKind.BarBarToken
+    ) {
+      return {
+        node: tested,
+        yielded: nonNullableDeclaredType(typeChecker, tested),
+      };
+    }
+    return null;
+  }
+  if (
+    (ts.isPrefixUnaryExpression(parent) &&
+      parent.operator === ts.SyntaxKind.ExclamationToken) ||
+    parent.kind in GOVERNING_CONDITION
+  ) {
+    return {
+      node: tested,
+      yielded: nonNullableDeclaredType(typeChecker, tested),
+    };
+  }
+  return null;
+}
+
+function yieldProvesTarget(typeChecker, yielded, targetType) {
+  if (yielded === OBJECT_YIELD) {
+    return (
+      !typeChecker.isArrayLikeType(targetType) &&
+      claimsOnlyUnknownValuedKeys(typeChecker, targetType)
+    );
+  }
+  return narrowingProvesTarget(typeChecker, yielded, targetType);
+}
+
+function establishingTest(
+  typeChecker,
+  occurrence,
+  governing,
+  castNode,
+  targetType
+) {
+  const tested = skipOuterParents(occurrence.node);
+  if (ts.isExpressionStatement(governing)) {
+    const call = skipTransparentExpressions(governing.expression);
+    const yielded =
+      ts.isCallExpression(call) && predicateYield(typeChecker, call, tested);
+    const established =
+      yielded && navigateMembers(typeChecker, yielded, occurrence.remainder);
+    return established &&
+      yieldProvesTarget(typeChecker, established, targetType) &&
+      governing.end <= castNode.getStart() &&
+      isWithin(castNode, governing.parent)
+      ? { node: governing, exclude: null }
+      : null;
+  }
+  const condition = GOVERNING_CONDITION[governing.kind](governing);
+  if (!isWithin(tested, condition) || tested.end > castNode.getStart()) {
+    return null;
+  }
+  const test = testOf(typeChecker, tested);
+  const established =
+    test && navigateMembers(typeChecker, test.yielded, occurrence.remainder);
+  if (
+    !established ||
+    !yieldProvesTarget(typeChecker, established, targetType)
+  ) {
+    return null;
+  }
+  if (governing.pos <= castNode.pos && governing.end >= castNode.end) {
+    return { node: test.node, exclude: null };
+  }
+  return isEarlyExitGuard(governing, castNode)
+    ? { node: test.node, exclude: governing.thenStatement }
+    : null;
+}
+
+function proofPoint(typeChecker, chain, castNode, body, targetType) {
   let latest = null;
   for (const occurrence of referenceOccurrences(typeChecker, chain)) {
-    const tested = skipOuterParents(occurrence);
+    const tested = skipOuterParents(occurrence.node);
     const governing = governingConstruct(tested);
-    if (
-      !governing ||
-      enclosingContainer(tested) !== body ||
-      !establishesProof(typeChecker, tested, governing, castNode)
-    ) {
+    if (!governing || enclosingContainer(tested) !== body) {
       continue;
     }
-    const proof =
-      ts.isExpressionStatement(governing) ||
-      isEarlyExitGuard(governing, castNode)
-        ? governing
-        : GOVERNING_CONDITION[governing.kind](governing);
-    if (!latest || proof.end > latest.end) {
+    const proof = establishingTest(
+      typeChecker,
+      occurrence,
+      governing,
+      castNode,
+      targetType
+    );
+    if (proof && (!latest || proof.node.end > latest.node.end)) {
       latest = proof;
     }
   }
   return latest;
 }
 
-function windowDisruption(typeChecker, chain, castNode) {
+function windowDisruption(typeChecker, chain, castNode, targetType) {
   const body = enclosingContainer(castNode);
   const loop = enclosingIterationStatement(castNode, body);
-  const proof = proofPoint(typeChecker, chain, castNode, body);
-  const windowStart = proof ? proof.end : body.pos;
+  const proof = proofPoint(typeChecker, chain, castNode, body, targetType);
+  const windowStart = proof ? proof.node.end : body.pos;
   const proofRepeatsEachIteration = Boolean(
-    loop && proof && proof.pos >= loop.pos
+    loop && proof && proof.node.pos >= loop.pos
   );
   const windowEnd =
     loop && !proofRepeatsEachIteration
@@ -637,6 +856,7 @@ function windowDisruption(typeChecker, chain, castNode) {
     if (
       disruption ||
       node === castNode ||
+      node === proof?.exclude ||
       node.pos >= windowEnd ||
       node.end <= windowStart ||
       (node !== body && ts.isFunctionLike(node))
@@ -683,7 +903,12 @@ export function narrowingDisruption(typeChecker, operand, castNode) {
   }
   return chain.memberNames.length === 0
     ? null
-    : windowDisruption(typeChecker, chain, castNode);
+    : windowDisruption(
+        typeChecker,
+        chain,
+        castNode,
+        typeChecker.getTypeFromTypeNode(castNode.type)
+      );
 }
 
 function testConsumers(occurrence) {
@@ -728,12 +953,11 @@ export function proofCandidateNodes(typeChecker, operand, castNode) {
   const body = enclosingContainer(castNode);
   const loop = enclosingIterationStatement(castNode, body);
   return referenceOccurrences(typeChecker, chain)
-    .filter((occurrence) => {
-      const tested = skipOuterParents(occurrence);
-      return (
+    .map((occurrence) => skipOuterParents(occurrence.node))
+    .filter(
+      (tested) =>
         executesBeforeCast(tested, castNode, loop) &&
-        ts.findAncestor(tested, (ancestor) => ancestor === body) !== undefined
-      );
-    })
+        enclosingContainer(tested) === body
+    )
     .flatMap(testConsumers);
 }

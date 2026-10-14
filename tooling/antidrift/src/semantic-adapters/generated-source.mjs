@@ -4,6 +4,7 @@ const GENERATED_DECLARATION_FORMS = [
   /^@generated(?:\b|$)/u,
   /\bdo[\s-]*not[\s-]*(?:edit|modify)\b/iu,
   /\bthis (?:file|code) (?:is|was|has been)\b.*\bgenerated\b/iu,
+  /\bthis is code generated\b/iu,
   /^generated (?:by|from|with|using)\b/iu,
   /\bauto-?generated\b/iu,
 ];
