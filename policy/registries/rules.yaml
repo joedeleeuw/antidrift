@@ -263,6 +263,8 @@ ruleFamilies:
           - antidrift/no-structural-type-fork
           - antidrift/no-canonical-model-fork
           - antidrift/no-inline-structural-type-at-use-site
+          - antidrift/no-restated-dependency-type
+          - antidrift/no-unresolved-dependency-types
           - antidrift/no-nullable-positional-tuple
         flags:
           - "type UserFork = { id: string; email: string; status: UserStatus };"
@@ -350,9 +352,9 @@ policyRuleReviews:
   ts/no-inline-structural-type-at-use-site:
     status: active-custom
     antidriftRule: antidrift/no-inline-structural-type-at-use-site
-    coverage: Implemented as a structural AST rule for exported and boundary use-site object contracts.
-    reason: Generic syntax bans are too broad; the custom rule narrows to public/boundary contract drift.
-    nextAction: Seek independent boundary-function replication and JSX-backed prop clean pressure before stable promotion.
+    coverage: Implemented as a TypeChecker identity rule for boundary-parameter object contracts that repeat a first-party shape; antidrift/no-restated-dependency-type covers declared dependency exports with the same matcher.
+    reason: Generic syntax bans are too broad; the custom rule reports only proven repeats of an existing shape.
+    nextAction: Keep the boundary scope and the generated-owner exclusion; review new false reports before stable promotion.
   ts/no-nullable-positional-tuple:
     status: active-custom
     antidriftRule: antidrift/no-nullable-positional-tuple
@@ -921,48 +923,130 @@ rules:
     stable: false
     defaultOff: false
     directive: W4
-    signal: TypeScript finds an existing object type with the same properties and compatible property types.
+    signal: TypeScript identity, from semantic-adapters/shape-identity.mjs, between a boundary-parameter inline object type with at least three members and an existing first-party object type.
     solveType: type-contract-shape
     proofBuckets: [local-ast-source-shape]
     promotion:
       proofBucket: local-ast-source-shape
-      association: Boundary parameter types match declarations in the TypeScript program.
-      blockingThreshold: A named object type matches, or the same inline shape appears twice in one package.
+      association: Boundary parameter types match first-party declarations in the TypeScript program.
+      blockingThreshold: A named object type or a same-package inline shape is identical at every depth under four comparison rules (an error type on either side makes the comparison undecided and reports the site as incomplete analysis; any on either side never matches; the same type, or the same generic reference or alias with equal type arguments, matches without comparing what it contains; everything else is compared structurally, type-parameter constraints and defaults included), the owner does not derive from the reported declaration, and the owner's file does not declare itself generated.
       ecosystemComparison: Syntax selectors cannot compare property types across declarations.
-      corpusEvidence: Earlier syntax-only samples include unique parameter contracts. They do not prove the narrowed rule.
-      realCorpusInventory: The fresh sample has 13 true reports out of 20. The rule reports in 30 repositories.
+      corpusEvidence: "October 14, 2026 fresh hit-weighted sample after the course review, capped at 3 per repository and excluding every earlier-labelled location: 29 of 30 true across 15 repositories of oss-corpus and oss-corpus-agents, 14 at 70% or more. The round-4 sample before it scored 24 of 24; the round-3 review's independent labels scored 23 of 24."
+      realCorpusInventory: "899 restatement hits in 21 oss-corpus repositories (4,401 before the shape work), 7 of them in fixtures directories now that the preset no longer ignores **/fixtures/**, and 19 in 8 agent-written repositories; 179 undecided comparisons in oss-corpus. Labels SHA256 e240b95f5ce7552d7e0be79af43774ee09b48ba830eba9f1e027d5d338dcdd8f."
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-inline-structural-type-at-use-site.md
       replicationsNotIntroducedForTest: true
-      knownFalsePositives: 7
-      knownFalseNegatives: Function-type parameters, component props, and return annotations remain outside scope.
-      productionConcerns: Matching types may still describe different concepts. Review the reported declaration.
+      knownFalsePositives: "1 of 30 in the fresh sample: a test helper's expected error shape (name, message, cause) coinciding with the intersection part of a named error type."
+      knownFalseNegatives: "Return annotations, variables, properties and component props stay outside the boundary-parameter scope. Separately written shapes that compare any directly, such as two { payload: any } fields, do not match."
+      productionConcerns: Generated owners without a generator declaration still count as first-party. A suggested owner can be another module's copy of the same concept, such as a browser protocol type.
       noSinkBehavior: Diagnostics do not require a separate output file.
-      noDeadWorkBehavior: Unique inline shapes and named parameter types stay clean.
+      noDeadWorkBehavior: Unique inline shapes, named parameter types and owners in files that declare themselves generated stay clean.
     referenceDoc: docs/rule-investigations/no-inline-structural-type-at-use-site.md
-    corpusRepositories: [chaski, sudocode-main]
+    corpusRepositories: [oss-corpus, oss-corpus-agents]
     concerns:
-      - "Superseded October 12, 2026 study. The syntax rule reported 3,152 hits in 45 repositories. Its first frozen sample scored 5/20. A fresh sample scored 11/20. A one-property exemption was tried and removed because W4 has no property-count exception. The current rule requires a matching owner or repeated shape."
       - TypeScript services are required. Missing services produce an error.
-      - Generated, vendored, shared, and local types can supply matches. Dependencies, TypeScript library files, explicitly identified fixture files, and compiler-mapped declaration copies do not.
-      - Property names, optional properties, and assignability in both directions must match.
-      - Identical any types and identical unknown types match. Nested properties, index values, union members, and function signatures also reject broad-to-specific assignment.
+      - Dependencies, TypeScript library files, compiler-mapped declaration copies and files whose leading comment declares them generated (a line that opens with an @generated tag, a Code generated ... DO NOT EDIT line, or a line opening with "this file was generated by", "this is generated from" or "generated by") do not supply owners.
+      - An owner whose declaration, directly or through type aliases, interfaces and the declared types or initializers of variables it references (function bodies and whole modules excluded), resolves through the checker to a declaration containing the reported type, such as Parameters<typeof f>[0], is never suggested.
+      - "Comparison rules: an error type on either side makes the comparison undecided, reported as incomplete analysis at the site when no owner matches; any on either side never matches; the same type, or the same generic reference or alias with equal type arguments, matches without comparing what it contains, so any inside a shared named type is not a wildcard; everything else is compared structurally under the same rules, type-parameter constraints and defaults included."
       - Repeated unnamed shapes must belong to the same package.
     external:
       state: partial-overlap
       support: medium
       candidates: ["ESLint no-restricted-syntax"]
       decision: own-antidrift
-      whyThisState: "Core selectors can find inline type literals, but the custom rule narrows the violation to exported non-JSX functions, exported-class methods, and boundary object methods."
-      whyNotOtherState: "Not equivalent because a raw syntax ban would report legitimate local props, callbacks, and small internal shapes."
+      whyThisState: "Core selectors can find inline type literals, but only the TypeChecker can prove that one repeats an existing shape."
+      whyNotOtherState: "Not equivalent because a raw syntax ban would report every unique inline shape."
     examples:
       flags:
-        - "type LoadInput = { userId: string }; export function load(input: { userId: string }) {}"
-        - "export function load(input: { userId: string }) {} export function save(input: { userId: string }) {}"
+        - "type LoadInput = { userId: string; tenantId: string; limit: number }; export function load(input: { userId: string; tenantId: string; limit: number }) {}"
       allows:
         - "export function load(input: LoadInput) {}"
-        - "export function load(input: { uniqueOption: string }) {}"
-    nextAction: The fresh sample scores 13/20. Review unrelated owners and unresolved imported types before using a suggested declaration. This sample does not meet 70%.
+        - "export function load(input: { uniqueOption: string; other: number; third: boolean }) {}"
+    nextAction: Blocking at error. Review generated owners without a declaration and owners that are another module's copy of a concept before stable promotion.
+  antidrift/no-restated-dependency-type:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: W4
+    signal: TypeScript identity, from semantic-adapters/shape-identity.mjs, between a first-party interface or type literal with at least three members and an interface or type alias exported from the public entry points of a declared dependency, including workspace packages.
+    solveType: type-contract-shape
+    proofBuckets: [local-ast-source-shape]
+    promotion:
+      proofBucket: local-ast-source-shape
+      association: First-party object types matched against interfaces and type aliases exported, directly or through exported namespaces, from the root and subpath exports of packages named in the nearest package.json dependencies, devDependencies and peerDependencies.
+      blockingThreshold: The types are identical at every depth under the four comparison rules of semantic-adapters/shape-identity.mjs, an error type making the comparison undecided and reported as such; classes and exports declared only in the linted package are not owners; an interface that merges into the owner export itself does not report.
+      ecosystemComparison: No maintained lint rule compares first-party types with installed package exports.
+      corpusEvidence: "October 14, 2026 fresh sample after the course review: 69 decided reports no earlier label, sample or review named remain in 5 repositories, and the 3-per-repository cap selects 11; 9 true with a vendored declaration copy and a coincidental three-id test type counted false (81.8%), 3 repositories at 70% or more. The round-4 sample before it scored 19 of 24; agreement with the dependency corpus detector: 62 of 65 positives, 0 of 47 negatives."
+      realCorpusInventory: "235 restatement reports in 21 oss-corpus repositories, 1 in a fixtures directory now that the preset no longer ignores **/fixtures/**, and 88 in 18 agent-written repositories; 17 undecided comparisons in oss-corpus. Labels SHA256 e240b95f5ce7552d7e0be79af43774ee09b48ba830eba9f1e027d5d338dcdd8f."
+      realCorpusInventoryRefs:
+        - docs/rule-investigations/no-restated-dependency-type.md
+      replicationsNotIntroducedForTest: true
+      knownFalsePositives: 5
+      knownFalseNegatives: Class exports, separately written shapes that compare any directly, and exports of declared dependencies that neither node_modules nor the compiler options resolve are not compared; antidrift/no-unresolved-dependency-types reports those dependencies.
+      productionConcerns: Vendored declaration copies, data-migration snapshots and small shapes that coincide with an unrelated library still report.
+      noSinkBehavior: Diagnostics do not require a separate output file.
+      noDeadWorkBehavior: Types that differ in any field, flag or nested type, interfaces that merge into the owner export and class owners stay clean.
+    referenceDoc: docs/rule-investigations/no-restated-dependency-type.md
+    corpusRepositories: [oss-corpus, oss-corpus-agents]
+    concerns:
+      - TypeScript services are required. Missing services produce an error.
+      - Entry points missing from the linted program are added to one second program that reuses the linted program's source files; twentyhq-twenty finishes inside an 8 GB heap at 7.1 GiB peak RSS.
+      - Dependencies and entries this rule cannot inventory are reported by antidrift/no-unresolved-dependency-types, which runs whether or not this rule is enabled.
+    external:
+      state: net-antidrift
+      support: none
+      candidates: []
+      decision: own-antidrift
+      whyThisState: "Maintained rules do not inspect dependency exports when checking first-party type declarations."
+      whyNotOtherState: "Not partial overlap because no-structural-type-fork reports installed packages only for owners accepted in ownership.yaml."
+    examples:
+      flags:
+        - "interface ApiError { code: string | null; message: string; param: string | null; type: string } // restates openai ErrorObject"
+      allows:
+        - "import type { ErrorObject } from 'openai/resources';"
+        - "declare module 'vitest' { interface ProvidedContext { db: Database; client: Client; server: Server } }"
+    nextAction: Blocking at error. Find evidence that separates vendored declaration copies and migration snapshots before stable promotion.
+  antidrift/no-unresolved-dependency-types:
+    status: ready
+    stable: false
+    defaultOff: false
+    directive: W4
+    signal: Package manifests linted with @eslint/json and TypeScript module resolution of declared dependencies, their public entries and their imports.
+    solveType: type-contract-shape
+    proofBuckets: [local-ast-source-shape]
+    promotion:
+      proofBucket: local-ast-source-shape
+      association: Keys of dependencies, devDependencies and peerDependencies in package.json, and module specifiers of imports of those packages, matched to node_modules and to module resolution under the governing tsconfig.
+      blockingThreshold: "A declared dependency that neither node_modules nor module resolution finds, reported on its key and at each import; a workspace or linked dependency (real path outside node_modules) with a public script entry, wildcard-expanded JavaScript targets included, that does not resolve to type declarations, or a wildcard entry that matches no file at all, reported once per package on the key of the first dependency field naming it (a wildcard whose existing targets are all blocked by null patterns is decided); an installed package import whose script specifier does not resolve to type declarations, reported at the import, where a side-effect import needs only to resolve to a module. Installed registry artifacts with a dangling types target publish no owners there and are not reported on their key."
+      ecosystemComparison: TypeScript and eslint-plugin-import report unresolved modules at imports, but not declared-but-uninstalled dependencies on manifest keys or unbuilt workspace entries that no file imports.
+      corpusEvidence: "October 14, 2026 fresh hit-weighted sample, capped at 3 per repository: 22 of 24 real gaps across 12 repositories, 10 at 70% or more. The two false reports, entries blocked by null export patterns and a side-effect import of an existing JavaScript-only marker, were fixed after the freeze; both no longer report and the 22 true reports remain."
+      realCorpusInventory: "oss-corpus rescan after the course review, fixtures directories included now that the preset no longer ignores them: 4,652 missing-package manifest keys, 6,304 missing-package import sites, 4,401 unresolved workspace-entry manifest keys and 53,141 unresolved imports of installed packages (68,498 in all, 4,377 of them from fixtures directories), most of them imports of unbuilt workspace packages; agent-written: 8, 18, 6 and 7. Labels SHA256 4d87452d3338aa32b27076c1035f7fa0041505afdf795ed587e6cf71574a893f."
+      realCorpusInventoryRefs:
+        - docs/rule-investigations/no-unresolved-dependency-types.md
+      replicationsNotIntroducedForTest: true
+      knownFalsePositives: 0
+      knownFalseNegatives: An installed registry artifact with a dangling types entry that no file imports is not reported, by owner ruling.
+      productionConcerns: A checkout whose workspace packages are not built reports every import of them until they are built.
+      noSinkBehavior: Diagnostics do not require a separate output file.
+      noDeadWorkBehavior: Installed dependencies with resolving declarations, asset subpaths such as styles.css, null-blocked export patterns and side-effect imports of existing modules stay clean.
+    referenceDoc: docs/rule-investigations/no-unresolved-dependency-types.md
+    corpusRepositories: [oss-corpus, oss-corpus-agents]
+    concerns:
+      - TypeScript services are required on TypeScript files. Missing services produce an error.
+      - The preset enables the rule in the TypeScript block and in a **/package.json block that uses ESLint's JSON language from @eslint/json 0.14.0, so every createConfig() consumer gets the reports without further setup.
+    external:
+      state: partial-overlap
+      support: medium
+      candidates: ["TypeScript TS2307", "eslint-plugin-import no-unresolved"]
+      decision: own-antidrift
+      whyThisState: "Compilers and import plugins report unresolved imports, but neither reports uninstalled dependencies or unbuilt workspace entries on the declaring manifest."
+      whyNotOtherState: "Not equivalent because a dependency that no file imports is invisible to import-site checks."
+    examples:
+      flags:
+        - '"dependencies": { "never-installed": "1.0.0" } // not in node_modules'
+      allows:
+        - 'import "server-only"; // side-effect import of an existing module'
+    nextAction: Blocking at error. Seek a published-artifact owner ruling for dangling types entries before stable promotion.
 
   antidrift/no-nullable-positional-tuple:
     status: ready

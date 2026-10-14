@@ -19,6 +19,8 @@ import { ruleNoIdentitySchemaTransform } from "./rules/no-identity-schema-transf
 import { ruleNoExplicitTypeArgumentsOnOwnedApi } from "./rules/no-explicit-type-arguments-on-owned-api.js";
 import { ruleRequireConvexReturnValidator } from "./rules/require-convex-return-validator.js";
 import { ruleNoSchemaValidatorTranscoding } from "./rules/no-schema-validator-transcoding.js";
+import { ruleNoRestatedDependencyType } from "./rules/no-restated-dependency-type.js";
+import { ruleNoUnresolvedDependencyTypes } from "./rules/no-unresolved-dependency-types.js";
 import { ruleNoRedundantLocalReturnType } from "./rules/no-redundant-local-return-type.js";
 import ruleNoMockedResponseBodyOracle from "../oxlint-plugin/rules/no-mocked-response-body-oracle.js";
 import noWrappingFunctionsRule from "./rules/no-wrapping-functions.js";
@@ -59,6 +61,8 @@ const rules = {
     ruleNoExplicitTypeArgumentsOnOwnedApi(),
   "require-convex-return-validator": ruleRequireConvexReturnValidator(),
   "no-schema-validator-transcoding": ruleNoSchemaValidatorTranscoding(),
+  "no-restated-dependency-type": ruleNoRestatedDependencyType(),
+  "no-unresolved-dependency-types": ruleNoUnresolvedDependencyTypes(),
   "no-redundant-local-return-type": ruleNoRedundantLocalReturnType(),
   "no-mocked-response-body-oracle": ruleNoMockedResponseBodyOracle(),
   "no-wrapping-functions": noWrappingFunctionsRule,

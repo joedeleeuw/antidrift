@@ -1,5 +1,11 @@
-import { dirname, join, relative, resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import ts from "typescript";
+import {
+  declaresGenerated,
+  packageDirectory,
+  shapeComparison,
+  unresolvedDescription,
+} from "../../semantic-adapters/shape-identity.mjs";
 import { inlineStructuralTypeAtBoundary } from "../../semantic-adapters/local-ast-rules.mjs";
 import {
   missingTypeServicesVisitors,
@@ -8,16 +14,6 @@ import {
 
 const declarationsByProgram = new WeakMap();
 const dependencySources = /(?:^|[/\\])node_modules(?:[/\\]|$)/u;
-
-function packageDirectory(filename) {
-  let directory = dirname(filename);
-  while (!ts.sys.fileExists(join(directory, "package.json"))) {
-    const parent = dirname(directory);
-    if (parent === directory) return null;
-    directory = parent;
-  }
-  return directory;
-}
 
 function propertyKey(type, checker) {
   const properties = checker.getPropertiesOfType(type);
@@ -86,6 +82,66 @@ function compiledDeclarations(program) {
   );
 }
 
+function referenceSymbol(node, checker) {
+  if (ts.isShorthandPropertyAssignment(node)) {
+    return checker.getShorthandAssignmentValueSymbol(node);
+  }
+  if (ts.isIdentifier(node)) {
+    return checker.getSymbolAtLocation(node);
+  }
+  return undefined;
+}
+
+function derivesFrom(owner, declaration, checker) {
+  const target = declaration.getSourceFile();
+  const visited = new Set([owner]);
+  const pending = [owner];
+  while (pending.length > 0) {
+    const node = pending.pop();
+    const symbol = referenceSymbol(node, checker);
+    const referenced =
+      symbol && symbol.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(symbol)
+        : symbol;
+    for (const reference of referenced?.declarations ?? []) {
+      if (
+        reference.getSourceFile() === target &&
+        !ts.isSourceFile(reference) &&
+        !ts.isModuleDeclaration(reference) &&
+        reference.pos <= declaration.pos &&
+        declaration.end <= reference.end
+      ) {
+        return true;
+      }
+      if (
+        reference.getSourceFile().isDeclarationFile ||
+        visited.has(reference)
+      ) {
+        continue;
+      }
+      if (
+        ts.isTypeAliasDeclaration(reference) ||
+        ts.isInterfaceDeclaration(reference)
+      ) {
+        visited.add(reference);
+        pending.push(reference);
+      } else if (ts.isVariableDeclaration(reference)) {
+        const typed = reference.type ?? reference.initializer;
+        if (typed) {
+          visited.add(reference);
+          pending.push(typed);
+        }
+      }
+    }
+    ts.forEachChild(node, (child) => {
+      if (!(ts.isFunctionLike(node) && child === node.body)) {
+        pending.push(child);
+      }
+    });
+  }
+  return false;
+}
+
 function programDeclarations(program) {
   const cached = declarationsByProgram.get(program);
   if (cached) return cached;
@@ -96,7 +152,8 @@ function programDeclarations(program) {
     if (
       program.isSourceFileDefaultLibrary(source) ||
       compiledCopies.has(source) ||
-      dependencySources.test(source.fileName)
+      dependencySources.test(source.fileName) ||
+      declaresGenerated(source)
     ) {
       continue;
     }
@@ -128,114 +185,76 @@ function programDeclarations(program) {
   return declarations;
 }
 
-function matchingTypes(type, ownedType, checker, compared) {
-  if (type === ownedType) return true;
-  const unchecked = ts.TypeFlags.Any | ts.TypeFlags.Unknown;
-  if (
-    (type.flags & unchecked) !== (ownedType.flags & unchecked) ||
-    !checker.isTypeAssignableTo(type, ownedType) ||
-    !checker.isTypeAssignableTo(ownedType, type)
-  ) {
-    return false;
-  }
-  if (compared.get(type)?.has(ownedType)) return true;
-  const comparisons = new Map(compared);
-  comparisons.set(type, new Set([...(compared.get(type) ?? []), ownedType]));
-  if (type.isUnionOrIntersection() || ownedType.isUnionOrIntersection()) {
-    if (type.flags !== ownedType.flags) return false;
-    return (
-      type.types.every((member) =>
-        ownedType.types.some((ownedMember) =>
-          matchingTypes(member, ownedMember, checker, comparisons)
-        )
-      ) &&
-      ownedType.types.every((ownedMember) =>
-        type.types.some((member) =>
-          matchingTypes(member, ownedMember, checker, comparisons)
-        )
-      )
-    );
-  }
-  if (checker.isArrayType(type) || checker.isTupleType(type)) {
-    if (!checker.isArrayType(ownedType) && !checker.isTupleType(ownedType)) {
-      return false;
-    }
-    const elements = checker.getTypeArguments(type);
-    const ownedElements = checker.getTypeArguments(ownedType);
-    return (
-      elements.length === ownedElements.length &&
-      elements.every((element, index) =>
-        matchingTypes(element, ownedElements[index], checker, comparisons)
-      )
-    );
-  }
-  const propertiesMatch = checker
-    .getPropertiesOfType(type)
-    .every((property) => {
-      const owned = checker.getPropertyOfType(ownedType, property.name);
-      if (!owned) return true;
-      return matchingTypes(
-        checker.getTypeOfSymbol(property),
-        checker.getTypeOfSymbol(owned),
-        checker,
-        comparisons
-      );
-    });
-  if (!propertiesMatch) return false;
-  const indexesMatch = checker.getIndexInfosOfType(type).every((index) => {
-    const owned = checker
-      .getIndexInfosOfType(ownedType)
-      .find(
-        (ownedIndex) =>
-          checker.isTypeAssignableTo(index.keyType, ownedIndex.keyType) &&
-          checker.isTypeAssignableTo(ownedIndex.keyType, index.keyType)
-      );
-    return (
-      !owned || matchingTypes(index.type, owned.type, checker, comparisons)
-    );
-  });
-  if (!indexesMatch) return false;
-  return [ts.SignatureKind.Call, ts.SignatureKind.Construct].every((kind) => {
-    const signatures = checker.getSignaturesOfType(type, kind);
-    const ownedSignatures = checker.getSignaturesOfType(ownedType, kind);
-    return signatures.every((signature, index) => {
-      const owned = ownedSignatures[index];
-      if (!owned) return false;
-      return (
-        matchingTypes(
-          checker.getReturnTypeOfSignature(signature),
-          checker.getReturnTypeOfSignature(owned),
-          checker,
-          comparisons
-        ) &&
-        signature.parameters.every((parameter, parameterIndex) => {
-          const ownedParameter = owned.parameters[parameterIndex];
-          return Boolean(
-            ownedParameter &&
-            matchingTypes(
-              checker.getTypeOfSymbol(parameter),
-              checker.getTypeOfSymbol(ownedParameter),
-              checker,
-              comparisons
-            )
-          );
-        })
-      );
-    });
-  });
+function lineLocation(node, cwd) {
+  const source = node.getSourceFile();
+  const line =
+    source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+  return `${relative(cwd, source.fileName)}:${line}`;
 }
 
-function matchingProperties(candidate, type, checker) {
+function overriddenParameter(declaration, checker) {
+  const parameter = declaration.parent;
+  const member = parameter.parent;
+  if (
+    !ts.isParameter(parameter) ||
+    parameter.type !== declaration ||
+    !ts.isMethodDeclaration(member) ||
+    !ts.isClassLike(member.parent) ||
+    ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Static
+  ) {
+    return null;
+  }
+  const memberName = checker.getSymbolAtLocation(member.name)?.name;
+  const index = member.parameters.indexOf(parameter);
+  const bases = [
+    ...checker.getBaseTypes(checker.getTypeAtLocation(member.parent)),
+    ...(ts.getEffectiveImplementsTypeNodes(member.parent) ?? []).map(
+      (implemented) => checker.getTypeAtLocation(implemented)
+    ),
+  ];
+  for (const base of bases) {
+    const contract = memberName && checker.getPropertyOfType(base, memberName);
+    const signatures = contract
+      ? checker.getSignaturesOfType(
+          checker.getTypeOfSymbolAtLocation(contract, member),
+          ts.SignatureKind.Call
+        )
+      : [];
+    const owned = signatures.length === 1 && signatures[0].parameters[index];
+    if (owned?.valueDeclaration && contract.valueDeclaration) {
+      return {
+        node: owned.valueDeclaration.type ?? owned.valueDeclaration,
+        type: checker.getTypeOfSymbolAtLocation(owned, member),
+        name: `${contract.valueDeclaration.parent.name?.text ?? checker.typeToString(base)}.${memberName}`,
+      };
+    }
+  }
+  return null;
+}
+
+function exported(candidate, checker) {
+  const source = candidate.node.getSourceFile();
+  if (!ts.isExternalModule(source)) {
+    return ts.isSourceFile(candidate.node.parent);
+  }
+  const moduleSymbol = checker.getSymbolAtLocation(source);
+  const symbol = checker.getSymbolAtLocation(candidate.node.name);
+  return checker
+    .getExportsOfModule(moduleSymbol)
+    .some(
+      (exportedSymbol) =>
+        (exportedSymbol.flags & ts.SymbolFlags.Alias
+          ? checker.getAliasedSymbol(exportedSymbol)
+          : exportedSymbol) === symbol
+    );
+}
+
+function inScope(candidate, declaration) {
+  const scope = candidate.node.parent;
   return (
-    matchingTypes(type, candidate.type, checker, new Map()) &&
-    checker.getPropertiesOfType(type).every((property) => {
-      const owned = checker.getPropertyOfType(candidate.type, property.name);
-      return (
-        owned &&
-        (property.flags & ts.SymbolFlags.Optional) ===
-          (owned.flags & ts.SymbolFlags.Optional)
-      );
-    })
+    scope.getSourceFile() === declaration.getSourceFile() &&
+    scope.pos <= declaration.pos &&
+    declaration.end <= scope.end
   );
 }
 
@@ -247,25 +266,18 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
         description:
           "Require reuse when a boundary parameter repeats an existing object type.",
       },
-      schema: [
-        {
-          type: "object",
-          properties: {
-            fixtureFiles: {
-              type: "array",
-              items: { type: "string" },
-              uniqueItems: true,
-            },
-          },
-          required: ["fixtureFiles"],
-          additionalProperties: false,
-        },
-      ],
+      schema: [],
       messages: {
+        overridden:
+          "This parameter repeats the parameter of {{name}} at {{location}}, which this method overrides. Use that parameter's type.",
         named:
           "This parameter repeats {{name}} at {{location}}. Use that named type.",
+        unscoped:
+          "This parameter repeats {{name}} at {{location}}, which is not usable here. Export or move that type and reuse it.",
         repeated:
           "This parameter repeats the inline type at {{location}}. Give the shared type one name and reuse it.",
+        undecided:
+          "Whether this parameter repeats the type at {{location}} is undecided because {{unresolved}} does not resolve.",
       },
     },
     create(context) {
@@ -277,15 +289,17 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
         );
       }
       const checker = services.program.getTypeChecker();
-      const fixtureFiles = new Set(
-        context.options
-          .flatMap((options) => options.fixtureFiles)
-          .map((filename) => resolve(context.cwd, filename))
-      );
+      const sameShape = shapeComparison(services.program);
       return {
         TSTypeLiteral(node) {
-          if (!inlineStructuralTypeAtBoundary(node)) return;
+          if (
+            node.members.length < 3 ||
+            !inlineStructuralTypeAtBoundary(node)
+          ) {
+            return;
+          }
           const declaration = services.esTreeNodeToTSNodeMap.get(node);
+          if (declaresGenerated(declaration.getSourceFile())) return;
           const type = checker.getTypeAtLocation(declaration);
           const key = propertyKey(type, checker);
           if (!key) return;
@@ -294,32 +308,89 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
           );
           const candidates =
             programDeclarations(services.program).get(key) ?? [];
-          const matches = candidates.filter(
+          const verdicts = candidates
+            .filter(
+              (candidate) =>
+                candidate.node !== declaration &&
+                (candidate.name ||
+                  (packageRoot !== null &&
+                    candidate.packageRoot === packageRoot))
+            )
+            .map((candidate) => ({
+              candidate,
+              verdict: sameShape(type, candidate.type),
+            }))
+            .filter(
+              ({ candidate, verdict }) =>
+                verdict !== false &&
+                !derivesFrom(candidate.node, declaration, checker)
+            );
+          const governing = overriddenParameter(declaration, checker);
+          if (
+            governing &&
+            sameShape(type, governing.type) === true &&
+            !derivesFrom(governing.node, declaration, checker)
+          ) {
+            context.report({
+              node,
+              messageId: "overridden",
+              data: {
+                name: governing.name,
+                location: lineLocation(governing.node, context.cwd),
+              },
+            });
+            return;
+          }
+          const matches = verdicts
+            .filter(({ verdict }) => verdict === true)
+            .map(({ candidate }) => candidate);
+          const named = matches.filter((candidate) => candidate.name);
+          const usable = named.filter(
             (candidate) =>
-              candidate.node !== declaration &&
-              !fixtureFiles.has(
-                resolve(candidate.node.getSourceFile().fileName)
-              ) &&
-              (candidate.name ||
-                (packageRoot !== null &&
-                  candidate.packageRoot === packageRoot)) &&
-              matchingProperties(candidate, type, checker)
+              inScope(candidate, declaration) ||
+              (candidate.node.getSourceFile() !== declaration.getSourceFile() &&
+                exported(candidate, checker))
           );
-          const existing =
-            matches.find((candidate) => candidate.name) ?? matches[0];
-          if (!existing) return;
-          const source = existing.node.getSourceFile();
-          const line =
-            source.getLineAndCharacterOfPosition(existing.node.getStart(source))
-              .line + 1;
-          context.report({
-            node,
-            messageId: existing.name ? "named" : "repeated",
-            data: {
-              name: existing.name,
-              location: `${relative(context.cwd, source.fileName)}:${line}`,
-            },
-          });
+          const existing = [
+            ...usable.filter((candidate) => inScope(candidate, declaration)),
+            ...usable.filter(
+              (candidate) => candidate.packageRoot === packageRoot
+            ),
+            ...usable,
+            ...named,
+            ...matches,
+          ][0];
+          if (existing) {
+            let messageId = "repeated";
+            if (usable.includes(existing)) messageId = "named";
+            else if (existing.name) messageId = "unscoped";
+            context.report({
+              node,
+              messageId,
+              data: {
+                name: existing.name,
+                location: lineLocation(existing.node, context.cwd),
+              },
+            });
+            return;
+          }
+          const undecided = verdicts.find(
+            ({ verdict }) => typeof verdict === "object"
+          );
+          if (undecided) {
+            context.report({
+              node,
+              messageId: "undecided",
+              data: {
+                location: lineLocation(undecided.candidate.node, context.cwd),
+                unresolved: unresolvedDescription(
+                  undecided.verdict,
+                  checker,
+                  context.cwd
+                ),
+              },
+            });
+          }
         },
       };
     },
