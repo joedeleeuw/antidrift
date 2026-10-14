@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 function readonlyProperty(property) {
   return Boolean(
@@ -12,23 +12,59 @@ function readonlyProperty(property) {
 }
 
 function everyComparison(comparands, compare) {
-  let undecided = false;
+  let undecided = null;
   for (const [index, comparand] of comparands.entries()) {
     const verdict = compare(comparand, index);
     if (verdict === false) return false;
-    if (verdict === null) undecided = true;
+    if (verdict !== true) undecided ??= verdict;
   }
-  return undecided ? null : true;
+  return undecided ?? true;
 }
 
 function anyComparison(comparands, compare) {
-  let undecided = false;
+  let undecided = null;
   for (const [index, comparand] of comparands.entries()) {
     const verdict = compare(comparand, index);
     if (verdict === true) return true;
-    if (verdict === null) undecided = true;
+    if (verdict !== false) undecided ??= verdict;
   }
-  return undecided ? null : false;
+  return undecided ?? false;
+}
+
+function unresolvedReference(node, checker) {
+  if (
+    ts.isTypeReferenceNode(node) &&
+    checker.getTypeFromTypeNode(node).intrinsicName === "error"
+  ) {
+    return node;
+  }
+  return ts.forEachChild(node, (child) => unresolvedReference(child, checker));
+}
+
+export function unresolvedDescription(verdict, checker, cwd) {
+  const where =
+    verdict.path.length > 0 ? ` at property ${verdict.path.join(".")}` : "";
+  const reference = verdict.declarations
+    .filter((declaration) => declaration.type)
+    .map((declaration) => unresolvedReference(declaration.type, checker))
+    .find(Boolean);
+  if (!reference) return `a type${where}`;
+  const imported = checker
+    .getSymbolAtLocation(ts.getFirstIdentifier(reference.typeName))
+    ?.declarations?.find(
+      (declaration) =>
+        ts.isImportSpecifier(declaration) || ts.isImportClause(declaration)
+    );
+  const origin = imported ?? reference;
+  const source = origin.getSourceFile();
+  const line =
+    source.getLineAndCharacterOfPosition(origin.getStart(source)).line + 1;
+  const location = `${relative(cwd, source.fileName)}:${line}`;
+  const name = reference.typeName.getText(reference.getSourceFile());
+  if (!imported) return `${name} (${location})${where}`;
+  const specifier = ts.findAncestor(imported, ts.isImportDeclaration)
+    .moduleSpecifier.text;
+  return `${name} imported from '${specifier}' (${location})${where}`;
 }
 
 export function shapeComparison(program) {
@@ -181,10 +217,20 @@ export function shapeComparison(program) {
             ) {
               return false;
             }
-            return sameType(
+            const verdict = sameType(
               checker.getTypeOfSymbol(property),
               checker.getTypeOfSymbol(ownedProperty)
             );
+            if (typeof verdict === "boolean") return verdict;
+            return {
+              path: [property.name, ...verdict.path],
+              declarations:
+                verdict.path.length > 0
+                  ? verdict.declarations
+                  : [property, ownedProperty].flatMap(
+                      (side) => side.valueDeclaration ?? []
+                    ),
+            };
           }),
         () =>
           everyComparison(indexes, (index) =>
@@ -275,7 +321,7 @@ export function shapeComparison(program) {
 
   function sameType(type, owner) {
     if ([type, owner].some((side) => side.intrinsicName === "error")) {
-      return null;
+      return { path: [], declarations: [] };
     }
     if ([type, owner].some((side) => side.flags & ts.TypeFlags.Any)) {
       return false;
@@ -312,7 +358,7 @@ export function packageDirectory(filename) {
 const generationDeclarations = [
   /^@generated\b/u,
   /^code generated\b.*\bdo not edit\.?$/iu,
-  /^(?:this (?:file|module) (?:is|was|has been) )?(?:auto(?:matically)?[- ]?)?generated (?:by|from|with|using) \S/iu,
+  /^(?:this (?:(?:file|module) )?(?:is|was|has been) )?(?:auto(?:matically)?[- ]?)?generated (?:by|from|with|using) \S/iu,
 ];
 
 function commentLines(text) {

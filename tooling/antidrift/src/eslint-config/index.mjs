@@ -43,7 +43,6 @@ export function createConfig({
         "**/coverage/**",
         "reports/**",
         "docs/examples/**",
-        "**/fixtures/**",
         "**/*.d.ts",
         "**/*.d.mts",
         "**/*.d.cts",

@@ -4,6 +4,7 @@ import {
   declaresGenerated,
   packageDirectory,
   shapeComparison,
+  unresolvedDescription,
 } from "../../semantic-adapters/shape-identity.mjs";
 import { inlineStructuralTypeAtBoundary } from "../../semantic-adapters/local-ast-rules.mjs";
 import {
@@ -81,15 +82,23 @@ function compiledDeclarations(program) {
   );
 }
 
+function referenceSymbol(node, checker) {
+  if (ts.isShorthandPropertyAssignment(node)) {
+    return checker.getShorthandAssignmentValueSymbol(node);
+  }
+  if (ts.isIdentifier(node)) {
+    return checker.getSymbolAtLocation(node);
+  }
+  return undefined;
+}
+
 function derivesFrom(owner, declaration, checker) {
   const target = declaration.getSourceFile();
   const visited = new Set([owner]);
   const pending = [owner];
   while (pending.length > 0) {
     const node = pending.pop();
-    const symbol = ts.isIdentifier(node)
-      ? checker.getSymbolAtLocation(node)
-      : undefined;
+    const symbol = referenceSymbol(node, checker);
     const referenced =
       symbol && symbol.flags & ts.SymbolFlags.Alias
         ? checker.getAliasedSymbol(symbol)
@@ -97,23 +106,37 @@ function derivesFrom(owner, declaration, checker) {
     for (const reference of referenced?.declarations ?? []) {
       if (
         reference.getSourceFile() === target &&
+        !ts.isSourceFile(reference) &&
+        !ts.isModuleDeclaration(reference) &&
         reference.pos <= declaration.pos &&
         declaration.end <= reference.end
       ) {
         return true;
       }
       if (
-        (ts.isTypeAliasDeclaration(reference) ||
-          ts.isInterfaceDeclaration(reference)) &&
-        !reference.getSourceFile().isDeclarationFile &&
-        !visited.has(reference)
+        reference.getSourceFile().isDeclarationFile ||
+        visited.has(reference)
+      ) {
+        continue;
+      }
+      if (
+        ts.isTypeAliasDeclaration(reference) ||
+        ts.isInterfaceDeclaration(reference)
       ) {
         visited.add(reference);
         pending.push(reference);
+      } else if (ts.isVariableDeclaration(reference)) {
+        const typed = reference.type ?? reference.initializer;
+        if (typed) {
+          visited.add(reference);
+          pending.push(typed);
+        }
       }
     }
     ts.forEachChild(node, (child) => {
-      pending.push(child);
+      if (!(ts.isFunctionLike(node) && child === node.body)) {
+        pending.push(child);
+      }
     });
   }
   return false;
@@ -162,6 +185,78 @@ function programDeclarations(program) {
   return declarations;
 }
 
+function lineLocation(node, cwd) {
+  const source = node.getSourceFile();
+  const line =
+    source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+  return `${relative(cwd, source.fileName)}:${line}`;
+}
+
+function overriddenParameter(declaration, checker) {
+  const parameter = declaration.parent;
+  const member = parameter.parent;
+  if (
+    !ts.isParameter(parameter) ||
+    parameter.type !== declaration ||
+    !ts.isMethodDeclaration(member) ||
+    !ts.isClassLike(member.parent) ||
+    ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Static
+  ) {
+    return null;
+  }
+  const memberName = checker.getSymbolAtLocation(member.name)?.name;
+  const index = member.parameters.indexOf(parameter);
+  const bases = [
+    ...checker.getBaseTypes(checker.getTypeAtLocation(member.parent)),
+    ...(ts.getEffectiveImplementsTypeNodes(member.parent) ?? []).map(
+      (implemented) => checker.getTypeAtLocation(implemented)
+    ),
+  ];
+  for (const base of bases) {
+    const contract = memberName && checker.getPropertyOfType(base, memberName);
+    const signatures = contract
+      ? checker.getSignaturesOfType(
+          checker.getTypeOfSymbolAtLocation(contract, member),
+          ts.SignatureKind.Call
+        )
+      : [];
+    const owned = signatures.length === 1 && signatures[0].parameters[index];
+    if (owned?.valueDeclaration && contract.valueDeclaration) {
+      return {
+        node: owned.valueDeclaration.type ?? owned.valueDeclaration,
+        type: checker.getTypeOfSymbolAtLocation(owned, member),
+        name: `${contract.valueDeclaration.parent.name?.text ?? checker.typeToString(base)}.${memberName}`,
+      };
+    }
+  }
+  return null;
+}
+
+function exported(candidate, checker) {
+  const source = candidate.node.getSourceFile();
+  if (!ts.isExternalModule(source))
+    return ts.isSourceFile(candidate.node.parent);
+  const moduleSymbol = checker.getSymbolAtLocation(source);
+  const symbol = checker.getSymbolAtLocation(candidate.node.name);
+  return checker
+    .getExportsOfModule(moduleSymbol)
+    .some(
+      (exportedSymbol) =>
+        (exportedSymbol.flags & ts.SymbolFlags.Alias
+          ? checker.getAliasedSymbol(exportedSymbol)
+          : exportedSymbol) === symbol
+    );
+}
+
+function inScope(candidate, declaration) {
+  const scope = candidate.node.parent;
+  return (
+    scope.getSourceFile() === declaration.getSourceFile() &&
+    scope.pos <= declaration.pos &&
+    declaration.end <= scope.end
+  );
+}
+
 export function ruleNoInlineStructuralTypeAtUseSite() {
   return {
     meta: {
@@ -172,12 +267,16 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
       },
       schema: [],
       messages: {
+        overridden:
+          "This parameter repeats the parameter of {{name}} at {{location}}, which this method overrides. Use that parameter's type.",
         named:
           "This parameter repeats {{name}} at {{location}}. Use that named type.",
+        unscoped:
+          "This parameter repeats {{name}} at {{location}}, which is not usable here. Export or move that type and reuse it.",
         repeated:
           "This parameter repeats the inline type at {{location}}. Give the shared type one name and reuse it.",
         undecided:
-          "Whether this parameter repeats the type at {{location}} is undecided because the comparison reached an unresolved type.",
+          "Whether this parameter repeats the type at {{location}} is undecided because {{unresolved}} does not resolve.",
       },
     },
     create(context) {
@@ -199,6 +298,7 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
             return;
           }
           const declaration = services.esTreeNodeToTSNodeMap.get(node);
+          if (declaresGenerated(declaration.getSourceFile())) return;
           const type = checker.getTypeAtLocation(declaration);
           const key = propertyKey(type, checker);
           if (!key) return;
@@ -224,29 +324,68 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
                 verdict !== false &&
                 !derivesFrom(candidate.node, declaration, checker)
             );
+          const governing = overriddenParameter(declaration, checker);
+          if (governing && sameShape(type, governing.type) === true) {
+            context.report({
+              node,
+              messageId: "overridden",
+              data: {
+                name: governing.name,
+                location: lineLocation(governing.node, context.cwd),
+              },
+            });
+            return;
+          }
           const matches = verdicts
             .filter(({ verdict }) => verdict === true)
             .map(({ candidate }) => candidate);
-          const existing =
-            matches.find((candidate) => candidate.name) ??
-            matches[0] ??
-            verdicts.find(({ verdict }) => verdict === null)?.candidate;
-          if (!existing) return;
-          const source = existing.node.getSourceFile();
-          const line =
-            source.getLineAndCharacterOfPosition(existing.node.getStart(source))
-              .line + 1;
-          let messageId = "repeated";
-          if (matches.length === 0) messageId = "undecided";
-          else if (existing.name) messageId = "named";
-          context.report({
-            node,
-            messageId,
-            data: {
-              name: existing.name,
-              location: `${relative(context.cwd, source.fileName)}:${line}`,
-            },
-          });
+          const named = matches.filter((candidate) => candidate.name);
+          const usable = named.filter(
+            (candidate) =>
+              inScope(candidate, declaration) ||
+              (candidate.node.getSourceFile() !== declaration.getSourceFile() &&
+                exported(candidate, checker))
+          );
+          const existing = [
+            ...usable.filter((candidate) => inScope(candidate, declaration)),
+            ...usable.filter(
+              (candidate) => candidate.packageRoot === packageRoot
+            ),
+            ...usable,
+            ...named,
+            ...matches,
+          ][0];
+          if (existing) {
+            let messageId = "repeated";
+            if (usable.includes(existing)) messageId = "named";
+            else if (existing.name) messageId = "unscoped";
+            context.report({
+              node,
+              messageId,
+              data: {
+                name: existing.name,
+                location: lineLocation(existing.node, context.cwd),
+              },
+            });
+            return;
+          }
+          const undecided = verdicts.find(
+            ({ verdict }) => typeof verdict === "object"
+          );
+          if (undecided) {
+            context.report({
+              node,
+              messageId: "undecided",
+              data: {
+                location: lineLocation(undecided.candidate.node, context.cwd),
+                unresolved: unresolvedDescription(
+                  undecided.verdict,
+                  checker,
+                  context.cwd
+                ),
+              },
+            });
+          }
         },
       };
     },

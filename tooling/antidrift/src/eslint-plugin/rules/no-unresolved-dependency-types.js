@@ -112,41 +112,44 @@ function manifestVisitors(context) {
   return {
     Document(node) {
       if (node.body.type !== "Object") return;
-      for (const field of node.body.members) {
-        if (
-          !manifestDependencyFields.includes(field.name.value) ||
-          field.value.type !== "Object"
-        ) {
+      const keys = new Map();
+      for (const fieldName of manifestDependencyFields) {
+        const field = node.body.members.find(
+          (member) => member.name.value === fieldName
+        );
+        if (field?.value.type !== "Object") continue;
+        for (const member of field.value.members) {
+          if (!keys.has(member.name.value)) {
+            keys.set(member.name.value, member.name);
+          }
+        }
+      }
+      for (const [packageName, key] of keys) {
+        const manifestPath = dependencyManifest(
+          packageRoot,
+          packageName,
+          options
+        );
+        if (!manifestPath) {
+          context.report({
+            node: key,
+            messageId: "uninstalledManifest",
+            data: { packageName },
+          });
           continue;
         }
-        for (const member of field.value.members) {
-          const packageName = member.name.value;
-          const manifestPath = dependencyManifest(
-            packageRoot,
-            packageName,
-            options
-          );
-          if (!manifestPath) {
-            context.report({
-              node: member.name,
-              messageId: "uninstalledManifest",
-              data: { packageName },
-            });
-            continue;
-          }
-          const entries = unresolvedEntries(
-            packageRoot,
-            packageName,
-            manifestPath,
-            options
-          );
-          if (entries.length > 0) {
-            context.report({
-              node: member.name,
-              messageId: "unresolvedEntry",
-              data: { packageName, entries: entries.join(", ") },
-            });
-          }
+        const entries = unresolvedEntries(
+          packageRoot,
+          packageName,
+          manifestPath,
+          options
+        );
+        if (entries.length > 0) {
+          context.report({
+            node: key,
+            messageId: "unresolvedEntry",
+            data: { packageName, entries: entries.join(", ") },
+          });
         }
       }
     },

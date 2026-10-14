@@ -3,12 +3,15 @@ import ts from "typescript";
 import {
   declaredDependencies,
   dependencyManifest,
+  dependsBack,
   importedName,
   publicEntries,
 } from "../../semantic-adapters/declared-dependencies.mjs";
 import {
+  declaresGenerated,
   packageDirectory,
   shapeComparison,
+  unresolvedDescription,
 } from "../../semantic-adapters/shape-identity.mjs";
 import {
   missingTypeServicesVisitors,
@@ -23,6 +26,7 @@ function packageEntries(packageRoot, modes, options, entriesByManifest) {
   for (const dependency of declaredDependencies(packageRoot)) {
     const manifestPath = dependencyManifest(packageRoot, dependency, options);
     if (!manifestPath) continue;
+    const reverses = dependsBack(packageRoot, manifestPath);
     if (!entriesByManifest.has(manifestPath)) {
       entriesByManifest.set(
         manifestPath,
@@ -46,6 +50,7 @@ function packageEntries(packageRoot, modes, options, entriesByManifest) {
             specifier,
             mode,
             fileName: resolved.resolvedFileName,
+            reverses,
           });
         }
       }
@@ -180,7 +185,8 @@ function dependencyInventory(program) {
       for (const bucket of owners.values()) {
         bucket.sort(
           (left, right) =>
-            left.name.split(".").length - right.name.split(".").length
+            left.name.split(".").length - right.name.split(".").length ||
+            left.specifier.length - right.specifier.length
         );
       }
     }
@@ -203,8 +209,12 @@ export function ruleNoRestatedDependencyType() {
       messages: {
         restated:
           "This type restates {{name}} exported by the dependency {{packageName}}. Import it from '{{specifier}}' instead of redeclaring it.",
+        restatedAmong:
+          "This type restates {{owners}}, exported by declared dependencies. Import the one that owns this concept instead of redeclaring it.",
+        reversed:
+          "This type restates {{owners}}, but {{packageName}} depends on this package. Give the shape one owner that both packages can import.",
         undecided:
-          "Whether this type restates {{name}} exported by the dependency {{packageName}} is undecided because the comparison reached an unresolved type.",
+          "Whether this type restates {{name}} exported by the dependency {{packageName}} is undecided because {{unresolved}} does not resolve.",
       },
     },
     create(context) {
@@ -236,47 +246,102 @@ export function ruleNoRestatedDependencyType() {
         const located = packageScope();
         if (!located) return;
         const { source, packageRoot, inventory, scopes } = located;
+        if (declaresGenerated(source)) return;
         const { checker } = inventory;
         const declaration = services.esTreeNodeToTSNodeMap.get(node);
-        const type = checker.getTypeAtLocation(declaration);
         const declared =
           ts.isInterfaceDeclaration(declaration) &&
           checker.getSymbolAtLocation(declaration.name);
-        const merged = declared && checker.getMergedSymbol(declared);
+        if (
+          declared &&
+          checker
+            .getMergedSymbol(declared)
+            .declarations?.some(
+              (merged) =>
+                packageDirectory(merged.getSourceFile().fileName) !==
+                packageRoot
+            )
+        ) {
+          return;
+        }
+        const type = checker.getTypeAtLocation(declaration);
         const sameShape = shapeComparison(inventory.program);
         const verdicts = (
           scopes
             .get(source.impliedNodeFormat)
             ?.get(propertyKey(type, checker)) ?? []
         )
-          .filter(
-            (candidate) =>
-              candidate.symbol !== merged &&
-              candidate.symbol.declarations?.some(
-                (ownerDeclaration) =>
-                  packageDirectory(
-                    ownerDeclaration.getSourceFile().fileName
-                  ) !== packageRoot
-              )
+          .filter((candidate) =>
+            candidate.symbol.declarations?.some(
+              (ownerDeclaration) =>
+                packageDirectory(ownerDeclaration.getSourceFile().fileName) !==
+                packageRoot
+            )
           )
           .map((candidate) => ({
             owner: candidate,
             verdict: sameShape(type, candidate.type),
           }));
-        const decided =
-          verdicts.find(({ verdict }) => verdict === true) ??
-          verdicts.find(({ verdict }) => verdict === null);
-        if (!decided) return;
-        const { owner, verdict } = decided;
-        context.report({
-          node,
-          messageId: verdict ? "restated" : "undecided",
-          data: {
-            name: owner.name,
-            packageName: owner.packageName,
-            specifier: importedName(owner.specifier),
-          },
-        });
+        const restating = verdicts
+          .filter(({ verdict }) => verdict === true)
+          .map(({ owner }) => owner);
+        const owners = restating.filter(
+          (owner, index) =>
+            restating.findIndex(({ symbol }) => symbol === owner.symbol) ===
+            index
+        );
+        const listed = owners
+          .map(
+            (owner) => `${owner.name} from '${importedName(owner.specifier)}'`
+          )
+          .join(", ");
+        const reversed = owners.find((owner) => owner.reverses);
+        if (reversed) {
+          context.report({
+            node,
+            messageId: "reversed",
+            data: { owners: listed, packageName: reversed.packageName },
+          });
+          return;
+        }
+        if (owners.length > 1) {
+          context.report({
+            node,
+            messageId: "restatedAmong",
+            data: { owners: listed },
+          });
+          return;
+        }
+        if (owners.length === 1) {
+          context.report({
+            node,
+            messageId: "restated",
+            data: {
+              name: owners[0].name,
+              packageName: owners[0].packageName,
+              specifier: importedName(owners[0].specifier),
+            },
+          });
+          return;
+        }
+        const undecided = verdicts.find(
+          ({ verdict }) => typeof verdict === "object"
+        );
+        if (undecided) {
+          context.report({
+            node,
+            messageId: "undecided",
+            data: {
+              name: undecided.owner.name,
+              packageName: undecided.owner.packageName,
+              unresolved: unresolvedDescription(
+                undecided.verdict,
+                checker,
+                context.cwd
+              ),
+            },
+          });
+        }
       }
       return {
         TSInterfaceDeclaration: check,

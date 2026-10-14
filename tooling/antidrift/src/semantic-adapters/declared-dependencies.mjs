@@ -18,7 +18,6 @@ const scriptExtensions = new Set([
   ".mts",
   ".cts",
 ]);
-const declarationExtensions = [".ts", ".mts", ".cts"];
 const typedExtensions = new Set([
   ts.Extension.Dts,
   ts.Extension.Dmts,
@@ -80,6 +79,14 @@ export function declaredDependencies(packageRoot) {
       )
     ),
   ];
+}
+
+export function dependsBack(packageRoot, manifestPath) {
+  const { name } = readManifest(join(packageRoot, "package.json"));
+  return (
+    typeof name === "string" &&
+    declaredDependencies(dirname(manifestPath)).includes(name)
+  );
 }
 
 function exportTargets(entry) {
@@ -166,19 +173,13 @@ export function publicEntries(name, manifestPath) {
       files ??= ts.sys
         .readDirectory(packageRoot, undefined, ["node_modules"])
         .filter((filename) => scriptExtensions.has(extname(filename)));
-      const matches = targets
+      const existing = targets
         .filter((pattern) => pattern.includes("*"))
-        .flatMap((pattern) => wildcardMatches(packageRoot, pattern, files))
-        .filter(
-          ({ replacement }) =>
-            governingEntry(
-              entries,
-              entry.replace("*", () => replacement)
-            ) === entry
-        );
-      if (matches.length === 0) undecided.push(subpath);
-      for (const { filename, replacement } of matches) {
-        if (declarationExtensions.includes(extname(filename))) {
+        .flatMap((pattern) => wildcardMatches(packageRoot, pattern, files));
+      if (existing.length === 0) undecided.push(subpath);
+      for (const { replacement } of existing) {
+        const governed = entry.replace("*", () => replacement);
+        if (governingEntry(entries, governed) === entry) {
           specifiers.add(subpath.replace("*", () => replacement));
         }
       }
