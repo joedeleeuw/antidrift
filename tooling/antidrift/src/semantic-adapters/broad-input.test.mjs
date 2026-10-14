@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   isAppeasementCastSourceType,
-  isAppeasementCastTargetType,
   isNamedTypeReference,
 } from "./broad-input.mjs";
 
@@ -38,20 +37,9 @@ function variableType(checker, sourceFile, name) {
   throw new Error(`Missing variable ${name}`);
 }
 
-function aliasType(checker, sourceFile, name) {
-  for (const statement of sourceFile.statements) {
-    if (ts.isTypeAliasDeclaration(statement) && statement.name.text === name) {
-      return checker.getTypeFromTypeNode(statement.type);
-    }
-  }
-  throw new Error(`Missing type alias ${name}`);
-}
-
 describe("broad-input appeasement cast helpers", () => {
-  it("classifies broad source types and named object contract targets", () => {
+  it("classifies broad source types", () => {
     const { checker, sourceFile } = programFor(`
-      type UserDto = { id: string; email: string };
-      type Empty = {};
       declare const rawAny: any;
       declare const rawUnknown: unknown;
       declare const label: string;
@@ -67,12 +55,6 @@ describe("broad-input appeasement cast helpers", () => {
     ).toBe(true);
     expect(
       isAppeasementCastSourceType(variableType(checker, sourceFile, "label"))
-    ).toBe(false);
-    expect(
-      isAppeasementCastTargetType(aliasType(checker, sourceFile, "UserDto"))
-    ).toBe(true);
-    expect(
-      isAppeasementCastTargetType(aliasType(checker, sourceFile, "Empty"))
     ).toBe(false);
     expect(isNamedTypeReference({ type: "TSTypeReference" })).toBe(true);
     expect(isNamedTypeReference({ type: "TSStringKeyword" })).toBe(false);

@@ -312,23 +312,6 @@ export function isNamedTypeReference(typeNode) {
   return typeNode?.type === "TSTypeReference";
 }
 
-function isEmptyObjectLiteralType(type) {
-  return (
-    Boolean(type.flags & TS_TYPE_FLAG_OBJECT) &&
-    !type.types &&
-    (type.getProperties?.() ?? []).length === 0 &&
-    !type.getStringIndexType?.() &&
-    !type.getNumberIndexType?.() &&
-    (type.getCallSignatures?.() ?? []).length === 0 &&
-    (type.getConstructSignatures?.() ?? []).length === 0
-  );
-}
-
-export function isAppeasementCastTargetType(type) {
-  if (!type || isAppeasementCastSourceType(type)) return false;
-  return !isEmptyObjectLiteralType(type);
-}
-
 export function isPredicateObjectContract(type) {
   if (!type) return false;
   if (typeof type.isUnion === "function" && type.isUnion()) return false;

@@ -720,13 +720,13 @@ rules:
     directive: G2
     status: ready
     stable: false
-    signal: A cast forces an unproven any or unknown value into a named object type.
+    signal: A cast forces an unproven any or unknown value into a contract.
     solveType: type-escape-hatch
     proofBuckets: [semantic-source-type-provenance]
     promotion:
       proofBucket: semantic-source-type-provenance
-      association: TypeChecker proves an `as` assertion takes an `any` or `unknown` source expression and claims a named object contract with resolved properties.
-      blockingThreshold: Plain `value as NamedObjectContract` reports only when the source type is `any` or `unknown`, the target is a named object contract with at least one property, and the target is not a branded type delegated to the retired brand-specific branch.
+      association: TypeChecker proves an `as` or angle-bracket assertion takes an operand declared `any` or `unknown` and claims a target type that no checker-visible narrowing of that operand establishes.
+      blockingThreshold: A cast reports only when the operand's declared type is `any` or `unknown`, the target is neither, no TypeScript narrowing of the operand is assignable to the target, and every module and name the cast's types and proof candidates reach resolves. Unresolvable provenance, unresolved import sites and narrowings a later call or alias write may invalidate are incomplete-analysis diagnostics, not violations.
       ecosystemComparison: The maintained @typescript-eslint/no-unsafe-type-assertion rule is a strict superset in the measured corpus; it reports every no-appeasement-cast location but also reports typed SDK/API conversion pressure that this custom rule keeps clean through the source-type gate.
       corpusEvidence: Chaski, Codebase Atlas, and Sudocode broad inventories classify broad-input casts into named contracts as drift, with copy-backed Chaski and Codebase Atlas remediation proving caught-error guards, serialized-storage parsing, schema-backed object-contract validation, and third-party bag guards.
       realCorpusInventory: docs/rule-investigations/no-appeasement-cast.md and reports/no-appeasement-inventory-*.json record broad real-repo inventory; reports/unsafe-type-assertion-benchmark.json records the maintained-upstream comparison.
@@ -741,10 +741,10 @@ rules:
         - reports/claude-rule-review-no-appeasement-cast-20260603-205832.md
       replicationsNotIntroducedForTest: true
       knownFalsePositives: 1
-      knownFalseNegatives: Angle-bracket assertions, source laundering hidden behind an intermediate typed value, and some generic-helper boundaries are outside the current single-expression proof.
+      knownFalseNegatives: Source laundering hidden behind an intermediate typed value, some generic-helper boundaries, and writes into a proved object's fields through another reference are outside the single-expression proof. A value typed through a shorthand ambient module is incomplete, not reported.
       productionConcerns: Broad inventory still needs rerun/classification after real consumer cleanup; test-file casts remain in scope but do not count as production drift evidence; Cloudflare parse-output contract casts remain parked on external tsconfig resolution.
       noSinkBehavior: This rule emits no semantic facts; diagnostics depend on parser services and TypeChecker source/target proof, not sink availability.
-      noDeadWorkBehavior: Typed-source conversions, dominating runtime guards, schema parses, and brand constructors stay clean. Inline double casts through unknown belong to no-unsafe-cast-chain alone.
+      noDeadWorkBehavior: Typed-source conversions, `as const`, and casts whose operand TypeScript narrows to a type assignable to the target (type predicates, asserts calls, instanceof, typeof, discriminants, typed decoder results) stay clean. Inline double casts through unknown belong to no-unsafe-cast-chain alone.
     referenceDoc: docs/rule-investigations/no-appeasement-cast.md
     corpusRepositories: [chaski, codebase-atlas, sudocode-main, opencode]
     concerns:
@@ -752,8 +752,10 @@ rules:
       - "October 12 2026 precision (79 deduplicated TypeScript roots, 35 local and 44 on sushi; vendored, generated, build, dot and fixture trees excluded; type-checked after frozen installs, sampled from the 49 roots whose install resolved): 1,838 hits in 52 repositories (pool 1,372 in 35: LibreChat 329, cloudflare-agents 277, reanimated 170, executor 128, chatbiz-webapp 117). Hand-checked 20 round-robin across 20 repositories: 20/20 true positives, mostly caught-error, JSON.parse and response.json() casts into named contracts."
       - Broad inventory classified all current Chaski, Codebase Atlas, and Sudocode findings as real boundary/type-escape drift or in-scope test setup.
       - Copy-backed remediation evidence now covers caught-error guards, serialized browser storage validation, schema-backed object-contract checks, and third-party bag guards; do not add more copy-only remediation before the next promotion review.
-      - Test-file casts remain in scope and report unless an earlier assertion in the same flow proves the target type checker-visibly.
-      - The rule has no explicit SDK/API allowlist; typed conversions stay clean only when the source is not any or unknown or when a dominating runtime check or schema decode proves the target type.
+      - Test-file casts remain in scope and report unless an earlier assertion in the same flow narrows the value checker-visibly; expect matchers do not narrow.
+      - The rule has no explicit SDK/API allowlist; typed conversions stay clean only when the operand is not declared any or unknown or when TypeScript's own narrowing proves the target type.
+      - A declared annotation is conclusive for provenance, so `const value: any = untyped()` reports as a declared any and `const value: unknown = missing()` is not incomplete. An unconstrained type parameter is as broad as unknown. A proof never rests on an any at any depth of the narrowed type.
+      - Generated-file declarations are owned by semantic-adapters/generated-source.mjs (`@generated`, do-not-edit notices, `this file was ... generated`, `generated by/from/with/using`, `auto-generated`), shared by the rule and the corpus scan driver; prose that merely contains the word stays in scope.
       - The upstream @typescript-eslint/no-unsafe-type-assertion benchmark checked 2,585 real files and reported every no-appeasement-cast location, but also produced 1,517 upstream-only locations; keep upstream as an optional strict benchmark rather than the default replacement.
       - Cloudflare Agents has production WebSocket JSON parse-output contract assertions in packages/ai-chat/src/ws-chat-transport.ts, but that external checkout cannot currently resolve agents/tsconfig for type-aware evaluation.
     external:
