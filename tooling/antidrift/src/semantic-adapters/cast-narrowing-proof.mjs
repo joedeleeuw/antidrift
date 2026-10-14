@@ -218,6 +218,12 @@ function signatureParameterTypes(typeChecker, signature) {
   return { fixed, rest, receiver: receiver ?? null };
 }
 
+function tupleTailRepeats(tuple) {
+  const flags = tuple.target?.elementFlags ?? [];
+  const last = flags[flags.length - 1];
+  return Boolean(last & (ts.ElementFlags.Rest | ts.ElementFlags.Variadic));
+}
+
 function effectiveParameterType(typeChecker, slots, index) {
   if (index < slots.fixed.length) {
     return slots.fixed[index];
@@ -226,10 +232,25 @@ function effectiveParameterType(typeChecker, slots, index) {
     return null;
   }
   const elements = elementTypesOf(typeChecker, slots.rest);
-  if (typeChecker.isTupleType(slots.rest)) {
-    return elements[index - slots.fixed.length] ?? null;
+  if (!typeChecker.isTupleType(slots.rest)) {
+    return elements[0] ?? null;
   }
-  return elements[0] ?? null;
+  const position = index - slots.fixed.length;
+  if (position < elements.length) {
+    return elements[position];
+  }
+  return tupleTailRepeats(slots.rest) ? elements[elements.length - 1] : null;
+}
+
+function effectivePositions(typeChecker, slots) {
+  if (!slots.rest) {
+    return slots.fixed.length;
+  }
+  const restPositions = typeChecker.isTupleType(slots.rest)
+    ? elementTypesOf(typeChecker, slots.rest).length +
+      Number(tupleTailRepeats(slots.rest))
+    : 1;
+  return slots.fixed.length + restPositions;
 }
 
 function anyProvesParameters(
@@ -252,8 +273,10 @@ function anyProvesParameters(
   ) {
     return true;
   }
-  const positions =
-    Math.max(flowSlots.fixed.length, targetSlots.fixed.length) + 1;
+  const positions = Math.max(
+    effectivePositions(typeChecker, flowSlots),
+    effectivePositions(typeChecker, targetSlots)
+  );
   for (let index = 0; index < positions; index += 1) {
     const flowParameter = effectiveParameterType(typeChecker, flowSlots, index);
     const targetParameter = effectiveParameterType(
@@ -879,13 +902,21 @@ function conditionTests(typeChecker, chain, condition, castNode, targetType) {
   return tests;
 }
 
+function earlierNode(left, right) {
+  return left.end <= right.end ? left : right;
+}
+
+function laterNode(left, right) {
+  return left.end >= right.end ? left : right;
+}
+
 function conditionProof(node, outcome, tests) {
   const expression = skipTransparentExpressions(node);
   const test = tests.get(expression);
   if (test) {
     const established =
       outcome !== test.negated ? test.established : test.complement;
-    return established ? [expression] : null;
+    return established ? { anchor: expression } : null;
   }
   if (
     ts.isPrefixUnaryExpression(expression) &&
@@ -903,10 +934,15 @@ function conditionProof(node, outcome, tests) {
   }
   const left = conditionProof(expression.left, outcome, tests);
   const right = conditionProof(expression.right, outcome, tests);
+  const bothExecute = conjunction === outcome;
   if (left && right) {
-    return [...left, ...right];
+    return {
+      anchor: bothExecute
+        ? laterNode(left.anchor, right.anchor)
+        : earlierNode(left.anchor, right.anchor),
+    };
   }
-  return conjunction === outcome ? (left ?? right) : null;
+  return bothExecute ? (left ?? right) : null;
 }
 
 function proofWithinCondition(condition, castNode, tests) {
@@ -988,12 +1024,6 @@ function assertionProof(
     : null;
 }
 
-function latestNode(nodes) {
-  return nodes.reduce((latest, node) =>
-    node.end > latest.end ? node : latest
-  );
-}
-
 function conditionGovernedProof(
   typeChecker,
   chain,
@@ -1017,20 +1047,20 @@ function conditionGovernedProof(
   }
   if (isWithin(castNode, condition)) {
     const proof = proofWithinCondition(condition, castNode, tests);
-    return proof ? { node: latestNode(proof), exclude: null } : null;
+    return proof ? { node: proof.anchor, exclude: null } : null;
   }
   if (governing.pos <= castNode.pos && governing.end >= castNode.end) {
     const required = outcomeReachingCast(governing, castNode);
     const proof =
       required !== null && conditionProof(condition, required, tests);
-    return proof ? { node: latestNode(proof), exclude: null } : null;
+    return proof ? { node: proof.anchor, exclude: null } : null;
   }
   if (!isEarlyExitGuard(governing, castNode)) {
     return null;
   }
   const proof = conditionProof(condition, false, tests);
   return proof
-    ? { node: latestNode(proof), exclude: governing.thenStatement }
+    ? { node: proof.anchor, exclude: governing.thenStatement }
     : null;
 }
 
