@@ -196,18 +196,23 @@ function anyProvesStructure(typeChecker, flowType, targetType, seen) {
         anyProvesDifferent(typeChecker, argument, targetArguments[index], seen)
       );
   }
-  const properties = typeChecker.getPropertiesOfType(targetType).some((property) => {
-    const flowProperty = typeChecker.getPropertyOfType(flowType, property.name);
-    return Boolean(
-      flowProperty &&
-      anyProvesDifferent(
-        typeChecker,
-        typeChecker.getTypeOfSymbol(flowProperty),
-        typeChecker.getTypeOfSymbol(property),
-        seen
-      )
-    );
-  });
+  const properties = typeChecker
+    .getPropertiesOfType(targetType)
+    .some((property) => {
+      const flowProperty = typeChecker.getPropertyOfType(
+        flowType,
+        property.name
+      );
+      return Boolean(
+        flowProperty &&
+        anyProvesDifferent(
+          typeChecker,
+          typeChecker.getTypeOfSymbol(flowProperty),
+          typeChecker.getTypeOfSymbol(property),
+          seen
+        )
+      );
+    });
   if (properties) {
     return true;
   }
@@ -491,24 +496,15 @@ function isChainPrefixSpelling(typeChecker, node, chain) {
 
 function callHasTypePredicate(typeChecker, call) {
   const signature = typeChecker.getResolvedSignature(call);
-  return Boolean(signature && typeChecker.getTypePredicateOfSignature(signature));
+  return Boolean(
+    signature && typeChecker.getTypePredicateOfSignature(signature)
+  );
 }
 
-function receivesReference(typeChecker, call, chain) {
-  const operands = ts.isPropertyAccessExpression(call.expression)
+function callOperands(call) {
+  return ts.isPropertyAccessExpression(call.expression)
     ? [...call.arguments, call.expression.expression]
     : call.arguments;
-  return operands.some((operand) =>
-    isChainPrefixSpelling(typeChecker, operand, chain)
-  );
-}
-
-function testsProvedReference(typeChecker, node, chain) {
-  return (
-    ts.isCallExpression(node) &&
-    callHasTypePredicate(typeChecker, node) &&
-    receivesReference(typeChecker, node, chain)
-  );
 }
 
 function mutatesChainMember(typeChecker, node, chain) {
@@ -612,9 +608,11 @@ function proofPoint(typeChecker, chain, castNode, body) {
     ) {
       continue;
     }
-    const proof = ts.isExpressionStatement(governing)
-      ? governing
-      : GOVERNING_CONDITION[governing.kind](governing);
+    const proof =
+      ts.isExpressionStatement(governing) ||
+      isEarlyExitGuard(governing, castNode)
+        ? governing
+        : GOVERNING_CONDITION[governing.kind](governing);
     if (!latest || proof.end > latest.end) {
       latest = proof;
     }
@@ -627,7 +625,13 @@ function windowDisruption(typeChecker, chain, castNode) {
   const loop = enclosingIterationStatement(castNode, body);
   const proof = proofPoint(typeChecker, chain, castNode, body);
   const windowStart = proof ? proof.end : body.pos;
-  const windowEnd = loop ? Math.max(loop.end, castNode.end) : castNode.end;
+  const proofRepeatsEachIteration = Boolean(
+    loop && proof && proof.pos >= loop.pos
+  );
+  const windowEnd =
+    loop && !proofRepeatsEachIteration
+      ? Math.max(loop.end, castNode.end)
+      : castNode.end;
   let disruption = null;
   function visit(node) {
     if (
@@ -643,7 +647,13 @@ function windowDisruption(typeChecker, chain, castNode) {
       executesBeforeCast(node, castNode, loop) &&
       node.getStart() >= windowStart &&
       EXECUTION_YIELDING_KINDS.has(node.kind) &&
-      !testsProvedReference(typeChecker, node, chain)
+      !(
+        ts.isCallExpression(node) &&
+        callHasTypePredicate(typeChecker, node) &&
+        callOperands(node).some((operand) =>
+          isChainPrefixSpelling(typeChecker, operand, chain)
+        )
+      )
     ) {
       disruption = { node, kind: "call" };
       return;
