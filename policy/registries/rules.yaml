@@ -769,7 +769,7 @@ rules:
         - "const message = JSON.parse(text) as Message;"
       allows:
         - "if (axios.isAxiosError(caught)) return caught.response?.status;"
-    nextAction: The fresh 24-hit sample scores 23/24 (95.83%) on 3,992 hits in 51 repositories across 58 scanned repositories. Keep ready and enabled at error.
+    nextAction: The round 2 fresh 24-hit sample scores 23/24 (95.83%, seed round2-appeasement-cast-20261013) on 15,813 hits across 59 scanned repositories (145,311 of 145,317 eligible tracked TypeScript files scanned; 53 repositories with complete coverage and 6 with 1 unanalysed syntax-error file each). Keep ready and enabled at error.
   antidrift/no-async-array-method:
     status: ready
     stable: false

@@ -103,12 +103,6 @@ export function isAppeasementCastTargetType(
   type: ts.Type | null | undefined
 ): boolean;
 
-export function isAppeasementContractCast(
-  node: unknown,
-  services: TypeScriptParserServices,
-  checker: ts.TypeChecker
-): boolean;
-
 export function isPredicateObjectContract(
   type: ts.Type | null | undefined
 ): boolean;

@@ -1,16 +1,25 @@
 import ts from "typescript";
-import {
-  isAppeasementCastSourceType,
-  isAppeasementCastTargetType,
-  isNamedTypeReference,
-} from "./broad-input.mjs";
-import { EFFECT_DECODE_METHODS } from "./effect-schema.mjs";
-import { ZOD_VALIDATION_METHODS } from "./schema-provenance.mjs";
+import { isAppeasementCastSourceType } from "./broad-input.mjs";
+import { isEffectSchemaMethod } from "./effect-schema.mjs";
+import { ZOD_PARSE_METHODS, isZodMethod } from "./schema-provenance.mjs";
 
 const TYPE_FLAG_ANY = 1;
 const TYPE_FLAG_UNKNOWN = 2;
+const MAX_PROVENANCE_DEPTH = 16;
 
-export function expressionRoot(expression) {
+const EFFECT_VALUE_DECODE_METHODS = new Set([
+  "decode",
+  "decodeSync",
+  "decodePromise",
+  "decodeUnknown",
+  "decodeUnknownSync",
+  "decodeUnknownPromise",
+]);
+
+const YUP_VALIDATE_METHODS = new Set(["validate", "validateSync", "cast"]);
+const ZOD_SAFE_PARSE_METHODS = new Set(["safeParse", "safeParseAsync"]);
+
+function expressionRoot(expression) {
   let currentExpression = expression;
   while (currentExpression) {
     if (
@@ -27,19 +36,17 @@ export function expressionRoot(expression) {
   return currentExpression;
 }
 
-export function sameReference(typeChecker, leftExpression, rightExpression) {
+function sameReference(typeChecker, leftExpression, rightExpression) {
   const cleanLeft = expressionRoot(leftExpression);
   const cleanRight = expressionRoot(rightExpression);
   if (!cleanLeft || !cleanRight) {
     return false;
   }
-
   if (ts.isIdentifier(cleanLeft) && ts.isIdentifier(cleanRight)) {
     const leftSymbol = typeChecker.getSymbolAtLocation(cleanLeft);
     const rightSymbol = typeChecker.getSymbolAtLocation(cleanRight);
     return Boolean(leftSymbol && leftSymbol === rightSymbol);
   }
-
   if (
     ts.isPropertyAccessExpression(cleanLeft) &&
     ts.isPropertyAccessExpression(cleanRight) &&
@@ -51,7 +58,6 @@ export function sameReference(typeChecker, leftExpression, rightExpression) {
       cleanRight.expression
     );
   }
-
   if (
     ts.isElementAccessExpression(cleanLeft) &&
     ts.isElementAccessExpression(cleanRight) &&
@@ -65,15 +71,10 @@ export function sameReference(typeChecker, leftExpression, rightExpression) {
       cleanRight.expression
     );
   }
-
   return false;
 }
 
-export function changesOperand(
-  typeChecker,
-  statementOrExpression,
-  operandExpression
-) {
+function changesOperand(typeChecker, statementOrExpression, operandExpression) {
   if (
     ts.isBinaryExpression(statementOrExpression) &&
     statementOrExpression.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
@@ -99,7 +100,7 @@ export function changesOperand(
   );
 }
 
-export function statementAlwaysExits(statementNode) {
+function statementAlwaysExits(statementNode) {
   if (!statementNode) {
     return false;
   }
@@ -117,6 +118,455 @@ export function statementAlwaysExits(statementNode) {
     );
   }
   return false;
+}
+
+function isExternalOrLibraryFile(program, sourceFile) {
+  if (!sourceFile) {
+    return true;
+  }
+  const normalizedPath = sourceFile.fileName.replace(/\\/gu, "/");
+  return (
+    normalizedPath.includes("/node_modules/") ||
+    Boolean(program?.isSourceFileDefaultLibrary?.(sourceFile))
+  );
+}
+
+function isCompilerErrorType(typeChecker, type) {
+  if (!type) {
+    return true;
+  }
+  return (
+    type.intrinsicName === "error" ||
+    Boolean(typeChecker.isErrorType && typeChecker.isErrorType(type))
+  );
+}
+
+function isModuleSpecifierResolved(program, typeChecker, specifierNode) {
+  if (!specifierNode || !ts.isStringLiteralLike(specifierNode)) {
+    return true;
+  }
+  const sourceFile = specifierNode.getSourceFile();
+  const programResolved = program?.getResolvedModuleFromModuleSpecifier?.(
+    specifierNode,
+    sourceFile
+  );
+  if (programResolved?.resolvedModule) {
+    return true;
+  }
+  const compilerOptions = {
+    ...program?.getCompilerOptions?.(),
+    traceResolution: false,
+  };
+  const fallbackResolved = ts.resolveModuleName(
+    specifierNode.text,
+    sourceFile.fileName,
+    compilerOptions,
+    ts.sys
+  );
+  if (fallbackResolved?.resolvedModule) {
+    return true;
+  }
+  const moduleSymbol = typeChecker.getSymbolAtLocation(specifierNode);
+  if ((moduleSymbol?.declarations?.length ?? 0) > 0) {
+    return true;
+  }
+  return Boolean(typeChecker.tryFindAmbientModule?.(specifierNode.text));
+}
+
+function enclosingImportModuleSpecifier(node) {
+  let parentNode = node.parent;
+  while (parentNode && !ts.isImportDeclaration(parentNode)) {
+    parentNode = parentNode.parent;
+  }
+  const specifier = parentNode?.moduleSpecifier;
+  return specifier && ts.isStringLiteralLike(specifier) ? specifier : null;
+}
+
+function directNodeModuleSpecifier(node) {
+  if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+    const specifier = node.moduleSpecifier;
+    return specifier && ts.isStringLiteralLike(specifier) ? specifier : null;
+  }
+  if (
+    ts.isImportSpecifier(node) ||
+    ts.isImportClause(node) ||
+    ts.isNamespaceImport(node)
+  ) {
+    return enclosingImportModuleSpecifier(node);
+  }
+  if (
+    ts.isImportEqualsDeclaration(node) &&
+    ts.isExternalModuleReference(node.moduleReference)
+  ) {
+    const expr = node.moduleReference.expression;
+    return expr && ts.isStringLiteralLike(expr) ? expr : null;
+  }
+  if (
+    ts.isImportTypeNode(node) &&
+    ts.isLiteralTypeNode(node.argument) &&
+    ts.isStringLiteralLike(node.argument.literal)
+  ) {
+    return node.argument.literal;
+  }
+  if (ts.isCallExpression(node) && node.arguments.length > 0) {
+    const firstArg = node.arguments[0];
+    const isDynamicImport =
+      node.expression.kind === ts.SyntaxKind.ImportKeyword;
+    const isRequireCall =
+      ts.isIdentifier(node.expression) && node.expression.text === "require";
+    if (
+      (isDynamicImport || isRequireCall) &&
+      ts.isStringLiteralLike(firstArg)
+    ) {
+      return firstArg;
+    }
+  }
+  return null;
+}
+
+function isConstAssertionTypeNode(node) {
+  return (
+    ts.isTypeReferenceNode(node) &&
+    ts.isIdentifier(node.typeName) &&
+    node.typeName.text === "const"
+  );
+}
+
+function isResolvedCheckerSymbol(typeChecker, symbol) {
+  if (!symbol) {
+    return false;
+  }
+  if ((symbol.declarations?.length ?? 0) > 0) {
+    return true;
+  }
+  if (symbol.flags & ts.SymbolFlags.Alias) {
+    const aliasedSymbol = typeChecker.getAliasedSymbol(symbol);
+    return (aliasedSymbol?.declarations?.length ?? 0) > 0;
+  }
+  return false;
+}
+
+function entityNameRootIdentifier(entityName) {
+  let current = entityName;
+  while (current && ts.isQualifiedName(current)) {
+    current = current.left;
+  }
+  return current && ts.isIdentifier(current) ? current : null;
+}
+
+function isPartOfTypeEntityName(node) {
+  let current = node;
+  while (current?.parent && ts.isQualifiedName(current.parent)) {
+    current = current.parent;
+  }
+  return Boolean(
+    current?.parent &&
+    (ts.isTypeReferenceNode(current.parent) ||
+      ts.isTypeQueryNode(current.parent))
+  );
+}
+
+function unresolvedDirectNodeReference(typeChecker, node) {
+  if (ts.isTypeReferenceNode(node) && !isConstAssertionTypeNode(node)) {
+    const symbol = typeChecker.getSymbolAtLocation(node.typeName);
+    if (
+      !isResolvedCheckerSymbol(typeChecker, symbol) &&
+      isCompilerErrorType(typeChecker, typeChecker.getTypeFromTypeNode(node))
+    ) {
+      return { kind: "type", name: node.typeName.getText() };
+    }
+  }
+  if (ts.isTypeQueryNode(node)) {
+    if (
+      isCompilerErrorType(typeChecker, typeChecker.getTypeFromTypeNode(node))
+    ) {
+      return { kind: "value", name: node.exprName.getText() };
+    }
+  }
+  if (
+    ts.isIdentifier(node) &&
+    node.text !== "undefined" &&
+    !isPartOfTypeEntityName(node)
+  ) {
+    const parentNode = node.parent;
+    const isMemberName =
+      parentNode &&
+      ts.isPropertyAccessExpression(parentNode) &&
+      parentNode.name === node;
+    if (
+      !isMemberName &&
+      !typeChecker.getSymbolAtLocation(node) &&
+      isCompilerErrorType(typeChecker, typeChecker.getTypeAtLocation(node))
+    ) {
+      return { kind: "value", name: node.text };
+    }
+  }
+  return null;
+}
+
+const IMPORT_DECLARATION_KINDS = new Set([
+  ts.SyntaxKind.ImportSpecifier,
+  ts.SyntaxKind.ImportClause,
+  ts.SyntaxKind.NamespaceImport,
+  ts.SyntaxKind.ImportEqualsDeclaration,
+]);
+
+const BINDING_CHAIN_KINDS = new Set([
+  ts.SyntaxKind.BindingElement,
+  ts.SyntaxKind.ObjectBindingPattern,
+  ts.SyntaxKind.ArrayBindingPattern,
+]);
+
+const TYPED_INITIALIZER_DECLARATION_KINDS = new Set([
+  ts.SyntaxKind.VariableDeclaration,
+  ts.SyntaxKind.Parameter,
+  ts.SyntaxKind.PropertyDeclaration,
+  ts.SyntaxKind.PropertySignature,
+  ts.SyntaxKind.PropertyAssignment,
+]);
+
+const CALLABLE_DECLARATION_KINDS = new Set([
+  ts.SyntaxKind.FunctionDeclaration,
+  ts.SyntaxKind.MethodDeclaration,
+  ts.SyntaxKind.MethodSignature,
+  ts.SyntaxKind.ArrowFunction,
+  ts.SyntaxKind.FunctionExpression,
+  ts.SyntaxKind.GetAccessorDeclaration,
+]);
+
+function collectBindingElementTargets(bindingElement) {
+  const targets = [];
+  let current = bindingElement;
+  while (current && BINDING_CHAIN_KINDS.has(current.kind)) {
+    if (current.initializer) {
+      targets.push(current.initializer);
+    }
+    current = current.parent;
+  }
+  if (
+    current &&
+    (ts.isVariableDeclaration(current) || ts.isParameter(current))
+  ) {
+    return [...targets, ...[current.type, current.initializer].filter(Boolean)];
+  }
+  return targets;
+}
+
+function collectDeclarationFollowTargets(declarationNode) {
+  if (IMPORT_DECLARATION_KINDS.has(declarationNode.kind)) {
+    return [declarationNode];
+  }
+  if (ts.isBindingElement(declarationNode)) {
+    return collectBindingElementTargets(declarationNode);
+  }
+  if (TYPED_INITIALIZER_DECLARATION_KINDS.has(declarationNode.kind)) {
+    return [declarationNode.type, declarationNode.initializer].filter(Boolean);
+  }
+  if (CALLABLE_DECLARATION_KINDS.has(declarationNode.kind)) {
+    if (declarationNode.type) {
+      return [declarationNode.type];
+    }
+    return declarationNode.body && !ts.isBlock(declarationNode.body)
+      ? [declarationNode.body]
+      : [];
+  }
+  if (ts.isTypeAliasDeclaration(declarationNode)) {
+    return [declarationNode.type];
+  }
+  if (
+    ts.isInterfaceDeclaration(declarationNode) ||
+    ts.isClassDeclaration(declarationNode)
+  ) {
+    return [
+      ...(declarationNode.heritageClauses ?? []),
+      ...(declarationNode.members ?? []),
+    ];
+  }
+  return [];
+}
+
+function collectLookupTargetNodes(node) {
+  if (ts.isTypeReferenceNode(node)) {
+    return [entityNameRootIdentifier(node.typeName), node.typeName].filter(
+      Boolean
+    );
+  }
+  if (ts.isTypeQueryNode(node)) {
+    return [entityNameRootIdentifier(node.exprName), node.exprName].filter(
+      Boolean
+    );
+  }
+  if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
+    return [node];
+  }
+  return [];
+}
+
+function lookupNodeSymbols(typeChecker, node) {
+  const symbols = [];
+  for (const targetNode of collectLookupTargetNodes(node)) {
+    const primarySymbol = typeChecker.getSymbolAtLocation(targetNode);
+    if (!primarySymbol) {
+      continue;
+    }
+    symbols.push(primarySymbol);
+    if (primarySymbol.flags & ts.SymbolFlags.Alias) {
+      const aliasedSymbol = typeChecker.getAliasedSymbol(primarySymbol);
+      if (aliasedSymbol && aliasedSymbol !== primarySymbol) {
+        symbols.push(aliasedSymbol);
+      }
+    }
+  }
+  return symbols;
+}
+
+function findNodeUnresolvedProvenance(program, typeChecker, rootNode) {
+  if (!rootNode) {
+    return null;
+  }
+  const visitedNodes = new Set();
+  const visitedSymbols = new Set();
+
+  function walk(node, depth) {
+    if (
+      !node ||
+      depth > MAX_PROVENANCE_DEPTH ||
+      visitedNodes.has(node) ||
+      isConstAssertionTypeNode(node)
+    ) {
+      return null;
+    }
+    visitedNodes.add(node);
+    if (isExternalOrLibraryFile(program, node.getSourceFile?.())) {
+      return null;
+    }
+    const specifier = directNodeModuleSpecifier(node);
+    if (
+      specifier &&
+      !isModuleSpecifierResolved(program, typeChecker, specifier)
+    ) {
+      return { kind: "module", name: specifier.text };
+    }
+    for (const symbol of lookupNodeSymbols(typeChecker, node)) {
+      if (visitedSymbols.has(symbol)) {
+        continue;
+      }
+      visitedSymbols.add(symbol);
+      for (const declaration of symbol.declarations ?? []) {
+        if (isExternalOrLibraryFile(program, declaration.getSourceFile?.())) {
+          continue;
+        }
+        for (const followTarget of collectDeclarationFollowTargets(
+          declaration
+        )) {
+          const hit = walk(followTarget, depth + 1);
+          if (hit) {
+            return hit;
+          }
+        }
+      }
+    }
+    const directUnresolved = unresolvedDirectNodeReference(typeChecker, node);
+    if (directUnresolved) {
+      return directUnresolved;
+    }
+    let childHit = null;
+    ts.forEachChild(node, (childNode) => {
+      if (!childHit) {
+        childHit = walk(childNode, depth + 1);
+      }
+    });
+    return childHit;
+  }
+
+  return walk(rootNode, 0);
+}
+
+function typeContainsCompilerError(typeChecker, type, seen = new Set()) {
+  if (!type) {
+    return true;
+  }
+  if (seen.has(type)) {
+    return false;
+  }
+  seen.add(type);
+  if (isCompilerErrorType(typeChecker, type)) {
+    return true;
+  }
+  if (
+    (type.types ?? []).some((constituent) =>
+      typeContainsCompilerError(typeChecker, constituent, seen)
+    )
+  ) {
+    return true;
+  }
+  if (
+    (typeChecker.getTypeArguments?.(type) ?? []).some((argumentType) =>
+      typeContainsCompilerError(typeChecker, argumentType, seen)
+    )
+  ) {
+    return true;
+  }
+  const stringIndexType = type.getStringIndexType?.();
+  if (
+    stringIndexType &&
+    typeContainsCompilerError(typeChecker, stringIndexType, seen)
+  ) {
+    return true;
+  }
+  const numberIndexType = type.getNumberIndexType?.();
+  return Boolean(
+    numberIndexType &&
+    typeContainsCompilerError(typeChecker, numberIndexType, seen)
+  );
+}
+
+function findCastUnresolvedProvenance(
+  program,
+  typeChecker,
+  tsExpression,
+  tsTypeNode,
+  sourceType,
+  targetType
+) {
+  if (!tsExpression || !tsTypeNode) {
+    return { kind: "type", name: null };
+  }
+  const expressionUnresolved = findNodeUnresolvedProvenance(
+    program,
+    typeChecker,
+    tsExpression
+  );
+  if (expressionUnresolved) {
+    return expressionUnresolved;
+  }
+  if (!isConstAssertionTypeNode(tsTypeNode)) {
+    const targetUnresolved = findNodeUnresolvedProvenance(
+      program,
+      typeChecker,
+      tsTypeNode
+    );
+    if (targetUnresolved) {
+      return targetUnresolved;
+    }
+  }
+  if (
+    typeContainsCompilerError(typeChecker, sourceType) ||
+    typeContainsCompilerError(typeChecker, targetType)
+  ) {
+    return { kind: "type", name: null };
+  }
+  return null;
+}
+
+function formatIncompleteAnalysisMessage(unresolved) {
+  if (unresolved?.kind === "module" && unresolved.name) {
+    return `Incomplete analysis: TypeScript could not resolve module '${unresolved.name}' for this cast.`;
+  }
+  if (unresolved?.name) {
+    return `Incomplete analysis: TypeScript could not resolve '${unresolved.name}' for this cast.`;
+  }
+  return "Incomplete analysis: TypeScript could not resolve the types for this cast.";
 }
 
 function isBroadArrayPredicateType(typeChecker, predicateType, targetType) {
@@ -150,12 +600,8 @@ function isPredicateAssignableToTarget(typeChecker, predicateType, targetType) {
   return typeChecker.isTypeAssignableTo(predicateType, targetType);
 }
 
-function isExpectationInstanceCheck(
-  typeChecker,
-  callExpression,
-  operandExpression,
-  targetType
-) {
+function isExpectationInstanceCheck(castContext, callExpression) {
+  const { typeChecker, tsExpression, targetType } = castContext;
   if (
     !ts.isCallExpression(callExpression) ||
     !ts.isPropertyAccessExpression(callExpression.expression)
@@ -169,7 +615,7 @@ function isExpectationInstanceCheck(
     !ts.isCallExpression(expectationCall) ||
     !ts.isIdentifier(expectationCall.expression) ||
     expectationCall.arguments.length !== 1 ||
-    !sameReference(typeChecker, expectationCall.arguments[0], operandExpression)
+    !sameReference(typeChecker, expectationCall.arguments[0], tsExpression)
   ) {
     return false;
   }
@@ -184,45 +630,57 @@ function isExpectationInstanceCheck(
   });
 }
 
-function hasTypePredicateSignature(
-  typeChecker,
-  callExpression,
-  operandExpression,
-  targetType
-) {
+function hasBooleanTypePredicateSignature(castContext, callExpression) {
+  const { typeChecker, tsExpression, targetType } = castContext;
   const signature = typeChecker.getResolvedSignature(callExpression);
   const typePredicate =
     signature && typeChecker.getTypePredicateOfSignature(signature);
-  if (!typePredicate || !typePredicate.type) {
+  if (
+    !typePredicate ||
+    !typePredicate.type ||
+    (typePredicate.kind !== ts.TypePredicateKind.Identifier &&
+      typePredicate.kind !== ts.TypePredicateKind.This)
+  ) {
     return false;
   }
   const argumentForPredicate =
     callExpression.arguments[typePredicate.parameterIndex];
   return Boolean(
     argumentForPredicate &&
-    sameReference(typeChecker, argumentForPredicate, operandExpression) &&
+    sameReference(typeChecker, argumentForPredicate, tsExpression) &&
     isPredicateAssignableToTarget(typeChecker, typePredicate.type, targetType)
   );
 }
 
-function isCallTypePredicateProof(
-  typeChecker,
-  callExpression,
-  operandExpression,
-  targetType
-) {
+function isAssertsCallProof(castContext, callExpression) {
   if (!ts.isCallExpression(callExpression)) {
     return false;
   }
+  const { typeChecker, tsExpression, targetType } = castContext;
+  const signature = typeChecker.getResolvedSignature(callExpression);
+  const typePredicate =
+    signature && typeChecker.getTypePredicateOfSignature(signature);
   if (
-    hasTypePredicateSignature(
-      typeChecker,
-      callExpression,
-      operandExpression,
-      targetType
-    )
+    typePredicate &&
+    (typePredicate.kind === ts.TypePredicateKind.AssertsIdentifier ||
+      typePredicate.kind === ts.TypePredicateKind.AssertsThis)
   ) {
-    return true;
+    const argumentForPredicate =
+      callExpression.arguments[typePredicate.parameterIndex];
+    if (!argumentForPredicate) {
+      return false;
+    }
+    if (typePredicate.type) {
+      return (
+        sameReference(typeChecker, argumentForPredicate, tsExpression) &&
+        isPredicateAssignableToTarget(
+          typeChecker,
+          typePredicate.type,
+          targetType
+        )
+      );
+    }
+    return conditionProvesTarget(castContext, argumentForPredicate, false);
   }
   if (
     ts.isIdentifier(callExpression.expression) &&
@@ -230,37 +688,36 @@ function isCallTypePredicateProof(
     callExpression.arguments.length >= 1
   ) {
     return conditionProvesTarget(
-      typeChecker,
+      castContext,
       callExpression.arguments[0],
-      operandExpression,
-      targetType,
       false
     );
   }
   return false;
 }
 
-function callConditionProvesTarget(
-  typeChecker,
-  callExpression,
-  operandExpression,
-  targetType
-) {
-  if (
-    hasTypePredicateSignature(
-      typeChecker,
-      callExpression,
-      operandExpression,
-      targetType
-    )
-  ) {
+function isDefaultLibraryCollectionHas(program, typeChecker, methodNameNode) {
+  const symbol = typeChecker.getSymbolAtLocation(methodNameNode);
+  return (symbol?.declarations ?? []).some((declaration) =>
+    Boolean(program?.isSourceFileDefaultLibrary?.(declaration.getSourceFile()))
+  );
+}
+
+function callConditionProvesTarget(castContext, callExpression) {
+  if (hasBooleanTypePredicateSignature(castContext, callExpression)) {
     return true;
   }
+  const { program, typeChecker, tsExpression, targetType } = castContext;
   if (
     ts.isPropertyAccessExpression(callExpression.expression) &&
     callExpression.expression.name.text === "has" &&
     callExpression.arguments.length === 1 &&
-    sameReference(typeChecker, callExpression.arguments[0], operandExpression)
+    isDefaultLibraryCollectionHas(
+      program,
+      typeChecker,
+      callExpression.expression.name
+    ) &&
+    sameReference(typeChecker, callExpression.arguments[0], tsExpression)
   ) {
     const signatureHas = typeChecker.getResolvedSignature(callExpression);
     const firstParameter = signatureHas?.parameters[0];
@@ -278,15 +735,11 @@ function callConditionProvesTarget(
   return false;
 }
 
-function instanceOfConditionProvesTarget(
-  typeChecker,
-  binaryExpression,
-  operandExpression,
-  targetType
-) {
+function instanceOfConditionProvesTarget(castContext, binaryExpression) {
+  const { typeChecker, tsExpression, targetType } = castContext;
   if (
     binaryExpression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword &&
-    sameReference(typeChecker, binaryExpression.left, operandExpression)
+    sameReference(typeChecker, binaryExpression.left, tsExpression)
   ) {
     const constructorType = typeChecker.getTypeAtLocation(
       binaryExpression.right
@@ -299,119 +752,303 @@ function instanceOfConditionProvesTarget(
   return false;
 }
 
-function resolveInitializerCall(typeChecker, expressionNode) {
-  const unwrapped = expressionRoot(expressionNode);
-  if (ts.isCallExpression(unwrapped)) {
-    return unwrapped;
+function isYupMethod(typeChecker, tsNameNode) {
+  const rawSymbol = tsNameNode && typeChecker.getSymbolAtLocation(tsNameNode);
+  const symbol =
+    rawSymbol && rawSymbol.flags & ts.SymbolFlags.Alias
+      ? typeChecker.getAliasedSymbol(rawSymbol)
+      : rawSymbol;
+  for (const declaration of symbol?.declarations ?? []) {
+    const filePath = declaration.getSourceFile().fileName.replace(/\\/gu, "/");
+    const markerIndex = filePath.lastIndexOf("/node_modules/");
+    if (markerIndex === -1) {
+      continue;
+    }
+    const packagePath = filePath.slice(markerIndex + "/node_modules/".length);
+    if (
+      packagePath === "yup" ||
+      packagePath.startsWith("yup/") ||
+      packagePath.startsWith("@types/yup/")
+    ) {
+      return true;
+    }
   }
-  if (!ts.isIdentifier(unwrapped)) {
+  return false;
+}
+
+function isBrandKitMethod(typeChecker, tsNameNode, expectedMethodName) {
+  if (!tsNameNode || tsNameNode.text !== expectedMethodName) {
+    return false;
+  }
+  const rawSymbol = typeChecker.getSymbolAtLocation(tsNameNode);
+  const symbol =
+    rawSymbol && rawSymbol.flags & ts.SymbolFlags.Alias
+      ? typeChecker.getAliasedSymbol(rawSymbol)
+      : rawSymbol;
+  for (const declaration of symbol?.declarations ?? []) {
+    const filePath = declaration.getSourceFile().fileName.replace(/\\/gu, "/");
+    if (
+      filePath.endsWith("@joedeleeuw/antidrift/src/brand/index.d.mts") ||
+      filePath.endsWith("tooling/antidrift/src/brand/index.d.mts")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isRecognisedLibraryDecoderCall(typeChecker, callExpression) {
+  const callee = callExpression.expression;
+  if (ts.isPropertyAccessExpression(callee)) {
+    const methodName = callee.name.text;
+    if (
+      ZOD_PARSE_METHODS.has(methodName) &&
+      isZodMethod(typeChecker, callee.name)
+    ) {
+      return true;
+    }
+    if (
+      YUP_VALIDATE_METHODS.has(methodName) &&
+      isYupMethod(typeChecker, callee.name)
+    ) {
+      return true;
+    }
+    if (
+      EFFECT_VALUE_DECODE_METHODS.has(methodName) &&
+      isEffectSchemaMethod(typeChecker, callee.name)
+    ) {
+      return true;
+    }
+    if (isBrandKitMethod(typeChecker, callee.name, "make")) {
+      return true;
+    }
+  }
+  if (
+    ts.isCallExpression(callee) &&
+    ts.isPropertyAccessExpression(callee.expression)
+  ) {
+    const innerMethod = callee.expression.name;
+    if (
+      EFFECT_VALUE_DECODE_METHODS.has(innerMethod.text) &&
+      isEffectSchemaMethod(typeChecker, innerMethod)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isCallReturningDecodedTarget(
+  typeChecker,
+  candidateExpression,
+  targetType
+) {
+  let unwrapped = expressionRoot(candidateExpression);
+  let wasAwaited = false;
+  if (unwrapped && ts.isAwaitExpression(unwrapped)) {
+    wasAwaited = true;
+    unwrapped = expressionRoot(unwrapped.expression);
+  }
+  if (!unwrapped || !ts.isCallExpression(unwrapped)) {
+    return false;
+  }
+  if (!isRecognisedLibraryDecoderCall(typeChecker, unwrapped)) {
+    return false;
+  }
+  const signature = typeChecker.getResolvedSignature(unwrapped);
+  if (!signature) {
+    return false;
+  }
+  let outputType = typeChecker.getReturnTypeOfSignature(signature);
+  if (wasAwaited && typeChecker.getAwaitedType) {
+    outputType = typeChecker.getAwaitedType(outputType) ?? outputType;
+  }
+  if (
+    !outputType ||
+    outputType.flags &
+      (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Void)
+  ) {
+    return false;
+  }
+  return typeChecker.isTypeAssignableTo(outputType, targetType);
+}
+
+function resolveSingleInitializerExpression(typeChecker, expressionNode) {
+  const unwrapped = expressionRoot(expressionNode);
+  if (!unwrapped || !ts.isIdentifier(unwrapped)) {
     return null;
   }
   const symbol = typeChecker.getSymbolAtLocation(unwrapped);
   for (const declaration of symbol?.declarations ?? []) {
     if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
-      const initNode = expressionRoot(declaration.initializer);
-      if (ts.isCallExpression(initNode)) {
-        return initNode;
-      }
+      return declaration.initializer;
     }
   }
   return null;
 }
 
-function conditionProvesTarget(
+function isRecognisedSafeWrapperResult(
   typeChecker,
-  conditionExpression,
-  operandExpression,
-  targetType,
-  negated
+  wrapperExpression,
+  propertyName,
+  targetType
 ) {
+  let callNode = expressionRoot(wrapperExpression);
+  const initExpr = resolveSingleInitializerExpression(typeChecker, callNode);
+  if (initExpr) {
+    callNode = expressionRoot(initExpr);
+  }
+  let wasAwaited = false;
+  if (callNode && ts.isAwaitExpression(callNode)) {
+    wasAwaited = true;
+    callNode = expressionRoot(callNode.expression);
+  }
+  if (
+    !callNode ||
+    !ts.isCallExpression(callNode) ||
+    !ts.isPropertyAccessExpression(callNode.expression)
+  ) {
+    return false;
+  }
+  const methodNode = callNode.expression.name;
+  const isZodSafe =
+    propertyName === "data" &&
+    ZOD_SAFE_PARSE_METHODS.has(methodNode.text) &&
+    isZodMethod(typeChecker, methodNode);
+  const isBrandSafe =
+    propertyName === "value" &&
+    isBrandKitMethod(typeChecker, methodNode, "safe");
+  if (!isZodSafe && !isBrandSafe) {
+    return false;
+  }
+  const signature = typeChecker.getResolvedSignature(callNode);
+  if (!signature) {
+    return false;
+  }
+  let wrapperType = typeChecker.getReturnTypeOfSignature(signature);
+  if (wasAwaited && typeChecker.getAwaitedType) {
+    wrapperType = typeChecker.getAwaitedType(wrapperType) ?? wrapperType;
+  }
+  const variants = wrapperType?.types ?? [wrapperType];
+  for (const variant of variants) {
+    const propSym =
+      variant && typeChecker.getPropertyOfType(variant, propertyName);
+    if (!propSym) {
+      continue;
+    }
+    const propType = typeChecker.getTypeOfSymbolAtLocation(propSym, callNode);
+    const nonNullPropType = typeChecker.getNonNullableType(propType);
+    if (
+      nonNullPropType &&
+      !(nonNullPropType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) &&
+      typeChecker.isTypeAssignableTo(nonNullPropType, targetType)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function safeWrapperAccessTarget(typeChecker, operandExpression) {
+  let cleanOperand = expressionRoot(operandExpression);
+  const initExpr = resolveSingleInitializerExpression(
+    typeChecker,
+    cleanOperand
+  );
+  if (initExpr) {
+    cleanOperand = expressionRoot(initExpr);
+  }
+  if (!cleanOperand || !ts.isPropertyAccessExpression(cleanOperand)) {
+    return null;
+  }
+  const propName = cleanOperand.name.text;
+  if (propName !== "data" && propName !== "value") {
+    return null;
+  }
+  return {
+    wrapperObject: cleanOperand.expression,
+    valueProperty: propName,
+    flagProperty: propName === "data" ? "success" : "ok",
+  };
+}
+
+function isSafeWrapperFlagCondition(castContext, conditionNode) {
+  if (!ts.isPropertyAccessExpression(conditionNode)) {
+    return false;
+  }
+  const { typeChecker, tsExpression, targetType } = castContext;
+  const accessTarget = safeWrapperAccessTarget(typeChecker, tsExpression);
+  if (
+    !accessTarget ||
+    conditionNode.name.text !== accessTarget.flagProperty ||
+    !sameReference(
+      typeChecker,
+      conditionNode.expression,
+      accessTarget.wrapperObject
+    )
+  ) {
+    return false;
+  }
+  return isRecognisedSafeWrapperResult(
+    typeChecker,
+    accessTarget.wrapperObject,
+    accessTarget.valueProperty,
+    targetType
+  );
+}
+
+function isDecodedValueCast(castContext) {
+  const { typeChecker, tsExpression, targetType } = castContext;
+  if (isCallReturningDecodedTarget(typeChecker, tsExpression, targetType)) {
+    return true;
+  }
+  const initializer = resolveSingleInitializerExpression(
+    typeChecker,
+    tsExpression
+  );
+  return Boolean(
+    initializer &&
+    isCallReturningDecodedTarget(typeChecker, initializer, targetType)
+  );
+}
+
+function conditionProvesTarget(castContext, conditionExpression, negated) {
   const unwrappedCondition = expressionRoot(conditionExpression);
   if (!unwrappedCondition) {
     return false;
   }
-
   if (
     ts.isPrefixUnaryExpression(unwrappedCondition) &&
     unwrappedCondition.operator === ts.SyntaxKind.ExclamationToken
   ) {
     return conditionProvesTarget(
-      typeChecker,
+      castContext,
       unwrappedCondition.operand,
-      operandExpression,
-      targetType,
       !negated
     );
   }
-
   if (ts.isBinaryExpression(unwrappedCondition)) {
+    const operatorKind = unwrappedCondition.operatorToken.kind;
     if (
-      (!negated &&
-        unwrappedCondition.operatorToken.kind ===
-          ts.SyntaxKind.AmpersandAmpersandToken) ||
-      (negated &&
-        unwrappedCondition.operatorToken.kind === ts.SyntaxKind.BarBarToken)
+      (!negated && operatorKind === ts.SyntaxKind.AmpersandAmpersandToken) ||
+      (negated && operatorKind === ts.SyntaxKind.BarBarToken)
     ) {
       return (
-        conditionProvesTarget(
-          typeChecker,
-          unwrappedCondition.left,
-          operandExpression,
-          targetType,
-          negated
-        ) ||
-        conditionProvesTarget(
-          typeChecker,
-          unwrappedCondition.right,
-          operandExpression,
-          targetType,
-          negated
-        )
+        conditionProvesTarget(castContext, unwrappedCondition.left, negated) ||
+        conditionProvesTarget(castContext, unwrappedCondition.right, negated)
       );
     }
     if (!negated) {
-      return instanceOfConditionProvesTarget(
-        typeChecker,
-        unwrappedCondition,
-        operandExpression,
-        targetType
-      );
+      return instanceOfConditionProvesTarget(castContext, unwrappedCondition);
     }
   }
-
   if (negated) {
     return false;
   }
-
   if (ts.isCallExpression(unwrappedCondition)) {
-    return callConditionProvesTarget(
-      typeChecker,
-      unwrappedCondition,
-      operandExpression,
-      targetType
-    );
+    return callConditionProvesTarget(castContext, unwrappedCondition);
   }
-
-  if (
-    ts.isPropertyAccessExpression(unwrappedCondition) &&
-    unwrappedCondition.name.text === "success"
-  ) {
-    const safeParseCall = resolveInitializerCall(
-      typeChecker,
-      unwrappedCondition.expression
-    );
-    return Boolean(
-      safeParseCall &&
-      isPrecedingStatementSchemaDecode(
-        typeChecker,
-        safeParseCall,
-        operandExpression,
-        targetType
-      )
-    );
-  }
-
-  return false;
+  return isSafeWrapperFlagCondition(castContext, unwrappedCondition);
 }
 
 function extractExpectationTrueCondition(callExpression) {
@@ -442,186 +1079,21 @@ function extractExpectationTrueCondition(callExpression) {
   return expectationCall.arguments[0];
 }
 
-function isExpectationNonNullCheck(
-  typeChecker,
-  callExpression,
-  operandExpression,
-  sourceType,
-  targetType
-) {
-  const nonNullableSourceType = typeChecker.getNonNullableType(sourceType);
-  if (!typeChecker.isTypeAssignableTo(nonNullableSourceType, targetType)) {
-    return false;
-  }
-  if (
-    !ts.isCallExpression(callExpression) ||
-    !ts.isPropertyAccessExpression(callExpression.expression)
-  ) {
-    return false;
-  }
-  const memberAccess = callExpression.expression;
-  const matcherName = memberAccess.name.text;
-  let subjectCall = memberAccess.expression;
-  if (
-    ts.isPropertyAccessExpression(subjectCall) &&
-    subjectCall.name.text === "not"
-  ) {
-    if (["toBeNull", "toBeUndefined", "toBeFalsy"].includes(matcherName)) {
-      subjectCall = subjectCall.expression;
-    } else {
-      return false;
-    }
-  } else if (!["toBeDefined", "toBeTruthy"].includes(matcherName)) {
-    return false;
-  }
-
-  return Boolean(
-    ts.isCallExpression(subjectCall) &&
-    ts.isIdentifier(subjectCall.expression) &&
-    subjectCall.arguments.length === 1 &&
-    sameReference(typeChecker, subjectCall.arguments[0], operandExpression)
-  );
-}
-
-function isPrecedingStatementSchemaDecode(
-  typeChecker,
-  callExpression,
-  operandExpression,
-  targetType
-) {
-  if (
-    !ts.isCallExpression(callExpression) ||
-    callExpression.arguments.length < 1 ||
-    !sameReference(typeChecker, callExpression.arguments[0], operandExpression)
-  ) {
-    return false;
-  }
-  const callee = callExpression.expression;
-  if (
-    ts.isPropertyAccessExpression(callee) &&
-    ZOD_VALIDATION_METHODS.has(callee.name.text)
-  ) {
-    return true;
-  }
-  const signature = typeChecker.getResolvedSignature(callExpression);
-  if (!signature || signature.parameters.length < 1) {
-    return false;
-  }
-  const parameterType = typeChecker.getTypeOfSymbolAtLocation(
-    signature.parameters[0],
-    callExpression
-  );
-  if (!(parameterType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown))) {
-    return false;
-  }
-  const returnType = typeChecker.getReturnTypeOfSignature(signature);
-  return (
-    !(
-      returnType.flags &
-      (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Void)
-    ) && typeChecker.isTypeAssignableTo(returnType, targetType)
-  );
-}
-
-function isCallDecodeExpression(typeChecker, candidateCall, targetType) {
-  if (ts.isPropertyAccessExpression(candidateCall.expression)) {
-    const methodName = candidateCall.expression.name.text;
-    if (
-      ZOD_VALIDATION_METHODS.has(methodName) ||
-      ["validate", "validateSync", "isValidSync"].includes(methodName)
-    ) {
-      return true;
-    }
-  }
-  if (ts.isCallExpression(candidateCall.expression)) {
-    const innerCall = candidateCall.expression;
-    if (
-      ts.isPropertyAccessExpression(innerCall.expression) &&
-      EFFECT_DECODE_METHODS.has(innerCall.expression.name.text)
-    ) {
-      return true;
-    }
-  }
-  const signature = typeChecker.getResolvedSignature(candidateCall);
-  if (!signature || signature.parameters.length < 1) {
-    return false;
-  }
-  const parameterType = typeChecker.getTypeOfSymbolAtLocation(
-    signature.parameters[0],
-    candidateCall
-  );
-  if (!(parameterType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown))) {
-    return false;
-  }
-  const returnType = typeChecker.getReturnTypeOfSignature(signature);
-  return (
-    !(
-      returnType.flags &
-      (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Void)
-    ) && typeChecker.isTypeAssignableTo(returnType, targetType)
-  );
-}
-
-function isInitializedBySchemaDecode(
-  typeChecker,
-  operandExpression,
-  targetType
-) {
-  const unwrappedOperand = expressionRoot(operandExpression);
-  if (!unwrappedOperand || !ts.isIdentifier(unwrappedOperand)) {
-    return false;
-  }
-  const operandSymbol = typeChecker.getSymbolAtLocation(unwrappedOperand);
-  for (const declaration of operandSymbol?.declarations ?? []) {
-    if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) {
-      continue;
-    }
-    let candidateCall = expressionRoot(declaration.initializer);
-    if (ts.isAwaitExpression(candidateCall)) {
-      candidateCall = expressionRoot(candidateCall.expression);
-    }
-    if (
-      ts.isCallExpression(candidateCall) &&
-      isCallDecodeExpression(typeChecker, candidateCall, targetType)
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function checkEnclosingBranchProof(
-  typeChecker,
-  parentNode,
-  childNode,
-  operandExpression,
-  targetType
-) {
-  if (changesOperand(typeChecker, childNode, operandExpression)) {
+function checkEnclosingBranchProof(castContext, parentNode, childNode) {
+  const { typeChecker, tsExpression } = castContext;
+  if (changesOperand(typeChecker, childNode, tsExpression)) {
     return null;
   }
   if (ts.isIfStatement(parentNode)) {
     if (
       parentNode.thenStatement === childNode &&
-      conditionProvesTarget(
-        typeChecker,
-        parentNode.expression,
-        operandExpression,
-        targetType,
-        false
-      )
+      conditionProvesTarget(castContext, parentNode.expression, false)
     ) {
       return "branch_guard";
     }
     if (
       parentNode.elseStatement === childNode &&
-      conditionProvesTarget(
-        typeChecker,
-        parentNode.expression,
-        operandExpression,
-        targetType,
-        true
-      )
+      conditionProvesTarget(castContext, parentNode.expression, true)
     ) {
       return "branch_guard";
     }
@@ -629,25 +1101,13 @@ function checkEnclosingBranchProof(
   if (ts.isConditionalExpression(parentNode)) {
     if (
       parentNode.whenTrue === childNode &&
-      conditionProvesTarget(
-        typeChecker,
-        parentNode.condition,
-        operandExpression,
-        targetType,
-        false
-      )
+      conditionProvesTarget(castContext, parentNode.condition, false)
     ) {
       return "branch_guard";
     }
     if (
       parentNode.whenFalse === childNode &&
-      conditionProvesTarget(
-        typeChecker,
-        parentNode.condition,
-        operandExpression,
-        targetType,
-        true
-      )
+      conditionProvesTarget(castContext, parentNode.condition, true)
     ) {
       return "branch_guard";
     }
@@ -656,37 +1116,19 @@ function checkEnclosingBranchProof(
     ts.isBinaryExpression(parentNode) &&
     parentNode.right === childNode &&
     parentNode.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-    conditionProvesTarget(
-      typeChecker,
-      parentNode.left,
-      operandExpression,
-      targetType,
-      false
-    )
+    conditionProvesTarget(castContext, parentNode.left, false)
   ) {
     return "branch_guard";
   }
   return null;
 }
 
-function checkPrecedingStatementProof(
-  typeChecker,
-  priorStatement,
-  operandExpression,
-  sourceType,
-  targetType
-) {
+function checkPrecedingStatementProof(castContext, priorStatement) {
   if (
     ts.isIfStatement(priorStatement) &&
     !priorStatement.elseStatement &&
     statementAlwaysExits(priorStatement.thenStatement) &&
-    conditionProvesTarget(
-      typeChecker,
-      priorStatement.expression,
-      operandExpression,
-      targetType,
-      true
-    )
+    conditionProvesTarget(castContext, priorStatement.expression, true)
   ) {
     return "early_exit_guard";
   }
@@ -694,59 +1136,18 @@ function checkPrecedingStatementProof(
     return null;
   }
   const expression = priorStatement.expression;
-  if (
-    isExpectationInstanceCheck(
-      typeChecker,
-      expression,
-      operandExpression,
-      targetType
-    )
-  ) {
+  if (isExpectationInstanceCheck(castContext, expression)) {
     return "instance_check";
   }
   const expectationCondition = extractExpectationTrueCondition(expression);
   if (
     expectationCondition &&
-    conditionProvesTarget(
-      typeChecker,
-      expectationCondition,
-      operandExpression,
-      targetType,
-      false
-    )
+    conditionProvesTarget(castContext, expectationCondition, false)
   ) {
     return "condition_check";
   }
-  if (
-    isExpectationNonNullCheck(
-      typeChecker,
-      expression,
-      operandExpression,
-      sourceType,
-      targetType
-    )
-  ) {
-    return "non_null_check";
-  }
-  if (
-    isCallTypePredicateProof(
-      typeChecker,
-      expression,
-      operandExpression,
-      targetType
-    )
-  ) {
-    return "type_predicate";
-  }
-  if (
-    isPrecedingStatementSchemaDecode(
-      typeChecker,
-      expression,
-      operandExpression,
-      targetType
-    )
-  ) {
-    return "schema_decode";
+  if (isAssertsCallProof(castContext, expression)) {
+    return "asserts_call";
   }
   return null;
 }
@@ -760,74 +1161,100 @@ function isStatementContainerNode(node) {
   );
 }
 
-export function findDominatingProof(
-  typeChecker,
-  assertionNode,
-  operandExpression,
-  sourceType,
-  targetType
-) {
-  if (isInitializedBySchemaDecode(typeChecker, operandExpression, targetType)) {
-    return "schema_decode";
+function findDominatingProof(castContext) {
+  const { typeChecker, tsAssertion, tsExpression } = castContext;
+  if (!tsAssertion || !tsExpression) {
+    return null;
   }
-
+  let decodedCandidate = isDecodedValueCast(castContext);
   for (
-    let currentNode = assertionNode;
+    let currentNode = tsAssertion;
     currentNode.parent && !ts.isFunctionLike(currentNode.parent);
     currentNode = currentNode.parent
   ) {
     const parentNode = currentNode.parent;
     const branchProof = checkEnclosingBranchProof(
-      typeChecker,
+      castContext,
       parentNode,
-      currentNode,
-      operandExpression,
-      targetType
+      currentNode
     );
     if (branchProof) {
       return branchProof;
     }
-
     if (!isStatementContainerNode(parentNode)) {
       continue;
     }
-
     const statementList = parentNode.statements;
     const currentIndex = statementList.indexOf(currentNode);
     if (currentIndex === -1) {
       continue;
     }
-
     for (
       let statementIndex = currentIndex - 1;
       statementIndex >= 0;
       statementIndex -= 1
     ) {
       const priorStatement = statementList[statementIndex];
-      if (changesOperand(typeChecker, priorStatement, operandExpression)) {
+      if (changesOperand(typeChecker, priorStatement, tsExpression)) {
+        decodedCandidate = false;
         return null;
       }
       const proofKind = checkPrecedingStatementProof(
-        typeChecker,
-        priorStatement,
-        operandExpression,
-        sourceType,
-        targetType
+        castContext,
+        priorStatement
       );
       if (proofKind) {
         return proofKind;
       }
     }
   }
-
-  return null;
+  return decodedCandidate ? "schema_decode" : null;
 }
 
-export function buildCastEvaluationContext(
-  castNode,
-  parserServices,
-  typeChecker
-) {
+function isTypePredicateParameterCast(castContext) {
+  const { castNode, tsExpression, typeChecker } = castContext;
+  let ancestorNode = castNode.parent;
+  while (ancestorNode) {
+    if (
+      [
+        "FunctionDeclaration",
+        "FunctionExpression",
+        "ArrowFunctionExpression",
+      ].includes(ancestorNode.type)
+    ) {
+      const predicateAnnotation = ancestorNode.returnType?.typeAnnotation;
+      if (
+        predicateAnnotation?.type !== "TSTypePredicate" ||
+        predicateAnnotation.parameterName?.type !== "Identifier"
+      ) {
+        return false;
+      }
+      const paramName = predicateAnnotation.parameterName.name;
+      const rootExpr = expressionRoot(tsExpression);
+      if (!rootExpr || !ts.isIdentifier(rootExpr)) {
+        return false;
+      }
+      if (rootExpr.text === paramName) {
+        return true;
+      }
+      const initExpr = resolveSingleInitializerExpression(
+        typeChecker,
+        rootExpr
+      );
+      const unwrappedInit = expressionRoot(initExpr);
+      return Boolean(
+        unwrappedInit &&
+        ts.isIdentifier(unwrappedInit) &&
+        unwrappedInit.text === paramName
+      );
+    }
+    ancestorNode = ancestorNode.parent;
+  }
+  return false;
+}
+
+function buildCastEvaluationContext(castNode, parserServices, typeChecker) {
+  const program = parserServices.program;
   const tsExpression = parserServices.esTreeNodeToTSNodeMap.get(
     castNode.expression
   );
@@ -842,30 +1269,37 @@ export function buildCastEvaluationContext(
   const targetType = tsTypeNode
     ? typeChecker.getTypeFromTypeNode(tsTypeNode)
     : null;
+  const unresolved = findCastUnresolvedProvenance(
+    program,
+    typeChecker,
+    tsExpression,
+    tsTypeNode,
+    sourceType,
+    targetType
+  );
 
   return {
     castNode,
+    program,
     tsExpression,
     tsTypeNode,
     tsAssertion,
     sourceType,
     targetType,
+    unresolved,
     typeChecker,
     parserServices,
   };
 }
 
-function isCompilerErrorType(typeChecker, type) {
-  if (!type) {
-    return true;
-  }
-  return (
-    type.intrinsicName === "error" ||
-    Boolean(typeChecker.isErrorType && typeChecker.isErrorType(type))
-  );
-}
-
-export const CAST_DECISION_TABLE = [
+const CAST_DECISION_TABLE = [
+  {
+    decisionKind: "unresolved_type_analysis",
+    resolutionAction: "incomplete",
+    rationale:
+      "TypeScript could not resolve a module or name reached by the cast's source or target, or resolved a compiler error type.",
+    matches: (castContext) => Boolean(castContext.unresolved),
+  },
   {
     decisionKind: "double_cast_chain",
     resolutionAction: "clear",
@@ -882,100 +1316,37 @@ export const CAST_DECISION_TABLE = [
   {
     decisionKind: "type_predicate_implementation",
     resolutionAction: "clear",
-    rationale: "Cast inside a type predicate function implementing the guard.",
-    matches: ({ castNode }) => {
-      let ancestorNode = castNode.parent;
-      while (ancestorNode) {
-        if (
-          [
-            "FunctionDeclaration",
-            "FunctionExpression",
-            "ArrowFunctionExpression",
-          ].includes(ancestorNode.type)
-        ) {
-          return (
-            ancestorNode.returnType?.typeAnnotation?.type === "TSTypePredicate"
-          );
-        }
-        ancestorNode = ancestorNode.parent;
-      }
-      return false;
-    },
-  },
-  {
-    decisionKind: "unnamed_target_contract",
-    resolutionAction: "clear",
-    rationale: "Target is not a named type reference to a contract.",
-    matches: ({ castNode }) => !isNamedTypeReference(castNode.typeAnnotation),
+    rationale:
+      "Cast of a type predicate function's parameter inside its body to inspect fields for the guard.",
+    matches: isTypePredicateParameterCast,
   },
   {
     decisionKind: "non_broad_source",
     resolutionAction: "clear",
     rationale: "Resolved source type is not any or unknown.",
-    matches: ({ sourceType, typeChecker }) =>
-      !isCompilerErrorType(typeChecker, sourceType) &&
-      !isAppeasementCastSourceType(sourceType),
+    matches: (castContext) =>
+      !isAppeasementCastSourceType(castContext.sourceType),
   },
   {
-    decisionKind: "untyped_or_empty_target",
+    decisionKind: "non_narrowing_target",
     resolutionAction: "clear",
     rationale:
-      "Resolved target has no declared object contract properties or is an antidrift branded type.",
-    matches: ({ targetType, typeChecker }) =>
-      !isCompilerErrorType(typeChecker, targetType) &&
-      !isAppeasementCastTargetType(targetType),
+      "Resolved target type is any or unknown and claims no contract beyond the source.",
+    matches: (castContext) =>
+      isAppeasementCastSourceType(castContext.targetType),
   },
   {
     decisionKind: "dominating_runtime_proof",
     resolutionAction: "clear",
-    rationale: "Preceding runtime assertion or decode proves the target type.",
-    matches: ({
-      typeChecker,
-      tsAssertion,
-      tsExpression,
-      sourceType,
-      targetType,
-    }) => {
-      if (
-        !tsAssertion ||
-        !tsExpression ||
-        isCompilerErrorType(typeChecker, sourceType) ||
-        isCompilerErrorType(typeChecker, targetType)
-      ) {
-        return false;
-      }
-      return Boolean(
-        findDominatingProof(
-          typeChecker,
-          tsAssertion,
-          tsExpression,
-          sourceType,
-          targetType
-        )
-      );
-    },
+    rationale:
+      "Dominating runtime assertion, type guard, or recognised schema decode proves the target contract for the cast value.",
+    matches: (castContext) => Boolean(findDominatingProof(castContext)),
   },
   {
-    decisionKind: "unresolved_type_analysis",
-    resolutionAction: "incomplete",
-    rationale: "TypeScript compiler could not resolve source or target type.",
-    matches: ({
-      tsExpression,
-      tsTypeNode,
-      sourceType,
-      targetType,
-      typeChecker,
-    }) =>
-      !tsExpression ||
-      !tsTypeNode ||
-      isCompilerErrorType(typeChecker, sourceType) ||
-      isCompilerErrorType(typeChecker, targetType),
-  },
-  {
-    decisionKind: "broad_source_to_named_contract",
+    decisionKind: "broad_source_to_unproven_contract",
     resolutionAction: "report",
     rationale:
-      "Casting any or unknown into a named object contract without preceding proof.",
+      "Casting any or unknown into a target contract without a dominating runtime proof.",
     matches: () => true,
   },
 ];
@@ -992,6 +1363,11 @@ export function inspectAppeasementCast(castNode, parserServices, typeChecker) {
         action: tableEntry.resolutionAction,
         decisionKind: tableEntry.decisionKind,
         rationale: tableEntry.rationale,
+        unresolved: castContext.unresolved,
+        message:
+          tableEntry.resolutionAction === "incomplete"
+            ? formatIncompleteAnalysisMessage(castContext.unresolved)
+            : null,
       };
     }
   }
