@@ -196,6 +196,82 @@ function anyProvesElements(typeChecker, flowType, targetType, seen) {
   );
 }
 
+function signatureParameterTypes(typeChecker, signature) {
+  const fixed = [];
+  let rest = null;
+  for (const parameter of signature.parameters) {
+    const type = typeChecker.getTypeOfSymbol(parameter);
+    const declaration = parameter.valueDeclaration;
+    if (
+      declaration &&
+      ts.isParameter(declaration) &&
+      declaration.dotDotDotToken
+    ) {
+      rest = type;
+    } else {
+      fixed.push(type);
+    }
+  }
+  const receiver =
+    signature.thisParameter &&
+    typeChecker.getTypeOfSymbol(signature.thisParameter);
+  return { fixed, rest, receiver: receiver ?? null };
+}
+
+function effectiveParameterType(typeChecker, slots, index) {
+  if (index < slots.fixed.length) {
+    return slots.fixed[index];
+  }
+  if (!slots.rest) {
+    return null;
+  }
+  const elements = elementTypesOf(typeChecker, slots.rest);
+  if (typeChecker.isTupleType(slots.rest)) {
+    return elements[index - slots.fixed.length] ?? null;
+  }
+  return elements[0] ?? null;
+}
+
+function anyProvesParameters(
+  typeChecker,
+  flowSignature,
+  targetSignature,
+  seen
+) {
+  const flowSlots = signatureParameterTypes(typeChecker, flowSignature);
+  const targetSlots = signatureParameterTypes(typeChecker, targetSignature);
+  if (
+    flowSlots.receiver &&
+    targetSlots.receiver &&
+    anyProvesDifferent(
+      typeChecker,
+      flowSlots.receiver,
+      targetSlots.receiver,
+      seen
+    )
+  ) {
+    return true;
+  }
+  const positions =
+    Math.max(flowSlots.fixed.length, targetSlots.fixed.length) + 1;
+  for (let index = 0; index < positions; index += 1) {
+    const flowParameter = effectiveParameterType(typeChecker, flowSlots, index);
+    const targetParameter = effectiveParameterType(
+      typeChecker,
+      targetSlots,
+      index
+    );
+    if (
+      flowParameter &&
+      targetParameter &&
+      anyProvesDifferent(typeChecker, flowParameter, targetParameter, seen)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function anyProvesSignatures(typeChecker, flowType, targetType, seen) {
   return ["getCallSignatures", "getConstructSignatures"].some((method) => {
     const flowSignatures = flowType[method]();
@@ -204,28 +280,15 @@ function anyProvesSignatures(typeChecker, flowType, targetType, seen) {
       if (!flowSignature) {
         return false;
       }
-      if (
+      return (
         anyProvesDifferent(
           typeChecker,
           typeChecker.getReturnTypeOfSignature(flowSignature),
           typeChecker.getReturnTypeOfSignature(targetSignature),
           seen
-        )
-      ) {
-        return true;
-      }
-      return targetSignature.parameters.some((parameter, parameterIndex) => {
-        const flowParameter = flowSignature.parameters[parameterIndex];
-        return (
-          Boolean(flowParameter) &&
-          anyProvesDifferent(
-            typeChecker,
-            typeChecker.getTypeOfSymbol(flowParameter),
-            typeChecker.getTypeOfSymbol(parameter),
-            seen
-          )
-        );
-      });
+        ) ||
+        anyProvesParameters(typeChecker, flowSignature, targetSignature, seen)
+      );
     });
   });
 }
@@ -674,9 +737,12 @@ function predicateYield(typeChecker, call, tested) {
       ? call.arguments[predicate.parameterIndex]
       : ts.isPropertyAccessExpression(call.expression) &&
         call.expression.expression;
+  const asserts =
+    predicate.kind === ts.TypePredicateKind.AssertsIdentifier ||
+    predicate.kind === ts.TypePredicateKind.AssertsThis;
   return subject &&
     skipOuterParents(skipTransparentExpressions(subject)) === tested
-    ? predicate.type
+    ? { type: predicate.type, asserts }
     : null;
 }
 
@@ -697,11 +763,18 @@ function isNullishLiteral(node) {
   );
 }
 
+const NEGATED_EQUALITY_KINDS = new Set([
+  ts.SyntaxKind.ExclamationEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsEqualsToken,
+]);
+
 function testOf(typeChecker, tested) {
   const parent = tested.parent;
   if (ts.isCallExpression(parent)) {
     const yielded = predicateYield(typeChecker, parent, tested);
-    return yielded ? { node: parent, yielded } : null;
+    return yielded
+      ? { node: parent, yielded: yielded.type, negated: false }
+      : null;
   }
   if (ts.isTypeOfExpression(parent) && ts.isBinaryExpression(parent.parent)) {
     const comparison = parent.parent;
@@ -711,7 +784,13 @@ function testOf(typeChecker, tested) {
       EQUALITY_OPERATOR_KINDS.has(comparison.operatorToken.kind) &&
       ts.isStringLiteralLike(other) &&
       TYPEOF_YIELDS[other.text];
-    return form ? { node: comparison, yielded: form(typeChecker) } : null;
+    return form
+      ? {
+          node: comparison,
+          yielded: form(typeChecker),
+          negated: NEGATED_EQUALITY_KINDS.has(comparison.operatorToken.kind),
+        }
+      : null;
   }
   if (ts.isBinaryExpression(parent)) {
     const operatorKind = parent.operatorToken.kind;
@@ -726,11 +805,12 @@ function testOf(typeChecker, tested) {
         ? {
             node: parent,
             yielded: typeChecker.getReturnTypeOfSignature(constructSignature),
+            negated: false,
           }
         : null;
     }
     if (operatorKind === ts.SyntaxKind.InKeyword && parent.right === tested) {
-      return { node: parent, yielded: OBJECT_YIELD };
+      return { node: parent, yielded: OBJECT_YIELD, negated: false };
     }
     if (EQUALITY_OPERATOR_KINDS.has(operatorKind)) {
       const other = parent.left === tested ? parent.right : parent.left;
@@ -738,6 +818,11 @@ function testOf(typeChecker, tested) {
         ? {
             node: parent,
             yielded: nonNullableDeclaredType(typeChecker, tested),
+            negated: !NEGATED_EQUALITY_KINDS.has(operatorKind),
+            complement:
+              other.kind === ts.SyntaxKind.NullKeyword
+                ? typeChecker.getNullType()
+                : typeChecker.getUndefinedType(),
           }
         : null;
     }
@@ -748,6 +833,7 @@ function testOf(typeChecker, tested) {
       return {
         node: tested,
         yielded: nonNullableDeclaredType(typeChecker, tested),
+        negated: false,
       };
     }
     return null;
@@ -760,9 +846,113 @@ function testOf(typeChecker, tested) {
     return {
       node: tested,
       yielded: nonNullableDeclaredType(typeChecker, tested),
+      negated: false,
     };
   }
   return null;
+}
+
+function conditionTests(typeChecker, chain, condition, castNode, targetType) {
+  const tests = new Map();
+  for (const occurrence of referenceOccurrences(typeChecker, chain)) {
+    const tested = skipOuterParents(occurrence.node);
+    if (!isWithin(tested, condition) || tested.end > castNode.getStart()) {
+      continue;
+    }
+    const test = testOf(typeChecker, tested);
+    if (!test) {
+      continue;
+    }
+    const proves = (yielded) => {
+      const established =
+        yielded && navigateMembers(typeChecker, yielded, occurrence.remainder);
+      return Boolean(
+        established && yieldProvesTarget(typeChecker, established, targetType)
+      );
+    };
+    tests.set(test.node, {
+      negated: test.negated,
+      established: proves(test.yielded),
+      complement: proves(test.complement ?? null),
+    });
+  }
+  return tests;
+}
+
+function conditionProof(node, outcome, tests) {
+  const expression = skipTransparentExpressions(node);
+  const test = tests.get(expression);
+  if (test) {
+    const established =
+      outcome !== test.negated ? test.established : test.complement;
+    return established ? [expression] : null;
+  }
+  if (
+    ts.isPrefixUnaryExpression(expression) &&
+    expression.operator === ts.SyntaxKind.ExclamationToken
+  ) {
+    return conditionProof(expression.operand, !outcome, tests);
+  }
+  if (!ts.isBinaryExpression(expression)) {
+    return null;
+  }
+  const operatorKind = expression.operatorToken.kind;
+  const conjunction = operatorKind === ts.SyntaxKind.AmpersandAmpersandToken;
+  if (!conjunction && operatorKind !== ts.SyntaxKind.BarBarToken) {
+    return null;
+  }
+  const left = conditionProof(expression.left, outcome, tests);
+  const right = conditionProof(expression.right, outcome, tests);
+  if (left && right) {
+    return [...left, ...right];
+  }
+  return conjunction === outcome ? (left ?? right) : null;
+}
+
+function proofWithinCondition(condition, castNode, tests) {
+  let current = castNode;
+  while (current && current !== condition) {
+    const parent = current.parent;
+    if (ts.isBinaryExpression(parent) && parent.right === current) {
+      const operatorKind = parent.operatorToken.kind;
+      const proof =
+        operatorKind === ts.SyntaxKind.AmpersandAmpersandToken
+          ? conditionProof(parent.left, true, tests)
+          : operatorKind === ts.SyntaxKind.BarBarToken &&
+            conditionProof(parent.left, false, tests);
+      if (proof) {
+        return proof;
+      }
+    }
+    if (ts.isConditionalExpression(parent) && parent.condition !== current) {
+      const proof = conditionProof(
+        parent.condition,
+        parent.whenTrue === current,
+        tests
+      );
+      if (proof) {
+        return proof;
+      }
+    }
+    current = parent;
+  }
+  return null;
+}
+
+function outcomeReachingCast(governing, castNode) {
+  if (ts.isIfStatement(governing)) {
+    if (isWithin(castNode, governing.thenStatement)) {
+      return true;
+    }
+    return isWithin(castNode, governing.elseStatement) ? false : null;
+  }
+  if (ts.isConditionalExpression(governing)) {
+    if (isWithin(castNode, governing.whenTrue)) {
+      return true;
+    }
+    return isWithin(castNode, governing.whenFalse) ? false : null;
+  }
+  return ts.isSwitchStatement(governing) ? null : true;
 }
 
 function yieldProvesTarget(typeChecker, yielded, targetType) {
@@ -775,7 +965,7 @@ function yieldProvesTarget(typeChecker, yielded, targetType) {
   return narrowingProvesTarget(typeChecker, yielded, targetType);
 }
 
-function establishingTest(
+function assertionProof(
   typeChecker,
   occurrence,
   governing,
@@ -783,58 +973,100 @@ function establishingTest(
   targetType
 ) {
   const tested = skipOuterParents(occurrence.node);
-  if (ts.isExpressionStatement(governing)) {
-    const call = skipTransparentExpressions(governing.expression);
-    const yielded =
-      ts.isCallExpression(call) && predicateYield(typeChecker, call, tested);
-    const established =
-      yielded && navigateMembers(typeChecker, yielded, occurrence.remainder);
-    return established &&
-      yieldProvesTarget(typeChecker, established, targetType) &&
-      governing.end <= castNode.getStart() &&
-      isWithin(castNode, governing.parent)
-      ? { node: governing, exclude: null }
-      : null;
-  }
-  const condition = GOVERNING_CONDITION[governing.kind](governing);
-  if (!isWithin(tested, condition) || tested.end > castNode.getStart()) {
-    return null;
-  }
-  const test = testOf(typeChecker, tested);
+  const call = skipTransparentExpressions(governing.expression);
+  const yielded =
+    ts.isCallExpression(call) && predicateYield(typeChecker, call, tested);
   const established =
-    test && navigateMembers(typeChecker, test.yielded, occurrence.remainder);
-  if (
-    !established ||
-    !yieldProvesTarget(typeChecker, established, targetType)
-  ) {
+    yielded &&
+    yielded.asserts &&
+    navigateMembers(typeChecker, yielded.type, occurrence.remainder);
+  return established &&
+    yieldProvesTarget(typeChecker, established, targetType) &&
+    governing.end <= castNode.getStart() &&
+    isWithin(castNode, governing.parent)
+    ? { node: governing, exclude: null }
+    : null;
+}
+
+function latestNode(nodes) {
+  return nodes.reduce((latest, node) =>
+    node.end > latest.end ? node : latest
+  );
+}
+
+function conditionGovernedProof(
+  typeChecker,
+  chain,
+  governing,
+  castNode,
+  targetType
+) {
+  const condition = GOVERNING_CONDITION[governing.kind](governing);
+  if (!condition) {
     return null;
+  }
+  const tests = conditionTests(
+    typeChecker,
+    chain,
+    condition,
+    castNode,
+    targetType
+  );
+  if (!tests.size) {
+    return null;
+  }
+  if (isWithin(castNode, condition)) {
+    const proof = proofWithinCondition(condition, castNode, tests);
+    return proof ? { node: latestNode(proof), exclude: null } : null;
   }
   if (governing.pos <= castNode.pos && governing.end >= castNode.end) {
-    return { node: test.node, exclude: null };
+    const required = outcomeReachingCast(governing, castNode);
+    const proof =
+      required !== null && conditionProof(condition, required, tests);
+    return proof ? { node: latestNode(proof), exclude: null } : null;
   }
-  return isEarlyExitGuard(governing, castNode)
-    ? { node: test.node, exclude: governing.thenStatement }
+  if (!isEarlyExitGuard(governing, castNode)) {
+    return null;
+  }
+  const proof = conditionProof(condition, false, tests);
+  return proof
+    ? { node: latestNode(proof), exclude: governing.thenStatement }
     : null;
 }
 
 function proofPoint(typeChecker, chain, castNode, body, targetType) {
   let latest = null;
+  const governed = new Set();
+  const consider = (proof) => {
+    if (proof && (!latest || proof.node.end > latest.node.end)) {
+      latest = proof;
+    }
+  };
   for (const occurrence of referenceOccurrences(typeChecker, chain)) {
     const tested = skipOuterParents(occurrence.node);
     const governing = governingConstruct(tested);
     if (!governing || enclosingContainer(tested) !== body) {
       continue;
     }
-    const proof = establishingTest(
-      typeChecker,
-      occurrence,
-      governing,
-      castNode,
-      targetType
-    );
-    if (proof && (!latest || proof.node.end > latest.node.end)) {
-      latest = proof;
+    if (ts.isExpressionStatement(governing)) {
+      consider(
+        assertionProof(typeChecker, occurrence, governing, castNode, targetType)
+      );
+      continue;
     }
+    if (governed.has(governing)) {
+      continue;
+    }
+    governed.add(governing);
+    consider(
+      conditionGovernedProof(
+        typeChecker,
+        chain,
+        governing,
+        castNode,
+        targetType
+      )
+    );
   }
   return latest;
 }
