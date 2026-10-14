@@ -196,9 +196,22 @@ function anyProvesElements(typeChecker, flowType, targetType, seen) {
   );
 }
 
-function signatureParameterTypes(typeChecker, signature) {
-  const fixed = [];
-  let rest = null;
+const REPEATING_ELEMENT_FLAGS = ts.ElementFlags.Rest | ts.ElementFlags.Variadic;
+
+function restSegments(typeChecker, restType) {
+  const elements = elementTypesOf(typeChecker, restType);
+  if (!typeChecker.isTupleType(restType)) {
+    return elements.length ? [{ type: elements[0], repeats: true }] : [];
+  }
+  const flags = restType.target?.elementFlags ?? [];
+  return elements.map((type, index) => ({
+    type,
+    repeats: Boolean(flags[index] & REPEATING_ELEMENT_FLAGS),
+  }));
+}
+
+function parameterShape(typeChecker, signature) {
+  const segments = [];
   for (const parameter of signature.parameters) {
     const type = typeChecker.getTypeOfSymbol(parameter);
     const declaration = parameter.valueDeclaration;
@@ -207,50 +220,52 @@ function signatureParameterTypes(typeChecker, signature) {
       ts.isParameter(declaration) &&
       declaration.dotDotDotToken
     ) {
-      rest = type;
+      segments.push(...restSegments(typeChecker, type));
     } else {
-      fixed.push(type);
+      segments.push({ type, repeats: false });
     }
   }
   const receiver =
     signature.thisParameter &&
     typeChecker.getTypeOfSymbol(signature.thisParameter);
-  return { fixed, rest, receiver: receiver ?? null };
+  const firstRepeat = segments.findIndex((segment) => segment.repeats);
+  if (firstRepeat < 0) {
+    return { prefix: segments, repeating: [], suffix: [], receiver };
+  }
+  const lastRepeat = segments.findLastIndex((segment) => segment.repeats);
+  return {
+    prefix: segments.slice(0, firstRepeat),
+    repeating: segments.slice(firstRepeat, lastRepeat + 1),
+    suffix: segments.slice(lastRepeat + 1),
+    receiver: receiver ?? null,
+  };
 }
 
-function tupleTailRepeats(tuple) {
-  const flags = tuple.target?.elementFlags ?? [];
-  const last = flags[flags.length - 1];
-  return Boolean(last & (ts.ElementFlags.Rest | ts.ElementFlags.Variadic));
+function sameShape(flow, target) {
+  return (
+    flow.prefix.length === target.prefix.length &&
+    flow.repeating.length === target.repeating.length &&
+    flow.suffix.length === target.suffix.length
+  );
 }
 
-function effectiveParameterType(typeChecker, slots, index) {
-  if (index < slots.fixed.length) {
-    return slots.fixed[index];
+function typesFromFront(shape, index) {
+  if (index < shape.prefix.length) {
+    return [shape.prefix[index].type];
   }
-  if (!slots.rest) {
-    return null;
-  }
-  const elements = elementTypesOf(typeChecker, slots.rest);
-  if (!typeChecker.isTupleType(slots.rest)) {
-    return elements[0] ?? null;
-  }
-  const position = index - slots.fixed.length;
-  if (position < elements.length) {
-    return elements[position];
-  }
-  return tupleTailRepeats(slots.rest) ? elements[elements.length - 1] : null;
+  return shape.repeating.map((segment) => segment.type);
 }
 
-function effectivePositions(typeChecker, slots) {
-  if (!slots.rest) {
-    return slots.fixed.length;
+function typesFromBack(shape, index) {
+  const tail = shape.repeating.length ? shape.suffix : shape.prefix;
+  if (index < tail.length) {
+    return [tail[tail.length - 1 - index].type];
   }
-  const restPositions = typeChecker.isTupleType(slots.rest)
-    ? elementTypesOf(typeChecker, slots.rest).length +
-      Number(tupleTailRepeats(slots.rest))
-    : 1;
-  return slots.fixed.length + restPositions;
+  return shape.repeating.map((segment) => segment.type);
+}
+
+function segmentCount(shape) {
+  return shape.prefix.length + shape.repeating.length + shape.suffix.length;
 }
 
 function anyProvesParameters(
@@ -259,35 +274,44 @@ function anyProvesParameters(
   targetSignature,
   seen
 ) {
-  const flowSlots = signatureParameterTypes(typeChecker, flowSignature);
-  const targetSlots = signatureParameterTypes(typeChecker, targetSignature);
+  const flow = parameterShape(typeChecker, flowSignature);
+  const target = parameterShape(typeChecker, targetSignature);
   if (
-    flowSlots.receiver &&
-    targetSlots.receiver &&
-    anyProvesDifferent(
-      typeChecker,
-      flowSlots.receiver,
-      targetSlots.receiver,
-      seen
-    )
+    flow.receiver &&
+    target.receiver &&
+    anyProvesDifferent(typeChecker, flow.receiver, target.receiver, seen)
   ) {
     return true;
   }
-  const positions = Math.max(
-    effectivePositions(typeChecker, flowSlots),
-    effectivePositions(typeChecker, targetSlots)
-  );
-  for (let index = 0; index < positions; index += 1) {
-    const flowParameter = effectiveParameterType(typeChecker, flowSlots, index);
-    const targetParameter = effectiveParameterType(
-      typeChecker,
-      targetSlots,
-      index
+  if (sameShape(flow, target)) {
+    return ["prefix", "repeating", "suffix"].some((part) =>
+      flow[part].some((segment, index) =>
+        anyProvesDifferent(
+          typeChecker,
+          segment.type,
+          target[part][index].type,
+          seen
+        )
+      )
     );
+  }
+  const alignTail = flow.repeating.length > 0 || target.repeating.length > 0;
+  const positions = segmentCount(flow) + segmentCount(target);
+  for (let index = 0; index < positions; index += 1) {
+    const alignments = [
+      [typesFromFront(flow, index), typesFromFront(target, index)],
+      ...(alignTail
+        ? [[typesFromBack(flow, index), typesFromBack(target, index)]]
+        : []),
+    ];
     if (
-      flowParameter &&
-      targetParameter &&
-      anyProvesDifferent(typeChecker, flowParameter, targetParameter, seen)
+      alignments.some(([flowTypes, targetTypes]) =>
+        flowTypes.some((flowType) =>
+          targetTypes.some((targetType) =>
+            anyProvesDifferent(typeChecker, flowType, targetType, seen)
+          )
+        )
+      )
     ) {
       return true;
     }
@@ -902,21 +926,13 @@ function conditionTests(typeChecker, chain, condition, castNode, targetType) {
   return tests;
 }
 
-function earlierNode(left, right) {
-  return left.end <= right.end ? left : right;
-}
-
-function laterNode(left, right) {
-  return left.end >= right.end ? left : right;
-}
-
 function conditionProof(node, outcome, tests) {
   const expression = skipTransparentExpressions(node);
   const test = tests.get(expression);
   if (test) {
     const established =
       outcome !== test.negated ? test.established : test.complement;
-    return established ? { anchor: expression } : null;
+    return established ? { anchor: expression, skipped: [] } : null;
   }
   if (
     ts.isPrefixUnaryExpression(expression) &&
@@ -934,15 +950,20 @@ function conditionProof(node, outcome, tests) {
   }
   const left = conditionProof(expression.left, outcome, tests);
   const right = conditionProof(expression.right, outcome, tests);
-  const bothExecute = conjunction === outcome;
-  if (left && right) {
-    return {
-      anchor: bothExecute
-        ? laterNode(left.anchor, right.anchor)
-        : earlierNode(left.anchor, right.anchor),
-    };
+  if (conjunction === outcome) {
+    return right ?? left;
   }
-  return bothExecute ? (left ?? right) : null;
+  if (!left || !right) {
+    return null;
+  }
+  return {
+    anchor: left.anchor,
+    skipped: [
+      ...left.skipped,
+      ...right.skipped,
+      { pos: expression.right.pos, end: right.anchor.end },
+    ],
+  };
 }
 
 function proofWithinCondition(condition, castNode, tests) {
@@ -1020,7 +1041,7 @@ function assertionProof(
     yieldProvesTarget(typeChecker, established, targetType) &&
     governing.end <= castNode.getStart() &&
     isWithin(castNode, governing.parent)
-    ? { node: governing, exclude: null }
+    ? { node: governing, skipped: [] }
     : null;
 }
 
@@ -1047,20 +1068,23 @@ function conditionGovernedProof(
   }
   if (isWithin(castNode, condition)) {
     const proof = proofWithinCondition(condition, castNode, tests);
-    return proof ? { node: proof.anchor, exclude: null } : null;
+    return proof ? { node: proof.anchor, skipped: proof.skipped } : null;
   }
   if (governing.pos <= castNode.pos && governing.end >= castNode.end) {
     const required = outcomeReachingCast(governing, castNode);
     const proof =
       required !== null && conditionProof(condition, required, tests);
-    return proof ? { node: proof.anchor, exclude: null } : null;
+    return proof ? { node: proof.anchor, skipped: proof.skipped } : null;
   }
   if (!isEarlyExitGuard(governing, castNode)) {
     return null;
   }
   const proof = conditionProof(condition, false, tests);
   return proof
-    ? { node: proof.anchor, exclude: governing.thenStatement }
+    ? {
+        node: proof.anchor,
+        skipped: [...proof.skipped, governing.thenStatement],
+      }
     : null;
 }
 
@@ -1118,7 +1142,9 @@ function windowDisruption(typeChecker, chain, castNode, targetType) {
     if (
       disruption ||
       node === castNode ||
-      node === proof?.exclude ||
+      proof?.skipped.some(
+        (span) => node.pos >= span.pos && node.end <= span.end
+      ) ||
       node.pos >= windowEnd ||
       node.end <= windowStart ||
       (node !== body && ts.isFunctionLike(node))
