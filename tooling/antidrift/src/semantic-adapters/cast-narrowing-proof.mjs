@@ -174,16 +174,6 @@ function elementTypeOf(typeChecker, type) {
   return typeChecker.getIndexTypeOfType(type, ts.IndexKind.Number) ?? null;
 }
 
-function anyProvesMember(typeChecker, flowType, targetType, seen) {
-  if (targetType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
-    return false;
-  }
-  if (flowType.flags & ts.TypeFlags.Any) {
-    return true;
-  }
-  return anyProvesDifferent(typeChecker, flowType, targetType, seen);
-}
-
 function anyProvesStructure(typeChecker, flowType, targetType, seen) {
   if (typeChecker.isArrayLikeType(targetType)) {
     const flowElement = elementTypeOf(typeChecker, flowType);
@@ -191,7 +181,7 @@ function anyProvesStructure(typeChecker, flowType, targetType, seen) {
     return Boolean(
       flowElement &&
       targetElement &&
-      anyProvesMember(typeChecker, flowElement, targetElement, seen)
+      anyProvesDifferent(typeChecker, flowElement, targetElement, seen)
     );
   }
   if (
@@ -203,14 +193,14 @@ function anyProvesStructure(typeChecker, flowType, targetType, seen) {
     return typeChecker
       .getTypeArguments(flowType)
       .some((argument, index) =>
-        anyProvesMember(typeChecker, argument, targetArguments[index], seen)
+        anyProvesDifferent(typeChecker, argument, targetArguments[index], seen)
       );
   }
   const properties = typeChecker.getPropertiesOfType(targetType).some((property) => {
     const flowProperty = typeChecker.getPropertyOfType(flowType, property.name);
     return Boolean(
       flowProperty &&
-      anyProvesMember(
+      anyProvesDifferent(
         typeChecker,
         typeChecker.getTypeOfSymbol(flowProperty),
         typeChecker.getTypeOfSymbol(property),
@@ -226,12 +216,18 @@ function anyProvesStructure(typeChecker, flowType, targetType, seen) {
     flowIndexTypes.some(
       ([flowKeyType, flowValueType]) =>
         flowKeyType === keyType &&
-        anyProvesMember(typeChecker, flowValueType, valueType, seen)
+        anyProvesDifferent(typeChecker, flowValueType, valueType, seen)
     )
   );
 }
 
 function anyProvesDifferent(typeChecker, flowType, targetType, seen) {
+  if (targetType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+    return false;
+  }
+  if (flowType.flags & ts.TypeFlags.Any) {
+    return true;
+  }
   if (sameType(typeChecker, flowType, targetType)) {
     return false;
   }
