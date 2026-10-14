@@ -15,7 +15,17 @@ const manifestDependencyFields = [
   "devDependencies",
   "peerDependencies",
 ];
+const installedArtifact = /(?:^|[/\\])node_modules[/\\]/u;
 const ownerSymbols = ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias;
+const typedExtensions = new Set([
+  ts.Extension.Dts,
+  ts.Extension.Dmts,
+  ts.Extension.Dcts,
+  ts.Extension.Ts,
+  ts.Extension.Tsx,
+  ts.Extension.Mts,
+  ts.Extension.Cts,
+]);
 
 function readManifest(filename) {
   try {
@@ -96,25 +106,85 @@ function publicEntries(name, manifestPath) {
   return [...entries];
 }
 
-function packageEntries(packageRoot, modes, options, entriesByManifest) {
+function declaresTypes(target) {
+  if (!target || typeof target !== "object") return false;
+  return Object.entries(target).some(
+    ([condition, conditionTarget]) =>
+      condition === "types" ||
+      condition === "typings" ||
+      declaresTypes(conditionTarget)
+  );
+}
+
+function typedEntries(name, manifest) {
+  if (!manifest.exports) {
+    return manifest.types || manifest.typings ? [name] : [];
+  }
+  const exports =
+    typeof manifest.exports === "object" &&
+    !Array.isArray(manifest.exports) &&
+    Object.keys(manifest.exports).some((key) => key.startsWith("."))
+      ? manifest.exports
+      : { ".": manifest.exports };
+  return Object.entries(exports)
+    .filter(([entry, target]) => !entry.includes("*") && declaresTypes(target))
+    .map(([entry]) => (entry === "." ? name : name + entry.slice(1)));
+}
+
+function resolvesToTypes(specifier, containingFile, options, mode) {
+  const resolved = ts.resolveModuleName(
+    specifier,
+    containingFile,
+    options,
+    ts.sys,
+    undefined,
+    undefined,
+    mode
+  ).resolvedModule;
+  return Boolean(resolved) && typedExtensions.has(resolved.extension);
+}
+
+function dependencyStatus(packageRoot, dependency, options) {
+  const manifestPath =
+    dependencyManifest(packageRoot, dependency) ??
+    resolvedManifest(packageRoot, dependency, options);
+  if (!manifestPath) return { dependency, manifestPath, unresolvedEntries: [] };
+  const manifest = readManifest(manifestPath);
+  if (installedArtifact.test(ts.sys.realpath(dirname(manifestPath)))) {
+    return { dependency, manifestPath, unresolvedEntries: [] };
+  }
+  return {
+    dependency,
+    manifestPath,
+    unresolvedEntries: typedEntries(dependency, manifest).filter(
+      (specifier) =>
+        !resolvesToTypes(specifier, join(packageRoot, "package.json"), options)
+    ),
+  };
+}
+
+function declaredDependencies(packageRoot) {
   const manifest = readManifest(join(packageRoot, "package.json"));
-  const dependencies = [
+  return [
     ...new Set(
       manifestDependencyFields.flatMap((field) =>
         Object.keys(manifest[field] ?? {})
       )
     ),
   ];
+}
+
+function packageEntries(packageRoot, modes, options, entriesByManifest) {
   const uninstalled = [];
+  const installed = [];
   const entries = [];
-  for (const dependency of dependencies) {
-    const manifestPath =
-      dependencyManifest(packageRoot, dependency) ??
-      resolvedManifest(packageRoot, dependency, options);
+  for (const dependency of declaredDependencies(packageRoot)) {
+    const { manifestPath } = dependencyStatus(packageRoot, dependency, options);
     if (!manifestPath) {
       uninstalled.push(dependency);
       continue;
     }
+    installed.push(dependency);
     if (!entriesByManifest.has(manifestPath)) {
       entriesByManifest.set(
         manifestPath,
@@ -143,7 +213,7 @@ function packageEntries(packageRoot, modes, options, entriesByManifest) {
       }
     }
   }
-  return { entries, uninstalled };
+  return { entries, uninstalled, installed };
 }
 
 function programWithEntries(program, fileNames) {
@@ -250,7 +320,7 @@ function dependencyInventory(program) {
   const checker = expanded.getTypeChecker();
   const ownersByEntry = new Map();
   const ownersByScope = new Map();
-  for (const [packageRoot, { entries, uninstalled }] of packages) {
+  for (const [packageRoot, { entries, uninstalled, installed }] of packages) {
     const scopes = new Map();
     for (const entry of entries) {
       const entryKey = `${entry.packageName}\0${entry.specifier}\0${entry.fileName}`;
@@ -278,7 +348,8 @@ function dependencyInventory(program) {
     }
     ownersByScope.set(packageRoot, {
       scopes,
-      ...coverageGaps(program, packageRoot, uninstalled),
+      missingByName: dependencyNames(uninstalled),
+      installedByName: dependencyNames(installed),
     });
   }
   const inventory = { program: expanded, checker, ownersByScope };
@@ -335,54 +406,70 @@ function moduleSpecifiers(node, specifiers = []) {
   return specifiers;
 }
 
-function missingDependencyNames(uninstalled) {
+function dependencyNames(packageNames) {
   return new Map(
-    uninstalled.flatMap((packageName) => [
+    packageNames.flatMap((packageName) => [
       [packageName, packageName],
       [importedName(packageName), packageName],
     ])
   );
 }
 
-function packageGapFile(packageRoot) {
-  return ts.sys
-    .readDirectory(
-      packageRoot,
-      [".ts", ".tsx", ".mts", ".cts"],
-      ["**/node_modules"]
-    )
-    .filter(
-      (fileName) =>
-        !/\.d\.[cm]?ts$/u.test(fileName) &&
-        packageDirectory(fileName) === packageRoot
-    )
-    .sort()[0];
+function bindsModule(specifier) {
+  const holder = specifier.parent;
+  return !(ts.isImportDeclaration(holder) && !holder.importClause);
 }
 
-function coverageGaps(program, packageRoot, uninstalled) {
-  if (uninstalled.length === 0) {
-    return { missingByName: new Map(), unimported: [], gapFile: null };
-  }
-  const missingByName = missingDependencyNames(uninstalled);
-  const imported = new Set();
-  for (const source of program.getSourceFiles()) {
-    if (
-      program.isSourceFileDefaultLibrary(source) ||
-      program.isSourceFileFromExternalLibrary(source) ||
-      packageDirectory(source.fileName) !== packageRoot
-    ) {
-      continue;
-    }
-    for (const specifier of moduleSpecifiers(source)) {
-      const missing = missingByName.get(specifierPackage(specifier.text));
-      if (missing) imported.add(missing);
-    }
-  }
-  const unimported = uninstalled.filter((name) => !imported.has(name));
+function governingOptions(packageRoot) {
+  const configPath = ts.findConfigFile(packageRoot, ts.sys.fileExists);
+  if (!configPath) return {};
+  return ts.parseJsonConfigFileContent(
+    ts.readConfigFile(configPath, ts.sys.readFile).config,
+    ts.sys,
+    dirname(configPath),
+    undefined,
+    configPath
+  ).options;
+}
+
+function manifestVisitors(context) {
+  const packageRoot = dirname(context.filename);
+  const options = governingOptions(packageRoot);
   return {
-    missingByName,
-    unimported,
-    gapFile: unimported.length > 0 ? packageGapFile(packageRoot) : null,
+    Document(node) {
+      if (node.body.type !== "Object") return;
+      for (const field of node.body.members) {
+        if (
+          !manifestDependencyFields.includes(field.name.value) ||
+          field.value.type !== "Object"
+        ) {
+          continue;
+        }
+        for (const member of field.value.members) {
+          const status = dependencyStatus(
+            packageRoot,
+            member.name.value,
+            options
+          );
+          if (!status.manifestPath) {
+            context.report({
+              node: member.name,
+              messageId: "uninstalledManifest",
+              data: { packageName: status.dependency },
+            });
+          } else if (status.unresolvedEntries.length > 0) {
+            context.report({
+              node: member.name,
+              messageId: "unresolvedEntry",
+              data: {
+                packageName: status.dependency,
+                entries: status.unresolvedEntries.join(", "),
+              },
+            });
+          }
+        }
+      }
+    },
   };
 }
 
@@ -400,11 +487,18 @@ export function ruleNoRestatedDependencyType() {
           "This type restates {{name}} exported by the dependency {{packageName}}. Import it from '{{specifier}}' instead of redeclaring it.",
         uninstalledImport:
           "{{packageName}} is declared in {{manifest}} but not installed, so object types are not compared with its exports.",
-        uninstalledPackage:
-          "{{packages}} declared in {{manifest}} are not installed and not imported in this package, so object types are not compared with their exports.",
+        unresolvedImport:
+          "{{packageName}} is installed but '{{specifier}}' does not resolve to type declarations, so object types are not compared with its exports.",
+        uninstalledManifest:
+          "{{packageName}} is declared here but not installed, so object types in this package are not compared with its exports.",
+        unresolvedEntry:
+          "{{packageName}} is a workspace or linked package whose declared type entries {{entries}} do not resolve, so object types in this package are not compared with their exports.",
       },
     },
     create(context) {
+      if (context.sourceCode.ast.type === "Document") {
+        return manifestVisitors(context);
+      }
       const services = requireTypeServices(context);
       if (!services) {
         return missingTypeServicesVisitors(
@@ -424,19 +518,54 @@ export function ruleNoRestatedDependencyType() {
           scope: inventory.ownersByScope.get(packageRoot),
         };
       }
+      function moduleResolves(specifier, source) {
+        const holder = specifier.parent;
+        if (
+          ts.isCallExpression(holder) &&
+          ts.isIdentifier(holder.expression) &&
+          holder.expression.text === "require" &&
+          !ts.isInJSFile(holder)
+        ) {
+          return resolvesToTypes(
+            specifier.text,
+            source.fileName,
+            services.program.getCompilerOptions(),
+            source.impliedNodeFormat
+          );
+        }
+        return Boolean(
+          services.program.getTypeChecker().getSymbolAtLocation(specifier)
+        );
+      }
       function reportCoverageGaps() {
         const located = packageScope();
-        if (!located || located.scope.missingByName.size === 0) return;
+        if (!located) return;
         const { source, packageRoot, scope } = located;
         const manifest = relative(
           context.cwd,
           join(packageRoot, "package.json")
         );
         for (const specifier of moduleSpecifiers(source)) {
-          const packageName = scope.missingByName.get(
-            specifierPackage(specifier.text)
-          );
-          if (!packageName) continue;
+          const imported = specifierPackage(specifier.text);
+          const missing = scope.missingByName.get(imported);
+          const installed = scope.installedByName.get(imported);
+          let report = null;
+          if (missing) {
+            report = {
+              messageId: "uninstalledImport",
+              data: { packageName: missing, manifest },
+            };
+          } else if (
+            installed &&
+            bindsModule(specifier) &&
+            !moduleResolves(specifier, source)
+          ) {
+            report = {
+              messageId: "unresolvedImport",
+              data: { packageName: installed, specifier: specifier.text },
+            };
+          }
+          if (!report) continue;
           const start = source.getLineAndCharacterOfPosition(
             specifier.getStart(source)
           );
@@ -446,15 +575,7 @@ export function ruleNoRestatedDependencyType() {
               start: { line: start.line + 1, column: start.character },
               end: { line: end.line + 1, column: end.character },
             },
-            messageId: "uninstalledImport",
-            data: { packageName, manifest },
-          });
-        }
-        if (scope.gapFile === source.fileName) {
-          context.report({
-            loc: { line: 1, column: 0 },
-            messageId: "uninstalledPackage",
-            data: { packages: scope.unimported.join(", "), manifest },
+            ...report,
           });
         }
       }

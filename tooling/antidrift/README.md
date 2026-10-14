@@ -21,7 +21,7 @@ The presets also enforce one rule per shared AGENT.md directive, each recorded w
 The ESLint pass also enforces these syntax rules at error, exported by both plugins but configured only in ESLint:
 
 - G15 test independence: `antidrift/no-nonindependent-test-oracle`, `antidrift/no-validator-output-oracle`, `antidrift/no-schema-library-in-test`
-- W4 type reuse: `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-restated-dependency-type`, `antidrift/no-duplicated-object-field-blocks`, `antidrift/no-redeclared-owned-union`
+- W4 type reuse: `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-duplicated-object-field-blocks`, `antidrift/no-redeclared-owned-union`
 - G4 boundary decoding: `antidrift/no-open-dictionary-at-boundary`, `antidrift/unknown-input-must-be-decoded`
 - G7 loud failure: `antidrift/no-sentinel-absence-fallback`, `antidrift/no-silent-empty-detection-fallback`
 - G11 one owner per concern: `antidrift/no-raw-fetch-in-component`, `antidrift/no-raw-react-native-touchables`
@@ -57,8 +57,7 @@ eslint . \
   --suppress-rule antidrift/no-identity-schema-transform \
   --suppress-rule antidrift/require-convex-return-validator \
   --suppress-rule antidrift/no-explicit-type-arguments-on-owned-api \
-  --suppress-rule antidrift/no-schema-validator-transcoding \
-  --suppress-rule antidrift/no-restated-dependency-type
+  --suppress-rule antidrift/no-schema-validator-transcoding
 ```
 
 See `docs/rule-investigations/directive-rules.md` in the repository for scope and corpus evidence.
@@ -111,6 +110,8 @@ export default [
   ...antidrift({ tsconfigRootDir: import.meta.dirname }),
 ];
 ```
+
+The antidrift preset also parses every `package.json` with ESLint's JSON language (`@eslint/json`, a dependency of this package). `antidrift/no-restated-dependency-type` is default-off; when a consumer enables it in both the TypeScript and `package.json` blocks, it reports a declared dependency that is not installed, or whose declared type entry does not resolve, on its manifest key. Spreading `createConfig()` supplies the language for `**/package.json`, so `eslint .` lints those files once the rule is enabled with a `files` entry or a config object without `files`. ESLint 9.38 or later is required, as for the rest of the preset.
 
 `createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, and the imported rules for unknown aliases and chained assertions. Test-focused `antidrift/no-mocked-response-body-oracle` is registered default-off. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. The remaining imported rules stay registered but default-off because their syntax is not sufficient general evidence at runtime, test, and external-data boundaries. Other syntax, scope, and local-control-flow Antidrift rules are also registered as default-off inventory. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services and the ratcheted syntax rules above, and keeps `no-explicit-type-arguments-on-owned-api`, `no-identity-schema-transform`, `no-redundant-local-return-type`, `no-schema-validator-transcoding`, `no-sql-string-concat`, and `require-convex-return-validator` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
