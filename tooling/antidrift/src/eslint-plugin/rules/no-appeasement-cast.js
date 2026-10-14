@@ -1,4 +1,8 @@
-import { isAppeasementContractCast } from "../../semantic-adapters/broad-input.mjs";
+import {
+  inspectAppeasementCast,
+  inspectImportSite,
+} from "../../semantic-adapters/cast-proof.mjs";
+import { isDeclaredGeneratedSource } from "../../semantic-adapters/generated-source.mjs";
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
@@ -10,27 +14,40 @@ export function ruleNoAppeasementCast() {
       type: "problem",
       docs: {
         description:
-          "Disallow casting any/unknown values into named object contracts.",
+          "Disallow casting any/unknown values into contracts without proof.",
       },
       schema: [],
     },
     create(context) {
+      if (isDeclaredGeneratedSource(context.sourceCode.text)) {
+        return {};
+      }
       const services = requireTypeServices(context);
       if (!services) {
         return missingTypeServicesVisitors(context, "no-appeasement-cast");
       }
       const checker = services.program.getTypeChecker();
+      function reportCast(node) {
+        const decision = inspectAppeasementCast(node, services, checker);
+        if (decision.action !== "clear") {
+          context.report({ node, message: decision.message });
+        }
+      }
+      function reportImportSite(node) {
+        const message = inspectImportSite(node, services, checker);
+        if (message) {
+          context.report({ node, message });
+        }
+      }
       return {
-        TSAsExpression(node) {
-          if (!isAppeasementContractCast(node, services, checker)) {
-            return;
-          }
-          context.report({
-            node,
-            message:
-              "Do not cast any/unknown into a named contract. Validate or narrow the value before assigning the type.",
-          });
-        },
+        TSAsExpression: reportCast,
+        TSTypeAssertion: reportCast,
+        ImportDeclaration: reportImportSite,
+        ExportAllDeclaration: reportImportSite,
+        "ExportNamedDeclaration[source]": reportImportSite,
+        ImportExpression: reportImportSite,
+        TSExternalModuleReference: reportImportSite,
+        TSImportType: reportImportSite,
       };
     },
   };

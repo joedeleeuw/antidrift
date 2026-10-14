@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 
 import parser from "@typescript-eslint/parser";
+import json from "@eslint/json";
 import { defineConfig } from "eslint/config";
 
 import aiPolicy from "../eslint-plugin/index.js";
@@ -42,7 +43,6 @@ export function createConfig({
         "**/coverage/**",
         "reports/**",
         "docs/examples/**",
-        "**/fixtures/**",
         "**/*.d.ts",
         "**/*.d.mts",
         "**/*.d.cts",
@@ -94,6 +94,9 @@ export function createConfig({
         "antidrift/require-convex-return-validator": "error",
         "antidrift/no-explicit-type-arguments-on-owned-api": "error",
         "antidrift/no-schema-validator-transcoding": "error",
+        "antidrift/no-restated-dependency-type": "error",
+        "antidrift/no-unresolved-dependency-types": "error",
+        "antidrift/no-wrapping-functions": "error",
         "antidrift/no-redundant-local-return-type": "off",
         "antidrift/no-sql-string-concat": "off",
         ...ratchetedRules,
@@ -108,6 +111,12 @@ export function createConfig({
       },
       plugins: { antidrift: aiPolicy },
       rules: ratchetedRules,
+    },
+    {
+      files: ["**/package.json"],
+      language: "json/json",
+      plugins: { json, antidrift: aiPolicy },
+      rules: { "antidrift/no-unresolved-dependency-types": "error" },
     }
   );
 }

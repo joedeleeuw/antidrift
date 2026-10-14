@@ -6,7 +6,6 @@ import { isZodMethod } from "./schema-provenance.mjs";
 const TS_TYPE_FLAG_ANY = 1;
 const TS_TYPE_FLAG_UNKNOWN = 2;
 const TS_TYPE_FLAG_OBJECT = ts.TypeFlags.Object;
-const antidriftBrandMarkerName = "__antidriftBrand";
 const ZOD_VALIDATOR_METHODS = new Set(["parse", "parseAsync", "safeParse"]);
 
 export const BROAD_INPUT_ARRAY_TRANSFORM_METHODS = new Set([
@@ -309,49 +308,8 @@ export function isBroadPredicateInputType(checker, type) {
   );
 }
 
-function isAntidriftBrandMarkerProperty(prop) {
-  for (const decl of prop.declarations ?? []) {
-    const name = decl.name;
-    const sourceFile =
-      decl.getSourceFile?.().fileName.replace(/\\/gu, "/") ?? "";
-    const isAntidriftDeclaration =
-      sourceFile.endsWith("@joedeleeuw/antidrift/src/brand/index.d.mts") ||
-      sourceFile.endsWith("tooling/antidrift/src/brand/index.d.mts");
-    if (!isAntidriftDeclaration) continue;
-    if (name?.getText?.() === `[${antidriftBrandMarkerName}]`) return true;
-  }
-  return false;
-}
-
-function isAntidriftBrandedType(type, seen = new Set()) {
-  if (!type || seen.has(type)) return false;
-  seen.add(type);
-  if ((type.getProperties?.() ?? []).some(isAntidriftBrandMarkerProperty)) {
-    return true;
-  }
-  return (type.types ?? []).some((part) => isAntidriftBrandedType(part, seen));
-}
-
 export function isNamedTypeReference(typeNode) {
   return typeNode?.type === "TSTypeReference";
-}
-
-export function isAppeasementCastTargetType(type) {
-  if (isAntidriftBrandedType(type)) return false;
-  return (type?.getProperties?.() ?? []).length > 0;
-}
-
-export function isAppeasementContractCast(node, services, checker) {
-  if (!isNamedTypeReference(node?.typeAnnotation)) return false;
-
-  const tsExpression = services.esTreeNodeToTSNodeMap.get(node.expression);
-  const tsTypeNode = services.esTreeNodeToTSNodeMap.get(node.typeAnnotation);
-  if (!tsExpression || !tsTypeNode) return false;
-
-  return (
-    isAppeasementCastSourceType(checker.getTypeAtLocation(tsExpression)) &&
-    isAppeasementCastTargetType(checker.getTypeFromTypeNode(tsTypeNode))
-  );
 }
 
 export function isPredicateObjectContract(type) {

@@ -9,4 +9,5 @@ export default [
     files: ["**/*.{ts,tsx}"],
   })),
   ...antidrift({ tsconfigRootDir: import.meta.dirname }),
+  { ignores: ["tooling/antidrift/src/**/fixtures/**"] },
 ];

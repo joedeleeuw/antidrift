@@ -12,7 +12,7 @@ The positive pattern behind the rules is one owner per concept: domain owns busi
 
 ## Install
 
-The shared governance preset enables `antidrift/no-wrapping-functions` as an error by default. Named functions and named arrows that only delegate to another call must earn their extra layer through a concrete boundary or callback requirement. Exports are included. Anonymous inline callbacks, calculations, argument transformations and functions that own additional behavior stay outside the rule. It provides no automatic fix. When removing a callback adapter, preserve its exact signature, receiver behavior, hook position and stable identity; pass the existing owner directly only when it already satisfies that callback contract.
+`antidrift/no-wrapping-functions` runs as a typed ESLint rule that inlines each candidate in memory and reports only verified hops; the typed preset enables it at error and the Oxlint preset does not run the syntax stage. Named functions and named arrows that only delegate to another call must earn their extra layer through a concrete boundary or callback requirement. Exports are included. Anonymous inline callbacks, calculations, argument transformations and functions that own additional behavior stay outside the rule. It provides no automatic fix. When removing a callback adapter, preserve its exact signature, receiver behavior, hook position and stable identity; pass the existing owner directly only when it already satisfies that callback contract.
 
 For example, `const loadItems = (id) => owner.load(id)` reports; call `owner.load(id)` directly at its callers. `button.onClick(() => owner.load(id))` remains a callback with deferred execution. For a subscription API, `useSyncExternalStore(subscribeToConsent, getSnapshot)` is the valid direct substitution only when `subscribeToConsent` has the adapter's signature and receiver semantics; do not replace a required stable adapter with a new inline arrow or `.bind`. ESLint-only consumers can enable the same rule through the ESLint plugin; do not enable it in both lint runtimes.
 
@@ -29,7 +29,7 @@ The ESLint pass also enforces these syntax rules at error, exported by both plug
 
 `antidrift/no-raw-react-native-touchables` reports every raw React Native or gesture-handler touchable import until a repository creates one shared Touchable module and registers it as the rule's owner (`allowedFiles`); the owner file alone may then import the raw primitives.
 
-The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-parse-as-cast`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate` and `antidrift/no-underchecked-type-predicate` at error.
+The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-parse-as-cast`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-restated-dependency-type` and `antidrift/no-unresolved-dependency-types` at error.
 
 Every ESLint-pass rule above, typed rules included, is ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
 
@@ -42,6 +42,7 @@ eslint . \
   --suppress-rule antidrift/no-validator-output-oracle \
   --suppress-rule antidrift/no-schema-library-in-test \
   --suppress-rule antidrift/no-inline-structural-type-at-use-site \
+  --suppress-rule antidrift/no-restated-dependency-type \
   --suppress-rule antidrift/no-duplicated-object-field-blocks \
   --suppress-rule antidrift/no-redeclared-owned-union \
   --suppress-rule antidrift/no-open-dictionary-at-boundary \
@@ -110,6 +111,8 @@ export default [
   ...antidrift({ tsconfigRootDir: import.meta.dirname }),
 ];
 ```
+
+The antidrift preset also parses every `package.json` with ESLint's JSON language (`@eslint/json`, a dependency of this package). `antidrift/no-unresolved-dependency-types` is enabled at error in that block and in the TypeScript block, independent of `antidrift/no-restated-dependency-type`: it reports a declared dependency that is not installed, or a workspace or linked dependency with a public entry that does not resolve to type declarations, on its manifest key, and each import of a declared package whose types do not resolve at the import. Spreading `createConfig()` supplies the language for `**/package.json`, so `eslint .` reports those gaps with no further setup. These reports stay out of the suppression ratchet above; a gap closes when the dependency is installed or built. ESLint 9.38 or later is required, as for the rest of the preset.
 
 `createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, and the imported rules for unknown aliases and chained assertions. Test-focused `antidrift/no-mocked-response-body-oracle` is registered default-off. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. The remaining imported rules stay registered but default-off because their syntax is not sufficient general evidence at runtime, test, and external-data boundaries. Other syntax, scope, and local-control-flow Antidrift rules are also registered as default-off inventory. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services and the ratcheted syntax rules above, and keeps `no-explicit-type-arguments-on-owned-api`, `no-identity-schema-transform`, `no-redundant-local-return-type`, `no-schema-validator-transcoding`, `no-sql-string-concat`, and `require-convex-return-validator` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
