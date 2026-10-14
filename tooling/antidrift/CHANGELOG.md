@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `no-wrapping-functions` becomes two stages. The portable syntax rule supplies candidates, now including composed calls and bound literals. A typed ESLint rule inlines each candidate at every reference in memory, applies the owner table and hazard checks, re-checks the edited files, and reports only verified hops. The Oxlint preset no longer runs the syntax stage. The engine also proves each inline keeps the evaluation sequence, keeps parenthesized method arguments unbound, reports hops without call sites, and reports an incomplete-analysis diagnostic when a package entry maps to no source. Member reads commute only when the type system forbids writing them, receivers stay unbound through wrappers on both sides, build configuration is evaluated as the tool receives it, exported hops without callers in their program are incomplete, and any analysis failure becomes an incomplete-analysis diagnostic instead of a crash. A fresh frozen sample over every tracked TypeScript file scored 29/30 with 18 repositories at 70% or more, so the typed preset enables the rule at error.
+
 - `unknown-input-must-be-decoded` now requires a declared unknown receiving point. It skips casts that manufacture unknown and decoder functions that assert a type for the same parameter. The assertion-only version regressed to 19,903 hits and 0/20 precision. The provenance fix scores 7/20 on 1,920 hits. The rule is now default-off and marked false-positive-prone. The investigation retains the regression as superseded history.
 - `no-appeasement-cast` now reports inline double casts through unknown when the target is a named object type.
 - `no-open-dictionary-at-boundary` reports exported dictionaries of any. Dictionaries of unknown remain allowed.

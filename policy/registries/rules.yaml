@@ -374,7 +374,7 @@ policyRuleReviews:
     directive: G10
     status: active-custom
     antidriftRule: antidrift/no-wrapping-functions
-    coverage: Default error for named function declarations and named arrow/function expressions whose only operation is simple call delegation.
+    coverage: Typed ESLint rule at error that reports only engine-verified hops. The Oxlint preset does not run the syntax stage.
     reason: The owner explicitly chose this as a style policy on September 8, 2026. Exporting or naming a wrapper does not exempt it.
     nextAction: Keep enabled by default and preserve actual callback timing and boundary contracts when removing wrappers.
   arch/max-function-lines:
@@ -2961,15 +2961,16 @@ rules:
     status: ready
     stable: false
     defaultOff: false
-    signal: Deterministic AST for an explicitly adopted named-delegation style policy
+    signal: Portable AST candidates verified by executing the inline at every reference in the TypeScript program
     solveType: no-wrapping-functions
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/no-wrapping-functions.md
     corpusRepositories: [homer, chatbiz-webapp]
     concerns:
       - "Two-corpus precision check (October 2026; 84 TypeScript roots): 2,256 hits in 52 repositories, 9/18 on the first frozen sample once an artifact-snapshot hit and a semgrep test input are removed. A narrowing to calls that forward only the function's own parameters (1,118 hits, a fresh sample 12/20) was reverted: it dropped partial applications and thunks over module values, which the directive names as hops and the frozen labels marked true. A fresh sample of the rule as it stands measured 7/20. False positives are handlers and listeners that bind a value or need a stable identity, accessors over module-owned state, functions that own a format, message or predicate, and a framework-required export. Below the 70% bar."
-      - A matching wrapper can be a legitimate adapter or boundary. This is a style diagnostic, not proof that deleting the function preserves semantics. No automatic fix is provided.
-      - The shared governance preset enables this owner-chosen style policy at error severity. Exceptions need a concrete, documented boundary requirement.
+      - "Two stages (October 13, 2026): the portable syntax rule supplies candidates, including composed calls and bound literals; the typed ESLint rule inlines each candidate in memory at every reference, applies the owner table (contracts, identity references, package entry exports resolved per entry through the declared build, literals bound across two or more modules), checks argument order and duplication, call-site type identity and binding identity, re-checks only the edited files, and reports only verified hops."
+      - "Fresh measurement on commit db1443d over every tracked TypeScript file in 59 repositories, skipping only files that declare themselves generated: 13,045 stage-1 candidates, 4,584 verified hops in 51 repositories and 881 incomplete-analysis diagnostics; a capped sample of 30 scored 29/30 with 18 repositories at 70% or better (labels sha256 37fec87d442711ef98f5715095e5efece3e2feb41e3850a3b5317f3eeb4ffbc9). The false report is the read hook of a module-private React context. Earlier rounds are superseded."
+      - The Oxlint preset does not run the syntax stage, because Oxlint has no types and its report would restore the false positives the typed stage rejects.
     external:
       state: net-antidrift
       support: none
@@ -2985,7 +2986,7 @@ rules:
       allows:
         - "const area = (radius) => Math.PI * radius ** 2;"
         - "button.onClick(() => owner.load(id));"
-    nextAction: Keep default error severity; review concrete adapter requirements instead of automatically deleting functions. Do not claim stable semantic redundancy detection.
+    nextAction: Keep the typed stage at error in the typed preset. Known gaps are unexported closures kept only as compile-time type tests, inlines that must export module-private state, module mocks that replace an export by name, and fixtures whose module identity a test asserts.
 
   antidrift/no-tutorial-comments:
     status: ready
