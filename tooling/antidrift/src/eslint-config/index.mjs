@@ -96,6 +96,7 @@ export function createConfig({
         "antidrift/no-explicit-type-arguments-on-owned-api": "error",
         "antidrift/no-schema-validator-transcoding": "error",
         "antidrift/no-restated-dependency-type": "off",
+        "antidrift/no-wrapping-functions": "error",
         "antidrift/no-redundant-local-return-type": "off",
         "antidrift/no-sql-string-concat": "off",
         ...ratchetedRules,
