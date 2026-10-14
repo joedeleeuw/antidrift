@@ -17,7 +17,11 @@ On TypeScript files, the rule reports the module specifier of each import, expor
 
 The rule requires TypeScript parser services on TypeScript files. Missing services produce an error.
 
-## Measurement on October 14, 2026
+## Rescan after the course review on October 14, 2026
+
+With the preset's `**/fixtures/**` ignore removed, the rescan of the same 39 oss-corpus repositories gives 4,652 missing-package reports on manifest keys, 6,304 at import sites, 4,401 unresolved workspace-entry reports on manifest keys and 53,141 unresolved imports of installed packages: 68,498 in all, of which 4,377 come from fixtures directories. The 20 agent-written repositories give 8, 18, 6 and 7. The scans record 61 configuration-group exclusions covering 633 files that no tsconfig owns, and 3 individual parser failures on deliberately broken fixture sources (Vite, Vitest) and one example script; those files produce no reports. The labels below are unchanged.
+
+## Measurement before the fixture-ignore removal on October 14, 2026
 
 The shipped lint population of 39 installed oss-corpus repositories, with 3,157 `package.json` files linted, gives 4,499 missing-package reports on manifest keys, 3,961 at import sites, 3,635 unresolved workspace-entry reports on manifest keys and 52,344 unresolved imports of installed packages, most of them imports of unbuilt workspace packages such as `twenty-shared/utils`. The 20 agent-written repositories give 8, 18, 6 and 7. The preset's `**/fixtures/**` ignore hides 4,377 further gap reports.
 

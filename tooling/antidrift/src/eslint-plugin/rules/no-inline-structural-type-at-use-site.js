@@ -234,8 +234,9 @@ function overriddenParameter(declaration, checker) {
 
 function exported(candidate, checker) {
   const source = candidate.node.getSourceFile();
-  if (!ts.isExternalModule(source))
+  if (!ts.isExternalModule(source)) {
     return ts.isSourceFile(candidate.node.parent);
+  }
   const moduleSymbol = checker.getSymbolAtLocation(source);
   const symbol = checker.getSymbolAtLocation(candidate.node.name);
   return checker
@@ -325,7 +326,11 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
                 !derivesFrom(candidate.node, declaration, checker)
             );
           const governing = overriddenParameter(declaration, checker);
-          if (governing && sameShape(type, governing.type) === true) {
+          if (
+            governing &&
+            sameShape(type, governing.type) === true &&
+            !derivesFrom(governing.node, declaration, checker)
+          ) {
             context.report({
               node,
               messageId: "overridden",
