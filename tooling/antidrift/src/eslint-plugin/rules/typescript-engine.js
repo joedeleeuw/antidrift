@@ -604,7 +604,6 @@ export function editedProgramHazard(program, files, sites) {
 }
 
 const assignedSymbolSets = new WeakMap();
-const writtenMembers = new WeakMap();
 
 function assignmentTargets(target, found) {
   const node = unwrapped(target);
@@ -723,11 +722,29 @@ function isPrimitive(checker, node) {
     : Boolean(type.flags & PRIMITIVE_TYPES);
 }
 
-function isDataFieldDeclaration(declaration) {
+function isConstAsserted(objectLiteral) {
+  let node = objectLiteral;
+  while (
+    ts.isObjectLiteralExpression(node) ||
+    ts.isArrayLiteralExpression(node) ||
+    ts.isPropertyAssignment(node) ||
+    ts.isParenthesizedExpression(node) ||
+    ts.isSatisfiesExpression(node)
+  ) {
+    node = node.parent;
+    if (ts.isAsExpression(node) && ts.isConstTypeReference(node.type)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isImmutableDataField(declaration) {
   const modifiers = ts.getCombinedModifierFlags(declaration);
   if (ts.isPropertyDeclaration(declaration)) {
     return (
       ts.isClassLike(declaration.parent) &&
+      Boolean(modifiers & ts.ModifierFlags.Readonly) &&
       !(modifiers & (ts.ModifierFlags.Abstract | ts.ModifierFlags.Accessor))
     );
   }
@@ -735,29 +752,9 @@ function isDataFieldDeclaration(declaration) {
     (ts.isPropertyAssignment(declaration) ||
       ts.isShorthandPropertyAssignment(declaration) ||
       ts.isMethodDeclaration(declaration)) &&
-    ts.isObjectLiteralExpression(declaration.parent)
+    ts.isObjectLiteralExpression(declaration.parent) &&
+    isConstAsserted(declaration.parent)
   );
-}
-
-function isMemberWritten(program, declaration) {
-  const byDeclaration = writtenMembers.get(program) ?? new Map();
-  writtenMembers.set(program, byDeclaration);
-  if (!byDeclaration.has(declaration)) {
-    const sourceFile = declaration.getSourceFile();
-    const referenced = languageServiceOf(program).findReferences(
-      sourceFile.fileName,
-      declaration.name.getStart(sourceFile)
-    );
-    byDeclaration.set(
-      declaration,
-      (referenced ?? []).some(({ references }) =>
-        references.some(
-          (reference) => reference.isWriteAccess && !reference.isDefinition
-        )
-      )
-    );
-  }
-  return byDeclaration.get(declaration);
 }
 
 function memberStep(program, node) {
@@ -783,8 +780,7 @@ function memberStep(program, node) {
       memberStep(program, receiver) === "read";
   return declarations.length > 0 &&
     stableReceiver &&
-    declarations.every(isDataFieldDeclaration) &&
-    !declarations.some((declaration) => isMemberWritten(program, declaration))
+    declarations.every(isImmutableDataField)
     ? "read"
     : "effect";
 }
