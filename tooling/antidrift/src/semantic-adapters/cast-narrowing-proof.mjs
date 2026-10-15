@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { boundaryObservations } from "./boundary-observations.mjs";
 import { isAppeasementCastSourceType } from "./broad-input.mjs";
 
 const referenceIndexByChecker = new WeakMap();
@@ -392,7 +393,7 @@ function anyProvesStructure(typeChecker, flowType, targetType, seen) {
   );
 }
 
-const SEEN_TYPE_PAIRS = 2048;
+const SEEN_TYPE_PAIRS = boundaryObservations.bounds.narrowingProofPairCap.limit;
 
 function anyProvesDifferent(typeChecker, flowType, targetType, seen) {
   if (targetType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
@@ -405,7 +406,11 @@ function anyProvesDifferent(typeChecker, flowType, targetType, seen) {
     return false;
   }
   const seenTargets = seen.get(flowType) ?? new Set();
-  if (seenTargets.has(targetType) || seen.size > SEEN_TYPE_PAIRS) {
+  if (seenTargets.has(targetType)) {
+    return false;
+  }
+  if (seen.size > SEEN_TYPE_PAIRS) {
+    seen.capped = true;
     return false;
   }
   seenTargets.add(targetType);
@@ -445,7 +450,12 @@ function claimsOnlyUnknownValuedKeys(typeChecker, targetType) {
   );
 }
 
-export function narrowingProvesTarget(typeChecker, flowType, targetType) {
+export function narrowingProvesTarget(
+  typeChecker,
+  flowType,
+  targetType,
+  onPairCap
+) {
   if (isBroadSourceType(typeChecker, flowType)) {
     return false;
   }
@@ -453,7 +463,17 @@ export function narrowingProvesTarget(typeChecker, flowType, targetType) {
     return true;
   }
   if (typeChecker.isTypeAssignableTo(flowType, targetType)) {
-    return !anyProvesDifferent(typeChecker, flowType, targetType, new Map());
+    const seen = new Map();
+    const different = anyProvesDifferent(
+      typeChecker,
+      flowType,
+      targetType,
+      seen
+    );
+    if (seen.capped && onPairCap) {
+      onPairCap();
+    }
+    return !different;
   }
   return (
     isNonPrimitiveType(flowType) &&

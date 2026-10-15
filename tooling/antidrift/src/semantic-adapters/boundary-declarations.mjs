@@ -3,6 +3,7 @@ import { basename, dirname, join } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
 import { boundaryCases } from "./boundary-cases.mjs";
+import { boundaryObservations } from "./boundary-observations.mjs";
 import {
   callbackReturns,
   enclosingFunction,
@@ -69,8 +70,8 @@ function terminates(statement) {
   );
 }
 
-export function boundaryDeclarations(program) {
-  const checker = program.getTypeChecker();
+export function boundaryDeclarations(program, observer) {
+  const { checker } = observer;
   const packages = new Map();
   const dependencySets = new Map();
   const callsBySource = new WeakMap();
@@ -749,9 +750,81 @@ export function boundaryDeclarations(program) {
     );
   }
 
+  function blockedByUnprovedNarrowing(
+    expression,
+    parameter,
+    visited = new Set()
+  ) {
+    const unwrapped = unwrapExpression(expression);
+    if (!unwrapped || visited.has(unwrapped)) {
+      return false;
+    }
+    visited.add(unwrapped);
+    if (
+      derivesFromSubject(unwrapped, parameter) &&
+      typed(checker.getTypeAtLocation(unwrapped)) &&
+      unprovedNarrowing(unwrapped)
+    ) {
+      return true;
+    }
+    if (!ts.isIdentifier(unwrapped)) {
+      return false;
+    }
+    return (checker.getSymbolAtLocation(unwrapped)?.declarations ?? []).some(
+      (declaration) =>
+        ts.isVariableDeclaration(declaration) &&
+        declaration.initializer &&
+        blockedByUnprovedNarrowing(declaration.initializer, parameter, visited)
+    );
+  }
+
+  function decoderBranch(declaration, evidence, returns, proven) {
+    const { decoderBranches } = boundaryObservations;
+    if (evidence.form === "assertion" && !returns.length) {
+      return decoderBranches.assertionBody;
+    }
+    if (evidence.kind === "predicate") {
+      return decoderBranches.predicateReturn;
+    }
+    if (!declaration.body || !returns.length) {
+      return decoderBranches.derivationRefused;
+    }
+    if (proven) {
+      return returns.some((expression) => failureLiteral(expression))
+        ? decoderBranches.failureLiteral
+        : decoderBranches.validatedReturn;
+    }
+    if (
+      returns.some((expression) =>
+        blockedByUnprovedNarrowing(
+          expression,
+          declaration.parameters[evidence.parameter]
+        )
+      )
+    ) {
+      return decoderBranches.unprovedNarrowing;
+    }
+    return returns.every((expression) => failureLiteral(expression))
+      ? decoderBranches.failureLiteral
+      : decoderBranches.derivationRefused;
+  }
+
   function implementationDecode(declaration, evidence) {
-    if (decoderProofs.has(declaration)) return decoderProofs.get(declaration);
+    if (decoderProofs.has(declaration)) {
+      return decoderProofs.get(declaration);
+    }
     decoderProofs.set(declaration, false);
+    if (!declaration.body) {
+      if (observer.enabled) {
+        observer.decoderProof({
+          declaration,
+          evidence,
+          proved: false,
+          branch: boundaryObservations.decoderBranches.derivationRefused,
+        });
+      }
+      return false;
+    }
     const parameter = declaration.parameters[evidence.parameter];
     const returns = callbackReturns(declaration);
     const provedReturn = (expression) =>
@@ -769,12 +842,22 @@ export function boundaryDeclarations(program) {
               (evidence.kind !== "predicate" && failureLiteral(expression))
           );
     decoderProofs.set(declaration, proven);
+    if (observer.enabled) {
+      observer.decoderProof({
+        declaration,
+        evidence,
+        proved: proven,
+        branch: decoderBranch(declaration, evidence, returns, proven),
+      });
+    }
     return proven;
   }
 
   function signatureDecode(signature, use) {
     const evidence = signatureForm(signature);
-    if (!evidence || !signature.declaration) return null;
+    if (!evidence || !signature.declaration) {
+      return null;
+    }
     const declaration = signature.declaration;
     const source = declaration.getSourceFile();
     const ownerName = packageAt(source.fileName)?.name;
@@ -787,8 +870,10 @@ export function boundaryDeclarations(program) {
     const unprovedDecoder =
       !platform &&
       origin(declaration, use) !== "dependency" &&
-      (!declaration.body || !implementationDecode(declaration, evidence));
-    if (excluded({ platformProjection, unprovedDecoder })) return null;
+      !implementationDecode(declaration, evidence);
+    if (excluded({ platformProjection, unprovedDecoder })) {
+      return null;
+    }
     return evidence;
   }
 
