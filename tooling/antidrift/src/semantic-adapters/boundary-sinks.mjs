@@ -116,22 +116,41 @@ export function boundarySinks({
       : null;
   }
 
-  function demandedBy(root, target) {
+  function demandedBy(root, target, options) {
     let contract = target;
     for (const step of root.path ?? []) {
-      if (!contract) return true;
+      if (!contract) {
+        return true;
+      }
       if (step === ELEMENT) {
         contract = elementContract(contract);
         continue;
       }
       const demanded = demandedFields(contract);
-      if (!demanded) return true;
-      if (!demanded.has(step)) return false;
+      if (!demanded) {
+        return true;
+      }
+      if (!demanded.has(step)) {
+        return false;
+      }
       contract = memberContract(contract, step);
     }
-    if (root.deep || !root.overrides || !contract) return true;
+    if (
+      !root.deep &&
+      root.path?.length &&
+      contract &&
+      !unresolvedType(contract) &&
+      !typed(contract, options)
+    ) {
+      return false;
+    }
+    if (root.deep || !root.overrides || !contract) {
+      return true;
+    }
     const demanded = demandedFields(contract);
-    if (!demanded) return true;
+    if (!demanded) {
+      return true;
+    }
     return [...demanded].some((name) => !root.overrides.has(name));
   }
 
@@ -214,7 +233,7 @@ export function boundarySinks({
     const roots = activeRoots(expression).filter(
       (root) =>
         !excluded({
-          undemanded: !demandedBy(root, target),
+          undemanded: !demandedBy(root, target, options),
           claimed: claimCovers(root, target, options.claimNode, expression),
         })
     );

@@ -46,7 +46,7 @@ export const boundaryObservations = {
   bounds: {
     fieldDepth: {
       bound: "field-depth",
-      limit: 2,
+      limit: 3,
       reason:
         "A root's containment path or a parameter placeholder's access path exceeded the field depth of the finite root domain; the remainder is the whole value (over-approximation).",
     },

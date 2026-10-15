@@ -3,6 +3,14 @@ import { boundaryCases } from "./boundary-cases.mjs";
 import { broad, excluded } from "./boundary-declarations.mjs";
 import { unwrapExpression } from "./boundary-syntax.mjs";
 
+const writeOperators = new Set([
+  ts.SyntaxKind.EqualsToken,
+  ts.SyntaxKind.PlusEqualsToken,
+  ts.SyntaxKind.QuestionQuestionEqualsToken,
+  ts.SyntaxKind.BarBarEqualsToken,
+  ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+]);
+
 export function boundarySources({ checker, declarations, hasRoots }) {
   const { callsInSource, carrierPath, exported, origin, platformSource } =
     declarations;
@@ -15,7 +23,7 @@ export function boundarySources({ checker, declarations, hasRoots }) {
     function visit(node) {
       if (
         ts.isBinaryExpression(node) &&
-        node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        writeOperators.has(node.operatorToken.kind)
       ) {
         const symbol = checker.getSymbolAtLocation(node.left);
         if (symbol) {
