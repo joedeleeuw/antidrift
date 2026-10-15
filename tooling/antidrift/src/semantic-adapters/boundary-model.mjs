@@ -7,7 +7,11 @@ import {
   unresolvedType,
 } from "./boundary-contracts.mjs";
 import { classReceivers } from "./boundary-classes.mjs";
-import { boundaryDeclarations, excluded } from "./boundary-declarations.mjs";
+import {
+  boundaryDeclarations,
+  broad,
+  excluded,
+} from "./boundary-declarations.mjs";
 import { signatureForwarding } from "./boundary-plan-roots.mjs";
 import { boundaryObserver } from "./boundary-observations.mjs";
 import { boundarySinks } from "./boundary-sinks.mjs";
@@ -25,6 +29,8 @@ import {
   callbackReturns,
   enclosingFunction,
   isAssertionChain,
+  safeExpressionKinds,
+  unconditionalBefore,
   unwrapExpression,
   wrapperKinds,
 } from "./boundary-syntax.mjs";
@@ -41,53 +47,6 @@ const binaryDispositions = new Map([
   [ts.SyntaxKind.PlusToken, "concatenation"],
   [ts.SyntaxKind.PlusEqualsToken, "concatenation"],
 ]);
-
-const safeExpressionKinds = new Set([
-  ts.SyntaxKind.StringLiteral,
-  ts.SyntaxKind.NumericLiteral,
-  ts.SyntaxKind.BigIntLiteral,
-  ts.SyntaxKind.RegularExpressionLiteral,
-  ts.SyntaxKind.NoSubstitutionTemplateLiteral,
-  ts.SyntaxKind.TrueKeyword,
-  ts.SyntaxKind.FalseKeyword,
-  ts.SyntaxKind.NullKeyword,
-  ts.SyntaxKind.OmittedExpression,
-  ts.SyntaxKind.ArrowFunction,
-  ts.SyntaxKind.FunctionExpression,
-  ts.SyntaxKind.ClassExpression,
-  ts.SyntaxKind.TypeOfExpression,
-  ts.SyntaxKind.VoidExpression,
-  ts.SyntaxKind.DeleteExpression,
-  ts.SyntaxKind.PrefixUnaryExpression,
-  ts.SyntaxKind.PostfixUnaryExpression,
-  ts.SyntaxKind.MetaProperty,
-  ts.SyntaxKind.ImportKeyword,
-  ts.SyntaxKind.JsxElement,
-  ts.SyntaxKind.JsxSelfClosingElement,
-  ts.SyntaxKind.JsxFragment,
-]);
-
-function contains(ancestor, node) {
-  return ancestor.pos <= node.pos && ancestor.end >= node.end;
-}
-
-function unconditionalBefore(write, use) {
-  if (write.end >= use.pos) return false;
-  let ancestor = write.parent;
-  while (ancestor && !ts.isFunctionLike(ancestor)) {
-    if (
-      (ts.isBlock(ancestor) ||
-        ts.isIfStatement(ancestor) ||
-        ts.isConditionalExpression(ancestor) ||
-        ts.isIterationStatement(ancestor, false)) &&
-      !contains(ancestor, use)
-    ) {
-      return false;
-    }
-    ancestor = ancestor.parent;
-  }
-  return ancestor === enclosingFunction(use);
-}
 
 function once(compute) {
   let computed;
@@ -255,8 +214,23 @@ export function boundaryModel(program, options = {}) {
     );
   }
 
+  function assignmentRoots(assignment) {
+    return assignment.operatorToken.kind === ts.SyntaxKind.PlusEqualsToken
+      ? concatenationRoots(assignment, [assignment.right])
+      : trace(assignment.right);
+  }
+
   function variableRoots(declaration) {
     const use = currentUse;
+    const source = platformSource(declaration);
+    if (source && !source.requiresProvenance) {
+      const declaredType = checker.getTypeAtLocation(declaration);
+      if (!declaredType.getCallSignatures().length) {
+        const awaitedOutput = checker.getAwaitedType(declaredType);
+        const opaque = Boolean(source.opaque || broad(awaitedOutput));
+        return [{ kind: source.kind, root: use, declaration, opaque }];
+      }
+    }
     const declarationList = declaration.parent;
     if (
       ts.isVariableDeclarationList(declarationList) &&
@@ -281,20 +255,27 @@ export function boundaryModel(program, options = {}) {
     );
     const last = nestedUse
       ? undefined
-      : direct.findLast((assignment) => unconditionalBefore(assignment, use));
-    const expressions = [];
-    if (last) expressions.push(last.right);
-    else if (declaration.initializer) expressions.push(declaration.initializer);
+      : direct.findLast(
+          (assignment) =>
+            assignment.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+            unconditionalBefore(assignment, use)
+        );
+    const collected = [];
+    if (last) {
+      collected.push(...assignmentRoots(last));
+    } else if (declaration.initializer) {
+      collected.push(...trace(declaration.initializer));
+    }
     for (const assignment of direct) {
       if (!last || assignment.pos > last.pos) {
-        expressions.push(assignment.right);
+        collected.push(...assignmentRoots(assignment));
       }
     }
     for (const assignment of closureWrites) {
-      expressions.push(assignment.right);
+      collected.push(...assignmentRoots(assignment));
     }
     return withClaim(
-      expressions.flatMap((expression) => trace(expression)),
+      collected,
       declaration.type && checker.getTypeFromTypeNode(declaration.type),
       declaration
     );
@@ -535,6 +516,8 @@ export function boundaryModel(program, options = {}) {
     summary,
     substituteAll,
     flagged,
+    projected,
+    elementStep,
   });
 
   const { classFieldRoots, superRoots, thisRoots } = classReceivers({

@@ -85,7 +85,14 @@ export const boundaryCases = {
       owner: "@types/node",
       platform: true,
       modules: ["stream"],
-      symbols: ["Readable.read", "Readable.on", "Readable.once"],
+      symbols: [
+        "Readable.read",
+        "Readable.on",
+        "Readable.once",
+        "Stream.Readable.read",
+        "Stream.Readable.on",
+        "Stream.Readable.once",
+      ],
       reason:
         "An incoming readable stream supplies chunks; constructed local receivers retain their argument provenance instead.",
     },
@@ -618,6 +625,54 @@ export const boundaryCases = {
       fact: "unopenedString",
       reason:
         "An exported string entry parameter or string formatting projection activates only when a declared deserializer opens it.",
+    },
+  ],
+  collections: [
+    {
+      symbols: [
+        "Array",
+        "ReadonlyArray",
+        "ConcatArray",
+        "ArrayLike",
+        "Iterable",
+        "Iterator",
+        "IterableIterator",
+        "AsyncIterable",
+        "AsyncIterator",
+        "AsyncIterableIterator",
+        "Generator",
+        "AsyncGenerator",
+        "Set",
+        "ReadonlySet",
+      ],
+      elementIndex: 0,
+      reason:
+        "Sequential and set collections carry their element contract in the first type parameter.",
+    },
+    {
+      symbols: ["Map", "ReadonlyMap"],
+      elementIndex: 1,
+      reason:
+        "Key-value map collections carry their value contract in the second type parameter.",
+    },
+  ],
+  nonForwardingOutputs: [
+    {
+      kind: "this-return",
+      property: "isThisType",
+      reason:
+        "A method returning polymorphic this chains the receiver without projecting a value output.",
+    },
+    {
+      kind: "numeric-return",
+      numeric: true,
+      reason:
+        "A numeric return such as Array.push or String.indexOf reports a count or offset, not the input payload.",
+    },
+    {
+      kind: "void-return",
+      voidLike: true,
+      reason: "A void return such as Array.forEach carries no output value.",
     },
   ],
 };

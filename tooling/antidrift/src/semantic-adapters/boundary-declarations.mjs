@@ -122,7 +122,16 @@ export function boundaryDeclarations(program, observer) {
       if (dependency?.name) manifests.set(dependency.name, dependency);
     }
     const names = new Set();
-    const pending = [owner];
+    const pending = [];
+    let currentOwner = owner;
+    while (currentOwner) {
+      pending.push(currentOwner);
+      const parentDirectory = dirname(dirname(currentOwner.manifest));
+      if (parentDirectory === dirname(currentOwner.manifest)) break;
+      const nextOwner = packageAt(parentDirectory);
+      if (!nextOwner || nextOwner.manifest === currentOwner.manifest) break;
+      currentOwner = nextOwner;
+    }
     while (pending.length) {
       const manifest = pending.pop();
       for (const name of Object.keys({
@@ -145,7 +154,11 @@ export function boundaryDeclarations(program, observer) {
     if (program.isSourceFileDefaultLibrary(source)) return "platform";
     const owner = packageAt(source.fileName);
     if (owner?.name === "@types/node") return "platform";
-    if (owner && dependencies(use.getSourceFile()).has(owner.name)) {
+    if (
+      (owner && dependencies(use.getSourceFile()).has(owner.name)) ||
+      program.isSourceFileFromExternalLibrary(source) ||
+      source.fileName.includes("/node_modules/")
+    ) {
       return "dependency";
     }
     return null;

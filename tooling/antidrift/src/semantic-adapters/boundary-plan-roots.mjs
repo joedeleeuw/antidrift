@@ -1,10 +1,31 @@
 import ts from "typescript";
+import { boundaryCases } from "./boundary-cases.mjs";
 import { broad, typed } from "./boundary-declarations.mjs";
 import { boundaryObservations } from "./boundary-observations.mjs";
 import { callbackReturns, unwrapExpression } from "./boundary-syntax.mjs";
 
 const RETURNED_FUNCTION_DEPTH =
   boundaryObservations.bounds.returnedFunctionDepth.limit;
+
+function isNonForwardingReturn(returned) {
+  if (!returned) {
+    return true;
+  }
+  return boundaryCases.nonForwardingOutputs.some((row) => {
+    if (row.property) {
+      return Boolean(returned[row.property]);
+    }
+    if (row.numeric) {
+      return Boolean(
+        returned.flags & (ts.TypeFlags.NumberLike | ts.TypeFlags.BigIntLike)
+      );
+    }
+    if (row.voidLike) {
+      return Boolean(returned.flags & ts.TypeFlags.Void);
+    }
+    return false;
+  });
+}
 
 export function signatureForwarding({
   checker,
@@ -14,13 +35,19 @@ export function signatureForwarding({
   summary,
   substituteAll,
   flagged,
+  projected,
+  elementStep,
 }) {
   const { origin, platformSource } = declarations;
 
   function broadPayload(type, visited = new Set()) {
-    if (!type || visited.has(type)) return false;
+    if (!type || visited.has(type)) {
+      return false;
+    }
     visited.add(type);
-    if (broad(type)) return true;
+    if (broad(type)) {
+      return true;
+    }
     if (type.isUnion()) {
       return type.types.some((member) => broadPayload(member, visited));
     }
@@ -32,6 +59,36 @@ export function signatureForwarding({
     return false;
   }
 
+  function enqueueCompositeChildren(current, depth, pending) {
+    const members = current.isUnionOrIntersection() ? current.types : [];
+    const aliasArguments = current.aliasTypeArguments ?? [];
+    for (const member of [
+      ...members,
+      ...checker.getTypeArguments(current),
+      ...aliasArguments,
+    ]) {
+      pending.push([member, depth]);
+    }
+    for (const indexSignature of checker.getIndexInfosOfType(current)) {
+      pending.push([indexSignature.type, depth]);
+    }
+    const symbolDeclaration = current.symbol?.declarations?.[0];
+    if (symbolDeclaration && ts.isTypeLiteralNode(symbolDeclaration)) {
+      for (const property of checker.getPropertiesOfType(current)) {
+        pending.push([checker.getTypeOfSymbol(property), depth]);
+      }
+    }
+    for (const compositeChild of [
+      current.templateType,
+      current.objectType,
+      current.indexType,
+    ]) {
+      if (compositeChild) {
+        pending.push([compositeChild, depth]);
+      }
+    }
+  }
+
   function returnedTypeParameters(returned) {
     const typeParameters = new Set();
     const visited = new Set();
@@ -39,24 +96,110 @@ export function signatureForwarding({
     const pending = [[returned, 0]];
     while (pending.length) {
       const [current, depth] = pending.pop();
-      if (!current || visited.has(current)) continue;
+      if (!current || visited.has(current)) {
+        continue;
+      }
       if (depth > RETURNED_FUNCTION_DEPTH) {
         truncated = true;
         continue;
       }
       visited.add(current);
-      if (current.flags & ts.TypeFlags.TypeParameter) {
+      if (current.flags & ts.TypeFlags.TypeParameter && !current.isThisType) {
         typeParameters.add(current);
+        const constraintNode = current.symbol?.declarations?.[0]?.constraint;
+        const constraint =
+          constraintNode && checker.getTypeFromTypeNode(constraintNode);
+        if (
+          constraint &&
+          constraint.flags & ts.TypeFlags.TypeParameter &&
+          !constraint.isThisType
+        ) {
+          pending.push([constraint, depth]);
+        }
       }
-      const members = current.isUnionOrIntersection() ? current.types : [];
-      for (const member of [...members, ...checker.getTypeArguments(current)]) {
-        pending.push([member, depth]);
-      }
+      enqueueCompositeChildren(current, depth, pending);
       for (const signature of current.getCallSignatures()) {
         pending.push([checker.getReturnTypeOfSignature(signature), depth + 1]);
       }
     }
     return { typeParameters, truncated };
+  }
+
+  function sharedTypeParameters(type, targetSet) {
+    const shared = new Set();
+    if (!type || !targetSet?.size) {
+      return shared;
+    }
+    for (const candidate of returnedTypeParameters(type).typeParameters) {
+      if (targetSet.has(candidate)) {
+        shared.add(candidate);
+      }
+    }
+    return shared;
+  }
+
+  function collectionElements(type) {
+    const nonNull = type?.getNonNullableType();
+    if (!nonNull) {
+      return [];
+    }
+    const symbolName =
+      nonNull.symbol?.name ?? nonNull.target?.symbol?.name ?? null;
+    const collectionRow = boundaryCases.collections.find((row) =>
+      row.symbols.includes(symbolName)
+    );
+    if (collectionRow) {
+      const typeArguments = checker.getTypeArguments(nonNull);
+      const element = typeArguments[collectionRow.elementIndex];
+      return element ? [element] : typeArguments;
+    }
+    if (checker.isArrayLikeType(nonNull) && !checker.isTupleType(nonNull)) {
+      const indexed = checker.getIndexTypeOfType(nonNull, ts.IndexKind.Number);
+      return indexed ? [indexed] : checker.getTypeArguments(nonNull);
+    }
+    return [];
+  }
+
+  function isCollectionOver(type, targetSet) {
+    if (!type || !targetSet?.size) {
+      return false;
+    }
+    const nonNull = type.getNonNullableType();
+    if (nonNull.isUnion()) {
+      return nonNull.types.some((member) =>
+        isCollectionOver(member, targetSet)
+      );
+    }
+    const elements = collectionElements(nonNull);
+    if (elements.length) {
+      return elements.some(
+        (element) => sharedTypeParameters(element, targetSet).size > 0
+      );
+    }
+    if (nonNull.templateType && nonNull.constraintType) {
+      return sharedTypeParameters(nonNull.templateType, targetSet).size > 0;
+    }
+    const promised = checker.getPromisedTypeOfPromise(nonNull);
+    return Boolean(
+      promised && promised !== nonNull && isCollectionOver(promised, targetSet)
+    );
+  }
+
+  function unpackIfCollection(
+    roots,
+    sourceNode,
+    sourceIsCollection,
+    targetType,
+    sharedSet
+  ) {
+    if (
+      sourceIsCollection &&
+      sharedSet.size > 0 &&
+      !isCollectionOver(targetType, sharedSet)
+    ) {
+      return projected(roots, elementStep(sourceNode));
+    }
+    return roots;
   }
 
   function callOpaque(declaration, sourceOpaque, call) {
@@ -72,8 +215,31 @@ export function signatureForwarding({
         declaration,
       });
     }
+    const parentParameters = new Set(
+      declaration?.parent?.typeParameters?.map((parameter) =>
+        checker.getTypeAtLocation(parameter)
+      ) ?? []
+    );
+    const receiverType =
+      call &&
+      ts.isPropertyAccessExpression(call.expression) &&
+      checker.getTypeAtLocation(call.expression.expression);
+    const receiverArguments =
+      receiverType &&
+      checker.getTypeArguments(receiverType.getNonNullableType());
+    const narrowedReceiver =
+      !sourceOpaque &&
+      typeParameters.size > 0 &&
+      [...typeParameters].every((parameter) =>
+        parentParameters.has(parameter)
+      ) &&
+      Boolean(receiverArguments?.length) &&
+      !receiverArguments.some(broad);
     return Boolean(
-      sourceOpaque || broad(declaredOutput) || typeParameters.size || truncated
+      sourceOpaque ||
+      broad(declaredOutput) ||
+      (typeParameters.size && !narrowedReceiver) ||
+      truncated
     );
   }
 
@@ -81,7 +247,9 @@ export function signatureForwarding({
     if (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) {
       return [argument];
     }
-    if (!ts.isObjectLiteralExpression(argument)) return [];
+    if (!ts.isObjectLiteralExpression(argument)) {
+      return [];
+    }
     return argument.properties.flatMap((property) => {
       if (
         ts.isPropertyAssignment(property) &&
@@ -140,6 +308,185 @@ export function signatureForwarding({
     return candidates;
   }
 
+  function receiverSharedParameters(declaration, declaredSignature, targetSet) {
+    const parentDeclaration = declaration?.parent;
+    const parentParameters =
+      parentDeclaration?.typeParameters?.map((parameter) =>
+        checker.getTypeAtLocation(parameter)
+      ) ?? [];
+    const sharedParent = new Set(
+      parentParameters.filter((parameter) => targetSet.has(parameter))
+    );
+    if (sharedParent.size) {
+      const parentName =
+        parentDeclaration?.name?.getText(declaration.getSourceFile()) ?? null;
+      const collectionRow = boundaryCases.collections.find((row) =>
+        row.symbols.includes(parentName)
+      );
+      const elementParameter = collectionRow
+        ? (parentParameters[collectionRow.elementIndex] ?? parentParameters[0])
+        : null;
+      return {
+        shared: sharedParent,
+        sourceIsCollection: Boolean(
+          elementParameter && sharedParent.has(elementParameter)
+        ),
+      };
+    }
+    const thisContract =
+      declaredSignature.thisParameter &&
+      checker.getTypeOfSymbol(declaredSignature.thisParameter);
+    const sharedThis = sharedTypeParameters(thisContract, targetSet);
+    return {
+      shared: sharedThis,
+      sourceIsCollection: isCollectionOver(thisContract, sharedThis),
+    };
+  }
+
+  function matchedParentContextualRoots(
+    hostCall,
+    declaredSignature,
+    targetParameters
+  ) {
+    if (!ts.isCallExpression(hostCall.parent)) {
+      return [];
+    }
+    const hostReturned = checker.getReturnTypeOfSignature(declaredSignature);
+    const parentContextual = checker
+      .getContextualType(hostCall)
+      ?.getNonNullableType()
+      .getCallSignatures()[0];
+    if (!parentContextual) {
+      return [];
+    }
+    const roots = [];
+    for (const returnedSig of hostReturned
+      ?.getNonNullableType()
+      .getCallSignatures() ?? []) {
+      for (const [
+        paramIndex,
+        paramSymbol,
+      ] of returnedSig.parameters.entries()) {
+        const parentSubject = parentContextual.parameters[paramIndex];
+        if (
+          parentSubject &&
+          sharedTypeParameters(
+            checker.getTypeOfSymbol(paramSymbol),
+            targetParameters
+          ).size > 0
+        ) {
+          roots.push(
+            ...contextualSources(
+              parentSubject,
+              hostCall,
+              hostCall.parent,
+              hostCall
+            )
+          );
+        }
+      }
+    }
+    return roots;
+  }
+
+  function matchedUpstreamRoots(
+    callback,
+    hostCall,
+    targetParameters,
+    targetContract
+  ) {
+    const declaration = checker.getResolvedSignature(hostCall)?.declaration;
+    const declaredSignature =
+      declaration && checker.getSignatureFromDeclaration(declaration);
+    if (!declaration || !declaredSignature) {
+      return null;
+    }
+    const roots = [];
+    let matched = false;
+    if (ts.isPropertyAccessExpression(hostCall.expression)) {
+      const receiverMatch = receiverSharedParameters(
+        declaration,
+        declaredSignature,
+        targetParameters
+      );
+      if (receiverMatch.shared.size) {
+        matched = true;
+        const receiverNode = hostCall.expression.expression;
+        roots.push(
+          ...unpackIfCollection(
+            trace(receiverNode),
+            receiverNode,
+            receiverMatch.sourceIsCollection,
+            targetContract,
+            receiverMatch.shared
+          )
+        );
+      }
+    }
+    const callArguments = hostCall.arguments ?? [];
+    const callbackIndex = callArguments.findIndex(
+      (argument) =>
+        argument === callback || unwrapExpression(argument) === callback
+    );
+    for (const [otherIndex, otherArgument] of callArguments.entries()) {
+      if (!otherArgument || otherIndex === callbackIndex) {
+        continue;
+      }
+      const otherSymbol =
+        declaredSignature.parameters[
+          Math.min(otherIndex, declaredSignature.parameters.length - 1)
+        ];
+      const otherContract = otherSymbol && checker.getTypeOfSymbol(otherSymbol);
+      if (!otherContract) {
+        continue;
+      }
+      const otherCallables = otherContract
+        .getNonNullableType()
+        .getCallSignatures();
+      if (!otherCallables.length) {
+        const shared = sharedTypeParameters(otherContract, targetParameters);
+        if (shared.size) {
+          matched = true;
+          roots.push(
+            ...unpackIfCollection(
+              trace(otherArgument),
+              otherArgument,
+              isCollectionOver(otherContract, shared),
+              targetContract,
+              shared
+            )
+          );
+        }
+        continue;
+      }
+      const sharesReturn =
+        (callbackIndex < 0 || otherIndex < callbackIndex) &&
+        otherCallables.some(
+          (otherSig) =>
+            sharedTypeParameters(
+              checker.getReturnTypeOfSignature(otherSig),
+              targetParameters
+            ).size > 0
+        );
+      if (sharesReturn) {
+        matched = true;
+        roots.push(
+          ...callbackResultRoots(otherArgument, otherContract, hostCall)
+        );
+      }
+    }
+    const parentRoots = matchedParentContextualRoots(
+      hostCall,
+      declaredSignature,
+      targetParameters
+    );
+    if (parentRoots.length) {
+      matched = true;
+      roots.push(...parentRoots);
+    }
+    return matched ? roots : null;
+  }
+
   function contextualSources(subject, callback, hostCall, use) {
     for (const declaration of subject?.declarations ?? []) {
       const source = platformSource(declaration);
@@ -151,7 +498,18 @@ export function signatureForwarding({
       }
       const contract =
         declaration.type && checker.getTypeFromTypeNode(declaration.type);
-      if (contract?.flags & ts.TypeFlags.TypeParameter && hostCall) {
+      const { typeParameters: targetParameters } =
+        returnedTypeParameters(contract);
+      if (targetParameters.size && hostCall) {
+        const matched = matchedUpstreamRoots(
+          callback,
+          hostCall,
+          targetParameters,
+          contract
+        );
+        if (matched !== null) {
+          return matched;
+        }
         return callbackUpstreamCandidates(callback, hostCall).flatMap(
           (candidate) => trace(candidate)
         );
@@ -188,7 +546,9 @@ export function signatureForwarding({
 
   function contextualParameterRoots(parameter) {
     const callback = parameter.parent;
-    if (!ts.isExpression(callback)) return [];
+    if (!ts.isExpression(callback)) {
+      return [];
+    }
     const index = callback.parameters.indexOf(parameter);
     const contextual = checker.getContextualType(callback);
     const hostCall = hostCallOf(callback);
@@ -201,7 +561,9 @@ export function signatureForwarding({
         hostCall,
         parameter
       );
-      if (roots.length) return roots;
+      if (roots.length) {
+        return roots;
+      }
     }
     return [];
   }
@@ -218,6 +580,47 @@ export function signatureForwarding({
     return bound;
   }
 
+  function pointFreeSignatures(argument, hostCall) {
+    const unwrapped = unwrapExpression(argument);
+    if (!unwrapped || ts.isFunctionLike(unwrapped)) {
+      return [];
+    }
+    if (ts.isCallExpression(unwrapped)) {
+      const declaration = checker.getResolvedSignature(unwrapped)?.declaration;
+      if (
+        !declaration ||
+        (origin(declaration, hostCall) === null && declaration.body)
+      ) {
+        return [];
+      }
+      const declared = checker.getSignatureFromDeclaration(declaration);
+      const returned = declared && checker.getReturnTypeOfSignature(declared);
+      return returned?.getNonNullableType().getCallSignatures() ?? [];
+    }
+    if (
+      ts.isIdentifier(unwrapped) ||
+      ts.isPropertyAccessExpression(unwrapped)
+    ) {
+      const symbol = checker.getSymbolAtLocation(unwrapped);
+      const target =
+        symbol && symbol.flags & ts.SymbolFlags.Alias
+          ? checker.getAliasedSymbol(symbol)
+          : symbol;
+      const declaration = target?.declarations?.[0];
+      if (
+        !declaration ||
+        (origin(declaration, hostCall) === null && declaration.body)
+      ) {
+        return [];
+      }
+      const declaredType =
+        (declaration.type && checker.getTypeFromTypeNode(declaration.type)) ??
+        checker.getTypeOfSymbol(target);
+      return declaredType?.getNonNullableType().getCallSignatures() ?? [];
+    }
+    return [];
+  }
+
   function callbackResultRoots(argument, contract, call) {
     const literal = callbackNodes(argument);
     if (literal.length) {
@@ -232,31 +635,65 @@ export function signatureForwarding({
         callbackBindings(declared, contract, call)
       );
     }
-    return ts.isCallExpression(argument) ? trace(argument) : [];
+    const roots = ts.isCallExpression(argument) ? [...trace(argument)] : [];
+    const contextual = contract.getNonNullableType().getCallSignatures()[0];
+    if (!contextual) {
+      return roots;
+    }
+    for (const signature of pointFreeSignatures(argument, call)) {
+      const { typeParameters: signatureOutput } = returnedTypeParameters(
+        checker.getReturnTypeOfSignature(signature)
+      );
+      for (const [paramIndex, paramSymbol] of signature.parameters.entries()) {
+        const shared = sharedTypeParameters(
+          checker.getTypeOfSymbol(paramSymbol),
+          signatureOutput
+        );
+        const subject = shared.size
+          ? contextual.parameters[paramIndex]
+          : undefined;
+        if (subject) {
+          roots.push(...contextualSources(subject, argument, call, argument));
+        }
+      }
+    }
+    return roots;
   }
 
   function receiverRoots(call, signature, output) {
     const { declaration } = signature;
-    if (!declaration || !ts.isCallExpression(call)) return [];
-    const receiverParameters =
-      declaration?.parent?.typeParameters?.map((parameter) =>
-        checker.getTypeAtLocation(parameter)
-      ) ?? [];
-    const methodLike =
-      ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration);
-    const receiverTyped =
-      receiverParameters.some((parameter) => output.has(parameter)) ||
-      (!output.size && methodLike);
-    if (!receiverTyped || !ts.isPropertyAccessExpression(call.expression)) {
+    if (!declaration || !ts.isCallExpression(call)) {
+      return [];
+    }
+    if (!ts.isPropertyAccessExpression(call.expression)) {
       return [];
     }
     const returned = checker.getReturnTypeOfSignature(signature);
+    const receiverMatch = receiverSharedParameters(
+      declaration,
+      signature,
+      output
+    );
+    const methodLike =
+      ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration);
+    const receiverTyped =
+      receiverMatch.shared.size > 0 || (!output.size && methodLike);
+    if (!receiverTyped) {
+      return [];
+    }
     const projection =
       !output.size &&
       origin(declaration, call) === "platform" &&
       typed(returned) &&
       !broadPayload(returned);
-    const inherited = trace(call.expression.expression);
+    const receiverNode = call.expression.expression;
+    const inherited = unpackIfCollection(
+      trace(receiverNode),
+      receiverNode,
+      receiverMatch.sourceIsCollection,
+      returned,
+      receiverMatch.shared
+    );
     return projection
       ? inherited.map((root) =>
           root.incomplete ? root : flagged(root, { opaque: false })
@@ -272,7 +709,9 @@ export function signatureForwarding({
           ...returnedTypeParameters(checker.getTypeOfSymbol(parameter))
             .typeParameters,
         ].some((candidate) => !output.has(candidate));
-      if (!unsettled) return [];
+      if (!unsettled) {
+        return [];
+      }
       return [
         {
           kind: "unresolved-declaration",
@@ -286,27 +725,42 @@ export function signatureForwarding({
   }
 
   function forwardedRoots(call, signature) {
-    const { typeParameters: output, truncated } = returnedTypeParameters(
-      checker.getReturnTypeOfSignature(signature)
-    );
+    const returned = checker.getReturnTypeOfSignature(signature);
+    if (
+      isNonForwardingReturn(returned) &&
+      isNonForwardingReturn(checker.getAwaitedType(returned))
+    ) {
+      return [];
+    }
+    const { typeParameters: output, truncated } =
+      returnedTypeParameters(returned);
     const roots = [];
     const callArguments = call.arguments ?? [];
     for (const [index, parameter] of signature.parameters.entries()) {
       const argument = callArguments[index];
-      if (!argument) continue;
+      if (!argument) {
+        continue;
+      }
       const contract = checker.getTypeOfSymbol(parameter);
-      const mentionsOutput = [
-        ...returnedTypeParameters(contract).typeParameters,
-      ].some((candidate) => output.has(candidate));
+      const shared = sharedTypeParameters(contract, output);
       const callable = contract.getNonNullableType().getCallSignatures();
-      const sharesOutput = callable.some((callback) =>
-        [
-          ...returnedTypeParameters(checker.getReturnTypeOfSignature(callback))
-            .typeParameters,
-        ].some((candidate) => output.has(candidate))
+      const sharesOutput = callable.some(
+        (callback) =>
+          sharedTypeParameters(
+            checker.getReturnTypeOfSignature(callback),
+            output
+          ).size > 0
       );
-      if (mentionsOutput && !callable.length) {
-        roots.push(...trace(argument));
+      if (shared.size > 0 && !callable.length) {
+        roots.push(
+          ...unpackIfCollection(
+            trace(argument),
+            argument,
+            isCollectionOver(contract, shared),
+            returned,
+            shared
+          )
+        );
       }
       if (
         sharesOutput ||

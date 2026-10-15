@@ -54,3 +54,52 @@ export function isAssertionChain(expression) {
   }
   return assertions >= 2;
 }
+
+export const safeExpressionKinds = new Set([
+  ts.SyntaxKind.StringLiteral,
+  ts.SyntaxKind.NumericLiteral,
+  ts.SyntaxKind.BigIntLiteral,
+  ts.SyntaxKind.RegularExpressionLiteral,
+  ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+  ts.SyntaxKind.TrueKeyword,
+  ts.SyntaxKind.FalseKeyword,
+  ts.SyntaxKind.NullKeyword,
+  ts.SyntaxKind.OmittedExpression,
+  ts.SyntaxKind.ArrowFunction,
+  ts.SyntaxKind.FunctionExpression,
+  ts.SyntaxKind.ClassExpression,
+  ts.SyntaxKind.TypeOfExpression,
+  ts.SyntaxKind.VoidExpression,
+  ts.SyntaxKind.DeleteExpression,
+  ts.SyntaxKind.PrefixUnaryExpression,
+  ts.SyntaxKind.PostfixUnaryExpression,
+  ts.SyntaxKind.MetaProperty,
+  ts.SyntaxKind.ImportKeyword,
+  ts.SyntaxKind.JsxElement,
+  ts.SyntaxKind.JsxSelfClosingElement,
+  ts.SyntaxKind.JsxFragment,
+]);
+
+function contains(ancestor, node) {
+  return ancestor.pos <= node.pos && ancestor.end >= node.end;
+}
+
+export function unconditionalBefore(write, use) {
+  if (write.end >= use.pos) {
+    return false;
+  }
+  let ancestor = write.parent;
+  while (ancestor && !ts.isFunctionLike(ancestor)) {
+    if (
+      (ts.isBlock(ancestor) ||
+        ts.isIfStatement(ancestor) ||
+        ts.isConditionalExpression(ancestor) ||
+        ts.isIterationStatement(ancestor, false)) &&
+      !contains(ancestor, use)
+    ) {
+      return false;
+    }
+    ancestor = ancestor.parent;
+  }
+  return ancestor === enclosingFunction(use);
+}

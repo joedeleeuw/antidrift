@@ -120,11 +120,41 @@ export function contractProjection(checker) {
     );
   }
 
+  function stripNullish(type) {
+    if (
+      type.aliasSymbol?.escapedName === "Awaited" &&
+      type.aliasTypeArguments?.length === 1
+    ) {
+      return stripNullish(type.aliasTypeArguments[0]);
+    }
+    if (type.isUnion()) {
+      const members = type.types.filter(
+        (member) =>
+          !(member.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Null))
+      );
+      if (members.length === 1) {
+        return stripNullish(members[0]);
+      }
+    }
+    if (type.isIntersection() && type.types.length === 2) {
+      const typeParameter = type.types.find(
+        (member) => member.flags & ts.TypeFlags.TypeParameter
+      );
+      if (typeParameter) {
+        return typeParameter;
+      }
+    }
+    return type;
+  }
+
   function claimContract(contract) {
-    if (!contract) return null;
-    if (contract.flags & ts.TypeFlags.TypeParameter) {
-      const constraint = checker.getBaseConstraintOfType(contract);
-      return constraint && constraint !== contract
+    if (!contract) {
+      return null;
+    }
+    const core = stripNullish(contract);
+    if (core.flags & ts.TypeFlags.TypeParameter) {
+      const constraint = checker.getBaseConstraintOfType(core);
+      return constraint && constraint !== core
         ? claimContract(constraint)
         : null;
     }
