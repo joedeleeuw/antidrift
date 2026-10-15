@@ -77,7 +77,7 @@ export function createConfig({
         "antidrift/react-max-component-props": ["error", { max: 12 }],
         "antidrift/no-unsafe-deserialize": "error",
         "antidrift/no-inline-structural-type-at-use-site": "error",
-        "antidrift/unknown-input-must-be-decoded": "off",
+        "antidrift/unknown-input-must-be-decoded": "error",
         "antidrift/no-appeasement-cast": "error",
         "antidrift/no-nullable-positional-tuple": "error",
         "antidrift/no-underchecked-type-predicate": "error",

@@ -1,4 +1,3 @@
-import ts from "typescript";
 import { boundaryModel } from "../../semantic-adapters/boundary-model.mjs";
 import {
   missingTypeServicesVisitors,
@@ -17,6 +16,8 @@ export default function ruleUnknownInputMustBeDecoded() {
       messages: {
         decodeUnknown:
           "Untrusted input reaches a typed use without a dominating decode. Decode it at the receiving boundary.",
+        incompleteAnalysis:
+          "Untrusted input provenance could not be resolved ({{cause}}). Decode the value before typed use.",
       },
     },
     create(context) {
@@ -27,72 +28,43 @@ export default function ruleUnknownInputMustBeDecoded() {
           "unknown-input-must-be-decoded"
         );
       }
-      const checker = services.program.getTypeChecker();
       const model = boundaryModel(services.program);
       const reported = new Set();
-      function check(node, expression, target) {
-        if (reported.has(node) || !model.unchecked(expression, target).length) {
+      function reportRoots(node, roots) {
+        if (reported.has(node) || !roots.length) return;
+        reported.add(node);
+        if (roots.some((root) => !root.incomplete)) {
+          context.report({ node, messageId: "decodeUnknown" });
           return;
         }
-        reported.add(node);
-        context.report({ node, messageId: "decodeUnknown" });
-      }
-      function assertion(node) {
-        const expression = services.esTreeNodeToTSNodeMap.get(node);
-        check(
+        context.report({
           node,
-          expression.expression,
-          checker.getTypeAtLocation(expression)
-        );
+          messageId: "incompleteAnalysis",
+          data: { cause: roots[0].incomplete },
+        });
+      }
+      const tsNode = (node) => services.esTreeNodeToTSNodeMap.get(node);
+      function sink(node) {
+        reportRoots(node, model.uncheckedAt(tsNode(node)));
+      }
+      function callArguments(node) {
+        for (const argument of node.arguments) {
+          reportRoots(argument, model.uncheckedArgument(tsNode(argument)));
+        }
       }
       return {
-        TSAsExpression: assertion,
-        TSTypeAssertion: assertion,
-        VariableDeclarator(node) {
-          const declaration = services.esTreeNodeToTSNodeMap.get(node);
-          if (declaration.type && declaration.initializer) {
-            check(
-              node,
-              declaration.initializer,
-              checker.getTypeFromTypeNode(declaration.type)
-            );
-          }
-        },
-        AssignmentExpression(node) {
-          const assignment = services.esTreeNodeToTSNodeMap.get(node);
-          check(
-            node,
-            assignment.right,
-            checker.getTypeAtLocation(assignment.left)
-          );
-        },
+        TSAsExpression: sink,
+        TSTypeAssertion: sink,
+        VariableDeclarator: sink,
+        AssignmentExpression: sink,
+        ReturnStatement: sink,
         CallExpression(node) {
-          const call = services.esTreeNodeToTSNodeMap.get(node);
-          const signature = checker.getResolvedSignature(call);
-          if (!signature || model.decode(call)) return;
-          for (const [index, argument] of call.arguments.entries()) {
-            const parameter = signature.parameters[index];
-            if (parameter) {
-              check(
-                node.arguments[index],
-                argument,
-                checker.getTypeOfSymbolAtLocation(parameter, call)
-              );
-            }
+          reportRoots(node, model.uncheckedAt(tsNode(node)));
+          for (const argument of node.arguments) {
+            reportRoots(argument, model.uncheckedArgument(tsNode(argument)));
           }
         },
-        ReturnStatement(node) {
-          if (!node.argument) return;
-          const statement = services.esTreeNodeToTSNodeMap.get(node);
-          let owner = statement.parent;
-          while (owner && !ts.isFunctionLike(owner)) owner = owner.parent;
-          if (!owner?.type) return;
-          check(
-            node,
-            statement.expression,
-            checker.getAwaitedType(checker.getTypeFromTypeNode(owner.type))
-          );
-        },
+        NewExpression: callArguments,
       };
     },
   };

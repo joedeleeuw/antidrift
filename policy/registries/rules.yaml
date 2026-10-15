@@ -2449,26 +2449,27 @@ rules:
     nextAction: Keep the 18-of-20 measurement in the investigation document. Review hidden implementation annotations and nested generic constraints.
 
   antidrift/unknown-input-must-be-decoded:
-    status: false-positive-prone
+    status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     directive: G4
-    signal: Checker provenance and local flow connect untrusted platform, dependency, and exported contract input to an unchecked cast or typed use.
+    signal: Checker provenance and local flow connect platform I/O, contextual framework request fields, and exported unknown entry parameters to an unchecked cast or typed use.
     solveType: unknown-input-decoding
     proofBuckets: [semantic-source-type-provenance]
     semanticAdapterStatus:
       status: inline-pending
-      reason: The shared boundary-model.mjs owner is an internal checker adapter. Its public adapter manifest registration remains pending while corpus precision is below the readiness threshold; both future parse-rule consumers can import the same owner directly.
+      reason: The shared boundary-model.mjs owner is an internal checker adapter behind unknown-input-must-be-decoded. Its public adapter manifest registration waits for the fresh post-rework measurement; both future parse-rule consumers can import the same owner directly.
     referenceDoc: docs/rule-investigations/unknown-input-must-be-decoded.md
     corpusRepositories: [antidrift]
     concerns:
       - "Superseded October 12, 2026 study. Before narrowing, 1,793 hits in 46 repositories scored 8/20. After the object-field and serialization changes, 1,526 hits in 45 repositories scored 10/20. Both samples fell below 70%. The later assertion-only rule regressed on the fresh corpus to 19,903 hits and 0/20, compared with 4,238 old-rule hits. The owner now requires input provenance."
       - TypeScript services are required. Missing services produce an error.
-      - Roots combine declaration ownership with any/unknown payload signatures; exported unknown parameters supply explicit first-party contracts.
-      - Decoder signatures accept unknown/any and return typed output, a checked Result, or a predicate/assertion over that argument. Explicit self-decoder contracts are exempt; inferred casts are not evidence.
+      - Roots require declared platform I/O, contextual request shapes or exported unknown entry contracts. Dependency any/unknown plumbing alone is not a root.
+      - Decoder signatures accept unknown/any and return typed output, a checked Result, or a predicate/assertion over that argument. First-party decoder subjects and calls require proved narrowed or decoded returns; annotations and cast-only returns are not evidence.
       - Aliases, assignments, destructuring, property access and await retain roots. Constant inputs, round trips and expect matchers have no exemptions.
-      - All assertion targets count, including primitive types and inline object types.
+      - All typed assertion targets count, including primitive types and inline object types.
       - The rule overlaps with no-appeasement-cast but also covers unnamed targets and angle-bracket assertions.
+      - "October 14, 2026 rework: the 16/30 sample and 42/76 strict recall of the earlier model are superseded by the claim-path model; its measurement is pending and the rule runs at error ahead of it by operator decision."
     external:
       state: net-antidrift
       support: low
@@ -2488,7 +2489,7 @@ rules:
         - "function receive(input: unknown) { return messageSchema.parse(input); }"
         - 'function receive(input: unknown) { if (typeof input === "string") return input; }'
         - "function format(error: unknown) { return String(error); }"
-    nextAction: Keep this rule default-off. The shared boundary model passes package controls but scores 16/30 (53.3%) on a fresh frozen sample across 11 repositories. Resolve local construction, broad callback and rest signatures, and checked generic decode provenance before remeasurement.
+    nextAction: Enabled at error on October 14, 2026 after the course-review rework (claim-path model with projected claims, carrier semantics, first-claim reporting and incomplete-analysis for unresolved contracts). Append the fresh three-corpus measurement (recall against the 76/52 verified sites, a frozen sample of at least 30 reports) to the investigation when the scan ends; return the preset to off if the sample scores below 70%.
 
   antidrift/no-convex-return-widening:
     status: ready
