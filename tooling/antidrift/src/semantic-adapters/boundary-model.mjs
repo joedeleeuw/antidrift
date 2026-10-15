@@ -8,12 +8,15 @@ import {
 } from "./boundary-contracts.mjs";
 import { classReceivers } from "./boundary-classes.mjs";
 import {
+  boundaryObservations,
+  boundaryObserver,
+} from "./boundary-observations.mjs";
+import {
   boundaryDeclarations,
   broad,
   excluded,
 } from "./boundary-declarations.mjs";
 import { signatureForwarding } from "./boundary-plan-roots.mjs";
-import { boundaryObserver } from "./boundary-observations.mjs";
 import { boundarySinks } from "./boundary-sinks.mjs";
 import { boundarySources } from "./boundary-sources.mjs";
 import {
@@ -913,11 +916,23 @@ export function boundaryModel(program, options = {}) {
     }
   }
 
+  const TRACE_DEPTH = boundaryObservations.bounds.traceDepth.limit;
+
   function trace(expression) {
     if (!expression) return [];
     if (visiting.has(expression)) {
       recordCut(expression);
       return [];
+    }
+    if (visiting.size >= TRACE_DEPTH) {
+      observer.boundFired(boundaryObservations.bounds.traceDepth, {
+        depth: visiting.size,
+        declaration: enclosingFunction(expression),
+      });
+      return unknownProvenance(
+        expression,
+        `trace deeper than ${TRACE_DEPTH} expressions`
+      );
     }
     visiting.add(expression);
     try {

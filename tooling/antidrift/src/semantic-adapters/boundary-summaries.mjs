@@ -11,24 +11,10 @@ export function nodeKey(node) {
   return `${node.getSourceFile().fileName}:${node.pos}:${node.end}`;
 }
 
-const objectIds = new WeakMap();
-let nextObjectId = 0;
-
-function objectId(object) {
-  if (!object) return "";
-  let id = objectIds.get(object);
-  if (id === undefined) {
-    nextObjectId += 1;
-    id = nextObjectId;
-    objectIds.set(object, id);
-  }
-  return String(id);
-}
-
 function claimKey(claim) {
   if (claim === null) return "cleared";
   if (!claim) return "";
-  return `${nodeKey(claim.node)}#${claim.contract ? objectId(claim.contract) : "?"}`;
+  return `${nodeKey(claim.node)}#${claim.contract ? "" : "?"}@${claim.afterAccess ?? ""}`;
 }
 
 function setKey(keys) {

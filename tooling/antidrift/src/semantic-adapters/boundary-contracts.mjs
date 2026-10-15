@@ -75,38 +75,41 @@ export function contractProjection(checker) {
     return literalText(expression.argumentExpression);
   }
 
+  function passesThrough(contract) {
+    return Boolean(
+      contract.flags & ts.TypeFlags.TypeParameter || unresolvedType(contract)
+    );
+  }
+
+  function soleAcrossOwners(contract, projection) {
+    const owner = contract.getNonNullableType();
+    const whole = projection(owner);
+    if (whole || !owner.isUnion()) return whole ?? null;
+    const contracts = owner.types.map(projection).filter(Boolean);
+    return contracts.length === 1 ? contracts[0] : null;
+  }
+
   function memberContract(contract, memberName) {
     if (!contract) return null;
-    if (
-      contract.flags & ts.TypeFlags.TypeParameter ||
-      unresolvedType(contract)
-    ) {
-      return contract;
-    }
-    const owner = contract.getNonNullableType();
-    const property =
-      memberName !== null && checker.getPropertyOfType(owner, memberName);
-    if (property) return checker.getTypeOfSymbol(property);
-    return (
-      checker.getIndexTypeOfType(owner, ts.IndexKind.String) ??
-      checker.getIndexTypeOfType(owner, ts.IndexKind.Number) ??
-      null
-    );
+    if (passesThrough(contract)) return contract;
+    return soleAcrossOwners(contract, (owner) => {
+      if (owner.flags & ts.TypeFlags.Primitive) return null;
+      const property =
+        memberName !== null && checker.getPropertyOfType(owner, memberName);
+      if (property) return checker.getTypeOfSymbol(property);
+      return (
+        checker.getIndexTypeOfType(owner, ts.IndexKind.String) ??
+        checker.getIndexTypeOfType(owner, ts.IndexKind.Number) ??
+        null
+      );
+    });
   }
 
   function elementContract(contract) {
     if (!contract) return null;
-    if (
-      contract.flags & ts.TypeFlags.TypeParameter ||
-      unresolvedType(contract)
-    ) {
-      return contract;
-    }
-    return (
-      checker.getIndexTypeOfType(
-        contract.getNonNullableType(),
-        ts.IndexKind.Number
-      ) ?? null
+    if (passesThrough(contract)) return contract;
+    return soleAcrossOwners(contract, (owner) =>
+      checker.getIndexTypeOfType(owner, ts.IndexKind.Number)
     );
   }
 
@@ -156,7 +159,7 @@ export function contractProjection(checker) {
       const constraint = checker.getBaseConstraintOfType(core);
       return constraint && constraint !== core
         ? claimContract(constraint)
-        : null;
+        : core;
     }
     return typed(contract) || unresolvedType(contract) ? contract : null;
   }

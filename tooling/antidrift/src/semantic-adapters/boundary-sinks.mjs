@@ -40,8 +40,13 @@ export function boundarySinks({
   unprovedNarrowing,
   contracts,
 }) {
-  const { elementContract, memberContract, projectContract, propertyKey } =
-    contracts;
+  const {
+    claimContract,
+    elementContract,
+    memberContract,
+    projectContract,
+    propertyKey,
+  } = contracts;
   const rootFiles = new Set(program.getRootFileNames());
 
   function narrowingOccurred(node) {
@@ -187,14 +192,22 @@ export function boundarySinks({
       return true;
     }
     const demanded = projectContract(target, root.path);
+    const claimed =
+      claim.contract.flags & ts.TypeFlags.TypeParameter
+        ? projectContract(checker.getTypeAtLocation(expression), root.path)
+        : claim.contract;
     const covered =
       Boolean(demanded) &&
-      narrowingProvesTarget(
-        checker,
-        claim.contract,
-        demanded,
-        pairCapCallback(claim.node)
-      );
+      Boolean(claimed) &&
+      (claimed.flags & ts.TypeFlags.TypeParameter
+        ? claimContract(demanded) === claimed ||
+          checker.isTypeAssignableTo(claimed, demanded)
+        : narrowingProvesTarget(
+            checker,
+            claimed,
+            demanded,
+            pairCapCallback(claim.node)
+          ));
     if (covered && observer.enabled) {
       observer.claimCovered({
         claimNode: claim.node,

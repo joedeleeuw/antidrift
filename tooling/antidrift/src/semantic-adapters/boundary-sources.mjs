@@ -57,12 +57,14 @@ export function boundarySources({ checker, declarations, hasRoots }) {
   }
 
   function exportedParameterRoots(parameter, declared) {
+    const members = declared.isUnion() ? declared.types : [declared];
+    const declares = (flag) => members.some((member) => member.flags & flag);
     const row = boundaryCases.roots.find(
       (candidate) =>
         candidate.exported &&
         (candidate.parameter === "unknown"
-          ? declared.flags & ts.TypeFlags.Unknown
-          : declared.flags & ts.TypeFlags.String)
+          ? declares(ts.TypeFlags.Unknown)
+          : declares(ts.TypeFlags.String))
     );
     if (!row) return [];
     const { kind, activation } = row;

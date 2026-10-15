@@ -62,6 +62,12 @@ export const boundaryObservations = {
       reason:
         "Structural type-pair comparison in cast-narrowing-proof exceeded the seen type-pair cap.",
     },
+    traceDepth: {
+      bound: "trace-depth",
+      limit: 256,
+      reason:
+        "The expression trace nested deeper than the trace depth; the expression is an incomplete root (over-approximation) instead of growing the native stack.",
+    },
   },
   decoderBranches: {
     assertionBody: "assertion-body",

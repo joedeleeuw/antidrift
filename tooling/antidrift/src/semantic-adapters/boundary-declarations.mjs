@@ -36,6 +36,18 @@ export function broad(type) {
   return Boolean(type && type.flags & broadFlags);
 }
 
+function shapeless(type) {
+  if (type.flags & ts.TypeFlags.NonPrimitive) return true;
+  return Boolean(
+    type.flags & ts.TypeFlags.Object &&
+    !type.getProperties().length &&
+    !type.getCallSignatures().length &&
+    !type.getConstructSignatures().length &&
+    !type.getStringIndexType() &&
+    !type.getNumberIndexType()
+  );
+}
+
 export function typed(type, options = {}) {
   if (!type) return false;
   const disallowed =
@@ -43,7 +55,7 @@ export function typed(type, options = {}) {
     ts.TypeFlags.Void |
     ts.TypeFlags.Never |
     (options.allowTypeParameter ? 0 : ts.TypeFlags.TypeParameter);
-  return !(type.flags & disallowed);
+  return !(type.flags & disallowed) && !shapeless(type);
 }
 
 export function excluded(facts) {
