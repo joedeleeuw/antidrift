@@ -107,9 +107,13 @@ export function isThrowAssertionCallbackParse(node) {
   );
 }
 
-// ── Schema-derivation trace: resolve a declared type alias back to the
-// z.infer/z.output schema it descends from, and the schema receiving a parse. ──
-const SCHEMA_OUTPUT_TYPE_NAMES = new Set(["infer", "output", "TypeOf"]);
+const SCHEMA_OUTPUT_TYPE_NAMES = new Set([
+  "infer",
+  "output",
+  "TypeOf",
+  "InferOutput",
+  "Type",
+]);
 
 function resolvedSymbol(checker, symbol) {
   return symbol && symbol.flags & ts.SymbolFlags.Alias
@@ -138,15 +142,30 @@ function symbolForExpression(checker, expression) {
 
 export function parsedSchemaSymbol(checker, tsCall) {
   const callee = tsCall.expression;
-  if (!ts.isPropertyAccessExpression(callee)) {
-    return undefined;
+  if (ts.isPropertyAccessExpression(callee)) {
+    return symbolForExpression(checker, callee.expression);
   }
-  return symbolForExpression(checker, callee.expression);
+  if (ts.isCallExpression(callee) && callee.arguments.length > 0) {
+    return symbolForExpression(checker, callee.arguments[0]);
+  }
+  return undefined;
 }
 
-// `z.infer<typeof S>` / `z.output<typeof S>` — the schema the alias was derived from.
 function schemaSymbolOfOutputAlias(checker, typeNode) {
-  if (!typeNode || !ts.isTypeReferenceNode(typeNode)) {
+  if (!typeNode) {
+    return undefined;
+  }
+  if (
+    ts.isTypeQueryNode(typeNode) &&
+    ts.isQualifiedName(typeNode.exprName) &&
+    typeNode.exprName.right.text === "Type"
+  ) {
+    const owner = ts.isQualifiedName(typeNode.exprName.left)
+      ? typeNode.exprName.left.right
+      : typeNode.exprName.left;
+    return resolvedSymbol(checker, checker.getSymbolAtLocation(owner));
+  }
+  if (!ts.isTypeReferenceNode(typeNode)) {
     return undefined;
   }
   const name = typeNode.typeName;
@@ -187,6 +206,10 @@ export function declaredSchemaParameter(checker, tsArg) {
   );
   if (!declaration) {
     return undefined;
+  }
+  const directSchema = schemaSymbolOfOutputAlias(checker, declaration.type);
+  if (directSchema) {
+    return { declaration, schema: directSchema };
   }
   const alias = aliasDeclarationOfTypeNode(checker, declaration.type);
   const schema = alias && schemaSymbolOfOutputAlias(checker, alias.type);

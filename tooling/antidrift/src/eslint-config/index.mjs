@@ -83,7 +83,6 @@ export function createConfig({
         "antidrift/no-underchecked-type-predicate": "error",
         "antidrift/no-redundant-type-predicate": "error",
         "antidrift/no-defensive-shape-probing": "error",
-        "antidrift/no-parse-as-cast": "error",
         "antidrift/no-appeasement-erasure": "error",
         "antidrift/no-structural-type-fork": [
           "error",

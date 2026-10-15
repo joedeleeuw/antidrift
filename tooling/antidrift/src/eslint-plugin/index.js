@@ -13,7 +13,6 @@ import { ruleNoUnsafeDeserialize } from "./rules/no-unsafe-deserialize.js";
 import { ruleNoStructuralTypeFork } from "./rules/no-structural-type-fork.js";
 import { ruleNoCanonicalModelFork } from "./rules/no-canonical-model-fork.js";
 import { ruleNoRedundantZodParse } from "./rules/no-redundant-zod-parse.js";
-import { ruleNoParseAsCast } from "./rules/no-parse-as-cast.js";
 import { ruleNoAppeasementErasure } from "./rules/no-appeasement-erasure.js";
 import { ruleNoIdentitySchemaTransform } from "./rules/no-identity-schema-transform.js";
 import { ruleNoExplicitTypeArgumentsOnOwnedApi } from "./rules/no-explicit-type-arguments-on-owned-api.js";
@@ -22,7 +21,6 @@ import { ruleNoSchemaValidatorTranscoding } from "./rules/no-schema-validator-tr
 import { ruleNoRestatedDependencyType } from "./rules/no-restated-dependency-type.js";
 import { ruleNoUnresolvedDependencyTypes } from "./rules/no-unresolved-dependency-types.js";
 import { ruleNoRedundantLocalReturnType } from "./rules/no-redundant-local-return-type.js";
-import ruleNoMockedResponseBodyOracle from "../oxlint-plugin/rules/no-mocked-response-body-oracle.js";
 import noWrappingFunctionsRule from "./rules/no-wrapping-functions.js";
 import noPassThroughParametersRule from "./rules/no-pass-through-parameters.js";
 import noVagueNamesRule from "./rules/no-vague-names.js";
@@ -54,7 +52,6 @@ const rules = {
   "no-structural-type-fork": ruleNoStructuralTypeFork(),
   "no-canonical-model-fork": ruleNoCanonicalModelFork(),
   "no-redundant-zod-parse": ruleNoRedundantZodParse(),
-  "no-parse-as-cast": ruleNoParseAsCast(),
   "no-appeasement-erasure": ruleNoAppeasementErasure(),
   "no-identity-schema-transform": ruleNoIdentitySchemaTransform(),
   "no-explicit-type-arguments-on-owned-api":
@@ -64,7 +61,6 @@ const rules = {
   "no-restated-dependency-type": ruleNoRestatedDependencyType(),
   "no-unresolved-dependency-types": ruleNoUnresolvedDependencyTypes(),
   "no-redundant-local-return-type": ruleNoRedundantLocalReturnType(),
-  "no-mocked-response-body-oracle": ruleNoMockedResponseBodyOracle(),
   "no-wrapping-functions": noWrappingFunctionsRule,
   "no-pass-through-parameters": noPassThroughParametersRule,
   "no-vague-names": noVagueNamesRule,

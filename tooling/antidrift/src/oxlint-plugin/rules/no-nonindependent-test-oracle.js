@@ -1,20 +1,31 @@
-import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
+import {
+  bareAssertionMethods,
+  collectBlockFacts,
+  enclosingTestBlockCallback,
+  equalityMatcherMethods,
+  equalityMethods,
+  isBooleanLiteral,
+  isMembershipAssertionNode,
+  literalAtPath,
+  literalContainerTypes,
+  literalNodesEqual,
+  matchesMockedResponseBody,
+  parseAssertAssertion,
+  parseExpectAssertion,
+  resolutionDepthLimit,
+  resolveLiteralNode,
+  templateText,
+  testBlockCallback,
+  unwrapAwaitedExpression,
+  unwrapExpression,
+  walkWithinBlock,
+} from "../shared/test-block-arrangement.js";
+import {
+  contextFilename,
+  isTestFilename,
+  staticPropertyName,
+} from "../shared/test-files.js";
 
-const booleanValues = new Set([true, false]);
-const equalityMethods = new Set([
-  "deepEqual",
-  "deepStrictEqual",
-  "equal",
-  "strictEqual",
-]);
-const bareAssertionMethods = new Set(["ok"]);
-const booleanMatcherMethods = new Set(["toBe", "toEqual", "toStrictEqual"]);
-const equalityMatcherMethods = new Set([
-  "toBe",
-  "toEqual",
-  "toStrictEqual",
-  "toMatchObject",
-]);
 const fullEqualityMatcherMethods = new Set(["toEqual", "toStrictEqual"]);
 const fullEqualityMethods = new Set(["deepEqual", "deepStrictEqual"]);
 const existenceMatcherMethods = new Set(["toBeDefined", "toBeTruthy"]);
@@ -36,519 +47,6 @@ const mockCallCountMatcherMethods = new Set([
 const outcomeFlagProperties = new Set(["success", "ok"]);
 const outcomeFlagMethods = new Set(["isOk", "isErr", "isSuccess", "isFailure"]);
 const throwingParseMethods = new Set(["parse", "parseAsync"]);
-const testBlockNames = new Set(["it", "test", "xit", "xtest", "fit"]);
-const literalContainerTypes = new Set([
-  "ObjectExpression",
-  "ArrayExpression",
-  "Literal",
-  "TemplateLiteral",
-]);
-const resolutionDepthLimit = 8;
-const testFilenamePattern =
-  /(?:(?:^|[/\\])(?:test|tests|__tests__)(?:[/\\])|[.](?:test|spec)[.][cm]?[jt]sx?$)/u;
-
-function contextFilename(context) {
-  if (typeof context.getFilename === "function") return context.getFilename();
-  return context.filename ?? "";
-}
-
-function isTestFilename(filename) {
-  if (!filename || filename === "<input>" || filename === "<text>") {
-    return true;
-  }
-  return testFilenamePattern.test(filename);
-}
-
-function staticPropertyName(member) {
-  if (member?.type !== "MemberExpression") return "";
-  const property = member.property;
-  if (!member.computed && property?.type === "Identifier") return property.name;
-  if (property?.type === "Literal" && typeof property.value === "string") {
-    return property.value;
-  }
-  return "";
-}
-
-function calleeName(callee) {
-  if (callee?.type === "Identifier") return callee.name;
-  return staticPropertyName(callee);
-}
-
-function unwrapExpression(node) {
-  let current = node;
-  while (
-    current?.type === "ChainExpression" ||
-    current?.type === "TSNonNullExpression" ||
-    current?.type === "TSAsExpression" ||
-    current?.type === "TSSatisfiesExpression"
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
-
-function isBooleanLiteral(node) {
-  return node?.type === "Literal" && booleanValues.has(node.value);
-}
-
-function isIncludesCall(node) {
-  const expression = unwrapExpression(node);
-  return (
-    expression?.type === "CallExpression" &&
-    expression.callee.type === "MemberExpression" &&
-    staticPropertyName(expression.callee) === "includes"
-  );
-}
-
-function isInExpression(node) {
-  const expression = unwrapExpression(node);
-  return (
-    expression?.type === "BinaryExpression" && expression.operator === "in"
-  );
-}
-
-function isKeyOwnershipCall(node) {
-  const expression = unwrapExpression(node);
-  if (
-    expression?.type !== "CallExpression" ||
-    expression.callee.type !== "MemberExpression"
-  ) {
-    return false;
-  }
-  const method = staticPropertyName(expression.callee);
-  if (method === "hasOwnProperty") return true;
-  const owner = unwrapExpression(expression.callee.object);
-  return (
-    method === "hasOwn" &&
-    owner?.type === "Identifier" &&
-    owner.name === "Object"
-  );
-}
-
-function isSomeMembershipCall(node) {
-  const expression = unwrapExpression(node);
-  if (
-    expression?.type !== "CallExpression" ||
-    expression.callee.type !== "MemberExpression" ||
-    staticPropertyName(expression.callee) !== "some"
-  ) {
-    return false;
-  }
-  const callback = expression.arguments[0];
-  if (
-    callback?.type !== "ArrowFunctionExpression" &&
-    callback?.type !== "FunctionExpression"
-  ) {
-    return false;
-  }
-  if (callback.body.type !== "BlockStatement") {
-    return true;
-  }
-  return callback.body.body.some(
-    (statement) =>
-      statement.type === "ReturnStatement" && Boolean(statement.argument)
-  );
-}
-
-function isMembershipPredicate(node) {
-  const expression = unwrapExpression(node);
-  return (
-    isIncludesCall(expression) ||
-    isInExpression(expression) ||
-    isKeyOwnershipCall(expression) ||
-    isSomeMembershipCall(expression)
-  );
-}
-
-function isNegatedMembershipPredicate(node) {
-  const expression = unwrapExpression(node);
-  return (
-    expression?.type === "UnaryExpression" &&
-    expression.operator === "!" &&
-    isMembershipPredicate(expression.argument)
-  );
-}
-
-function isBareMembershipAssertion(node) {
-  if (node.type !== "CallExpression") return false;
-  const name = calleeName(node.callee);
-  if (
-    equalityMethods.has(name) &&
-    isMembershipPredicate(node.arguments[0]) &&
-    isBooleanLiteral(node.arguments[1])
-  ) {
-    return true;
-  }
-  if (
-    bareAssertionMethods.has(name) &&
-    (isMembershipPredicate(node.arguments[0]) ||
-      isNegatedMembershipPredicate(node.arguments[0]))
-  ) {
-    return true;
-  }
-  if (
-    name === "assert" &&
-    (isMembershipPredicate(node.arguments[0]) ||
-      isNegatedMembershipPredicate(node.arguments[0]))
-  ) {
-    return true;
-  }
-  return false;
-}
-
-function isMembershipMatcherAssertion(node) {
-  const record = parseExpectAssertion(node);
-  if (!record) return false;
-  const matcher = record.matcher;
-  if (matcher === "toContain") return true;
-  if (matcher === "toHaveProperty") return record.args.length <= 1;
-  if (
-    !booleanMatcherMethods.has(matcher) ||
-    !isBooleanLiteral(record.args[0])
-  ) {
-    return false;
-  }
-  return isMembershipPredicate(record.subject);
-}
-
-function isMembershipAssertionNode(node) {
-  return isBareMembershipAssertion(node) || isMembershipMatcherAssertion(node);
-}
-
-function isTestBlockCallee(callee) {
-  if (!callee) return false;
-  if (callee.type === "Identifier") return testBlockNames.has(callee.name);
-  if (callee.type === "MemberExpression") {
-    return isTestBlockCallee(callee.object);
-  }
-  if (callee.type === "CallExpression") return isTestBlockCallee(callee.callee);
-  return false;
-}
-
-function testBlockCallback(node) {
-  if (node?.type !== "CallExpression" || !isTestBlockCallee(node.callee)) {
-    return null;
-  }
-  return (
-    node.arguments.find(
-      (argument) =>
-        argument.type === "ArrowFunctionExpression" ||
-        argument.type === "FunctionExpression"
-    ) ?? null
-  );
-}
-
-function enclosingTestBlockCallback(node) {
-  let current = node.parent;
-  while (current) {
-    if (
-      (current.type === "ArrowFunctionExpression" ||
-        current.type === "FunctionExpression") &&
-      testBlockCallback(current.parent) === current
-    ) {
-      return current;
-    }
-    current = current.parent;
-  }
-  return null;
-}
-
-function isNodeLike(value) {
-  return (
-    Boolean(value) &&
-    typeof value === "object" &&
-    typeof value.type === "string"
-  );
-}
-
-function pushChildNodes(node, stack) {
-  for (const key of Object.keys(node)) {
-    if (key === "parent") continue;
-    const value = node[key];
-    const children = Array.isArray(value) ? value : [value];
-    for (const child of children) {
-      if (isNodeLike(child) && !testBlockCallback(child)) stack.push(child);
-    }
-  }
-}
-
-function walkWithinBlock(root, visit) {
-  const stack = [root];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    visit(node);
-    pushChildNodes(node, stack);
-  }
-}
-
-function expectRootCall(expression) {
-  if (expression?.type !== "CallExpression") return null;
-  const callee = expression.callee;
-  if (callee.type === "Identifier" && callee.name === "expect") {
-    return expression;
-  }
-  const owner =
-    callee.type === "MemberExpression" ? unwrapExpression(callee.object) : null;
-  if (owner?.type === "Identifier" && owner.name === "expect") {
-    return expression;
-  }
-  return null;
-}
-
-function parseExpectAssertion(node) {
-  if (
-    node.type !== "CallExpression" ||
-    node.callee.type !== "MemberExpression"
-  ) {
-    return null;
-  }
-  const matcher = staticPropertyName(node.callee);
-  if (!matcher) return null;
-  const modifiers = new Set();
-  let current = unwrapExpression(node.callee.object);
-  while (current?.type === "MemberExpression") {
-    modifiers.add(staticPropertyName(current));
-    current = unwrapExpression(current.object);
-  }
-  const expectCall = expectRootCall(current);
-  if (!expectCall) return null;
-  const subject = expectCall.arguments[0]
-    ? unwrapExpression(expectCall.arguments[0])
-    : null;
-  return {
-    kind: "expect",
-    node,
-    expectCall,
-    subject,
-    matcher,
-    args: node.arguments,
-    modifiers,
-  };
-}
-
-function parseAssertAssertion(node) {
-  if (node.type !== "CallExpression") return null;
-  if (node.callee.type === "Identifier" && node.callee.name === "assert") {
-    return { kind: "assert", node, method: "assert", args: node.arguments };
-  }
-  const owner =
-    node.callee.type === "MemberExpression"
-      ? unwrapExpression(node.callee.object)
-      : null;
-  if (owner?.type === "Identifier" && owner.name === "assert") {
-    return {
-      kind: "assert",
-      node,
-      method: staticPropertyName(node.callee),
-      args: node.arguments,
-    };
-  }
-  return null;
-}
-
-function bindingCall(init) {
-  let expression = unwrapExpression(init);
-  if (expression?.type === "AwaitExpression") {
-    expression = unwrapExpression(expression.argument);
-  }
-  return expression?.type === "CallExpression" ? expression : null;
-}
-
-function recordActBinding(declarator, bindings) {
-  if (declarator.id?.type !== "Identifier" || !declarator.init) return;
-  bindings.set(declarator.id.name, declarator.init);
-}
-
-function collectActArgument(argument, names, literals) {
-  const expression = unwrapExpression(argument);
-  if (!expression) return;
-  if (expression.type === "Identifier") {
-    names.add(expression.name);
-    return;
-  }
-  if (literalContainerTypes.has(expression.type)) literals.push(expression);
-}
-
-function collectBlockFacts(callback) {
-  const calls = [];
-  const bindings = new Map();
-  walkWithinBlock(callback.body, (node) => {
-    if (node.type === "CallExpression") calls.push(node);
-    else if (node.type === "VariableDeclarator") {
-      recordActBinding(node, bindings);
-    }
-  });
-  const assertions = [];
-  const assertionCalls = new Set();
-  for (const call of calls) {
-    const record = parseExpectAssertion(call) ?? parseAssertAssertion(call);
-    if (!record) continue;
-    assertions.push(record);
-    assertionCalls.add(call);
-    if (record.expectCall) assertionCalls.add(record.expectCall);
-  }
-  const actArgNames = new Set();
-  const actArgLiterals = [];
-  for (const call of calls) {
-    if (assertionCalls.has(call)) continue;
-    for (const argument of call.arguments) {
-      collectActArgument(argument, actArgNames, actArgLiterals);
-    }
-  }
-  return { assertions, bindings, actArgNames, actArgLiterals };
-}
-
-function constInitializer(sourceCode, identifier) {
-  const variable = findVariable(sourceCode, identifier);
-  const definition = variable?.defs?.[0];
-  if (
-    definition?.type !== "Variable" ||
-    definition.node?.type !== "VariableDeclarator" ||
-    definition.parent?.kind !== "const"
-  ) {
-    return null;
-  }
-  return definition.node.init ?? null;
-}
-
-function resolveLiteralNode(node, sourceCode, depth) {
-  const expression = unwrapExpression(node);
-  if (!expression || depth <= 0) return null;
-  if (expression.type === "Identifier") {
-    const init = constInitializer(sourceCode, expression);
-    return init ? resolveLiteralNode(init, sourceCode, depth - 1) : null;
-  }
-  return literalContainerTypes.has(expression.type) ? expression : null;
-}
-
-function propertyKeyName(property) {
-  if (property.type !== "Property") return null;
-  if (property.computed) {
-    return property.key.type === "Literal" ? String(property.key.value) : null;
-  }
-  if (property.key.type === "Identifier") return property.key.name;
-  if (property.key.type === "Literal") return String(property.key.value);
-  return null;
-}
-
-function objectPropertyValue(objectExpression, segment, sourceCode, depth) {
-  let result = null;
-  for (const property of objectExpression.properties) {
-    if (property.type === "SpreadElement") {
-      const spread = resolveLiteralNode(
-        property.argument,
-        sourceCode,
-        depth - 1
-      );
-      if (spread?.type !== "ObjectExpression") continue;
-      const inherited = objectPropertyValue(
-        spread,
-        segment,
-        sourceCode,
-        depth - 1
-      );
-      if (inherited) result = inherited;
-      continue;
-    }
-    if (propertyKeyName(property) === String(segment)) result = property.value;
-  }
-  return result;
-}
-
-function literalStep(container, segment, sourceCode, depth) {
-  if (container.type === "ObjectExpression") {
-    return objectPropertyValue(container, segment, sourceCode, depth);
-  }
-  if (container.type === "ArrayExpression" && typeof segment === "number") {
-    const hasSpread = container.elements.some(
-      (element) => element?.type === "SpreadElement"
-    );
-    return hasSpread ? null : (container.elements[segment] ?? null);
-  }
-  return null;
-}
-
-function literalAtPath(baseNode, path, sourceCode) {
-  let depth = resolutionDepthLimit;
-  let current = resolveLiteralNode(baseNode, sourceCode, depth);
-  for (const segment of path) {
-    if (!current || depth <= 0) return null;
-    depth -= 1;
-    const next = literalStep(current, segment, sourceCode, depth);
-    current = next
-      ? (resolveLiteralNode(next, sourceCode, depth) ?? unwrapExpression(next))
-      : null;
-  }
-  return current;
-}
-
-function templateText(template) {
-  if (template.expressions.length > 0) return null;
-  return template.quasis.map((quasi) => quasi.value.cooked).join("");
-}
-
-function hasSpreadProperty(objectExpression) {
-  return objectExpression.properties.some(
-    (property) => property.type === "SpreadElement"
-  );
-}
-
-function arrayLiteralsEqual(left, right, depth) {
-  if (left.elements.length !== right.elements.length) return false;
-  return left.elements.every((element, index) => {
-    const other = right.elements[index];
-    if (!element || !other) return false;
-    if (element.type === "SpreadElement" || other.type === "SpreadElement") {
-      return false;
-    }
-    return literalNodesEqual(element, other, depth - 1);
-  });
-}
-
-function objectLiteralsEqual(left, right, depth) {
-  if (
-    left.properties.length !== right.properties.length ||
-    hasSpreadProperty(left) ||
-    hasSpreadProperty(right)
-  ) {
-    return false;
-  }
-  const rightByKey = new Map();
-  for (const property of right.properties) {
-    rightByKey.set(propertyKeyName(property), property.value);
-  }
-  return left.properties.every((property) => {
-    const key = propertyKeyName(property);
-    if (key === null || !rightByKey.has(key)) return false;
-    return literalNodesEqual(property.value, rightByKey.get(key), depth - 1);
-  });
-}
-
-function literalNodesEqual(a, b, depth = resolutionDepthLimit) {
-  const left = unwrapExpression(a);
-  const right = unwrapExpression(b);
-  if (!left || !right || depth <= 0 || left.type !== right.type) return false;
-  if (left.type === "Literal") return left.value === right.value;
-  if (left.type === "TemplateLiteral") {
-    const text = templateText(left);
-    return text !== null && text === templateText(right);
-  }
-  if (left.type === "Identifier") return left.name === right.name;
-  if (left.type === "UnaryExpression") {
-    return (
-      left.operator === "-" &&
-      right.operator === "-" &&
-      literalNodesEqual(left.argument, right.argument, depth - 1)
-    );
-  }
-  if (left.type === "ArrayExpression") {
-    return arrayLiteralsEqual(left, right, depth);
-  }
-  if (left.type === "ObjectExpression") {
-    return objectLiteralsEqual(left, right, depth);
-  }
-  return false;
-}
 
 function memberSegment(member) {
   if (!member.computed && member.property.type === "Identifier") {
@@ -569,7 +67,9 @@ function memberPathInfo(expression) {
   let current = unwrapExpression(expression);
   while (current?.type === "MemberExpression") {
     const segment = memberSegment(current);
-    if (segment === null) return null;
+    if (segment === null) {
+      return null;
+    }
     path.unshift(segment);
     current = unwrapExpression(current.object);
   }
@@ -577,10 +77,15 @@ function memberPathInfo(expression) {
 }
 
 function actForRoot(root, bindings) {
-  if (!root) return null;
-  if (root.type === "CallExpression") return root;
+  if (!root) {
+    return null;
+  }
+  if (root.type === "CallExpression") {
+    return root;
+  }
   if (root.type === "Identifier") {
-    return bindingCall(bindings.get(root.name)) ?? null;
+    const bound = unwrapAwaitedExpression(bindings.get(root.name));
+    return bound?.type === "CallExpression" ? bound : null;
   }
   return null;
 }
@@ -596,20 +101,32 @@ function arrangedActPathForExpression(
   depth = resolutionDepthLimit
 ) {
   const target = unwrapExpression(expression);
-  if (!target || depth <= 0) return null;
+  if (!target || depth <= 0) {
+    return null;
+  }
   if (target.type === "Identifier") {
     const act = arrangedActForRoot(target, bindings);
-    if (act) return { act, path: [] };
+    if (act) {
+      return { act, path: [] };
+    }
     const binding = bindings.get(target.name);
     return binding
       ? arrangedActPathForExpression(binding, bindings, depth - 1)
       : null;
   }
   if (target.type === "MemberExpression") {
-    const info = memberPathInfo(target);
-    if (!info) return null;
-    const base = arrangedActPathForExpression(info.root, bindings, depth - 1);
-    return base ? { act: base.act, path: [...base.path, ...info.path] } : null;
+    const pathInfo = memberPathInfo(target);
+    if (!pathInfo) {
+      return null;
+    }
+    const base = arrangedActPathForExpression(
+      pathInfo.root,
+      bindings,
+      depth - 1
+    );
+    return base
+      ? { act: base.act, path: [...base.path, ...pathInfo.path] }
+      : null;
   }
   if (
     target.type === "CallExpression" &&
@@ -638,35 +155,32 @@ function pathsEqual(left, right) {
 
 function equalityOperands(record) {
   if (record.kind === "expect") {
-    if (!equalityMatcherMethods.has(record.matcher)) return null;
-    if (record.modifiers.has("not") || record.modifiers.has("rejects")) {
+    if (
+      !equalityMatcherMethods.has(record.matcher) ||
+      record.modifiers.has("not") ||
+      record.modifiers.has("rejects")
+    ) {
       return null;
     }
     return { actual: record.subject, expected: record.args[0] ?? null };
   }
-  if (!equalityMethods.has(record.method)) return null;
+  if (!equalityMethods.has(record.method)) {
+    return null;
+  }
   return {
     actual: record.args[0] ? unwrapExpression(record.args[0]) : null,
     expected: record.args[1] ?? null,
   };
 }
 
-function stripNegation(expression) {
-  const unwrapped = unwrapExpression(expression);
-  if (unwrapped?.type === "UnaryExpression" && unwrapped.operator === "!") {
-    return unwrapExpression(unwrapped.argument);
-  }
-  return unwrapped;
-}
-
 function isOutcomeFlagExpression(expression, bindings) {
-  const info = memberPathInfo(expression);
+  const pathInfo = memberPathInfo(expression);
   if (
-    info &&
-    info.path.length > 0 &&
-    outcomeFlagProperties.has(String(info.path.at(-1)))
+    pathInfo &&
+    pathInfo.path.length > 0 &&
+    outcomeFlagProperties.has(String(pathInfo.path.at(-1)))
   ) {
-    return Boolean(arrangedActForRoot(info.root, bindings));
+    return Boolean(arrangedActForRoot(pathInfo.root, bindings));
   }
   const call = unwrapExpression(expression);
   if (
@@ -689,35 +203,55 @@ function isBooleanAssertMethod(method) {
 
 function classifyOutcomeAssertion(record, facts) {
   if (record.kind === "assert" && isBooleanAssertMethod(record.method)) {
-    const target = stripNegation(record.args[0]);
-    if (target && isOutcomeFlagExpression(target, facts.bindings)) {
-      return {
-        independent: false,
-        messageId: "outcomeEcho",
-        node: record.node,
-      };
-    }
-    return null;
+    const rawTarget = unwrapExpression(record.args[0]);
+    const target =
+      rawTarget?.type === "UnaryExpression" && rawTarget.operator === "!"
+        ? unwrapExpression(rawTarget.argument)
+        : rawTarget;
+    return target && isOutcomeFlagExpression(target, facts.bindings)
+      ? { independent: false, messageId: "outcomeEcho", node: record.node }
+      : null;
   }
   const operands = equalityOperands(record);
   if (
     !operands?.actual ||
-    !isBooleanLiteral(unwrapExpression(operands.expected))
+    !isBooleanLiteral(unwrapExpression(operands.expected)) ||
+    !isOutcomeFlagExpression(operands.actual, facts.bindings)
   ) {
     return null;
   }
-  if (!isOutcomeFlagExpression(operands.actual, facts.bindings)) return null;
   return { independent: false, messageId: "outcomeEcho", node: record.node };
 }
 
-function actHasStaticallyArrangedArgument(act) {
-  return act.arguments.some((argument) => {
-    const expression = unwrapExpression(argument);
-    return (
-      expression?.type === "Identifier" ||
-      literalContainerTypes.has(expression?.type)
-    );
-  });
+function isArrangedParseCall(node, bindings) {
+  const call = unwrapExpression(node);
+  return (
+    call?.type === "CallExpression" &&
+    call.callee.type === "MemberExpression" &&
+    throwingParseMethods.has(staticPropertyName(call.callee)) &&
+    Boolean(arrangedActForRoot(call, bindings))
+  );
+}
+
+function isArrangedThrowingParseSubject(record, bindings) {
+  if (
+    record.subject?.type === "ArrowFunctionExpression" ||
+    record.subject?.type === "FunctionExpression"
+  ) {
+    let found = false;
+    walkWithinBlock(record.subject.body, (node) => {
+      if (!found && isArrangedParseCall(node, bindings)) {
+        found = true;
+      }
+    });
+    if (found) {
+      return true;
+    }
+  }
+  return (
+    record.modifiers.has("rejects") &&
+    isArrangedParseCall(record.subject, bindings)
+  );
 }
 
 function classifyErrorShapeAssertion(record, facts) {
@@ -736,60 +270,29 @@ function classifyErrorShapeAssertion(record, facts) {
     record.kind === "expect"
       ? record.subject
       : equalityOperands(record)?.actual;
-  if (!actual) return null;
-  const info = arrangedActPathForExpression(actual, facts.bindings);
-  if (!info || !actHasStaticallyArrangedArgument(info.act)) return null;
-  if (!info.path.some((segment) => String(segment) === "error")) return null;
+  const actPath =
+    actual && arrangedActPathForExpression(actual, facts.bindings);
+  if (!actPath) {
+    return null;
+  }
+  const hasArrangedArg = actPath.act.arguments.some((argument) => {
+    const expression = unwrapExpression(argument);
+    return (
+      expression?.type === "Identifier" ||
+      literalContainerTypes.has(expression?.type)
+    );
+  });
+  if (
+    !hasArrangedArg ||
+    !actPath.path.some((segment) => String(segment) === "error")
+  ) {
+    return null;
+  }
   return {
     independent: false,
     messageId: "errorShapeEcho",
     node: record.node,
   };
-}
-
-function isArrangedParseCall(node, bindings) {
-  const call = unwrapExpression(node);
-  return (
-    call?.type === "CallExpression" &&
-    call.callee.type === "MemberExpression" &&
-    throwingParseMethods.has(staticPropertyName(call.callee)) &&
-    Boolean(arrangedActForRoot(call, bindings))
-  );
-}
-
-function functionContainsArrangedParse(subject, bindings) {
-  if (
-    subject?.type !== "ArrowFunctionExpression" &&
-    subject?.type !== "FunctionExpression"
-  ) {
-    return false;
-  }
-  let found = false;
-  walkWithinBlock(subject.body, (node) => {
-    if (!found && isArrangedParseCall(node, bindings)) found = true;
-  });
-  return found;
-}
-
-function isArrangedThrowingParseSubject(record, bindings) {
-  if (functionContainsArrangedParse(record.subject, bindings)) return true;
-  return (
-    record.modifiers.has("rejects") &&
-    isArrangedParseCall(record.subject, bindings)
-  );
-}
-
-function arrangedArrayLength(info, expectedCount, facts, sourceCode) {
-  const act = actForRoot(info.root, facts.bindings);
-  if (!act) return false;
-  return act.arguments.some((argument) => {
-    const target = literalAtPath(argument, info.path, sourceCode);
-    if (target?.type !== "ArrayExpression") return false;
-    const countable = target.elements.every(
-      (element) => element && element.type !== "SpreadElement"
-    );
-    return countable && target.elements.length === expectedCount;
-  });
 }
 
 function lengthAssertionParts(record) {
@@ -800,69 +303,64 @@ function lengthAssertionParts(record) {
     return { collection: record.subject, count: record.args[0] ?? null };
   }
   const operands = equalityOperands(record);
-  if (!operands?.actual) return null;
-  const info = memberPathInfo(operands.actual);
-  if (!info || String(info.path.at(-1)) !== "length") return null;
+  const pathInfo = operands?.actual && memberPathInfo(operands.actual);
+  if (!pathInfo || String(pathInfo.path.at(-1)) !== "length") {
+    return null;
+  }
   return {
     collection: null,
-    collectionInfo: { root: info.root, path: info.path.slice(0, -1) },
+    collectionInfo: { root: pathInfo.root, path: pathInfo.path.slice(0, -1) },
     count: operands.expected,
   };
 }
 
-function countEchoesArgLength(countNode, facts) {
-  if (countNode?.type !== "MemberExpression") return false;
-  const info = memberPathInfo(countNode);
-  return (
-    info?.root?.type === "Identifier" &&
-    String(info.path.at(-1)) === "length" &&
-    facts.actArgNames.has(info.root.name)
-  );
-}
-
 function classifyLengthAssertion(record, facts, sourceCode) {
   const parts = lengthAssertionParts(record);
-  if (!parts) return null;
+  if (!parts) {
+    return null;
+  }
   const countNode = unwrapExpression(parts.count);
-  if (countEchoesArgLength(countNode, facts)) {
+  const countInfo =
+    countNode?.type === "MemberExpression" ? memberPathInfo(countNode) : null;
+  if (
+    countInfo?.root?.type === "Identifier" &&
+    String(countInfo.path.at(-1)) === "length" &&
+    facts.actArgNames.has(countInfo.root.name)
+  ) {
     return { independent: false, messageId: "lengthEcho", node: record.node };
   }
   if (countNode?.type !== "Literal" || typeof countNode.value !== "number") {
     return null;
   }
-  const info = parts.collectionInfo ?? memberPathInfo(parts.collection);
-  if (!info) return null;
-  if (!arrangedArrayLength(info, countNode.value, facts, sourceCode)) {
+  const collectionInfo =
+    parts.collectionInfo ?? memberPathInfo(parts.collection);
+  const act = collectionInfo && actForRoot(collectionInfo.root, facts.bindings);
+  if (!act) {
     return null;
   }
-  return { independent: false, messageId: "lengthEcho", node: record.node };
-}
-
-function isSpreadCloneOfActArgs(expression, argNames) {
-  if (
-    expression?.type !== "ObjectExpression" ||
-    expression.properties.length === 0
-  ) {
-    return false;
-  }
-  return expression.properties.every((property) => {
-    if (property.type !== "SpreadElement") return false;
-    const source = unwrapExpression(property.argument);
-    return source?.type === "Identifier" && argNames.has(source.name);
+  const matchesArrangedLength = act.arguments.some((argument) => {
+    const target = literalAtPath(argument, collectionInfo.path, sourceCode);
+    return (
+      target?.type === "ArrayExpression" &&
+      target.elements.every(
+        (element) => element && element.type !== "SpreadElement"
+      ) &&
+      target.elements.length === countNode.value
+    );
   });
-}
-
-function actArgumentNames(act) {
-  const names = new Set();
-  for (const argument of act.arguments) {
-    const expression = unwrapExpression(argument);
-    if (expression?.type === "Identifier") names.add(expression.name);
-  }
-  return names;
+  return matchesArrangedLength
+    ? { independent: false, messageId: "lengthEcho", node: record.node }
+    : null;
 }
 
 function echoesActArgument(actualInfo, expected, act, sourceCode) {
-  const argNames = actArgumentNames(act);
+  const argNames = new Set();
+  for (const argument of act.arguments) {
+    const expression = unwrapExpression(argument);
+    if (expression?.type === "Identifier") {
+      argNames.add(expression.name);
+    }
+  }
   if (
     expected.type === "Identifier" &&
     actualInfo.path.length === 0 &&
@@ -881,7 +379,15 @@ function echoesActArgument(actualInfo, expected, act, sourceCode) {
   }
   if (
     actualInfo.path.length === 0 &&
-    isSpreadCloneOfActArgs(expected, argNames)
+    expected?.type === "ObjectExpression" &&
+    expected.properties.length > 0 &&
+    expected.properties.every((property) => {
+      const source =
+        property.type === "SpreadElement"
+          ? unwrapExpression(property.argument)
+          : null;
+      return source?.type === "Identifier" && argNames.has(source.name);
+    })
   ) {
     return true;
   }
@@ -893,20 +399,24 @@ function echoesActArgument(actualInfo, expected, act, sourceCode) {
 
 function classifyInputEcho(record, facts, sourceCode) {
   const operands = equalityOperands(record);
-  if (!operands?.actual || !operands.expected) return null;
-  const actualInfo = memberPathInfo(operands.actual);
-  if (!actualInfo) return null;
-  const act = actForRoot(actualInfo.root, facts.bindings);
-  if (!act) return null;
-  const expected = unwrapExpression(operands.expected);
-  if (!expected || !echoesActArgument(actualInfo, expected, act, sourceCode)) {
+  const actualInfo = operands?.actual && memberPathInfo(operands.actual);
+  const act = actualInfo && actForRoot(actualInfo.root, facts.bindings);
+  const expected = operands?.expected && unwrapExpression(operands.expected);
+  if (
+    !actualInfo ||
+    !act ||
+    !expected ||
+    !echoesActArgument(actualInfo, expected, act, sourceCode)
+  ) {
     return null;
   }
   return { independent: false, messageId: "inputEcho", node: record.node };
 }
 
 function isVacuousExistenceTarget(target, requireTruthy) {
-  if (!target) return false;
+  if (!target) {
+    return false;
+  }
   if (target.type === "ObjectExpression" || target.type === "ArrayExpression") {
     return true;
   }
@@ -933,46 +443,42 @@ function classifyExistenceAssertion(record, sourceCode) {
       sourceCode,
       resolutionDepthLimit
     );
-    if (!isVacuousExistenceTarget(target, record.matcher === "toBeTruthy")) {
-      return null;
-    }
-    return {
-      independent: false,
-      messageId: "existenceEcho",
-      node: record.node,
-    };
+    return isVacuousExistenceTarget(target, record.matcher === "toBeTruthy")
+      ? { independent: false, messageId: "existenceEcho", node: record.node }
+      : null;
   }
-  if (!isBooleanAssertMethod(record.method)) return null;
-  if (record.args.length !== 1) return null;
+  if (!isBooleanAssertMethod(record.method) || record.args.length !== 1) {
+    return null;
+  }
   const target = resolveLiteralNode(
     record.args[0],
     sourceCode,
     resolutionDepthLimit
   );
-  if (!isVacuousExistenceTarget(target, true)) return null;
-  return { independent: false, messageId: "existenceEcho", node: record.node };
-}
-
-function mockRecordArguments(record) {
-  if (
-    record.matcher === "toHaveBeenNthCalledWith" ||
-    record.matcher === "nthCalledWith"
-  ) {
-    return record.args.slice(1);
-  }
-  return record.args;
+  return isVacuousExistenceTarget(target, true)
+    ? { independent: false, messageId: "existenceEcho", node: record.node }
+    : null;
 }
 
 function classifyMockAssertion(record, facts) {
-  if (record.kind !== "expect") return null;
+  if (record.kind !== "expect") {
+    return null;
+  }
   if (mockCallCountMatcherMethods.has(record.matcher)) {
     return { independent: true, messageId: null, node: record.node };
   }
-  if (!mockCallRecordMatcherMethods.has(record.matcher)) return null;
+  if (!mockCallRecordMatcherMethods.has(record.matcher)) {
+    return null;
+  }
   if (record.modifiers.has("not")) {
     return { independent: true, messageId: null, node: record.node };
   }
-  const echoed = mockRecordArguments(record).some((argument) => {
+  const callArgs =
+    record.matcher === "toHaveBeenNthCalledWith" ||
+    record.matcher === "nthCalledWith"
+      ? record.args.slice(1)
+      : record.args;
+  const echoed = callArgs.some((argument) => {
     const expression = unwrapExpression(argument);
     if (expression?.type === "Identifier") {
       return facts.actArgNames.has(expression.name);
@@ -981,15 +487,25 @@ function classifyMockAssertion(record, facts) {
       literalNodesEqual(literal, expression)
     );
   });
-  if (!echoed) return { independent: true, messageId: null, node: record.node };
-  return { independent: false, messageId: "mockCallEcho", node: record.node };
+  return echoed
+    ? { independent: false, messageId: "mockCallEcho", node: record.node }
+    : { independent: true, messageId: null, node: record.node };
 }
 
 function classifyAssertion(record, facts, sourceCode) {
   const errorShape = classifyErrorShapeAssertion(record, facts);
-  if (errorShape) return errorShape;
+  if (errorShape) {
+    return errorShape;
+  }
   if (isMembershipAssertionNode(record.node)) {
     return { independent: false, messageId: null, node: record.node };
+  }
+  if (matchesMockedResponseBody(record, facts, sourceCode)) {
+    return {
+      independent: false,
+      messageId: "mockedResponseBodyOracle",
+      node: record.node,
+    };
   }
   return (
     classifyMockAssertion(record, facts) ??
@@ -1009,61 +525,81 @@ function fullEqualityCollectionInfo(record, sourceCode) {
     record.kind === "expect"
       ? fullEqualityMatcherMethods.has(record.matcher)
       : fullEqualityMethods.has(record.method);
-  if (!deep) return null;
+  if (!deep) {
+    return null;
+  }
   const operands = equalityOperands(record);
-  if (!operands?.actual) return null;
+  if (!operands?.actual) {
+    return null;
+  }
   const expected = resolveLiteralNode(
     operands.expected,
     sourceCode,
     resolutionDepthLimit
   );
-  if (expected?.type !== "ArrayExpression") return null;
-  return memberPathInfo(operands.actual);
+  return expected?.type === "ArrayExpression"
+    ? memberPathInfo(operands.actual)
+    : null;
 }
 
-function lengthCollectionInfo(record) {
-  const parts = lengthAssertionParts(record);
-  if (!parts) return null;
-  return parts.collectionInfo ?? memberPathInfo(parts.collection);
-}
-
-function sameCollection(left, right) {
-  return (
-    left.root.type === "Identifier" &&
-    right.root.type === "Identifier" &&
-    left.root.name === right.root.name &&
-    pathsEqual(left.path, right.path)
-  );
-}
-
-// A length assertion is redundant, not an echo, when a sibling independent
-// full-equality assertion over the same collection already proves its
-// transformed contents and ordering.
-function hasIndependentContentsOracle(lengthRecord, results, sourceCode) {
-  const collection = lengthCollectionInfo(lengthRecord);
-  if (!collection) return false;
-  return results.some((result) => {
-    if (!result.independent || result.record === lengthRecord) return false;
-    const contents = fullEqualityCollectionInfo(result.record, sourceCode);
-    return Boolean(contents) && sameCollection(collection, contents);
+function hasIndependentContentsOracle(
+  lengthRecord,
+  assertionResults,
+  sourceCode
+) {
+  const parts = lengthAssertionParts(lengthRecord);
+  const collection =
+    parts && (parts.collectionInfo ?? memberPathInfo(parts.collection));
+  if (!collection) {
+    return false;
+  }
+  return assertionResults.some((assertionResult) => {
+    if (
+      !assertionResult.independent ||
+      assertionResult.record === lengthRecord
+    ) {
+      return false;
+    }
+    const contents = fullEqualityCollectionInfo(
+      assertionResult.record,
+      sourceCode
+    );
+    return (
+      Boolean(contents) &&
+      collection.root.type === "Identifier" &&
+      contents.root.type === "Identifier" &&
+      collection.root.name === contents.root.name &&
+      pathsEqual(collection.path, contents.path)
+    );
   });
 }
 
 function analyzeTestBlock(facts, context, sourceCode) {
-  if (facts.assertions.length === 0) return;
-  const results = facts.assertions.map((record) => ({
+  if (facts.assertions.length === 0) {
+    return;
+  }
+  const assertionResults = facts.assertions.map((record) => ({
     ...classifyAssertion(record, facts, sourceCode),
     record,
   }));
-  for (const result of results) {
-    if (!result.messageId) continue;
+  for (const assertionResult of assertionResults) {
+    if (!assertionResult.messageId) {
+      continue;
+    }
     if (
-      result.messageId === "lengthEcho" &&
-      hasIndependentContentsOracle(result.record, results, sourceCode)
+      assertionResult.messageId === "lengthEcho" &&
+      hasIndependentContentsOracle(
+        assertionResult.record,
+        assertionResults,
+        sourceCode
+      )
     ) {
       continue;
     }
-    context.report({ node: result.node, messageId: result.messageId });
+    context.report({
+      node: assertionResult.node,
+      messageId: assertionResult.messageId,
+    });
   }
 }
 
@@ -1073,7 +609,7 @@ export default function ruleNoNonindependentTestOracle() {
       type: "suggestion",
       docs: {
         description:
-          "Disallow tests whose assertions restate their own arrangement or reduce to bare membership, dependency pass/fail or error shapes, or vacuous existence checks",
+          "Disallow tests whose assertions restate their own arrangement or mock response body, or reduce to bare membership, dependency pass/fail or error shapes, or vacuous existence checks",
       },
       schema: [],
       messages: {
@@ -1091,16 +627,20 @@ export default function ruleNoNonindependentTestOracle() {
           "This existence check is satisfied by the arranged value's construction and cannot fail. Assert real output instead.",
         mockCallEcho:
           "This test only proves the mock received the argument the test itself passed. Assert output, state, or an effect beyond the mocked call.",
+        mockedResponseBodyOracle:
+          "This test asserts a response-body object shape supplied by a mock. Object-shape checks are candidates for deleting the entire test block, not for swapping schema.parse with direct equality. Keep the test only if it proves an independently owned effect. Tip: checking response-body or payload shapes is often a sign of a low-value test; assert behavior not supplied by the mock or remove the test.",
       },
     },
     create(context) {
-      if (!isTestFilename(contextFilename(context))) return {};
+      if (!isTestFilename(contextFilename(context))) {
+        return {};
+      }
       const sourceCode = context.sourceCode ?? context.getSourceCode();
       const factsByCallback = new WeakMap();
       const blockFacts = (callback) => {
         let facts = factsByCallback.get(callback);
         if (!facts) {
-          facts = collectBlockFacts(callback);
+          facts = collectBlockFacts(callback, sourceCode);
           factsByCallback.set(callback, facts);
         }
         return facts;

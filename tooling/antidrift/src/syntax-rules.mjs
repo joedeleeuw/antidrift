@@ -9,7 +9,6 @@ import {
 import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "./oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
-import ruleNoMockedResponseBodyOracle from "./oxlint-plugin/rules/no-mocked-response-body-oracle.js";
 import ruleNoNonindependentTestOracle from "./oxlint-plugin/rules/no-nonindependent-test-oracle.js";
 import ruleNoSchemaLibraryInTest from "./oxlint-plugin/rules/no-schema-library-in-test.js";
 import ruleNoSentinelAbsenceFallback from "./oxlint-plugin/rules/no-sentinel-absence-fallback.js";
@@ -17,7 +16,6 @@ import ruleNoSilentEmptyDetectionFallback from "./oxlint-plugin/rules/no-silent-
 import ruleNoStaticPropertyLoop from "./oxlint-plugin/rules/no-static-property-loop.js";
 import ruleNoValidatorOutputOracle from "./oxlint-plugin/rules/no-validator-output-oracle.js";
 import ruleRequireEffectDeps from "./oxlint-plugin/rules/require-effect-deps.js";
-import ruleNoConvexReturnWidening from "./oxlint-plugin/rules/no-convex-return-widening.js";
 import ruleNoOpenDictionaryAtBoundary from "./oxlint-plugin/rules/no-open-dictionary-at-boundary.js";
 import ruleNoRedeclaredOwnedUnion from "./oxlint-plugin/rules/no-redeclared-owned-union.js";
 import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-mirror-assertion.js";
@@ -29,13 +27,11 @@ export function createSyntaxRules() {
   return {
     "no-async-array-method": ruleNoAsyncArrayMethod(),
     "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
-    "no-convex-return-widening": ruleNoConvexReturnWidening(),
     "no-duplicated-conditional-classnames":
       ruleNoDuplicatedConditionalClassnames(),
     "no-duplicated-object-field-blocks": ruleNoDuplicatedObjectFieldBlocks(),
     "no-handrolled-resource-lifecycle-cells":
       ruleNoHandrolledResourceLifecycleCells(),
-    "no-mocked-response-body-oracle": ruleNoMockedResponseBodyOracle(),
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
     "no-open-dictionary-at-boundary": ruleNoOpenDictionaryAtBoundary(),
     "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),

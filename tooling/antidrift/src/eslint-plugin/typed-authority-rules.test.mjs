@@ -20,7 +20,6 @@ const typeServiceGuardedRules = [
   "no-schema-validator-transcoding",
   "no-redundant-local-return-type",
   "no-redundant-zod-parse",
-  "no-parse-as-cast",
   "no-appeasement-erasure",
   "no-structural-type-fork",
   "no-underchecked-type-predicate",
@@ -703,69 +702,6 @@ typedRuleTester.run("no-unsafe-deserialize", rule("no-unsafe-deserialize"), {
         message: /Validate parsed JSON against the schema for 'Settings'/u,
       })),
     },
-  ],
-});
-
-// ─── no-redundant-zod-parse fixture suite ─────────────────────────────────────
-// Provenance-based: fires only when a value produced by `S.parse()` is re-parsed by the same S.
-typedRuleTester.run("no-redundant-zod-parse", rule("no-redundant-zod-parse"), {
-  valid: [
-    // Boundary parse of raw/any input — the legitimate first validation
-    fixture("programs/correct/zod-boundary-parse.ts"),
-    // Different schema for the storage shape — a genuine second validation, not redundant
-    fixture("programs/correct/zod-different-schema-reparse.ts"),
-    // Double JSON.parse — not Zod, must stay silent (confirms the zod guard)
-    fixture("programs/correct/zod-non-zod-parse.ts"),
-    // External framework call results are legitimate boundary parses
-    fixture("programs/correct/zod-external-call-boundary.ts"),
-    // Typed param re-parse — no local provenance, so Rule A correctly abstains (Rule C's case)
-    fixture("programs/drift/zod-reparse-typed-value.ts"),
-    // Call-result assignability is not decoder provenance: a helper typed as the
-    // schema output never proves this schema validated the value (refinements are
-    // invisible to TypeScript). Silent until producer provenance exists.
-    fixture("programs/drift/zod-reparse-service-result.ts"),
-    fixture("programs/drift/zod-reparse-array-find.ts"),
-    fixture("programs/drift/zod-reparse-sync-helper-result.ts"),
-  ],
-  invalid: [
-    // Re-parse of a parsed value in the same function
-    { ...fixture("programs/drift/zod-reparse-same-fn.ts"), errors: 1 },
-    // Re-parse across functions in the same file via a module-scoped validated const
-    {
-      ...fixture("programs/drift/zod-reparse-cross-fn-same-file.ts"),
-      errors: 1,
-    },
-    // safeParse of a value this schema already validated
-    { ...fixture("programs/drift/zod-safe-parse-variants.ts"), errors: 1 },
-  ],
-});
-
-// ─── no-parse-as-cast fixture suite ───────────────────────────────────────────
-// Declared-contract based: fires when a parameter is already typed as the schema
-// output, so the parse coerces rather than validates. Complements
-// no-redundant-zod-parse, which needs local parse provenance this case never has.
-typedRuleTester.run("no-parse-as-cast", rule("no-parse-as-cast"), {
-  valid: [
-    // unknown/any parameters are real boundaries — the parse earns the contract
-    fixture("programs/correct/parse-as-cast-boundary-inputs.ts"),
-    // Call results, not parameters — no-redundant-zod-parse owns that provenance
-    fixture("programs/drift/zod-reparse-sync-helper-result.ts"),
-    // External SDK result boundary must stay clean
-    fixture("programs/correct/zod-external-call-boundary.ts"),
-    // Test-context exemption: a schema-conformance oracle under a test/ path
-    fixture("programs/correct/test/zod-contract-oracle.ts"),
-  ],
-  invalid: [
-    // Parameter declared as the schema output and parsed with that schema
-    { ...fixture("programs/drift/zod-reparse-typed-value.ts"), errors: 1 },
-    // Real shape from the murderbox desktop IPC bridge: schema reached through a
-    // contract object, parameter typed as z.infer of that same schema
-    {
-      ...fixture("programs/drift/parse-as-cast-contract-schema.ts"),
-      errors: 1,
-    },
-    // safeParse is the same coercion with a different error model
-    { ...fixture("programs/drift/zod-safe-parse-variants.ts"), errors: 1 },
   ],
 });
 

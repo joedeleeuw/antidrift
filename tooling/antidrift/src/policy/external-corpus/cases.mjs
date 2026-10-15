@@ -687,7 +687,7 @@ export const codebaseAtlasCases = [
     // Refinement-carrying schema: PersistedAtlasProjectIdSchema is z.string().min(1)
     // and the parameter is a plain string, so the parse is a real runtime check.
     id: "atlas-refinement-schema-parse-clean",
-    ruleId: "antidrift/no-parse-as-cast",
+    ruleId: "antidrift/no-redundant-zod-parse",
     kind: "correct",
     classification: "under-proven",
     subproject: "app",
@@ -698,7 +698,7 @@ export const codebaseAtlasCases = [
     // z.input parameter: the declared contract is pre-validation, so parsing it
     // is the boundary rather than a cast.
     id: "atlas-schema-input-contract-parse-clean",
-    ruleId: "antidrift/no-parse-as-cast",
+    ruleId: "antidrift/no-redundant-zod-parse",
     kind: "correct",
     classification: "under-proven",
     subproject: "app",

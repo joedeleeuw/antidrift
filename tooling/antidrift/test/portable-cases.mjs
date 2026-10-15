@@ -1,11 +1,5 @@
 export const portableCases = [
   {
-    name: "no-wrapping-functions",
-    invalid: "export const loadItems = (id) => owner.load(id);",
-    valid:
-      "export const area = (radius) => Math.PI * radius ** 2; button.onClick(() => owner.load(id));",
-  },
-  {
     name: "no-hash-literal",
     invalid: `const patchSha256 = "${"ab".repeat(32)}";`,
     valid: `const encryptionKey = "${"ab".repeat(32)}";`,

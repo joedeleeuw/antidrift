@@ -291,9 +291,16 @@ function memberPropertyName(member) {
   return "";
 }
 
+const schemaObjectConstructors = new Set(["object", "Struct", "Object"]);
+
 function zodObjectShape(node) {
-  if (memberPropertyName(node.callee) !== "object") return null;
-  if (node.arguments.length !== 1) return null;
+  const method = memberPropertyName(node.callee);
+  if (!schemaObjectConstructors.has(method)) {
+    return null;
+  }
+  if (node.arguments.length !== 1) {
+    return null;
+  }
   const [shape] = node.arguments;
   return shape?.type === "ObjectExpression" ? shape : null;
 }

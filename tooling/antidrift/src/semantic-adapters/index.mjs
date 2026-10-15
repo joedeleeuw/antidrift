@@ -131,7 +131,6 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     subpath: "@joedeleeuw/antidrift/semantic-adapters/schema-provenance",
     rules: Object.freeze([
       "antidrift/no-redundant-zod-parse",
-      "antidrift/no-parse-as-cast",
       "antidrift/no-identity-schema-transform",
     ]),
     proofBuckets: Object.freeze(["semantic-source-type-provenance"]),
@@ -144,7 +143,7 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
       "identity object reconstruction to transform diagnostic",
       "parsed value to schema provenance",
       "call result to schema output type",
-      "Values already proven as a Zod schema output to later parse calls on the same schema.",
+      "Values already proven as a schema output (via same-binding parse or declared schema-output parameter type) to later validation calls on the same schema.",
       "Parameter type aliases derived with z.infer back to the schema symbol receiving the parse.",
     ]),
     carrier: "TypeChecker plus schema provenance",
