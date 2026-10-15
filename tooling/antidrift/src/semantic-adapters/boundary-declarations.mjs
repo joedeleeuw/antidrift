@@ -418,7 +418,7 @@ export function boundaryDeclarations(program) {
 
   function literalConstant(type) {
     if (type.flags & ts.TypeFlags.BooleanLiteral) {
-      return checker.typeToString(type) === "true";
+      return type.intrinsicName === "true";
     }
     return type.isLiteral() ? type.value : undefined;
   }
@@ -539,6 +539,39 @@ export function boundaryDeclarations(program) {
     return null;
   }
 
+  function unprovedNarrowing(expression) {
+    let subject = unwrapExpression(expression);
+    while (
+      subject &&
+      (ts.isPropertyAccessExpression(subject) ||
+        ts.isElementAccessExpression(subject))
+    ) {
+      subject = unwrapExpression(subject.expression);
+    }
+    if (!subject || !ts.isIdentifier(subject)) return false;
+    const owner = enclosingFunction(subject);
+    const symbol = checker.getSymbolAtLocation(subject);
+    if (!owner?.body || !symbol) return false;
+    function visit(node) {
+      if (ts.isFunctionLike(node) || node.pos >= subject.pos) return false;
+      if (ts.isCallExpression(node)) {
+        const signature = checker.getResolvedSignature(node);
+        const predicate =
+          signature && checker.getTypePredicateOfSignature(signature);
+        const narrowed = predicate && node.arguments[predicate.parameterIndex];
+        if (
+          narrowed &&
+          checker.getSymbolAtLocation(narrowed) === symbol &&
+          !decode(node)
+        ) {
+          return true;
+        }
+      }
+      return ts.forEachChild(node, visit);
+    }
+    return Boolean(visit(owner.body));
+  }
+
   function failureLiteral(expression) {
     const unwrapped = unwrapExpression(expression);
     return Boolean(
@@ -578,7 +611,8 @@ export function boundaryDeclarations(program) {
     }
     if (
       derivesFromSubject(expression, parameter) &&
-      typed(checker.getTypeAtLocation(expression))
+      typed(checker.getTypeAtLocation(expression)) &&
+      !unprovedNarrowing(expression)
     ) {
       return true;
     }
@@ -778,5 +812,6 @@ export function boundaryDeclarations(program) {
     signatureForm,
     signatureDecode,
     decode,
+    unprovedNarrowing,
   };
 }

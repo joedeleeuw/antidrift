@@ -14,21 +14,38 @@ export const assertionKinds = new Set([
   ts.SyntaxKind.TypeAssertionExpression,
 ]);
 
-export function propertyName(property) {
-  const { name } = property;
-  if (!name) return null;
-  return ts.isIdentifier(name) ||
-    ts.isStringLiteralLike(name) ||
-    ts.isNumericLiteral(name)
-    ? name.text
-    : null;
-}
-
 export function unresolvedType(type) {
   return Boolean(type) && type.intrinsicName === "error";
 }
 
 export function contractProjection(checker) {
+  function literalText(expression) {
+    if (!expression) return null;
+    if (ts.isStringLiteralLike(expression) || ts.isNumericLiteral(expression)) {
+      return expression.text;
+    }
+    const keyType = checker.getTypeAtLocation(expression);
+    return keyType.isStringLiteral() || keyType.isNumberLiteral()
+      ? String(keyType.value)
+      : null;
+  }
+
+  function propertyKey(property) {
+    const { name } = property;
+    if (!name) return null;
+    if (ts.isIdentifier(name) || ts.isPrivateIdentifier(name)) {
+      return name.text;
+    }
+    return literalText(
+      ts.isComputedPropertyName(name) ? name.expression : name
+    );
+  }
+
+  function accessKey(expression) {
+    if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+    return literalText(expression.argumentExpression);
+  }
+
   function memberContract(contract, memberName) {
     if (!contract) return null;
     if (
@@ -85,5 +102,12 @@ export function contractProjection(checker) {
     return typed(contract) || unresolvedType(contract) ? contract : null;
   }
 
-  return { claimContract, elementContract, memberContract, projectContract };
+  return {
+    accessKey,
+    claimContract,
+    elementContract,
+    memberContract,
+    projectContract,
+    propertyKey,
+  };
 }

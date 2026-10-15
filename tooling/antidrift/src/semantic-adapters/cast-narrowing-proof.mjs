@@ -392,6 +392,8 @@ function anyProvesStructure(typeChecker, flowType, targetType, seen) {
   );
 }
 
+const SEEN_TYPE_PAIRS = 2048;
+
 function anyProvesDifferent(typeChecker, flowType, targetType, seen) {
   if (targetType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
     return false;
@@ -402,11 +404,12 @@ function anyProvesDifferent(typeChecker, flowType, targetType, seen) {
   if (sameType(typeChecker, flowType, targetType)) {
     return false;
   }
-  const key = `${typeChecker.typeToString(flowType)}\u0000${typeChecker.typeToString(targetType)}`;
-  if (seen.has(key)) {
+  const seenTargets = seen.get(flowType) ?? new Set();
+  if (seenTargets.has(targetType) || seen.size > SEEN_TYPE_PAIRS) {
     return false;
   }
-  seen.add(key);
+  seenTargets.add(targetType);
+  seen.set(flowType, seenTargets);
   return unionConstituents(flowType).some((constituent) => {
     const admitted = unionConstituents(targetType).filter((candidate) =>
       typeChecker.isTypeAssignableTo(constituent, candidate)
@@ -450,7 +453,7 @@ export function narrowingProvesTarget(typeChecker, flowType, targetType) {
     return true;
   }
   if (typeChecker.isTypeAssignableTo(flowType, targetType)) {
-    return !anyProvesDifferent(typeChecker, flowType, targetType, new Set());
+    return !anyProvesDifferent(typeChecker, flowType, targetType, new Map());
   }
   return (
     isNonPrimitiveType(flowType) &&

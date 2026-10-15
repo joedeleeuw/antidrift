@@ -5,7 +5,6 @@ import {
   assertionKinds,
   contractProjection,
   logicalOperators,
-  propertyName,
   unresolvedType,
 } from "./boundary-contracts.mjs";
 import {
@@ -25,6 +24,12 @@ import {
 
 const models = new WeakMap();
 const RETURNED_FUNCTION_DEPTH = 16;
+const IMPLEMENTATION_DEPTH = 4;
+const INLINING_BUDGET = 1024;
+
+function nodeKey(node) {
+  return `${node.getSourceFile().fileName}:${node.pos}-${node.end}:${node.kind}`;
+}
 
 function prefixed(root, step) {
   return step === null ? root : { ...root, path: [step, ...(root.path ?? [])] };
@@ -57,7 +62,13 @@ export function boundaryModel(program) {
   const checker = program.getTypeChecker();
   const writesBySource = new WeakMap();
   const contracts = contractProjection(checker);
-  const { claimContract, memberContract, projectContract } = contracts;
+  const {
+    accessKey,
+    claimContract,
+    memberContract,
+    projectContract,
+    propertyKey,
+  } = contracts;
   const {
     callsInSource,
     carrierPath,
@@ -69,6 +80,7 @@ export function boundaryModel(program) {
     platformSource,
     signatureDecode,
     signatureForm,
+    unprovedNarrowing,
   } = boundaryDeclarations(program);
 
   function broadPayload(type, visited = new Set()) {
@@ -97,14 +109,6 @@ export function boundaryModel(program) {
             claim: { contract: projectContract(claimed, root.path), node },
           }
     );
-  }
-
-  function memberKey(expression) {
-    if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
-    const key = expression.argumentExpression;
-    return ts.isStringLiteralLike(key) || ts.isNumericLiteral(key)
-      ? key.text
-      : null;
   }
 
   function callbackNodes(argument) {
@@ -567,9 +571,7 @@ export function boundaryModel(program) {
       }
     }
     roots.push(...receiverRoots(call, signature, output, flow));
-    if (truncated && !roots.length) {
-      return truncatedRoots(call, signature, output);
-    }
+    if (truncated) roots.push(...truncatedRoots(call, signature, output));
     return roots;
   }
 
@@ -602,24 +604,24 @@ export function boundaryModel(program) {
   }
 
   function truncatedRoots(call, signature, output) {
-    const unsettled = signature.parameters.some(
-      (parameter, index) =>
+    return signature.parameters.flatMap((parameter, index) => {
+      const unsettled =
         call.arguments[index] &&
         [
           ...returnedTypeParameters(checker.getTypeOfSymbol(parameter))
             .typeParameters,
-        ].some((candidate) => !output.has(candidate))
-    );
-    if (!unsettled) return [];
-    return [
-      {
-        kind: "unresolved-declaration",
-        root: call,
-        declaration: signature.declaration,
-        opaque: true,
-        incomplete: `generic return deeper than ${RETURNED_FUNCTION_DEPTH} returned functions`,
-      },
-    ];
+        ].some((candidate) => !output.has(candidate));
+      if (!unsettled) return [];
+      return [
+        {
+          kind: "unresolved-declaration",
+          root: call.arguments[index],
+          declaration: signature.declaration,
+          opaque: true,
+          incomplete: `generic return deeper than ${RETURNED_FUNCTION_DEPTH} returned functions`,
+        },
+      ];
+    });
   }
 
   function calleeImplementation(call, declaration) {
@@ -752,17 +754,54 @@ export function boundaryModel(program) {
     ]);
   }
 
-  function implementationRoots(call, implementation, flow) {
-    const nextBindings = new Map(flow.bindings);
-    for (const [index, parameter] of implementation.parameters.entries()) {
-      if (call.arguments[index]) {
-        nextBindings.set(parameter, call.arguments[index]);
-      }
+  const internedBindings = new Map();
+
+  function bindingsFor(entries) {
+    const key = entries
+      .map(
+        ([parameter, argument]) => `${nodeKey(parameter)}=${nodeKey(argument)}`
+      )
+      .sort()
+      .join("|");
+    let bindings = internedBindings.get(key);
+    if (!bindings) {
+      bindings = new Map(entries);
+      internedBindings.set(key, bindings);
     }
+    return bindings;
+  }
+
+  function callSiteBindings(call, implementation, flow) {
+    const bound = new Map(flow.bindings);
+    for (const [index, parameter] of implementation.parameters.entries()) {
+      if (call.arguments[index]) bound.set(parameter, call.arguments[index]);
+    }
+    return bindingsFor([...bound]);
+  }
+
+  function implementationRoots(call, implementation, flow) {
+    if (flow.inlining.remaining <= 0) {
+      return [
+        {
+          kind: "unresolved-declaration",
+          root: call,
+          declaration: implementation,
+          opaque: true,
+          incomplete: `more than ${INLINING_BUDGET} first-party implementations inlined for one use`,
+        },
+      ];
+    }
+    flow.inlining.remaining -= 1;
+    const depth = (flow.depth ?? 0) + 1;
+    const nextBindings =
+      depth > IMPLEMENTATION_DEPTH
+        ? undefined
+        : callSiteBindings(call, implementation, flow);
     return withClaim(
       callbackReturns(implementation).flatMap((expression) =>
         trace(expression, {
           ...flow,
+          depth,
           bindings: nextBindings,
           visited: new Set(flow.visited),
         })
@@ -861,7 +900,7 @@ export function boundaryModel(program) {
   }
 
   function carrierMemberRoots(expression, inherited, receiverType) {
-    const key = memberKey(expression);
+    const key = accessKey(expression);
     return inherited.flatMap((root) => {
       if (!root.pending) return [root];
       const { carrier } = root.pending;
@@ -906,7 +945,7 @@ export function boundaryModel(program) {
     const inherited = trace(expression.expression, flow);
     const receiverType = checker.getTypeAtLocation(expression.expression);
     if (inherited.length) {
-      const key = memberKey(expression);
+      const key = accessKey(expression);
       const elementKey = key === null || /^\d+$/u.test(key);
       return carrierMemberRoots(expression, inherited, receiverType).flatMap(
         (root) => {
@@ -979,42 +1018,56 @@ export function boundaryModel(program) {
     return unresolvedReceiverRoot(expression);
   }
 
-  function objectRoots(expression, flow) {
-    const names = expression.properties.map((property) =>
-      ts.isSpreadAssignment(property) ? null : propertyName(property)
-    );
-    return expression.properties.flatMap((property, position) => {
-      const nested = { ...flow, visited: new Set(flow.visited) };
-      if (ts.isSpreadAssignment(property)) {
-        const overrides = new Set(
-          names.slice(position + 1).filter((name) => name !== null)
-        );
-        return trace(property.expression, nested).flatMap((root) => {
-          if (root.path?.length) {
-            return overrides.has(root.path[0]) ? [] : [root];
-          }
-          return [
-            {
-              ...root,
-              overrides: new Set([...(root.overrides ?? []), ...overrides]),
-            },
-          ];
-        });
-      }
-      const field = names[position];
-      if (ts.isPropertyAssignment(property)) {
-        return trace(property.initializer, nested).map((root) =>
-          prefixed(root, field)
-        );
-      }
-      if (!ts.isShorthandPropertyAssignment(property)) return [];
-      const declarations =
-        checker.getShorthandAssignmentValueSymbol(property)?.declarations ?? [];
-      return declarations.flatMap((declaration) =>
-        bindingRoots(declaration, { ...nested, use: property }).map((root) =>
-          prefixed(root, field)
-        )
+  function writtenKeys(property) {
+    if (!ts.isSpreadAssignment(property)) {
+      const key = propertyKey(property);
+      return key === null ? [] : [key];
+    }
+    const spread = checker
+      .getTypeAtLocation(property.expression)
+      .getNonNullableType();
+    return checker
+      .getPropertiesOfType(spread)
+      .filter((member) => !(member.flags & ts.SymbolFlags.Optional))
+      .map((member) => member.name);
+  }
+
+  function propertyRoots(property, flow) {
+    if (ts.isSpreadAssignment(property)) {
+      return trace(property.expression, flow);
+    }
+    const field = propertyKey(property);
+    if (ts.isPropertyAssignment(property)) {
+      return trace(property.initializer, flow).map((root) =>
+        prefixed(root, field)
       );
+    }
+    if (!ts.isShorthandPropertyAssignment(property)) return [];
+    const declarations =
+      checker.getShorthandAssignmentValueSymbol(property)?.declarations ?? [];
+    return declarations.flatMap((declaration) =>
+      bindingRoots(declaration, { ...flow, use: property }).map((root) =>
+        prefixed(root, field)
+      )
+    );
+  }
+
+  function objectRoots(expression, flow) {
+    const written = expression.properties.map(writtenKeys);
+    return expression.properties.flatMap((property, position) => {
+      const overrides = new Set(written.slice(position + 1).flat());
+      const nested = { ...flow, visited: new Set(flow.visited) };
+      return propertyRoots(property, nested).flatMap((root) => {
+        if (root.path?.length) {
+          return overrides.has(root.path[0]) ? [] : [root];
+        }
+        return [
+          {
+            ...root,
+            overrides: new Set([...(root.overrides ?? []), ...overrides]),
+          },
+        ];
+      });
     });
   }
 
@@ -1052,7 +1105,10 @@ export function boundaryModel(program) {
     }
     if (traced.has(expression)) return traced.get(expression);
     visited.add(expression);
-    const roots = traceExpression(expression, flow);
+    const budgeted = flow.inlining
+      ? flow
+      : { ...flow, inlining: { remaining: INLINING_BUDGET } };
+    const roots = traceExpression(expression, budgeted);
     traced.set(expression, roots);
     return roots;
   }
@@ -1104,6 +1160,7 @@ export function boundaryModel(program) {
     checker,
     trace,
     decode,
+    unprovedNarrowing,
     contracts,
   });
 

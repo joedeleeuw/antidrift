@@ -3,7 +3,6 @@ import {
   ELEMENT,
   assertionKinds,
   logicalOperators,
-  propertyName,
   unresolvedType,
 } from "./boundary-contracts.mjs";
 import { broad, excluded, typed } from "./boundary-declarations.mjs";
@@ -31,33 +30,17 @@ function branchesOf(expression) {
   return null;
 }
 
-export function boundarySinks({ program, checker, trace, decode, contracts }) {
-  const { elementContract, memberContract, projectContract } = contracts;
+export function boundarySinks({
+  program,
+  checker,
+  trace,
+  decode,
+  unprovedNarrowing,
+  contracts,
+}) {
+  const { elementContract, memberContract, projectContract, propertyKey } =
+    contracts;
   const rootFiles = new Set(program.getRootFileNames());
-
-  function unprovedNarrowing(expression) {
-    const owner = enclosingFunction(expression);
-    const symbol = checker.getSymbolAtLocation(expression);
-    if (!owner?.body || !symbol) return false;
-    function visit(node) {
-      if (ts.isFunctionLike(node) || node.pos >= expression.pos) return false;
-      if (ts.isCallExpression(node)) {
-        const signature = checker.getResolvedSignature(node);
-        const predicate =
-          signature && checker.getTypePredicateOfSignature(signature);
-        const subject = predicate && node.arguments[predicate.parameterIndex];
-        if (
-          subject &&
-          checker.getSymbolAtLocation(subject) === symbol &&
-          !decode(node)
-        ) {
-          return true;
-        }
-      }
-      return ts.forEachChild(node, visit);
-    }
-    return Boolean(visit(owner.body));
-  }
 
   function narrowingOccurred(node) {
     const unwrapped = unwrapExpression(node);
@@ -210,7 +193,7 @@ export function boundarySinks({ program, checker, trace, decode, contracts }) {
   function propertySite(literal, step) {
     const property = literal.properties.find(
       (candidate) =>
-        !ts.isSpreadAssignment(candidate) && propertyName(candidate) === step
+        !ts.isSpreadAssignment(candidate) && propertyKey(candidate) === step
     );
     if (!property) return null;
     if (ts.isPropertyAssignment(property)) return property.initializer;
