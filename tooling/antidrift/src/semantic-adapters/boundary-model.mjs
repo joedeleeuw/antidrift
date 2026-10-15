@@ -1,11 +1,20 @@
 import ts from "typescript";
 import { boundaryCases } from "./boundary-cases.mjs";
 import {
+  ELEMENT,
+  assertionKinds,
+  contractProjection,
+  logicalOperators,
+  propertyName,
+  unresolvedType,
+} from "./boundary-contracts.mjs";
+import {
   boundaryDeclarations,
   broad,
   excluded,
   typed,
 } from "./boundary-declarations.mjs";
+import { boundarySinks } from "./boundary-sinks.mjs";
 import {
   callbackReturns,
   enclosingFunction,
@@ -13,34 +22,12 @@ import {
   unwrapExpression,
   wrapperKinds,
 } from "./boundary-syntax.mjs";
-import {
-  declaredOperandType,
-  narrowingProvesTarget,
-  sameType,
-} from "./cast-narrowing-proof.mjs";
 
 const models = new WeakMap();
-const logicalOperators = new Set([
-  ts.SyntaxKind.QuestionQuestionToken,
-  ts.SyntaxKind.BarBarToken,
-  ts.SyntaxKind.AmpersandAmpersandToken,
-]);
-const assertionKinds = new Set([
-  ts.SyntaxKind.AsExpression,
-  ts.SyntaxKind.TypeAssertionExpression,
-]);
+const RETURNED_FUNCTION_DEPTH = 16;
 
-function branchesOf(expression) {
-  if (ts.isConditionalExpression(expression)) {
-    return [expression.whenTrue, expression.whenFalse];
-  }
-  if (
-    ts.isBinaryExpression(expression) &&
-    logicalOperators.has(expression.operatorToken.kind)
-  ) {
-    return [expression.left, expression.right];
-  }
-  return null;
+function prefixed(root, step) {
+  return step === null ? root : { ...root, path: [step, ...(root.path ?? [])] };
 }
 
 function contains(ancestor, node) {
@@ -65,15 +52,12 @@ function unconditionalBefore(write, use) {
   return ancestor === enclosingFunction(use);
 }
 
-function unresolvedType(type) {
-  return Boolean(type) && type.intrinsicName === "error";
-}
-
 export function boundaryModel(program) {
   if (models.has(program)) return models.get(program);
   const checker = program.getTypeChecker();
   const writesBySource = new WeakMap();
-  const rootFiles = new Set(program.getRootFileNames());
+  const contracts = contractProjection(checker);
+  const { claimContract, memberContract, projectContract } = contracts;
   const {
     callsInSource,
     carrierPath,
@@ -102,46 +86,15 @@ export function boundaryModel(program) {
     return false;
   }
 
-  function memberContract(contract, memberName) {
-    if (!contract) return null;
-    if (
-      contract.flags & ts.TypeFlags.TypeParameter ||
-      unresolvedType(contract)
-    ) {
-      return contract;
-    }
-    const owner = contract.getNonNullableType();
-    const property =
-      memberName !== null && checker.getPropertyOfType(owner, memberName);
-    if (property) return checker.getTypeOfSymbol(property);
-    return (
-      checker.getIndexTypeOfType(owner, ts.IndexKind.String) ??
-      checker.getIndexTypeOfType(owner, ts.IndexKind.Number) ??
-      null
-    );
-  }
-
   function withClaim(roots, contract, node) {
-    if (
-      !contract ||
-      !(
-        typed(contract, { allowTypeParameter: true }) ||
-        unresolvedType(contract)
-      )
-    ) {
-      return roots;
-    }
+    const claimed = claimContract(contract);
+    if (!claimed) return roots;
     return roots.map((root) =>
       root.decoded || root.incomplete
         ? root
         : {
             ...root,
-            claim: {
-              contract: root.field
-                ? memberContract(contract, root.field)
-                : contract,
-              node,
-            },
+            claim: { contract: projectContract(claimed, root.path), node },
           }
     );
   }
@@ -315,25 +268,28 @@ export function boundaryModel(program) {
     const symbol = checker.getSymbolAtLocation(declaration.name);
     const declaringFunction = enclosingFunction(declaration);
     const nestedUse = declaringFunction !== enclosingFunction(use);
-    const assignments = (writes(use.getSourceFile()).get(symbol) ?? []).filter(
+    const assignments = writes(use.getSourceFile()).get(symbol) ?? [];
+    const direct = assignments.filter(
       (assignment) =>
-        nestedUse
-          ? enclosingFunction(assignment) === declaringFunction
-          : assignment.end < use.pos &&
-            enclosingFunction(assignment) === enclosingFunction(use)
+        enclosingFunction(assignment) === declaringFunction &&
+        (nestedUse || assignment.end < use.pos)
+    );
+    const closureWrites = assignments.filter(
+      (assignment) => enclosingFunction(assignment) !== declaringFunction
     );
     const last = nestedUse
       ? undefined
-      : assignments.findLast((assignment) =>
-          unconditionalBefore(assignment, use)
-        );
+      : direct.findLast((assignment) => unconditionalBefore(assignment, use));
     const expressions = [];
     if (last) expressions.push(last.right);
     else if (declaration.initializer) expressions.push(declaration.initializer);
-    for (const assignment of assignments) {
+    for (const assignment of direct) {
       if (!last || assignment.pos > last.pos) {
         expressions.push(assignment.right);
       }
+    }
+    for (const assignment of closureWrites) {
+      expressions.push(assignment.right);
     }
     return withClaim(
       expressions.flatMap((expression) =>
@@ -540,36 +496,37 @@ export function boundaryModel(program) {
     return "unresolved-provenance";
   }
 
-  const RETURNED_FUNCTION_DEPTH = 8;
-
-  function typeParameters(
-    type,
-    collected = new Set(),
-    visited = new Set(),
-    depth = 0
-  ) {
-    if (!type || visited.has(type) || depth > RETURNED_FUNCTION_DEPTH) {
-      return collected;
+  function returnedTypeParameters(returned) {
+    const typeParameters = new Set();
+    const visited = new Set();
+    let truncated = false;
+    const pending = [[returned, 0]];
+    while (pending.length) {
+      const [current, depth] = pending.pop();
+      if (!current || visited.has(current)) continue;
+      if (depth > RETURNED_FUNCTION_DEPTH) {
+        truncated = true;
+        continue;
+      }
+      visited.add(current);
+      if (current.flags & ts.TypeFlags.TypeParameter) {
+        typeParameters.add(current);
+      }
+      const members = current.isUnionOrIntersection() ? current.types : [];
+      for (const member of [...members, ...checker.getTypeArguments(current)]) {
+        pending.push([member, depth]);
+      }
+      for (const signature of current.getCallSignatures()) {
+        pending.push([checker.getReturnTypeOfSignature(signature), depth + 1]);
+      }
     }
-    visited.add(type);
-    if (type.flags & ts.TypeFlags.TypeParameter) collected.add(type);
-    const members = type.isUnionOrIntersection() ? type.types : [];
-    for (const member of [...members, ...checker.getTypeArguments(type)]) {
-      typeParameters(member, collected, visited, depth);
-    }
-    for (const signature of type.getCallSignatures()) {
-      typeParameters(
-        checker.getReturnTypeOfSignature(signature),
-        collected,
-        visited,
-        depth + 1
-      );
-    }
-    return collected;
+    return { typeParameters, truncated };
   }
 
   function forwardedRoots(call, signature, flow) {
-    const output = typeParameters(checker.getReturnTypeOfSignature(signature));
+    const { typeParameters: output, truncated } = returnedTypeParameters(
+      checker.getReturnTypeOfSignature(signature)
+    );
     const roots = [];
     for (const [index, parameter] of signature.parameters.entries()) {
       const argument = call.arguments[index];
@@ -585,9 +542,11 @@ export function boundaryModel(program) {
         .getNonNullableType()
         .getCallSignatures()
         .some((callback) =>
-          [...typeParameters(checker.getReturnTypeOfSignature(callback))].some(
-            (candidate) => output.has(candidate)
-          )
+          [
+            ...returnedTypeParameters(
+              checker.getReturnTypeOfSignature(callback)
+            ).typeParameters,
+          ].some((candidate) => output.has(candidate))
         );
       if (
         callbacks.length &&
@@ -607,34 +566,60 @@ export function boundaryModel(program) {
         );
       }
     }
-    const owner = signature.declaration?.parent;
-    const receiverParameters =
-      owner?.typeParameters?.map((parameter) =>
-        checker.getTypeAtLocation(parameter)
-      ) ?? [];
-    if (
-      (receiverParameters.some((parameter) => output.has(parameter)) ||
-        (!output.size &&
-          (ts.isMethodSignature(signature.declaration) ||
-            ts.isMethodDeclaration(signature.declaration)))) &&
-      ts.isPropertyAccessExpression(call.expression)
-    ) {
-      const returned = checker.getReturnTypeOfSignature(signature);
-      const projection =
-        !output.size &&
-        origin(signature.declaration, call) === "platform" &&
-        typed(returned) &&
-        !broadPayload(returned);
-      roots.push(
-        ...trace(call.expression.expression, {
-          ...flow,
-          visited: new Set(flow.visited),
-        }).map((root) =>
-          projection && !root.incomplete ? { ...root, opaque: false } : root
-        )
-      );
+    roots.push(...receiverRoots(call, signature, output, flow));
+    if (truncated && !roots.length) {
+      return truncatedRoots(call, signature, output);
     }
     return roots;
+  }
+
+  function receiverRoots(call, signature, output, flow) {
+    const { declaration } = signature;
+    const receiverParameters =
+      declaration?.parent?.typeParameters?.map((parameter) =>
+        checker.getTypeAtLocation(parameter)
+      ) ?? [];
+    const methodLike =
+      ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration);
+    const receiverTyped =
+      receiverParameters.some((parameter) => output.has(parameter)) ||
+      (!output.size && methodLike);
+    if (!receiverTyped || !ts.isPropertyAccessExpression(call.expression)) {
+      return [];
+    }
+    const returned = checker.getReturnTypeOfSignature(signature);
+    const projection =
+      !output.size &&
+      origin(declaration, call) === "platform" &&
+      typed(returned) &&
+      !broadPayload(returned);
+    return trace(call.expression.expression, {
+      ...flow,
+      visited: new Set(flow.visited),
+    }).map((root) =>
+      projection && !root.incomplete ? { ...root, opaque: false } : root
+    );
+  }
+
+  function truncatedRoots(call, signature, output) {
+    const unsettled = signature.parameters.some(
+      (parameter, index) =>
+        call.arguments[index] &&
+        [
+          ...returnedTypeParameters(checker.getTypeOfSymbol(parameter))
+            .typeParameters,
+        ].some((candidate) => !output.has(candidate))
+    );
+    if (!unsettled) return [];
+    return [
+      {
+        kind: "unresolved-declaration",
+        root: call,
+        declaration: signature.declaration,
+        opaque: true,
+        incomplete: `generic return deeper than ${RETURNED_FUNCTION_DEPTH} returned functions`,
+      },
+    ];
   }
 
   function calleeImplementation(call, declaration) {
@@ -661,8 +646,9 @@ export function boundaryModel(program) {
       declaredSignature && checker.getReturnTypeOfSignature(declaredSignature);
     const declaredOutput =
       rawOutput && (checker.getPromisedTypeOfPromise(rawOutput) ?? rawOutput);
+    const { typeParameters, truncated } = returnedTypeParameters(rawOutput);
     return Boolean(
-      sourceOpaque || broad(declaredOutput) || typeParameters(rawOutput).size
+      sourceOpaque || broad(declaredOutput) || typeParameters.size || truncated
     );
   }
 
@@ -687,7 +673,7 @@ export function boundaryModel(program) {
       .map((root) => ({
         ...root,
         root: call,
-        field: undefined,
+        path: undefined,
         overrides: undefined,
         claim: root.claim && {
           ...root.claim,
@@ -921,19 +907,29 @@ export function boundaryModel(program) {
     const receiverType = checker.getTypeAtLocation(expression.expression);
     if (inherited.length) {
       const key = memberKey(expression);
-      return carrierMemberRoots(expression, inherited, receiverType)
-        .filter((root) => !root.field || root.field === key)
-        .map((root) => ({
-          ...root,
-          field: undefined,
-          overrides: undefined,
-          claim: root.claim && {
-            ...root.claim,
-            contract: root.field
-              ? root.claim.contract
-              : memberContract(root.claim.contract, key),
-          },
-        }));
+      const elementKey = key === null || /^\d+$/u.test(key);
+      return carrierMemberRoots(expression, inherited, receiverType).flatMap(
+        (root) => {
+          if (!root.path?.length) {
+            if (root.overrides?.has(key)) return [];
+            return [
+              {
+                ...root,
+                overrides: undefined,
+                claim: root.claim && {
+                  ...root.claim,
+                  contract: memberContract(root.claim.contract, key),
+                },
+              },
+            ];
+          }
+          const [step, ...rest] = root.path;
+          const matches = step === ELEMENT ? elementKey : step === key;
+          return matches
+            ? [{ ...root, path: rest.length ? rest : undefined }]
+            : [];
+        }
+      );
     }
     const request = frameworkRoot(expression);
     if (request) return [request];
@@ -985,36 +981,49 @@ export function boundaryModel(program) {
 
   function objectRoots(expression, flow) {
     const names = expression.properties.map((property) =>
-      ts.isSpreadAssignment(property)
-        ? null
-        : property.name?.getText(expression.getSourceFile())
+      ts.isSpreadAssignment(property) ? null : propertyName(property)
     );
     return expression.properties.flatMap((property, position) => {
       const nested = { ...flow, visited: new Set(flow.visited) };
       if (ts.isSpreadAssignment(property)) {
-        const overrides = new Set(names.slice(position + 1).filter(Boolean));
-        return trace(property.expression, nested).map((root) => ({
-          ...root,
-          overrides,
-        }));
+        const overrides = new Set(
+          names.slice(position + 1).filter((name) => name !== null)
+        );
+        return trace(property.expression, nested).flatMap((root) => {
+          if (root.path?.length) {
+            return overrides.has(root.path[0]) ? [] : [root];
+          }
+          return [
+            {
+              ...root,
+              overrides: new Set([...(root.overrides ?? []), ...overrides]),
+            },
+          ];
+        });
       }
+      const field = names[position];
       if (ts.isPropertyAssignment(property)) {
-        const field = names[position];
-        return trace(property.initializer, nested).map((root) => ({
-          ...root,
-          field,
-        }));
+        return trace(property.initializer, nested).map((root) =>
+          prefixed(root, field)
+        );
       }
       if (!ts.isShorthandPropertyAssignment(property)) return [];
-      const field = property.name.text;
       const declarations =
         checker.getShorthandAssignmentValueSymbol(property)?.declarations ?? [];
       return declarations.flatMap((declaration) =>
-        bindingRoots(declaration, { ...nested, use: property }).map((root) => ({
-          ...root,
-          field,
-        }))
+        bindingRoots(declaration, { ...nested, use: property }).map((root) =>
+          prefixed(root, field)
+        )
       );
+    });
+  }
+
+  function arrayRoots(expression, flow) {
+    return expression.elements.flatMap((element) => {
+      const nested = { ...flow, visited: new Set(flow.visited) };
+      if (ts.isSpreadElement(element)) return trace(element.expression, nested);
+      if (ts.isOmittedExpression(element)) return [];
+      return trace(element, nested).map((root) => prefixed(root, ELEMENT));
     });
   }
 
@@ -1066,6 +1075,9 @@ export function boundaryModel(program) {
     if (ts.isObjectLiteralExpression(expression)) {
       return objectRoots(expression, flow);
     }
+    if (ts.isArrayLiteralExpression(expression)) {
+      return arrayRoots(expression, flow);
+    }
     if (ts.isConditionalExpression(expression)) {
       return [expression.whenTrue, expression.whenFalse].flatMap((branch) =>
         trace(branch, { ...flow, visited: new Set(visited) })
@@ -1087,335 +1099,13 @@ export function boundaryModel(program) {
     );
   }
 
-  function unprovedNarrowing(expression) {
-    const owner = enclosingFunction(expression);
-    const symbol = checker.getSymbolAtLocation(expression);
-    if (!owner?.body || !symbol) return false;
-    function visit(node) {
-      if (ts.isFunctionLike(node) || node.pos >= expression.pos) return false;
-      if (ts.isCallExpression(node)) {
-        const signature = checker.getResolvedSignature(node);
-        const predicate =
-          signature && checker.getTypePredicateOfSignature(signature);
-        const subject = predicate && node.arguments[predicate.parameterIndex];
-        if (
-          subject &&
-          checker.getSymbolAtLocation(subject) === symbol &&
-          !decode(node)
-        ) {
-          return true;
-        }
-      }
-      return ts.forEachChild(node, visit);
-    }
-    return Boolean(visit(owner.body));
-  }
-
-  function narrowingOccurred(node) {
-    const unwrapped = unwrapExpression(node);
-    if (!unwrapped) return false;
-    const branches = branchesOf(unwrapped);
-    if (branches) {
-      return branches.every(
-        (branch) => !trace(branch).length || narrowingOccurred(branch)
-      );
-    }
-    if (ts.isObjectLiteralExpression(unwrapped)) {
-      return unwrapped.properties.every((property) => {
-        if (ts.isPropertyAssignment(property)) {
-          return (
-            !trace(property.initializer).length ||
-            narrowingOccurred(property.initializer)
-          );
-        }
-        return (
-          ts.isShorthandPropertyAssignment(property) &&
-          narrowingOccurred(property.name)
-        );
-      });
-    }
-    const flow = checker.getTypeAtLocation(unwrapped);
-    const declared = declaredOperandType(checker, unwrapped, flow);
-    return Boolean(declared) && !sameType(checker, declared, flow);
-  }
-
-  function activeRoots(expression) {
-    const source = expression.getSourceFile();
-    const preamble = source.text.slice(
-      0,
-      Math.min(source.statements[0]?.pos ?? 2048, 4096)
-    );
-    const generatedFile =
-      /^\s*(?:\/\/|\/\*+|\*+)?\s*(?:@generated\b|Code generated .* DO NOT EDIT\.|This file was generated by\b|Generated by\b)/mu.test(
-        preamble
-      );
-    if (excluded({ generatedFile })) return [];
-    return trace(expression).filter(
-      (root) =>
-        !excluded({
-          decoded: root.decoded,
-          unopenedString: Boolean(root.activation),
-          castChain: root.castChain,
-        })
-    );
-  }
-
-  function demandedFields(target) {
-    const nonNull = target.getNonNullableType();
-    if (
-      !(nonNull.flags & ts.TypeFlags.Object) ||
-      checker.isArrayLikeType(nonNull) ||
-      checker.getIndexInfosOfType(nonNull).length
-    ) {
-      return null;
-    }
-    const properties = checker.getPropertiesOfType(nonNull);
-    return properties.length
-      ? new Set(properties.map((property) => property.name))
-      : null;
-  }
-
-  function demandedBy(root, target) {
-    const demanded = demandedFields(target);
-    if (!demanded) return true;
-    if (root.field) return demanded.has(root.field);
-    if (root.overrides) {
-      return [...demanded].some((name) => !root.overrides.has(name));
-    }
-    return true;
-  }
-
-  function claimCovers(root, target, claimNode) {
-    const claim = root.claim;
-    if (!claim || !claim.contract || claim.node === claimNode) return false;
-    if (!rootFiles.has(claim.node.getSourceFile().fileName)) return false;
-    if (
-      unresolvedType(claim.contract) ||
-      claim.contract.flags & ts.TypeFlags.TypeParameter
-    ) {
-      return true;
-    }
-    const demanded =
-      (root.field && memberContract(target, root.field)) || target;
-    return narrowingProvesTarget(checker, claim.contract, demanded);
-  }
-
-  function unchecked(expression, target, options = {}) {
-    if (options.opaqueOnly) {
-      if (!(checker.getTypeAtLocation(expression)?.flags & ts.TypeFlags.Any)) {
-        return [];
-      }
-      return activeRoots(expression).filter((root) => Boolean(root.opaque));
-    }
-    if (unresolvedType(target)) {
-      return activeRoots(expression)
-        .filter(
-          (root) =>
-            !excluded({ claimed: claimCovers(root, target, options.claimNode) })
-        )
-        .map((root) => ({
-          ...root,
-          incomplete: root.incomplete ?? "unresolved contract type",
-        }));
-    }
-    if (excluded({ acceptsUnknown: !typed(target, options) })) return [];
-    const roots = activeRoots(expression).filter(
-      (root) =>
-        !excluded({
-          undemanded: !demandedBy(root, target),
-          claimed: claimCovers(root, target, options.claimNode),
-        })
-    );
-    if (!roots.length) return [];
-    const proves = pathProves(expression, target);
-    const intactCarrier =
-      proves && roots.every((root) => root.pending && !root.incomplete);
-    const narrowed = roots.every((root) =>
-      rootNarrowed(root, expression, target)
-    );
-    if (excluded({ intactCarrier, narrowed })) return [];
-    return roots;
-  }
-
-  function pathProves(site, target) {
-    const rawActual = checker.getTypeAtLocation(site);
-    const actual = ts.isReturnStatement(site.parent)
-      ? (checker.getAwaitedType(rawActual) ?? rawActual)
-      : rawActual;
-    return Boolean(actual) && narrowingProvesTarget(checker, actual, target);
-  }
-
-  function fieldSite(expression, field) {
-    const unwrapped = unwrapExpression(expression);
-    if (!field || !unwrapped || !ts.isObjectLiteralExpression(unwrapped)) {
-      return null;
-    }
-    const property = unwrapped.properties.find(
-      (candidate) =>
-        !ts.isSpreadAssignment(candidate) &&
-        candidate.name?.getText(unwrapped.getSourceFile()) === field
-    );
-    if (!property) return null;
-    if (ts.isPropertyAssignment(property)) return property.initializer;
-    return ts.isShorthandPropertyAssignment(property) ? property.name : null;
-  }
-
-  function rootNarrowed(root, expression, target) {
-    const site = fieldSite(expression, root.field);
-    const demanded = site
-      ? (memberContract(target, root.field) ?? target)
-      : target;
-    return (
-      pathProves(site ?? expression, demanded) &&
-      !unprovedNarrowing(site ?? expression) &&
-      (!root.opaque || narrowingOccurred(site ?? expression))
-    );
-  }
-
-  function argumentType(call, index) {
-    const signature = checker.getResolvedSignature(call);
-    if (!signature) return null;
-    const parameter =
-      signature.parameters[Math.min(index, signature.parameters.length - 1)];
-    if (!parameter) return null;
-    const instantiated = checker.getTypeOfSymbolAtLocation(parameter, call);
-    const declaredParameter = parameter.valueDeclaration;
-    const declared =
-      declaredParameter &&
-      ts.isParameter(declaredParameter) &&
-      declaredParameter.type &&
-      checker.getTypeFromTypeNode(declaredParameter.type);
-    const contract =
-      broad(instantiated) && declared?.flags & ts.TypeFlags.TypeParameter
-        ? (checker.getBaseConstraintOfType(declared) ?? instantiated)
-        : instantiated;
-    if (!declaredParameter?.dotDotDotToken) return contract;
-    if (checker.isTupleType(contract)) {
-      return checker.getTypeArguments(contract)[
-        index - signature.parameters.length + 1
-      ];
-    }
-    return checker.getIndexTypeOfType(contract, ts.IndexKind.Number);
-  }
-
-  function ownedByCastChain(expression) {
-    let current = expression;
-    while (
-      current &&
-      (ts.isParenthesizedExpression(current) || ts.isAwaitExpression(current))
-    ) {
-      current = current.expression;
-    }
-    return Boolean(current) && isAssertionChain(current);
-  }
-
-  function assertionSink(assertion) {
-    if (
-      isAssertionChain(assertion) ||
-      assertionKinds.has(assertion.parent.kind)
-    ) {
-      return [];
-    }
-    return unchecked(
-      assertion.expression,
-      checker.getTypeAtLocation(assertion),
-      {
-        allowTypeParameter: true,
-        claimNode: assertion,
-      }
-    );
-  }
-
-  function declarationSink(declaration) {
-    if (!declaration.initializer || ownedByCastChain(declaration.initializer)) {
-      return [];
-    }
-    if (declaration.type) {
-      return unchecked(
-        declaration.initializer,
-        checker.getTypeFromTypeNode(declaration.type),
-        { claimNode: declaration }
-      );
-    }
-    if (
-      ts.isObjectBindingPattern(declaration.name) ||
-      ts.isArrayBindingPattern(declaration.name)
-    ) {
-      return unchecked(declaration.initializer, null, { opaqueOnly: true });
-    }
-    return [];
-  }
-
-  function assignmentSink(assignment) {
-    if (
-      assignment.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
-      ownedByCastChain(assignment.right)
-    ) {
-      return [];
-    }
-    return unchecked(
-      assignment.right,
-      checker.getTypeAtLocation(assignment.left)
-    );
-  }
-
-  function returnSink(statement) {
-    if (!statement.expression || ownedByCastChain(statement.expression))
-      return [];
-    const owner = enclosingFunction(statement);
-    if (!owner?.type) return [];
-    return unchecked(
-      statement.expression,
-      checker.getAwaitedType(checker.getTypeFromTypeNode(owner.type)),
-      { claimNode: owner }
-    );
-  }
-
-  function typeArgumentSink(call) {
-    if (
-      !call.typeArguments?.length ||
-      !checker.getResolvedSignature(call) ||
-      decode(call) ||
-      !trace(call).some((root) => root.root === call)
-    ) {
-      return [];
-    }
-    return unchecked(call, checker.getTypeFromTypeNode(call.typeArguments[0]), {
-      allowTypeParameter: true,
-      claimNode: call,
-    });
-  }
-
-  const sinks = {
-    [ts.SyntaxKind.AsExpression]: assertionSink,
-    [ts.SyntaxKind.TypeAssertionExpression]: assertionSink,
-    [ts.SyntaxKind.VariableDeclaration]: declarationSink,
-    [ts.SyntaxKind.BinaryExpression]: assignmentSink,
-    [ts.SyntaxKind.ReturnStatement]: returnSink,
-    [ts.SyntaxKind.CallExpression]: typeArgumentSink,
-  };
-
-  function uncheckedAt(node) {
-    const sink = sinks[node.kind];
-    return sink ? sink(node) : [];
-  }
-
-  function uncheckedArgument(argument) {
-    const call = argument.parent;
-    if (
-      !call?.arguments?.includes(argument) ||
-      !(ts.isCallExpression(call) || ts.isNewExpression(call)) ||
-      ownedByCastChain(argument) ||
-      !checker.getResolvedSignature(call) ||
-      (ts.isCallExpression(call) && decode(call))
-    ) {
-      return [];
-    }
-    return unchecked(
-      argument,
-      argumentType(call, call.arguments.indexOf(argument))
-    );
-  }
+  const { uncheckedAt, uncheckedArgument } = boundarySinks({
+    program,
+    checker,
+    trace,
+    decode,
+    contracts,
+  });
 
   const model = { trace, decode, uncheckedAt, uncheckedArgument };
   models.set(program, model);

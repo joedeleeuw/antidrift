@@ -490,10 +490,17 @@ export function boundaryDeclarations(program) {
     if (ts.isCallExpression(unwrapped)) {
       const opened = deserializedArgument(unwrapped);
       if (opened) return derivesFromSubject(opened, parameter, visited);
-      const declaration = checker.getResolvedSignature(unwrapped)?.declaration;
+      const evidence = decode(unwrapped);
+      if (evidence) {
+        return derivesFromSubject(evidence.input, parameter, visited);
+      }
+      const signature = checker.getResolvedSignature(unwrapped);
+      const declaration = signature?.declaration;
+      const returned = signature && checker.getReturnTypeOfSignature(signature);
       return Boolean(
         declaration &&
         origin(declaration, unwrapped) === null &&
+        broad(checker.getAwaitedType(returned) ?? returned) &&
         unwrapped.arguments.some((argument) =>
           derivesFromSubject(argument, parameter, visited)
         )
