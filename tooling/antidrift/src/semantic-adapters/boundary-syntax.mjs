@@ -30,7 +30,9 @@ export function callbackReturns(callback) {
   const expressions = [];
   function visit(node) {
     if (ts.isFunctionLike(node)) return;
-    if (ts.isReturnStatement(node)) expressions.push(node.expression ?? node);
+    if (ts.isReturnStatement(node) && node.expression) {
+      expressions.push(node.expression);
+    }
     ts.forEachChild(node, visit);
   }
   visit(callback.body);
