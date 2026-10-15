@@ -1,4 +1,6 @@
+import { appendFileSync } from "node:fs";
 import { boundaryModel } from "../../semantic-adapters/boundary-model.mjs";
+import { boundaryObservations } from "../../semantic-adapters/boundary-observations.mjs";
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
@@ -28,7 +30,16 @@ export default function ruleUnknownInputMustBeDecoded() {
           "unknown-input-must-be-decoded"
         );
       }
-      const model = boundaryModel(services.program);
+      const observationPath = process.env[boundaryObservations.envVar];
+      const observe = observationPath
+        ? (observation) => {
+            appendFileSync(observationPath, `${JSON.stringify(observation)}\n`);
+          }
+        : undefined;
+      const model = boundaryModel(
+        services.program,
+        observe ? { observe, rootDirectory: context.cwd } : undefined
+      );
       const reported = new Set();
       function reportRoots(node, roots) {
         if (reported.has(node) || !roots.length) return;

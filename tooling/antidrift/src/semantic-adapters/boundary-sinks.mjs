@@ -6,6 +6,7 @@ import {
   unresolvedType,
 } from "./boundary-contracts.mjs";
 import { broad, excluded, typed } from "./boundary-declarations.mjs";
+import { boundaryObservations } from "./boundary-observations.mjs";
 import {
   enclosingFunction,
   isAssertionChain,
@@ -33,6 +34,7 @@ function branchesOf(expression) {
 export function boundarySinks({
   program,
   checker,
+  observer,
   trace,
   decode,
   unprovedNarrowing,
@@ -133,16 +135,57 @@ export function boundarySinks({
     return [...demanded].some((name) => !root.overrides.has(name));
   }
 
-  function claimCovers(root, target, claimNode) {
+  function pairCapCallback(node) {
+    if (!observer.enabled) {
+      return undefined;
+    }
+    return () => {
+      observer.boundFired(boundaryObservations.bounds.narrowingProofPairCap, {
+        call: ts.isCallExpression(node) ? node : null,
+        declaration: enclosingFunction(node) ?? node,
+      });
+    };
+  }
+
+  function claimCovers(root, target, claimNode, expression) {
     const claim = root.claim;
-    if (!claim || !claim.contract || claim.node === claimNode) return false;
-    if (!rootFiles.has(claim.node.getSourceFile().fileName)) return false;
-    if (unresolvedType(claim.contract)) return true;
+    if (!claim || !claim.contract || claim.node === claimNode) {
+      return false;
+    }
+    if (!rootFiles.has(claim.node.getSourceFile().fileName)) {
+      return false;
+    }
+    if (unresolvedType(claim.contract)) {
+      if (observer.enabled) {
+        observer.claimCovered({
+          claimNode: claim.node,
+          claimContract: claim.contract,
+          demandedContract: null,
+          path: root.path,
+          useExpression: expression,
+        });
+      }
+      return true;
+    }
     const demanded = projectContract(target, root.path);
-    return (
+    const covered =
       Boolean(demanded) &&
-      narrowingProvesTarget(checker, claim.contract, demanded)
-    );
+      narrowingProvesTarget(
+        checker,
+        claim.contract,
+        demanded,
+        pairCapCallback(claim.node)
+      );
+    if (covered && observer.enabled) {
+      observer.claimCovered({
+        claimNode: claim.node,
+        claimContract: claim.contract,
+        demandedContract: demanded,
+        path: root.path,
+        useExpression: expression,
+      });
+    }
+    return covered;
   }
 
   function unchecked(expression, target, options = {}) {
@@ -156,29 +199,37 @@ export function boundarySinks({
       return activeRoots(expression)
         .filter(
           (root) =>
-            !excluded({ claimed: claimCovers(root, target, options.claimNode) })
+            !excluded({
+              claimed: claimCovers(root, target, options.claimNode, expression),
+            })
         )
         .map((root) => ({
           ...root,
           incomplete: root.incomplete ?? "unresolved contract type",
         }));
     }
-    if (excluded({ acceptsUnknown: !typed(target, options) })) return [];
+    if (excluded({ acceptsUnknown: !typed(target, options) })) {
+      return [];
+    }
     const roots = activeRoots(expression).filter(
       (root) =>
         !excluded({
           undemanded: !demandedBy(root, target),
-          claimed: claimCovers(root, target, options.claimNode),
+          claimed: claimCovers(root, target, options.claimNode, expression),
         })
     );
-    if (!roots.length) return [];
+    if (!roots.length) {
+      return [];
+    }
     const proves = pathProves(expression, target);
     const intactCarrier =
       proves && roots.every((root) => root.pending && !root.incomplete);
     const narrowed = roots.every((root) =>
       rootNarrowed(root, expression, target)
     );
-    if (excluded({ intactCarrier, narrowed })) return [];
+    if (excluded({ intactCarrier, narrowed })) {
+      return [];
+    }
     return roots;
   }
 
@@ -187,7 +238,10 @@ export function boundarySinks({
     const actual = ts.isReturnStatement(site.parent)
       ? (checker.getAwaitedType(rawActual) ?? rawActual)
       : rawActual;
-    return Boolean(actual) && narrowingProvesTarget(checker, actual, target);
+    return (
+      Boolean(actual) &&
+      narrowingProvesTarget(checker, actual, target, pairCapCallback(site))
+    );
   }
 
   function propertySite(literal, step) {
@@ -195,8 +249,12 @@ export function boundarySinks({
       (candidate) =>
         !ts.isSpreadAssignment(candidate) && propertyKey(candidate) === step
     );
-    if (!property) return null;
-    if (ts.isPropertyAssignment(property)) return property.initializer;
+    if (!property) {
+      return null;
+    }
+    if (ts.isPropertyAssignment(property)) {
+      return property.initializer;
+    }
     return ts.isShorthandPropertyAssignment(property) ? property.name : null;
   }
 
@@ -213,7 +271,9 @@ export function boundarySinks({
         break;
       }
       const next = propertySite(literal, step);
-      if (!next) break;
+      if (!next) {
+        break;
+      }
       site = next;
       contract = memberContract(contract, step) ?? contract;
     }
@@ -231,10 +291,14 @@ export function boundarySinks({
 
   function argumentType(call, index) {
     const signature = checker.getResolvedSignature(call);
-    if (!signature) return null;
+    if (!signature) {
+      return null;
+    }
     const parameter =
       signature.parameters[Math.min(index, signature.parameters.length - 1)];
-    if (!parameter) return null;
+    if (!parameter) {
+      return null;
+    }
     const instantiated = checker.getTypeOfSymbolAtLocation(parameter, call);
     const declaredParameter = parameter.valueDeclaration;
     const declared =
@@ -246,7 +310,9 @@ export function boundarySinks({
       broad(instantiated) && declared?.flags & ts.TypeFlags.TypeParameter
         ? (checker.getBaseConstraintOfType(declared) ?? instantiated)
         : instantiated;
-    if (!declaredParameter?.dotDotDotToken) return contract;
+    if (!declaredParameter?.dotDotDotToken) {
+      return contract;
+    }
     if (checker.isTupleType(contract)) {
       return checker.getTypeArguments(contract)[
         index - signature.parameters.length + 1
@@ -266,6 +332,14 @@ export function boundarySinks({
     return Boolean(current) && isAssertionChain(current);
   }
 
+  function observeSink(sinkKind, sinkNode, expression, evaluate) {
+    if (!observer.enabled) {
+      return evaluate();
+    }
+    const decision = observer.beginSink(sinkKind, sinkNode, expression);
+    return observer.finishSink(decision, evaluate());
+  }
+
   function assertionSink(assertion) {
     if (
       isAssertionChain(assertion) ||
@@ -273,13 +347,15 @@ export function boundarySinks({
     ) {
       return [];
     }
-    return unchecked(
+    return observeSink(
+      boundaryObservations.sinks.assertion,
+      assertion,
       assertion.expression,
-      checker.getTypeAtLocation(assertion),
-      {
-        allowTypeParameter: true,
-        claimNode: assertion,
-      }
+      () =>
+        unchecked(assertion.expression, checker.getTypeAtLocation(assertion), {
+          allowTypeParameter: true,
+          claimNode: assertion,
+        })
     );
   }
 
@@ -288,17 +364,28 @@ export function boundarySinks({
       return [];
     }
     if (declaration.type) {
-      return unchecked(
+      return observeSink(
+        boundaryObservations.sinks.declaration,
+        declaration,
         declaration.initializer,
-        checker.getTypeFromTypeNode(declaration.type),
-        { claimNode: declaration }
+        () =>
+          unchecked(
+            declaration.initializer,
+            checker.getTypeFromTypeNode(declaration.type),
+            { claimNode: declaration }
+          )
       );
     }
     if (
       ts.isObjectBindingPattern(declaration.name) ||
       ts.isArrayBindingPattern(declaration.name)
     ) {
-      return unchecked(declaration.initializer, null, { opaqueOnly: true });
+      return observeSink(
+        boundaryObservations.sinks.declaration,
+        declaration,
+        declaration.initializer,
+        () => unchecked(declaration.initializer, null, { opaqueOnly: true })
+      );
     }
     return [];
   }
@@ -310,9 +397,12 @@ export function boundarySinks({
     ) {
       return [];
     }
-    return unchecked(
+    return observeSink(
+      boundaryObservations.sinks.assignment,
+      assignment,
       assignment.right,
-      checker.getTypeAtLocation(assignment.left)
+      () =>
+        unchecked(assignment.right, checker.getTypeAtLocation(assignment.left))
     );
   }
 
@@ -321,27 +411,48 @@ export function boundarySinks({
       return [];
     }
     const owner = enclosingFunction(statement);
-    if (!owner?.type) return [];
-    return unchecked(
+    if (!owner?.type) {
+      return [];
+    }
+    return observeSink(
+      boundaryObservations.sinks.return,
+      statement,
       statement.expression,
-      checker.getAwaitedType(checker.getTypeFromTypeNode(owner.type)),
-      { claimNode: owner }
+      () =>
+        unchecked(
+          statement.expression,
+          checker.getAwaitedType(checker.getTypeFromTypeNode(owner.type)),
+          { claimNode: owner }
+        )
     );
   }
 
   function typeArgumentSink(call) {
-    if (
-      !call.typeArguments?.length ||
-      !checker.getResolvedSignature(call) ||
-      decode(call) ||
-      !trace(call).some((root) => root.root === call)
-    ) {
+    if (!call.typeArguments?.length) {
       return [];
     }
-    return unchecked(call, checker.getTypeFromTypeNode(call.typeArguments[0]), {
-      allowTypeParameter: true,
-      claimNode: call,
-    });
+    return observeSink(
+      boundaryObservations.sinks.typeArgument,
+      call,
+      call,
+      () => {
+        if (
+          !checker.getResolvedSignature(call) ||
+          decode(call) ||
+          !trace(call).some((root) => root.root === call)
+        ) {
+          return [];
+        }
+        return unchecked(
+          call,
+          checker.getTypeFromTypeNode(call.typeArguments[0]),
+          {
+            allowTypeParameter: true,
+            claimNode: call,
+          }
+        );
+      }
+    );
   }
 
   const sinks = {
@@ -363,15 +474,26 @@ export function boundarySinks({
     if (
       !call?.arguments?.includes(argument) ||
       !(ts.isCallExpression(call) || ts.isNewExpression(call)) ||
-      ownedByCastChain(argument) ||
-      !checker.getResolvedSignature(call) ||
-      (ts.isCallExpression(call) && decode(call))
+      ownedByCastChain(argument)
     ) {
       return [];
     }
-    return unchecked(
+    return observeSink(
+      boundaryObservations.sinks.argument,
       argument,
-      argumentType(call, call.arguments.indexOf(argument))
+      argument,
+      () => {
+        if (
+          !checker.getResolvedSignature(call) ||
+          (ts.isCallExpression(call) && decode(call))
+        ) {
+          return [];
+        }
+        return unchecked(
+          argument,
+          argumentType(call, call.arguments.indexOf(argument))
+        );
+      }
     );
   }
 

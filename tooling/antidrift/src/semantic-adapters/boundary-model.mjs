@@ -13,6 +13,10 @@ import {
   excluded,
   typed,
 } from "./boundary-declarations.mjs";
+import {
+  boundaryObservations,
+  boundaryObserver,
+} from "./boundary-observations.mjs";
 import { boundarySinks } from "./boundary-sinks.mjs";
 import {
   callbackReturns,
@@ -23,9 +27,11 @@ import {
 } from "./boundary-syntax.mjs";
 
 const models = new WeakMap();
-const RETURNED_FUNCTION_DEPTH = 16;
-const IMPLEMENTATION_DEPTH = 4;
-const INLINING_BUDGET = 1024;
+const RETURNED_FUNCTION_DEPTH =
+  boundaryObservations.bounds.returnedFunctionDepth.limit;
+const IMPLEMENTATION_DEPTH =
+  boundaryObservations.bounds.inliningDepthFallback.limit;
+const INLINING_BUDGET = boundaryObservations.bounds.inliningBudget.limit;
 
 function nodeKey(node) {
   return `${node.getSourceFile().fileName}:${node.pos}-${node.end}:${node.kind}`;
@@ -57,9 +63,23 @@ function unconditionalBefore(write, use) {
   return ancestor === enclosingFunction(use);
 }
 
-export function boundaryModel(program) {
-  if (models.has(program)) return models.get(program);
-  const checker = program.getTypeChecker();
+export function boundaryModel(program, options = {}) {
+  const existing = models.get(program);
+  if (existing) {
+    if (options.observe === undefined) {
+      return existing.model;
+    }
+    if (existing.hasProxy) {
+      existing.observer.setSink(options.observe, options.rootDirectory);
+      return existing.model;
+    }
+  }
+  const observer = boundaryObserver(
+    program,
+    options.observe,
+    options.rootDirectory
+  );
+  const { checker } = observer;
   const writesBySource = new WeakMap();
   const contracts = contractProjection(checker);
   const {
@@ -81,7 +101,7 @@ export function boundaryModel(program) {
     signatureDecode,
     signatureForm,
     unprovedNarrowing,
-  } = boundaryDeclarations(program);
+  } = boundaryDeclarations(program, observer);
 
   function broadPayload(type, visited = new Set()) {
     if (!type || visited.has(type)) return false;
@@ -571,7 +591,17 @@ export function boundaryModel(program) {
       }
     }
     roots.push(...receiverRoots(call, signature, output, flow));
-    if (truncated) roots.push(...truncatedRoots(call, signature, output));
+    if (truncated) {
+      const unsettled = truncatedRoots(call, signature, output);
+      if (observer.enabled) {
+        observer.boundFired(boundaryObservations.bounds.returnedFunctionDepth, {
+          call,
+          declaration: signature.declaration,
+          unsettledParameters: unsettled.length,
+        });
+      }
+      roots.push(...unsettled);
+    }
     return roots;
   }
 
@@ -642,13 +672,19 @@ export function boundaryModel(program) {
     return null;
   }
 
-  function callOpaque(declaration, sourceOpaque) {
+  function callOpaque(declaration, sourceOpaque, call) {
     const declaredSignature = checker.getSignatureFromDeclaration(declaration);
     const rawOutput =
       declaredSignature && checker.getReturnTypeOfSignature(declaredSignature);
     const declaredOutput =
       rawOutput && (checker.getPromisedTypeOfPromise(rawOutput) ?? rawOutput);
     const { typeParameters, truncated } = returnedTypeParameters(rawOutput);
+    if (truncated && observer.enabled) {
+      observer.boundFired(boundaryObservations.bounds.returnedFunctionDepth, {
+        call,
+        declaration,
+      });
+    }
     return Boolean(
       sourceOpaque || broad(declaredOutput) || typeParameters.size || truncated
     );
@@ -735,7 +771,7 @@ export function boundaryModel(program) {
     const construction =
       ts.isPropertyAccessExpression(call.expression) &&
       localReceiver(call.expression.expression);
-    const opaque = callOpaque(declaration, source.opaque);
+    const opaque = callOpaque(declaration, source.opaque, call);
     if (excluded({ local: Boolean(construction) })) {
       return (construction.arguments ?? [])
         .flatMap((argument) =>
@@ -781,6 +817,12 @@ export function boundaryModel(program) {
 
   function implementationRoots(call, implementation, flow) {
     if (flow.inlining.remaining <= 0) {
+      if (observer.enabled) {
+        observer.boundFired(boundaryObservations.bounds.inliningBudget, {
+          call,
+          declaration: implementation,
+        });
+      }
       return [
         {
           kind: "unresolved-declaration",
@@ -793,6 +835,13 @@ export function boundaryModel(program) {
     }
     flow.inlining.remaining -= 1;
     const depth = (flow.depth ?? 0) + 1;
+    if (depth === IMPLEMENTATION_DEPTH + 1 && observer.enabled) {
+      observer.boundFired(boundaryObservations.bounds.inliningDepthFallback, {
+        call,
+        declaration: implementation,
+        depth,
+      });
+    }
     const nextBindings =
       depth > IMPLEMENTATION_DEPTH
         ? undefined
@@ -838,7 +887,11 @@ export function boundaryModel(program) {
     const request = frameworkRoot(call.expression);
     if (request) {
       return typeArgumentClaim(call, [
-        { ...request, root: call, opaque: callOpaque(declaration, false) },
+        {
+          ...request,
+          root: call,
+          opaque: callOpaque(declaration, false, call),
+        },
       ]);
     }
     const implementation = calleeImplementation(call, declaration);
@@ -1096,14 +1149,27 @@ export function boundaryModel(program) {
 
   function trace(expression, flow = { use: expression, visited: new Set() }) {
     const { visited } = flow;
-    if (!expression || visited.has(expression)) return [];
+    if (!expression || visited.has(expression)) {
+      return [];
+    }
+    if (observer.enabled) {
+      observer.recordTraceCall();
+    }
     const bindings = flow.bindings ?? unbound;
     let traced = tracedByBindings.get(bindings);
     if (!traced) {
       traced = new Map();
       tracedByBindings.set(bindings, traced);
     }
-    if (traced.has(expression)) return traced.get(expression);
+    if (traced.has(expression)) {
+      if (observer.enabled) {
+        observer.recordMemoHit();
+      }
+      return traced.get(expression);
+    }
+    if (observer.enabled) {
+      observer.recordMemoMiss();
+    }
     visited.add(expression);
     const budgeted = flow.inlining
       ? flow
@@ -1158,6 +1224,7 @@ export function boundaryModel(program) {
   const { uncheckedAt, uncheckedArgument } = boundarySinks({
     program,
     checker,
+    observer,
     trace,
     decode,
     unprovedNarrowing,
@@ -1165,6 +1232,10 @@ export function boundaryModel(program) {
   });
 
   const model = { trace, decode, uncheckedAt, uncheckedArgument };
-  models.set(program, model);
+  models.set(program, {
+    model,
+    observer,
+    hasProxy: Boolean(options.observe),
+  });
   return model;
 }
