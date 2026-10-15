@@ -161,14 +161,6 @@
       "count": 2
     }
   },
-  "tooling/antidrift/src/eslint-plugin/rules/no-sql-string-concat.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 5
-    },
-    "antidrift/no-vague-names": {
-      "count": 29
-    }
-  },
   "tooling/antidrift/src/eslint-plugin/rules/no-structural-type-fork.js": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
@@ -182,25 +174,6 @@
   "tooling/antidrift/src/eslint-plugin/rules/react-max-component-props.js": {
     "antidrift/no-vague-names": {
       "count": 10
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/sql-syntax-analysis.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 17
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/structural-fork-proof.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 5
-    },
-    "antidrift/no-sentinel-absence-fallback": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 2
     }
   },
   "tooling/antidrift/src/eslint-plugin/semantic-facts.test.mjs": {
@@ -955,11 +928,16 @@
     }
   },
   "tooling/antidrift/src/semantic-adapters/schema-provenance.mjs": {
+    "antidrift/no-vague-names": {
+      "count": 2
+    }
+  },
+  "tooling/antidrift/src/semantic-adapters/sql-syntax-analysis.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
     },
     "antidrift/no-vague-names": {
-      "count": 2
+      "count": 17
     }
   },
   "tooling/antidrift/src/semantic-adapters/sql.mjs": {
@@ -973,6 +951,17 @@
     },
     "antidrift/no-vague-names": {
       "count": 3
+    }
+  },
+  "tooling/antidrift/src/semantic-adapters/structural-fork-proof.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 5
+    },
+    "antidrift/no-sentinel-absence-fallback": {
+      "count": 1
+    },
+    "antidrift/no-vague-names": {
+      "count": 2
     }
   },
   "tooling/antidrift/src/semantic-adapters/tuple-shape.mjs": {

@@ -478,9 +478,9 @@ policyRuleReviews:
   auth/require-authz-check:
     status: active-custom
     antidriftRule: antidrift/require-authz-check
-    coverage: Implemented but default-off; current handler-local request-param/authz-call matching is inventory, not blocking proof.
-    reason: Project authz calls are registry facts, but absence of a nearby call does not prove the route lacks middleware, wrapper, or framework-owned authorization.
-    nextAction: Replace absence-of-call detection with typed policy-wrapper route registration or a dataflow/dominance proof before enabling.
+    coverage: Enabled by default in createGovernanceOxlintConfig with authzFunctions derived from policy/registries/boundaries.yaml requiredCalls.authorization (inert when unconfigured).
+    reason: Project authz calls are registry facts; handlers reading request params must invoke a configured boundary authorization function.
+    nextAction: Keep enabled by default; extend to typed policy-wrapper route registration when framework route wrappers are declared.
   errors/preserve-caught-error:
     status: ecosystem-covered
     replacement: preserve-caught-error
@@ -629,12 +629,11 @@ policyRuleReviews:
     reason: Secret detection should be delegated to a maintained scanner; custom AST variable-name heuristics are not acceptable.
     nextAction: Wire a maintained secret scanner before claiming enforcement.
   sec/no-sql-string-concat:
-    status: ecosystem-covered
-    replacement: sql-template/no-unsafe-query
+    status: active-custom
     antidriftRule: antidrift/no-sql-string-concat
-    coverage: Everyday surface delegated to eslint-plugin-sql-template; cross-function taint delegated to CodeQL/Semgrep per Learning 9.
-    reason: The custom rule's text-shape detection flags parameterized tagged templates, the ecosystem's dominant safe idiom — measured at 71 false positives in one Cloudflare Agents file. Trust-the-tag delegation is established practice; deliberate tag-name evasion is taint territory, not lint territory.
-    nextAction: Adopt eslint-plugin-sql-template in the shared config and remove antidrift/no-sql-string-concat from the configured surface. Reopen only with evidence of real tag-name evasion, at which point the differentiated upgrade is tag-body proof.
+    coverage: Enabled by default in createConfig with AST, scope-binding guard, escaper, and TypeChecker declaration-source/member provenance.
+    reason: Ecosystem SQL plugins such as eslint-plugin-sql-template and ai-guard-dev/eslint-plugin-ai-guard lack TypeChecker escaper/member provenance, HogQL/template sentence coverage, and static/placeholder fragment flow proof.
+    nextAction: Keep antidrift/no-sql-string-concat enabled at error; expand configured safeTemplateTags and safeIdentifierMembers only with TypeChecker declaration-source proof.
   sec/no-unsafe-deserialize:
     status: active-custom
     antidriftRule: antidrift/no-unsafe-deserialize
@@ -1482,9 +1481,9 @@ rules:
         - "query({ returns: v.array(v.object({ machineId: v.string() })), handler })"
     nextAction: Blocking at error with the bulk-suppression baseline. Extend the sink proof to project-local _generated/server builders before claiming coverage on real Convex consumers.
   antidrift/no-sql-string-concat:
-    status: ecosystem-covered
+    status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     referenceDoc: docs/rule-investigations/no-sql-string-concat.md
     signal: SQL keyword/context AST plus scope-binding guard control-flow plus import-bound SQL-builder tags, TypeChecker imported-escaper, configured safe-identifier-member, and declaration-source safe-template-member proof
     solveType: injection-boundary
@@ -1569,7 +1568,7 @@ rules:
         - 'if (!VALID_NAMESPACE.test(ns)) throw new Error("bad namespace"); this.tableName = `cf_workspace_${ns}`; this.sql.run(`SELECT * FROM ${this.tableName}`);'
         - 'const table = [catalog, database, name].map(sqlIdentifier).join("."); db.prepare(`SELECT * FROM ${table}`);'
         - 'await connectAndRun(`ws.send(JSON.stringify({ input: { query: "SELECT * FROM everything" }, output: "${hugeOutput}" }))`);'
-    nextAction: Keep as default-off inventory until the remaining Cloudflare package SQL-tag type-service blockers are resolved and source-fleet/adversarial review confirms the new safe-template provenance has no hidden false negatives.
+    nextAction: Enabled at error in createConfig; expand safeTemplateTags and safeIdentifierMembers only with TypeChecker declaration-source proof.
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
@@ -1900,9 +1899,9 @@ rules:
         - "const parsed = schema.parse(JSON.parse(text));"
     nextAction: Stable only as a narrow parse-boundary specialization; retire or demote if @typescript-eslint/no-unsafe-argument becomes acceptable as a broad consumer default.
   antidrift/require-authz-check:
-    status: under-proven
+    status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     signal: handler-local request-param shape plus explicit authz function config
     solveType: authorization-boundary
     proofBuckets: [local-ast-source-shape, graph-config-source]
@@ -1911,7 +1910,7 @@ rules:
     concerns:
       - Current rule is Express-style and does not prove tRPC procedure coverage, framework route ownership, or middleware dominance.
       - The implementation recognizes caller-configured authz function names and request-param roots; it does not prove that authorization dominates the resource access.
-      - Enabling the rule without authzFunctions now fails closed; the package no longer ships a default trusted authz-name list.
+      - When no authzFunctions are configured in policy/registries/boundaries.yaml requiredCalls.authorization, the rule is inert.
       - Absence-of-call detection is fragile when authentication or authorization is provided by middleware, higher-order handlers, or framework wrappers.
       - A typed policy-wrapper registration pattern may be a stronger construction rule than scanning handlers for nearby authz calls.
     external:
@@ -1926,7 +1925,7 @@ rules:
         - 'app.get("/users/:id", (req) => read(req.params.id));'
       allows:
         - 'app.get("/users/:id", (req) => { requireUser(req); read(req.params.id); });'
-    nextAction: Keep default-off until typed policy-wrapper route registration or a dataflow/dominance proof replaces absence-of-call detection.
+    nextAction: Enabled at error in createGovernanceOxlintConfig with authzFunctions loaded from policy/registries/boundaries.yaml requiredCalls.authorization (inert when empty).
   antidrift/require-effect-deps:
     status: ready
     stable: true
@@ -4236,7 +4235,7 @@ researchCandidates:
     signal: maintained SQL lint plugin
     solveType: sql-injection-boundary
     referenceDoc: docs/rule-equivalence-audit.md
-    nextAction: Keep `antidrift/no-sql-string-concat` as default-off inventory until a maintained SQL lint plugin proves equivalent coverage for the HogQL/template interpolation delta or the remaining SQL-builder proof is complete.
+    nextAction: Keep `antidrift/no-sql-string-concat` enabled at error; revisit maintained SQL lint plugins only if they match TypeChecker escaper/member provenance and HogQL/template interpolation coverage.
   antidrift/no-same-schema-recertification:
     status: research
     signal: TypeChecker plus schema-output assignability and refinement-free override proof

@@ -2,14 +2,11 @@ import {
   inspectAppeasementCast,
   inspectImportSite,
 } from "../../semantic-adapters/cast-proof.mjs";
-import { isDeclaredGeneratedSource } from "../../semantic-adapters/generated-source.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 export function ruleNoAppeasementCast() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-appeasement-cast",
     meta: {
       type: "problem",
       docs: {
@@ -18,15 +15,7 @@ export function ruleNoAppeasementCast() {
       },
       schema: [],
     },
-    create(context) {
-      if (isDeclaredGeneratedSource(context.sourceCode.text)) {
-        return {};
-      }
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(context, "no-appeasement-cast");
-      }
-      const checker = services.program.getTypeChecker();
+    visitors({ context, checker, services }) {
       function reportCast(node) {
         const decision = inspectAppeasementCast(node, services, checker);
         if (decision.action !== "clear") {
@@ -50,5 +39,5 @@ export function ruleNoAppeasementCast() {
         TSImportType: reportImportSite,
       };
     },
-  };
+  });
 }

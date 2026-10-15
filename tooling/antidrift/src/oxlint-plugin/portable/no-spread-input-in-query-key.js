@@ -246,6 +246,11 @@ export default {
         }
       }
     };
+    const swrKeyHooks = new Set([
+      "useSWR",
+      "useSWRImmutable",
+      "useSWRMutation",
+    ]);
     return {
       Property(node) {
         if (getPropertyName(node.key) !== "queryKey") {
@@ -263,6 +268,18 @@ export default {
           return;
         }
         reportLeakyValue(node);
+      },
+      CallExpression(node) {
+        const callee = unwrapExpression(node.callee);
+        if (!isIdentifier(callee) || !swrKeyHooks.has(callee.name)) {
+          return;
+        }
+        const keyArg = unwrapExpression(node.arguments?.at(0));
+        if (isIdentifier(keyArg)) {
+          reportLeakyValue(findVisibleConstInitializer(keyArg));
+          return;
+        }
+        reportLeakyValue(keyArg);
       },
     };
   },

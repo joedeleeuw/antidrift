@@ -1,8 +1,8 @@
 import ts from "typescript";
 
 import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
+  defineTypeScriptRule,
+  resolveAliasedSymbol,
 } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const convexRegistrars = new Set([
@@ -15,13 +15,6 @@ const convexRegistrars = new Set([
 ]);
 
 const convexCombinators = new Set(["array", "optional", "union", "record"]);
-
-function resolvedSymbol(checker, symbol) {
-  if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
-    return checker.getAliasedSymbol(symbol);
-  }
-  return symbol;
-}
 
 function symbolDeclaresInConvexPath(symbol, segment) {
   for (const declaration of symbol?.declarations ?? []) {
@@ -57,7 +50,10 @@ function isConvexRegistrarCall(checker, tsCall) {
   if (!ts.isIdentifier(target)) {
     return false;
   }
-  const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(target));
+  const symbol = resolveAliasedSymbol(
+    checker,
+    checker.getSymbolAtLocation(target)
+  );
   const rawName = symbol?.getName() ?? target.text;
   const normalizedName = rawName.replace(/Generic$/u, "");
   if (!convexRegistrars.has(normalizedName)) {
@@ -82,11 +78,11 @@ function convexValidatorMethod(node, services, checker) {
   ) {
     return null;
   }
-  const methodSymbol = resolvedSymbol(
+  const methodSymbol = resolveAliasedSymbol(
     checker,
     checker.getSymbolAtLocation(tsNode.expression.name)
   );
-  const receiverSymbol = resolvedSymbol(
+  const receiverSymbol = resolveAliasedSymbol(
     checker,
     checker.getSymbolAtLocation(tsNode.expression.expression)
   );
@@ -183,7 +179,9 @@ function definitionName(node) {
 }
 
 export function ruleRequireConvexReturnValidator() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "require-convex-return-validator",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -210,16 +208,8 @@ export function ruleRequireConvexReturnValidator() {
           "Return validator widens past the owned shape; return the owning validator, not v.any().",
       },
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "require-convex-return-validator"
-        );
-      }
-      const allows = new Set(context.options[0]?.allows ?? []);
-      const checker = services.program.getTypeChecker();
+    visitors({ context, checker, services, options }) {
+      const allows = new Set(options[0]?.allows ?? []);
       return {
         CallExpression(node) {
           const firstArgument = unwrapExpression(node.arguments[0]);
@@ -253,5 +243,5 @@ export function ruleRequireConvexReturnValidator() {
         },
       };
     },
-  };
+  });
 }

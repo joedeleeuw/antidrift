@@ -1,18 +1,13 @@
 import ts from "typescript";
 
-import { effectDecodeCallParts } from "../../semantic-adapters/effect-schema.mjs";
 import {
   declaredSchemaParameter,
   isThrowAssertionCallbackParse,
   parsedSchemaSymbol,
   recordParsedConst,
-  ZOD_VALIDATION_METHODS,
-  zodParseCallParts,
+  schemaValidationCallParts,
 } from "../../semantic-adapters/schema-provenance.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const testFilenamePattern =
   /(?:(?:^|[/\\])(?:test|tests|__tests__)(?:[/\\])|[.](?:test|spec)[.][cm]?[jt]sx?$)/u;
@@ -63,26 +58,10 @@ function isServerAction(checker, parameter) {
   );
 }
 
-function validationCallParts(node, services, checker) {
-  const zodParts = zodParseCallParts(
-    node,
-    services,
-    checker,
-    ZOD_VALIDATION_METHODS
-  );
-  if (zodParts) {
-    return { tsCall: zodParts.tsCall, arg: zodParts.arg };
-  }
-  const effectParts = effectDecodeCallParts(node, services, checker);
-  if (!effectParts) {
-    return null;
-  }
-  const tsCall = services.esTreeNodeToTSNodeMap.get(node);
-  return tsCall ? { tsCall, arg: effectParts.valueArg } : null;
-}
-
 export function ruleNoRedundantZodParse() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-redundant-zod-parse",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -91,13 +70,8 @@ export function ruleNoRedundantZodParse() {
       },
       schema: [],
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(context, "no-redundant-zod-parse");
-      }
-      const isTestFile = testFilenamePattern.test(context.filename ?? "");
-      const checker = services.program.getTypeChecker();
+    visitors({ context, checker, services, filename }) {
+      const isTestFile = testFilenamePattern.test(filename ?? "");
       const validatedBy = new Map();
       const symbolOf = (node) => {
         const tsNode = services.esTreeNodeToTSNodeMap.get(node);
@@ -105,12 +79,12 @@ export function ruleNoRedundantZodParse() {
       };
       return {
         CallExpression(node) {
-          const parts = validationCallParts(node, services, checker);
+          const parts = schemaValidationCallParts(node, services, checker);
           if (!parts || isThrowAssertionCallbackParse(node)) {
             return;
           }
-          const { tsCall, arg } = parts;
-          const schemaSym = parsedSchemaSymbol(checker, tsCall);
+          const { tsCall, arg, schemaNode, returnsSchemaOutput } = parts;
+          const schemaSym = parsedSchemaSymbol(checker, tsCall, schemaNode);
           if (
             arg.type === "Identifier" &&
             schemaSym &&
@@ -139,9 +113,11 @@ export function ruleNoRedundantZodParse() {
               return;
             }
           }
-          recordParsedConst(node, schemaSym, symbolOf, validatedBy);
+          if (returnsSchemaOutput) {
+            recordParsedConst(node, schemaSym, symbolOf, validatedBy);
+          }
         },
       };
     },
-  };
+  });
 }

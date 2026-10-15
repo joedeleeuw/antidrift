@@ -1,5 +1,7 @@
 import ts from "typescript";
 
+import { effectDecodeCallParts } from "./effect-schema.mjs";
+
 // Methods whose call result IS the schema output, so return-type comparison is valid.
 export const ZOD_PARSE_METHODS = new Set(["parse", "parseAsync"]);
 // Every method that performs validation. The safe variants return a
@@ -10,24 +12,46 @@ export const ZOD_VALIDATION_METHODS = new Set([
   "safeParse",
   "safeParseAsync",
 ]);
+export const TYPEBOX_VALIDATION_METHODS = new Set(["Decode", "Parse", "Check"]);
 export const ZOD_TRANSFORM_METHOD = "transform";
 export const ZOD_THROW_ASSERTION_MATCHERS = new Set([
   "toThrow",
   "toThrowError",
 ]);
 
-export function isZodMethod(checker, tsNameNode) {
-  const sym = tsNameNode && checker.getSymbolAtLocation(tsNameNode);
-  for (const decl of sym?.declarations ?? []) {
+function isPackageSymbol(symbol, prefixes) {
+  for (const decl of symbol?.declarations ?? []) {
     const file = decl.getSourceFile().fileName.replace(/\\/gu, "/");
     const idx = file.lastIndexOf("/node_modules/");
     if (idx === -1) continue;
     const rest = file.slice(idx + "/node_modules/".length);
-    if (rest === "zod" || rest.startsWith("zod/") || rest.startsWith("@zod/")) {
+    if (
+      prefixes.some(
+        (prefix) => rest === prefix || rest.startsWith(`${prefix}/`)
+      )
+    ) {
       return true;
     }
   }
   return false;
+}
+
+export function isZodMethod(checker, tsNameNode) {
+  const sym = tsNameNode && checker.getSymbolAtLocation(tsNameNode);
+  return isPackageSymbol(resolvedSymbol(checker, sym), ["zod", "@zod"]);
+}
+
+export function isValibotMethod(checker, tsNameNode) {
+  const sym = tsNameNode && checker.getSymbolAtLocation(tsNameNode);
+  return isPackageSymbol(resolvedSymbol(checker, sym), ["valibot", "@valibot"]);
+}
+
+export function isTypeBoxMethod(checker, tsNameNode) {
+  const sym = tsNameNode && checker.getSymbolAtLocation(tsNameNode);
+  return isPackageSymbol(resolvedSymbol(checker, sym), [
+    "@sinclair/typebox",
+    "typebox",
+  ]);
 }
 
 function staticMemberName(node) {
@@ -113,6 +137,8 @@ const SCHEMA_OUTPUT_TYPE_NAMES = new Set([
   "TypeOf",
   "InferOutput",
   "Type",
+  "Static",
+  "StaticDecode",
 ]);
 
 function resolvedSymbol(checker, symbol) {
@@ -121,7 +147,25 @@ function resolvedSymbol(checker, symbol) {
     : symbol;
 }
 
-function symbolForExpression(checker, expression) {
+function schemaExpressionOfCall(tsCall, schemaNode) {
+  if (schemaNode) {
+    return schemaNode;
+  }
+  const callee = tsCall.expression;
+  if (ts.isPropertyAccessExpression(callee)) {
+    return callee.expression;
+  }
+  if (ts.isCallExpression(callee) && callee.arguments.length > 0) {
+    return callee.arguments[0];
+  }
+  return undefined;
+}
+
+export function parsedSchemaSymbol(checker, tsCall, schemaNode) {
+  const expression = schemaExpressionOfCall(tsCall, schemaNode);
+  if (!expression) {
+    return undefined;
+  }
   const node = ts.isPropertyAccessExpression(expression)
     ? expression.name
     : expression;
@@ -138,17 +182,6 @@ function symbolForExpression(checker, expression) {
     );
   }
   return symbol;
-}
-
-export function parsedSchemaSymbol(checker, tsCall) {
-  const callee = tsCall.expression;
-  if (ts.isPropertyAccessExpression(callee)) {
-    return symbolForExpression(checker, callee.expression);
-  }
-  if (ts.isCallExpression(callee) && callee.arguments.length > 0) {
-    return symbolForExpression(checker, callee.arguments[0]);
-  }
-  return undefined;
 }
 
 function schemaSymbolOfOutputAlias(checker, typeNode) {
@@ -241,6 +274,67 @@ export function zodParseCallParts(
     method: callee.property.name,
     returnsSchemaOutput: ZOD_PARSE_METHODS.has(callee.property.name),
   };
+}
+
+function schemaFirstValidationCallParts(node, services, checker) {
+  if (node?.type !== "CallExpression" || node.arguments.length < 2) {
+    return null;
+  }
+  const callee = node.callee;
+  const methodName =
+    callee.type === "Identifier" ? callee.name : staticMemberName(callee);
+  if (
+    !methodName ||
+    (!ZOD_VALIDATION_METHODS.has(methodName) &&
+      !TYPEBOX_VALIDATION_METHODS.has(methodName))
+  ) {
+    return null;
+  }
+  const tsCall = services.esTreeNodeToTSNodeMap.get(node);
+  if (!tsCall || !ts.isCallExpression(tsCall)) return null;
+  const tsNameNode = ts.isPropertyAccessExpression(tsCall.expression)
+    ? tsCall.expression.name
+    : tsCall.expression;
+  const isRecognizedLibrary = ZOD_VALIDATION_METHODS.has(methodName)
+    ? isValibotMethod(checker, tsNameNode)
+    : isTypeBoxMethod(checker, tsNameNode);
+  if (!isRecognizedLibrary) return null;
+  return {
+    tsCall,
+    arg: node.arguments[1],
+    schemaNode: tsCall.arguments[0],
+    returnsSchemaOutput: methodName !== "Check",
+  };
+}
+
+export function schemaValidationCallParts(node, services, checker) {
+  const zodParts = zodParseCallParts(
+    node,
+    services,
+    checker,
+    ZOD_VALIDATION_METHODS
+  );
+  if (zodParts) {
+    return {
+      tsCall: zodParts.tsCall,
+      arg: zodParts.arg,
+      schemaNode: zodParts.tsCall.expression.expression,
+      returnsSchemaOutput: true,
+    };
+  }
+  const effectParts = effectDecodeCallParts(node, services, checker);
+  if (effectParts) {
+    const tsCall = services.esTreeNodeToTSNodeMap.get(node);
+    return tsCall
+      ? {
+          tsCall,
+          arg: effectParts.valueArg,
+          schemaNode: effectParts.tsSchemaArg,
+          returnsSchemaOutput: true,
+        }
+      : null;
+  }
+  return schemaFirstValidationCallParts(node, services, checker);
 }
 
 export function zodTransformCallParts(node, services, checker) {

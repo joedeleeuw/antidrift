@@ -29,7 +29,7 @@ The ESLint pass also enforces these syntax rules at error, exported by both plug
 
 `antidrift/no-raw-react-native-touchables` reports every raw React Native or gesture-handler touchable import until a repository creates one shared Touchable module and registers it as the rule's owner (`allowedFiles`); the owner file alone may then import the raw primitives.
 
-The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-redundant-zod-parse`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-restated-dependency-type`, `antidrift/no-unresolved-dependency-types`, `antidrift/no-redundant-local-return-type` and `antidrift/no-service-constructor-imports` at error.
+The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-redundant-zod-parse`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-restated-dependency-type`, `antidrift/no-unresolved-dependency-types`, `antidrift/no-redundant-local-return-type`, `antidrift/no-service-constructor-imports` and `antidrift/no-sql-string-concat` at error.
 
 Every ESLint-pass rule above, typed rules included, is ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
 
@@ -60,7 +60,8 @@ eslint . \
   --suppress-rule antidrift/no-explicit-type-arguments-on-owned-api \
   --suppress-rule antidrift/no-schema-validator-transcoding \
   --suppress-rule antidrift/no-redundant-local-return-type \
-  --suppress-rule antidrift/no-service-constructor-imports
+  --suppress-rule antidrift/no-service-constructor-imports \
+  --suppress-rule antidrift/no-sql-string-concat
 ```
 
 See `docs/rule-investigations/directive-rules.md` in the repository for scope and corpus evidence.

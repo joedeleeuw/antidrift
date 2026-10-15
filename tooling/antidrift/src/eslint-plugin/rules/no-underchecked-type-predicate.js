@@ -10,10 +10,7 @@ import {
   requiredTypeProps,
   typePredicateParts,
 } from "../../semantic-adapters/broad-input.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 function isObjectContract(checker, type) {
   return (
@@ -43,7 +40,9 @@ function uncheckedProbedPayload(checker, variants, paths) {
 }
 
 export function ruleNoUndercheckedTypePredicate() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-underchecked-type-predicate",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -52,15 +51,7 @@ export function ruleNoUndercheckedTypePredicate() {
       },
       schema: [],
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-underchecked-type-predicate"
-        );
-      }
-      const checker = services.program.getTypeChecker();
+    visitors({ context, checker, services }) {
       function check(fn) {
         const parts = typePredicateParts(fn);
         if (!parts) {
@@ -149,5 +140,5 @@ export function ruleNoUndercheckedTypePredicate() {
         ArrowFunctionExpression: check,
       };
     },
-  };
+  });
 }

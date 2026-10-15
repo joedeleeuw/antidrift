@@ -8,15 +8,11 @@ import {
   publicEntries,
 } from "../../semantic-adapters/declared-dependencies.mjs";
 import {
-  declaresGenerated,
   packageDirectory,
   shapeComparison,
   unresolvedDescription,
 } from "../../semantic-adapters/shape-identity.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const inventoryByProgram = new WeakMap();
 const ownerSymbols = ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias;
@@ -198,7 +194,8 @@ function dependencyInventory(program) {
 }
 
 export function ruleNoRestatedDependencyType() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-restated-dependency-type",
     meta: {
       type: "problem",
       docs: {
@@ -217,38 +214,16 @@ export function ruleNoRestatedDependencyType() {
           "Whether this type restates {{name}} exported by the dependency {{packageName}} is undecided because {{unresolved}} does not resolve.",
       },
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-restated-dependency-type"
-        );
-      }
-      function packageScope() {
-        const source = services.program.getSourceFile(context.filename);
-        const packageRoot = source && packageDirectory(source.fileName);
-        if (!packageRoot) return null;
-        const inventory = dependencyInventory(services.program);
-        return {
-          source,
-          packageRoot,
-          inventory,
-          scopes: inventory.ownersByScope.get(packageRoot),
-        };
-      }
-      function check(node) {
-        const members =
-          node.type === "TSInterfaceDeclaration"
-            ? node.body.body
-            : node.members;
-        if (members.length < 3) return;
-        const located = packageScope();
-        if (!located) return;
-        const { source, packageRoot, inventory, scopes } = located;
-        if (declaresGenerated(source)) return;
-        const { checker } = inventory;
-        const declaration = services.esTreeNodeToTSNodeMap.get(node);
+    run({ sourceFile, program, cwd, reportNode }) {
+      const packageRoot = packageDirectory(sourceFile.fileName);
+      if (!packageRoot) return;
+      const inventory = dependencyInventory(program);
+      const scopes = inventory.ownersByScope.get(packageRoot);
+      if (!scopes) return;
+      const { checker } = inventory;
+      const sameShape = shapeComparison(inventory.program);
+      function check(declaration) {
+        if (declaration.members.length < 3) return;
         const declared =
           ts.isInterfaceDeclaration(declaration) &&
           checker.getSymbolAtLocation(declaration.name);
@@ -265,10 +240,9 @@ export function ruleNoRestatedDependencyType() {
           return;
         }
         const type = checker.getTypeAtLocation(declaration);
-        const sameShape = shapeComparison(inventory.program);
         const verdicts = (
           scopes
-            .get(source.impliedNodeFormat)
+            .get(sourceFile.impliedNodeFormat)
             ?.get(propertyKey(type, checker)) ?? []
         )
           .filter((candidate) =>
@@ -297,24 +271,21 @@ export function ruleNoRestatedDependencyType() {
           .join(", ");
         const reversed = owners.find((owner) => owner.reverses);
         if (reversed) {
-          context.report({
-            node,
+          reportNode(declaration, {
             messageId: "reversed",
             data: { owners: listed, packageName: reversed.packageName },
           });
           return;
         }
         if (owners.length > 1) {
-          context.report({
-            node,
+          reportNode(declaration, {
             messageId: "restatedAmong",
             data: { owners: listed },
           });
           return;
         }
         if (owners.length === 1) {
-          context.report({
-            node,
+          reportNode(declaration, {
             messageId: "restated",
             data: {
               name: owners[0].name,
@@ -328,8 +299,7 @@ export function ruleNoRestatedDependencyType() {
           ({ verdict }) => typeof verdict === "object"
         );
         if (undecided) {
-          context.report({
-            node,
+          reportNode(declaration, {
             messageId: "undecided",
             data: {
               name: undecided.owner.name,
@@ -337,16 +307,16 @@ export function ruleNoRestatedDependencyType() {
               unresolved: unresolvedDescription(
                 undecided.verdict,
                 checker,
-                context.cwd
+                cwd
               ),
             },
           });
         }
       }
       return {
-        TSInterfaceDeclaration: check,
-        TSTypeLiteral: check,
+        [ts.SyntaxKind.InterfaceDeclaration]: check,
+        [ts.SyntaxKind.TypeLiteral]: check,
       };
     },
-  };
+  });
 }

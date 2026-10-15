@@ -3,10 +3,7 @@ import {
   closedZodTransformInputKeys,
   zodTransformCallParts,
 } from "../../semantic-adapters/schema-provenance.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 function staticPropertyKey(property) {
   if (property.computed) return null;
@@ -165,7 +162,9 @@ function emitIdentityTransformFact(context, node, proof) {
 }
 
 export function ruleNoIdentitySchemaTransform() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-identity-schema-transform",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -178,15 +177,7 @@ export function ruleNoIdentitySchemaTransform() {
           "This Zod transform only reconstructs the same object shape. Remove the identity transform and infer the schema output directly.",
       },
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-identity-schema-transform"
-        );
-      }
-      const checker = services.program.getTypeChecker();
+    visitors({ context, checker, services }) {
       return {
         CallExpression(node) {
           const parts = zodTransformCallParts(node, services, checker);
@@ -207,5 +198,5 @@ export function ruleNoIdentitySchemaTransform() {
         },
       };
     },
-  };
+  });
 }

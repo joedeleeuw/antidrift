@@ -766,24 +766,20 @@ export function ruleRequireAuthzCheck() {
             authzFunctions: {
               type: "array",
               items: { type: "string", minLength: 1 },
-              minItems: 1,
               uniqueItems: true,
             },
           },
-          required: ["authzFunctions"],
           additionalProperties: false,
         },
       ],
     },
     create(context) {
-      const options = context.options[0];
-      if (!options) {
-        throw new Error(
-          "antidrift/require-authz-check requires authzFunctions"
-        );
+      const authzFunctions = context.options[0]?.authzFunctions ?? [];
+      if (authzFunctions.length === 0) {
+        return {};
       }
       const tracker = createAuthBoundaryTracker({
-        authzFunctions: options.authzFunctions,
+        authzFunctions,
         onFrameExit(frame) {
           if (frame.paramsAccess && !frame.sawAuthz) {
             context.report({

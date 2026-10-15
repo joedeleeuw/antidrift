@@ -1,14 +1,7 @@
-import { isEffectDecodeApplication } from "../../semantic-adapters/effect-schema.mjs";
-import {
-  ZOD_VALIDATION_METHODS,
-  zodParseCallParts,
-} from "../../semantic-adapters/schema-provenance.mjs";
+import { schemaValidationCallParts } from "../../semantic-adapters/schema-provenance.mjs";
 import { noKnownValueWideningRule } from "../../oxlint-plugin/anti-slop/rules/no-known-value-widening.js";
 import { noWidenThenAssertRule } from "../../oxlint-plugin/anti-slop/rules/no-widen-then-assert.js";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const TS_TYPE_FLAG_ANY = 1;
 const TS_TYPE_FLAG_UNKNOWN = 2;
@@ -75,14 +68,11 @@ function hasSpecificType(checker, services, expression) {
 
 function isParseArgument(identifier, services, checker) {
   const call = identifier.parent;
-  if (call?.type !== "CallExpression" || call.arguments[0] !== identifier) {
+  if (call?.type !== "CallExpression") {
     return false;
   }
-  return (
-    Boolean(
-      zodParseCallParts(call, services, checker, ZOD_VALIDATION_METHODS)
-    ) || isEffectDecodeApplication(call, services, checker)
-  );
+  const parts = schemaValidationCallParts(call, services, checker);
+  return parts?.arg === identifier;
 }
 
 function isNamedContractCast(identifier) {
@@ -108,7 +98,9 @@ function reestablishingReference(references, services, checker) {
 }
 
 export function ruleNoAppeasementErasure() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-appeasement-erasure",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -123,12 +115,7 @@ export function ruleNoAppeasementErasure() {
       },
       schema: [],
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(context, "no-appeasement-erasure");
-      }
-      const checker = services.program.getTypeChecker();
+    visitors({ context, checker, services }) {
       const localVisitors = {
         VariableDeclarator(node) {
           // A reassigned binding is a traversal cursor, not a boundary value.
@@ -163,5 +150,5 @@ export function ruleNoAppeasementErasure() {
         localVisitors
       );
     },
-  };
+  });
 }

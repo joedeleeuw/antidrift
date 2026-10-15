@@ -7,10 +7,7 @@ import {
   unresolvedDescription,
 } from "../../semantic-adapters/shape-identity.mjs";
 import { inlineStructuralTypeAtBoundary } from "../../semantic-adapters/local-ast-rules.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const declarationsByProgram = new WeakMap();
 const dependencySources = /(?:^|[/\\])node_modules(?:[/\\]|$)/u;
@@ -259,7 +256,8 @@ function inScope(candidate, declaration) {
 }
 
 export function ruleNoInlineStructuralTypeAtUseSite() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-inline-structural-type-at-use-site",
     meta: {
       type: "problem",
       docs: {
@@ -280,16 +278,8 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
           "Whether this parameter repeats the type at {{location}} is undecided because {{unresolved}} does not resolve.",
       },
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-inline-structural-type-at-use-site"
-        );
-      }
-      const checker = services.program.getTypeChecker();
-      const sameShape = shapeComparison(services.program);
+    visitors({ context, checker, program, services, cwd }) {
+      const sameShape = shapeComparison(program);
       return {
         TSTypeLiteral(node) {
           if (
@@ -306,8 +296,7 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
           const packageRoot = packageDirectory(
             declaration.getSourceFile().fileName
           );
-          const candidates =
-            programDeclarations(services.program).get(key) ?? [];
+          const candidates = programDeclarations(program).get(key) ?? [];
           const verdicts = candidates
             .filter(
               (candidate) =>
@@ -336,7 +325,7 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
               messageId: "overridden",
               data: {
                 name: governing.name,
-                location: lineLocation(governing.node, context.cwd),
+                location: lineLocation(governing.node, cwd),
               },
             });
             return;
@@ -369,7 +358,7 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
               messageId,
               data: {
                 name: existing.name,
-                location: lineLocation(existing.node, context.cwd),
+                location: lineLocation(existing.node, cwd),
               },
             });
             return;
@@ -382,11 +371,11 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
               node,
               messageId: "undecided",
               data: {
-                location: lineLocation(undecided.candidate.node, context.cwd),
+                location: lineLocation(undecided.candidate.node, cwd),
                 unresolved: unresolvedDescription(
                   undecided.verdict,
                   checker,
-                  context.cwd
+                  cwd
                 ),
               },
             });
@@ -394,5 +383,5 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
         },
       };
     },
-  };
+  });
 }

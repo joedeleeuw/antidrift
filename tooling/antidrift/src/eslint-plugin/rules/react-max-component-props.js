@@ -4,10 +4,7 @@ import {
   memberNodeTypes,
 } from "../../semantic-adapters/local-ast-rules.mjs";
 import ts from "typescript";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const reactComponentFactoryWrappers = new Set(["forwardRef", "memo"]);
 const reactComponentTypeNames = new Set(["FC", "FunctionComponent"]);
@@ -279,7 +276,9 @@ const callableVisitors = (check) => ({
   Property: check,
 });
 export function ruleReactMaxComponentProps() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "react-max-component-props",
+    skipGenerated: false,
     meta: {
       type: "suggestion",
       docs: {
@@ -294,19 +293,11 @@ export function ruleReactMaxComponentProps() {
         },
       ],
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "react-max-component-props"
-        );
-      }
-      const checker = services.program.getTypeChecker();
-      const max = context.options[0]?.max ?? DEFAULT_REACT_COMPONENT_PROPS_MAX;
+    visitors({ context, checker, services, options }) {
+      const max = options[0]?.max ?? DEFAULT_REACT_COMPONENT_PROPS_MAX;
       return callableVisitors((node) =>
         reportLargeComponentProps(node, context, services, checker, max)
       );
     },
-  };
+  });
 }

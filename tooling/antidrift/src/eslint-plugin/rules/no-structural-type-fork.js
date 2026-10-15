@@ -1,5 +1,3 @@
-import ts from "typescript";
-
 import { semanticFactSink } from "../../policy/lib/semantic-facts.mjs";
 import { collectOwnedContractProvenance } from "../../semantic-adapters/owned-contract-provenance.mjs";
 import {
@@ -15,8 +13,8 @@ import {
   typePropsDetailed,
 } from "../../semantic-adapters/type-owner.mjs";
 import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
+  defineTypeScriptRule,
+  resolveAliasedSymbol,
 } from "../../semantic-adapters/ts-rule-kernel.mjs";
 import {
   emitStructuralMatchFact,
@@ -30,13 +28,6 @@ import {
 const canonicalCache = new WeakMap();
 // Same per-program caching for the implicit Convex generated owner sweep.
 const convexOwnerCache = new WeakMap();
-
-function resolvedSymbol(checker, symbol) {
-  if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
-    return checker.getAliasedSymbol(symbol);
-  }
-  return symbol;
-}
 
 function declaresInConvexOwnedModule(sym) {
   for (const declaration of sym?.getDeclarations?.() ??
@@ -64,12 +55,17 @@ function isConvexOwnerReferenceAlias(services, checker, node) {
   const tsAnnotation = services.esTreeNodeToTSNodeMap.get(annotation);
   const typeName = tsAnnotation?.typeName;
   if (!typeName) return false;
-  const sym = resolvedSymbol(checker, checker.getSymbolAtLocation(typeName));
+  const sym = resolveAliasedSymbol(
+    checker,
+    checker.getSymbolAtLocation(typeName)
+  );
   return declaresInConvexOwnedModule(sym);
 }
 
 export function ruleNoStructuralTypeFork() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-structural-type-fork",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -108,15 +104,9 @@ export function ruleNoStructuralTypeFork() {
         },
       ],
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(context, "no-structural-type-fork");
-      }
-      const program = services.program;
-      const checker = program.getTypeChecker();
-      const generatedSources = context.options[0]?.generatedSources ?? {};
-      const packageTypeOwners = context.options[0]?.packageTypeOwners ?? {};
+    visitors({ context, checker, program, services, options, filename }) {
+      const generatedSources = options[0]?.generatedSources ?? {};
+      const packageTypeOwners = options[0]?.packageTypeOwners ?? {};
       const shouldCollectProposalFacts = Boolean(semanticFactSink(context));
       let candidates = [];
       if (Object.keys(generatedSources).length > 0) {
@@ -189,9 +179,7 @@ export function ruleNoStructuralTypeFork() {
           return;
         }
         // Generated output is owner, never fork.
-        if (
-          isConvexGeneratedFile(context.filename ?? context.getFilename?.())
-        ) {
+        if (isConvexGeneratedFile(filename ?? context.getFilename?.())) {
           return;
         }
         if (isConvexOwnerReferenceAlias(services, checker, node)) {
@@ -252,5 +240,5 @@ export function ruleNoStructuralTypeFork() {
         TSUnionType: checkProjection,
       };
     },
-  };
+  });
 }

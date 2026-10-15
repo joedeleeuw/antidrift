@@ -1,8 +1,8 @@
 import ts from "typescript";
 
 import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
+  defineTypeScriptRule,
+  resolveAliasedSymbol,
 } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const convexRegistrationNames = new Set([
@@ -14,13 +14,6 @@ const convexRegistrationNames = new Set([
   "internalAction",
 ]);
 const convexRegistrationProperties = new Set(["args", "returns"]);
-
-function resolvedSymbol(checker, symbol) {
-  if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
-    return checker.getAliasedSymbol(symbol);
-  }
-  return symbol;
-}
 
 function symbolPackagePath(symbol) {
   for (const declaration of symbol?.declarations ?? []) {
@@ -41,10 +34,13 @@ function packageNameOf(packagePath) {
 function resolvedCalleeSymbol(checker, tsCall) {
   const callee = tsCall.expression;
   if (ts.isPropertyAccessExpression(callee)) {
-    return resolvedSymbol(checker, checker.getSymbolAtLocation(callee.name));
+    return resolveAliasedSymbol(
+      checker,
+      checker.getSymbolAtLocation(callee.name)
+    );
   }
   if (ts.isIdentifier(callee)) {
-    return resolvedSymbol(checker, checker.getSymbolAtLocation(callee));
+    return resolveAliasedSymbol(checker, checker.getSymbolAtLocation(callee));
   }
   return null;
 }
@@ -62,7 +58,7 @@ function isZodToJsonSchemaCall(checker, tsCall) {
   const callee = tsCall.expression;
   if (!ts.isPropertyAccessExpression(callee)) return false;
   if (callee.name.text !== "toJSONSchema") return false;
-  const symbol = resolvedSymbol(
+  const symbol = resolveAliasedSymbol(
     checker,
     checker.getSymbolAtLocation(callee.name)
   );
@@ -70,10 +66,18 @@ function isZodToJsonSchemaCall(checker, tsCall) {
   return rest !== null && (rest === "zod" || rest.startsWith("zod/"));
 }
 
+function isValibotToJsonSchemaCall(checker, tsCall) {
+  const symbol = resolvedCalleeSymbol(checker, tsCall);
+  if (symbol?.getName() !== "toJsonSchema") return false;
+  const rest = symbolPackagePath(symbol);
+  return rest !== null && rest.startsWith("@valibot/to-json-schema");
+}
+
 function isJsonSchemaConversionCall(checker, tsCall) {
   return (
     isEffectJsonSchemaMakeCall(checker, tsCall) ||
-    isZodToJsonSchemaCall(checker, tsCall)
+    isZodToJsonSchemaCall(checker, tsCall) ||
+    isValibotToJsonSchemaCall(checker, tsCall)
   );
 }
 
@@ -95,39 +99,29 @@ function isOpenApiDocumentationCall(checker, tsCall) {
   return rest !== null && packageNameOf(rest).toLowerCase().includes("openapi");
 }
 
-function isJsonSchemaConversionResult(
-  checker,
-  services,
-  estreeNode,
-  depth = 4
-) {
-  if (!estreeNode || depth <= 0) return false;
-  const tsNode = services.esTreeNodeToTSNodeMap.get(estreeNode);
-  if (!tsNode) return false;
+function isJsonSchemaConversionResult(checker, tsNode, depth = 4) {
+  if (!tsNode || depth <= 0) return false;
   if (ts.isCallExpression(tsNode)) {
     if (isJsonSchemaConversionCall(checker, tsNode)) return true;
     // One converter wrapper is part of the chain: the JSON Schema
     // representation flows through a handwritten or helper converter whose
     // result becomes the registered validator.
     return tsNode.arguments.some((argument) =>
-      isJsonSchemaConversionResult(
-        checker,
-        services,
-        services.tsNodeToESTreeNodeMap.get(argument),
-        depth - 1
-      )
+      isJsonSchemaConversionResult(checker, argument, depth - 1)
     );
   }
   if (ts.isIdentifier(tsNode)) {
-    const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(tsNode));
+    const symbol = resolveAliasedSymbol(
+      checker,
+      checker.getSymbolAtLocation(tsNode)
+    );
     for (const declaration of symbol?.declarations ?? []) {
       if (
         ts.isVariableDeclaration(declaration) &&
         declaration.initializer &&
         isJsonSchemaConversionResult(
           checker,
-          services,
-          services.tsNodeToESTreeNodeMap.get(declaration.initializer),
+          declaration.initializer,
           depth - 1
         )
       ) {
@@ -139,7 +133,8 @@ function isJsonSchemaConversionResult(
 }
 
 export function ruleNoSchemaValidatorTranscoding() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-schema-validator-transcoding",
     meta: {
       type: "problem",
       docs: {
@@ -152,33 +147,21 @@ export function ruleNoSchemaValidatorTranscoding() {
           "This schema's runtime authority is being re-derived through a second representation: the source schema already owns runtime validation, and registering its JSON Schema as a Convex validator creates a second owner that drifts silently. Keep one runtime owner — register the Convex validator directly (convex/values), or keep the JSON Schema for documentation (OpenAPI) only.",
       },
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-schema-validator-transcoding"
-        );
-      }
-      const checker = services.program.getTypeChecker();
+    run({ checker, reportNode }) {
       return {
-        CallExpression(node) {
-          const tsCall = services.esTreeNodeToTSNodeMap.get(node);
-          if (!tsCall || !ts.isCallExpression(tsCall)) return;
+        [ts.SyntaxKind.CallExpression](tsCall) {
           if (isOpenApiDocumentationCall(checker, tsCall)) return;
           if (!isConvexRegistrationCall(checker, tsCall)) return;
-          const [config] = node.arguments;
-          if (!config || config.type !== "ObjectExpression") return;
+          const [config] = tsCall.arguments;
+          if (!config || !ts.isObjectLiteralExpression(config)) return;
           for (const property of config.properties) {
-            if (property.type !== "Property" || property.computed) continue;
-            const key =
-              property.key.type === "Identifier" ? property.key.name : null;
+            if (!ts.isPropertyAssignment(property)) continue;
+            const key = ts.isIdentifier(property.name)
+              ? property.name.text
+              : null;
             if (!convexRegistrationProperties.has(key)) continue;
-            if (
-              isJsonSchemaConversionResult(checker, services, property.value)
-            ) {
-              context.report({
-                node: property.value,
+            if (isJsonSchemaConversionResult(checker, property.initializer)) {
+              reportNode(property.initializer, {
                 messageId: "schemaValidatorTranscoding",
               });
             }
@@ -186,5 +169,5 @@ export function ruleNoSchemaValidatorTranscoding() {
         },
       };
     },
-  };
+  });
 }

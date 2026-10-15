@@ -4,10 +4,7 @@ import {
   functionParameterByName,
   typePredicateParts,
 } from "../../semantic-adapters/broad-input.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 // TypeScript 5.5 infers `x is T` for a function without a return annotation
 // whose single returned expression narrows `x` to T on true and to never
@@ -290,7 +287,9 @@ function orphanedImportRemovals(sourceCode, fixer, annotation) {
 }
 
 export function ruleNoRedundantTypePredicate() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-redundant-type-predicate",
+    skipGenerated: false,
     meta: {
       type: "suggestion",
       fixable: "code",
@@ -300,16 +299,8 @@ export function ruleNoRedundantTypePredicate() {
       },
       schema: [],
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-redundant-type-predicate"
-        );
-      }
+    visitors({ context, checker, services }) {
       if (!infersTypePredicates()) return {};
-      const checker = services.program.getTypeChecker();
       function check(callback) {
         if (callback.async || callback.generator) return;
         if (!isCallbackArgument(callback)) return;
@@ -368,5 +359,5 @@ export function ruleNoRedundantTypePredicate() {
         ArrowFunctionExpression: check,
       };
     },
-  };
+  });
 }

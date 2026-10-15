@@ -98,7 +98,7 @@ export function createConfig({
         "antidrift/no-wrapping-functions": "error",
         "antidrift/no-redundant-local-return-type": "error",
         "antidrift/no-service-constructor-imports": "error",
-        "antidrift/no-sql-string-concat": "off",
+        "antidrift/no-sql-string-concat": "error",
         ...ratchetedRules,
       },
     },

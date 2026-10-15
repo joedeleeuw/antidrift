@@ -11,6 +11,7 @@ export type ZodValidationMethod =
   | ZodParseMethod
   | "safeParse"
   | "safeParseAsync";
+export type TypeBoxValidationMethod = "Decode" | "Parse" | "Check";
 
 export interface ZodParseCallParts {
   callee: unknown;
@@ -18,6 +19,13 @@ export interface ZodParseCallParts {
   arg: unknown;
   method: ZodValidationMethod;
   /** False for the safe variants, whose result is a wrapper rather than the schema output. */
+  returnsSchemaOutput: boolean;
+}
+
+export interface SchemaValidationCallParts {
+  tsCall: ts.CallExpression;
+  arg: unknown;
+  schemaNode: ts.Expression | undefined;
   returnsSchemaOutput: boolean;
 }
 
@@ -29,6 +37,7 @@ export interface ZodTransformCallParts {
 
 export const ZOD_PARSE_METHODS: ReadonlySet<ZodParseMethod>;
 export const ZOD_VALIDATION_METHODS: ReadonlySet<ZodValidationMethod>;
+export const TYPEBOX_VALIDATION_METHODS: ReadonlySet<TypeBoxValidationMethod>;
 export const ZOD_TRANSFORM_METHOD: "transform";
 export const ZOD_THROW_ASSERTION_MATCHERS: ReadonlySet<
   "toThrow" | "toThrowError"
@@ -39,11 +48,22 @@ export function isZodMethod(
   tsNameNode: ts.Node | null | undefined
 ): boolean;
 
+export function isValibotMethod(
+  checker: ts.TypeChecker,
+  tsNameNode: ts.Node | null | undefined
+): boolean;
+
+export function isTypeBoxMethod(
+  checker: ts.TypeChecker,
+  tsNameNode: ts.Node | null | undefined
+): boolean;
+
 export function isThrowAssertionCallbackParse(node: unknown): boolean;
 
 export function parsedSchemaSymbol(
   checker: ts.TypeChecker,
-  tsCall: ts.CallExpression
+  tsCall: ts.CallExpression,
+  schemaNode?: ts.Expression
 ): ts.Symbol | undefined;
 
 export function declaredSchemaParameter(
@@ -57,6 +77,12 @@ export function zodParseCallParts(
   checker: ts.TypeChecker,
   methods?: ReadonlySet<string>
 ): ZodParseCallParts | null;
+
+export function schemaValidationCallParts(
+  node: unknown,
+  services: TypeScriptParserServices,
+  checker: ts.TypeChecker
+): SchemaValidationCallParts | null;
 
 export function zodTransformCallParts(
   node: unknown,

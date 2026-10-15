@@ -1,8 +1,8 @@
 import ts from "typescript";
 
 import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
+  defineTypeScriptRule,
+  resolveAliasedSymbol,
 } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const convexHookNames = new Set([
@@ -24,17 +24,20 @@ const tanstackClientMethods = new Set([
   "prefetchQuery",
   "ensureQueryData",
 ]);
-const registrationFactories = new Set(["queryOptions", "mutationOptions"]);
-
-function resolvedSymbol(checker, symbol) {
-  if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
-    return checker.getAliasedSymbol(symbol);
-  }
-  return symbol;
-}
+const registrationFactories = new Set([
+  "queryOptions",
+  "mutationOptions",
+  "infiniteQueryOptions",
+]);
+const swrHookNames = new Set([
+  "useSWR",
+  "useSWRImmutable",
+  "useSWRInfinite",
+  "useSWRMutation",
+]);
 
 function resolvedCalleeName(checker, tsNameNode) {
-  const symbol = resolvedSymbol(
+  const symbol = resolveAliasedSymbol(
     checker,
     checker.getSymbolAtLocation(tsNameNode)
   );
@@ -42,7 +45,7 @@ function resolvedCalleeName(checker, tsNameNode) {
 }
 
 function calleePackagePath(checker, tsNameNode) {
-  const symbol = resolvedSymbol(
+  const symbol = resolveAliasedSymbol(
     checker,
     checker.getSymbolAtLocation(tsNameNode)
   );
@@ -64,6 +67,47 @@ function isConvexHookCall(checker, tsCall) {
     (rest === "convex" || rest.startsWith("convex/")) &&
     rest.includes("/react")
   );
+}
+
+function isTrpcProcedureHookCall(checker, tsCall) {
+  const callee = tsCall.expression;
+  if (!ts.isPropertyAccessExpression(callee)) return false;
+  if (!tanstackHookNames.has(callee.name.text)) return false;
+  const rest = calleePackagePath(checker, callee.name);
+  return rest !== null && rest.startsWith("@trpc/");
+}
+
+function isSwrOwnedFetcherCall(checker, tsCall) {
+  const callee = tsCall.expression;
+  if (!ts.isIdentifier(callee)) return false;
+  const name = resolvedCalleeName(checker, callee);
+  if (!swrHookNames.has(name) && !swrHookNames.has(callee.text)) return false;
+  const rest = calleePackagePath(checker, callee);
+  if (rest === null || (rest !== "swr" && !rest.startsWith("swr/"))) {
+    return false;
+  }
+  const fetcherArg = tsCall.arguments[1];
+  if (
+    !fetcherArg ||
+    (!ts.isIdentifier(fetcherArg) && !ts.isPropertyAccessExpression(fetcherArg))
+  ) {
+    return false;
+  }
+  const fetcherType = checker.getTypeAtLocation(fetcherArg);
+  const signatures = checker.getSignaturesOfType(
+    fetcherType,
+    ts.SignatureKind.Call
+  );
+  if (signatures.length === 0) return false;
+  return signatures.every((signature) => {
+    const returnType = checker.getReturnTypeOfSignature(signature);
+    const awaited = checker.getAwaitedType(returnType) ?? returnType;
+    return (
+      (awaited.flags &
+        (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)) ===
+      0
+    );
+  });
 }
 
 function isTanstackCallee(checker, tsCall) {
@@ -111,9 +155,7 @@ function importSourceOfRootIdentifier(checker, tsExpression) {
   return null;
 }
 
-function isGeneratedApiReference(checker, services, estreeNode) {
-  if (!estreeNode) return false;
-  const tsNode = services.esTreeNodeToTSNodeMap.get(estreeNode);
+function isGeneratedApiReference(checker, tsNode) {
   if (!tsNode) return false;
   const source = importSourceOfRootIdentifier(checker, tsNode);
   return source !== null && source.endsWith("convex/_generated/api");
@@ -122,36 +164,44 @@ function isGeneratedApiReference(checker, services, estreeNode) {
 function isRegistrationFactoryCall(checker, tsNode) {
   if (!tsNode || !ts.isCallExpression(tsNode)) return false;
   const callee = tsNode.expression;
-  if (!ts.isIdentifier(callee)) return false;
-  if (!registrationFactories.has(resolvedCalleeName(checker, callee))) {
-    return false;
+  if (ts.isIdentifier(callee)) {
+    if (!registrationFactories.has(resolvedCalleeName(checker, callee))) {
+      return false;
+    }
+    const rest = calleePackagePath(checker, callee);
+    return (
+      rest !== null &&
+      (rest.startsWith("@tanstack/react-query") ||
+        rest.startsWith("@tanstack/query-core"))
+    );
   }
-  const rest = calleePackagePath(checker, callee);
-  return (
-    rest !== null &&
-    (rest.startsWith("@tanstack/react-query") ||
-      rest.startsWith("@tanstack/query-core"))
-  );
+  if (ts.isPropertyAccessExpression(callee)) {
+    if (!registrationFactories.has(callee.name.text)) return false;
+    const rest = calleePackagePath(checker, callee.name);
+    return (
+      rest !== null &&
+      (rest.startsWith("@trpc/") ||
+        rest.startsWith("@orpc/") ||
+        rest.startsWith("@tanstack/"))
+    );
+  }
+  return false;
 }
 
-function resolvesToRegistration(checker, services, estreeNode, depth = 6) {
-  if (!estreeNode || depth <= 0) return false;
-  const tsNode = services.esTreeNodeToTSNodeMap.get(estreeNode);
-  if (!tsNode) return false;
+function resolvesToRegistration(checker, tsNode, depth = 6) {
+  if (!tsNode || depth <= 0) return false;
   if (isRegistrationFactoryCall(checker, tsNode)) return true;
   if (
     ts.isPropertyAccessExpression(tsNode) &&
     tsNode.name.text === "queryKey"
   ) {
-    return resolvesToRegistration(
-      checker,
-      services,
-      services.tsNodeToESTreeNodeMap.get(tsNode.expression),
-      depth - 1
-    );
+    return resolvesToRegistration(checker, tsNode.expression, depth - 1);
   }
   if (ts.isIdentifier(tsNode)) {
-    const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(tsNode));
+    const symbol = resolveAliasedSymbol(
+      checker,
+      checker.getSymbolAtLocation(tsNode)
+    );
     for (const declaration of symbol?.declarations ?? []) {
       if (
         declaration.initializer &&
@@ -165,53 +215,51 @@ function resolvesToRegistration(checker, services, estreeNode, depth = 6) {
 }
 
 export function ruleNoExplicitTypeArgumentsOnOwnedApi() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-explicit-type-arguments-on-owned-api",
     meta: {
       type: "problem",
       docs: {
         description:
-          "Disallow caller-supplied result type arguments where a registered API already owns inference (Convex generated function references, TanStack queryOptions/mutationOptions registrations). The explicit argument restates or forks the owner.",
+          "Disallow caller-supplied result type arguments where a registered API already owns inference (Convex generated function references, TanStack queryOptions/mutationOptions registrations, tRPC procedure hooks, or SWR calls with a typed fetcher). The explicit argument restates or forks the owner.",
       },
       schema: [],
       messages: {
         explicitTypeArgumentOnOwnedApi:
-          "This call's result type is owned by its registration (FunctionReturnType of the referenced function, or the queryOptions/mutationOptions queryFn). Drop the explicit type argument and infer from the owner; a caller-supplied type can drift from the registration silently.",
+          "This call's result type is owned by its registration (FunctionReturnType of the referenced function, the queryOptions/mutationOptions queryFn, the tRPC procedure, or the typed SWR fetcher). Drop the explicit type argument and infer from the owner; a caller-supplied type can drift from the registration silently.",
       },
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-explicit-type-arguments-on-owned-api"
-        );
-      }
-      const checker = services.program.getTypeChecker();
+    run({ checker, reportNode }) {
       return {
-        CallExpression(node) {
-          if (!node.typeArguments || node.typeArguments.params.length === 0) {
+        [ts.SyntaxKind.CallExpression](tsCall) {
+          if (!tsCall.typeArguments || tsCall.typeArguments.length === 0) {
             return;
           }
-          const tsCall = services.esTreeNodeToTSNodeMap.get(node);
-          if (!tsCall || !ts.isCallExpression(tsCall)) return;
           if (isConvexHookCall(checker, tsCall)) {
-            if (isGeneratedApiReference(checker, services, node.arguments[0])) {
-              context.report({
-                node,
+            if (isGeneratedApiReference(checker, tsCall.arguments[0])) {
+              reportNode(tsCall, {
                 messageId: "explicitTypeArgumentOnOwnedApi",
               });
             }
             return;
           }
+          if (
+            isTrpcProcedureHookCall(checker, tsCall) ||
+            isSwrOwnedFetcherCall(checker, tsCall)
+          ) {
+            reportNode(tsCall, {
+              messageId: "explicitTypeArgumentOnOwnedApi",
+            });
+            return;
+          }
           if (!isTanstackCallee(checker, tsCall)) return;
-          if (resolvesToRegistration(checker, services, node.arguments[0])) {
-            context.report({
-              node,
+          if (resolvesToRegistration(checker, tsCall.arguments[0])) {
+            reportNode(tsCall, {
               messageId: "explicitTypeArgumentOnOwnedApi",
             });
           }
         },
       };
     },
-  };
+  });
 }

@@ -1,12 +1,11 @@
 import { isUnsafeJsonParseInput } from "../../semantic-adapters/parse-input.mjs";
 import { parsedJsonTarget } from "../../semantic-adapters/parsed-json.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 export function ruleNoUnsafeDeserialize() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-unsafe-deserialize",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -15,12 +14,7 @@ export function ruleNoUnsafeDeserialize() {
       },
       schema: [],
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(context, "no-unsafe-deserialize");
-      }
-      const checker = services.program.getTypeChecker();
+    visitors({ context, checker, services }) {
       function inspectTarget(node) {
         const target = parsedJsonTarget(node, context, services, checker);
         if (!target) return false;
@@ -44,5 +38,5 @@ export function ruleNoUnsafeDeserialize() {
         Identifier: inspectTarget,
       };
     },
-  };
+  });
 }

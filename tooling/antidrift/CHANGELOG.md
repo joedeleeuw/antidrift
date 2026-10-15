@@ -1,5 +1,19 @@
 # changelog
 
+## 0.18.0
+
+- Migrate all 23 TypeChecker-requiring ESLint rules in `src/eslint-plugin/rules/` onto `defineTypeScriptRule` in `src/semantic-adapters/ts-rule-kernel.mjs`:
+  - `defineTypeScriptRule` now supports both TypeScript `SyntaxKind` AST listeners (`run`) and ESTree visitors with `checker`/`program`/`services` (`visitors`), `skipGenerated` toggling, and `allowWithoutTypeServices` for rules with syntax-only fallback modes.
+  - Consolidate `src/eslint-plugin/rules/type-services.js` into `ts-rule-kernel.mjs` and move `structural-fork-proof.mjs` and `sql-syntax-analysis.mjs` out of `src/eslint-plugin/rules/` into `src/semantic-adapters/`.
+- Complete zero `defaultOff` rules across `policy/registries/rules.yaml`:
+  - Split `src/eslint-plugin/rules/no-sql-string-concat.js` (1,181 lines -> 174 lines) by extracting `createSqlProvenanceTracker` into `src/semantic-adapters/sql-provenance.mjs`, promote `antidrift/no-sql-string-concat` to `status: ready` (`defaultOff: false`), and enable it at `"error"` in the TypeScript ESLint preset.
+  - Make `authzFunctions` optional in `antidrift/require-authz-check` (returning `{}` when `authzFunctions` is empty, wired from `registries.boundaries?.requiredCalls?.authorization ?? []`), promote `antidrift/require-authz-check` to `status: ready` (`defaultOff: false`), and enable it at `"error"` in `createGovernanceOxlintConfig`.
+- Extend schema and query rules across library families:
+  - `@joedeleeuw/antidrift/semantic-adapters/schema-provenance`, `antidrift/no-redundant-zod-parse`, and `antidrift/no-appeasement-erasure` now recognize Zod (`S.parse`, `S.safeParse`, `z.infer`), Effect Schema (both curried `Schema.decodeUnknownSync(S)(x)` and two-argument `Schema.decodeUnknownSync(S, x)`, `typeof S.Type`, `Schema.Schema.Type<typeof S>`), Valibot (`v.parse(S, x)`, `parse(S, x)`, `v.safeParse(S, x)`, `v.InferOutput<typeof S>`), and TypeBox (`Value.Decode(S, x)`, `Value.Parse(S, x)`, `Value.Check(S, x)`, `Static<typeof S>`, `StaticDecode<typeof S>`).
+  - `antidrift/no-schema-validator-transcoding` also detects Valibot `toJsonSchema` (`@valibot/to-json-schema`) alongside Effect `JSONSchema.make` and Zod `z.toJSONSchema`.
+  - `antidrift/no-explicit-type-arguments-on-owned-api` also covers `infiniteQueryOptions`, tRPC/oRPC `.queryOptions(...)` / `.mutationOptions(...)` registrations, tRPC procedure hooks (`trpc.<proc>.useQuery<T>()`, `useSuspenseQuery<T>()`, `useInfiniteQuery<T>()`, `useMutation<T>()`), and SWR hooks (`useSWR<T>(key, fetcher)`, `useSWRImmutable`, `useSWRInfinite`, `useSWRMutation`) when passed a typed fetcher reference.
+  - `antidrift/no-spread-input-in-query-key` also checks array keys passed to SWR hooks (`useSWR`, `useSWRImmutable`, `useSWRMutation`).
+
 ## 0.17.0
 
 - Unify the 5 semantic rule primitives (`shape-identity`, symbol/module/package provenance, boundary dataflow, program call-graph/evaluation stepper, and domain provenance) in `src/semantic-adapters/`:

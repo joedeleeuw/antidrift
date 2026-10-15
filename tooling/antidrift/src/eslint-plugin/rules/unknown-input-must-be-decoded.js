@@ -1,13 +1,13 @@
 import { appendFileSync } from "node:fs";
+import ts from "typescript";
 import { boundaryModel } from "../../semantic-adapters/boundary-model.mjs";
 import { boundaryObservations } from "../../semantic-adapters/boundary-observations.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 export default function ruleUnknownInputMustBeDecoded() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "unknown-input-must-be-decoded",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -22,14 +22,7 @@ export default function ruleUnknownInputMustBeDecoded() {
           "Untrusted input provenance could not be resolved ({{cause}}). Decode the value before typed use.",
       },
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "unknown-input-must-be-decoded"
-        );
-      }
+    run({ program, cwd, reportNode }) {
       const observationPath = process.env[boundaryObservations.envVar];
       const observe = observationPath
         ? (observation) => {
@@ -37,46 +30,42 @@ export default function ruleUnknownInputMustBeDecoded() {
           }
         : undefined;
       const model = boundaryModel(
-        services.program,
-        observe ? { observe, rootDirectory: context.cwd } : undefined
+        program,
+        observe ? { observe, rootDirectory: cwd } : undefined
       );
       const reported = new Set();
       function reportRoots(node, roots) {
         if (reported.has(node) || !roots.length) return;
         reported.add(node);
         if (roots.some((root) => !root.incomplete)) {
-          context.report({ node, messageId: "decodeUnknown" });
+          reportNode(node, { messageId: "decodeUnknown" });
           return;
         }
-        context.report({
-          node,
+        reportNode(node, {
           messageId: "incompleteAnalysis",
           data: { cause: roots[0].incomplete },
         });
       }
-      const tsNode = (node) => services.esTreeNodeToTSNodeMap.get(node);
       function sink(node) {
-        reportRoots(node, model.uncheckedAt(tsNode(node)));
+        reportRoots(node, model.uncheckedAt(node));
       }
       function callArguments(node) {
-        for (const argument of node.arguments) {
-          reportRoots(argument, model.uncheckedArgument(tsNode(argument)));
+        for (const argument of node.arguments ?? []) {
+          reportRoots(argument, model.uncheckedArgument(argument));
         }
       }
       return {
-        TSAsExpression: sink,
-        TSTypeAssertion: sink,
-        VariableDeclarator: sink,
-        AssignmentExpression: sink,
-        ReturnStatement: sink,
-        CallExpression(node) {
-          reportRoots(node, model.uncheckedAt(tsNode(node)));
-          for (const argument of node.arguments) {
-            reportRoots(argument, model.uncheckedArgument(tsNode(argument)));
-          }
+        [ts.SyntaxKind.AsExpression]: sink,
+        [ts.SyntaxKind.TypeAssertionExpression]: sink,
+        [ts.SyntaxKind.VariableDeclaration]: sink,
+        [ts.SyntaxKind.BinaryExpression]: sink,
+        [ts.SyntaxKind.ReturnStatement]: sink,
+        [ts.SyntaxKind.CallExpression](node) {
+          reportRoots(node, model.uncheckedAt(node));
+          callArguments(node);
         },
-        NewExpression: callArguments,
+        [ts.SyntaxKind.NewExpression]: callArguments,
       };
     },
-  };
+  });
 }

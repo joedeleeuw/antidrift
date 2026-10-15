@@ -6,17 +6,6 @@ import { declaresGenerated, shapeComparison } from "./shape-identity.mjs";
 
 const serviceContractsByProgram = new WeakMap();
 
-export function missingTypeServicesVisitors(eslintContext, ruleName) {
-  return {
-    Program(programNode) {
-      eslintContext.report({
-        node: programNode,
-        message: `antidrift/${ruleName} requires TypeScript parser services. Use @joedeleeuw/antidrift createConfig(...) or configure @typescript-eslint/parser with projectService/project.`,
-      });
-    },
-  };
-}
-
 export function requireTypeServices(eslintContext) {
   const services =
     eslintContext.sourceCode?.parserServices ?? eslintContext.parserServices;
@@ -56,12 +45,20 @@ export function defineTypeScriptRule({
   meta,
   skipGenerated = true,
   skipNonRuleFile = false,
+  documentVisitors,
+  visitors,
   run,
 }) {
   const missingServicesMessage = `antidrift/${ruleName} requires TypeScript parser services. Use @joedeleeuw/antidrift createConfig(...) or configure @typescript-eslint/parser with projectService/project.`;
   return {
     meta,
     create(eslintContext) {
+      if (
+        typeof documentVisitors === "function" &&
+        eslintContext.sourceCode?.ast?.type === "Document"
+      ) {
+        return documentVisitors(eslintContext);
+      }
       if (skipNonRuleFile && !isRuleFile(eslintContext)) {
         return {};
       }
@@ -83,16 +80,27 @@ export function defineTypeScriptRule({
           },
         };
       }
+      const program = services.program;
+      const checker = program.getTypeChecker();
+      if (typeof visitors === "function") {
+        return visitors({
+          context: eslintContext,
+          checker,
+          program,
+          services,
+          options: eslintContext.options,
+          cwd: eslintContext.cwd,
+          filename: eslintContext.filename,
+        });
+      }
       return {
         Program(programNode) {
           const sourceFile =
             services.esTreeNodeToTSNodeMap.get(programNode) ??
-            services.program.getSourceFile(eslintContext.filename);
+            program.getSourceFile(eslintContext.filename);
           if (!sourceFile || (skipGenerated && declaresGenerated(sourceFile))) {
             return;
           }
-          const program = services.program;
-          const checker = program.getTypeChecker();
           function reportNode(targetNode, descriptor) {
             const esNode = services.tsNodeToESTreeNodeMap?.get(targetNode);
             if (esNode) {
@@ -113,6 +121,7 @@ export function defineTypeScriptRule({
             cwd: eslintContext.cwd,
             filename: eslintContext.filename,
             reportNode,
+            context: eslintContext,
           });
           if (!listeners) {
             return;

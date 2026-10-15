@@ -4,10 +4,7 @@ import {
   unwrapExpression,
 } from "../../semantic-adapters/local-ast-rules.mjs";
 import ts from "typescript";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const collectionMetadataMemberNames = new Set(["length", "size"]);
 function hasExplicitReturnType(fn) {
@@ -729,7 +726,9 @@ function checkContractAppeasementProjection(node, context, services, checker) {
   }
 }
 export function ruleNoContractAppeasementProjection() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-contract-appeasement-projection",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -738,18 +737,10 @@ export function ruleNoContractAppeasementProjection() {
       },
       schema: [],
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-contract-appeasement-projection"
-        );
-      }
-      const checker = services.program.getTypeChecker();
+    visitors({ context, checker, services }) {
       return callableVisitors((node) =>
         checkContractAppeasementProjection(node, context, services, checker)
       );
     },
-  };
+  });
 }

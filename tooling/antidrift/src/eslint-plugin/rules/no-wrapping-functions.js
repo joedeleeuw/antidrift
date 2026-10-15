@@ -1,12 +1,6 @@
-import {
-  isRuleFile,
-  scopeProperties,
-} from "../../oxlint-plugin/portable/scope.js";
+import { scopeProperties } from "../../oxlint-plugin/portable/scope.js";
 import { verifyHop } from "../../semantic-adapters/hop-inline-verification.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 function isCallee(node) {
   return (
@@ -134,7 +128,10 @@ function hopCandidate(services, node, identifier) {
   };
 }
 
-export default {
+export default defineTypeScriptRule({
+  ruleName: "no-wrapping-functions",
+  skipGenerated: false,
+  skipNonRuleFile: true,
   meta: {
     type: "suggestion",
     docs: {
@@ -156,14 +153,7 @@ export default {
         "Incomplete analysis for '{{name}}', a candidate hop to '{{callee}}': {{cause}}.",
     },
   },
-  create(context) {
-    if (!isRuleFile(context)) {
-      return {};
-    }
-    const services = requireTypeServices(context);
-    if (!services) {
-      return missingTypeServicesVisitors(context, "no-wrapping-functions");
-    }
+  visitors({ context, program, services }) {
     return namedFunctionVisitors((node, identifier) => {
       const candidate = hopCandidate(services, node, identifier);
       if (!candidate) {
@@ -171,7 +161,7 @@ export default {
       }
       let verdict;
       try {
-        verdict = verifyHop(services.program, candidate);
+        verdict = verifyHop(program, candidate);
       } catch (error) {
         verdict = { incomplete: `the analysis failed with ${error}` };
       }
@@ -194,4 +184,4 @@ export default {
       }
     });
   },
-};
+});

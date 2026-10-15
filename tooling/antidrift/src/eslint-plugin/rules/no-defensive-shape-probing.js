@@ -3,16 +3,15 @@ import {
   hasBroadObjectEntriesValue,
   objectEntriesCallbackProbe,
 } from "../../semantic-adapters/broad-input.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 function isTypePredicateReturn(fn) {
   return fn?.returnType?.typeAnnotation?.type === "TSTypePredicate";
 }
 export function ruleNoDefensiveShapeProbing() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-defensive-shape-probing",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -27,16 +26,8 @@ export function ruleNoDefensiveShapeProbing() {
         },
       ],
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-defensive-shape-probing"
-        );
-      }
-      const checker = services.program.getTypeChecker();
-      const threshold = context.options[0]?.threshold ?? 4;
+    visitors({ context, checker, services, options }) {
+      const threshold = options[0]?.threshold ?? 4;
       return {
         CallExpression(node) {
           const probe = objectEntriesCallbackProbe(node);
@@ -60,5 +51,5 @@ export function ruleNoDefensiveShapeProbing() {
         },
       };
     },
-  };
+  });
 }

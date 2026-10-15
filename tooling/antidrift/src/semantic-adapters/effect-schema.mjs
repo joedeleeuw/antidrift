@@ -46,11 +46,13 @@ export function effectDecodeCallParts(node, services, checker) {
   if (node?.type !== "CallExpression" || node.arguments.length === 0) {
     return null;
   }
-  const inner = node.callee;
-  if (inner?.type !== "CallExpression" || inner.arguments.length === 0) {
+  const isCurried = node.callee?.type === "CallExpression";
+  const schemaCall = isCurried ? node.callee : node;
+  const valueArg = isCurried ? node.arguments[0] : node.arguments[1];
+  if (!valueArg || schemaCall.arguments.length === 0) {
     return null;
   }
-  const decoder = inner.callee;
+  const decoder = schemaCall.callee;
   if (
     decoder?.type !== "MemberExpression" ||
     decoder.computed ||
@@ -59,19 +61,20 @@ export function effectDecodeCallParts(node, services, checker) {
   ) {
     return null;
   }
-  const tsInner = services.esTreeNodeToTSNodeMap.get(inner);
+  const tsSchemaCall = services.esTreeNodeToTSNodeMap.get(schemaCall);
   if (
-    !tsInner ||
-    !ts.isCallExpression(tsInner) ||
-    !ts.isPropertyAccessExpression(tsInner.expression) ||
-    !isEffectSchemaMethod(checker, tsInner.expression.name)
+    !tsSchemaCall ||
+    !ts.isCallExpression(tsSchemaCall) ||
+    !ts.isPropertyAccessExpression(tsSchemaCall.expression) ||
+    !isEffectSchemaMethod(checker, tsSchemaCall.expression.name)
   ) {
     return null;
   }
   return {
     method: decoder.property.name,
-    schemaArg: inner.arguments[0],
-    valueArg: node.arguments[0],
+    schemaArg: schemaCall.arguments[0],
+    tsSchemaArg: tsSchemaCall.arguments[0],
+    valueArg,
   };
 }
 

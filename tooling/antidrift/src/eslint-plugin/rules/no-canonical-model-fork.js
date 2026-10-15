@@ -6,10 +6,7 @@ import {
   typeProps,
   typePropsDetailed,
 } from "../../semantic-adapters/type-owner.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 import {
   emitStructuralMatchFact,
   findStructuralProof,
@@ -18,7 +15,9 @@ import {
 } from "../../semantic-adapters/structural-fork-proof.mjs";
 
 export function ruleNoCanonicalModelFork() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-canonical-model-fork",
+    skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
@@ -50,14 +49,8 @@ export function ruleNoCanonicalModelFork() {
         },
       ],
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(context, "no-canonical-model-fork");
-      }
-      const program = services.program;
-      const checker = program.getTypeChecker();
-      const canonicalEntities = context.options[0]?.canonicalEntities ?? {};
+    visitors({ context, checker, program, services, options }) {
+      const canonicalEntities = options[0]?.canonicalEntities ?? {};
       const candidates = collectDomainCanonicalTypes(
         program,
         checker,
@@ -154,5 +147,5 @@ export function ruleNoCanonicalModelFork() {
         TSUnionType: checkProjection,
       };
     },
-  };
+  });
 }

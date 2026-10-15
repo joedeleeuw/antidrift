@@ -13,10 +13,7 @@ import {
   unresolvedEntries,
 } from "../../semantic-adapters/declared-dependencies.mjs";
 import { packageDirectory } from "../../semantic-adapters/shape-identity.mjs";
-import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const scopesByProgram = new WeakMap();
 
@@ -157,7 +154,10 @@ function manifestVisitors(context) {
 }
 
 export function ruleNoUnresolvedDependencyTypes() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-unresolved-dependency-types",
+    skipGenerated: false,
+    documentVisitors: manifestVisitors,
     meta: {
       type: "problem",
       docs: {
@@ -176,63 +176,35 @@ export function ruleNoUnresolvedDependencyTypes() {
           "{{packageName}} is a workspace or linked package whose public entries {{entries}} do not resolve to type declarations, so their exported types are not compared with first-party types in this package.",
       },
     },
-    create(context) {
-      if (context.sourceCode.ast.type === "Document") {
-        return manifestVisitors(context);
+    run({ sourceFile, program, cwd, reportNode }) {
+      const packageRoot = packageDirectory(sourceFile.fileName);
+      if (!packageRoot) return;
+      const scope = dependencyScope(program, packageRoot);
+      const manifest = relative(cwd, join(packageRoot, "package.json"));
+      for (const specifier of moduleSpecifiers(sourceFile)) {
+        const imported = specifierPackage(specifier.text);
+        const missing = scope.missingByName.get(imported);
+        const installed = scope.installedByName.get(imported);
+        let report = null;
+        if (missing) {
+          report = {
+            messageId: "uninstalledImport",
+            data: { packageName: missing, manifest },
+          };
+        } else if (
+          installed &&
+          scriptSpecifier(specifier.text, imported) &&
+          !moduleResolves(specifier, sourceFile, program)
+        ) {
+          report = {
+            messageId: "unresolvedImport",
+            data: { packageName: installed, specifier: specifier.text },
+          };
+        }
+        if (report) {
+          reportNode(specifier, report);
+        }
       }
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-unresolved-dependency-types"
-        );
-      }
-      return {
-        Program() {
-          const { program } = services;
-          const source = program.getSourceFile(context.filename);
-          const packageRoot = source && packageDirectory(source.fileName);
-          if (!packageRoot) return;
-          const scope = dependencyScope(program, packageRoot);
-          const manifest = relative(
-            context.cwd,
-            join(packageRoot, "package.json")
-          );
-          for (const specifier of moduleSpecifiers(source)) {
-            const imported = specifierPackage(specifier.text);
-            const missing = scope.missingByName.get(imported);
-            const installed = scope.installedByName.get(imported);
-            let report = null;
-            if (missing) {
-              report = {
-                messageId: "uninstalledImport",
-                data: { packageName: missing, manifest },
-              };
-            } else if (
-              installed &&
-              scriptSpecifier(specifier.text, imported) &&
-              !moduleResolves(specifier, source, program)
-            ) {
-              report = {
-                messageId: "unresolvedImport",
-                data: { packageName: installed, specifier: specifier.text },
-              };
-            }
-            if (!report) continue;
-            const start = source.getLineAndCharacterOfPosition(
-              specifier.getStart(source)
-            );
-            const end = source.getLineAndCharacterOfPosition(specifier.end);
-            context.report({
-              loc: {
-                start: { line: start.line + 1, column: start.character },
-                end: { line: end.line + 1, column: end.character },
-              },
-              ...report,
-            });
-          }
-        },
-      };
     },
-  };
+  });
 }

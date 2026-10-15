@@ -78,7 +78,7 @@ const additionalAntidriftRules = {
   "antidrift/no-handrolled-resource-lifecycle-cells": "error",
   "antidrift/no-repo-state-mirror-assertion": "error",
   "antidrift/no-status-literal-in-type": "error",
-  "antidrift/require-authz-check": "off",
+  "antidrift/require-authz-check": "error",
 };
 
 function generatedImportPatterns(registries) {
@@ -175,6 +175,8 @@ export function createGovernanceOxlintConfig({
 } = {}) {
   const registries = loadRegistriesSync(resolve(repoRoot, policyDir));
   const statuses = registries.domain?.statuses ?? {};
+  const authzFunctions =
+    registries.boundaries?.requiredCalls?.authorization ?? [];
   const generatedIgnores = generatedIgnorePatterns(registries, repoRoot);
   const generatedPatterns = generatedImportPatterns(registries);
   const restrictedImportPatterns = [
@@ -188,6 +190,7 @@ export function createGovernanceOxlintConfig({
     "antidrift/no-unsafe-cast-chain": "error",
     ...additionalAntidriftRules,
     "antidrift/no-status-literal-in-type": ["error", { statuses }],
+    "antidrift/require-authz-check": ["error", { authzFunctions }],
   };
   if (restrictedImportPatterns.length > 0) {
     rules["no-restricted-imports"] = restrictedImportsRule(
