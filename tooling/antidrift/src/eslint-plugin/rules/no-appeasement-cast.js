@@ -6,7 +6,7 @@ import { isDeclaredGeneratedSource } from "../../semantic-adapters/generated-sou
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 export function ruleNoAppeasementCast() {
   return {

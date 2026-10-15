@@ -13,7 +13,7 @@ import {
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 function isObjectContract(checker, type) {
   return (

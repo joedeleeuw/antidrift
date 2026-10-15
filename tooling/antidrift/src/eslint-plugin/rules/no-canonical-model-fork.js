@@ -9,13 +9,13 @@ import {
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 import {
   emitStructuralMatchFact,
   findStructuralProof,
   isAllOptionalObjectShape,
   isStructuralDerivationAlias,
-} from "./structural-fork-proof.js";
+} from "../../semantic-adapters/structural-fork-proof.mjs";
 
 export function ruleNoCanonicalModelFork() {
   return {

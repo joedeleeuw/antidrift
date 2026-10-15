@@ -2,11 +2,11 @@ import {
   isRuleFile,
   scopeProperties,
 } from "../../oxlint-plugin/portable/scope.js";
-import { verifyHop } from "./hop-inline-verification.js";
+import { verifyHop } from "../../semantic-adapters/hop-inline-verification.mjs";
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 function isCallee(node) {
   return (

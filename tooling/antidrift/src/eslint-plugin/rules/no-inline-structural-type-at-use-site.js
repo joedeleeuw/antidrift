@@ -10,7 +10,7 @@ import { inlineStructuralTypeAtBoundary } from "../../semantic-adapters/local-as
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const declarationsByProgram = new WeakMap();
 const dependencySources = /(?:^|[/\\])node_modules(?:[/\\]|$)/u;

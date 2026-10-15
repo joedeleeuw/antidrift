@@ -9,7 +9,7 @@ import {
   classifyStructuralRelation,
   sortedStructuralCandidates,
   structuralDerivationUtilities,
-} from "../eslint-plugin/rules/structural-fork-proof.js";
+} from "../semantic-adapters/structural-fork-proof.mjs";
 import { loadRegistriesSync } from "./lib/registries.mjs";
 import {
   collectCanonicalTypes,

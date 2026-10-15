@@ -7,7 +7,7 @@ import ts from "typescript";
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const reactComponentFactoryWrappers = new Set(["forwardRef", "memo"]);
 const reactComponentTypeNames = new Set(["FC", "FunctionComponent"]);

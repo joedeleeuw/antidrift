@@ -8,7 +8,7 @@ import { noWidenThenAssertRule } from "../../oxlint-plugin/anti-slop/rules/no-wi
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const TS_TYPE_FLAG_ANY = 1;
 const TS_TYPE_FLAG_UNKNOWN = 2;

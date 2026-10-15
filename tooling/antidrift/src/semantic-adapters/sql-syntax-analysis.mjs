@@ -1,7 +1,7 @@
 import ts from "typescript";
 
-import { unwrapExpression } from "../../semantic-adapters/local-ast-rules.mjs";
-import { isSqlIdentifierTokenValue } from "../../semantic-adapters/sql.mjs";
+import { unwrapExpression } from "./local-ast-rules.mjs";
+import { isSqlIdentifierTokenValue } from "./sql.mjs";
 
 export const SQL_PREFIX_PATTERN =
   /\b(?:SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`]+\s+SET\b|DELETE\s+FROM\b|DROP\s+TABLE\b)/iu;

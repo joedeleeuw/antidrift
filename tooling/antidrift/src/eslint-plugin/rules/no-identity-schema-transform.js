@@ -6,7 +6,7 @@ import {
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 function staticPropertyKey(property) {
   if (property.computed) return null;

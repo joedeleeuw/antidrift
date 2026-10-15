@@ -7,7 +7,7 @@ import ts from "typescript";
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const collectionMetadataMemberNames = new Set(["length", "size"]);
 function hasExplicitReturnType(fn) {

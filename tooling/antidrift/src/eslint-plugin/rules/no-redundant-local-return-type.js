@@ -1,42 +1,47 @@
 import ts from "typescript";
 
-import { isBoundary } from "../../semantic-adapters/local-ast-rules.mjs";
+import { shapeComparison } from "../../semantic-adapters/shape-identity.mjs";
 import {
-  missingTypeServicesVisitors,
-  requireTypeServices,
-} from "./type-services.js";
+  defineTypeScriptRule,
+  isSymbolPubliclyExported,
+  symbolAtNode,
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const unsafeTypeFlags =
   ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never;
 
 function functionCandidate(node) {
-  if (node.type === "FunctionDeclaration") {
-    return node.body ? { fn: node, owner: node, name: node.id } : null;
+  if (ts.isFunctionDeclaration(node)) {
+    return node.body && node.name
+      ? { functionNode: node, ownerNode: node, nameNode: node.name }
+      : null;
   }
   if (
-    node.type !== "VariableDeclarator" ||
-    node.id?.type !== "Identifier" ||
-    node.id.typeAnnotation ||
-    node.parent?.kind !== "const"
+    !ts.isVariableDeclaration(node) ||
+    !ts.isIdentifier(node.name) ||
+    node.type ||
+    !ts.isVariableDeclarationList(node.parent) ||
+    !(node.parent.flags & ts.NodeFlags.Const) ||
+    !node.initializer ||
+    (!ts.isArrowFunction(node.initializer) &&
+      !ts.isFunctionExpression(node.initializer))
   ) {
     return null;
   }
-  if (
-    node.init?.type !== "ArrowFunctionExpression" &&
-    node.init?.type !== "FunctionExpression"
-  ) {
-    return null;
-  }
-  return { fn: node.init, owner: node, name: node.id };
+  return {
+    functionNode: node.initializer,
+    ownerNode: node,
+    nameNode: node.name,
+  };
 }
 
 function enclosingFunction(node) {
   let current = node.parent;
   while (current) {
     if (
-      current.type === "FunctionDeclaration" ||
-      current.type === "FunctionExpression" ||
-      current.type === "ArrowFunctionExpression"
+      ts.isFunctionDeclaration(current) ||
+      ts.isFunctionExpression(current) ||
+      ts.isArrowFunction(current)
     ) {
       return current;
     }
@@ -45,40 +50,99 @@ function enclosingFunction(node) {
   return null;
 }
 
-function singleReturnedObject(fn) {
-  if (fn.body?.type === "ObjectExpression") return fn.body;
-  if (fn.body?.type !== "BlockStatement") return null;
-  const finalStatement = fn.body.body.at(-1);
+function functionOwner(functionNode) {
   if (
-    finalStatement?.type !== "ReturnStatement" ||
-    finalStatement.argument?.type !== "ObjectExpression"
+    (ts.isFunctionExpression(functionNode) ||
+      ts.isArrowFunction(functionNode)) &&
+    ts.isVariableDeclaration(functionNode.parent)
+  ) {
+    return functionNode.parent;
+  }
+  if (functionNode.parent && ts.isPropertyAssignment(functionNode.parent)) {
+    return functionNode.parent;
+  }
+  return functionNode;
+}
+
+function isExportedStatement(statement) {
+  const modifiers = ts.canHaveModifiers(statement)
+    ? ts.getModifiers(statement)
+    : undefined;
+  return Boolean(
+    modifiers?.some(
+      (modifier) =>
+        modifier.kind === ts.SyntaxKind.ExportKeyword ||
+        modifier.kind === ts.SyntaxKind.DefaultKeyword
+    )
+  );
+}
+
+function isExportedOwner(ownerNode) {
+  if (ts.isVariableDeclaration(ownerNode)) {
+    const statement = ownerNode.parent?.parent;
+    return Boolean(
+      statement &&
+      ts.isVariableStatement(statement) &&
+      isExportedStatement(statement)
+    );
+  }
+  return isExportedStatement(ownerNode);
+}
+
+function singleReturnedObject(functionNode) {
+  const body = functionNode.body;
+  if (!body) {
+    return null;
+  }
+  if (
+    ts.isParenthesizedExpression(body) &&
+    ts.isObjectLiteralExpression(body.expression)
+  ) {
+    return body.expression;
+  }
+  if (!ts.isBlock(body)) {
+    return null;
+  }
+  const finalStatement = body.statements.at(-1);
+  if (
+    !finalStatement ||
+    !ts.isReturnStatement(finalStatement) ||
+    !finalStatement.expression ||
+    !ts.isObjectLiteralExpression(finalStatement.expression)
   ) {
     return null;
   }
-  let returns = 0;
-  function visit(node) {
+  let returnCount = 0;
+  function visit(currentNode) {
     if (
-      node !== fn.body &&
-      (node.type === "FunctionDeclaration" ||
-        node.type === "FunctionExpression" ||
-        node.type === "ArrowFunctionExpression")
+      currentNode !== body &&
+      (ts.isFunctionDeclaration(currentNode) ||
+        ts.isFunctionExpression(currentNode) ||
+        ts.isArrowFunction(currentNode))
     ) {
       return;
     }
-    if (node.type === "ReturnStatement") returns += 1;
-    for (const [key, value] of Object.entries(node)) {
-      if (key === "parent" || key === "range" || key === "loc") continue;
-      if (Array.isArray(value)) {
-        for (const child of value) {
-          if (child && typeof child.type === "string") visit(child);
-        }
-      } else if (value && typeof value.type === "string") {
-        visit(value);
-      }
+    if (ts.isReturnStatement(currentNode)) {
+      returnCount += 1;
     }
+    ts.forEachChild(currentNode, visit);
   }
-  visit(fn.body);
-  return returns === 1 ? finalStatement.argument : null;
+  visit(body);
+  return returnCount === 1 ? finalStatement.expression : null;
+}
+
+function shorthandProperties(objectLiteral) {
+  const properties = new Map();
+  for (const property of objectLiteral.properties) {
+    if (
+      !ts.isShorthandPropertyAssignment(property) ||
+      properties.has(property.name.text)
+    ) {
+      return null;
+    }
+    properties.set(property.name.text, property.name);
+  }
+  return properties.size > 0 ? properties : null;
 }
 
 function directMutableTypeLiteral(checker, typeNode) {
@@ -111,230 +175,45 @@ function directMutableTypeLiteral(checker, typeNode) {
     ) {
       return null;
     }
-    const name =
+    const memberName =
       ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)
         ? member.name.text
         : null;
-    if (!name || properties.has(name)) return null;
-    properties.set(name, member);
-  }
-  return properties.size > 0 ? properties : null;
-}
-
-function shorthandProperties(objectExpression) {
-  const properties = new Map();
-  for (const property of objectExpression.properties) {
-    if (
-      property.type !== "Property" ||
-      !property.shorthand ||
-      property.computed ||
-      property.kind !== "init" ||
-      property.key?.type !== "Identifier" ||
-      property.value?.type !== "Identifier" ||
-      properties.has(property.key.name)
-    ) {
+    if (!memberName || properties.has(memberName)) {
       return null;
     }
-    properties.set(property.key.name, property.value);
+    properties.set(memberName, member);
   }
   return properties.size > 0 ? properties : null;
 }
 
-function symbolForNode(checker, services, node) {
-  const tsNode = services.esTreeNodeToTSNodeMap.get(node);
-  return tsNode ? checker.getSymbolAtLocation(tsNode) : null;
-}
-
-function referencesSymbol(checker, root, symbol) {
+function referencesSymbol(checker, rootNode, targetSymbol) {
   let found = false;
-  function visit(node) {
-    if (found) return;
-    if (ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === symbol) {
+  function visit(currentNode) {
+    if (found) {
+      return;
+    }
+    if (
+      ts.isIdentifier(currentNode) &&
+      symbolAtNode(checker, currentNode) === targetSymbol
+    ) {
       found = true;
       return;
     }
-    ts.forEachChild(node, visit);
+    ts.forEachChild(currentNode, visit);
   }
-  visit(root);
+  visit(rootNode);
   return found;
 }
 
-function hasOverload(symbol) {
-  return (symbol?.declarations?.length ?? 0) > 1;
-}
-
-function functionOwner(fn) {
-  if (
-    (fn?.type === "FunctionExpression" ||
-      fn?.type === "ArrowFunctionExpression") &&
-    fn.parent?.type === "VariableDeclarator"
-  ) {
-    return fn.parent;
-  }
-  if (fn?.parent?.type === "Property") return fn.parent;
-  return fn;
-}
-
-function canonicalSymbol(checker, symbol) {
-  if (!symbol || !(symbol.flags & ts.SymbolFlags.Alias)) return symbol;
-  return checker.getAliasedSymbol(symbol);
-}
-
-function symbolAtIdentifier(checker, node) {
-  if (
-    ts.isShorthandPropertyAssignment(node.parent) &&
-    node.parent.name === node
-  ) {
-    return canonicalSymbol(
-      checker,
-      checker.getShorthandAssignmentValueSymbol(node.parent)
-    );
-  }
-  return canonicalSymbol(checker, checker.getSymbolAtLocation(node));
-}
-
-function declarationDependsOnSymbol(
-  checker,
-  declaration,
-  target,
-  sourceFile,
-  seen
-) {
+function referencesLocalFunction(checker, rootNode, ownSymbol) {
   let found = false;
-  function visit(node) {
-    if (found) return;
-    if (ts.isIdentifier(node)) {
-      const symbol = symbolAtIdentifier(checker, node);
-      if (symbol === target) {
-        if (
-          !ts.isCallExpression(node.parent) ||
-          node.parent.expression !== node
-        ) {
-          found = true;
-        }
-        return;
-      }
-      if (symbol && !seen.has(symbol)) {
-        const localDeclarations = (symbol.declarations ?? []).filter(
-          (candidate) => candidate.getSourceFile() === sourceFile
-        );
-        if (localDeclarations.length > 0) {
-          seen.add(symbol);
-          found = localDeclarations.some((candidate) =>
-            declarationDependsOnSymbol(
-              checker,
-              candidate,
-              target,
-              sourceFile,
-              seen
-            )
-          );
-          if (found) return;
-        }
-      }
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(declaration);
-  return found;
-}
-
-function isPubliclyExposed(checker, declaration, symbol) {
-  const sourceFile = declaration?.getSourceFile();
-  const moduleSymbol = sourceFile
-    ? checker.getSymbolAtLocation(sourceFile)
-    : null;
-  if (!sourceFile || !symbol) return true;
-  if (!moduleSymbol) return false;
-  const target = canonicalSymbol(checker, symbol);
-  for (const statement of sourceFile.statements) {
-    const modifiers = ts.canHaveModifiers(statement)
-      ? ts.getModifiers(statement)
-      : undefined;
-    const exported =
-      ts.isExportAssignment(statement) ||
-      ts.isExportDeclaration(statement) ||
-      modifiers?.some(
-        (modifier) =>
-          modifier.kind === ts.SyntaxKind.ExportKeyword ||
-          modifier.kind === ts.SyntaxKind.DefaultKeyword
-      );
-    if (
-      exported &&
-      declarationDependsOnSymbol(
-        checker,
-        statement,
-        target,
-        sourceFile,
-        new Set()
-      )
-    ) {
-      return true;
-    }
-  }
-  for (const exported of checker.getExportsOfModule(moduleSymbol)) {
-    const exportedTarget = canonicalSymbol(checker, exported);
-    if (exportedTarget === target) return true;
-    const declarations = new Set([
-      ...(exported.declarations ?? []),
-      ...(exportedTarget?.declarations ?? []),
-    ]);
-    const seen = new Set([exported, exportedTarget].filter(Boolean));
-    if (
-      [...declarations].some((candidate) =>
-        declarationDependsOnSymbol(checker, candidate, target, sourceFile, seen)
-      )
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function escapesThroughBoundary(checker, services, candidate) {
-  const outer = enclosingFunction(candidate.owner);
-  const outerOwner = functionOwner(outer);
-  const tsOuterOwner = services.esTreeNodeToTSNodeMap.get(outerOwner);
-  const outerSymbol = symbolForNode(
-    checker,
-    services,
-    outerOwner.id ?? outerOwner.key
-  );
-  if (
-    !outer ||
-    !outerOwner ||
-    (!isBoundary(outerOwner) &&
-      !isPubliclyExposed(checker, tsOuterOwner, outerSymbol))
-  ) {
-    return false;
-  }
-  const tsOuter = services.esTreeNodeToTSNodeMap.get(outer);
-  const symbol = symbolForNode(checker, services, candidate.name);
-  if (!tsOuter?.body || !symbol) return true;
-  let escaped = false;
-  function visit(node) {
-    if (escaped) return;
-    if (node !== tsOuter.body && ts.isFunctionLike(node)) return;
-    if (
-      ts.isReturnStatement(node) &&
-      node.expression &&
-      referencesSymbol(checker, node.expression, symbol)
-    ) {
-      escaped = true;
+  function visit(currentNode) {
+    if (found) {
       return;
     }
-    ts.forEachChild(node, visit);
-  }
-  visit(tsOuter.body);
-  return escaped;
-}
-
-function referencesLocalFunction(checker, root, ownSymbol) {
-  let found = false;
-  function visit(node) {
-    if (found) return;
-    if (ts.isIdentifier(node)) {
-      const symbol = checker.getSymbolAtLocation(node);
+    if (ts.isIdentifier(currentNode)) {
+      const symbol = checker.getSymbolAtLocation(currentNode);
       if (symbol && symbol !== ownSymbol) {
         for (const declaration of symbol.declarations ?? []) {
           if (
@@ -350,49 +229,91 @@ function referencesLocalFunction(checker, root, ownSymbol) {
         }
       }
     }
-    ts.forEachChild(node, visit);
+    ts.forEachChild(currentNode, visit);
   }
-  visit(root);
+  visit(rootNode);
   return found;
 }
 
-function hasTypedOwnerProof(
-  checker,
-  services,
-  candidate,
-  symbol,
-  declaredType
-) {
-  const outer = enclosingFunction(candidate.owner);
-  const tsOuter = services.esTreeNodeToTSNodeMap.get(outer);
-  const tsOwner = services.esTreeNodeToTSNodeMap.get(candidate.owner);
-  if (!outer?.returnType || !tsOuter?.body || !tsOwner) return false;
+function escapesThroughBoundary(checker, candidate, candidateSymbol) {
+  const outer = enclosingFunction(candidate.ownerNode);
+  if (!outer) {
+    return false;
+  }
+  const outerOwner = functionOwner(outer);
+  const outerNameNode = outerOwner.name ?? null;
+  const outerSymbol = outerNameNode
+    ? checker.getSymbolAtLocation(outerNameNode)
+    : null;
+  if (
+    !isExportedOwner(outerOwner) &&
+    !isSymbolPubliclyExported(checker, outerOwner, outerSymbol)
+  ) {
+    return false;
+  }
+  if (!outer.body || !candidateSymbol) {
+    return true;
+  }
+  let escaped = false;
+  function visit(currentNode) {
+    if (escaped) {
+      return;
+    }
+    if (currentNode !== outer.body && ts.isFunctionLike(currentNode)) {
+      return;
+    }
+    if (
+      ts.isReturnStatement(currentNode) &&
+      currentNode.expression &&
+      referencesSymbol(checker, currentNode.expression, candidateSymbol)
+    ) {
+      escaped = true;
+      return;
+    }
+    ts.forEachChild(currentNode, visit);
+  }
+  visit(outer.body);
+  return escaped;
+}
+
+function hasTypedOwnerProof(checker, candidate, candidateSymbol, declaredType) {
+  const outer = enclosingFunction(candidate.ownerNode);
+  if (!outer?.type || !outer.body) {
+    return false;
+  }
   let calls = 0;
   let valid = true;
-  function visit(node) {
-    if (!valid || node === tsOwner) return;
-    if (ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === symbol) {
+  function visit(currentNode) {
+    if (!valid || currentNode === candidate.ownerNode) {
+      return;
+    }
+    if (
+      ts.isIdentifier(currentNode) &&
+      checker.getSymbolAtLocation(currentNode) === candidateSymbol
+    ) {
       if (
-        !ts.isCallExpression(node.parent) ||
-        node.parent.expression !== node
+        !ts.isCallExpression(currentNode.parent) ||
+        currentNode.parent.expression !== currentNode
       ) {
         valid = false;
         return;
       }
-      const call = node.parent;
-      let current = call.parent;
-      while (current && current !== tsOuter.body) {
-        if (ts.isFunctionLike(current)) {
+      const call = currentNode.parent;
+      let ancestor = call.parent;
+      while (ancestor && ancestor !== outer.body) {
+        if (ts.isFunctionLike(ancestor)) {
           valid = false;
           return;
         }
-        if (ts.isReturnStatement(current)) break;
-        current = current.parent;
+        if (ts.isReturnStatement(ancestor)) {
+          break;
+        }
+        ancestor = ancestor.parent;
       }
       if (
-        !current ||
-        current === tsOuter.body ||
-        !ts.isReturnStatement(current) ||
+        !ancestor ||
+        ancestor === outer.body ||
+        !ts.isReturnStatement(ancestor) ||
         checker.getContextualType(call) !== declaredType
       ) {
         valid = false;
@@ -401,18 +322,18 @@ function hasTypedOwnerProof(
       calls += 1;
       return;
     }
-    ts.forEachChild(node, visit);
+    ts.forEachChild(currentNode, visit);
   }
-  visit(tsOuter.body);
+  visit(outer.body);
   return valid && calls > 0;
 }
 
 function exactPropertyTypes({
   checker,
+  sameShape,
   declaredType,
   objectProperties,
   typeProperties,
-  services,
 }) {
   if (
     objectProperties.size !== typeProperties.size ||
@@ -422,20 +343,25 @@ function exactPropertyTypes({
   ) {
     return false;
   }
-  for (const [name, expression] of objectProperties) {
-    const typeProperty = typeProperties.get(name);
-    const declaredProperty = checker.getPropertyOfType(declaredType, name);
-    const tsExpression = services.esTreeNodeToTSNodeMap.get(expression);
-    if (!typeProperty || !declaredProperty || !tsExpression) return false;
-    const expressionType = checker.getTypeAtLocation(tsExpression);
+  for (const [propertyName, identifierNode] of objectProperties) {
+    const typeProperty = typeProperties.get(propertyName);
+    const declaredProperty = checker.getPropertyOfType(
+      declaredType,
+      propertyName
+    );
+    if (!typeProperty || !declaredProperty) {
+      return false;
+    }
+    const expressionType = checker.getTypeAtLocation(identifierNode);
     const propertyType = checker.getTypeOfSymbolAtLocation(
       declaredProperty,
       typeProperty
     );
     if (
-      expressionType !== propertyType ||
       expressionType.flags & unsafeTypeFlags ||
-      expressionType.getCallSignatures().length > 0
+      expressionType.getCallSignatures().length > 0 ||
+      (expressionType !== propertyType &&
+        sameShape(expressionType, propertyType) !== true)
     ) {
       return false;
     }
@@ -444,7 +370,9 @@ function exactPropertyTypes({
 }
 
 export function ruleNoRedundantLocalReturnType() {
-  return {
+  return defineTypeScriptRule({
+    ruleName: "no-redundant-local-return-type",
+    skipGenerated: false,
     meta: {
       type: "suggestion",
       docs: {
@@ -457,80 +385,74 @@ export function ruleNoRedundantLocalReturnType() {
           "This nested implementation's explicit return type repeats its inferred shorthand-object shape, and every call is constrained by the enclosing function's return contract. Remove the local annotation and keep the named type at that owner.",
       },
     },
-    create(context) {
-      const services = requireTypeServices(context);
-      if (!services) {
-        return missingTypeServicesVisitors(
-          context,
-          "no-redundant-local-return-type"
-        );
-      }
-      const checker = services.program.getTypeChecker();
-
-      function check(node) {
-        const candidate = functionCandidate(node);
+    run({ checker, program, reportNode }) {
+      const sameShape = shapeComparison(program);
+      function checkDeclaration(declarationNode) {
+        const candidate = functionCandidate(declarationNode);
         if (
           !candidate ||
-          !candidate.fn.returnType ||
-          candidate.fn.async ||
-          candidate.fn.generator ||
-          !enclosingFunction(candidate.owner) ||
-          isBoundary(candidate.owner) ||
-          escapesThroughBoundary(checker, services, candidate)
+          !candidate.functionNode.type ||
+          Boolean(
+            ts.getCombinedModifierFlags(candidate.functionNode) &
+            ts.ModifierFlags.Async
+          ) ||
+          Boolean(candidate.functionNode.asteriskToken) ||
+          !enclosingFunction(candidate.ownerNode) ||
+          isExportedOwner(candidate.ownerNode)
         ) {
           return;
         }
-        const returnedObject = singleReturnedObject(candidate.fn);
+        const symbol = checker.getSymbolAtLocation(candidate.nameNode);
+        if (
+          !symbol ||
+          (symbol.declarations?.length ?? 0) > 1 ||
+          escapesThroughBoundary(checker, candidate, symbol)
+        ) {
+          return;
+        }
+        const returnedObject = singleReturnedObject(candidate.functionNode);
         const objectProperties = returnedObject
           ? shorthandProperties(returnedObject)
           : null;
-        if (!objectProperties) return;
-        const tsReturnType = services.esTreeNodeToTSNodeMap.get(
-          candidate.fn.returnType.typeAnnotation
-        );
-        const tsBody = services.esTreeNodeToTSNodeMap.get(candidate.fn.body);
-        const symbol = symbolForNode(checker, services, candidate.name);
+        if (!objectProperties) {
+          return;
+        }
+        const returnTypeNode = candidate.functionNode.type;
+        const bodyNode = candidate.functionNode.body;
         if (
-          !tsReturnType ||
-          !tsBody ||
-          !symbol ||
-          hasOverload(symbol) ||
-          referencesSymbol(checker, tsBody, symbol) ||
-          referencesLocalFunction(checker, tsBody, symbol)
+          referencesSymbol(checker, bodyNode, symbol) ||
+          referencesLocalFunction(checker, bodyNode, symbol)
         ) {
           return;
         }
-        const typeProperties = directMutableTypeLiteral(checker, tsReturnType);
-        if (!typeProperties) return;
-        const declaredType = checker.getTypeFromTypeNode(tsReturnType);
+        const typeProperties = directMutableTypeLiteral(
+          checker,
+          returnTypeNode
+        );
+        if (!typeProperties) {
+          return;
+        }
+        const declaredType = checker.getTypeFromTypeNode(returnTypeNode);
         if (
-          !hasTypedOwnerProof(
-            checker,
-            services,
-            candidate,
-            symbol,
-            declaredType
-          ) ||
+          !hasTypedOwnerProof(checker, candidate, symbol, declaredType) ||
           !exactPropertyTypes({
             checker,
+            sameShape,
             declaredType,
             objectProperties,
             typeProperties,
-            services,
           })
         ) {
           return;
         }
-        context.report({
-          node: candidate.fn.returnType,
+        reportNode(returnTypeNode, {
           messageId: "redundantLocalReturnType",
         });
       }
-
       return {
-        FunctionDeclaration: check,
-        VariableDeclarator: check,
+        [ts.SyntaxKind.FunctionDeclaration]: checkDeclaration,
+        [ts.SyntaxKind.VariableDeclaration]: checkDeclaration,
       };
     },
-  };
+  });
 }

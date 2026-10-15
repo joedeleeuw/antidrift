@@ -17,13 +17,13 @@ import {
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 import {
   emitStructuralMatchFact,
   findStructuralProof,
   isAllOptionalObjectShape,
   isStructuralDerivationAlias,
-} from "./structural-fork-proof.js";
+} from "../../semantic-adapters/structural-fork-proof.mjs";
 
 // Canonical candidate list is cached per TypeScript Program (stable per ESLint process),
 // so the node_modules enumeration runs once rather than per linted file.

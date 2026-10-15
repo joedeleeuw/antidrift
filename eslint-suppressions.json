@@ -155,10 +155,10 @@
   },
   "tooling/antidrift/src/eslint-plugin/rules/no-redundant-local-return-type.js": {
     "antidrift/no-pass-through-parameters": {
-      "count": 3
+      "count": 2
     },
     "antidrift/no-vague-names": {
-      "count": 5
+      "count": 2
     }
   },
   "tooling/antidrift/src/eslint-plugin/rules/no-sql-string-concat.js": {
@@ -184,7 +184,7 @@
       "count": 10
     }
   },
-  "tooling/antidrift/src/eslint-plugin/rules/sql-syntax-analysis.js": {
+  "tooling/antidrift/src/semantic-adapters/sql-syntax-analysis.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
     },
@@ -192,7 +192,7 @@
       "count": 17
     }
   },
-  "tooling/antidrift/src/eslint-plugin/rules/structural-fork-proof.js": {
+  "tooling/antidrift/src/semantic-adapters/structural-fork-proof.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 5
     },

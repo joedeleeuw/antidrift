@@ -242,8 +242,22 @@ try {
       `default packed Oxlint config should report max-lines for ordinary code even when generated-looking names are undeclared, got: ${JSON.stringify(moduleSizeDiagnostics)}`
     );
   }
+  const asyncRepositoryDiagnostics = repositoryDiagnostics.filter(
+    ({ code }) => code === "antidrift(no-async-array-method)"
+  );
+  if (
+    JSON.stringify(
+      asyncRepositoryDiagnostics.map(({ filename }) => filename)
+    ) !== JSON.stringify(["packages/app/src/async-foreach-drift.ts"])
+  ) {
+    fail(
+      `default packed Oxlint config should report no-async-array-method on async-foreach-drift.ts, got: ${JSON.stringify(asyncRepositoryDiagnostics)}`
+    );
+  }
   const sharedRuleDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) => code !== "eslint(max-lines)"
+    ({ code }) =>
+      code !== "eslint(max-lines)" &&
+      code !== "antidrift(no-async-array-method)"
   );
   if (sharedRuleDiagnostics.length > 0) {
     fail(

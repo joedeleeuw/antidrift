@@ -1,5 +1,5 @@
-import { equivalentType } from "../../semantic-adapters/contract-types.mjs";
-import { emitSemanticFact } from "../../policy/lib/semantic-facts.mjs";
+import { equivalentType } from "./contract-types.mjs";
+import { emitSemanticFact } from "../policy/lib/semantic-facts.mjs";
 
 export const structuralDerivationUtilities = new Set([
   "Omit",

@@ -70,7 +70,11 @@ describe("semantic facts", () => {
       semanticFactKindContractsForRule(
         "antidrift/no-handrolled-resource-lifecycle-cells"
       ).map((entry) => entry.factKind)
-    ).toEqual(["broadSetterCoMutation", "resourceLifecycleProof"]);
+    ).toEqual([
+      "broadSetterCoMutation",
+      "resourceLifecycleProof",
+      "sourceMemberStateShardCandidate",
+    ]);
     expect(
       semanticFactKindContractsForRule(
         "antidrift/no-identity-schema-transform"

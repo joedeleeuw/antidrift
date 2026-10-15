@@ -3,7 +3,7 @@ import { parsedJsonTarget } from "../../semantic-adapters/parsed-json.mjs";
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 export function ruleNoUnsafeDeserialize() {
   return {

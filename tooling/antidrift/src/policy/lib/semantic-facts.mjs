@@ -58,7 +58,7 @@ export const SEMANTIC_FACT_KINDS = Object.freeze({
     ]),
   }),
   sourceMemberStateShardCandidate: Object.freeze({
-    rules: Object.freeze(["antidrift/no-shattered-ingested-entity-state"]),
+    rules: Object.freeze(["antidrift/no-handrolled-resource-lifecycle-cells"]),
     adapterId: "react-state",
     carrier: "semantic-adapter",
     confidence: Object.freeze(["heuristic-inventory"]),

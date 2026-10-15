@@ -2,7 +2,6 @@ import {
   ruleNoAsyncArrayMethod,
   ruleNoHandrolledResourceLifecycleCells,
   ruleNoRawFetchInComponent,
-  ruleNoShatteredIngestedEntityState,
   ruleNoStatusLiteralInType,
   ruleRequireAuthzCheck,
 } from "./semantic-adapters/local-ast-rules.mjs";
@@ -39,7 +38,6 @@ export function createSyntaxRules() {
     "no-schema-library-in-test": ruleNoSchemaLibraryInTest(),
     "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
     "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
-    "no-shattered-ingested-entity-state": ruleNoShatteredIngestedEntityState(),
     "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
     "no-static-property-loop": ruleNoStaticPropertyLoop(),
     "no-status-literal-in-type": ruleNoStatusLiteralInType(),

@@ -31,7 +31,7 @@ function writeConfig() {
       "  plugins: { antidrift: plugin },",
       "  rules: {",
       "    'antidrift/no-async-array-method': 'error',",
-      "    'antidrift/no-shattered-ingested-entity-state': 'error',",
+      "    'antidrift/no-handrolled-resource-lifecycle-cells': 'error',",
       "  },",
       "}];",
       "",
@@ -132,7 +132,7 @@ describe("diffScopedAdapters", () => {
       expect.objectContaining({
         path: "app.js",
         factKind: "sourceMemberStateShardCandidate",
-        ruleId: "antidrift/no-shattered-ingested-entity-state",
+        ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
         payload: expect.objectContaining({
           source: "profile",
           members: expect.arrayContaining([

@@ -737,7 +737,7 @@ export const defaultCases = [
     id: "crow-reporting-action-items-resource-lifecycle",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "drift",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "frontend",
     paths: [
       "src/frontend/crow-v2/app/(drawer)/reporting/action-items/index.tsx",
@@ -753,7 +753,7 @@ export const defaultCases = [
     id: "crow-reporting-weekly-digest-resource-lifecycle",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "drift",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "frontend",
     paths: [
       "src/frontend/crow-v2/app/(drawer)/reporting/weekly-digest/index.tsx",
@@ -775,7 +775,7 @@ export const defaultCases = [
   },
   {
     id: "monolith-edit-po-modal-controlled-input-clean",
-    ruleId: "antidrift/no-shattered-ingested-entity-state",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",

@@ -16,7 +16,7 @@ import {
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const inventoryByProgram = new WeakMap();
 const ownerSymbols = ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias;

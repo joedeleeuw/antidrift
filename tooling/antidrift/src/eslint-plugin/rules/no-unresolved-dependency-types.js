@@ -16,7 +16,7 @@ import { packageDirectory } from "../../semantic-adapters/shape-identity.mjs";
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const scopesByProgram = new WeakMap();
 

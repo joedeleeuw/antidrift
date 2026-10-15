@@ -977,7 +977,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       '  throw new Error("Missing semantic fact association metadata");\n' +
       "}\n" +
       "\n" +
-      'if (SEMANTIC_FACT_KIND_CONTRACT_LIST.find((entry) => entry.factKind === "resourceLifecycleProof")?.adapterId !== "react-state" || semanticFactKindContractsForAdapterId("react-state").filter((entry) => entry.rules.includes("antidrift/no-handrolled-resource-lifecycle-cells")).length !== 2 || semanticFactKindContractsForRule("antidrift/no-handrolled-resource-lifecycle-cells").length !== 2 || semanticFactKindContractsForAdapterId("not-real").length !== 0) {\n' +
+      'if (SEMANTIC_FACT_KIND_CONTRACT_LIST.find((entry) => entry.factKind === "resourceLifecycleProof")?.adapterId !== "react-state" || semanticFactKindContractsForAdapterId("react-state").filter((entry) => entry.rules.includes("antidrift/no-handrolled-resource-lifecycle-cells")).length !== 3 || semanticFactKindContractsForRule("antidrift/no-handrolled-resource-lifecycle-cells").length !== 3 || semanticFactKindContractsForAdapterId("not-real").length !== 0) {\n' +
       '  throw new Error("Missing semantic fact contract lookup behavior");\n' +
       "}\n" +
       "\n" +

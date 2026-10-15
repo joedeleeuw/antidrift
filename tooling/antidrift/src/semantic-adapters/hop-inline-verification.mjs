@@ -2,7 +2,7 @@ import { posix } from "node:path";
 
 import ts from "typescript";
 
-import { publicSurface } from "./package-entry-points.js";
+import { publicSurface } from "./package-entry-points.mjs";
 import {
   bindingAtSite,
   bodyBindings,
@@ -17,7 +17,7 @@ import {
   stepsCommute,
   strongerStep,
   unwrapped,
-} from "./typescript-engine.js";
+} from "./typescript-engine.mjs";
 
 const BARE_ARGUMENT_KINDS = new Set([
   ts.SyntaxKind.Identifier,

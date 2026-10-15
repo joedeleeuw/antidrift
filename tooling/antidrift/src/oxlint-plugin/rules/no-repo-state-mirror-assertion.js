@@ -135,7 +135,6 @@ export default function ruleNoRepoStateMirrorAssertion() {
               },
             },
           },
-          required: ["sources"],
           additionalProperties: false,
         },
       ],

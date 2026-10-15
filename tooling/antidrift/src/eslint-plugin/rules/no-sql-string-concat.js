@@ -18,7 +18,7 @@ import {
   findVariable,
   getDeclaredVariable,
 } from "../../semantic-adapters/async-control-flow.mjs";
-import { requireTypeServices } from "./type-services.js";
+import { requireTypeServices } from "../../semantic-adapters/ts-rule-kernel.mjs";
 import {
   SQL_PREFIX_PATTERN,
   containsSqlStatement,
@@ -51,7 +51,7 @@ import {
   declarationSourceMatches,
   importedSpecifierName,
   importSourceValue,
-} from "./sql-syntax-analysis.js";
+} from "../../semantic-adapters/sql-syntax-analysis.mjs";
 
 export function ruleNoSqlStringConcat() {
   return {

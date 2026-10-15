@@ -1,5 +1,17 @@
 # changelog
 
+## 0.17.0
+
+- Unify the 5 semantic rule primitives (`shape-identity`, symbol/module/package provenance, boundary dataflow, program call-graph/evaluation stepper, and domain provenance) in `src/semantic-adapters/`:
+  - Move `typescript-engine.mjs`, `package-entry-points.mjs`, and `hop-inline-verification.mjs` from `src/eslint-plugin/` into `src/semantic-adapters/` with no re-export shims.
+  - Add `src/semantic-adapters/ts-rule-kernel.mjs` providing the `tsgolint`-shaped `defineTypeScriptRule` runner (`({ sourceFile, checker, program, services, options, cwd, filename, reportNode }) => listeners`) plus shared TypeScript symbol/module/service provenance helpers (`resolveAliasedSymbol`, `symbolAtNode`, `isSymbolPubliclyExported`, `resolveImportedModuleSourceFile`, `isLayerConstructionCall`, `serviceContractProvenance`).
+- Add `antidrift/no-service-constructor-imports` at `"error"` in the TypeScript ESLint preset, built from scratch on `ts-rule-kernel.mjs` and `shape-identity.mjs` to replace the retired syntax-only `anti-slop` import. Reports only when TypeChecker module provenance proves a project-local module owns an Effect service contract (`Context.Tag`, `Context.GenericTag`, `Effect.Service`, or `Layer.*` wiring) and a non-owner imports its raw service constructor or factory outside `Layer.*` composition. Plain `make*`/`create*` helper modules with no service contract stay clean.
+- Refactor `antidrift/no-redundant-local-return-type` onto `ts-rule-kernel.mjs` and `shapeComparison(program)` from `shape-identity.mjs` (replacing ~250 lines of bespoke AST/property-matching logic) and enable it at `"error"` in the TypeScript ESLint preset.
+- Resolve the remaining `defaultOff: true` rules:
+  - Fold `antidrift/no-shattered-ingested-entity-state`'s `sourceMemberStateShardCandidate` inventory fact emission into `antidrift/no-handrolled-resource-lifecycle-cells` (one per-component React state cell and transition pass in `semantic-adapters/local-ast-rules.mjs`), retire `antidrift/no-shattered-ingested-entity-state` in `policy/registries/rules.yaml`, and enable `antidrift/no-handrolled-resource-lifecycle-cells` at `"error"` in `createGovernanceOxlintConfig`.
+  - Enable `antidrift/no-async-array-method`, `antidrift/no-status-literal-in-type`, and `antidrift/no-repo-state-mirror-assertion` (defaulting `sources` to `[]` as a safe no-op until configured) at `"error"` in `createGovernanceOxlintConfig` (`defaultOff: false`).
+  - Leave only the two taint/dominance rules (`antidrift/require-authz-check` and `antidrift/no-sql-string-concat`, `target: dataflow-taint` in `policy/registries/solve-buckets.yaml`) as `defaultOff: true`.
+
 ## 0.16.0
 
 - Consolidate overlapping rules, extend schema rules across libraries of the same class, and retire the 12 default-off `false-positive-prone` vendored `anti-slop` rules (`no-export-all`, `no-hover-shadow`, `no-inline-svg`, `no-inline-type-annotations`, `no-mock-only-tests`, `no-module-mocking`, `no-object-parameters`, `no-raw-tailwind-colors`, `no-reflect-Get-or-Set`, `no-unannotated-empty-collections`, `no-unknown-returns`, `no-unsafe-dictionary-type`). All 15 removed rule IDs are recorded in `retiredRules` in `policy/registries/rules.yaml`:

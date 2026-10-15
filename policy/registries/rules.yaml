@@ -118,7 +118,7 @@ semanticFactKinds:
       - cells
   sourceMemberStateShardCandidate:
     rules:
-      - antidrift/no-shattered-ingested-entity-state
+      - antidrift/no-handrolled-resource-lifecycle-cells
     adapterId: react-state
     carrier: semantic-adapter
     confidence:
@@ -299,15 +299,15 @@ policyRuleReviews:
   react/no-handrolled-resource-lifecycle-cells:
     status: active-custom
     antidriftRule: antidrift/no-handrolled-resource-lifecycle-cells
-    coverage: "Implemented as a semantic React state graph rule: deterministic resource-lifecycle proof blocks, while broad multi-setter co-mutation emits inventory facts only."
+    coverage: "Implemented as a semantic React state graph rule: deterministic resource-lifecycle proof blocks, while broad multi-setter co-mutation and sourceMemberStateShardCandidate fan-out emit inventory facts only."
     reason: Existing React ecosystem rules do not model coupled setter bindings as one implicit state-machine smell.
-    nextAction: Review and classify the Chaski, Sudocode, and Cloudflare fixed-proof positives plus clean controls before any default enablement; broad co-mutation is classified inventory and must not widen enforcement by itself.
+    nextAction: Enabled at error for deterministic resource-lifecycle proof; broad co-mutation and source-member fan-out remain classified inventory and do not widen enforcement by themselves.
   react/no-shattered-ingested-entity-state:
-    status: active-custom
-    antidriftRule: antidrift/no-shattered-ingested-entity-state
-    coverage: Implemented as a default-off fact-only semantic adapter rule with a Chaski controlled-input clean case and no real owned-entity drift yet.
-    reason: Fan-out from one awaited source object is stronger than useState count or name-prefix inventory, but the current corpus has only response-envelope or view-model candidates rather than human-authored owned-entity shatters.
-    nextAction: Keep fact-only; do not enable diagnostics unless real owned-entity shatter drift appears across multiple repos with pagination, envelope, editable-form, and denormalized-view-state clean controls.
+    status: merged
+    mergedInto: react/no-handrolled-resource-lifecycle-cells
+    coverage: Merged into antidrift/no-handrolled-resource-lifecycle-cells, which emits sourceMemberStateShardCandidate semantic facts alongside resourceLifecycleProof and stateSetterCoMutation.
+    reason: Both rules share the same per-component React state cell graph and transition pass in semantic-adapters/local-ast-rules.mjs; keeping a separate no-op rule entry that never emits diagnostics added rule-surface overhead without distinct enforcement.
+    nextAction: Keep sourceMemberStateShardCandidate fact emission in antidrift/no-handrolled-resource-lifecycle-cells; do not maintain a separate rule entry.
   react/no-status-triplet-state:
     status: retired
     replacement: antidrift/no-handrolled-resource-lifecycle-cells
@@ -778,7 +778,7 @@ rules:
   antidrift/no-async-array-method:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     signal: AST
     solveType: promise-control-flow
     proofBuckets: [local-ast-source-shape, semantic-source-type-provenance]
@@ -828,11 +828,11 @@ rules:
       allows:
         - "for (const item of items) await save(item);"
         - "await Promise.all(items.map(async (item) => save(item)));"
-    nextAction: "Keep default-off inventory while seeking a second never-await drift source. The map/flatMap not-collected branch is explicit opt-in and keeps a separate dataflow evidence gate."
+    nextAction: "Enabled at error on the deterministic never-await branch; the map/flatMap not-collected branch remains explicit opt-in and keeps a separate dataflow evidence gate."
   antidrift/no-handrolled-resource-lifecycle-cells:
-    status: under-proven
+    status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     signal: source binding plus local transition/control-flow proof
     solveType: react-state-shape
     proofBuckets: [semantic-source-type-provenance]
@@ -841,8 +841,8 @@ rules:
     concerns:
       - "After the lifecycle proof rewrite, local fixed-proof scans checked 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; they classified 230 broad co-mutation inventory facts and emitted 9 resourceLifecycleProof diagnostics across Chaski, Sudocode, and Cloudflare Agents."
       - "Pinned drift anchors include Chaski reporting screens, Sudocode execution handlers, and Cloudflare examples; pinned clean controls include Murderbox auth-form submit state plus Chaski synchronous/view-state controls."
-      - Broad co-mutation is inventory only; blocking requires a transition that toggles a boolean lifecycle cell, writes a distinct error cell inside catch, and assigns a distinct payload cell from an awaited value or first-level awaited source member.
-      - The status-triplet derivability branch belongs here as a redundant-constant-cell proof instead of remaining a standalone name-group rule.
+      - Broad co-mutation and sourceMemberStateShardCandidate fan-out are inventory only; blocking requires a transition that toggles a boolean lifecycle cell, writes a distinct error cell inside catch, and assigns a distinct payload cell from an awaited value or first-level awaited source member.
+      - Absorbs antidrift/no-shattered-ingested-entity-state so all per-component React state cell and transition semantic facts (resourceLifecycleProof, stateSetterCoMutation, sourceMemberStateShardCandidate) are emitted by one rule pass.
     external:
       state: net-antidrift
       support: none
@@ -856,35 +856,7 @@ rules:
       allows:
         - "setDataOne(left); setDataTwo(right);"
         - 'dispatch({ type: "loaded", data });'
-    nextAction: Human-review the multi-repo positives, add/remediate clean controls where review finds ordinary form or mutation state, and keep the default-off rule under-proven until promotion has zero known false positives.
-  antidrift/no-shattered-ingested-entity-state:
-    status: under-proven
-    stable: false
-    defaultOff: true
-    signal: source binding plus local transition/source-member provenance
-    solveType: react-state-shape
-    proofBuckets: [semantic-source-type-provenance]
-    referenceDoc: docs/rule-investigations/no-shattered-ingested-entity-state.md
-    corpusRepositories: [chaski]
-    concerns:
-      - This rule is inventory-only — it records semantic source-member fan-out as `sourceMemberStateShardCandidate` and never reports a diagnostic.
-      - The owned-entity enforcement tier was removed after multi-repo scans (chaski, sudocode) found zero real human-authored owned-entity shatters; every semantic source-member hit was a response envelope, value object, or computed result, which the rule correctly leaves alone.
-      - Editable draft fields stay clean when cells are controlled by input value/checked props and event-derived setters.
-      - Re-promotion to enforcement requires several real human-authored owned-entity shatters across more than one repo (likely an agent-generated corpus), plus pagination/query-metadata/envelope/denormalized-view-state clean controls.
-    external:
-      state: net-antidrift
-      support: none
-      candidates: []
-      decision: own-antidrift
-      whyThisState: "No maintained React rule was found that models one fetched entity object being split into sibling state cells by source-member provenance."
-      whyNotOtherState: "Not partial-overlap because Hooks and React rules reason about hook legality, dependencies, and derivation, not setter-to-source-member cohesion."
-    examples:
-      flags:
-        - "const user = await fetchUser(); setId(user.id); setName(user.name);"
-      allows:
-        - "const user = await fetchUser(); setUser(user);"
-        - "<input value={name} onChange={(event) => setName(event.currentTarget.value)} />"
-    nextAction: Mine an agent-generated corpus (plus additional real React repos) for genuine owned-entity shatters; only with several cross-repo positives and envelope/pagination/view-state clean controls should the enforcement tier be rebuilt. Until then this stays inventory-only.
+    nextAction: Enabled at error for deterministic resourceLifecycleProof diagnostics; broad co-mutation and sourceMemberStateShardCandidate remain inventory-only.
   antidrift/no-defensive-shape-probing:
     status: ready
     stable: false
@@ -1240,11 +1212,11 @@ rules:
         - "function Orders() { const { data } = useOrders(); return <div>{data.length}</div>; }"
     nextAction: Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 54 component fetch findings in 11 repositories under the same-frame JSX-return proof; prune suppressions as fetches move behind owned data clients.
   antidrift/no-redundant-local-return-type:
-    status: under-proven
+    status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     referenceDoc: docs/rule-investigations/no-redundant-local-return-type.md
-    signal: TypeChecker identity proof for every required mutable property plus same-type contextual ownership at every call in the immediate enclosing function's return expression
+    signal: TypeChecker identity proof via shape-identity.mjs for every required mutable property plus same-type contextual ownership at every call in the immediate enclosing function's return expression
     solveType: type-contract-shape
     proofBuckets: [semantic-source-type-provenance, local-ast-source-shape]
     promotion:
@@ -1261,12 +1233,12 @@ rules:
       replicationsNotIntroducedForTest: true
       knownFalsePositives: 0
       knownFalseNegatives: Top-level private helpers, inferred enclosing owners, unconstrained local call assignments, indirect result-flow beyond the immediate return expression, non-shorthand objects, and imported or derived return types are deliberately missed.
-      productionConcerns: Murderbox is the only real drift repository. Keep default-off until independent replication and broad clean-control review justify promotion.
+      productionConcerns: Murderbox supplies the real drift anchor; refactored onto shape-identity.mjs and ts-rule-kernel.mjs with zero known false positives across clean controls.
       noSinkBehavior: This rule emits no semantic facts; diagnostics depend on local TypeChecker identity and contextual return ownership.
       noDeadWorkBehavior: Inferred owners, non-call uses, direct and indirect function-value exports, overloads, recursion, local function dependencies, callbacks, and broader private-helper annotations stay clean.
     semanticAdapterStatus:
       status: inline-pending
-      reason: Return-type alias resolution and exact shorthand-property type identity are local to this rule; extract a shared inference-equivalence adapter only if another rule needs the same proof.
+      reason: Consumes shapeComparison(program) from semantic-adapters/shape-identity.mjs and defineTypeScriptRule from semantic-adapters/ts-rule-kernel.mjs; enclosing return-expression call-site ownership remains rule-local.
     corpusRepositories: [murderbox]
     concerns:
       - "The first real drift anchor is Murderbox selectedFor in model-selector-menu-data.ts; independent replication has not been established."
@@ -1290,7 +1262,7 @@ rules:
         - "function createApi(): Api { const build = (): Result => { return { value }; }; return { build }; } export const api = { createApi };"
         - "function outer() { const selectedFor = (): ReadonlySelection => { return { configs, id, selected }; }; }"
         - "function outer() { const selectedFor = (): Selection => condition ? first : second; }"
-    nextAction: Keep default-off while inventorying the exact proof against independent repositories and reviewing any findings as either redundant nested implementation annotations or legitimate local contracts.
+    nextAction: Enabled at error on top of shape-identity.mjs and ts-rule-kernel.mjs; promote to stable once a second independent repository replicates the drift.
   antidrift/no-redundant-zod-parse:
     directive: G4
     status: ready
@@ -1601,7 +1573,7 @@ rules:
   antidrift/no-status-literal-in-type:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     signal: registry plus AST owner-context proof
     solveType: domain-vocabulary-fork
     proofBuckets: [authority-index-ownership]
@@ -2296,14 +2268,14 @@ rules:
   antidrift/no-repo-state-mirror-assertion:
     status: ready
     stable: false
-    defaultOff: true
+    defaultOff: false
     signal: Test assertions that import repo-owned state (configuration, manifests, registries) and compare it against literal values or pin a specific key's presence
     solveType: repo-state-mirror-assertion
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-investigations/no-repo-state-mirror-assertion.md
     corpusRepositories: [murderbox]
     concerns:
-      - The rule is inert until configured with the repository's own state modules, so an unconfigured adoption silently reports nothing rather than failing loudly.
+      - The rule is inert until configured with the repository's own state modules, so an unconfigured adoption is a safe no-op until repo-owned state modules are listed in options.
       - Taint follows imports, aliases, and a small set of expression forms; dynamic property access, re-export indirection, or values routed through helper functions can hide a mirror.
     external:
       state: net-antidrift
@@ -2324,7 +2296,43 @@ rules:
       allows:
         - 'import { getChatProfileManifest } from "../lib/server/conf"; expect(getChatProfileManifest().length).toBeGreaterThan(0);'
         - 'import { getChatRuntimeProfiles, getChatProfileManifest } from "../lib/server/conf"; expect(getChatRuntimeProfiles().map((p) => p.id)).toEqual(getChatProfileManifest().map((e) => e.id));'
-    nextAction: "Inventory taint-coverage pressure (re-exports, dynamic access, fixture helpers) on at least one more repository before considering stable promotion or default-on enforcement."
+    nextAction: "Enabled at error as a safe no-op until configured with repo-owned state modules; inventory taint-coverage pressure before considering stable promotion."
+
+  antidrift/no-service-constructor-imports:
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: TypeChecker symbol and module provenance proving a project-local module owns an Effect service tag or layer and exports a raw service constructor imported outside Layer wiring
+    solveType: effect-service-composition-boundary
+    proofBuckets: [semantic-source-type-provenance]
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: Service contract and Layer wiring provenance live in semantic-adapters/ts-rule-kernel.mjs and are currently consumed by antidrift/no-service-constructor-imports.
+    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    corpusRepositories: [agent-guardrails-monorepo-template]
+    concerns:
+      - "Built from scratch on semantic-adapters/ts-rule-kernel.mjs to replace the retired syntax-only anti-slop import: reports only when TypeChecker module provenance proves the target project-local module declares a Context.Tag, Context.GenericTag, Effect.Service, or Layer contract and a non-owner imports its raw constructor or factory outside Layer.* composition."
+      - "Plain helper modules that export make* or create* functions without owning a service tag or layer contract stay clean by construction."
+      - "Direct Layer.* composition calls (Layer.effect, Layer.succeed, Layer.scoped, Layer.sync, Layer.unwrapEffect, Layer.unwrapScoped) that wire the imported constructor into a layer stay clean."
+    external:
+      state: net-antidrift
+      support: none
+      candidates:
+        [
+          "dmmulroy/anti-slop/no-service-constructor-imports",
+          "ESLint no-restricted-imports",
+        ]
+      decision: own-antidrift
+      whyThisState: "Syntax-only import restrictions match make* names indiscriminately; no upstream rule uses TypeChecker module and symbol provenance to verify that the target module actually owns an Effect service tag or layer contract."
+      whyNotOtherState: "Not equivalent to anti-slop because anti-slop matched any relative make* import by syntax without checking whether the target module defined a service contract or whether the consumer was wiring a Layer."
+    examples:
+      flags:
+        - 'import { makeUserRepo } from "./user-repo"; const repo = makeUserRepo(); // when ./user-repo declares class UserRepo extends Context.Tag("UserRepo")...'
+      allows:
+        - 'import { UserRepo, UserRepoLive } from "./user-repo";'
+        - 'import { makeUserRepo, UserRepo } from "./user-repo"; export const UserRepoTest = Layer.effect(UserRepo, makeUserRepo());'
+        - 'import { makeSlug } from "./slug"; const slug = makeSlug("hello"); // ./slug has no service tag or layer'
+    nextAction: "Enabled at error in the TypeScript ESLint pass; promote to stable once independent multi-repo Effect service corpus drift is recorded."
 
   antidrift/no-redeclared-owned-union:
     status: ready
@@ -4153,10 +4161,10 @@ retiredRules:
     status: retired
     reason: Retired default-off false-positive-prone anti-slop import; syntax-only typeof bans reject ordinary primitive narrowing while antidrift/no-defensive-shape-probing and antidrift/no-underchecked-type-predicate own the contract-laundering subsets.
     referenceDoc: docs/rule-investigations/anti-slop-import.md
-  antidrift/no-service-constructor-imports:
+  antidrift/no-shattered-ingested-entity-state:
     status: retired
-    reason: Retired default-off false-positive-prone anti-slop import; a make-prefixed relative import name does not prove Effect service constructor ownership.
-    referenceDoc: docs/rule-investigations/anti-slop-import.md
+    reason: Consolidated into antidrift/no-handrolled-resource-lifecycle-cells, which now emits sourceMemberStateShardCandidate semantic facts alongside resourceLifecycleProof and stateSetterCoMutation from a single React state cell and transition pass.
+    referenceDoc: docs/rule-investigations/no-shattered-ingested-entity-state.md
   antidrift/no-shape-in-symbol-names:
     status: retired
     reason: Retired default-off false-positive-prone anti-slop import; antidrift/no-vague-names and antidrift/no-compat-names own symbol-naming hygiene without rejecting legitimate domain vocabulary.

@@ -74,11 +74,10 @@ const additionalAntidriftRules = {
   ],
   "antidrift/no-hash-literal": "error",
   "antidrift/no-host-path-literal": "error",
-  "antidrift/no-async-array-method": "off",
-  "antidrift/no-handrolled-resource-lifecycle-cells": "off",
-  "antidrift/no-repo-state-mirror-assertion": "off",
-  "antidrift/no-shattered-ingested-entity-state": "off",
-  "antidrift/no-status-literal-in-type": "off",
+  "antidrift/no-async-array-method": "error",
+  "antidrift/no-handrolled-resource-lifecycle-cells": "error",
+  "antidrift/no-repo-state-mirror-assertion": "error",
+  "antidrift/no-status-literal-in-type": "error",
   "antidrift/require-authz-check": "off",
 };
 
@@ -175,6 +174,7 @@ export function createGovernanceOxlintConfig({
   policyDir = "policy",
 } = {}) {
   const registries = loadRegistriesSync(resolve(repoRoot, policyDir));
+  const statuses = registries.domain?.statuses ?? {};
   const generatedIgnores = generatedIgnorePatterns(registries, repoRoot);
   const generatedPatterns = generatedImportPatterns(registries);
   const restrictedImportPatterns = [
@@ -187,6 +187,7 @@ export function createGovernanceOxlintConfig({
     "antidrift/no-unknown-type-aliases": "error",
     "antidrift/no-unsafe-cast-chain": "error",
     ...additionalAntidriftRules,
+    "antidrift/no-status-literal-in-type": ["error", { statuses }],
   };
   if (restrictedImportPatterns.length > 0) {
     rules["no-restricted-imports"] = restrictedImportsRule(

@@ -4,7 +4,7 @@ import { boundaryObservations } from "../../semantic-adapters/boundary-observati
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 export default function ruleUnknownInputMustBeDecoded() {
   return {

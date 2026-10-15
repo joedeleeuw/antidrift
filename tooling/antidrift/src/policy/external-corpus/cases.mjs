@@ -155,7 +155,7 @@ export const sudocodeCases = [
     id: "sudocode-execution-view-cancel-resource-lifecycle",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "drift",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "frontend",
     paths: ["frontend/src/components/executions/ExecutionView.tsx"],
     expectedFindings: [
@@ -173,7 +173,7 @@ export const sudocodeCases = [
     id: "sudocode-inline-execution-delete-worktree-resource-lifecycle",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "drift",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "frontend",
     paths: ["frontend/src/components/executions/InlineExecutionView.tsx"],
     expectedFindings: [
@@ -187,7 +187,7 @@ export const sudocodeCases = [
     id: "sudocode-voice-config-resource-lifecycle",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "drift",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "frontend",
     paths: ["frontend/src/hooks/useVoiceConfig.ts"],
     expectedFindings: [
@@ -836,7 +836,7 @@ export const murderboxCases = [
     id: "murderbox-auth-flow-lifecycle-clean",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "client",
     paths: ["apps/client/src/components/auth/use-auth-flow.ts"],
   },
@@ -864,7 +864,7 @@ export const murderboxCases = [
     id: "murderbox-model-selector-redundant-local-return-type",
     ruleId: "antidrift/no-redundant-local-return-type",
     kind: "drift",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "client",
     typeAware: true,
     tsconfig: "apps/client/tsconfig.json",
@@ -1038,7 +1038,7 @@ export const cloudflareAgentsCases = [
     id: "cloudflare-worker-bundler-playground-resource-lifecycle",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "drift",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "examples/worker-bundler-playground",
     paths: ["examples/worker-bundler-playground/src/client.tsx"],
     expectedFindings: [
@@ -1052,7 +1052,7 @@ export const cloudflareAgentsCases = [
     id: "cloudflare-github-webhook-connect-resource-lifecycle",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "drift",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "examples/github-webhook",
     paths: ["examples/github-webhook/src/client.tsx"],
     expectedFindings: [
@@ -1066,7 +1066,7 @@ export const cloudflareAgentsCases = [
     id: "cloudflare-think-chat-webhook-setup-resource-lifecycle",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "drift",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "examples/think-chat-sdk",
     paths: ["examples/think-chat-sdk/src/client.tsx"],
     expectedFindings: [
@@ -1080,7 +1080,7 @@ export const cloudflareAgentsCases = [
     id: "cloudflare-think-submissions-submit-resource-lifecycle",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "drift",
-    classification: "under-proven",
+    classification: "ready",
     subproject: "examples/think-submissions",
     paths: ["examples/think-submissions/src/client.tsx"],
     expectedFindings: [

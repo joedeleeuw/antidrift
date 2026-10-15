@@ -350,7 +350,10 @@ async function lintSourceShardWithFacts(code, options = {}) {
           antidrift: plugin,
         },
         rules: {
-          "antidrift/no-shattered-ingested-entity-state": ["error", options],
+          "antidrift/no-handrolled-resource-lifecycle-cells": [
+            "error",
+            options,
+          ],
         },
         settings: {
           antidrift: {
@@ -876,7 +879,7 @@ it("emits a source-member shard candidate fact (inventory-only, no diagnostic)",
     expect.arrayContaining([
       expect.objectContaining({
         factKind: "sourceMemberStateShardCandidate",
-        ruleId: "antidrift/no-shattered-ingested-entity-state",
+        ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
         adapterId: "react-state",
         confidence: "heuristic-inventory",
         payload: expect.objectContaining({

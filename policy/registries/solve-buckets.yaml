@@ -197,16 +197,16 @@ rules:
   antidrift/no-handrolled-resource-lifecycle-cells:
     {
       current: semantic-ast,
-      fit: under-proven,
+      fit: proven,
       target: semantic-ast,
-      note: "fixed proof now catches Chaski/Sudocode/Cloudflare lifecycle diagnostics while keeping broad co-mutation inventory-only; still needs human review and clean-control pressure before default enablement.",
+      note: "fixed proof catches Chaski/Sudocode/Cloudflare lifecycle diagnostics while keeping broad co-mutation and sourceMemberStateShardCandidate inventory-only.",
     }
-  antidrift/no-shattered-ingested-entity-state:
+  antidrift/no-service-constructor-imports:
     {
       current: semantic-ast,
-      fit: inventory-only,
+      fit: proven,
       target: semantic-ast,
-      note: "source-member fan-out is detectable with semantic AST provenance; enforcement needs owner-config + agent-corpus evidence, not a new bucket.",
+      note: "TypeChecker symbol and module provenance proves a project-local module owns an Effect service tag or layer and reports direct constructor/factory imports outside Layer wiring.",
     }
 
 # Behaviors the taxonomy reveals we do not have blocking coverage for yet. Some need a missing

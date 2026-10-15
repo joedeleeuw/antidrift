@@ -9,7 +9,7 @@ import {
   moduleExportTargets,
   packageSources,
   unwrapped,
-} from "./typescript-engine.js";
+} from "./typescript-engine.mjs";
 
 const packageSurfaces = new WeakMap();
 

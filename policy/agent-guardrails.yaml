@@ -37,9 +37,9 @@ clusters:
         severity: error
         detector: sameFunctionDistinctStateSettersGte:3
         message: Model one transition instead of scattering updates across setters.
-      - id: react/no-shattered-ingested-entity-state # A transition splits one freshly ingested source object into sibling state cells instead of preserving the entity/resource association. Inventory-only; the antidrift rule records candidates and never blocks.
-        severity: warn
-        detector: sourceMemberStateShardCandidate
+      - id: react/no-shattered-ingested-entity-state # Merged into react/no-handrolled-resource-lifecycle-cells; sourceMemberStateShardCandidate inventory facts are emitted by the unified React state lifecycle adapter.
+        severity: off
+        detector: mergedInto:react/no-handrolled-resource-lifecycle-cells
         message: Keep an ingested entity together unless the split cells are proven editable draft fields.
       - id: react/no-status-triplet-state # Retired standalone name inventory; semantic AST lifecycle proof lives in no-handrolled-resource-lifecycle-cells.
         severity: off

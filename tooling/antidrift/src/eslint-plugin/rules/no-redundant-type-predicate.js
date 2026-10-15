@@ -7,7 +7,7 @@ import {
 import {
   missingTypeServicesVisitors,
   requireTypeServices,
-} from "./type-services.js";
+} from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 // TypeScript 5.5 infers `x is T` for a function without a return annotation
 // whose single returned expression narrows `x` to T on true and to never

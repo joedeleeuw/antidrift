@@ -453,27 +453,61 @@ export function inlineStructuralTypeAtBoundary(node) {
   return isBoundaryObjectMethod(fn) || isExportedFunctionBoundary(fn);
 }
 
+function sourceShardPayload(proof) {
+  return {
+    source: proof.source,
+    members: proof.entries.map(({ setter, cell, property }) => ({
+      setter,
+      cell,
+      property,
+    })),
+    editableCells: proof.editableCells,
+    transition: Boolean(proof.transition),
+    requestGuard: Boolean(proof.requestGuard),
+  };
+}
+
 export function ruleNoHandrolledResourceLifecycleCells() {
   return {
     meta: {
       type: "problem",
       docs: {
         description:
-          "Disallow hand-rolled resource-lifecycle state machines: an async transition that toggles a boolean lifecycle cell, resets and assigns an error cell, and assigns an awaited resource cell. Broad multi-setter co-mutation is inventory only, never blocking.",
+          "Disallow hand-rolled resource-lifecycle state machines: an async transition that toggles a boolean lifecycle cell, resets and assigns an error cell, and assigns an awaited resource cell. Broad multi-setter co-mutation and source-member state sharding are inventory only, never blocking.",
       },
       schema: [
         {
           type: "object",
-          properties: { threshold: { type: "number" } },
+          properties: {
+            threshold: { type: "number" },
+            shardThreshold: { type: "number" },
+          },
           additionalProperties: false,
         },
       ],
     },
     create(context) {
-      const threshold = context.options[0]?.threshold ?? 3;
+      const options = context.options[0] ?? {};
+      const threshold = options.threshold ?? 3;
+      const shardThreshold = options.shardThreshold ?? 2;
       const tracker = createReactStateTracker({
         context,
         onFrameExit(frame) {
+          if (frame.setters.size > 0) {
+            const shardProof = sourceShardProof(frame, {
+              threshold: shardThreshold,
+            });
+            if (shardProof.proven) {
+              emitSemanticFact(context, shardProof.node ?? frame.node, {
+                factKind: "sourceMemberStateShardCandidate",
+                ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+                adapterId: "react-state",
+                confidence: "heuristic-inventory",
+                provenance: ["AST", "scope-binding", "control-flow"],
+                payload: sourceShardPayload(shardProof),
+              });
+            }
+          }
           const proof = frame.isTransition
             ? lifecycleProof(frame)
             : { proven: false };
@@ -498,7 +532,6 @@ export function ruleNoHandrolledResourceLifecycleCells() {
             });
             return;
           }
-          // Broad co-mutation is name-agnostic but unproven: inventory only, never blocking.
           if (frame.called.size >= threshold) {
             emitSemanticFact(context, frame.node, {
               factKind: "broadSetterCoMutation",
@@ -537,66 +570,6 @@ function isGlobalFetchCall(sourceCode, callee) {
       isUnshadowedGlobalName(sourceCode, callee.object, name)
     )
   );
-}
-
-function sourceShardPayload(proof) {
-  return {
-    source: proof.source,
-    members: proof.entries.map(({ setter, cell, property }) => ({
-      setter,
-      cell,
-      property,
-    })),
-    editableCells: proof.editableCells,
-    transition: Boolean(proof.transition),
-    requestGuard: Boolean(proof.requestGuard),
-  };
-}
-
-export function ruleNoShatteredIngestedEntityState() {
-  return {
-    meta: {
-      type: "suggestion",
-      docs: {
-        description:
-          "Record (inventory-only) React transitions that split one freshly ingested source object into sibling state cells.",
-      },
-      schema: [
-        {
-          type: "object",
-          properties: {
-            threshold: { type: "number" },
-          },
-          additionalProperties: false,
-        },
-      ],
-    },
-    create(context) {
-      const options = context.options[0] ?? {};
-      const threshold = options.threshold ?? 2;
-      const tracker = createReactStateTracker({
-        context,
-        onFrameExit(frame) {
-          // Only the component frame declares useState cells; a nested async
-          // transition frame has no setters and bubbles its transitions (and the
-          // controlled/event-edited exclusions) up to this frame, which is the one
-          // evaluated. Dropping this guard would double-evaluate without exclusions.
-          if (frame.setters.size === 0) return;
-          const proof = sourceShardProof(frame, { threshold });
-          if (!proof.proven) return;
-          emitSemanticFact(context, proof.node ?? frame.node, {
-            factKind: "sourceMemberStateShardCandidate",
-            ruleId: "antidrift/no-shattered-ingested-entity-state",
-            adapterId: "react-state",
-            confidence: "heuristic-inventory",
-            provenance: ["AST", "scope-binding", "control-flow"],
-            payload: sourceShardPayload(proof),
-          });
-        },
-      });
-      return tracker.visitors;
-    },
-  };
 }
 
 function containsJsxNode(node) {
@@ -709,7 +682,6 @@ export function ruleNoAsyncArrayMethod() {
         {
           type: "object",
           additionalProperties: false,
-          required: ["branches"],
           properties: {
             branches: {
               type: "array",
