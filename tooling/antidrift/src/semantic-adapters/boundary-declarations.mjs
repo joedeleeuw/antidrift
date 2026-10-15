@@ -218,7 +218,9 @@ export function boundaryDeclarations(program, observer) {
     if (callsBySource.has(source)) return callsBySource.get(source);
     const collected = [];
     function visit(node) {
-      if (ts.isCallExpression(node)) collected.push(node);
+      if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
+        collected.push(node);
+      }
       ts.forEachChild(node, visit);
     }
     visit(source);

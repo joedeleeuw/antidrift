@@ -19,15 +19,44 @@ export function unresolvedType(type) {
 }
 
 export function contractProjection(checker) {
-  function literalText(expression) {
+  function literalKeys(expression) {
     if (!expression) return null;
     if (ts.isStringLiteralLike(expression) || ts.isNumericLiteral(expression)) {
-      return expression.text;
+      return new Set([expression.text]);
     }
     const keyType = checker.getTypeAtLocation(expression);
-    return keyType.isStringLiteral() || keyType.isNumberLiteral()
-      ? String(keyType.value)
-      : null;
+    const members = keyType.isUnion() ? keyType.types : [keyType];
+    if (
+      !members.every(
+        (member) => member.isStringLiteral() || member.isNumberLiteral()
+      )
+    ) {
+      return null;
+    }
+    return new Set(members.map((member) => String(member.value)));
+  }
+
+  function literalText(expression) {
+    const keys = literalKeys(expression);
+    return keys?.size === 1 ? [...keys][0] : null;
+  }
+
+  function propertyKeys(property) {
+    const { name } = property;
+    if (!name) return null;
+    if (ts.isIdentifier(name) || ts.isPrivateIdentifier(name)) {
+      return new Set([name.text]);
+    }
+    return literalKeys(
+      ts.isComputedPropertyName(name) ? name.expression : name
+    );
+  }
+
+  function accessKeys(expression) {
+    if (ts.isPropertyAccessExpression(expression)) {
+      return new Set([expression.name.text]);
+    }
+    return literalKeys(expression.argumentExpression);
   }
 
   function propertyKey(property) {
@@ -104,10 +133,12 @@ export function contractProjection(checker) {
 
   return {
     accessKey,
+    accessKeys,
     claimContract,
     elementContract,
     memberContract,
     projectContract,
     propertyKey,
+    propertyKeys,
   };
 }

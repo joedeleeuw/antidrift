@@ -29,6 +29,11 @@ export const boundaryObservations = {
       reason:
         "An earlier first-party contract claim covered a downstream typed use on the same path.",
     },
+    summaryFixpoint: {
+      kind: "summary-fixpoint",
+      reason:
+        "A recursive first-party declaration needed more than one iteration before its summary stabilised.",
+    },
   },
   sinks: {
     assertion: "assertion",
@@ -39,17 +44,11 @@ export const boundaryObservations = {
     argument: "argument",
   },
   bounds: {
-    inliningDepthFallback: {
-      bound: "inlining-depth-fallback",
-      limit: 4,
+    fieldDepth: {
+      bound: "field-depth",
+      limit: 2,
       reason:
-        "First-party call inlining exceeded context-sensitive depth and fell back to context-insensitive tracing.",
-    },
-    inliningBudget: {
-      bound: "inlining-budget",
-      limit: 1024,
-      reason:
-        "First-party call inlining exhausted the per-use inlining budget and produced an incomplete root.",
+        "A root's containment path or a parameter placeholder's access path exceeded the field depth of the finite root domain; the remainder is the whole value (over-approximation).",
     },
     returnedFunctionDepth: {
       bound: "returned-function-depth",
@@ -290,11 +289,21 @@ export function boundaryObserver(program, observe, explicitRootDirectory) {
       ...(details.unsettledParameters === undefined
         ? {}
         : { unsettledParameters: details.unsettledParameters }),
+      ...(details.widened === undefined ? {} : { widened: details.widened }),
       call: details.call ? expressionPreview(details.call) : null,
       callSpan: nodeSpan(details.call),
       declaration: declarationLabel(details.declaration),
       declarationSpan: nodeSpan(details.declaration),
       sinkSpan: currentDecision ? nodeSpan(currentDecision.sinkNode) : null,
+    });
+  }
+
+  function summaryFixpoint({ declaration, iterations }) {
+    sinkCallback({
+      kind: boundaryObservations.events.summaryFixpoint.kind,
+      declaration: declarationLabel(declaration),
+      declarationSpan: nodeSpan(declaration),
+      iterations,
     });
   }
 
@@ -351,6 +360,7 @@ export function boundaryObserver(program, observe, explicitRootDirectory) {
     recordMemoHit,
     recordMemoMiss,
     boundFired,
+    summaryFixpoint,
     decoderProof,
     claimCovered,
   };

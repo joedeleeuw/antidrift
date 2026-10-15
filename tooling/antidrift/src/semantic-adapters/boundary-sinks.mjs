@@ -129,7 +129,7 @@ export function boundarySinks({
       if (!demanded.has(step)) return false;
       contract = memberContract(contract, step);
     }
-    if (!root.overrides || !contract) return true;
+    if (root.deep || !root.overrides || !contract) return true;
     const demanded = demandedFields(contract);
     if (!demanded) return true;
     return [...demanded].some((name) => !root.overrides.has(name));
