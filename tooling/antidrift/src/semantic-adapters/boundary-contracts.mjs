@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { typed } from "./boundary-declarations.mjs";
+import { shapeless, typed } from "./boundary-declarations.mjs";
 
 export const ELEMENT = "[]";
 
@@ -139,29 +139,30 @@ export function contractProjection(checker) {
         return stripNullish(members[0]);
       }
     }
-    if (type.isIntersection() && type.types.length === 2) {
-      const typeParameter = type.types.find(
-        (member) => member.flags & ts.TypeFlags.TypeParameter
-      );
-      if (typeParameter) {
-        return typeParameter;
+    if (type.isIntersection()) {
+      const shaped = type.types.filter((member) => !shapeless(member));
+      if (shaped.length === 1) {
+        return stripNullish(shaped[0]);
       }
     }
     return type;
   }
 
-  function claimContract(contract) {
+  function claimContract(contract, options = {}) {
     if (!contract) {
       return null;
     }
     const core = stripNullish(contract);
     if (core.flags & ts.TypeFlags.TypeParameter) {
       const constraint = checker.getBaseConstraintOfType(core);
-      return constraint && constraint !== core
-        ? claimContract(constraint)
-        : core;
+      if (constraint && constraint !== core) {
+        return claimContract(constraint, options);
+      }
+      return options.allowTypeParameter ? core : null;
     }
-    return typed(contract) || unresolvedType(contract) ? contract : null;
+    return typed(contract, options) || unresolvedType(contract)
+      ? contract
+      : null;
   }
 
   return {

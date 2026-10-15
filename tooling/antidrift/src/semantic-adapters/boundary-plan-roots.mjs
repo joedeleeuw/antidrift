@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { boundaryCases } from "./boundary-cases.mjs";
+import { ELEMENT } from "./boundary-contracts.mjs";
 import { broad, typed } from "./boundary-declarations.mjs";
 import { boundaryObservations } from "./boundary-observations.mjs";
 import { callbackReturns, unwrapExpression } from "./boundary-syntax.mjs";
@@ -35,6 +36,7 @@ export function signatureForwarding({
   summary,
   substituteAll,
   flagged,
+  prefixed,
   projected,
   elementStep,
 }) {
@@ -200,6 +202,42 @@ export function signatureForwarding({
       return projected(roots, elementStep(sourceNode));
     }
     return roots;
+  }
+
+  function packIfCollection(
+    roots,
+    call,
+    sourceIsCollection,
+    targetType,
+    sharedSet
+  ) {
+    if (
+      !sourceIsCollection &&
+      sharedSet.size > 0 &&
+      isCollectionOver(targetType, sharedSet)
+    ) {
+      return roots.map((root) => prefixed(root, ELEMENT, call));
+    }
+    return roots;
+  }
+
+  function sharedCallbackOutput(callables, targetSet) {
+    const shared = new Set();
+    let sourceIsCollection = false;
+    for (const signature of callables) {
+      const callbackReturn = checker.getReturnTypeOfSignature(signature);
+      const callbackShared = sharedTypeParameters(callbackReturn, targetSet);
+      if (!callbackShared.size) {
+        continue;
+      }
+      for (const parameterType of callbackShared) {
+        shared.add(parameterType);
+      }
+      if (isCollectionOver(callbackReturn, callbackShared)) {
+        sourceIsCollection = true;
+      }
+    }
+    return { shared, sourceIsCollection };
   }
 
   function callOpaque(declaration, sourceOpaque, call) {
@@ -459,19 +497,27 @@ export function signatureForwarding({
         }
         continue;
       }
-      const sharesReturn =
-        (callbackIndex < 0 || otherIndex < callbackIndex) &&
-        otherCallables.some(
-          (otherSig) =>
-            sharedTypeParameters(
-              checker.getReturnTypeOfSignature(otherSig),
-              targetParameters
-            ).size > 0
-        );
-      if (sharesReturn) {
+      const callbackMatch =
+        callbackIndex < 0 || otherIndex < callbackIndex
+          ? sharedCallbackOutput(otherCallables, targetParameters)
+          : { shared: new Set(), sourceIsCollection: false };
+      if (callbackMatch.shared.size > 0) {
         matched = true;
+        const callbackRoots = packIfCollection(
+          callbackResultRoots(otherArgument, otherContract, hostCall),
+          hostCall,
+          callbackMatch.sourceIsCollection,
+          targetContract,
+          callbackMatch.shared
+        );
         roots.push(
-          ...callbackResultRoots(otherArgument, otherContract, hostCall)
+          ...unpackIfCollection(
+            callbackRoots,
+            otherArgument,
+            callbackMatch.sourceIsCollection,
+            targetContract,
+            callbackMatch.shared
+          )
         );
       }
     }
@@ -744,13 +790,7 @@ export function signatureForwarding({
       const contract = checker.getTypeOfSymbol(parameter);
       const shared = sharedTypeParameters(contract, output);
       const callable = contract.getNonNullableType().getCallSignatures();
-      const sharesOutput = callable.some(
-        (callback) =>
-          sharedTypeParameters(
-            checker.getReturnTypeOfSignature(callback),
-            output
-          ).size > 0
-      );
+      const callbackMatch = sharedCallbackOutput(callable, output);
       if (shared.size > 0 && !callable.length) {
         roots.push(
           ...unpackIfCollection(
@@ -763,11 +803,26 @@ export function signatureForwarding({
         );
       }
       if (
-        sharesOutput ||
+        callbackMatch.shared.size > 0 ||
         (ts.isObjectLiteralExpression(argument) &&
           callbackNodes(argument).length)
       ) {
-        roots.push(...callbackResultRoots(argument, contract, call));
+        const callbackRoots = packIfCollection(
+          callbackResultRoots(argument, contract, call),
+          call,
+          callbackMatch.sourceIsCollection,
+          returned,
+          callbackMatch.shared
+        );
+        roots.push(
+          ...unpackIfCollection(
+            callbackRoots,
+            argument,
+            callbackMatch.sourceIsCollection,
+            returned,
+            callbackMatch.shared
+          )
+        );
       }
     }
     roots.push(...receiverRoots(call, signature, output));

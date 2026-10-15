@@ -4,7 +4,8 @@ import { boundaryObservations } from "./boundary-observations.mjs";
 
 export const FIELD_DEPTH = boundaryObservations.bounds.fieldDepth.limit;
 
-const SUMMARY_ITERATION_INVARIANT = 64;
+const SUMMARY_ITERATION_INVARIANT =
+  boundaryObservations.bounds.summaryIterations.limit;
 
 export function nodeKey(node) {
   if (!node) return "";
@@ -14,7 +15,7 @@ export function nodeKey(node) {
 function claimKey(claim) {
   if (claim === null) return "cleared";
   if (!claim) return "";
-  return `${nodeKey(claim.node)}#${claim.contract ? "" : "?"}@${claim.afterAccess ?? ""}`;
+  return `${claim.contract ? "claimed" : "unresolved"}@${claim.afterAccess ?? ""}`;
 }
 
 function setKey(keys) {
@@ -22,9 +23,8 @@ function setKey(keys) {
 }
 
 function stepKey(step) {
-  return step.elementKey && !step.keys
-    ? ELEMENT
-    : `${setKey(step.keys)}@${step.at}`;
+  const base = step.elementKey && !step.keys ? ELEMENT : setKey(step.keys);
+  return step.sources().length ? `${base}@${step.at}` : base;
 }
 
 function flagsKey(flags) {
@@ -138,25 +138,32 @@ export function rootAlgebra({ contracts, narrowedToSuccess, observer }) {
       [step],
       at
     );
-    return { ...root, path, deep };
+    return { ...root, overrides: undefined, path, deep };
   }
 
   function claimed(root, contract, node) {
     if (root.parameter) {
       if (root.flags.decoded || root.flags.incomplete) return root;
+      const projected = projectContract(contract, root.path);
+      if (!projected) return root;
+      const hasSourcedStep = root.access.some(
+        (step) => step.sources().length > 0
+      );
       return {
         ...root,
         claim: {
-          contract: projectContract(contract, root.path),
+          contract: projected,
           node,
-          afterAccess: root.access.length,
+          afterAccess: hasSourcedStep ? root.access.length : 0,
         },
       };
     }
     if (root.decoded || root.incomplete) return root;
+    const projected = projectContract(contract, root.path ?? []);
+    if (!projected) return root;
     return {
       ...root,
-      claim: { contract: projectContract(contract, root.path ?? []), node },
+      claim: { contract: projected, node },
     };
   }
 
@@ -248,6 +255,11 @@ export function rootAlgebra({ contracts, narrowedToSuccess, observer }) {
     });
   }
 
+  function projectClaim(claim, singleKey) {
+    const contract = claim && memberContract(claim.contract, singleKey);
+    return contract ? { ...claim, contract } : undefined;
+  }
+
   function projectRoot(root, step) {
     const singleKey = step.keys?.size === 1 ? [...step.keys][0] : null;
     if (root.path?.length) {
@@ -274,19 +286,13 @@ export function rootAlgebra({ contracts, narrowedToSuccess, observer }) {
       {
         ...settled,
         overrides: undefined,
-        claim: settled.claim && {
-          ...settled.claim,
-          contract: memberContract(settled.claim.contract, singleKey),
-        },
+        claim: projectClaim(settled.claim, singleKey),
       },
     ];
   }
 
   function projectPlaceholder(root, step, singleKey) {
-    const claim = root.claim && {
-      ...root.claim,
-      contract: memberContract(root.claim.contract, singleKey),
-    };
+    const claim = projectClaim(root.claim, singleKey);
     if (root.deepAccess) {
       return { ...root, overrides: undefined, claim };
     }
@@ -305,17 +311,17 @@ export function rootAlgebra({ contracts, narrowedToSuccess, observer }) {
   function deepened(root) {
     if (root.parameter) {
       if (root.path.length || root.deep) {
-        return { ...root, path: [], deep: true };
+        return { ...root, overrides: undefined, path: [], deep: true };
       }
-      return { ...root, deepAccess: true };
+      return { ...root, overrides: undefined, deepAccess: true };
     }
     if (root.path?.length || root.deep) {
-      return { ...root, path: undefined, deep: true };
+      return { ...root, overrides: undefined, path: undefined, deep: true };
     }
-    return root;
+    return { ...root, overrides: undefined };
   }
 
-  function substitute(root, incoming) {
+  function projectAccess(root, incoming) {
     let current = incoming;
     let sourcedAt = -1;
     for (const [position, step] of root.access.entries()) {
@@ -327,6 +333,13 @@ export function rootAlgebra({ contracts, narrowedToSuccess, observer }) {
       }
     }
     if (root.deepAccess) current = current.map(deepened);
+    return { current: dedupe(current), sourcedAt };
+  }
+
+  function applyRootEffects(root, projectedAccess) {
+    let { current } = projectedAccess;
+    if (!current.length && !root.captures.length) return current;
+    const { sourcedAt } = projectedAccess;
     if (root.filter) current = filtered(current, root.filter);
     for (const capture of root.captures) {
       current = captured(current, capture);
@@ -352,18 +365,37 @@ export function rootAlgebra({ contracts, narrowedToSuccess, observer }) {
           root.path,
           root.parameter
         );
-        return { ...candidate, path, deep: deep || root.deep };
+        return {
+          ...candidate,
+          overrides: undefined,
+          path,
+          deep: deep || root.deep,
+        };
       });
     }
     return current;
   }
 
+  function substitute(root, incoming) {
+    return applyRootEffects(root, projectAccess(root, incoming));
+  }
+
   function substituteAll(roots, bound) {
-    return roots.flatMap((root) => {
-      if (!root.parameter) return [root];
-      const binding = bound.get(root.parameter);
-      return binding ? substitute(root, binding()) : [root];
-    });
+    const accessCache = new Map();
+    return dedupe(
+      roots.flatMap((root) => {
+        if (!root.parameter) return [root];
+        const binding = bound.get(root.parameter);
+        if (!binding) return [root];
+        const key = `${nodeKey(root.parameter)}|${root.access.map(stepKey).join(">")}|${root.deepAccess ? "1" : ""}`;
+        let projectedAccess = accessCache.get(key);
+        if (!projectedAccess) {
+          projectedAccess = projectAccess(root, binding());
+          accessCache.set(key, projectedAccess);
+        }
+        return applyRootEffects(root, projectedAccess);
+      })
+    );
   }
 
   return {
@@ -377,20 +409,6 @@ export function rootAlgebra({ contracts, narrowedToSuccess, observer }) {
     substitute,
     substituteAll,
   };
-}
-
-function declarationLabel(declaration) {
-  const sourceFile = declaration.getSourceFile();
-  if (declaration.name) {
-    return declaration.name.getText(sourceFile);
-  }
-  if (
-    ts.isVariableDeclaration(declaration.parent) ||
-    ts.isPropertyAssignment(declaration.parent)
-  ) {
-    return declaration.parent.name.getText(sourceFile);
-  }
-  return ts.SyntaxKind[declaration.kind];
 }
 
 export function declarationSummaries({ bodyRoots, observer, isActive }) {
@@ -417,12 +435,16 @@ export function declarationSummaries({ bodyRoots, observer, isActive }) {
   }
 
   function reusable(entry) {
-    return (
-      Boolean(entry) &&
-      [...entry.cutAt].every(
-        ([dependency, stamp]) => stampOf(dependency) === stamp
-      )
-    );
+    if (!entry) return false;
+    for (const [dependency, stamp] of entry.cutAt) {
+      if (stampOf(dependency) !== stamp) {
+        return false;
+      }
+      if (dependency.state === "done" && !dependency.cutAt.size) {
+        entry.cutAt.delete(dependency);
+      }
+    }
+    return true;
   }
 
   function collect(compute) {
@@ -478,9 +500,12 @@ export function declarationSummaries({ bodyRoots, observer, isActive }) {
       if (stable) break;
       entry.iteration += 1;
       if (entry.iteration > SUMMARY_ITERATION_INVARIANT) {
-        throw new Error(
-          `boundary model: summary of ${declarationLabel(declaration)} did not stabilise within ${SUMMARY_ITERATION_INVARIANT} iterations`
-        );
+        if (observer.enabled) {
+          observer.boundFired(boundaryObservations.bounds.summaryIterations, {
+            declaration,
+          });
+        }
+        break;
       }
     }
     entry.state = "done";

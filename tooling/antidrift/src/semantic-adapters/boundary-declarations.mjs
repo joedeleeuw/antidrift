@@ -36,7 +36,7 @@ export function broad(type) {
   return Boolean(type && type.flags & broadFlags);
 }
 
-function shapeless(type) {
+export function shapeless(type) {
   if (type.flags & ts.TypeFlags.NonPrimitive) return true;
   return Boolean(
     type.flags & ts.TypeFlags.Object &&
@@ -166,11 +166,7 @@ export function boundaryDeclarations(program, observer) {
     if (program.isSourceFileDefaultLibrary(source)) return "platform";
     const owner = packageAt(source.fileName);
     if (owner?.name === "@types/node") return "platform";
-    if (
-      (owner && dependencies(use.getSourceFile()).has(owner.name)) ||
-      program.isSourceFileFromExternalLibrary(source) ||
-      source.fileName.includes("/node_modules/")
-    ) {
+    if (owner && dependencies(use.getSourceFile()).has(owner.name)) {
       return "dependency";
     }
     return null;

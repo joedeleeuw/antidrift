@@ -192,15 +192,20 @@ export function boundarySinks({
       return true;
     }
     const demanded = projectContract(target, root.path);
-    const claimed =
+    const typeParameterClaim = Boolean(
       claim.contract.flags & ts.TypeFlags.TypeParameter
-        ? projectContract(checker.getTypeAtLocation(expression), root.path)
-        : claim.contract;
+    );
+    if (typeParameterClaim && unprovedNarrowing(expression)) {
+      return false;
+    }
+    const claimed = typeParameterClaim
+      ? projectContract(checker.getTypeAtLocation(expression), root.path)
+      : claim.contract;
     const covered =
       Boolean(demanded) &&
       Boolean(claimed) &&
       (claimed.flags & ts.TypeFlags.TypeParameter
-        ? claimContract(demanded) === claimed ||
+        ? claimContract(demanded, { allowTypeParameter: true }) === claimed ||
           checker.isTypeAssignableTo(claimed, demanded)
         : narrowingProvesTarget(
             checker,

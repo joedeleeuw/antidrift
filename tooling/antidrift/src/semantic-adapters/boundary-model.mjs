@@ -122,8 +122,8 @@ export function boundaryModel(program, options = {}) {
   const visiting = new Set();
   let currentUse = null;
 
-  function withClaim(roots, contract, node) {
-    const claimedContract = claimContract(contract);
+  function withClaim(roots, contract, node, claimOptions) {
+    const claimedContract = claimContract(contract, claimOptions);
     if (!claimedContract) return roots;
     return roots.map((root) => claimed(root, claimedContract, node));
   }
@@ -146,7 +146,7 @@ export function boundaryModel(program, options = {}) {
         return derived;
       },
       at: nodeKey(expression),
-      sources: sourcesOf,
+      sources: once(sourcesOf),
     };
   }
 
@@ -335,13 +335,9 @@ export function boundaryModel(program, options = {}) {
       receiverType,
       assertionDerived: () => false,
       at: nodeKey(pattern),
-      sources: () =>
-        bindingSourceRoots(
-          element,
-          receiverType,
-          keys,
-          bindingCarrier(element)
-        ),
+      sources: once(() =>
+        bindingSourceRoots(element, receiverType, keys, bindingCarrier(element))
+      ),
     };
     return [...defaults, ...projected(inherited, step)];
   }
@@ -457,7 +453,9 @@ export function boundaryModel(program, options = {}) {
   function typeArgumentClaim(call, roots) {
     const typeArgument = call.typeArguments?.[0];
     return typeArgument
-      ? withClaim(roots, checker.getTypeFromTypeNode(typeArgument), call)
+      ? withClaim(roots, checker.getTypeFromTypeNode(typeArgument), call, {
+          allowTypeParameter: true,
+        })
       : roots;
   }
 
@@ -519,6 +517,7 @@ export function boundaryModel(program, options = {}) {
     summary,
     substituteAll,
     flagged,
+    prefixed,
     projected,
     elementStep,
   });
@@ -800,7 +799,8 @@ export function boundaryModel(program, options = {}) {
       : withClaim(
           roots,
           checker.getTypeFromTypeNode(expression.type),
-          expression
+          expression,
+          { allowTypeParameter: true }
         );
   }
 
@@ -925,14 +925,13 @@ export function boundaryModel(program, options = {}) {
       return [];
     }
     if (visiting.size >= TRACE_DEPTH) {
-      observer.boundFired(boundaryObservations.bounds.traceDepth, {
-        depth: visiting.size,
-        declaration: enclosingFunction(expression),
-      });
-      return unknownProvenance(
-        expression,
-        `trace deeper than ${TRACE_DEPTH} expressions`
-      );
+      if (observer.enabled) {
+        observer.boundFired(boundaryObservations.bounds.traceDepth, {
+          depth: visiting.size,
+          declaration: enclosingFunction(expression),
+        });
+      }
+      return [];
     }
     visiting.add(expression);
     try {
