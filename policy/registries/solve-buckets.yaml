@@ -208,6 +208,13 @@ rules:
       target: semantic-ast,
       note: "TypeChecker symbol and module provenance proves a project-local module owns an Effect service tag or layer and reports direct constructor/factory imports outside Layer wiring.",
     }
+  antidrift/no-bag-reshaper:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "TypeChecker parameter-bag provenance plus pure object-literal return projection proof covers both bagToContract ('provide a bag, return a type I want') and bagToBag ('provide a bag, return a bag').",
+    }
 
 # Behaviors the taxonomy reveals we do not have blocking coverage for yet. Some need a missing
 # bucket; others, like diff-scope-creep, now have an inventory spine but still need promotion

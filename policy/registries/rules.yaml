@@ -2333,6 +2333,44 @@ rules:
         - 'import { makeSlug } from "./slug"; const slug = makeSlug("hello"); // ./slug has no service tag or layer'
     nextAction: "Enabled at error in the TypeScript ESLint pass; promote to stable once independent multi-repo Effect service corpus drift is recorded."
 
+  antidrift/no-bag-reshaper:
+    directive: G4
+    status: ready
+    stable: false
+    defaultOff: false
+    signal: TypeChecker parameter-bag provenance plus pure object-literal return projection proof covering both bagToContract and bagToBag
+    solveType: bag-reshaper-projection
+    proofBuckets: [semantic-source-type-provenance]
+    semanticAdapterStatus:
+      status: inline-pending
+      reason: The parameter-bag and object-literal projection proof runs on defineTypeScriptRule in the ESLint rule; extract a standalone semantic adapter once multi-rule sharing requires it.
+    referenceDoc: docs/rule-investigations/directive-parity-and-pathological-smells.md
+    corpusRepositories: [antidrift]
+    concerns:
+      - "Covers both bag-reshaping pathologies missed by no-contract-appeasement-projection: bagToContract ('provide a bag, return a type I want', where a function reshapes a parameter bag into a named target contract without validation or domain construction) and bagToBag ('provide a bag, return a bag', where a function repacks, renames, defaults, or coerces fields from an input bag into another ad-hoc object literal)."
+      - "Functions that perform real domain computation (method calls, function calls other than primitive String/Number/Boolean coercions, arithmetic, string concatenation, new construction, array literals, or async/await) stay clean."
+      - "Envelope constructors that wrap a whole parameter without unpacking its fields (e.g., ok(payload) => ({ ok: true, payload })) and multi-parameter assemblers stay clean."
+    external:
+      state: net-antidrift
+      support: none
+      candidates:
+        [
+          "antfu/eslint-plugin-slop no-trivial-functions",
+          "antidrift/no-contract-appeasement-projection",
+        ]
+      decision: own-antidrift
+      whyThisState: "No existing rule proves via TypeChecker that a unary parameter is a plain data bag and that every returned object literal property is a pure field projection, rename, spread, default, or primitive coercion into either a named contract (bagToContract) or an inferred anonymous bag (bagToBag)."
+      whyNotOtherState: "Not covered by no-contract-appeasement-projection because that rule skips all returned ObjectLiteralExpressions and requires an explicit return type annotation."
+    examples:
+      flags:
+        - 'function toUserRow(input: { id: string; email: string; name?: string | null }): UserRow { return { id: input.id, email: input.email, name: input.name ?? "Anonymous" }; }'
+        - 'function normalizeFilters(params: { teamId: string; status?: string }) { return { team_id: params.teamId, status: params.status ?? "active" }; }'
+      allows:
+        - "function parseUserRow(raw: unknown): UserRow { return UserRowSchema.parse(raw); }"
+        - "function formatUserSummary(user: UserRow) { return { id: user.id, label: user.email.trim().toLowerCase() }; }"
+        - "function ok<T>(payload: T) { return { ok: true, payload }; }"
+    nextAction: "Enabled at error in the TypeScript ESLint pass; inventory multi-repo bagToContract and bagToBag findings before stable promotion."
+
   antidrift/no-redeclared-owned-union:
     status: ready
     stable: false

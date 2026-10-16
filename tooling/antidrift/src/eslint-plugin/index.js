@@ -38,11 +38,13 @@ import ruleNoSentinelAbsenceFallback from "../oxlint-plugin/rules/no-sentinel-ab
 import ruleNoSilentEmptyDetectionFallback from "../oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
 import ruleNoValidatorOutputOracle from "../oxlint-plugin/rules/no-validator-output-oracle.js";
 import { ruleNoServiceConstructorImports } from "./rules/no-service-constructor-imports.js";
+import { ruleNoBagReshaper } from "./rules/no-bag-reshaper.js";
 import ruleUnknownInputMustBeDecoded from "./rules/unknown-input-must-be-decoded.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
   "no-contract-appeasement-projection": ruleNoContractAppeasementProjection(),
+  "no-bag-reshaper": ruleNoBagReshaper(),
   "no-appeasement-cast": ruleNoAppeasementCast(),
   "no-nullable-positional-tuple": ruleNoNullablePositionalTuple(),
   "no-underchecked-type-predicate": ruleNoUndercheckedTypePredicate(),
