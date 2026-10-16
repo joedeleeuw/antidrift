@@ -36,48 +36,31 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
 
 ## 2. Directive Parity Rules (Tier 1 & Tier 2)
 
-### 2.1 `antidrift/no-case-table-type-annotation` (Directive G3)
+### 2.1 Deepened `antidrift/no-appeasement-erasure` (`caseTableAnnotation` — Directive G3)
 
 - **Directive (`AGENT.md` § Type Safety):**
   > _"To index a case table by a generic key, declare `type Table = { [K in keyof Cases]: (value: Cases[K]) => Out }`, write `const TABLE = { ... } satisfies Table`, and read a row through a typed indexed access (`const row: Table[K] = TABLE[key]`). Do not annotate the binding with a mapped type or `Record`: that erases the table's evidence, and the antidrift lint rejects it."_
-- **Current gap:** `antidrift/no-partial-record-satisfies` rejects `{ ... } satisfies Partial<Record<K, V>>`, and its `allows` example currently permits `const labels: Partial<Record<State, string>> = { ready: "Ready" }`. No rule rejects annotating a `const` case-table object literal with `: Record<ClosedKey, V>` or `: MappedTable`, which widens each property value type and erases per-key literal/function specialization.
-- **Required context:** `defineTypeScriptRule` (`ts-rule-kernel.mjs`) — `sourceFile`, `checker`, and ESLint scope reference tracking (or AST write-reference scan).
-- **Implementation specification:**
-  1. Match `ts.SyntaxKind.VariableDeclaration` inside a `const` `VariableDeclarationList` where `initializer` (unwrapping `Object.freeze(...)`) is a non-empty `ObjectLiteralExpression` and `type` (the explicit `: T` annotation) is present.
-  2. Resolve the declared type `T = checker.getTypeFromTypeNode(node.type)`.
-  3. Determine whether `T` is a **closed case-table contract**:
-     - `T` is an instantiation of `Record<K, V>` or `Readonly<Record<K, V>>` where `K` is a finite union of string/number/symbol literals (or a type parameter constrained to `keyof Cases` / a finite union), OR
-     - `T`'s symbol declaration is a `MappedTypeNode` (`{ [K in ...]: ... }`) whose key space is a finite union or `keyof` a closed object/map (excluding `Partial<...>` / optional mapped types where keys are intentionally omitted, and excluding open index signatures `Record<string, V>`, `Record<number, V>`, `Record<PropertyKey, V>`).
-  4. Verify that the variable binding is never reassigned and never mutated (`TABLE[k] = ...`, `delete TABLE[k]`) across its lexical scope. (Mutable lookup caches legitimately require `: Record<...>` or `: Partial<Record<...>>`.)
-  5. Verify that every required key of `T` is present in the `ObjectLiteralExpression` (so replacing `: T` with `satisfies T` is type-valid).
-  6. Report the `: T` annotation and instruct using `satisfies T` on the object literal instead.
+- **Superset consolidation & shared logic (`dictionary-types.js` + `no-appeasement-erasure.js`):**
+  - Instead of creating a duplicate `no-case-table-type-annotation` rule ID, `antidrift/no-appeasement-erasure` is the single superset owner for variable-annotation evidence erasure (`widening`, `widenThenAssert`, `caseTableAnnotation`, and `unknown` erasure).
+  - [`dictionary-types.js`](file:///home/joedeleeuw/code/antidrift/tooling/antidrift/src/oxlint-plugin/anti-slop/shared/dictionary-types.js) exports `isPopulatedObjectExpression` (including `Object.freeze({ ... })`) and `isMutatedObjectBinding` alongside `hasBroadRecordKey`, so `no-known-value-widening` handles open-key dictionaries (`Record<string, V>`, `{ [K in string]: V }`) while `no-appeasement-erasure.js` uses `TypeChecker` (`classifyClosedCaseTableAnnotation`) plus shared `isPopulatedObjectExpression` and `isMutatedObjectBinding` to report closed `Record<ClosedKey, V>` and closed mapped-type (`{ [K in keyof Cases]: ... }`, including resolved type aliases) annotations on immutable `const` object-literal case tables.
 
-### 2.2 `antidrift/no-inline-parse-reshape` (Directive G4)
+### 2.2 Deepened `antidrift/no-redundant-zod-parse` (`inlineObjectReshape` & `inlineConditionalReshape` — Directive G4)
 
 - **Directive (`AGENT.md` § Parse at Boundaries):**
   > _"Never reshape a payload inline to satisfy a schema, as in `parse(x.kind === "ready" ? { kind: "ready" } : x)` or `parse({ text: e.text })`. Define a named decoder at the receiving adapter, built from the owner's contract shapes (for example `z.object(contractSchema.shape)` to drop extra native fields), and parse once."_
-- **Current gap:** `no-redundant-zod-parse` flags re-parsing an already validated value; `no-identity-schema-transform` flags `.transform((x) => ({ ... }))` identity copies; `unknown-input-must-be-decoded` flags unvalidated boundary uses. None flags inline payload reshaping inside the argument of a schema parse call.
-- **Required context:** `defineTypeScriptRule` (`ts-rule-kernel.mjs`) + Schema Provenance (`schema-provenance.mjs` and `effect-schema.mjs`).
-- **Implementation specification:**
-  1. Identify recognized schema parse/decode invocations across Zod (`schema.parse(arg)`, `schema.safeParse(arg)`, `schema.parseAsync(arg)`, `schema.safeParseAsync(arg)`), Valibot (`v.parse(schema, arg)`, `v.safeParse(schema, arg)`), Effect Schema (`Schema.decodeUnknown*(schema)(arg)`), and TypeBox (`Value.Decode(schema, arg)`, `Value.Parse(schema, arg)`).
-  2. Inspect the payload argument `arg`:
-     - **Case A (Inline projection object literal):** `arg` is an `ObjectLiteralExpression` with `>= 1` property assignments where every property value reads from the same source root binding `x` (e.g., `{ text: e.text }` or `{ ...e, kind: "ready" }`) and `x` is not a freshly constructed local builders/accumulators map.
-     - **Case B (Inline conditional reshape):** `arg` is a `ConditionalExpression` (`x.kind === "ready" ? { kind: "ready" } : x`) where one branch is a source binding `x` (or member of `x`) and the other branch is an inline `ObjectLiteralExpression` reshaping `x`.
-  3. **Clean controls (do not report):**
-     - Assembling distinct independent arguments into a composite object (`Schema.parse({ body: rawBody, headers: rawHeaders })` where properties come from `>= 2` distinct source bindings).
-     - Calls inside a schema's own `.preprocess(...)`, `.transform(...)`, or `Schema.transform(...)` combinator.
+- **Superset consolidation & shared logic (`bag-projection.mjs` + `schema-provenance.mjs`):**
+  - Instead of creating a separate `no-inline-parse-reshape` rule that walks every `schemaValidationCallParts(node, services, checker)` site a second time, `antidrift/no-redundant-zod-parse` owns all parse-site contract misuse (`inlineObjectReshape`, `inlineConditionalReshape`, same-schema re-parse, and parameter `z.infer` parse-as-cast) across Zod, Valibot, Effect Schema, and TypeBox.
+  - Both `antidrift/no-bag-reshaper` and `antidrift/no-redundant-zod-parse` share [`bag-projection.mjs`](file:///home/joedeleeuw/code/antidrift/tooling/antidrift/src/semantic-adapters/bag-projection.mjs) (`classifyInlineParseReshape`, `inspectObjectLiteralBagProjection`, `isPureBagCondition`, `isBagObjectReference`, `inspectBagValueExpression`):
+    - **`inlineObjectReshape`:** `arg` is a non-empty `ObjectLiteralExpression` whose non-literal properties (`SpreadAssignment` or `PropertyAssignment`) all project from a single root source symbol `source` (excluding multi-source composite bundles `{ body: rawBody, headers: rawHeaders }` and `.preprocess` / `.transform` combinator callbacks).
+    - **`inlineConditionalReshape`:** `arg` is a `ConditionalExpression` (`x.kind === "ready" ? { kind: "ready" } : x`) with a pure condition on `source` and inline object-literal reshaping on at least one branch.
 
-### 2.3 `antidrift/no-source-file-read-in-test` (Directive G15)
+### 2.3 Deepened `antidrift/no-repo-state-mirror-assertion` (Built-In Source-File Read Taint — Directive G15)
 
 - **Directive (`AGENT.md` § Testing & `~/code/AGENTS.md` § Smoke-First Validation):**
   > _"Avoid contract/guard tests that `readFileSync` a source module and assert it `.toContain("someCode")` / matches a code shape: they prove nothing about behavior, break on every refactor, and are treated as noise. Don't write them; remove them when found."_
-- **Current gap:** `antidrift/no-repo-state-mirror-assertion` only checks tests that _import_ configured repo-owned state modules, and is inert unless configured. Source-string contract tests read source files from disk with `readFileSync` / `readFile` / `Bun.file`.
-- **Required context:** Oxlint / portable AST + local variable taint within a test file (`*.test.*`, `*.spec.*`, `**/__tests__/**`).
-- **Implementation specification:**
-  1. Restrict to test files (`isTestFile(filename)`).
-  2. Track calls to `readFileSync`, `readFile`, `fs.readFileSync`, `fs.promises.readFile`, `fsPromises.readFile`, or `Bun.file(...).text()` whose path argument (literal, template literal, `path.join(...)`, `path.resolve(...)`, or `new URL(..., import.meta.url)`) ends with a source-code extension (`.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.py`, `.go`, `.rs`, `.css`) and does **not** point into a fixture/snapshot/artifact path (`fixtures`, `__fixtures__`, `__snapshots__`, `testdata`, `dist`, `build`).
-  3. Follow the returned string (or `await`ed string) directly or through a local `const`/`let` binding into `expect(actual).<matcher>(...)` where `<matcher>` is a string/regex/snapshot assertion (`toContain`, `toMatch`, `toBe`, `toEqual`, `toMatchSnapshot`, `toMatchInlineSnapshot`).
-  4. Report the assertion as a source-shape guard test that must be deleted or replaced with behavioral execution.
+- **Superset consolidation & shared taint engine (`no-repo-state-mirror-assertion.js`):**
+  - Rather than adding a duplicate `no-source-file-read-in-test` rule with a parallel taint tracker, [`no-repo-state-mirror-assertion.js`](file:///home/joedeleeuw/code/antidrift/tooling/antidrift/src/oxlint-plugin/rules/no-repo-state-mirror-assertion.js) integrates `sourceFileReadCallName(target, sourceCode)` directly into `taintRootName(node)` and adds `toMatch`, `toMatchSnapshot`, and `toMatchInlineSnapshot` to `EQUALITY_MATCHERS`.
+  - Calls to `readFileSync`, `readFile`, `fs.readFileSync`, `fs.promises.readFile`, `fsPromises.readFile`, or `Bun.file(...).text()` whose path argument (literal, template literal, `path.join`/`path.resolve`, `new URL(..., import.meta.url)`, or local path variable) ends with a source-code extension (`.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.py`, `.go`, `.rs`, `.css`, `.scss`, `.vue`, `.svelte`) outside fixture/snapshot/build paths flow through the existing variable, `for..of`, callback, and member-expression taint engine and work out-of-the-box with zero configuration.
 
 ### 2.4 `antidrift/no-bag-reshaper` (Directives G4, G8, G10 & W4 — "Provide a Bag, Return a Type I Want" and "Provide a Bag, Return a Bag")
 
@@ -120,7 +103,7 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
      }
      ```
      Neither the input nor the output is an owned domain contract; the function is a shallow object-repacking hop that hides field provenance and spawns parallel anonymous structural shapes across the call graph.
-- **Required context:** `defineTypeScriptRule` (`ts-rule-kernel.mjs`) + a shared `bag-reshape-proof.mjs` semantic helper in `src/semantic-adapters/`.
+- **Required context:** `defineTypeScriptRule` (`ts-rule-kernel.mjs`) + shared [`bag-projection.mjs`](file:///home/joedeleeuw/code/antidrift/tooling/antidrift/src/semantic-adapters/bag-projection.mjs) in `src/semantic-adapters/`.
 - **Implementation specification:**
   1. **Callable & parameter gate:** Inspect non-generated function declarations, arrow/function expressions, and methods that have `>= 1` object-shaped parameter (an `ObjectBindingPattern` `{ a, b }`, an inline `TypeLiteralNode` `{ ... }`, `Record<...>`, `Partial<...>`, or a parameter whose `checker.getTypeAtLocation(param)` is an object/interface type, excluding primitives, arrays, functions, and class instances with methods).
   2. **Return-path gate:** Collect all return expressions (handling concise arrow bodies, `return` statements, `if`/`else`, and conditional `? :` branches). Ignore `undefined`/`null` guard returns; require `>= 1` meaningful return expression and require every meaningful return expression (unwrapping parenthesized, `as T`, and `satisfies T` wrappers) to be a non-empty `ObjectLiteralExpression`.
@@ -286,13 +269,16 @@ These 7 rules target high-frequency AI and architectural pathologies that **cann
   2. Scan consumer member accesses on values of that type across `program.getSourceFiles()`:
      - Report when consumers guard or assert an optional property **inside a branch that narrows the discriminant property to a specific literal** (e.g., inside `if (x.status === "ready")`, code writes `x.data!` or `if (x.data)`), proving the optional property is state-coupled variant data that belongs in a discriminated union branch.
 
-### 3.6 `antidrift/no-lossy-error-rethrow` (Directive G7 — Catch-and-Rethrow That Strips Error Identity)
+### 3.6 `antidrift/no-lossy-error-rethrow` (Directive G7 — Catch-and-Rethrow That Strips Error Identity or Only Logs and Rethrows)
 
-- **Pathology:** Inside `catch (err)`, code writes `throw new Error(err instanceof Error ? err.message : String(err))` or `throw new Error(\`Failed: \${err.message}\`)`without`{ cause: err }` or without adding a typed domain error class (`RequestError`, `ValidationError`). Even when `preserve-caught-error`is satisfied or bypassed, re-wrapping a caught error into a bare`new Error(err.message)` destroys the original prototype (`instanceof`), custom fields (`code`, `status`), and stack frame origin.
-- **Why `preserve-caught-error` is insufficient:** Native `preserve-caught-error` only checks whether `{ cause }` is passed when a new `Error` is thrown; it allows `throw new Error(err.message, { cause: err })` in a catch block that adds zero context and strips the typed error class, and misses `.catch((err) => Promise.reject(new Error(err.message)))`.
+- **Pathology:**
+  1. **`lossyErrorRethrow`:** Inside `catch (err)` or `.catch((err) => ...)`, code writes `throw new Error(err instanceof Error ? err.message : String(err))` or `throw new Error(err.message)` without adding a typed domain error class (`RequestError`, `ValidationError`) or domain context. Re-wrapping a caught error into a bare `new Error(err.message)` destroys the original prototype (`instanceof`), custom fields (`code`, `status`), and stack frame origin.
+  2. **`catchLogRethrow`:** Inside `catch (err)` or `.catch((err) => ...)`, code only logs the error (`console.error(err)`, `logger.error(err)`, `log.warn(err)`) and immediately rethrows the identical error (`throw err` or `return Promise.reject(err)`), duplicating error logs at every call-stack hop instead of handling the failure at the boundary or enriching the error with context.
+- **Why `preserve-caught-error` and `ai-guard/no-catch-log-rethrow` are insufficient:** Native `preserve-caught-error` only checks whether `{ cause }` is passed when a new `Error` is thrown; it allows `throw new Error(err.message, { cause: err })` in a catch block that adds zero context and strips the typed error class, and misses `.catch((err) => Promise.reject(new Error(err.message)))`. `ai-guard/no-catch-log-rethrow` only matches `console.*` + bare `throw err` in `CatchClause`, missing `logger.*` / `log.*`, `.catch(...)` promise handlers, and combined log + lossy `new Error(err.message)` re-wraps.
 - **Deterministic proof (Oxlint / AST + Scope):**
-  1. Inside a `catch (err)` clause or `.catch((err) => ...)` handler whose only side effect is throwing/rejecting:
-  2. Report when the thrown expression is a bare `new Error(...)` (not a custom error subclass or domain error constructor) whose message argument is solely `err.message`, `String(err)`, or `` `${err}` `` / `` `${err.message}` `` (with no added context interpolation or structured error class).
+  1. Inside a `catch (err)` clause or `.catch((err) => ...)` handler whose statements consist only of optional `console.*` / `logger.*` / `log.*` calls followed by a `throw` or `Promise.reject(...)`:
+  2. Report `lossyErrorRethrow` when the thrown/rejected expression is a bare `new Error(...)` (not a custom error subclass or domain error constructor) whose message argument is solely `err.message`, `String(err)`, `err instanceof Error ? err.message : String(err)`, or `` `${err}` `` / `` `${err.message}` `` (with no added context prefix/interpolation or structured error class).
+  3. Report `catchLogRethrow` when the handler contains `>= 1` logging call (`console.error`, `console.warn`, `console.log`, `logger.error`, `logger.warn`, `log.error`, `log.warn`) and rethrows/rejects the unmodified caught `err` binding.
 
 ### 3.7 `antidrift/no-boolean-flag-mode-parameter` (Directive G9 / `codebase-design` — Boolean Control-Flow Mode Trap)
 
@@ -330,13 +316,14 @@ Each of the 17 rules above was audited against third-party AI-slop, guardrail, a
 | 3.6  | `no-lossy-error-rethrow`                                          | `eslint` `preserve-caught-error`; `biome` `useErrorCause`; `ai-guard` `no-catch-log-rethrow`                                                                                         | Syntax-only                                  | `preserve-caught-error` and `useErrorCause` allow `throw new Error(err.message, { cause: err })` even when it adds zero context and strips the error class/prototype (`instanceof`, `.code`, `.status`), and miss `.catch(err => Promise.reject(new Error(err.message)))`.                                                                                                                    |
 | 3.7  | `no-boolean-flag-mode-parameter`                                  | `@coderrob/eslint-plugin-zero-tolerance` `no-flag-argument`                                                                                                                          | Syntax-only (`TSBooleanKeyword`)             | `zero-tolerance/no-flag-argument` flags every `param: boolean` on every function (`setVisible(visible: boolean)`), whereas `antidrift/no-boolean-flag-mode-parameter` proves (a) `flag` is used solely in branch conditions inside the body AND (b) `>= 1` call site passes a bare positional `true`/`false` literal.                                                                         |
 
-### Notable Upstream Third-Party Rules Worth Tracking
+### 4.2 Impact of Ecosystem Learnings on the Wider Antidrift Ruleset
 
-1. **`dmmulroy/anti-slop` (commits since `6d53855`):**
-   - `no-reduce-accumulator-copy` (`src/rules/no-reduce-accumulator-copy.ts`): Catches non-spread O(N²) accumulator copies (`Object.assign({}, acc, ...)`, `Array.from(acc)`, `acc.concat(...)`, `acc.slice()`) inside `.reduce` / `.reduceRight`, complementing native `oxc/no-accumulating-spread`.
-   - `anti-slop-effect/*` (`no-manual-effect-error-tag`, `no-manual-tag-comparison`, `no-manual-tagged-construction`, `prefer-effect-match`): Effect-specific tag/match hygiene rules.
-   - `hasBroadRecordKey` in `src/shared/dictionary-types.ts`: Upstream refinement separating finite-key `Record<ClosedUnion, V>` from open dictionaries (`Record<string, V>`), which pairs directly with `2.1 antidrift/no-case-table-type-annotation`.
-2. **`ai-guard-dev/eslint-plugin-ai-guard`:**
-   - `no-catch-log-rethrow` (`src/rules/reliability/no-catch-log-rethrow.ts`): Flags `catch (err) { console.error(err); throw err; }` blocks that only log to `console.*` and rethrow the identical error without recovery or context (can be folded into or paired with `3.6 antidrift/no-lossy-error-rethrow`).
-3. **`jantimon/eslint-plugin-no-comment-slop`:**
-   - `no-banner-comment`: Flags ASCII section-divider banner comments (`// ====================`, `// --- Helpers ---`) that LLMs emit instead of splitting files by concern.
+1. **Clean Seam Between `antidrift/no-appeasement-erasure` and `antidrift/no-case-table-type-annotation` (Directive G3):**
+   - Updating [`dictionary-types.js`](file:///home/joedeleeuw/code/antidrift/tooling/antidrift/src/oxlint-plugin/anti-slop/shared/dictionary-types.js) with `hasBroadRecordKey` (ported from upstream `dmmulroy/anti-slop` `main`) ensures `antidrift/no-appeasement-erasure` only flags open-key dictionaries (`Record<string | number | symbol | PropertyKey, V>`, `{ [k: string]: V }`, `Map<string, unknown>`) and `unknown`/`object` widening.
+   - `antidrift/no-case-table-type-annotation` then cleanly owns closed-key `Record<ClosedUnion, V>` and mapped-type annotations on immutable `const` object-literal case tables (resolving imported `type Table = { [K in keyof Cases]: ... }` aliases via `TypeChecker` and verifying zero write/mutation references), enforcing `satisfies Table` with zero rule overlap.
+2. **Deepening Existing Rule Owners Instead of Spawning One-Off Rules (Directives G7, G10, G11):**
+   - **Error Rethrow Hygiene (`antidrift/no-lossy-error-rethrow`):** Unifies `lossyErrorRethrow` (`throw new Error(err.message)`) and `catchLogRethrow` (`console.error(err); throw err;` / `logger.error(err); throw err;`, inspired by `ai-guard-dev/eslint-plugin-ai-guard`) under a single owner covering both `CatchClause` and `.catch(...)` promise handlers.
+   - **Comment Hygiene (`antidrift/no-tutorial-comments`):** Extends [`no-tutorial-comments.js`](file:///home/joedeleeuw/code/antidrift/tooling/antidrift/src/oxlint-plugin/portable/no-tutorial-comments.js) with ASCII section-divider banner detection (`// ====================`, `// --- Helpers ---`, inspired by `jantimon/eslint-plugin-no-comment-slop` `no-banner-comment`) rather than adding a second comment-scanning rule.
+3. **Replacing Syntax-Only Receiver/Tag Whitelists with `TypeChecker` & Schema Provenance:**
+   - **O(N²) Accumulator Copy (`antidrift/no-reduce-accumulator-copy`):** Whereas upstream `dmmulroy/anti-slop` uses a syntax-only `isKnownArrayExpression` whitelist that misses `.reduce(...)` on typed array parameters (`items: readonly Item[]`) and typed function returns (`getRows().reduce(...)`), our implementation on `defineTypeScriptRule` checks `checker.isArrayType(receiverType) || checker.isTupleType(receiverType)` before flagging `Object.assign({}, acc, ...)`, `Array.from(acc)`, `acc.concat(...)`, and `acc.slice()`.
+   - **Effect Tagged Construction (`effect-schema.mjs`):** Whereas upstream `anti-slop-effect/no-manual-tagged-construction` bans all `{ _tag: "..." }` object literals by syntax (false-positiving on plain TypeScript discriminated unions), `TypeChecker` + `effect-schema.mjs` proves the contextual/expected type originates from an Effect `Data.TaggedClass`, `Data.TaggedError`, `Schema.TaggedError`, or `Schema.TaggedStruct` declaration.

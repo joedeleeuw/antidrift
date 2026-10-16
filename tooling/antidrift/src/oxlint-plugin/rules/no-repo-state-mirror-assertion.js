@@ -8,7 +8,12 @@ const EQUALITY_MATCHERS = new Set([
   "toContain",
   "toContainEqual",
   "toHaveProperty",
+  "toMatch",
+  "toMatchSnapshot",
+  "toMatchInlineSnapshot",
 ]);
+
+const SNAPSHOT_MATCHERS = new Set(["toMatchSnapshot", "toMatchInlineSnapshot"]);
 
 const EXISTENCE_MATCHERS = new Set([
   "toBeNull",
@@ -19,6 +24,16 @@ const EXISTENCE_MATCHERS = new Set([
 ]);
 
 const CHAIN_MODIFIERS = new Set(["not", "resolves", "rejects"]);
+
+const SOURCE_FILE_EXTENSION_PATTERN =
+  /\.(?:[cm]?[jt]sx?|py|go|rs|css|scss|vue|svelte)$/u;
+
+const FIXTURE_OR_BUILD_PATH_PATTERN =
+  /(?:^|[/\\])(?:fixtures?|__fixtures__|__snapshots__|testdata|snapshots?|dist|build|coverage|\.next)(?:[/\\]|$)|\.snap$/iu;
+
+const FILE_READ_FUNCTIONS = new Set(["readFileSync", "readFile"]);
+
+const PATH_JOIN_HELPER_NAMES = new Set(["join", "resolve", "fromFileUrl"]);
 
 const testFilenamePattern =
   /(?:(?:^|[/\\])(?:test|tests|__tests__)(?:[/\\])|[.](?:test|spec)[.][cm]?[jt]sx?$)/u;
@@ -107,13 +122,163 @@ function expectCallOf(matcherCallee) {
   return null;
 }
 
+function callTargetName(calleeNode) {
+  const callee = unwrap(calleeNode);
+  if (callee?.type === "Identifier") {
+    return callee.name;
+  }
+  if (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.property.type === "Identifier"
+  ) {
+    return callee.property.name;
+  }
+  return null;
+}
+
+function collectTemplatePathSegments(
+  templateNode,
+  sourceCode,
+  visitedBindings
+) {
+  const segments = [];
+  for (let index = 0; index < templateNode.quasis.length; index += 1) {
+    const cooked =
+      templateNode.quasis[index]?.value?.cooked ??
+      templateNode.quasis[index]?.value?.raw ??
+      "";
+    if (cooked) segments.push(cooked);
+    if (index < templateNode.expressions.length) {
+      segments.push(
+        ...collectStaticPathSegments(
+          templateNode.expressions[index],
+          sourceCode,
+          visitedBindings
+        )
+      );
+    }
+  }
+  return segments;
+}
+
+function collectIdentifierPathSegments(
+  identifierNode,
+  sourceCode,
+  visitedBindings
+) {
+  if (!sourceCode) return [];
+  const resolvedBinding = findVariable(sourceCode, identifierNode);
+  if (!resolvedBinding || visitedBindings.has(resolvedBinding)) return [];
+  visitedBindings.add(resolvedBinding);
+  for (const def of resolvedBinding.defs ?? []) {
+    if (
+      def.type === "Variable" &&
+      def.node.type === "VariableDeclarator" &&
+      def.node.init
+    ) {
+      return collectStaticPathSegments(
+        def.node.init,
+        sourceCode,
+        visitedBindings
+      );
+    }
+  }
+  return [];
+}
+
+function collectStaticPathSegments(
+  node,
+  sourceCode,
+  visitedBindings = new Set()
+) {
+  const target = unwrap(node);
+  if (!target) return [];
+  if (target.type === "Literal" && typeof target.value === "string") {
+    return [target.value];
+  }
+  if (target.type === "TemplateLiteral") {
+    return collectTemplatePathSegments(target, sourceCode, visitedBindings);
+  }
+  if (target.type === "BinaryExpression" && target.operator === "+") {
+    return [
+      ...collectStaticPathSegments(target.left, sourceCode, visitedBindings),
+      ...collectStaticPathSegments(target.right, sourceCode, visitedBindings),
+    ];
+  }
+  if (target.type === "Identifier") {
+    return collectIdentifierPathSegments(target, sourceCode, visitedBindings);
+  }
+  if (target.type === "CallExpression") {
+    const calleeName = callTargetName(target.callee);
+    if (calleeName && PATH_JOIN_HELPER_NAMES.has(calleeName)) {
+      return target.arguments.flatMap((argument) =>
+        collectStaticPathSegments(argument, sourceCode, visitedBindings)
+      );
+    }
+  }
+  if (
+    target.type === "NewExpression" &&
+    target.callee.type === "Identifier" &&
+    target.callee.name === "URL" &&
+    target.arguments.length >= 1
+  ) {
+    return collectStaticPathSegments(
+      target.arguments[0],
+      sourceCode,
+      visitedBindings
+    );
+  }
+  return [];
+}
+
+function isSourceCodePathArgument(pathArg, sourceCode) {
+  const segments = collectStaticPathSegments(pathArg, sourceCode);
+  if (segments.length === 0) return false;
+  const combinedPath = segments.join("/");
+  if (FIXTURE_OR_BUILD_PATH_PATTERN.test(combinedPath)) {
+    return false;
+  }
+  const finalSegment = segments[segments.length - 1];
+  return SOURCE_FILE_EXTENSION_PATTERN.test(finalSegment);
+}
+
+function sourceFileReadCallName(callNode, sourceCode) {
+  if (!callNode || callNode.arguments.length === 0) return null;
+  const callee = unwrap(callNode.callee);
+  if (!callee) return null;
+  let readerName = null;
+  if (callee.type === "Identifier" && FILE_READ_FUNCTIONS.has(callee.name)) {
+    readerName = callee.name;
+  } else if (
+    callee.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.property.type === "Identifier"
+  ) {
+    const propertyName = callee.property.name;
+    if (FILE_READ_FUNCTIONS.has(propertyName)) {
+      readerName = propertyName;
+    } else if (
+      propertyName === "file" &&
+      callee.object.type === "Identifier" &&
+      callee.object.name === "Bun"
+    ) {
+      readerName = "Bun.file";
+    }
+  }
+  if (!readerName) return null;
+  return isSourceCodePathArgument(callNode.arguments[0], sourceCode)
+    ? readerName
+    : null;
+}
+
 export default function ruleNoRepoStateMirrorAssertion() {
   return {
     meta: {
       type: "problem",
       docs: {
         description:
-          "Disallow test assertions that mirror repo-owned state (confs, manifests, registries) as literals instead of asserting behavior or invariants.",
+          "Disallow test assertions that mirror repo-owned state (confs, manifests, registries, or source files read from disk) as literals instead of asserting behavior or invariants.",
       },
       schema: [
         {
@@ -148,7 +313,6 @@ export default function ruleNoRepoStateMirrorAssertion() {
     create(context) {
       if (!isTestFilename(contextFilename(context))) return {};
       const sources = context.options?.[0]?.sources ?? [];
-      if (sources.length === 0) return {};
 
       const sourceCode = context.sourceCode ?? context.getSourceCode?.();
       const taintedImports = new Map();
@@ -164,14 +328,16 @@ export default function ruleNoRepoStateMirrorAssertion() {
         return null;
       }
 
-      function variableIsTainted(variable) {
-        if (taintCache.has(variable)) return taintCache.get(variable);
-        taintCache.set(variable, false);
+      function bindingIsTainted(resolvedBinding) {
+        if (taintCache.has(resolvedBinding)) {
+          return taintCache.get(resolvedBinding);
+        }
+        taintCache.set(resolvedBinding, false);
 
         let tainted = false;
-        for (const def of variable.defs ?? []) {
+        for (const def of resolvedBinding.defs ?? []) {
           if (def.type === "ImportBinding") {
-            tainted = taintedImports.has(variable.name);
+            tainted = taintedImports.has(resolvedBinding.name);
           } else if (
             def.type === "Variable" &&
             def.node.type === "VariableDeclarator"
@@ -187,11 +353,11 @@ export default function ruleNoRepoStateMirrorAssertion() {
               tainted = expressionIsTainted(def.node.parent.parent.right);
             }
           } else if (def.type === "Parameter") {
-            const fn = def.node;
-            const call = fn.parent;
+            const callbackFn = def.node;
+            const call = callbackFn.parent;
             if (
               call?.type === "CallExpression" &&
-              call.arguments.includes(fn) &&
+              call.arguments.includes(callbackFn) &&
               call.callee.type === "MemberExpression"
             ) {
               tainted = expressionIsTainted(call.callee.object);
@@ -199,7 +365,7 @@ export default function ruleNoRepoStateMirrorAssertion() {
           }
           if (tainted) break;
         }
-        taintCache.set(variable, tainted);
+        taintCache.set(resolvedBinding, tainted);
         return tainted;
       }
 
@@ -212,13 +378,16 @@ export default function ruleNoRepoStateMirrorAssertion() {
         if (!target) return null;
         switch (target.type) {
           case "Identifier": {
-            const variable = findVariable(sourceCode, target);
-            if (!variable) return null;
+            const resolvedBinding = findVariable(sourceCode, target);
+            if (!resolvedBinding) return null;
             if (taintedImports.has(target.name)) return target.name;
-            return variableIsTainted(variable) ? target.name : null;
+            return bindingIsTainted(resolvedBinding) ? target.name : null;
           }
           case "CallExpression":
-            return taintRootName(target.callee);
+            return (
+              sourceFileReadCallName(target, sourceCode) ??
+              taintRootName(target.callee)
+            );
           case "MemberExpression":
             return taintRootName(target.object);
           case "ConditionalExpression":
@@ -256,6 +425,7 @@ export default function ruleNoRepoStateMirrorAssertion() {
 
       return {
         ImportDeclaration(node) {
+          if (sources.length === 0) return;
           const moduleSpecifier = node.source.value;
           if (typeof moduleSpecifier !== "string") return;
           for (const specifier of node.specifiers) {
@@ -288,7 +458,8 @@ export default function ruleNoRepoStateMirrorAssertion() {
           const subject = expectCall.arguments[0];
 
           if (isEquality) {
-            if (node.arguments.length === 0) return;
+            const isSnapshot = SNAPSHOT_MATCHERS.has(matcher);
+            if (!isSnapshot && node.arguments.length === 0) return;
             if (!node.arguments.every((argument) => isLiteralLike(argument))) {
               return;
             }

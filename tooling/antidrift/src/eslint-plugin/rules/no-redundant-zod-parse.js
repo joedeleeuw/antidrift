@@ -1,5 +1,6 @@
 import ts from "typescript";
 
+import { classifyInlineParseReshape } from "../../semantic-adapters/bag-projection.mjs";
 import {
   declaredSchemaParameter,
   isThrowAssertionCallbackParse,
@@ -66,7 +67,13 @@ export function ruleNoRedundantZodParse() {
       type: "problem",
       docs: {
         description:
-          "Detect re-parsing a value with the same schema that already produced it or that already types its parameter contract. Validate once at the boundary and pass the parsed value inward.",
+          "Detect re-parsing a value with the same schema that already produced it, re-parsing a parameter typed by that schema, or reshaping a payload inline inside a schema parse call.",
+      },
+      messages: {
+        inlineObjectReshape:
+          "Do not reshape '{{source}}' inline inside a schema parse call (`parse({ ... })`). Pass the raw payload directly to a named boundary decoder built from the owner's contract shapes and parse once.",
+        inlineConditionalReshape:
+          "Do not conditionally reshape '{{source}}' inline inside a schema parse call (`parse(cond ? ... : ...)`). Define a named boundary decoder at the receiving adapter and parse once.",
       },
       schema: [],
     },
@@ -84,6 +91,18 @@ export function ruleNoRedundantZodParse() {
             return;
           }
           const { tsCall, arg, schemaNode, returnsSchemaOutput } = parts;
+          if (!isTestFile) {
+            const tsArg = services.esTreeNodeToTSNodeMap.get(arg);
+            const inlineReshape = classifyInlineParseReshape(tsArg, checker);
+            if (inlineReshape) {
+              context.report({
+                node: arg,
+                messageId: inlineReshape.messageId,
+                data: inlineReshape.data,
+              });
+              return;
+            }
+          }
           const schemaSym = parsedSchemaSymbol(checker, tsCall, schemaNode);
           if (
             arg.type === "Identifier" &&

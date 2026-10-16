@@ -22,7 +22,6 @@ function declaredStatement(statement) {
 }
 export function createTypeEnvironment(program) {
   const aliases = new Map();
-  const interfaces = new Map();
   const shadowedBuiltIns = new Set();
   for (const statement of program.body) {
     const declaration = declaredStatement(statement);
@@ -41,15 +40,10 @@ export function createTypeEnvironment(program) {
         shadowedBuiltIns.add(declaration.id.name);
       continue;
     }
-    if (declaration?.type === "TSInterfaceDeclaration") {
-      const declarations = interfaces.get(declaration.id.name) ?? [];
-      declarations.push(declaration);
-      interfaces.set(declaration.id.name, declarations);
-      if (BUILT_INS.has(declaration.id.name))
-        shadowedBuiltIns.add(declaration.id.name);
-      continue;
-    }
-    if (declaration?.type === "TSEnumDeclaration") {
+    if (
+      declaration?.type === "TSInterfaceDeclaration" ||
+      declaration?.type === "TSEnumDeclaration"
+    ) {
       if (BUILT_INS.has(declaration.id.name))
         shadowedBuiltIns.add(declaration.id.name);
       continue;
@@ -63,7 +57,7 @@ export function createTypeEnvironment(program) {
         shadowedBuiltIns.add(declaration.id.name);
     }
   }
-  return { aliases, interfaces, shadowedBuiltIns };
+  return { aliases, shadowedBuiltIns };
 }
 function typeReferenceName(type) {
   return type.typeName.type === "Identifier" ? type.typeName.name : null;
@@ -91,33 +85,6 @@ function unwrapTransparentType(type) {
   }
   return current;
 }
-function isNeverType(type) {
-  return unwrapTransparentType(type).type === "TSNeverKeyword";
-}
-function isEffectivelyEmptyMember(member) {
-  return (
-    member.type === "TSPropertySignature" &&
-    member.optional === true &&
-    member.typeAnnotation !== null &&
-    member.typeAnnotation !== undefined &&
-    isNeverType(member.typeAnnotation.typeAnnotation)
-  );
-}
-function isEffectivelyEmptyTypeLiteral(type) {
-  return (
-    type.members.length === 0 || type.members.every(isEffectivelyEmptyMember)
-  );
-}
-function isEffectivelyEmptyInterface(declarations) {
-  if (declarations.length !== 1) return false;
-  const [type] = declarations;
-  return (
-    type !== undefined &&
-    type.extends.length === 0 &&
-    (type.body.body.length === 0 ||
-      type.body.body.every(isEffectivelyEmptyMember))
-  );
-}
 function resolvedSubstitutionArgument(type, base, resolving = new Set()) {
   const unwrapped = unwrapTransparentType(type);
   if (unwrapped.type !== "TSTypeReference") return type;
@@ -130,92 +97,15 @@ function resolvedSubstitutionArgument(type, base, resolving = new Set()) {
   return resolvedSubstitutionArgument(substitution, base, nextResolving);
 }
 function aliasSubstitution(alias, type, base) {
-  const parameters = alias.typeParameters?.params ?? [];
+  const typeParameters = alias.typeParameters?.params ?? [];
   const arguments_ = type.typeArguments?.params ?? [];
   const next = new Map(base);
-  for (const [index, parameter] of parameters.entries()) {
+  for (const [index, parameter] of typeParameters.entries()) {
     const argument = arguments_[index] ?? parameter.default;
     if (argument === null || argument === undefined) return null;
     next.set(parameter.name.name, resolvedSubstitutionArgument(argument, next));
   }
   return next;
-}
-function unsafeDirectValue(type, environment, substitutions, resolvingAliases) {
-  const unwrapped = unwrapTransparentType(type);
-  if (unwrapped.type === "TSUnknownKeyword") return "unknown";
-  if (unwrapped.type === "TSAnyKeyword") return "any";
-  if (unwrapped.type === "TSObjectKeyword") return "object";
-  if (
-    unwrapped.type === "TSTypeLiteral" &&
-    isEffectivelyEmptyTypeLiteral(unwrapped)
-  )
-    return "empty-object";
-  if (unwrapped.type === "TSUnionType") {
-    return unwrapped.types.some(
-      (member) =>
-        unsafeDirectValue(
-          member,
-          environment,
-          substitutions,
-          resolvingAliases
-        ) !== null
-    )
-      ? "union"
-      : null;
-  }
-  if (unwrapped.type === "TSIntersectionType") {
-    const unsafeMembers = unwrapped.types.map((member) =>
-      unsafeDirectValue(member, environment, substitutions, resolvingAliases)
-    );
-    if (unsafeMembers.includes("any")) return "any";
-    return unsafeMembers.length > 0 &&
-      unsafeMembers.every((member) => member !== null)
-      ? unsafeMembers[0]
-      : null;
-  }
-  if (unwrapped.type !== "TSTypeReference") return null;
-  const name = typeReferenceName(unwrapped);
-  if (name === null) return null;
-  if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, environment)) {
-    const wrapped = unwrapped.typeArguments?.params[0];
-    return wrapped === undefined
-      ? null
-      : unsafeDirectValue(
-          wrapped,
-          environment,
-          substitutions,
-          resolvingAliases
-        );
-  }
-  const substitution = substitutions.get(name);
-  if (substitution !== undefined) {
-    return isUnappliedReferenceTo(substitution, name)
-      ? null
-      : unsafeDirectValue(
-          substitution,
-          environment,
-          substitutions,
-          resolvingAliases
-        );
-  }
-  const interfaceDeclarations = environment.interfaces.get(name);
-  if (interfaceDeclarations !== undefined) {
-    return isEffectivelyEmptyInterface(interfaceDeclarations)
-      ? "empty-object"
-      : null;
-  }
-  const alias = environment.aliases.get(name);
-  if (alias === undefined || resolvingAliases.has(name)) return null;
-  const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions);
-  if (nextSubstitutions === null) return null;
-  const nextResolving = new Set(resolvingAliases);
-  nextResolving.add(name);
-  return unsafeDirectValue(
-    alias.typeAnnotation,
-    environment,
-    nextSubstitutions,
-    nextResolving
-  );
 }
 function dictionaryValueTypes(
   type,
@@ -262,8 +152,10 @@ function dictionaryValueTypes(
         );
   }
   if (name === "Record" && isBuiltIn(name, environment)) {
-    const value = unwrapped.typeArguments?.params[1] ?? null;
-    return value === null ? [] : [{ type: value, substitutions }];
+    const recordEntryType = unwrapped.typeArguments?.params[1] ?? null;
+    return recordEntryType === null
+      ? []
+      : [{ type: recordEntryType, substitutions }];
   }
   if ((name === "Pick" || name === "Omit") && isBuiltIn(name, environment)) {
     const source = unwrapped.typeArguments?.params[0];
@@ -289,34 +181,6 @@ function dictionaryValueTypes(
     nextResolving
   );
 }
-export function classifyUnsafeDictionaryValue(valueType, environment) {
-  const unsafeValue = unsafeDirectValue(
-    valueType,
-    environment,
-    new Map(),
-    new Set()
-  );
-  return unsafeValue === null
-    ? null
-    : { kind: "unsafe-dictionary", unsafeValue };
-}
-export function classifyUnsafeDictionary(type, environment) {
-  for (const valueType of dictionaryValueTypes(
-    type,
-    environment,
-    new Map(),
-    new Set()
-  )) {
-    const unsafeValue = unsafeDirectValue(
-      valueType.type,
-      environment,
-      valueType.substitutions,
-      new Set()
-    );
-    if (unsafeValue !== null) return { kind: "unsafe-dictionary", unsafeValue };
-  }
-  return null;
-}
 function resolvesToDictionary(
   type,
   environment,
@@ -341,7 +205,11 @@ export function classifyWideningTarget(type, environment) {
         ? { kind: "anonymous object" }
         : null;
   }
-  if (unwrapped.type === "TSMappedType") return { kind: "open dictionary" };
+  if (unwrapped.type === "TSMappedType") {
+    return isBroadMappedKey(unwrapped.constraint, environment, new Map())
+      ? { kind: "open dictionary" }
+      : null;
+  }
   if (unwrapped.type !== "TSTypeReference") return null;
   const name = typeReferenceName(unwrapped);
   if (name === null) return null;
@@ -351,8 +219,11 @@ export function classifyWideningTarget(type, environment) {
       ? null
       : classifyWideningTarget(wrapped, environment);
   }
-  if (name === "Record" && isBuiltIn(name, environment))
-    return { kind: "open dictionary" };
+  if (name === "Record" && isBuiltIn(name, environment)) {
+    return hasBroadRecordKey(unwrapped, environment, new Map())
+      ? { kind: "open dictionary" }
+      : null;
+  }
   const alias = environment.aliases.get(name);
   if (alias === undefined) return null;
   if ((alias.typeParameters?.params.length ?? 0) > 0) {
@@ -377,7 +248,19 @@ export function classifyWideningTarget(type, environment) {
   );
   return resolved;
 }
-function isBroadMappedKey(type, environment, substitutions) {
+function hasBroadRecordKey(type, environment, substitutions) {
+  const key = type.typeArguments?.params[0];
+  return key === undefined
+    ? false
+    : isBroadMappedKey(key, environment, substitutions);
+}
+function isBroadMappedKey(
+  type,
+  environment,
+  substitutions,
+  resolvingAliases = new Set()
+) {
+  if (type === null || type === undefined) return false;
   const unwrapped = unwrapTransparentType(type);
   if (
     unwrapped.type === "TSStringKeyword" ||
@@ -388,7 +271,7 @@ function isBroadMappedKey(type, environment, substitutions) {
   }
   if (unwrapped.type === "TSUnionType") {
     return unwrapped.types.every((member) =>
-      isBroadMappedKey(member, environment, substitutions)
+      isBroadMappedKey(member, environment, substitutions, resolvingAliases)
     );
   }
   if (unwrapped.type !== "TSTypeReference") return false;
@@ -399,9 +282,28 @@ function isBroadMappedKey(type, environment, substitutions) {
     substitution !== undefined &&
     !isUnappliedReferenceTo(substitution, name)
   ) {
-    return isBroadMappedKey(substitution, environment, substitutions);
+    return isBroadMappedKey(
+      substitution,
+      environment,
+      substitutions,
+      resolvingAliases
+    );
   }
-  return name === "PropertyKey" && isBuiltIn(name, environment);
+  if (name === "PropertyKey" && isBuiltIn(name, environment)) {
+    return true;
+  }
+  const alias = environment.aliases.get(name);
+  if (alias === undefined || resolvingAliases.has(name)) return false;
+  const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions);
+  if (nextSubstitutions === null) return false;
+  const nextResolving = new Set(resolvingAliases);
+  nextResolving.add(name);
+  return isBroadMappedKey(
+    alias.typeAnnotation,
+    environment,
+    nextSubstitutions,
+    nextResolving
+  );
 }
 function classifyAliasBroadTarget(
   type,
@@ -450,7 +352,9 @@ function classifyAliasBroadTarget(
         );
   }
   if (name === "Record" && isBuiltIn(name, environment)) {
-    return { kind: "open dictionary" };
+    return hasBroadRecordKey(unwrapped, environment, substitutions)
+      ? { kind: "open dictionary" }
+      : null;
   }
   const alias = environment.aliases.get(name);
   if (alias === undefined || resolvingAliases.has(name)) return null;
@@ -468,14 +372,68 @@ function classifyAliasBroadTarget(
 export function isPopulatedObjectExpression(expression) {
   let current = expression;
   while (
-    current.type === "ParenthesizedExpression" ||
-    current.type === "TSAsExpression" ||
-    current.type === "TSTypeAssertion" ||
-    current.type === "TSNonNullExpression"
+    current &&
+    (current.type === "ParenthesizedExpression" ||
+      current.type === "TSAsExpression" ||
+      current.type === "TSTypeAssertion" ||
+      current.type === "TSNonNullExpression")
   ) {
     current = current.expression;
   }
-  return current.type === "ObjectExpression" && current.properties.length > 0;
+  if (!current) {
+    return false;
+  }
+  if (
+    current.type === "CallExpression" &&
+    current.callee.type === "MemberExpression" &&
+    !current.callee.computed &&
+    current.callee.object.type === "Identifier" &&
+    current.callee.object.name === "Object" &&
+    current.callee.property.type === "Identifier" &&
+    current.callee.property.name === "freeze" &&
+    current.arguments.length === 1
+  ) {
+    current = current.arguments[0];
+  }
+  return Boolean(
+    current?.type === "ObjectExpression" && current.properties.length > 0
+  );
+}
+export function isMutatedObjectBinding(declaredBinding) {
+  for (const reference of declaredBinding.references) {
+    if (!reference.init && reference.isWrite()) {
+      return true;
+    }
+    const identifier = reference.identifier;
+    const parent = identifier.parent;
+    if (parent?.type === "MemberExpression" && parent.object === identifier) {
+      const grandparent = parent.parent;
+      if (
+        (grandparent?.type === "AssignmentExpression" &&
+          grandparent.left === parent) ||
+        (grandparent?.type === "UpdateExpression" &&
+          grandparent.argument === parent) ||
+        (grandparent?.type === "UnaryExpression" &&
+          grandparent.operator === "delete" &&
+          grandparent.argument === parent)
+      ) {
+        return true;
+      }
+    }
+    if (
+      parent?.type === "CallExpression" &&
+      parent.arguments[0] === identifier &&
+      parent.callee.type === "MemberExpression" &&
+      !parent.callee.computed &&
+      parent.callee.object.type === "Identifier" &&
+      parent.callee.object.name === "Object" &&
+      parent.callee.property.type === "Identifier" &&
+      parent.callee.property.name === "assign"
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 export function isKnownEvidenceExpression(expression) {
   let current = expression;

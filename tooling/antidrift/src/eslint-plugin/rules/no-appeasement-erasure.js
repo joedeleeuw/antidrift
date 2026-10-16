@@ -1,6 +1,12 @@
+import ts from "typescript";
+
 import { schemaValidationCallParts } from "../../semantic-adapters/schema-provenance.mjs";
 import { noKnownValueWideningRule } from "../../oxlint-plugin/anti-slop/rules/no-known-value-widening.js";
 import { noWidenThenAssertRule } from "../../oxlint-plugin/anti-slop/rules/no-widen-then-assert.js";
+import {
+  isMutatedObjectBinding,
+  isPopulatedObjectExpression,
+} from "../../oxlint-plugin/anti-slop/shared/dictionary-types.js";
 import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
 
 const TS_TYPE_FLAG_ANY = 1;
@@ -29,7 +35,6 @@ function isUnknownTypeNode(typeNode) {
   return typeNode?.type === "TSUnknownKeyword";
 }
 
-// `const x: unknown = expr` and `const x = expr as unknown` are the same erasure.
 function erasedInitializer(node) {
   if (isUnknownTypeNode(node.id.typeAnnotation?.typeAnnotation)) {
     return node.init?.type === "TSAsExpression"
@@ -45,8 +50,6 @@ function erasedInitializer(node) {
   return null;
 }
 
-// `{} as unknown` / `[] as unknown` are placeholders and sentinels. The literal
-// carries no contract, so widening it discards nothing.
 function isContractFreeLiteral(expression) {
   return Boolean(
     (expression?.type === "ObjectExpression" &&
@@ -97,6 +100,114 @@ function reestablishingReference(references, services, checker) {
   });
 }
 
+function unwrapTsTransparentTypeNode(typeNode) {
+  let current = typeNode;
+  while (current) {
+    if (ts.isParenthesizedTypeNode(current)) {
+      current = current.type;
+      continue;
+    }
+    if (
+      ts.isTypeOperatorNode(current) &&
+      current.operator === ts.SyntaxKind.ReadonlyKeyword
+    ) {
+      current = current.type;
+      continue;
+    }
+    if (
+      ts.isTypeReferenceNode(current) &&
+      ts.isIdentifier(current.typeName) &&
+      current.typeName.text === "Readonly" &&
+      current.typeArguments?.length === 1
+    ) {
+      current = current.typeArguments[0];
+      continue;
+    }
+    break;
+  }
+  return current;
+}
+
+function isClosedKeyDomainType(keyType) {
+  if (!keyType) {
+    return false;
+  }
+  const openFlags =
+    ts.TypeFlags.Any |
+    ts.TypeFlags.Unknown |
+    ts.TypeFlags.Never |
+    ts.TypeFlags.String |
+    ts.TypeFlags.Number |
+    ts.TypeFlags.ESSymbol;
+  if (keyType.flags & openFlags) {
+    return false;
+  }
+  if (keyType.isUnion()) {
+    return (
+      keyType.types.length > 0 &&
+      keyType.types.every((member) => (member.flags & openFlags) === 0)
+    );
+  }
+  return true;
+}
+
+function classifyClosedCaseTableAnnotation(
+  checker,
+  tsTypeNode,
+  visited = new Set()
+) {
+  const current = unwrapTsTransparentTypeNode(tsTypeNode);
+  if (!current) {
+    return null;
+  }
+  if (ts.isMappedTypeNode(current)) {
+    if (current.questionToken) {
+      return null;
+    }
+    const constraint = current.typeParameter.constraint;
+    if (!constraint) {
+      return null;
+    }
+    const constraintType = checker.getTypeFromTypeNode(constraint);
+    return isClosedKeyDomainType(constraintType) ? "mapped type" : null;
+  }
+  if (!ts.isTypeReferenceNode(current)) {
+    return null;
+  }
+  if (
+    ts.isIdentifier(current.typeName) &&
+    current.typeName.text === "Record" &&
+    current.typeArguments?.length === 2
+  ) {
+    const keyType = checker.getTypeFromTypeNode(current.typeArguments[0]);
+    return isClosedKeyDomainType(keyType) ? "Record<K, V>" : null;
+  }
+  let symbol = checker.getSymbolAtLocation(current.typeName);
+  if (!symbol) {
+    return null;
+  }
+  if (symbol.flags & ts.SymbolFlags.Alias) {
+    symbol = checker.getAliasedSymbol(symbol);
+  }
+  if (!symbol || visited.has(symbol)) {
+    return null;
+  }
+  visited.add(symbol);
+  for (const declaration of symbol.declarations ?? []) {
+    if (ts.isTypeAliasDeclaration(declaration)) {
+      const matched = classifyClosedCaseTableAnnotation(
+        checker,
+        declaration.type,
+        visited
+      );
+      if (matched) {
+        return matched;
+      }
+    }
+  }
+  return null;
+}
+
 export function ruleNoAppeasementErasure() {
   return defineTypeScriptRule({
     ruleName: "no-appeasement-erasure",
@@ -105,22 +216,46 @@ export function ruleNoAppeasementErasure() {
       type: "problem",
       docs: {
         description:
-          "Detect known values widened into broad contracts, including flows that later re-establish a narrower contract.",
+          "Detect known values widened into broad contracts, including flows that later re-establish a narrower contract and case tables annotated with Record<K, V> or mapped types instead of satisfies.",
       },
       messages: {
         widening:
           "The explicit {{target}} type on {{subject}} discards known type evidence. Keep inference, validate with `satisfies`, or use a named owner contract.",
         widenThenAssert:
           'Binding "{{name}}" discards type evidence and later recreates it with an assertion. Keep the precise type from initialization through use; parse boundary input once.',
+        caseTableAnnotation:
+          'Annotating case table "{{name}}" with a {{annotationKind}} widens its per-key entry types and erases literal evidence. Remove the variable type annotation and validate with `satisfies` (`const {{name}} = { ... } satisfies ...`) instead.',
       },
       schema: [],
     },
     visitors({ context, checker, services }) {
       const localVisitors = {
         VariableDeclarator(node) {
-          // A reassigned binding is a traversal cursor, not a boundary value.
           if (node.id.type !== "Identifier" || node.parent?.kind !== "const") {
             return;
+          }
+          const typeAnnotationNode = node.id.typeAnnotation?.typeAnnotation;
+          if (typeAnnotationNode && isPopulatedObjectExpression(node.init)) {
+            const tsTypeNode =
+              services.esTreeNodeToTSNodeMap.get(typeAnnotationNode);
+            const annotationKind =
+              tsTypeNode &&
+              classifyClosedCaseTableAnnotation(checker, tsTypeNode);
+            if (annotationKind) {
+              const [declaredBinding] =
+                context.sourceCode.getDeclaredVariables(node);
+              if (declaredBinding && !isMutatedObjectBinding(declaredBinding)) {
+                context.report({
+                  node: node.id.typeAnnotation,
+                  messageId: "caseTableAnnotation",
+                  data: {
+                    name: node.id.name,
+                    annotationKind,
+                  },
+                });
+                return;
+              }
+            }
           }
           const initializer = erasedInitializer(node);
           if (
@@ -130,10 +265,15 @@ export function ruleNoAppeasementErasure() {
           ) {
             return;
           }
-          const [variable] = context.sourceCode.getDeclaredVariables(node);
+          const [declaredBinding] =
+            context.sourceCode.getDeclaredVariables(node);
           if (
-            !variable ||
-            !reestablishingReference(variable.references, services, checker)
+            !declaredBinding ||
+            !reestablishingReference(
+              declaredBinding.references,
+              services,
+              checker
+            )
           ) {
             return;
           }
