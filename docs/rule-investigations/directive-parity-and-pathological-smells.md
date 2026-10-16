@@ -79,7 +79,63 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
   3. Follow the returned string (or `await`ed string) directly or through a local `const`/`let` binding into `expect(actual).<matcher>(...)` where `<matcher>` is a string/regex/snapshot assertion (`toContain`, `toMatch`, `toBe`, `toEqual`, `toMatchSnapshot`, `toMatchInlineSnapshot`).
   4. Report the assertion as a source-shape guard test that must be deleted or replaced with behavioral execution.
 
-### 2.4 `antidrift/no-test-only-seam` (Directive G11 — `test_only_seams` Parity)
+### 2.4 `antidrift/no-bag-reshaper` (Directives G4, G8, G10 & W4 — "Provide a Bag, Return a Type I Want" and "Provide a Bag, Return a Bag")
+
+- **Directives (`AGENT.md` § Parse at Boundaries & § Code Design):**
+  > _"Within an established typed flow, project values directly instead of reparsing them, copying contract shapes, or adding wrapper types and conversion helpers."_
+  > _"Delete bug-hunt residue: nested ternaries and status chains, guards the types already rule out, polling or re-deriving values an owner already holds, fallbacks that never fire, and adapters that re-decide what the server validates."_
+- **Why `antidrift/no-contract-appeasement-projection` misses both patterns today:**
+  1. In [`no-contract-appeasement-projection.js`](file:///home/joedeleeuw/code/antidrift/tooling/antidrift/src/eslint-plugin/rules/no-contract-appeasement-projection.js#L460), `collectReturnRecordsFromExpression` treats any returned `ObjectExpression` (`return { ... }`) as `{ kind: "unsupported" }`. It only inspects scalar returns (`return file.source;`).
+  2. `no-contract-appeasement-projection` requires an explicit `: ReturnType` annotation (`hasExplicitReturnType(fn)`), so it never inspects functions with inferred object-literal return types.
+- **The two target pathologies:**
+  1. **`bagToContract` ("Provide a bag, return a type I want"):**
+     A function accepts a bag — an inline `{ ... }` parameter type, `Partial<T>`, `Record<string, unknown>`, a destructured `{ a, b, c }` bag, or a source object contract `Source` — and returns an `ObjectLiteralExpression` claiming a named target contract (`: TargetContract`, `as TargetContract`, or `satisfies TargetContract`) whose properties are merely plucked, renamed, spread, defaulted (`??` / `||`), or trivially coerced (`String(...)`, `Number(...)`, `Boolean(...)`) from the input bag:
+     ```ts
+     function toUserRow(input: {
+       id: string;
+       email: string;
+       name?: string | null;
+     }): UserRow {
+       return {
+         id: input.id,
+         email: input.email,
+         name: input.name ?? "Anonymous",
+       };
+     }
+     ```
+     Instead of decoding at the untrusted boundary with a schema (`UserRowSchema.parse(raw)`) or passing the owner's `UserRow` directly, the function acts as a hand-rolled, unvalidated conversion adapter or appeasement mapper.
+  2. **`bagToBag` ("Provide a bag, return a bag"):**
+     A function accepts an object/bag parameter and returns a new ad-hoc `ObjectLiteralExpression` (with an inferred anonymous object return type or an inline `{ ... }` / `Record<...>` / `Partial<...>` return annotation) whose properties are merely plucked, renamed, spread, defaulted, or trivially coerced from the input bag:
+     ```ts
+     function normalizeFilters(params: {
+       teamId: string;
+       status?: string;
+       includeArchived?: boolean;
+     }) {
+       return {
+         team_id: params.teamId,
+         status: params.status ?? "active",
+         include_archived: Boolean(params.includeArchived),
+       };
+     }
+     ```
+     Neither the input nor the output is an owned domain contract; the function is a shallow object-repacking hop that hides field provenance and spawns parallel anonymous structural shapes across the call graph.
+- **Required context:** `defineTypeScriptRule` (`ts-rule-kernel.mjs`) + a shared `bag-reshape-proof.mjs` semantic helper in `src/semantic-adapters/`.
+- **Implementation specification:**
+  1. **Callable & parameter gate:** Inspect non-generated function declarations, arrow/function expressions, and methods that have `>= 1` object-shaped parameter (an `ObjectBindingPattern` `{ a, b }`, an inline `TypeLiteralNode` `{ ... }`, `Record<...>`, `Partial<...>`, or a parameter whose `checker.getTypeAtLocation(param)` is an object/interface type, excluding primitives, arrays, functions, and class instances with methods).
+  2. **Return-path gate:** Collect all return expressions (handling concise arrow bodies, `return` statements, `if`/`else`, and conditional `? :` branches). Ignore `undefined`/`null` guard returns; require `>= 1` meaningful return expression and require every meaningful return expression (unwrapping parenthesized, `as T`, and `satisfies T` wrappers) to be a non-empty `ObjectLiteralExpression`.
+  3. **Pure bag-projection property proof:** Verify that every property in each returned `ObjectLiteralExpression` is derived from the parameter bag(s) without domain computation, I/O, or schema decoding:
+     - `SpreadAssignment` (`...bag`), or
+     - `PropertyAssignment` / `ShorthandPropertyAssignment` whose value expression (after unwrapping `expr ?? defaultLiteral`, `expr || defaultLiteral`, `expr ? literalA : literalB`, and primitive wrappers `String(...)`, `Number(...)`, `Boolean(...)`) is a direct parameter binding (from `{ a, b }`), a member chain rooted at a parameter bag (`bag.a`, `bag.nested.a`), or a static literal tag (`kind: "ready"`), with **at least 1 property** reading from a parameter bag.
+  4. **Classification (`bagToContract` vs. `bagToBag`):**
+     - **`bagToContract` ("Provide a bag, return a type I want"):** The function declares an explicit return type `: TargetType` or wraps the returned object literal in `as TargetType` / `satisfies TargetType`, where `TargetType` resolves via `TypeChecker` to a named `interface`, `type` alias, or schema-inferred contract (`z.infer<...>`). Report `bagToContract`: pass the owner's contract directly or decode at the boundary with the owner's schema instead of reshaping a bag into `TargetType`.
+     - **`bagToBag` ("Provide a bag, return a bag"):** The function has an inferred return type or an inline `TypeLiteralNode` / `Record<...>` / `Partial<...>` return annotation. Report `bagToBag`: delete the intermediate bag-repacking helper and pass or destructure the owner's fields at the call site.
+  5. **Clean controls (do not report):**
+     - **Real domain computation:** Any property value that calls a domain function, method (e.g., `.trim()`, `.map()`, `.filter()`, ` path.join()`), arithmetic/string concatenation, `new` constructor, or `await` expression.
+     - **Schema decoders / boundary parsers:** Functions that call `.parse` / `.safeParse` / `Schema.decode*`.
+     - **State reducers:** Functions matching `(state, action) => ({ ...state, ... })` passed to `useReducer` or state stores where `action` is a discriminated union.
+
+### 2.5 `antidrift/no-test-only-seam` (Directive G11 — `test_only_seams` Parity)
 
 - **Directive (`AGENT.md` § Code Design & `dotfiles/docs/enforcement-map.md` G11):**
   > _"One adapter means a hypothetical seam; two means a real one, so no port unless a production and a test adapter are both justified."_
@@ -97,7 +153,7 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
   5. Collect all call sites of the function/class across `program.getSourceFiles()`:
      - Report when **0 production call sites** supply an explicit argument for `param` and **`>= 1` test call sites** supply it (or `0` callers anywhere supply it).
 
-### 2.5 `antidrift/no-single-adapter-seam` (Directive G11 — `single_adapter_seams` Parity)
+### 2.6 `antidrift/no-single-adapter-seam` (Directive G11 — `single_adapter_seams` Parity)
 
 - **Directive (`AGENT.md` § Code Design & `dotfiles/docs/enforcement-map.md` G11):**
   In `dotfiles/local/bin/code_health/seams.py`, `single_adapter_seams` scored **20/20 (100% precision)** across 22 repositories. Currently `seams.py` scans TypeScript via `ast-grep` regexes over raw text.
@@ -112,7 +168,7 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
      - Test files passing a non-`new` fake to a parameter or property typed as `Seam`.
   4. Report when a production seam has **exactly 1 adapter** in the entire program and that adapter is in production code (i.e., there is neither a second production adapter nor a test adapter).
 
-### 2.6 `antidrift/no-closed-string-parameter` (Directive G9 — `g9-closed-string` Parity)
+### 2.7 `antidrift/no-closed-string-parameter` (Directive G9 — `g9-closed-string` Parity)
 
 - **Directive (`AGENT.md` § Code Design & `dotfiles/config/code-health/rules/g9-closed-string.yml`):**
   > _"Declare the case space first."_
@@ -127,7 +183,7 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
      - `param !== "a" && param !== "b"` (`>= 2` string literal inequality conjunctions).
   4. Report the `string` annotation: declare the literal union type on the parameter or field so callers and the type checker see the case space.
 
-### 2.7 `antidrift/no-reexport-only-module` (Directive G10 — `g10-reexport-module` Parity)
+### 2.8 `antidrift/no-reexport-only-module` (Directive G10 — `g10-reexport-module` Parity)
 
 - **Directive (`AGENT.md` § Code Design & `dotfiles/config/code-health/rules/g10-reexport-module.yml`):**
   > _"A function whose body is one call is a hop, not an owner; delete it and let the caller name the owner. The same goes for a module that re-exports one symbol... A split moves code and updates every importer in the same commit: no re-export shims."_
@@ -139,7 +195,7 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
   2. Ignore files declared as public package entrypoints in the enclosing `package.json` (`exports`, `main`, `module`, `bin`) and public facade files that only re-export from an underscore-prefixed private sibling (`export * from "./_internal"`).
   3. Report the module when `Program.body` is non-empty and every statement is an `ExportNamedDeclaration` with `source !== null` (`export { a } from "./b"`), an `ExportAllDeclaration` (`export * from "./b"`), or an `ImportDeclaration` whose bindings are only used in `export { a }`.
 
-### 2.8 `antidrift/no-argument-mutation-side-effect` (Directive D2 — `d2-dict-argument-write` Parity)
+### 2.9 `antidrift/no-argument-mutation-side-effect` (Directive D2 — `d2-dict-argument-write` Parity)
 
 - **Directive (`skills/codebase-design` § Designing for Testability & `dotfiles/config/code-health/rules/d2-dict-argument-write.yml`):**
   > _"Return results, don't produce side effects."_
@@ -155,7 +211,7 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
      - `checker.getTypeAtLocation(param)` is a plain object literal type, an interface with only data properties (no methods), `Record<K, V>`, or `Map<K, V>` (excluding class instances, streams, DOM nodes, and `Set`).
   4. Report the parameter write and instruct returning the computed result instead.
 
-### 2.9 `antidrift/no-direct-secret-cli-call` (Directive G18 — `g18-secret-call` Parity)
+### 2.10 `antidrift/no-direct-secret-cli-call` (Directive G18 — `g18-secret-call` Parity)
 
 - **Directive (`AGENT.md` § Secrets & `dotfiles/config/code-health/rules/g18-secret-call.yml`):**
   > _"Resolve automation secrets with `~/.local/bin/secret-resolve` — never hardcode keys or call `secret-tool`/`op` directly."_
