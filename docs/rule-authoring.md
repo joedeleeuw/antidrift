@@ -2,9 +2,15 @@
 
 ## Engine decision
 
-Use Oxlint for baseline and type-aware ecosystem rules. Use its JavaScript plugin API for custom rules whose proof is available from AST, scope, or control-flow data. Keep a custom rule in ESLint only when it needs TypeScript's `Program` or `TypeChecker`, such as installed package type forks, registry-backed generated-source and first-party model forks, alias/import identity, Zod provenance, inferred return types, or assignability.
+Use Oxlint for baseline and type-aware ecosystem rules. Use its JavaScript plugin API (`tooling/antidrift/src/oxlint-plugin/`) for custom rules whose proof is available from AST, scope, or control-flow data. Author TypeChecker-backed rules in `tooling/antidrift/src/eslint-plugin/rules/` against the TypeScript-native **Semantic Kernel** (`defineTypeScriptRule` in `tooling/antidrift/src/semantic-adapters/ts-rule-kernel.mjs`, documented in `docs/adr/0001-typescript-native-semantic-rule-kernel.md`) and the five shared **Semantic Primitives** in `tooling/antidrift/src/semantic-adapters/`:
 
-Use `docs/semantic-drift-goal.md` as the north-star requirement for new or migrated rules. A rule should recover a semantic association, authority fact, deterministic source construction, or repo/session proof surface; if it cannot, keep it in inventory, research, delegation, or retirement. Use `docs/semantic-validation-matrix.md` to decide the rule's carrier, blocking threshold, and validation evidence before implementation or promotion.
+1. **Shape Identity (`shape-identity.mjs`):** Deep structural comparison of `ts.Type`s with `any`-poisoning, `error`-type undecided tracking, generic parameter/constraint matching, and property mutability/optionality checks.
+2. **Symbol, Module & Package Surface Provenance (`ts-rule-kernel.mjs`, `package-entry-points.mjs`, `declared-dependencies.mjs`, `type-resolution-provenance.mjs`):** Alias resolution across imports/re-exports, package entry-point surface resolution, and external library symbol classification.
+3. **Boundary & Narrowing Dataflow (`boundary-model.mjs`, `cast-narrowing-proof.mjs`, `broad-input.mjs`):** Untrusted boundary sources, interprocedural summaries, demand paths, and control-flow narrowing proofs.
+4. **Program Call-Graph & Evaluation Order (`typescript-engine.mjs`, `hop-inline-verification.mjs`):** `ts.LanguageService`-backed cross-file reference discovery and expression evaluation-order stepping.
+5. **Domain Provenance Graphs (`schema-provenance.mjs`, `effect-schema.mjs`, `sql-provenance.mjs`, `sql-syntax-analysis.mjs`, `react-state-graph.js`):** Cross-library schema decode provenance (Zod, Effect Schema, Valibot, TypeBox), SQL fragment/identifier/escaper provenance, and React `useState` cell/transition provenance.
+
+Use the domain vocabulary in `GLOSSARY.md` and architectural decisions in `docs/adr/` throughout rule specs, investigations, and diagnostics. Use `docs/semantic-drift-goal.md` as the north-star requirement for new or migrated rules. A rule must recover a semantic association, authority fact, deterministic source construction, or repo/session proof surface (`docs/adr/0002-evidence-backed-provenance-over-name-heuristics.md`); every active rule in `policy/registries/rules.yaml` ships enabled by default at `"error"` (`defaultOff: false`). Use `docs/semantic-validation-matrix.md` to decide the rule's carrier, blocking threshold, and validation evidence before implementation or promotion.
 
 Keep baseline coverage in Oxlint and track ownership, replacement, or an accepted gap in `docs/lint-rule-parity.md`.
 
@@ -12,7 +18,7 @@ Record source provenance in `docs/source-ledger.md` whenever you add, remove, or
 
 New rules should start from `docs/build-patterns.md`: first define the simple construction pattern, then add a rule only when the violation can be detected without relying on reviewer interpretation.
 
-Use `docs/self-hosting-risks.md` when changing the rule package itself. The short version: native and supported type-aware semantics live in Oxlint, custom TypeChecker semantics live in the reduced ESLint pass, repository control-plane checks live in policy scripts, and agent lifecycle safety lives in hooks.
+Use `docs/self-hosting-risks.md` when changing the rule package itself. The short version: native and supported type-aware semantics live in Oxlint, custom TypeChecker semantics live in the Semantic Kernel (`defineTypeScriptRule`), repository control-plane checks live in policy scripts, and agent lifecycle safety lives in hooks.
 
 Shell source guardrails are the one opt-in non-ESLint rule-pack surface. They live under `tooling/antidrift/ast-grep` and run through `antidrift shell`, so Bash syntax policy is not duplicated as an ESLint rule.
 
@@ -22,7 +28,7 @@ Each candidate rule is judged on its own merits. Before implementing or keeping 
 
 Use the strongest available signal. Do not start with AST shape unless the syntax itself is the violation.
 
-1. **TypeChecker first** for type escape hatches, branded casts, structural type forks, Zod provenance, unsafe deserialization, inferred/declared type relationships, and assignability.
+1. **TypeChecker first** for type escape hatches, branded casts, structural type forks, schema provenance, service tag bypasses, unsafe deserialization, inferred/declared type relationships, and assignability.
 2. **Registry/project facts** for domain vocabulary, gateway imports, generated owners, architecture boundaries, and configured authorization functions.
 3. **Scope/binding** when local provenance or usage is the signal.
 4. **AST shape only when deterministic by construction**: the syntax is the bad behavior, not a proxy for intent.
@@ -34,16 +40,19 @@ This means a boolean predicate such as `isWebviewRoute` is not a type escape hat
 
 ### Type-aware deterministic rules
 
-These require `typescript-eslint` parser services and the TypeScript `Program`/`TypeChecker`:
+These run through `defineTypeScriptRule` (`tooling/antidrift/src/semantic-adapters/ts-rule-kernel.mjs`) and require TypeScript's `Program` and `TypeChecker`:
 
-- appeasement casts from `any`/`unknown` into named contracts
-- structural type forks
-- redundant Zod parses
-- unsafe deserialization from broad values
+- appeasement casts and erasures from `any`/`unknown` into named contracts
+- structural type forks and restated dependency types
+- cross-library redundant schema parses and validator transcoding (Zod, Effect Schema, Valibot, TypeBox)
+- service constructor imports that bypass an exported Service Tag or Layer
+- redundant local return type annotations restated over inferred returns
+- unsafe deserialization and undecoded boundary inputs
+- SQL string interpolation and concatenation with TypeChecker member/escaper provenance
 
 Double-cast tunnels and broad unsafe assertions are covered by `@typescript-eslint/no-unsafe-type-assertion`. The former custom brand-cast rule is retired until real non-test brand forgery and adopted brand-boundary evidence justify reopening it.
 
-The shareable `createConfig` path configures `typescript-eslint` project service for these rules. Raw plugin consumers must provide equivalent parser services. Fully type-aware antidrift rules fail closed with a configuration error when they are enabled without parser services, so missing type information is visible instead of silently weakening the rule. Hybrid rules may keep a non-type-aware branch only when the weaker proof is documented, tested, and emitted in a report; `antidrift/no-sql-string-concat` uses `parserServiceDeltas` for that split.
+The shareable `createConfig` path configures `typescript-eslint` project service for these rules. Raw plugin consumers must provide equivalent parser services. All 23 TypeChecker-backed antidrift rules fail closed via `defineTypeScriptRule` with a configuration error when they are enabled without parser services (`requireTypeServices: false` is used only for hybrid rules like `antidrift/no-sql-string-concat` that document and report their `parserServiceDeltas` branch).
 
 ### Deterministic AST or scope rules
 
