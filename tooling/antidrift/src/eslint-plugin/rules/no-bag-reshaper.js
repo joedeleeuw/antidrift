@@ -7,9 +7,9 @@ import {
   collectStatementReturnExpressions,
   inspectObjectLiteralBagProjection,
   resolveBagParameter,
-  unwrapExpression,
-} from "../../semantic-adapters/bag-projection.mjs";
+} from "../../semantic-adapters/projection/bag-projection.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
+import { unwrapTransparent } from "../../semantic-adapters/kernel/transparent-expression.ts";
 
 const ANONYMOUS_UTILITY_TYPE_NAMES = new Set([
   "Omit",
@@ -112,17 +112,13 @@ function classifyBagReshaper(functionNode, containerNode, checker, sourceFile) {
   if (!bagParameter) {
     return null;
   }
-  const bagState = {
-    bagRootSymbols: new Set(bagParameter.bagRootSymbols),
-    bagFieldSymbols: new Set(bagParameter.bagFieldSymbols),
-  };
+  const { scope } = bagParameter;
   const returnExpressions = [];
   if (ts.isBlock(functionNode.body)) {
     if (
       !collectStatementReturnExpressions(
+        scope,
         functionNode.body,
-        bagState,
-        checker,
         returnExpressions
       )
     ) {
@@ -150,11 +146,10 @@ function classifyBagReshaper(functionNode, containerNode, checker, sourceFile) {
     if (!targetContract && assertionTypeNode) {
       targetContract = namedContractFromTypeNode(assertionTypeNode, sourceFile);
     }
-    const unwrappedReturn = unwrapExpression(returnExpression);
+    const unwrappedReturn = unwrapTransparent(returnExpression);
     if (
-      !unwrappedReturn ||
       !ts.isObjectLiteralExpression(unwrappedReturn) ||
-      !inspectObjectLiteralBagProjection(unwrappedReturn, bagState, checker)
+      !inspectObjectLiteralBagProjection(scope, unwrappedReturn)
     ) {
       return null;
     }
@@ -177,7 +172,7 @@ function classifyBagReshaper(functionNode, containerNode, checker, sourceFile) {
 }
 
 function callableInitializer(initializer) {
-  const unwrapped = unwrapExpression(initializer);
+  const unwrapped = initializer && unwrapTransparent(initializer);
   if (
     unwrapped &&
     (ts.isArrowFunction(unwrapped) || ts.isFunctionExpression(unwrapped))

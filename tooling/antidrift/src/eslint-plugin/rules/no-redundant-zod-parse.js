@@ -1,6 +1,6 @@
 import ts from "typescript";
 
-import { classifyInlineParseReshape } from "../../semantic-adapters/bag-projection.mjs";
+import { classifyInlineParseReshape } from "../../semantic-adapters/projection/inline-parse-reshape.ts";
 import {
   declaredSchemaParameter,
   isThrowAssertionCallbackParse,
