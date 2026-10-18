@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { ELEMENT } from "./boundary-contracts.mjs";
-import { boundaryObservations } from "./boundary-observations.mjs";
+import { boundaryObservations } from "./boundary/boundary-observations.ts";
 
 export const FIELD_DEPTH = boundaryObservations.bounds.fieldDepth.limit;
 

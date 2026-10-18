@@ -1,10 +1,16 @@
 import ts from "typescript";
-import { boundaryCases } from "./boundary-cases.mjs";
+import {
+  collectionCases,
+  nonForwardingOutputCases,
+} from "./boundary/decision-cases.ts";
 import { ELEMENT } from "./boundary-contracts.mjs";
 import { broad, typed } from "./boundary-declarations.mjs";
-import { boundaryObservations } from "./boundary-observations.mjs";
+import { boundaryObservations } from "./boundary/boundary-observations.ts";
 import { nodeKey } from "./boundary-summaries.mjs";
-import { callbackReturns, unwrapExpression } from "./boundary-syntax.mjs";
+import {
+  callbackReturns,
+  unwrapExpression,
+} from "./boundary/boundary-syntax.ts";
 
 const RETURNED_FUNCTION_DEPTH =
   boundaryObservations.bounds.returnedFunctionDepth.limit;
@@ -13,7 +19,7 @@ function isNonForwardingReturn(returned) {
   if (!returned) {
     return true;
   }
-  return boundaryCases.nonForwardingOutputs.some((row) => {
+  return nonForwardingOutputCases.some((row) => {
     if (row.property) {
       return Boolean(returned[row.property]);
     }
@@ -151,7 +157,7 @@ export function signatureForwarding({
     }
     const symbolName =
       nonNull.symbol?.name ?? nonNull.target?.symbol?.name ?? null;
-    const collectionRow = boundaryCases.collections.find((row) =>
+    const collectionRow = collectionCases.find((row) =>
       row.symbols.includes(symbolName)
     );
     if (collectionRow) {
@@ -362,7 +368,7 @@ export function signatureForwarding({
     if (sharedParent.size) {
       const parentName =
         parentDeclaration?.name?.getText(declaration.getSourceFile()) ?? null;
-      const collectionRow = boundaryCases.collections.find((row) =>
+      const collectionRow = collectionCases.find((row) =>
         row.symbols.includes(parentName)
       );
       const elementParameter = collectionRow

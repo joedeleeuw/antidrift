@@ -2,14 +2,19 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
-import { boundaryCases } from "./boundary-cases.mjs";
-import { boundaryObservations } from "./boundary-observations.mjs";
+import {
+  decoderCases,
+  exclusionCases,
+  primitiveGuardCases,
+} from "./boundary/decision-cases.ts";
+import { rootCases } from "./boundary/source-cases.ts";
+import { boundaryObservations } from "./boundary/boundary-observations.ts";
 import {
   callbackReturns,
   enclosingFunction,
   unwrapExpression,
   wrapperKinds,
-} from "./boundary-syntax.mjs";
+} from "./boundary/boundary-syntax.ts";
 
 const packageManifest = z.object({
   name: z.string().optional(),
@@ -59,7 +64,7 @@ export function typed(type, options = {}) {
 }
 
 export function excluded(facts) {
-  return boundaryCases.exclusions.some((exclusion) => facts[exclusion.fact]);
+  return exclusionCases.some((exclusion) => facts[exclusion.fact]);
 }
 
 function rowMatchesOwner(row, packageName) {
@@ -199,7 +204,7 @@ export function boundaryDeclarations(program, observer) {
         ? [...names, declaration.name.getText(source)].join(".")
         : null;
     const ownerName = packageAt(source.fileName)?.name;
-    return boundaryCases.roots.find((row) => {
+    return rootCases.find((row) => {
       const symbolMatches =
         row.symbols?.includes(baseSymbol) ||
         Boolean(parameterSymbol && row.symbols?.includes(parameterSymbol));
@@ -413,7 +418,7 @@ export function boundaryDeclarations(program, observer) {
       predicate.kind === ts.TypePredicateKind.AssertsThis
         ? "asserts"
         : "is");
-    for (const form of boundaryCases.decoders) {
+    for (const form of decoderCases) {
       if (form.predicate && form.predicate === predicateForm) {
         const parameterIndex = predicate.parameterIndex;
         return {
@@ -450,9 +455,7 @@ export function boundaryDeclarations(program, observer) {
   function carrierContract(declaration, output) {
     if (!output.isUnion()) return null;
     const ownerName = packageAt(declaration.getSourceFile().fileName)?.name;
-    const carrierForm = boundaryCases.decoders.find(
-      (form) => form.output === "carrier"
-    );
+    const carrierForm = decoderCases.find((form) => form.output === "carrier");
     for (const row of carrierForm.carriers) {
       if (!rowMatchesOwner(row, ownerName)) continue;
       const success = output.types.find((variant) => {
@@ -748,7 +751,7 @@ export function boundaryDeclarations(program, observer) {
       if (check.kind === "literal") {
         return checker.isTypeAssignableTo(check.contract, contract);
       }
-      return boundaryCases.primitiveGuards.some(
+      return primitiveGuardCases.some(
         (guard) =>
           check.guard === guard.typeof &&
           Boolean(contract.flags & ts.TypeFlags[guard.flag])
@@ -886,9 +889,7 @@ export function boundaryDeclarations(program, observer) {
     const ownerName = packageAt(source.fileName)?.name;
     const platform =
       program.isSourceFileDefaultLibrary(source) ||
-      boundaryCases.roots.some(
-        (row) => row.platform && rowMatchesOwner(row, ownerName)
-      );
+      rootCases.some((row) => row.platform && rowMatchesOwner(row, ownerName));
     const platformProjection = platform && evidence.kind !== "predicate";
     const unprovedDecoder =
       !platform &&

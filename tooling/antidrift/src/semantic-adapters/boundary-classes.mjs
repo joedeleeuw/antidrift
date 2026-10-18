@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { aliasTarget, unknownProvenance } from "./boundary-summaries.mjs";
-import { enclosingFunction } from "./boundary-syntax.mjs";
+import { enclosingFunction } from "./boundary/boundary-syntax.ts";
 
 function bindsThisToClass(ancestor) {
   if (ts.isArrowFunction(ancestor)) return true;

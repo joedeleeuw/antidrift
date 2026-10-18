@@ -9,6 +9,9 @@ declare module "typescript" {
     node: ts.EntityNameOrEntityNameExpression
   ): ts.Identifier;
   function hasType(node: ts.Node): node is ts.HasType;
+  function isNamedDeclaration(
+    node: ts.Node
+  ): node is ts.NamedDeclaration & { readonly name: ts.DeclarationName };
   interface Node {
     readonly symbol?: ts.Symbol;
     readonly localSymbol?: ts.Symbol;
@@ -20,6 +23,9 @@ declare module "typescript" {
   interface GenericType {
     readonly readonly?: boolean;
     readonly elementFlags?: readonly ts.ElementFlags[];
+  }
+  interface Program {
+    getCommonSourceDirectory(): string;
   }
   interface Signature {
     readonly minArgumentCount: number;

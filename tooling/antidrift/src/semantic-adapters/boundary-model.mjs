@@ -9,8 +9,8 @@ import {
 import { classReceivers } from "./boundary-classes.mjs";
 import {
   boundaryObservations,
-  boundaryObserver,
-} from "./boundary-observations.mjs";
+  BoundaryObserver,
+} from "./boundary/boundary-observations.ts";
 import {
   boundaryDeclarations,
   broad,
@@ -36,7 +36,7 @@ import {
   unconditionalBefore,
   unwrapExpression,
   wrapperKinds,
-} from "./boundary-syntax.mjs";
+} from "./boundary/boundary-syntax.ts";
 
 const models = new WeakMap();
 
@@ -70,7 +70,7 @@ export function boundaryModel(program, options = {}) {
       return existing.model;
     }
   }
-  const observer = boundaryObserver(
+  const observer = new BoundaryObserver(
     program,
     options.observe,
     options.rootDirectory

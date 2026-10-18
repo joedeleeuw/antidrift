@@ -1,7 +1,8 @@
 import ts from "typescript";
-import { boundaryCases } from "./boundary-cases.mjs";
+import { exclusionCases } from "./boundary/decision-cases.ts";
+import { frameworkCases, rootCases } from "./boundary/source-cases.ts";
 import { broad, excluded } from "./boundary-declarations.mjs";
-import { unwrapExpression } from "./boundary-syntax.mjs";
+import { unwrapExpression } from "./boundary/boundary-syntax.ts";
 
 const writeOperators = new Set([
   ts.SyntaxKind.EqualsToken,
@@ -59,7 +60,7 @@ export function boundarySources({ checker, declarations, hasRoots }) {
   function exportedParameterRoots(parameter, declared) {
     const members = declared.isUnion() ? declared.types : [declared];
     const declares = (flag) => members.some((member) => member.flags & flag);
-    const row = boundaryCases.roots.find(
+    const row = rootCases.find(
       (candidate) =>
         candidate.exported &&
         (candidate.parameter === "unknown"
@@ -122,7 +123,7 @@ export function boundarySources({ checker, declarations, hasRoots }) {
       carrier.parameter,
       expression
     )) {
-      const upstreamContract = boundaryCases.exclusions.some(
+      const upstreamContract = exclusionCases.some(
         (row) =>
           row.required &&
           row.payloads.includes(carrier.path[0]) &&
@@ -131,7 +132,7 @@ export function boundarySources({ checker, declarations, hasRoots }) {
           )
       );
       if (excluded({ upstreamContract })) return null;
-      for (const shape of boundaryCases.frameworks) {
+      for (const shape of frameworkCases) {
         if (carrier.path.length <= shape.path.length) continue;
         if (
           !shape.path.every(

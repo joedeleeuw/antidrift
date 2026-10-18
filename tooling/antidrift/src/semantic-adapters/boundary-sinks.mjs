@@ -6,12 +6,12 @@ import {
   unresolvedType,
 } from "./boundary-contracts.mjs";
 import { broad, excluded, typed } from "./boundary-declarations.mjs";
-import { boundaryObservations } from "./boundary-observations.mjs";
+import { boundaryObservations } from "./boundary/boundary-observations.ts";
 import {
   enclosingFunction,
   isAssertionChain,
   unwrapExpression,
-} from "./boundary-syntax.mjs";
+} from "./boundary/boundary-syntax.ts";
 import {
   declaredOperandType,
   narrowingProvesTarget,
