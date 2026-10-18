@@ -1,112 +1,34 @@
 # `antidrift/no-redundant-zod-parse`
 
-## Problem
+## Definition
 
-Agents often make a typed value feel safer by parsing it again with the same Zod schema that already produced the type. That hides the real architecture question: where is the validation boundary?
+Validation belongs at the boundary where raw input first enters the program. Re-validating a value with the schema that already produced it — or that its declared contract already states it is — adds no proof and hides the real architecture question: where is the boundary?
 
-This rule should catch repeated validation after a value is already known to be the schema output. It should not catch first-boundary parsing of raw input, file contents, network responses, database rows, or deliberately assembled objects whose runtime shape is still being established.
+The rule reports three shapes at a schema validation call site:
+
+- re-parsing a value this file already produced from the same schema;
+- parsing a parameter the caller declared as the schema output, which coerces a contract the caller satisfied by construction;
+- reshaping a payload inline inside the parse call instead of decoding the raw value.
 
 ## Signal
 
-Canonical-path Zod provenance. No type information is consulted anywhere.
+This is a TypeChecker ESLint rule. It runs on `defineTypeScriptRule` ([`ts-rule-kernel.mjs`](../../tooling/antidrift/src/semantic-adapters/ts-rule-kernel.mjs)) and takes schema recognition and provenance from [`schema-provenance.mjs`](../../tooling/antidrift/src/semantic-adapters/schema-provenance.mjs); the inline-reshape branch shares [`bag-projection.mjs`](../../tooling/antidrift/src/semantic-adapters/bag-projection.mjs) with `antidrift/no-bag-reshaper`.
 
-The rule was a type-aware ESLint rule until 2026-08-13. It confirmed `.parse()` was a Zod method through TypeScript symbol declarations, and it unified the two parse sites through symbol identity — which meant the schema receiver had to be a plain identifier. That is blind to the ecosystem's dominant architecture: contract-first libraries (ts-rest, oRPC, tRPC, Hono validators) hold schemas as properties of a contract object, so the receiver is a member expression such as `contract.getPost.responses[200]` or `method.resultSchema`.
+`schemaValidationCallParts` recognises a validation call by resolving the callee symbol to its package: Zod (`parse`, `parseAsync`, `safeParse`, `safeParseAsync`), Effect Schema (curried `Schema.decodeUnknownSync(S)(value)` and two-argument `Schema.decodeUnknownSync(S, value)`), Valibot (`parse`, `safeParse`), and TypeBox (`Decode`, `Parse`, `Check`). A call that is the direct expression of an `expect(() => ...).toThrow()` / `not.toThrow()` callback is skipped: that asserts a schema contract rather than validating a value.
 
-The shipped detector is in the Oxlint syntax tier and works from local AST plus scope bindings:
+Provenance then comes from TypeScript symbols, never from argument types:
 
-- **`canon(expr)`** strips chain and TS wrappers, collects member segments while they stay static (identifier properties and literal computed keys, so `responses[200]` resolves), resolves the base identifier to a scope binding, expands const aliases whose initializer is an identifier or member expression (depth-capped and cycle-guarded), and roots at the first non-alias binding. The result is ⟨root binding⟩ plus segments. Dynamic segments, calls anywhere in the chain, and unresolved globals produce no path at all. Bailing is silent by design.
-- **Provenance** is recorded at `const v = P.parse(x)` (and the `parseAsync`/`safeParse`/`safeParseAsync` variants) and reported at `P'.<method>(v)` when the two canonical paths are equal, the root is a const or import that is never rebound, no prefix of the path is written anywhere in the file, and `v` is neither mutated nor escaped into a call between the two sites. The pre-migration same-binding rule is the zero-length-path case of this, so all six `zod-reparse-*` drift fixtures port unchanged.
-- **safeParse provenance flows through the result object**, not only the call: `const r = S.safeParse(x)` marks `r.data` as `S`-validated output, and `const { data } = S.safeParse(x)` marks the destructured binding. This is a bounded special case for the safeParse result shape, not general field-level provenance.
-- **Cross-module unification never happens by inference.** A local mirror of an imported contract schema has a different root binding, so it does not unify. Same root binding or nothing.
+- **Same-binding.** `const parsed = S.parse(raw)` (including an `await`ed call and the `safeParse` result) is recorded against the parsed value's symbol. A later validation call on the same schema symbol reports `Redundant Zod parse`.
+- **Declared schema-output parameter.** When the argument resolves to a parameter whose declared type — directly or through one type alias — is `z.infer<typeof S>`, `z.output`, `z.TypeOf`, `typeof S.Type`, `Schema.Schema.Type<typeof S>`, `InferOutput<typeof S>`, or `Static`/`StaticDecode<typeof S>` for the same schema `S`, the rule reports `Parse as cast`. Next.js server actions are exempt: a function exported from a module with a top-level `"use server"` directive, or carrying the directive in its own body, is a network endpoint whose declared parameter type the client never satisfied.
+- **Inline reshape.** In non-test files, `S.parse({ ... })` whose properties all project from one root source reports `inlineObjectReshape`, and `S.parse(cond ? { ... } : value)` over a pure condition on that source reports `inlineConditionalReshape`.
 
-The helper-result branch was removed on 2026-08-10 and must not return. It gated reports on bidirectional TypeScript assignability between the helper's declared return type and the schema output, but assignability never proves the same decoder ran: refinements (`.min`, `.positive`, `.refine`, `.transform`) are invisible to the type system, so `NonEmpty.parse(readName())` with `readName(): string` false-positived. Type equivalence is not decoder provenance — and the two public rules that share this rule's name are exactly that retired mechanism.
+Schema identity is TypeScript symbol identity: import aliases are followed, and one object-property assignment is followed so a schema held as a contract property (`contract.method.resultSchema`) resolves to the binding it was initialised from. Two different symbols never unify, so a local mirror of an imported contract does not match the import. Test files keep only the same-binding shape; the parameter and inline-reshape shapes are schema-contract checks there.
 
-## Schema-ness without types
+## Rejected Signal: Type Equivalence
 
-The method-name set (`parse`, `parseAsync`, `safeParse`, `safeParseAsync`) is only the trigger. Without a checker, the rule needs positive evidence that the receiver names a schema, because `JSON.parse`, `path.parse`, and document parsers share the method name. The classification, in order:
-
-1. If the path's root binding is an import, classify by module specifier: the zod family (configurable through `schemaModules`) is `zod-rooted`; a specifier in `contractModules` is `declared-container`; `node:` builtins and anything in `nonSchemaModules` are vetoed; everything else is `opaque-container`.
-2. Otherwise resolve the path in-file — descending object literals, array literals, and the object argument of a builder call so `c.router({ getPost: { responses: { 200: PostSchema } } })` resolves — and classify the base identifier of whatever expression the path lands on by the same module rules.
-3. An unresolved or global root (`JSON`, `Date`) is never a schema.
-
-The default `nonSchemaModules` list is the one heuristic in the rule, and it is a bounded, explicit, configurable list rather than a proof. Its residual false-positive shape is a same-file double parse through a member of a first-party or unlisted module that happens to expose a `parse` method; `nonSchemaModules` exists to silence exactly that.
-
-## Exemptions re-derived
-
-`dfine-io/dlint` ships a rule with this name whose detector is type-shape, and its four exemptions exist to suppress failure modes that shape-matching creates. Each was re-derived against the provenance gate:
-
-| Exemption                           | Verdict           | Reasoning                                                                                                                                                                                                                                                                                                                                                             |
-| ----------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| safeParse is always a boundary      | Rejected          | A shape detector cannot tell a defensive check of untrusted input from a re-check of its own output, so it must exempt the method wholesale. Under provenance, a defensive check of unknown input never reaches the gate, and `S.safeParse(ownOutput)` cannot fail — it is dead code, so it gets its own `alwaysSuccessfulSafeParse` message instead of an exemption. |
-| `.catch()` / `.default()` chain     | Kept structurally | `S.catch(x).parse(v)` puts a call in the receiver chain, so `canon` produces no path. It is also a different schema instance, so unifying it would have been wrong. No exemption code exists.                                                                                                                                                                         |
-| `"use server"` files                | Rejected          | It exists because a server action's typed parameters are untrusted at runtime, which only matters to a detector reading the parameter's type. A boundary parse of an argument never reaches the gate; a file that parses the same value twice is drift wherever it runs.                                                                                              |
-| Widely-typed veto (`any`/`unknown`) | Rejected          | It is a checker query this tier does not have, and it is unnecessary: it protects against a declared type that lies about the runtime value, while the gate requires the literal result of this schema's own parse call.                                                                                                                                              |
-| Throw-assertion callbacks           | Kept              | Carried over from the pre-migration rule. `expect(() => S.parse(v)).toThrow()` asserts a schema contract, not validation drift, and provenance cannot distinguish it.                                                                                                                                                                                                 |
-
-## Real-corpus validation (2026-08-13, canonical-path engine)
-
-Measured by running the shipped Oxlint plugin over seven trees with only this rule enabled, each pinned to a commit. murderbox was exported from `git archive HEAD` because its working tree changed during the run; every other tree is a shallow read-only clone. The funnel columns are the rule's own gate stages, instrumented.
-
-| Repository                          | Files     | Validation calls | Canonical path + stable root | Passes schema origin | Value carries provenance | Same canonical path | Findings |
-| ----------------------------------- | --------- | ---------------- | ---------------------------- | -------------------- | ------------------------ | ------------------- | -------- |
-| murderbox @ `777dc1bf`              | 896       | 788              | 579                          | 578                  | 1                        | 0                   | 0        |
-| dust-tt/dust @ `741e0fb`            | 9908      | 946              | 405                          | 393                  | 0                        | 0                   | 0        |
-| elizaOS/eliza @ `15c8bc84`          | 18141     | 5139             | 879                          | 833                  | 0                        | 0                   | 0        |
-| hyperdxio/hyperdx @ `69a89aa`       | 1221      | 592              | 172                          | 164                  | 0                        | 0                   | 0        |
-| pranitnale/InTown @ `b79dbcb`       | 264       | 91               | 53                           | 53                   | 0                        | 0                   | 0        |
-| ts-rest/ts-rest @ `dd7239b`         | 316       | 17               | 8                            | 8                    | 0                        | 0                   | 0        |
-| muralibasani/streamlens @ `8b1cdd1` | 88        | 17               | 15                           | 15                   | 0                        | 0                   | 0        |
-| **total**                           | **30834** | **7590**         | **2111**                     | **2044**             | **1**                    | **0**               | **0**    |
-
-**What the funnel actually shows.** Half the gate is well exercised and half is not, and the two must not be conflated:
-
-- The **receiver half is genuinely validated**. 2,044 of 7,590 validation calls (27%) resolve to a canonical path on a stable root and pass the schema-origin classification, so `canon`, alias expansion, object-literal collapse, literal computed keys, and the origin rules all ran against real code at scale rather than against fixtures. streamlens contributes 15 of its 17 calls here, including the nine scaffolded `api.<resource>.<op>.responses[<status>].parse(await res.json())` seams — the exact member-expression-with-literal-computed-key shape this migration adds.
-- The **provenance half is essentially unexercised**. Across 7,590 calls the value being parsed carried in-file provenance from any schema exactly **once**, and it never carried provenance from the _same_ canonical path. The zero findings therefore mean "this corpus almost never re-parses a locally parsed value", not "the rule discriminated well under pressure". Recall against the canonical-path engine is unproven, which is why the rule ships default-off.
-
-An earlier draft of this section claimed the false-positive-capable populations "were present and stayed silent". That overstates the evidence and is corrected here: what was present in volume was _receiver_ shape; what was absent was _provenance_ shape. The suppression work below is real but was measured at the receiver stage, not at the report stage.
-
-- **Non-schema receivers.** `JSON` resolves to no binding, so `canon` yields no path at all and the module-origin veto is never reached — murderbox's `JSON.parse` sites and the genuine double-`JSON.parse` sites in eliza (`packages/cloud/shared/src/lib/types/message-content.ts`, `plugins/plugin-mcp/src/service.ts`) drop out at the canon stage. The origin veto itself rejects 67 of the 2,111 canon-resolved receivers (dust 12, eliza 46, hyperdx 8, murderbox 1), so it does measurable work — but because none of those receivers reached the provenance stage, it changed no end result on this corpus. It is insurance, not a load-bearing measured filter.
-- **hyperdx's confessed re-parse is a correct bail, twice over.** `packages/api/src/utils/zod.ts` re-parses inside a `.transform` with the comment "Safe to call `.parse()` here — superRefine already validated the data". The receiver is a const initialized from a conditional expression, so there is no static canonical path; and the value is the transform callback's parameter, so there is no in-file provenance. Reproduced on a reduced probe. It is also arguably not drift: the re-parse selects a sub-schema to strip unknown fields, which does real work.
-- **Scope resolution beats text matching.** A loose textual scan produced candidates that the rule correctly ignores, including `dust/front/lib/api/triggers/built-in-webhooks/linear/linear_client.ts`, which binds `const webhook = LinearWebhookSchema.parse(...)` at line 169 and an unrelated arrow parameter named `webhook` at line 237.
-
-### The one provenance hit in the corpus is out of scope by design
-
-murderbox `apps/desktop/src/bridge.ts:23` at `777dc1bf` is the single site where the parsed value carried provenance:
-
-```ts
-import {
-  murderboxDesktopBridgeContract,
-  murderboxDesktopRuntimeInfoResultSchema,
-} from "@murderbox/shared/desktop-bridge";
-const method = murderboxDesktopBridgeContract.getRuntimeInfo;
-const parsedRuntimeInfo =
-  murderboxDesktopRuntimeInfoResultSchema.parse(runtimeInfo);
-return method.resultSchema.parse(parsedRuntimeInfo);
-```
-
-`murderboxDesktopBridgeContract.getRuntimeInfo.resultSchema` **is** `murderboxDesktopRuntimeInfoResultSchema` — but only the imported module says so. The two receivers root at two different import bindings, so the same-path test fails and nothing is reported. This is the documented "same root binding or nothing" boundary: a measured false negative, not a bug.
-
-A relaxation was implemented and measured before being rejected: unify two roots when both are import bindings from the _same module specifier_. Across the corpus it produced exactly one finding — this one — and no new false positives. It was still rejected, because it is unsound in a trivially constructible shape this corpus happens not to contain: `import { RequestSchema, contract } from "./contract"` would unify `RequestSchema` with `contract.route.responseSchema`, which are different schemas. The measurement argues for the _sound_ version of the capability, not for this one.
-
-The honest reading: in-file same-root re-validation is rare, and the shape that actually occurs is cross-module contract identity. Recall for this rule lives in a registry-declared or module-graph fact, which is the recorded follow-up.
-
-## Known holes
-
-Documented rather than solved, because both need module-graph facts the syntax tier does not have:
-
-- a path segment backed by a getter that returns a fresh object per read, so two reads of the same path are not the same schema instance;
-- cross-module mutation of an exported contract object.
-
-Cross-owner reporting for a generated mirror of a canonical contract is deliberate follow-up scope, not a hole: canonical paths are never unified across module boundaries by inference, so a registry-gated cross-owner message would have to come from declared facts.
+Helper and service call results. `S.parse(await getTypedValue())` was once gated on bidirectional assignability between the helper's declared return type and the schema output. It was removed on 2026-08-10 because refinements (`.min`, `.positive`, `.refine`, `.transform`) are invisible to the type system, so `NonEmpty.parse(readName())` with `readName(): string` false-positived. Type equivalence is not decoder provenance: the value must be proven to have come from this decoder. That leaves two accepted limits — a helper/service call result stays clean until decoder producer provenance exists, and a nested pipeline such as `OutputSchema.parse(CoercionSchema.parse(raw))` stays clean because the inner parse is a first-boundary step.
 
 ## Should Flag
-
-```ts
-const result = await setupMachine(machineId);
-return Response.json(machineSetupResponseSchema.parse(result));
-```
-
-Why: `setupMachine()` already returns `Promise<MachineSetupResponse>`, and `MachineSetupResponse` is the inferred output of `machineSetupResponseSchema`.
 
 ```ts
 const parsed = RowSchema.parse(raw);
@@ -114,6 +36,20 @@ const again = RowSchema.parse(parsed);
 ```
 
 Why: the second parse is the same schema validating its own output.
+
+```ts
+function enroll(request: z.infer<typeof enrollRequestSchema>) {
+  const parsed = enrollRequestSchema.parse(request);
+}
+```
+
+Why: the declared contract already states `request` is schema output; the parse turns a compile-time contract into a runtime failure inside the callee.
+
+```ts
+return enrollRequestSchema.parse({ machineId, ...row });
+```
+
+Why: the payload is reshaped inline to satisfy the schema. Define a named boundary decoder at the receiving adapter and parse once.
 
 ## Should Not Flag
 
@@ -130,71 +66,33 @@ const registry = workspaceProjectRegistrySchema.safeParse(JSON.parse(raw));
 Why: file contents are raw JSON and still need a boundary parse.
 
 ```ts
-const manifest = GeneratedStateManifestSchema.parse({
-  schemaVersion: 1,
-  source,
-  generated,
-});
+"use server";
+export async function enroll(request: z.infer<typeof enrollRequestSchema>) {
+  return enrollRequestSchema.parse(request);
+}
 ```
 
-Why: the function is constructing a schema-owned output object.
+Why: a server action is a network endpoint; its declared parameter type is not a caller guarantee.
 
 ```ts
 expect(() => GeneratedStateManifestSchema.parse(manifest)).not.toThrow();
 ```
 
-Why: this is a schema-contract assertion. The parse result is not passed back into application code; the test is proving that a generated or assembled typed value still satisfies the runtime schema.
-
-## Ecosystem Check
-
-No supported ESLint/Zod rule has been found that tracks schema provenance and reports "same schema parses its own output." Generic TypeScript safety rules (`no-unsafe-assignment`, `no-unsafe-return`) and generic Zod style rules do not distinguish raw input from schema-owned output.
-
-State: `net-antidrift`.
+Why: a schema-contract assertion. The parse result is not passed back into application code; the test proves a generated or assembled value still satisfies the runtime schema.
 
 ## Real Corpus Evidence
 
-Chaski drift:
+Chaski drift (`bff-sequence-count-router-redundant-zod-parse`), 2 findings:
 
-- `/Users/sushi/code/chaski/src/frontend/bff/api/routers/retool/sequence-count-router.ts` line 21 re-parses BigQuery gateway rows already typed as `CountSequenceRow[]`.
-- `/Users/sushi/code/chaski/src/frontend/bff/api/routers/retool/sequence-count-router.ts` line 26 directly parses flattened PostHog gateway rows already typed as `HogQLRow[]`.
+- `src/frontend/bff/api/routers/retool/sequence-count-router.ts` line 21 re-parses BigQuery gateway rows already typed as `CountSequenceRow[]`.
+- The same file line 26 parses flattened PostHog gateway rows already typed as `HogQLRow[]`.
 
-Murderbox production drift:
+Chaski clean controls: `bigquery-gateway.ts` parses and coerces BigQuery rows at the boundary, `scenarios-service.ts` validates external gRPC responses, `erp-router.ts` validates locally assembled ERP records, and the PostHog router validates a stringified payload.
 
-- `/Users/sushi/code/murderbox/apps/api/app/api/machines/setup/route.ts` line 27 parses `setupMachine(...)` output even though `setupMachine()` returns `Promise<MachineSetupResponse>`.
+Codebase Atlas clean: `services/generatedStateIntegrityService.ts` constructs schema-owned values, and `test/generatedStateDebugSimulation.test.ts` and `test/invariantService.test.ts` are schema-contract assertions. Deliberately clean (`under-proven`): `programs/persistenceCuration.ts` parses a plain `string` parameter with a refinement-carrying schema (`z.string().min(1)`), a real runtime check, and `programs/repo-ingestion/extractSemanticFacts.ts` parses a `z.input<typeof S>` parameter, the pre-validation contract.
 
-Clean controls:
+Murderbox clean: `apps/api/lib/server/workspace-projects.ts` normalises raw registry JSON at the boundary. The Murderbox drift for the declared-parameter shape this rule absorbed is inventoried in [`no-parse-as-cast.md`](no-parse-as-cast.md).
 
-- `/Users/sushi/code/chaski/src/frontend/bff/api/gateways/bigquery-gateway.ts` performs first-boundary parsing and coercion of BigQuery rows.
-- `/Users/sushi/code/chaski/src/frontend/bff/api/services/scenarios-service.ts` validates external gRPC responses.
-- `/Users/sushi/code/chaski/src/frontend/bff/api/routers/retool/erp-router.ts` validates locally assembled ERP records.
-- `/Users/sushi/code/codebase-atlas/src/services/generatedStateIntegrityService.ts` constructs schema-owned manifest/report values.
-- `/Users/sushi/code/murderbox/apps/api/lib/server/workspace-projects.ts` normalizes raw registry JSON at the boundary.
+## Ecosystem Check
 
-Broad inventory:
-
-- Codebase Atlas `src`: the prior 6 test-file findings are now clean when they appear inside `expect(() => Schema.parse(value)).not.toThrow()` schema-contract assertions.
-- Taskme `src`: 2 parse-candidate files, 0 findings.
-- Sudocode server/CLI: 46 parse-candidate files, 0 findings.
-- Murderbox API: 32 parse-candidate files, 1 production finding.
-- Murderbox shared, client, and asset pipeline: 18 parse-candidate files, 0 findings.
-
-## Scope Decision
-
-The Codebase Atlas findings were in tests that assert a generated product still satisfies a schema. That is legitimate schema-contract testing even when the value is statically typed.
-
-The rule now uses an assertion-context exception, not a test-file override. A Zod parse is ignored only when it is the direct expression checked by a function passed to `expect(...)` and that expectation uses a throw matcher such as `toThrow` or `not.toThrow`. A redundant parse in a test still reports if the parsed result is assigned, returned, or otherwise consumed as a value.
-
-Claude Opus 4.8 advisory review completed on June 4, 2026 (`reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md`). It agreed the assertion-context exception is the right shape and asked for either a real negative gate for consumed assertion-callback parses or an explicit acceptance that current corpora do not contain that edge.
-
-Follow-up real-corpus search on June 4, 2026 found no consumed assertion-callback reparse case to promote as a drift gate. The scan ran the narrowed rule over 50 Codebase Atlas test files, 30 Murderbox API test files, 132 Sudocode server test files, and 11 Chaski BFF test files; all stayed clean. The consumed-parse edge is accepted as unrepresented in the current corpus rather than blocked on a synthetic fixture. The implementation still keeps the exception narrow by requiring the parse call to be the direct throw-assertion expression.
-
-The helper-result slice that closed the promotion blocker was later found unsound and removed on 2026-08-10: `Schema.parse(await getTypedValue())` and `Schema.parse(getTypedValue())` gated on type equivalence, which cannot prove the same decoder ran (refinements are invisible to TypeScript). The slice may return only with real producer provenance in the schema-provenance adapter.
-
-Known remaining limits:
-
-- Helper/service call results are silent until decoder producer provenance exists; type equivalence is a rejected signal.
-- Nested schema pipelines such as `OutputSchema.parse(CoercionSchema.parse(raw))` stay clean because the inner parse is a first-boundary validation step, not a typed service result.
-
-## Promotion State
-
-Status: `ready`, `stable: true`.
+No maintained ESLint/Zod rule tracks schema provenance and reports "the same schema parses its own output". Generic TypeScript safety rules (`no-unsafe-assignment`, `no-unsafe-return`) and generic Zod style rules do not distinguish raw input from schema-owned output. The public rules of this name in `dfine-io/dlint` are type-shape detectors — the mechanism this package retired — so their exemptions do not transfer, though two hold structurally and the implementation covers them: `S.catch(x).parse(v)` is a different schema instance reached through a call, and a throw-assertion callback asserts the schema itself.
