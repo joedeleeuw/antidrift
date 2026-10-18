@@ -339,10 +339,9 @@ clusters:
         severity: error
         hookEvent: PostToolUse
         message: Edited files must pass changed-file policy checks.
-      - id: agent/require-checks-before-stop # Agents should not end without deterministic evidence.
+      - id: agent/require-checks-before-push # Pushes must carry deterministic evidence; agent turns stay fast.
         severity: error
-        hookEvent: Stop
-        message: Run required checks before stopping.
+        message: Run pnpm policy:verify-session before pushing.
 
   - id: quality-gate-drift # Agents may weaken checks to make output pass.
     owner: developer-experience # DX owns toolchain integrity.

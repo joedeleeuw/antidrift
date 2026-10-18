@@ -21,16 +21,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node node_modules/@joedeleeuw/antidrift/src/policy/hooks/verify-session-stop.mjs"
-          }
-        ]
-      }
     ]
   }
 }

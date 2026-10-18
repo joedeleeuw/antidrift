@@ -33,12 +33,12 @@ export function renderPolicyArtifacts(policy) {
   const artifacts = new Map();
   artifacts.set(
     "AGENTS.md",
-    `# Repository Agent Instructions\n\n${header}\n\n## Required checks\n\nRun \`pnpm policy:verify-session\` before finishing substantial code work.\n\n## Never\n\n${neverLines}\n\n## Rule clusters\n\n${clusterLines}\n`
+    `# Repository Agent Instructions\n\n${header}\n\n## Required checks\n\nRun \`pnpm policy:verify-session\` before pushing.\n\n## Never\n\n${neverLines}\n\n## Rule clusters\n\n${clusterLines}\n`
   );
 
   artifacts.set(
     "CLAUDE.md",
-    `# Claude Project Instructions\n\n${header}\n\nTreat hooks and deterministic checks as authoritative. Fix code instead of weakening policy.\n\n## Stop condition\n\nRun \`pnpm policy:verify-session\` before stopping.\n\n## Rule clusters\n\n${clusterLines}\n`
+    `# Claude Project Instructions\n\n${header}\n\nTreat hooks and deterministic checks as authoritative. Fix code instead of weakening policy.\n\n## Required checks\n\nRun \`pnpm policy:verify-session\` before pushing.\n\n## Rule clusters\n\n${clusterLines}\n`
   );
 
   artifacts.set(
@@ -82,13 +82,6 @@ export function renderPolicyArtifacts(policy) {
       {
         matcher: "Edit|Write|MultiEdit",
         hooks: [{ type: "command", command: "pnpm policy:check:changed" }],
-      },
-    ],
-    Stop: [
-      {
-        hooks: [
-          { type: "command", command: hookScript("verify-session-stop") },
-        ],
       },
     ],
   };

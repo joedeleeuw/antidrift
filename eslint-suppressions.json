@@ -809,22 +809,6 @@
       "count": 12
     }
   },
-  "tooling/antidrift/src/policy/verify-session.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 6
-    }
-  },
-  "tooling/antidrift/src/policy/verify-session.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
   "tooling/antidrift/src/semantic-adapters/async-control-flow.mjs": {
     "antidrift/no-vague-names": {
       "count": 8

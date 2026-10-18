@@ -652,12 +652,12 @@ policyRuleReviews:
     coverage: Covered by generated Claude/Codex PostToolUse hooks.
     reason: Changed-file validation is an edit-loop control-plane check.
     nextAction: Keep check-changed and generated hook artifacts aligned.
-  agent/require-checks-before-stop:
-    status: hook-covered
-    replacement: pnpm policy:verify-session Stop hook
-    coverage: Covered by generated Claude/Codex Stop hooks.
-    reason: Session completion evidence is lifecycle policy, not lint semantics.
-    nextAction: Keep verify-session as the stop condition.
+  agent/require-checks-before-push:
+    status: policy-script
+    replacement: pnpm policy:verify-session pre-push hook
+    coverage: Covered by the repository's simple-git-hooks pre-push hook; the publish workflow runs pnpm verify:release.
+    reason: The release gate runs typecheck, both lint tiers, tests and the packed consumer, so it belongs at the push boundary, not at the end of every agent turn.
+    nextAction: Keep verify-session on pre-push; edit-loop feedback stays with agent/lint-after-edit.
   policy/no-check-weakening-without-policy-task:
     status: policy-script
     replacement: pnpm policy:check:changed

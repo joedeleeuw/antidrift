@@ -101,7 +101,7 @@ Each future progress slice must clear these gates before it is considered done:
 6. **Rule surface gate**: any custom rule is exported, configured in one runtime, and covered by a real corpus case; `pnpm policy:check-rule-surface` must pass.
 7. **Self-host gate**: `pnpm check` must pass against this repository. If a rule flags antidrift itself, either fix the repo pattern or narrow the rule with real corpus evidence.
 8. **Package gate**: when exports, package shape, or shipped config change, `pnpm test:integration` must pass against the packed tarball consumer.
-9. **Session gate**: `pnpm policy:verify-session` is the final local stop condition.
+9. **Session gate**: `pnpm policy:verify-session` is the pre-push gate.
 
 Real project files are the primary assertion surface. Reduced fixture programs and inline RuleTester strings are regression aids only; they are not completion evidence for rule behavior.
 

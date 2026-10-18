@@ -338,7 +338,7 @@ export function parseOxlintArgs(
   }
 ): OxlintArgs;
 export function runOxlint(options?: PolicyCommandOptions): number;
-export function verifySession(options?: PolicyCommandOptions): unknown;
+export function verifySession(): void;
 export function eslintJsonToSonar(
   inputPath?: string,
   outputPath?: string
