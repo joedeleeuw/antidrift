@@ -25,6 +25,26 @@ const typescriptRules = {
   ...typescriptSyntaxRules,
   ...typescriptTypeAwareRules,
 } satisfies DummyRuleMap;
+const shippedRuleCodeQualityRules = {
+  complexity: ["error", { max: 20, variant: "classic" }],
+  curly: ["error", "all"],
+  "max-depth": ["error", 4],
+  "max-lines": [
+    "error",
+    { max: 500, skipBlankLines: true, skipComments: true },
+  ],
+  "max-lines-per-function": ["error", { max: 80, skipComments: true }],
+  "max-params": ["error", 6],
+  "max-statements": ["error", 50],
+  "no-dupe-else-if": "error",
+  "no-else-return": ["error", { allowElseIf: false }],
+  "no-lonely-if": "error",
+  "no-unused-vars": [
+    "error",
+    { args: "all", argsIgnorePattern: "^_$", caughtErrors: "all" },
+  ],
+  "unicorn/no-lonely-if": "error",
+} satisfies DummyRuleMap;
 const vitestRules = {
   "vitest/expect-expect": "error",
   "vitest/no-conditional-expect": "error",
@@ -194,6 +214,10 @@ export default defineConfig({
       rules: {
         "no-console": "off",
       },
+    },
+    {
+      files: ["tooling/antidrift/src/**/*.ts"],
+      rules: shippedRuleCodeQualityRules,
     },
   ],
 });

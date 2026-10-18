@@ -42,7 +42,7 @@ export function provePortableRules({ file, lintOxlint, packedFiles }) {
       },
     });
     if (
-      !packedFiles.has(`package/src/oxlint-plugin/portable/${entry.name}.js`)
+      !packedFiles.has(`package/dist/oxlint-plugin/portable/${entry.name}.js`)
     ) {
       throw new Error(`Portable rule missing from tarball: ${entry.name}`);
     }

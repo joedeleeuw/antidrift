@@ -1,18 +1,25 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "composite": false,
+    "noEmit": true,
+    "target": "ES2023",
+    "lib": ["ES2023"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "noEmit": true,
+    "types": ["node"],
     "allowJs": true,
-    "checkJs": false
+    "checkJs": false,
+    "erasableSyntaxOnly": true,
+    "rewriteRelativeImportExtensions": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": [
-    "src/**/*.js",
-    "src/**/*.mjs",
+    "src/**/*.ts",
     "src/**/*.mts",
-    "src/**/*.cts",
-    "test/**/*.mjs"
-  ]
+    "src/**/*.mjs",
+    "src/**/*.js",
+    "scripts/**/*.ts"
+  ],
+  "exclude": ["src/**/fixtures/**", "src/**/*.test.*"]
 }

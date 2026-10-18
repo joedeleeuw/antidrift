@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "include": ["files", "exports", "types", "nsExports", "nsTypes"],
+  "workspaces": {
+    ".": {
+      "entry": [],
+      "project": []
+    },
+    "tooling/antidrift": {
+      "entry": ["src/**/*.{js,mjs}", "test/**/*.mjs"],
+      "project": ["src/**/*.ts", "!src/**/fixtures/**"]
+    }
+  }
+}

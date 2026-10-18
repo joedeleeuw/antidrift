@@ -26,7 +26,82 @@
   "bugs": "https://github.com/joedeleeuw/antidrift/issues",
   "publishConfig": {
     "access": "public",
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "types": "./dist/index.d.mts",
+    "bin": {
+      "antidrift": "dist/policy/cli.mjs"
+    },
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs"
+      },
+      "./package.json": "./package.json",
+      "./brand": {
+        "types": "./dist/brand/index.d.mts",
+        "import": "./dist/brand/index.mjs"
+      },
+      "./eslint-plugin": {
+        "types": "./dist/eslint-plugin/index.d.ts",
+        "import": "./dist/eslint-plugin/index.js"
+      },
+      "./eslint-config": {
+        "types": "./dist/eslint-config/index.d.mts",
+        "import": "./dist/eslint-config/index.mjs"
+      },
+      "./oxlint-config": {
+        "types": "./dist/oxlint-config/index.d.mts",
+        "import": "./dist/oxlint-config/index.mjs"
+      },
+      "./oxlint-plugin": {
+        "types": "./dist/oxlint-plugin/index.d.ts",
+        "import": "./dist/oxlint-plugin/index.js"
+      },
+      "./policy": {
+        "types": "./dist/policy/index.d.mts",
+        "import": "./dist/policy/index.mjs"
+      },
+      "./semantic-adapters": {
+        "types": "./dist/semantic-adapters/index.d.mts",
+        "import": "./dist/semantic-adapters/index.mjs"
+      },
+      "./semantic-adapters/async-control-flow": {
+        "types": "./dist/semantic-adapters/async-control-flow.d.mts",
+        "import": "./dist/semantic-adapters/async-control-flow.mjs"
+      },
+      "./semantic-adapters/auth-boundary": {
+        "types": "./dist/semantic-adapters/auth-boundary.d.mts",
+        "import": "./dist/semantic-adapters/auth-boundary.mjs"
+      },
+      "./semantic-adapters/broad-input": {
+        "types": "./dist/semantic-adapters/broad-input.d.mts",
+        "import": "./dist/semantic-adapters/broad-input.mjs"
+      },
+      "./semantic-adapters/parse-input": {
+        "types": "./dist/semantic-adapters/parse-input.d.mts",
+        "import": "./dist/semantic-adapters/parse-input.mjs"
+      },
+      "./semantic-adapters/react-state": {
+        "types": "./dist/semantic-adapters/react-state.d.mts",
+        "import": "./dist/semantic-adapters/react-state.mjs"
+      },
+      "./semantic-adapters/schema-provenance": {
+        "types": "./dist/semantic-adapters/schema-provenance.d.mts",
+        "import": "./dist/semantic-adapters/schema-provenance.mjs"
+      },
+      "./semantic-adapters/sql": {
+        "types": "./dist/semantic-adapters/sql.d.mts",
+        "import": "./dist/semantic-adapters/sql.mjs"
+      },
+      "./semantic-adapters/tuple-shape": {
+        "types": "./dist/semantic-adapters/tuple-shape.d.mts",
+        "import": "./dist/semantic-adapters/tuple-shape.mjs"
+      },
+      "./semantic-adapters/type-owner": {
+        "types": "./dist/semantic-adapters/type-owner.d.mts",
+        "import": "./dist/semantic-adapters/type-owner.mjs"
+      }
+    }
   },
   "types": "./src/index.d.mts",
   "engines": {
@@ -106,6 +181,10 @@
   "bin": {
     "antidrift": "src/policy/cli.mjs"
   },
+  "scripts": {
+    "build": "node scripts/build.ts",
+    "prepack": "pnpm run build"
+  },
   "files": [
     "CHANGELOG.md",
     "LICENSE",
@@ -113,9 +192,7 @@
     "licenses",
     "README.md",
     "ast-grep",
-    "src",
-    "!src/**/*.test.*",
-    "!src/**/fixtures/**"
+    "dist"
   ],
   "dependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",

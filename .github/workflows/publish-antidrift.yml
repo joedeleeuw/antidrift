@@ -46,6 +46,5 @@ jobs:
       - name: Pack package
         run: pnpm --dir tooling/antidrift pack --pack-destination "$RUNNER_TEMP/antidrift-pack"
 
-      - name: Publish package
-        working-directory: tooling/antidrift
-        run: npm publish --access public
+      - name: Publish packed tarball
+        run: npm publish "$RUNNER_TEMP"/antidrift-pack/*.tgz --access public
