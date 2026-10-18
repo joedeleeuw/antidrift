@@ -109,13 +109,6 @@ export function joinSeparator(joinCall: unknown): string | null {
   return separator ? staticString(separator) : ",";
 }
 
-export function isCallbackExpression(node: unknown): boolean {
-  return (
-    isSyntaxType(node, "ArrowFunctionExpression") ||
-    isSyntaxType(node, "FunctionExpression")
-  );
-}
-
 export function sqlPropertyKeyName(key: unknown): string {
   if (isSyntaxType(key, "Identifier")) {
     return identifierName(key) ?? "";

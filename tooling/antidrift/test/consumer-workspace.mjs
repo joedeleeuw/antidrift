@@ -426,7 +426,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, isReturnedExpression, markAwaitedPendingMaps, markReturnedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap, type AsyncArrayCallbackClassification, type PendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
       'import { BROAD_INPUT_ARRAY_TRANSFORM_METHODS, assignmentTarget, callUsesPredicateParam, checkedTargetProperties, collectBindingIdentifiers, collectBindingNames, collectObjectPatternBindingNames, countShapeProbesIn, destructuredTargetPropertyAliases, directAliasName, functionParameterByName, hasBroadObjectEntriesValue, hasParamRoot, hasValidatorDelegation, isAppeasementCastSourceType, isBindingIdentifier, isBroadPredicateInputType, isBroadShapeProbeInputType, isNamedTypeReference, isNullishLiteral, isObjectEntriesCall, isPredicateObjectContract, isTypeofObjectProbe, memberExpressionPropertyName, memberExpressionRootName, objectEntriesCallbackProbe, objectEntriesValueBindings, objectHasOwnPropertyName, predicateValueNames, requiredTypeProps, staticPropertyName, typePredicateParts, unwrapExpression, walkNode, type ObjectEntriesCallbackProbe, type TypePredicateParts, type TypeScriptParserServices as BroadInputParserServices } from "@joedeleeuw/antidrift/semantic-adapters/broad-input";\n' +
       'import { conditionEnsuresString, hasLocalStringBoundary, isJsonParseCall, isUnsafeJsonParseInput, jsonParseArgument, type TypeScriptParserServices as ParseInputParserServices } from "@joedeleeuw/antidrift/semantic-adapters/parse-input";\n' +
-      'import { classifyWriteValue, createReactStateTracker, frameStatePayload, lifecycleProof, type ReactStateFrame, type ReactStateFramePayload, type ReactStateLifecycleProof, type ReactStateWriteClass } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
+      'import { classifyStateWrite, createReactStateTracker, frameStatePayload, lifecycleProof, type ReactStateFrame, type ReactStateFramePayload, type ReactStateLifecycleProof, type ReactStateWriteClass } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
       'import { ZOD_PARSE_METHODS, ZOD_THROW_ASSERTION_MATCHERS, isThrowAssertionCallbackParse, zodParseCallParts, type TypeScriptParserServices, type ZodParseCallParts } from "@joedeleeuw/antidrift/semantic-adapters/schema-provenance";\n' +
       'import { isSqlDirectionToken, isSqlIdentifierContext, isSqlIdentifierToken, isSqlInterpolationContext, normalizedSqlContext, removeTrailingSqlQuote, safeIdentifierMemberSpecs, safeTemplateTagSpecs, valuesAreSqlDirections, valuesAreSqlIdentifiers, type SafeIdentifierMemberSpec, type SafeTemplateTagSpecs } from "@joedeleeuw/antidrift/semantic-adapters/sql";\n' +
       'import { hasNullablePositionalTuple, nullableTupleSlots, tupleElementIsNullishSlot, tupleElementIsOptional, tupleElementResolvesToNullish, tupleElementTypeNode, typeIncludesNullish, typeNodeIncludesDirectNullish, type TypeScriptParserServices as TupleShapeParserServices } from "@joedeleeuw/antidrift/semantic-adapters/tuple-shape";\n' +
@@ -444,7 +444,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'const oxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false }) satisfies OxlintArgs;\n' +
       'const branded = brand("UserId", (value): value is string => typeof value === "string");\n' +
       'const authBoundaryTracker = createAuthBoundaryTracker({ authzFunctions: ["authorize"], onFrameExit(frame) { frame satisfies AuthBoundaryFrame; } });\n' +
-      'const writeClass = classifyWriteValue({ type: "Literal", value: false }, { awaitedNames: new Set<string>(), catchParams: [] });\n' +
+      'const writeClass = classifyStateWrite({ type: "Literal", value: false }, { awaitedNames: new Set<string>(), catchParams: [] });\n' +
       "const reactSourceCode = { getScope: (_node: unknown) => ({ set: new Map<string, unknown>(), upper: null }), getDeclaredVariables: (_node: unknown) => [] };\n" +
       "const tracker = createReactStateTracker({ sourceCode: reactSourceCode, onFrameExit(frame) { frame satisfies ReactStateFrame; } });\n" +
       "const parserServices = { esTreeNodeToTSNodeMap: { get: (_node: unknown) => undefined } } satisfies TypeScriptParserServices;\n" +
@@ -722,7 +722,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "void staticPropertyName;\n" +
       "void typePredicateParts;\n" +
       "void walkNode;\n" +
-      "void classifyWriteValue;\n" +
+      "void classifyStateWrite;\n" +
       "void createReactStateTracker;\n" +
       "void frameStatePayload;\n" +
       "void lifecycleProof;\n" +
@@ -772,7 +772,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, isReturnedExpression, markAwaitedPendingMaps, markReturnedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
       'import { BROAD_INPUT_ARRAY_TRANSFORM_METHODS, assignmentTarget, callUsesPredicateParam, checkedTargetProperties, collectBindingIdentifiers, collectBindingNames, collectObjectPatternBindingNames, countShapeProbesIn, destructuredTargetPropertyAliases, directAliasName, functionParameterByName, hasBroadObjectEntriesValue, hasParamRoot, hasValidatorDelegation, isAppeasementCastSourceType, isBindingIdentifier, isBroadPredicateInputType, isBroadShapeProbeInputType, isNamedTypeReference, isNullishLiteral, isObjectEntriesCall, isPredicateObjectContract, isTypeofObjectProbe, memberExpressionPropertyName, memberExpressionRootName, objectEntriesCallbackProbe, objectEntriesValueBindings, objectHasOwnPropertyName, predicateValueNames, requiredTypeProps, staticPropertyName, typePredicateParts, unwrapExpression, walkNode } from "@joedeleeuw/antidrift/semantic-adapters/broad-input";\n' +
       'import { hasLocalStringBoundary, isJsonParseCall, jsonParseArgument } from "@joedeleeuw/antidrift/semantic-adapters/parse-input";\n' +
-      'import { classifyWriteValue, createReactStateTracker, frameStatePayload, lifecycleProof } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
+      'import { classifyStateWrite, createReactStateTracker, frameStatePayload, lifecycleProof } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
       'import { ZOD_PARSE_METHODS, ZOD_THROW_ASSERTION_MATCHERS, isThrowAssertionCallbackParse, zodParseCallParts } from "@joedeleeuw/antidrift/semantic-adapters/schema-provenance";\n' +
       'import { isSqlDirectionToken, isSqlIdentifierContext, isSqlIdentifierToken, isSqlInterpolationContext, normalizedSqlContext, removeTrailingSqlQuote, safeIdentifierMemberSpecs, valuesAreSqlDirections, valuesAreSqlIdentifiers } from "@joedeleeuw/antidrift/semantic-adapters/sql";\n' +
       'import { hasNullablePositionalTuple, nullableTupleSlots, tupleElementIsNullishSlot, tupleElementIsOptional, tupleElementResolvesToNullish, tupleElementTypeNode, typeIncludesNullish, typeNodeIncludesDirectNullish } from "@joedeleeuw/antidrift/semantic-adapters/tuple-shape";\n' +
@@ -870,7 +870,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "  staticPropertyName,\n" +
       "  typePredicateParts,\n" +
       "  walkNode,\n" +
-      "  classifyWriteValue,\n" +
+      "  classifyStateWrite,\n" +
       "  createReactStateTracker,\n" +
       "  frameStatePayload,\n" +
       "  lifecycleProof,\n" +
@@ -994,7 +994,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       '  throw new Error("Missing semantic fact contract emission/confidence lookup behavior");\n' +
       "}\n" +
       "\n" +
-      'if (classifyWriteValue({ type: "Literal", value: false }, { awaitedNames: new Set(), catchParams: [] }) !== "falseConst") {\n' +
+      'if (classifyStateWrite({ type: "Literal", value: false }, { awaitedNames: new Set(), catchParams: [] }) !== "falseConst") {\n' +
       '  throw new Error("Missing react-state semantic adapter behavior");\n' +
       "}\n" +
       "\n" +

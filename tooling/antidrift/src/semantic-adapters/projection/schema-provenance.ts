@@ -1,6 +1,7 @@
 import ts from "typescript";
 
 import type { TypeScriptParserServices } from "../kernel/rule-kernel.ts";
+import { isInlineFunction } from "../kernel/syntax-function.ts";
 import type { SyntaxNode } from "../kernel/syntax-node.ts";
 import {
   identifierName,
@@ -55,11 +56,6 @@ export const ZOD_TRANSFORM_METHOD = "transform";
 export const ZOD_THROW_ASSERTION_MATCHERS: ReadonlySet<string> = new Set([
   "toThrow",
   "toThrowError",
-]);
-
-const FUNCTION_EXPRESSION_TYPES = new Set([
-  "ArrowFunctionExpression",
-  "FunctionExpression",
 ]);
 
 const THROW_MATCHER_CHAIN_TYPES = new Set([
@@ -149,11 +145,11 @@ function nearestFunctionExpression(node: unknown): SyntaxNode | null {
     isSyntaxNode(current);
     current = syntaxField(current, "parent")
   ) {
-    if (FUNCTION_EXPRESSION_TYPES.has(current.type)) {
-      return current;
-    }
     if (current.type === "FunctionDeclaration") {
       return null;
+    }
+    if (isInlineFunction(current)) {
+      return current;
     }
   }
   return null;
@@ -315,10 +311,6 @@ export function schemaValidationCallParts(
   );
 }
 
-function isCallbackExpression(node: unknown): boolean {
-  return isSyntaxNode(node) && FUNCTION_EXPRESSION_TYPES.has(node.type);
-}
-
 export function zodTransformCallParts(
   node: unknown,
   services: TypeScriptParserServices,
@@ -329,7 +321,7 @@ export function zodTransformCallParts(
   if (
     staticCallMethod(node) !== ZOD_TRANSFORM_METHOD ||
     callArguments.length !== 1 ||
-    !isCallbackExpression(callback)
+    !isInlineFunction(callback)
   ) {
     return null;
   }

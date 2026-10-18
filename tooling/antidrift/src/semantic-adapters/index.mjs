@@ -2,7 +2,7 @@ import * as asyncControlFlow from "./kernel/async-control-flow.ts";
 import * as authBoundary from "./auth-boundary.mjs";
 import * as broadInput from "./broad-input.mjs";
 import * as parseInput from "./parse-input.mjs";
-import * as reactState from "./react-state.mjs";
+import * as reactState from "./projection/react-state.ts";
 import * as schemaProvenance from "./projection/schema-provenance.ts";
 import * as sql from "./projection/sql.ts";
 import * as tupleShape from "./shape/tuple-shape.ts";

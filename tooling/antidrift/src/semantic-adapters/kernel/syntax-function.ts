@@ -22,6 +22,10 @@ export function isFunctionLike(node: unknown): node is SyntaxNode {
   return isSyntaxTypeIn(node, FUNCTION_TYPES);
 }
 
+export function isInlineFunction(node: unknown): node is SyntaxNode {
+  return isSyntaxTypeIn(node, FUNCTION_VALUE_TYPES);
+}
+
 export function getFunctionNode(node: unknown) {
   if (isFunctionLike(node)) {
     return node;
@@ -32,7 +36,5 @@ export function getFunctionNode(node: unknown) {
   const memberFunction = isSyntaxTypeIn(node, memberNodeTypes)
     ? syntaxField(node, "value")
     : null;
-  return isSyntaxTypeIn(memberFunction, FUNCTION_VALUE_TYPES)
-    ? memberFunction
-    : null;
+  return isInlineFunction(memberFunction) ? memberFunction : null;
 }

@@ -3,7 +3,7 @@ import {
   frameStatePayload,
   lifecycleProof,
   sourceShardProof,
-} from "./react-state-graph.js";
+} from "./projection/react-state.ts";
 import { emitSemanticFact } from "../policy/lib/semantic-facts.mjs";
 import {
   asyncArrayCallbackClassification,

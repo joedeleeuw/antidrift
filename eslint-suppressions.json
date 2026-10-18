@@ -858,19 +858,6 @@
       "count": 2
     }
   },
-  "tooling/antidrift/src/semantic-adapters/react-state-graph.js": {
-    "antidrift/no-vague-names": {
-      "count": 21
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/react-state-graph.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 7
-    },
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
   "tooling/antidrift/src/semantic-adapters/schema-parse-shape.mjs": {
     "antidrift/no-vague-names": {
       "count": 2

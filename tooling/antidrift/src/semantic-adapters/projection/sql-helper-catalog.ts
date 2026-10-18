@@ -4,7 +4,11 @@ import {
   findVariable,
   getDeclaredVariable,
 } from "../kernel/async-control-flow.ts";
-import { getFunctionNode, isFunctionLike } from "../kernel/syntax-function.ts";
+import {
+  getFunctionNode,
+  isFunctionLike,
+  isInlineFunction,
+} from "../kernel/syntax-function.ts";
 import {
   identifierName,
   isSyntaxType,
@@ -19,7 +23,6 @@ import {
 } from "./sql-escaper.ts";
 import {
   isAllowedSqlFragmentJoinSeparator,
-  isCallbackExpression,
   isUnquotedSqlInterpolation,
   joinSeparator,
   methodReceiver,
@@ -94,7 +97,7 @@ class FragmentFunctionScan {
     }
     const [callback] = syntaxChildren(mapCall, "arguments");
     return (
-      isCallbackExpression(callback) &&
+      isInlineFunction(callback) &&
       this.isSafeExpression(singleReturnExpression(callback))
     );
   }

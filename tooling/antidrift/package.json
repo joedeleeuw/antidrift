@@ -82,8 +82,8 @@
         "import": "./dist/semantic-adapters/parse-input.mjs"
       },
       "./semantic-adapters/react-state": {
-        "types": "./dist/semantic-adapters/react-state.d.mts",
-        "import": "./dist/semantic-adapters/react-state.mjs"
+        "types": "./dist/semantic-adapters/projection/react-state.d.ts",
+        "import": "./dist/semantic-adapters/projection/react-state.js"
       },
       "./semantic-adapters/schema-provenance": {
         "types": "./dist/semantic-adapters/projection/schema-provenance.d.ts",
@@ -158,8 +158,8 @@
       "import": "./src/semantic-adapters/parse-input.mjs"
     },
     "./semantic-adapters/react-state": {
-      "types": "./src/semantic-adapters/react-state.d.mts",
-      "import": "./src/semantic-adapters/react-state.mjs"
+      "types": "./src/semantic-adapters/projection/react-state.ts",
+      "import": "./src/semantic-adapters/projection/react-state.ts"
     },
     "./semantic-adapters/schema-provenance": {
       "types": "./src/semantic-adapters/projection/schema-provenance.ts",

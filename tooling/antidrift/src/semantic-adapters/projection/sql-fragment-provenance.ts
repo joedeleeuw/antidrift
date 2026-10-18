@@ -1,4 +1,5 @@
 import { findVariable } from "../kernel/async-control-flow.ts";
+import { isInlineFunction } from "../kernel/syntax-function.ts";
 import {
   identifierName,
   isSyntaxNode,
@@ -17,7 +18,6 @@ import type { SqlIdentifierProvenance } from "./sql-identifier-provenance.ts";
 import {
   collectReturnArguments,
   isAllowedSqlFragmentJoinSeparator,
-  isCallbackExpression,
   joinSeparator,
   methodReceiver,
   singleReturnExpression,
@@ -92,7 +92,7 @@ function mapCallback(joinCall: unknown) {
     return null;
   }
   const [callback] = syntaxChildren(mapCall, "arguments");
-  return isCallbackExpression(callback) ? callback : null;
+  return isInlineFunction(callback) ? callback : null;
 }
 
 function isStaticFragmentMapJoin(node: unknown): boolean {
@@ -362,7 +362,7 @@ export class SqlFragmentProvenance {
     if (
       !isSyntaxType(node, "CallExpression") ||
       syntaxChildren(node, "arguments").length !== 0 ||
-      !isCallbackExpression(callee)
+      !isInlineFunction(callee)
     ) {
       return null;
     }
