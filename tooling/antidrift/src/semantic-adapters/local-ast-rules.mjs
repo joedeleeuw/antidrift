@@ -15,7 +15,7 @@ import {
   queuePendingAsyncMap,
 } from "./kernel/async-control-flow.ts";
 import { createAuthBoundaryTracker } from "./auth-boundary.mjs";
-import { canonicalStatusLiteralOwner } from "./status-literal.mjs";
+import { canonicalStatusLiteralOwner } from "./shape/status-literal.ts";
 
 const exportedLocalNamesByProgram = new WeakMap();
 

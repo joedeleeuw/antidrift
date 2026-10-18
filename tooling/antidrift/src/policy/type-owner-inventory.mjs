@@ -9,7 +9,7 @@ import {
   classifyStructuralRelation,
   sortedStructuralCandidates,
   structuralDerivationUtilities,
-} from "../semantic-adapters/structural-fork-proof.mjs";
+} from "../semantic-adapters/shape/structural-fork-proof.ts";
 import { loadRegistriesSync } from "./lib/registries.mjs";
 import {
   collectCanonicalTypes,

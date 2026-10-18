@@ -848,11 +848,6 @@
       "count": 13
     }
   },
-  "tooling/antidrift/src/semantic-adapters/owned-contract-provenance.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 5
-    }
-  },
   "tooling/antidrift/src/semantic-adapters/parse-input.mjs": {
     "antidrift/no-vague-names": {
       "count": 2
@@ -897,30 +892,6 @@
   "tooling/antidrift/src/semantic-adapters/sql.mjs": {
     "antidrift/no-vague-names": {
       "count": 13
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/status-literal.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/structural-fork-proof.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 5
-    },
-    "antidrift/no-sentinel-absence-fallback": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/tuple-shape.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
     }
   },
   "tooling/antidrift/test/consumer-adoption.mjs": {

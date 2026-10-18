@@ -20,6 +20,11 @@ export type TypeServices = {
   };
 };
 
+export type TypeScriptParserServices = Pick<
+  TypeServices,
+  "esTreeNodeToTSNodeMap"
+>;
+
 type TypeScriptReport = Rule.ReportDescriptorOptions &
   Rule.ReportDescriptorMessage;
 

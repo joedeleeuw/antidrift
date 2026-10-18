@@ -94,8 +94,8 @@
         "import": "./dist/semantic-adapters/sql.mjs"
       },
       "./semantic-adapters/tuple-shape": {
-        "types": "./dist/semantic-adapters/tuple-shape.d.mts",
-        "import": "./dist/semantic-adapters/tuple-shape.mjs"
+        "types": "./dist/semantic-adapters/shape/tuple-shape.d.ts",
+        "import": "./dist/semantic-adapters/shape/tuple-shape.js"
       },
       "./semantic-adapters/type-owner": {
         "types": "./dist/semantic-adapters/type-owner.d.mts",
@@ -170,8 +170,8 @@
       "import": "./src/semantic-adapters/sql.mjs"
     },
     "./semantic-adapters/tuple-shape": {
-      "types": "./src/semantic-adapters/tuple-shape.d.mts",
-      "import": "./src/semantic-adapters/tuple-shape.mjs"
+      "types": "./src/semantic-adapters/shape/tuple-shape.ts",
+      "import": "./src/semantic-adapters/shape/tuple-shape.ts"
     },
     "./semantic-adapters/type-owner": {
       "types": "./src/semantic-adapters/type-owner.d.mts",

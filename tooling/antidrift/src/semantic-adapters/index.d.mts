@@ -5,7 +5,7 @@ import * as parseInput from "./parse-input.mjs";
 import * as reactState from "./react-state.mjs";
 import * as schemaProvenance from "./schema-provenance.mjs";
 import * as sql from "./sql.mjs";
-import * as tupleShape from "./tuple-shape.mjs";
+import * as tupleShape from "./shape/tuple-shape.ts";
 import * as typeOwner from "./type-owner.mjs";
 import type {
   RuleStatusProofBucket,

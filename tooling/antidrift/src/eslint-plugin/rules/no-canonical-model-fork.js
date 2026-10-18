@@ -1,4 +1,5 @@
-import { collectOwnedContractProvenance } from "../../semantic-adapters/owned-contract-provenance.mjs";
+import { emitSemanticFact } from "../../policy/lib/semantic-facts.mjs";
+import { collectOwnedContractProvenance } from "../../semantic-adapters/projection/owned-contract-provenance.ts";
 import {
   collectDomainCanonicalTypes,
   isObjectType,
@@ -8,11 +9,11 @@ import {
 } from "../../semantic-adapters/type-owner.mjs";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 import {
-  emitStructuralMatchFact,
   findStructuralProof,
   isAllOptionalObjectShape,
   isStructuralDerivationAlias,
-} from "../../semantic-adapters/structural-fork-proof.mjs";
+  structuralMatchFact,
+} from "../../semantic-adapters/shape/structural-fork-proof.ts";
 
 export function ruleNoCanonicalModelFork() {
   return defineTypeScriptRule({
@@ -73,11 +74,10 @@ export function ruleNoCanonicalModelFork() {
           if (reported.has(parent)) return;
         }
         reported.add(tsNode);
-        emitStructuralMatchFact(
+        emitSemanticFact(
           context,
           node,
-          "antidrift/no-canonical-model-fork",
-          proof
+          structuralMatchFact("antidrift/no-canonical-model-fork", proof)
         );
         context.report({
           node,
@@ -109,25 +109,24 @@ export function ruleNoCanonicalModelFork() {
         if (resolvesToDomainCanonicalType(declared, canonicalEntities)) {
           return;
         }
-        const local = typeProps(checker, declared);
-        const localDetailed = typePropsDetailed(checker, declared);
         const proof = findStructuralProof(
           checker,
-          declared,
-          sym,
-          local,
-          localDetailed,
+          {
+            type: declared,
+            symbol: sym,
+            props: typeProps(checker, declared),
+            detailedProps: typePropsDetailed(checker, declared),
+          },
           candidates,
           "canonicalModelFork"
         );
         if (!proof) {
           return;
         }
-        emitStructuralMatchFact(
+        emitSemanticFact(
           context,
           node,
-          "antidrift/no-canonical-model-fork",
-          proof
+          structuralMatchFact("antidrift/no-canonical-model-fork", proof)
         );
         if (proof.diagnostic.emitted) {
           reported.add(tsNode);

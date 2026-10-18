@@ -19,4 +19,4 @@ export {
   isStatusLiteralContext,
   nodeKeyName,
   normalizedContextName,
-} from "./status-literal.mjs";
+} from "./shape/status-literal.ts";

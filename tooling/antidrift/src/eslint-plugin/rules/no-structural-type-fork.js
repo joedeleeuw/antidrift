@@ -1,5 +1,8 @@
-import { semanticFactSink } from "../../policy/lib/semantic-facts.mjs";
-import { collectOwnedContractProvenance } from "../../semantic-adapters/owned-contract-provenance.mjs";
+import {
+  emitSemanticFact,
+  semanticFactSink,
+} from "../../policy/lib/semantic-facts.mjs";
+import { collectOwnedContractProvenance } from "../../semantic-adapters/projection/owned-contract-provenance.ts";
 import {
   collectAcceptedPackageCanonicalTypes,
   collectCanonicalTypes,
@@ -15,11 +18,11 @@ import {
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 import { resolveAliasedSymbol } from "../../semantic-adapters/provenance/symbol-provenance.ts";
 import {
-  emitStructuralMatchFact,
   findStructuralProof,
   isAllOptionalObjectShape,
   isStructuralDerivationAlias,
-} from "../../semantic-adapters/structural-fork-proof.mjs";
+  structuralMatchFact,
+} from "../../semantic-adapters/shape/structural-fork-proof.ts";
 
 // Canonical candidate list is cached per TypeScript Program (stable per ESLint process),
 // so the node_modules enumeration runs once rather than per linted file.
@@ -158,11 +161,10 @@ export function ruleNoStructuralTypeFork() {
           if (reported.has(parent)) return;
         }
         reported.add(tsNode);
-        emitStructuralMatchFact(
+        emitSemanticFact(
           context,
           node,
-          "antidrift/no-structural-type-fork",
-          proof
+          structuralMatchFact("antidrift/no-structural-type-fork", proof)
         );
         context.report({
           node,
@@ -200,25 +202,24 @@ export function ruleNoStructuralTypeFork() {
         if (resolvesToGeneratedType(declared, generatedSources)) {
           return;
         }
-        const local = typeProps(checker, declared);
-        const localDetailed = typePropsDetailed(checker, declared);
         const proof = findStructuralProof(
           checker,
-          declared,
-          sym,
-          local,
-          localDetailed,
+          {
+            type: declared,
+            symbol: sym,
+            props: typeProps(checker, declared),
+            detailedProps: typePropsDetailed(checker, declared),
+          },
           candidates,
           "structuralTypeFork"
         );
         if (!proof) {
           return;
         }
-        emitStructuralMatchFact(
+        emitSemanticFact(
           context,
           node,
-          "antidrift/no-structural-type-fork",
-          proof
+          structuralMatchFact("antidrift/no-structural-type-fork", proof)
         );
         if (proof.diagnostic.emitted) {
           reported.add(tsNode);

@@ -15,8 +15,14 @@ export function isSyntaxType(
   return isSyntaxNode(candidate) && candidate.type === type;
 }
 
+export function fieldOf(candidate: unknown, field: string): unknown {
+  return typeof candidate === "object" && candidate !== null
+    ? Reflect.get(candidate, field)
+    : undefined;
+}
+
 export function syntaxField(node: unknown, field: string): unknown {
-  return isSyntaxNode(node) ? Reflect.get(node, field) : undefined;
+  return isSyntaxNode(node) ? fieldOf(node, field) : undefined;
 }
 
 export function syntaxChildren(

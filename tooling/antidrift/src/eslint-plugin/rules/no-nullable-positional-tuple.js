@@ -1,4 +1,4 @@
-import { hasNullablePositionalTuple } from "../../semantic-adapters/tuple-shape.mjs";
+import { hasNullablePositionalTuple } from "../../semantic-adapters/shape/tuple-shape.ts";
 
 export function ruleNoNullablePositionalTuple() {
   return {
@@ -16,7 +16,7 @@ export function ruleNoNullablePositionalTuple() {
       const checker = services?.program?.getTypeChecker?.();
       return {
         TSTupleType(node) {
-          if (!hasNullablePositionalTuple(node, services, checker)) {
+          if (!hasNullablePositionalTuple(node, { services, checker })) {
             return;
           }
           context.report({

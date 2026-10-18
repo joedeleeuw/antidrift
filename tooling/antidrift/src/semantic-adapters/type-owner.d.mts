@@ -1,5 +1,18 @@
 import type * as ts from "typescript";
 
+export type {
+  DomainStatusEntry,
+  DomainStatusRegistry,
+  StatusLiteralOwner,
+} from "./shape/status-literal.ts";
+export {
+  canonicalStatusLiteralOwner,
+  isStatusContextName,
+  isStatusLiteralContext,
+  nodeKeyName,
+  normalizedContextName,
+} from "./shape/status-literal.ts";
+
 export const MIN_PROPS: 4;
 
 export type TypeOwnerAuthority =
@@ -52,21 +65,6 @@ export type DomainCanonicalEntityRegistry = Record<
   string,
   string | DomainCanonicalEntityEntry
 >;
-
-export interface DomainStatusEntry {
-  owner: string;
-  values: readonly string[];
-  valuesExport?: string;
-}
-
-export type DomainStatusRegistry = Record<string, DomainStatusEntry>;
-
-export interface StatusLiteralOwner {
-  name: string;
-  owner: string;
-  values: readonly string[];
-  value: string;
-}
 
 export function isObjectType(type: ts.Type | null | undefined): boolean;
 
@@ -123,22 +121,3 @@ export function resolvesToDomainCanonicalType(
   type: ts.Type | null | undefined,
   canonicalEntities?: DomainCanonicalEntityRegistry
 ): boolean;
-
-export function normalizedContextName(value: unknown): string;
-
-export function isStatusContextName(
-  contextName: unknown,
-  statusName: string
-): boolean;
-
-export function nodeKeyName(node: unknown): string;
-
-export function isStatusLiteralContext(
-  node: unknown,
-  statusName: string
-): boolean;
-
-export function canonicalStatusLiteralOwner(
-  node: unknown,
-  statuses: DomainStatusRegistry
-): StatusLiteralOwner | null;
