@@ -1,8 +1,8 @@
 import {
   countShapeProbesIn,
-  hasBroadObjectEntriesValue,
+  hasBroadObjectEntriesBinding,
   objectEntriesCallbackProbe,
-} from "../../semantic-adapters/broad-input.mjs";
+} from "../../semantic-adapters/boundary/broad-input.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 function isTypePredicateReturn(fn) {
@@ -34,7 +34,7 @@ export function ruleNoDefensiveShapeProbing() {
           if (!probe || isTypePredicateReturn(probe.callback)) {
             return;
           }
-          if (!hasBroadObjectEntriesValue(probe, services, checker)) {
+          if (!hasBroadObjectEntriesBinding(probe, services, checker)) {
             return;
           }
           if (

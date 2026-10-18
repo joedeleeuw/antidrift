@@ -9,7 +9,7 @@ import {
   predicateContractEvidence,
   requiredTypeProps,
   typePredicateParts,
-} from "../../semantic-adapters/broad-input.mjs";
+} from "../../semantic-adapters/boundary/broad-input.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 function isObjectContract(checker, type) {

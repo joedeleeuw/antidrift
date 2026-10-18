@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { isAppeasementCastSourceType } from "./broad-input.mjs";
+import { isAppeasementCastSourceType } from "./boundary/broad-input-type.ts";
 import {
   declaredOperandType,
   isBroadSourceType,

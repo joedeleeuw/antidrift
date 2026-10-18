@@ -809,14 +809,6 @@
       "count": 12
     }
   },
-  "tooling/antidrift/src/semantic-adapters/broad-input.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 4
-    },
-    "antidrift/no-vague-names": {
-      "count": 9
-    }
-  },
   "tooling/antidrift/src/semantic-adapters/canonical-path.mjs": {
     "antidrift/no-vague-names": {
       "count": 12

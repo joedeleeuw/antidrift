@@ -74,8 +74,8 @@
         "import": "./dist/semantic-adapters/boundary/auth-boundary.js"
       },
       "./semantic-adapters/broad-input": {
-        "types": "./dist/semantic-adapters/broad-input.d.mts",
-        "import": "./dist/semantic-adapters/broad-input.mjs"
+        "types": "./dist/semantic-adapters/boundary/broad-input.d.ts",
+        "import": "./dist/semantic-adapters/boundary/broad-input.js"
       },
       "./semantic-adapters/parse-input": {
         "types": "./dist/semantic-adapters/boundary/parse-input.d.ts",
@@ -150,8 +150,8 @@
       "import": "./src/semantic-adapters/boundary/auth-boundary.ts"
     },
     "./semantic-adapters/broad-input": {
-      "types": "./src/semantic-adapters/broad-input.d.mts",
-      "import": "./src/semantic-adapters/broad-input.mjs"
+      "types": "./src/semantic-adapters/boundary/broad-input.ts",
+      "import": "./src/semantic-adapters/boundary/broad-input.ts"
     },
     "./semantic-adapters/parse-input": {
       "types": "./src/semantic-adapters/boundary/parse-input.ts",

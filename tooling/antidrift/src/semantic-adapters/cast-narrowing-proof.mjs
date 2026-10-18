@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { boundaryObservations } from "./boundary-observations.mjs";
-import { isAppeasementCastSourceType } from "./broad-input.mjs";
+import { isAppeasementCastSourceType } from "./boundary/broad-input-type.ts";
 
 const referenceIndexByChecker = new WeakMap();
 

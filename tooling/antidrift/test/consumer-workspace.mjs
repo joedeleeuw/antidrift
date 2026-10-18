@@ -424,7 +424,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'import { SEMANTIC_ADAPTERS, SEMANTIC_ADAPTER_CONTRACTS, SEMANTIC_ADAPTER_CONTRACT_LIST, SEMANTIC_ADAPTER_MANIFEST, type asyncControlFlow as adapterAsyncControlFlow, authBoundary as adapterAuthBoundary, broadInput as adapterBroadInput, type parseInput as adapterParseInput, reactState as adapterReactState, schemaProvenance as adapterSchemaProvenance, semanticAdapterContractsForFactAdapterId, semanticAdapterContractsForFactKind, semanticAdapterContractsForProofBucket, semanticAdapterContractsForRule, semanticAdapterManifestForAdapterId, semanticAdapterManifestForFactAdapterId, semanticAdapterManifestForFactKind, semanticAdapterManifestForProofBucket, semanticAdapterManifestForRule, sql as adapterSql, type tupleShape as adapterTupleShape, typeOwner as adapterTypeOwner, type SemanticAdapterContract, type SemanticAdapterContractKey, type SemanticAdapterManifestEntry } from "@joedeleeuw/antidrift/semantic-adapters";\n' +
       'import { REQUEST_PARAM_ROOTS, callExpressionName, createAuthBoundaryTracker, isAuthzCall, isRequestParamsAccess, type AuthBoundaryFrame, type AuthBoundaryTracker } from "@joedeleeuw/antidrift/semantic-adapters/auth-boundary";\n' +
       'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, isReturnedExpression, markAwaitedPendingMaps, markReturnedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap, type AsyncArrayCallbackClassification, type PendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
-      'import { BROAD_INPUT_ARRAY_TRANSFORM_METHODS, assignmentTarget, callUsesPredicateParam, checkedTargetProperties, collectBindingIdentifiers, collectBindingNames, collectObjectPatternBindingNames, countShapeProbesIn, destructuredTargetPropertyAliases, directAliasName, functionParameterByName, hasBroadObjectEntriesValue, hasParamRoot, hasValidatorDelegation, isAppeasementCastSourceType, isBindingIdentifier, isBroadPredicateInputType, isBroadShapeProbeInputType, isNamedTypeReference, isNullishLiteral, isObjectEntriesCall, isPredicateObjectContract, isTypeofObjectProbe, memberExpressionPropertyName, memberExpressionRootName, objectEntriesCallbackProbe, objectEntriesValueBindings, objectHasOwnPropertyName, predicateValueNames, requiredTypeProps, staticPropertyName, typePredicateParts, unwrapExpression, walkNode, type ObjectEntriesCallbackProbe, type TypePredicateParts, type TypeScriptParserServices as BroadInputParserServices } from "@joedeleeuw/antidrift/semantic-adapters/broad-input";\n' +
+      'import { BROAD_INPUT_ARRAY_TRANSFORM_METHODS, assignmentTarget, callUsesPredicateParam, checkedTargetProperties, collectBindingIdentifiers, collectBindingNames, collectObjectPatternBindingNames, countShapeProbesIn, destructuredTargetPropertyAliases, directAliasName, functionParameterByName, hasBroadObjectEntriesBinding, hasParamRoot, hasValidatorDelegation, isAppeasementCastSourceType, isBindingIdentifier, isBroadPredicateInputType, isBroadShapeProbeInputType, isNullishLiteral, isObjectEntriesCall, isPredicateObjectContract, isTypeofObjectProbe, memberExpressionPropertyName, memberExpressionRootName, objectEntriesCallbackProbe, objectEntriesValueBindings, objectHasOwnPropertyName, predicateValueNames, requiredTypeProps, staticPropertyName, typePredicateParts, unwrapExpression, walkNode, type ObjectEntriesCallbackProbe, type TypePredicateParts, type TypeScriptParserServices as BroadInputParserServices } from "@joedeleeuw/antidrift/semantic-adapters/broad-input";\n' +
       'import { conditionEnsuresString, hasLocalStringBoundary, isJsonParseCall, isUnsafeJsonParseInput, jsonParseArgument, type TypeScriptParserServices as ParseInputParserServices } from "@joedeleeuw/antidrift/semantic-adapters/parse-input";\n' +
       'import { classifyStateWrite, createReactStateTracker, frameStatePayload, lifecycleProof, type ReactStateFrame, type ReactStateFramePayload, type ReactStateLifecycleProof, type ReactStateWriteClass } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
       'import { ZOD_PARSE_METHODS, ZOD_THROW_ASSERTION_MATCHERS, isThrowAssertionCallbackParse, zodParseCallParts, type TypeScriptParserServices, type ZodParseCallParts } from "@joedeleeuw/antidrift/semantic-adapters/schema-provenance";\n' +
@@ -489,7 +489,6 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "jsonParseArgument(jsonParseCall) satisfies unknown | null;\n" +
       "isUnsafeJsonParseInput satisfies (node: unknown, services: ParseInputParserServices, checker: ts.TypeChecker) => boolean;\n" +
       "isAppeasementCastSourceType satisfies (type: ts.Type | null | undefined) => boolean;\n" +
-      'isNamedTypeReference({ type: "TSTypeReference" }) satisfies boolean;\n' +
       "void parseParserServices;\n" +
       "void tupleParserServices;\n" +
       "toolingEslint(options) satisfies Linter.Config[]; void restrictedSyntax;\n" +
@@ -606,12 +605,12 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "countShapeProbesIn satisfies (node: unknown, paramNames: ReadonlySet<string>) => number;\n" +
       "objectEntriesValueBindings satisfies (callback: unknown, methodName: string) => unknown[];\n" +
       "objectEntriesCallbackProbe satisfies (node: unknown) => ObjectEntriesCallbackProbe | null;\n" +
-      "hasBroadObjectEntriesValue satisfies (probe: ObjectEntriesCallbackProbe, services: BroadInputParserServices, checker: ts.TypeChecker) => boolean;\n" +
-      "isBroadShapeProbeInputType satisfies (checker: ts.TypeChecker, type: ts.Type | null | undefined, seen?: Set<ts.Type>) => boolean;\n" +
+      "hasBroadObjectEntriesBinding satisfies (probe: ObjectEntriesCallbackProbe, services: BroadInputParserServices, checker: ts.TypeChecker) => boolean;\n" +
+      "isBroadShapeProbeInputType satisfies (type: ts.Type | null | undefined, seen?: Set<ts.Type>) => boolean;\n" +
       "walkNode satisfies (node: unknown, visit: (node: unknown) => void) => void;\n" +
       "typePredicateParts satisfies (fn: unknown) => TypePredicateParts | null;\n" +
       "functionParameterByName satisfies (fn: unknown, name: string) => unknown | null;\n" +
-      "isBroadPredicateInputType satisfies (checker: ts.TypeChecker, type: ts.Type | null | undefined) => boolean;\n" +
+      "isBroadPredicateInputType satisfies (checker: ts.TypeChecker, type: ts.Type) => boolean;\n" +
       "isPredicateObjectContract satisfies (type: ts.Type | null | undefined) => boolean;\n" +
       "requiredTypeProps satisfies (checker: ts.TypeChecker, type: ts.Type) => Set<string>;\n" +
       "staticPropertyName satisfies (node: unknown) => string | null;\n" +
@@ -698,7 +697,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "void collectObjectPatternBindingNames;\n" +
       "void countShapeProbesIn;\n" +
       "void destructuredTargetPropertyAliases;\n" +
-      "void hasBroadObjectEntriesValue;\n" +
+      "void hasBroadObjectEntriesBinding;\n" +
       "void hasParamRoot;\n" +
       "void isNullishLiteral;\n" +
       "void isObjectEntriesCall;\n" +
@@ -770,7 +769,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'import { SEMANTIC_ADAPTERS, SEMANTIC_ADAPTER_CONTRACTS, SEMANTIC_ADAPTER_CONTRACT_LIST, SEMANTIC_ADAPTER_MANIFEST, asyncControlFlow as adapterAsyncControlFlow, authBoundary as adapterAuthBoundary, broadInput as adapterBroadInput, parseInput as adapterParseInput, reactState as adapterReactState, schemaProvenance as adapterSchemaProvenance, semanticAdapterContractsForFactAdapterId, semanticAdapterContractsForFactKind, semanticAdapterContractsForProofBucket, semanticAdapterContractsForRule, semanticAdapterManifestForAdapterId, semanticAdapterManifestForFactAdapterId, semanticAdapterManifestForFactKind, semanticAdapterManifestForProofBucket, semanticAdapterManifestForRule, sql as adapterSql, tupleShape as adapterTupleShape, typeOwner as adapterTypeOwner } from "@joedeleeuw/antidrift/semantic-adapters";\n' +
       'import { REQUEST_PARAM_ROOTS, callExpressionName, createAuthBoundaryTracker, isAuthzCall, isRequestParamsAccess } from "@joedeleeuw/antidrift/semantic-adapters/auth-boundary";\n' +
       'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, isReturnedExpression, markAwaitedPendingMaps, markReturnedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
-      'import { BROAD_INPUT_ARRAY_TRANSFORM_METHODS, assignmentTarget, callUsesPredicateParam, checkedTargetProperties, collectBindingIdentifiers, collectBindingNames, collectObjectPatternBindingNames, countShapeProbesIn, destructuredTargetPropertyAliases, directAliasName, functionParameterByName, hasBroadObjectEntriesValue, hasParamRoot, hasValidatorDelegation, isAppeasementCastSourceType, isBindingIdentifier, isBroadPredicateInputType, isBroadShapeProbeInputType, isNamedTypeReference, isNullishLiteral, isObjectEntriesCall, isPredicateObjectContract, isTypeofObjectProbe, memberExpressionPropertyName, memberExpressionRootName, objectEntriesCallbackProbe, objectEntriesValueBindings, objectHasOwnPropertyName, predicateValueNames, requiredTypeProps, staticPropertyName, typePredicateParts, unwrapExpression, walkNode } from "@joedeleeuw/antidrift/semantic-adapters/broad-input";\n' +
+      'import { BROAD_INPUT_ARRAY_TRANSFORM_METHODS, assignmentTarget, callUsesPredicateParam, checkedTargetProperties, collectBindingIdentifiers, collectBindingNames, collectObjectPatternBindingNames, countShapeProbesIn, destructuredTargetPropertyAliases, directAliasName, functionParameterByName, hasBroadObjectEntriesBinding, hasParamRoot, hasValidatorDelegation, isAppeasementCastSourceType, isBindingIdentifier, isBroadPredicateInputType, isBroadShapeProbeInputType, isNullishLiteral, isObjectEntriesCall, isPredicateObjectContract, isTypeofObjectProbe, memberExpressionPropertyName, memberExpressionRootName, objectEntriesCallbackProbe, objectEntriesValueBindings, objectHasOwnPropertyName, predicateValueNames, requiredTypeProps, staticPropertyName, typePredicateParts, unwrapExpression, walkNode } from "@joedeleeuw/antidrift/semantic-adapters/broad-input";\n' +
       'import { hasLocalStringBoundary, isJsonParseCall, jsonParseArgument } from "@joedeleeuw/antidrift/semantic-adapters/parse-input";\n' +
       'import { classifyStateWrite, createReactStateTracker, frameStatePayload, lifecycleProof } from "@joedeleeuw/antidrift/semantic-adapters/react-state";\n' +
       'import { ZOD_PARSE_METHODS, ZOD_THROW_ASSERTION_MATCHERS, isThrowAssertionCallbackParse, zodParseCallParts } from "@joedeleeuw/antidrift/semantic-adapters/schema-provenance";\n' +
@@ -841,7 +840,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "  collectObjectPatternBindingNames,\n" +
       "  countShapeProbesIn,\n" +
       "  destructuredTargetPropertyAliases,\n" +
-      "  hasBroadObjectEntriesValue,\n" +
+      "  hasBroadObjectEntriesBinding,\n" +
       "  hasParamRoot,\n" +
       "  isNullishLiteral,\n" +
       "  isObjectEntriesCall,\n" +
@@ -861,7 +860,6 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "  isBindingIdentifier,\n" +
       "  isBroadPredicateInputType,\n" +
       "  isPredicateObjectContract,\n" +
-      "  isNamedTypeReference,\n" +
       "  hasLocalStringBoundary,\n" +
       "  isJsonParseCall,\n" +
       "  jsonParseArgument,\n" +
@@ -1057,7 +1055,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       '  throw new Error("Missing auth-boundary semantic adapter behavior");\n' +
       "}\n" +
       "\n" +
-      'if (!BROAD_INPUT_ARRAY_TRANSFORM_METHODS.has("map") || memberExpressionRootName({ type: "MemberExpression", object: { type: "Identifier", name: "value" }, property: { type: "Identifier", name: "field" } }) !== "value" || !hasParamRoot({ type: "MemberExpression", object: { type: "Identifier", name: "value" }, property: { type: "Identifier", name: "field" } }, new Set(["value"])) || !isNamedTypeReference({ type: "TSTypeReference" }) || !isNullishLiteral({ type: "Literal", value: null }) || !isObjectEntriesCall({ type: "CallExpression", callee: { type: "MemberExpression", object: { type: "Identifier", name: "Object" }, property: { type: "Identifier", name: "entries" } } })) {\n' +
+      'if (!BROAD_INPUT_ARRAY_TRANSFORM_METHODS.has("map") || memberExpressionRootName({ type: "MemberExpression", object: { type: "Identifier", name: "value" }, property: { type: "Identifier", name: "field" } }) !== "value" || !hasParamRoot({ type: "MemberExpression", object: { type: "Identifier", name: "value" }, property: { type: "Identifier", name: "field" } }, new Set(["value"])) || !isNullishLiteral({ type: "Literal", value: null }) || !isObjectEntriesCall({ type: "CallExpression", callee: { type: "MemberExpression", object: { type: "Identifier", name: "Object" }, property: { type: "Identifier", name: "entries" } } })) {\n' +
       '  throw new Error("Missing broad-input semantic adapter behavior");\n' +
       "}\n" +
       "\n" +

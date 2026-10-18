@@ -3,7 +3,7 @@ import ts from "typescript";
 import {
   functionParameterByName,
   typePredicateParts,
-} from "../../semantic-adapters/broad-input.mjs";
+} from "../../semantic-adapters/boundary/broad-input.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 // TypeScript 5.5 infers `x is T` for a function without a return annotation
