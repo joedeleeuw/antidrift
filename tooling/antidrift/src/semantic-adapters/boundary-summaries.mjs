@@ -505,6 +505,13 @@ export function declarationSummaries({ bodyRoots, observer, isActive }) {
             declaration,
           });
         }
+        entry.roots = [
+          ...roots,
+          ...unknownProvenance(
+            declaration,
+            `recursive summary did not converge in ${SUMMARY_ITERATION_INVARIANT} iterations`
+          ),
+        ];
         break;
       }
     }

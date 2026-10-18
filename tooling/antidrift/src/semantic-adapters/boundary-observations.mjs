@@ -66,13 +66,13 @@ export const boundaryObservations = {
       bound: "trace-depth",
       limit: 256,
       reason:
-        "The expression trace nested deeper than the trace depth; recursion stops expanding instead of growing the native stack.",
+        "The expression trace nested deeper than the trace depth; the expression becomes an incomplete root instead of growing the native stack.",
     },
     summaryIterations: {
       bound: "summary-iterations",
       limit: 64,
       reason:
-        "A recursive declaration summary reached the fixpoint iteration cap and stopped expanding.",
+        "A recursive declaration summary reached the fixpoint iteration cap; its summary gains an incomplete root.",
     },
   },
   decoderBranches: {

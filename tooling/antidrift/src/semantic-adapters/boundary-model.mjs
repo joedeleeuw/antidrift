@@ -931,7 +931,10 @@ export function boundaryModel(program, options = {}) {
           declaration: enclosingFunction(expression),
         });
       }
-      return [];
+      return unknownProvenance(
+        expression,
+        `trace deeper than ${TRACE_DEPTH} expressions`
+      );
     }
     visiting.add(expression);
     try {

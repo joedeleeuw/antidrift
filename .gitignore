@@ -12,3 +12,4 @@ data/fullshards/
 !.env.example
 *.tsbuildinfo
 *.tgz
+tooling/antidrift/bin
