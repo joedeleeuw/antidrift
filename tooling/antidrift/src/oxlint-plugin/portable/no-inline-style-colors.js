@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { getPropertyName, isAstNode, unwrapExpression } from "./ast.js";
 
 const HEX_IN_STRING = /#[0-9a-f]{3,8}\b/i;

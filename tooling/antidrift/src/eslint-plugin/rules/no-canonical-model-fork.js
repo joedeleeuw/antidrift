@@ -6,7 +6,7 @@ import {
   typeProps,
   typePropsDetailed,
 } from "../../semantic-adapters/type-owner.mjs";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 import {
   emitStructuralMatchFact,
   findStructuralProof,

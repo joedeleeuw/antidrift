@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 
 const MIN_BRANCHES = 4;
 const EQUALITY = new Set(["===", "=="]);

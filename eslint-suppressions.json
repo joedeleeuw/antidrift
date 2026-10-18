@@ -809,16 +809,6 @@
       "count": 12
     }
   },
-  "tooling/antidrift/src/semantic-adapters/async-control-flow.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 8
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/async-control-flow.test.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
   "tooling/antidrift/src/semantic-adapters/auth-boundary.mjs": {
     "antidrift/no-vague-names": {
       "count": 2

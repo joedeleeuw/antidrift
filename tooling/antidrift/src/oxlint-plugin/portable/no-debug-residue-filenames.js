@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 
 const DEBUG_FILENAME_PATTERN =
   /(?:^|\/)[^/]*(?:_old|_backup|_temp|_v2|\.bak|\.old|\.backup)(?:\.[^/]+)?$/i;

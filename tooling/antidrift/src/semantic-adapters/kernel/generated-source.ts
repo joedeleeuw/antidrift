@@ -9,12 +9,12 @@ const GENERATED_DECLARATION_FORMS = [
   /\bauto-?generated\b/iu,
 ];
 
-export function isGeneratedDeclarationLine(rawLine) {
+function isGeneratedDeclarationLine(rawLine: string): boolean {
   const cleanedLine = rawLine.replace(/^\s*\*+\s*/u, "").trim();
   return GENERATED_DECLARATION_FORMS.some((form) => form.test(cleanedLine));
 }
 
-export function isDeclaredGeneratedSource(sourceText) {
+export function isDeclaredGeneratedSource(sourceText: string): boolean {
   const scanner = ts.createScanner(
     ts.ScriptTarget.Latest,
     false,
@@ -55,4 +55,25 @@ export function isDeclaredGeneratedSource(sourceText) {
     }
     return false;
   }
+}
+
+const generationDeclarations = [
+  /^@generated\b/u,
+  /^code generated\b.*\bdo not edit\.?$/iu,
+  /^(?:this (?:(?:file|module) )?(?:is|was|has been) )?(?:auto(?:matically)?[- ]?)?generated (?:by|from|with|using) \S/iu,
+];
+
+function commentLines(text: string): string[] {
+  return text
+    .replace(/^\/\*+|\*+\/$/gu, "")
+    .split("\n")
+    .map((line) => line.replace(/^\s*(?:\/\/+|\*+)?\s*/u, "").trim());
+}
+
+export function declaresGenerated(source: ts.SourceFile): boolean {
+  return (ts.getLeadingCommentRanges(source.text, 0) ?? []).some((range) =>
+    commentLines(source.text.slice(range.pos, range.end)).some((line) =>
+      generationDeclarations.some((declaration) => declaration.test(line))
+    )
+  );
 }

@@ -1,9 +1,7 @@
 import ts from "typescript";
 
-import {
-  defineTypeScriptRule,
-  resolveAliasedSymbol,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
+import { resolveAliasedSymbol } from "../../semantic-adapters/provenance/symbol-provenance.ts";
 
 const convexRegistrationNames = new Set([
   "query",

@@ -1,4 +1,4 @@
-import * as asyncControlFlow from "./async-control-flow.mjs";
+import * as asyncControlFlow from "./kernel/async-control-flow.ts";
 import * as authBoundary from "./auth-boundary.mjs";
 import * as broadInput from "./broad-input.mjs";
 import * as parseInput from "./parse-input.mjs";

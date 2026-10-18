@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 
 const DEVTOOLS_PACKAGES = new Set([
   "@tanstack/react-devtools",

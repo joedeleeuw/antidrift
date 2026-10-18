@@ -1,7 +1,7 @@
 import {
   isRuleFile,
   scopeProperties,
-} from "../../oxlint-plugin/portable/scope.js";
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 
 const VAGUE_NOUN =
   /^(?:data|info|value|values|val|vals|obj|objects|objs|thing|things|stuff|temp|tmp|foo|bar|baz|res|ret|retval|misc|result|results|item|items|var|vars|variable|content|contents|param|params|parameters|arr|spam|ham|toto|tutu|tata)\d*$/i;

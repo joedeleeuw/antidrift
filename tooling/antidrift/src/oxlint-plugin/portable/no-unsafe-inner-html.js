@@ -3,7 +3,10 @@ import {
   importedOwnerSchema,
   findVariable,
 } from "./imported-owner.js";
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { getPropertyName, isIdentifier, unwrapExpression } from "./ast.js";
 
 const isJsxIdentifier = (node, name) =>

@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { filenameForContext, isAstNode, isStringLiteral } from "./ast.js";
 
 const LOADER_ICON_NAMES = [

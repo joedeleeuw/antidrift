@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { getPropertyName } from "./ast.js";
 
 const AWAIT_KEYWORD_LENGTH = "await".length;

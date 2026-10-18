@@ -1,7 +1,7 @@
 import {
   isRuleFile,
   scopeProperties,
-} from "../../oxlint-plugin/portable/scope.js";
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 
 const REMOVAL_VOCABULARY =
   /legacy|compat(?!ible)|deprecated|retire|no_?longer/i;

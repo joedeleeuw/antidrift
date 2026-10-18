@@ -1,6 +1,9 @@
 import { relative } from "node:path";
 import { packageOwner } from "./package-owner.js";
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 
 const MAX_QUARANTINE_MILLISECONDS = 31 * 24 * 60 * 60 * 1000;
 const EXACT_UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;

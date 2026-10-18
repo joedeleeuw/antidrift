@@ -1,7 +1,7 @@
 import {
   isRuleFile,
   scopeProperties,
-} from "../../oxlint-plugin/portable/scope.js";
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 
 const CALL_TYPES = new Set(["CallExpression", "NewExpression"]);
 const TYPE_WRAPPERS = new Set([

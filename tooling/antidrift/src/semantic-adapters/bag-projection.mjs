@@ -1,6 +1,9 @@
 import ts from "typescript";
 
-import { resolveAliasedSymbol, symbolAtNode } from "./ts-rule-kernel.mjs";
+import {
+  resolveAliasedSymbol,
+  symbolAtNode,
+} from "./provenance/symbol-provenance.ts";
 
 const NON_BAG_TYPE_NAMES = new Set([
   "AbortController",

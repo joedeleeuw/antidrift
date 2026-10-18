@@ -12,10 +12,8 @@ import {
   typeProps,
   typePropsDetailed,
 } from "../../semantic-adapters/type-owner.mjs";
-import {
-  defineTypeScriptRule,
-  resolveAliasedSymbol,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
+import { resolveAliasedSymbol } from "../../semantic-adapters/provenance/symbol-provenance.ts";
 import {
   emitStructuralMatchFact,
   findStructuralProof,

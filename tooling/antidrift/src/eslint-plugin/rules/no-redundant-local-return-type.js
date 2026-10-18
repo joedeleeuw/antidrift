@@ -1,11 +1,11 @@
 import ts from "typescript";
 
-import { shapeComparison } from "../../semantic-adapters/shape-identity.mjs";
+import { shapeComparison } from "../../semantic-adapters/shape/shape-identity.ts";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 import {
-  defineTypeScriptRule,
   isSymbolPubliclyExported,
   symbolAtNode,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+} from "../../semantic-adapters/provenance/symbol-provenance.ts";
 
 const unsafeTypeFlags =
   ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never;

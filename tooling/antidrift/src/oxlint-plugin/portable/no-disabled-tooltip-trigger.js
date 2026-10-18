@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 
 const TOOLTIP_ELEMENTS = new Set(["Tooltip", "TooltipRoot", "TooltipTrigger"]);
 const MAX_RENDER_DEPTH = 8;

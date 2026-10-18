@@ -5,14 +5,14 @@ import {
   dependencyManifest,
   dependsBack,
   importedName,
-  publicEntries,
-} from "../../semantic-adapters/declared-dependencies.mjs";
-import {
   packageDirectory,
+  publicEntries,
+} from "../../semantic-adapters/provenance/declared-dependencies.ts";
+import {
   shapeComparison,
   unresolvedDescription,
-} from "../../semantic-adapters/shape-identity.mjs";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+} from "../../semantic-adapters/shape/shape-identity.ts";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 const inventoryByProgram = new WeakMap();
 const ownerSymbols = ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias;

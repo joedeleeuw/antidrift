@@ -1,6 +1,6 @@
 import { isUnsafeJsonParseInput } from "../../semantic-adapters/parse-input.mjs";
 import { parsedJsonTarget } from "../../semantic-adapters/parsed-json.mjs";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 export function ruleNoUnsafeDeserialize() {
   return defineTypeScriptRule({

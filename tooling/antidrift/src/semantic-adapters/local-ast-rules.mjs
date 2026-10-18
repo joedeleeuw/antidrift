@@ -13,7 +13,7 @@ import {
   markAwaitedPendingMaps,
   markReturnedPendingMaps,
   queuePendingAsyncMap,
-} from "./async-control-flow.mjs";
+} from "./kernel/async-control-flow.ts";
 import { createAuthBoundaryTracker } from "./auth-boundary.mjs";
 import { canonicalStatusLiteralOwner } from "./status-literal.mjs";
 

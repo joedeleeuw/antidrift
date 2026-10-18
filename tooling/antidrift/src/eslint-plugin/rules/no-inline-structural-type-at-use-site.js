@@ -1,13 +1,13 @@
 import { relative, resolve } from "node:path";
 import ts from "typescript";
+import { declaresGenerated } from "../../semantic-adapters/kernel/generated-source.ts";
+import { packageDirectory } from "../../semantic-adapters/provenance/declared-dependencies.ts";
 import {
-  declaresGenerated,
-  packageDirectory,
   shapeComparison,
   unresolvedDescription,
-} from "../../semantic-adapters/shape-identity.mjs";
+} from "../../semantic-adapters/shape/shape-identity.ts";
 import { inlineStructuralTypeAtBoundary } from "../../semantic-adapters/local-ast-rules.mjs";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 const declarationsByProgram = new WeakMap();
 const dependencySources = /(?:^|[/\\])node_modules(?:[/\\]|$)/u;

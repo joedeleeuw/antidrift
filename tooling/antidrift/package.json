@@ -66,8 +66,8 @@
         "import": "./dist/semantic-adapters/index.mjs"
       },
       "./semantic-adapters/async-control-flow": {
-        "types": "./dist/semantic-adapters/async-control-flow.d.mts",
-        "import": "./dist/semantic-adapters/async-control-flow.mjs"
+        "types": "./dist/semantic-adapters/kernel/async-control-flow.d.ts",
+        "import": "./dist/semantic-adapters/kernel/async-control-flow.js"
       },
       "./semantic-adapters/auth-boundary": {
         "types": "./dist/semantic-adapters/auth-boundary.d.mts",
@@ -142,8 +142,8 @@
       "import": "./src/semantic-adapters/index.mjs"
     },
     "./semantic-adapters/async-control-flow": {
-      "types": "./src/semantic-adapters/async-control-flow.d.mts",
-      "import": "./src/semantic-adapters/async-control-flow.mjs"
+      "types": "./src/semantic-adapters/kernel/async-control-flow.ts",
+      "import": "./src/semantic-adapters/kernel/async-control-flow.ts"
     },
     "./semantic-adapters/auth-boundary": {
       "types": "./src/semantic-adapters/auth-boundary.d.mts",

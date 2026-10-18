@@ -1,6 +1,6 @@
 // Rule ported from getsentry/sentry static/eslint/eslintPluginSentry
 // (no-calling-components-as-functions). See that repo's LICENSE.
-import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
+import { findVariable } from "../../semantic-adapters/kernel/async-control-flow.ts";
 import {
   functionReturnsJsx,
   isFunctionLike,

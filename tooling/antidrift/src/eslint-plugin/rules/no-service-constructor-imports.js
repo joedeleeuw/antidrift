@@ -1,14 +1,16 @@
 import ts from "typescript";
 
-import { scopeProperties } from "../../oxlint-plugin/portable/scope.js";
+import { scopeProperties } from "../../semantic-adapters/kernel/rule-scope.ts";
 import { isTestFilename } from "../../oxlint-plugin/portable/syntax.js";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 import {
-  defineTypeScriptRule,
   isLayerConstructionCall,
+  serviceContractProvenance,
+} from "../../semantic-adapters/boundary/service-contract.ts";
+import {
   resolveAliasedSymbol,
   resolveImportedModuleSourceFile,
-  serviceContractProvenance,
-} from "../../semantic-adapters/ts-rule-kernel.mjs";
+} from "../../semantic-adapters/provenance/symbol-provenance.ts";
 
 function isInsideLayerConstruction(node, stopNode) {
   let current = node.parent;

@@ -3,7 +3,7 @@ import {
   closedZodTransformInputKeys,
   zodTransformCallParts,
 } from "../../semantic-adapters/schema-provenance.mjs";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 function staticPropertyKey(property) {
   if (property.computed) return null;

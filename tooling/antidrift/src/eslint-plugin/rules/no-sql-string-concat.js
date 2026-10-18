@@ -8,7 +8,7 @@ import {
   SQL_PREFIX_PATTERN,
   templateText,
 } from "../../semantic-adapters/sql-syntax-analysis.mjs";
-import { requireTypeServices } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { requireTypeServices } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 export function ruleNoSqlStringConcat() {
   return {

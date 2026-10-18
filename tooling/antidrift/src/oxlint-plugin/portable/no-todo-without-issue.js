@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { getString, toNode, toNodeArray } from "./syntax.js";
 
 const TOKEN_PATTERN = /\b(TODO|FIXME|HACK)\b/i;

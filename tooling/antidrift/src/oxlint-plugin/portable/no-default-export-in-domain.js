@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { isDomainFile, isTestFilename } from "./syntax.js";
 
 export const noDefaultExportInDomainRule = {

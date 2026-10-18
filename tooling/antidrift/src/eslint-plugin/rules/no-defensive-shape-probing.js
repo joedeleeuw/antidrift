@@ -3,7 +3,7 @@ import {
   hasBroadObjectEntriesValue,
   objectEntriesCallbackProbe,
 } from "../../semantic-adapters/broad-input.mjs";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 function isTypePredicateReturn(fn) {
   return fn?.returnType?.typeAnnotation?.type === "TSTypePredicate";

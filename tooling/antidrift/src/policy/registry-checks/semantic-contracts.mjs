@@ -108,8 +108,8 @@ function addFactKindsFromDirectory(kinds, repoRoot, relativeDir, extension) {
   if (!directory || !existsSync(directory)) {
     return;
   }
-  for (const file of readdirSync(directory)) {
-    if (!file.endsWith(extension) || file.includes(".test.")) {
+  for (const file of readdirSync(directory, { recursive: true })) {
+    if (!extension.test(file) || file.includes(".test.")) {
       continue;
     }
     for (const kind of factKindLiteralsIn(
@@ -131,10 +131,10 @@ function emittedSemanticFactKinds(repoRoot) {
     }
   }
   for (const [relativeDir, extension] of [
-    ["tooling/antidrift/src/eslint-plugin/rules", ".js"],
-    ["tooling/antidrift/src/oxlint-plugin/rules", ".js"],
-    ["tooling/antidrift/src/semantic-adapters", ".mjs"],
-    ["tooling/antidrift/src/change-scope", ".mjs"],
+    ["tooling/antidrift/src/eslint-plugin/rules", /\.js$/u],
+    ["tooling/antidrift/src/oxlint-plugin/rules", /\.js$/u],
+    ["tooling/antidrift/src/semantic-adapters", /\.(?:mjs|ts)$/u],
+    ["tooling/antidrift/src/change-scope", /\.mjs$/u],
   ]) {
     addFactKindsFromDirectory(kinds, repoRoot, relativeDir, extension);
   }
@@ -964,7 +964,7 @@ function semanticAdapterNamespaceImports(sourceFile) {
     const bindings = statement.importClause?.namedBindings;
     if (
       specifier?.startsWith("./") &&
-      specifier.endsWith(".mjs") &&
+      /\.(?:mjs|ts)$/u.test(specifier) &&
       bindings &&
       ts.isNamespaceImport(bindings)
     ) {

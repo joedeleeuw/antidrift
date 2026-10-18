@@ -4,7 +4,7 @@ import {
   functionParameterByName,
   typePredicateParts,
 } from "../../semantic-adapters/broad-input.mjs";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 // TypeScript 5.5 infers `x is T` for a function without a return annotation
 // whose single returned expression narrows `x` to T on true and to never

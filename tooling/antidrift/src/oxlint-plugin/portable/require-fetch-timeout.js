@@ -1,5 +1,8 @@
 import { findVariable } from "./imported-owner.js";
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { getPropertyName, isIdentifier } from "./ast.js";
 
 const getNodeType = (node) => {

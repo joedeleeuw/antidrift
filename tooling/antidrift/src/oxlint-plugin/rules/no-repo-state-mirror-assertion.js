@@ -1,4 +1,4 @@
-import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
+import { findVariable } from "../../semantic-adapters/kernel/async-control-flow.ts";
 
 const EQUALITY_MATCHERS = new Set([
   "toBe",

@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { isIdentifier } from "./ast.js";
 
 const CALL_DENYLIST = new Set(["createRedisClient", "postgres"]);

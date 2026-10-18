@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { getImportedName, isIdentifier, unwrapExpression } from "./ast.js";
 
 const REACT_MODULE = "react";

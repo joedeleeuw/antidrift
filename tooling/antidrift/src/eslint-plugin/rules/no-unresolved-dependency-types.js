@@ -6,14 +6,14 @@ import {
   governingOptions,
   importedName,
   manifestDependencyFields,
+  packageDirectory,
   resolvedModule,
   resolvesToTypes,
-  scriptSpecifier,
+  scriptPath,
   specifierPackage,
   unresolvedEntries,
-} from "../../semantic-adapters/declared-dependencies.mjs";
-import { packageDirectory } from "../../semantic-adapters/shape-identity.mjs";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+} from "../../semantic-adapters/provenance/declared-dependencies.ts";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 const scopesByProgram = new WeakMap();
 
@@ -193,7 +193,7 @@ export function ruleNoUnresolvedDependencyTypes() {
           };
         } else if (
           installed &&
-          scriptSpecifier(specifier.text, imported) &&
+          scriptPath(specifier.text.slice(imported.length)) &&
           !moduleResolves(specifier, sourceFile, program)
         ) {
           report = {

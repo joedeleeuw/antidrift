@@ -1,6 +1,6 @@
 import ts from "typescript";
 
-import { scopeProperties } from "../../oxlint-plugin/portable/scope.js";
+import { scopeProperties } from "../../semantic-adapters/kernel/rule-scope.ts";
 import { isTestFilename } from "../../oxlint-plugin/portable/syntax.js";
 import {
   collectReturnExpressionsFromExpression,
@@ -9,7 +9,7 @@ import {
   resolveBagParameter,
   unwrapExpression,
 } from "../../semantic-adapters/bag-projection.mjs";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 const ANONYMOUS_UTILITY_TYPE_NAMES = new Set([
   "Omit",

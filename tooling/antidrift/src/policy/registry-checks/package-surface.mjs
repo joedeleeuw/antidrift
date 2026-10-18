@@ -1,5 +1,6 @@
-import { isAbsolute, join, resolve, sep } from "node:path";
+import { isAbsolute, join, posix, resolve, sep } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { SEMANTIC_ADAPTER_CONTRACTS } from "../../semantic-adapters/index.mjs";
 
@@ -177,6 +178,43 @@ function packageExportedValueNames(sourceText, fileName, scriptKind) {
   }
   return names;
 }
+function sourceScriptKind(packagePath) {
+  return packagePath.endsWith(".ts") ? ts.ScriptKind.TS : ts.ScriptKind.JS;
+}
+function semanticAdapterModules() {
+  const indexPath = fileURLToPath(
+    new URL("../../semantic-adapters/index.mjs", import.meta.url)
+  );
+  const source = ts.createSourceFile(
+    indexPath,
+    readFileSync(indexPath, "utf8"),
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.JS
+  );
+  const modules = new Map();
+  for (const statement of source.statements) {
+    const bindings = ts.isImportDeclaration(statement)
+      ? statement.importClause?.namedBindings
+      : undefined;
+    if (
+      bindings &&
+      ts.isNamespaceImport(bindings) &&
+      ts.isStringLiteral(statement.moduleSpecifier)
+    ) {
+      modules.set(
+        bindings.name.text,
+        `./${posix.join("src/semantic-adapters", statement.moduleSpecifier.text)}`
+      );
+    }
+  }
+  return modules;
+}
+function semanticAdapterTypesPath(importPath) {
+  return importPath.endsWith(".mjs")
+    ? importPath.replace(/\.mjs$/u, ".d.mts")
+    : importPath;
+}
 function checkPackageExportRuntimeDeclarations(
   exportLabel,
   typesPath,
@@ -192,7 +230,7 @@ function checkPackageExportRuntimeDeclarations(
   const runtimeNames = packageExportedValueNames(
     readFileSync(runtimeTarget, "utf8"),
     importPath,
-    ts.ScriptKind.JS
+    sourceScriptKind(importPath)
   );
   const typeNames = packageExportedValueNames(
     readFileSync(typeTarget, "utf8"),
@@ -436,16 +474,24 @@ export function checkPackageSurface(repoRoot, errors) {
     "./src/semantic-adapters/index.mjs",
     errors
   );
+  const adapterModules = semanticAdapterModules();
   for (const contract of Object.values(SEMANTIC_ADAPTER_CONTRACTS)) {
     if (!isRecord(contract) || typeof contract.id !== "string") {
       continue;
     }
     const exportKey = `./semantic-adapters/${contract.id}`;
+    const importPath = adapterModules.get(contract.exportName);
+    if (!importPath?.endsWith(`/${contract.id}${posix.extname(importPath)}`)) {
+      errors.push(
+        `tooling/antidrift/src/semantic-adapters/index.mjs must import adapter ${contract.exportName} from a module named ${contract.id}.`
+      );
+      continue;
+    }
     checkSemanticAdapterPackageExportEntry(
       exportsMap,
       exportKey,
-      `./src/semantic-adapters/${contract.id}.d.mts`,
-      `./src/semantic-adapters/${contract.id}.mjs`,
+      semanticAdapterTypesPath(importPath),
+      importPath,
       errors
     );
   }

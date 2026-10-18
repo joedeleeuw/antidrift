@@ -4,7 +4,7 @@ import {
   unwrapExpression,
 } from "../../semantic-adapters/local-ast-rules.mjs";
 import ts from "typescript";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 const collectionMetadataMemberNames = new Set(["length", "size"]);
 function hasExplicitReturnType(fn) {

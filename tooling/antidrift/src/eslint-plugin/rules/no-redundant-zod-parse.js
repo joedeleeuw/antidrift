@@ -8,7 +8,7 @@ import {
   recordParsedConst,
   schemaValidationCallParts,
 } from "../../semantic-adapters/schema-provenance.mjs";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 const testFilenamePattern =
   /(?:(?:^|[/\\])(?:test|tests|__tests__)(?:[/\\])|[.](?:test|spec)[.][cm]?[jt]sx?$)/u;

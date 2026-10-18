@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { isTestFilename } from "./syntax.js";
 
 const HASH = /^[0-9a-fA-F]{64}$/;

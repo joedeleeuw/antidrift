@@ -1,5 +1,8 @@
 import { importedOwner, importedOwnerSchema } from "./imported-owner.js";
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { isIdentifier } from "./ast.js";
 
 const SAFE_HREF_PREFIXES = ["https://", "http://", "/", "#", "mailto:"];

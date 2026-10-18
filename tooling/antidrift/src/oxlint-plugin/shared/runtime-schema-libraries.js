@@ -1,4 +1,4 @@
-import { findVariable } from "../../semantic-adapters/async-control-flow.mjs";
+import { findVariable } from "../../semantic-adapters/kernel/async-control-flow.ts";
 import { unwrapExpression } from "./test-files.js";
 
 const runtimeSchemaLibrarySources = [

@@ -7,7 +7,7 @@ import {
   isMutatedObjectBinding,
   isPopulatedObjectExpression,
 } from "../../oxlint-plugin/anti-slop/shared/dictionary-types.js";
-import { defineTypeScriptRule } from "../../semantic-adapters/ts-rule-kernel.mjs";
+import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 const TS_TYPE_FLAG_ANY = 1;
 const TS_TYPE_FLAG_UNKNOWN = 2;

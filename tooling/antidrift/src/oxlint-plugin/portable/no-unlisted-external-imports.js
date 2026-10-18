@@ -1,4 +1,7 @@
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 import { isBuiltin } from "node:module";
 import { dirname, join } from "node:path";
 import { packageOwner } from "./package-owner.js";

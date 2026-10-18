@@ -1,5 +1,8 @@
 import ts from "typescript";
-import { findVariable, getDeclaredVariable } from "./async-control-flow.mjs";
+import {
+  findVariable,
+  getDeclaredVariable,
+} from "./kernel/async-control-flow.ts";
 import { getFunctionNode, unwrapExpression } from "./local-ast-rules.mjs";
 import {
   isSqlDirectionTokenValue,

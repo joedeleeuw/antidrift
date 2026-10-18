@@ -1,5 +1,8 @@
 import { isClassValue } from "./class-value.js";
-import { isRuleFile, scopeProperties } from "./scope.js";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
 
 const SPLIT = /[\s"'`{}()]+/;
 const baseClass = (token) => {
