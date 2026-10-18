@@ -14,7 +14,7 @@ import {
   markReturnedPendingMaps,
   queuePendingAsyncMap,
 } from "./kernel/async-control-flow.ts";
-import { createAuthBoundaryTracker } from "./auth-boundary.mjs";
+import { createAuthBoundaryTracker } from "./boundary/auth-boundary.ts";
 import { canonicalStatusLiteralOwner } from "./shape/status-literal.ts";
 import {
   getFunctionNode,

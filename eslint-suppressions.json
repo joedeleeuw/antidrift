@@ -809,11 +809,6 @@
       "count": 12
     }
   },
-  "tooling/antidrift/src/semantic-adapters/auth-boundary.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
   "tooling/antidrift/src/semantic-adapters/broad-input.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 4
@@ -846,16 +841,6 @@
     },
     "antidrift/no-vague-names": {
       "count": 12
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/parse-input.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/parsed-json.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
     }
   },
   "tooling/antidrift/src/semantic-adapters/schema-parse-shape.mjs": {

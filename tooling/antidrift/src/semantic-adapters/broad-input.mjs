@@ -1,6 +1,6 @@
 import ts from "typescript";
 
-import { callExpressionName } from "./auth-boundary.mjs";
+import { callExpressionName } from "./boundary/auth-boundary.ts";
 import { isZodMethod } from "./projection/schema-provenance.ts";
 
 const TS_TYPE_FLAG_ANY = 1;
