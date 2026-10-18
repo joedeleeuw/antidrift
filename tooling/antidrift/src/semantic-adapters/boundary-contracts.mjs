@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { shapeless, typed } from "./boundary-declarations.mjs";
+import { shapeless, typed } from "./boundary/boundary-types.ts";
 
 export const ELEMENT = "[]";
 

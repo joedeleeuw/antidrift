@@ -19,7 +19,7 @@ export const wrapperKinds: ReadonlySet<ts.SyntaxKind> = new Set([
   ts.SyntaxKind.SatisfiesExpression,
 ]);
 
-function isWrapperExpression(node: ts.Node): node is WrapperExpression {
+export function isWrapperExpression(node: ts.Node): node is WrapperExpression {
   return wrapperKinds.has(node.kind);
 }
 

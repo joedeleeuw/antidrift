@@ -11,11 +11,9 @@ import {
   boundaryObservations,
   BoundaryObserver,
 } from "./boundary/boundary-observations.ts";
-import {
-  boundaryDeclarations,
-  broad,
-  excluded,
-} from "./boundary-declarations.mjs";
+import { boundaryDeclarations } from "./boundary/boundary-declarations.ts";
+import { broad } from "./boundary/boundary-types.ts";
+import { excluded } from "./boundary/decision-cases.ts";
 import { signatureForwarding } from "./boundary-plan-roots.mjs";
 import { boundarySinks } from "./boundary-sinks.mjs";
 import { boundarySources } from "./boundary-sources.mjs";

@@ -27,6 +27,11 @@ declare module "typescript" {
   interface Program {
     getCommonSourceDirectory(): string;
   }
+  interface TypeChecker {
+    getSignatureFromDeclaration(
+      declaration: ts.SignatureDeclaration | ts.JSDocSignature
+    ): ts.Signature | undefined;
+  }
   interface Signature {
     readonly minArgumentCount: number;
     readonly flags: number;

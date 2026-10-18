@@ -4,7 +4,7 @@ import {
   nonForwardingOutputCases,
 } from "./boundary/decision-cases.ts";
 import { ELEMENT } from "./boundary-contracts.mjs";
-import { broad, typed } from "./boundary-declarations.mjs";
+import { broad, typed } from "./boundary/boundary-types.ts";
 import { boundaryObservations } from "./boundary/boundary-observations.ts";
 import { nodeKey } from "./boundary-summaries.mjs";
 import {

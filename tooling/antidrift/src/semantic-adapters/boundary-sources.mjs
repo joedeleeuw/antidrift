@@ -1,7 +1,7 @@
 import ts from "typescript";
-import { exclusionCases } from "./boundary/decision-cases.ts";
+import { excluded, exclusionCases } from "./boundary/decision-cases.ts";
 import { frameworkCases, rootCases } from "./boundary/source-cases.ts";
-import { broad, excluded } from "./boundary-declarations.mjs";
+import { broad } from "./boundary/boundary-types.ts";
 import { unwrapExpression } from "./boundary/boundary-syntax.ts";
 
 const writeOperators = new Set([

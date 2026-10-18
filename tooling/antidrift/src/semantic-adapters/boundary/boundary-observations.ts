@@ -109,7 +109,7 @@ type DecoderProof = {
   readonly evidence: {
     readonly kind: string;
     readonly form?: string | undefined;
-    readonly parameter: number;
+    readonly parameter: number | undefined;
   };
   readonly proved: boolean;
   readonly branch: string;

@@ -6,6 +6,23 @@ type PrimitiveGuardCase = {
   readonly reason: string;
 };
 
+export const carrierCases = [
+  {
+    owner: "zod",
+    discriminant: "success",
+    success: true,
+    payload: "data",
+    examples: ["Zod safeParse", "Zod safeParseAsync"],
+  },
+  {
+    owners: ["effect", "@effect/schema"],
+    discriminant: "_tag",
+    success: "Right",
+    payload: "right",
+    examples: ["Effect Schema decodeUnknownEither", "Either results"],
+  },
+];
+
 export const decoderCases = [
   {
     kind: "assertion",
@@ -27,22 +44,7 @@ export const decoderCases = [
     kind: "result",
     input: "any-or-unknown",
     output: "carrier",
-    carriers: [
-      {
-        owner: "zod",
-        discriminant: "success",
-        success: true,
-        payload: "data",
-        examples: ["Zod safeParse", "Zod safeParseAsync"],
-      },
-      {
-        owners: ["effect", "@effect/schema"],
-        discriminant: "_tag",
-        success: "Right",
-        payload: "right",
-        examples: ["Effect Schema decodeUnknownEither", "Either results"],
-      },
-    ],
+    carriers: carrierCases,
     reason:
       "A validation carrier is the published success-or-failure contract of its owning package, recognised by the declaration's package and the carrier's discriminant and payload members. Passing, assigning or returning the intact carrier is safe; reading its payload is decoded only where the checker has narrowed the carrier to its success variant, and an assertion is not that narrowing. A decoded domain union is a value, not a carrier.",
   },
@@ -58,7 +60,7 @@ export const decoderCases = [
     reason:
       "A declared any/unknown input and typed return, including an awaited return, establish the output contract, not a discarded input. A first-party string input that the body deserializes with a declared deserializer is the same subject once opened. Instantiating a generic carrier parameter as any does not turn it into a decoder.",
   },
-];
+] as const;
 
 export const primitiveGuardCases = [
   {
@@ -201,7 +203,15 @@ export const exclusionCases = [
     reason:
       "An exported string entry parameter or string formatting projection activates only when a declared deserializer opens it.",
   },
-];
+] as const;
+
+type ExclusionFact = (typeof exclusionCases)[number]["fact"];
+
+export function excluded(facts: {
+  readonly [Fact in ExclusionFact]?: unknown;
+}) {
+  return exclusionCases.some((exclusion) => facts[exclusion.fact]);
+}
 
 export const collectionCases = [
   {

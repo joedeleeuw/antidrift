@@ -5,7 +5,8 @@ import {
   logicalOperators,
   unresolvedType,
 } from "./boundary-contracts.mjs";
-import { broad, excluded, typed } from "./boundary-declarations.mjs";
+import { broad, typed } from "./boundary/boundary-types.ts";
+import { excluded } from "./boundary/decision-cases.ts";
 import { boundaryObservations } from "./boundary/boundary-observations.ts";
 import {
   enclosingFunction,
