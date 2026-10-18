@@ -1,5 +1,9 @@
 # changelog
 
+## Unreleased
+
+- `unknown-input-must-be-decoded` no longer crashes ESLint on two shapes. A declared callback whose parameter and result share its host call's type parameter (a `useReducer` reducer that returns `state`) rebound its parameter through the host call without end and overflowed the stack; each such binding is now one fixpoint per (parameter, host call), sharing the declaration-summary iteration cap and its incomplete root. Collecting a type's children read `checker.getTypeArguments` on non-reference types, where it returns `undefined` and threw `is not iterable`; it now reads type arguments only from type references. Reports on the controls, review probes and corpus probes are unchanged.
+
 ## 0.18.1
 
 - `unknown-input-must-be-decoded` reports an incomplete analysis instead of passing silently when its two bounds fire. Since 0.16.0 an expression nested past `TRACE_DEPTH` (256) traced to no roots, and a recursive summary still changing after `SUMMARY_ITERATION_INVARIANT` (64) iterations kept a partial result, so input past either bound read as decoded. The trace now yields an incomplete root at the bound, and the summary keeps its last roots plus an incomplete root. On the corpus probes neither bound fires, so reports there are unchanged; an input placed under 300 nested conditionals now reports `incompleteAnalysis` where 0.18.0 was silent.

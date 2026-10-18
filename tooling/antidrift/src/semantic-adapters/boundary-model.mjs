@@ -503,7 +503,7 @@ export function boundaryModel(program, options = {}) {
     return returnRoots(declaration);
   }
 
-  const { summary, recordCut, memoize } = declarationSummaries({
+  const { summary, fixpoint, recordCut, memoize } = declarationSummaries({
     bodyRoots: declarationRoots,
     observer,
     isActive: (node) => visiting.has(node),
@@ -515,6 +515,7 @@ export function boundaryModel(program, options = {}) {
     declarations,
     trace,
     summary,
+    fixpoint,
     substituteAll,
     flagged,
     prefixed,

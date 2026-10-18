@@ -3,6 +3,7 @@ import { boundaryCases } from "./boundary-cases.mjs";
 import { ELEMENT } from "./boundary-contracts.mjs";
 import { broad, typed } from "./boundary-declarations.mjs";
 import { boundaryObservations } from "./boundary-observations.mjs";
+import { nodeKey } from "./boundary-summaries.mjs";
 import { callbackReturns, unwrapExpression } from "./boundary-syntax.mjs";
 
 const RETURNED_FUNCTION_DEPTH =
@@ -34,6 +35,7 @@ export function signatureForwarding({
   declarations,
   trace,
   summary,
+  fixpoint,
   substituteAll,
   flagged,
   prefixed,
@@ -66,7 +68,9 @@ export function signatureForwarding({
     const aliasArguments = current.aliasTypeArguments ?? [];
     for (const member of [
       ...members,
-      ...checker.getTypeArguments(current),
+      ...(current.objectFlags & ts.ObjectFlags.Reference
+        ? checker.getTypeArguments(current)
+        : []),
       ...aliasArguments,
     ]) {
       pending.push([member, depth]);
@@ -614,13 +618,22 @@ export function signatureForwarding({
     return [];
   }
 
+  // A callback parameter bound from its host call can lead back to the same
+  // binding: a reducer's state is fed by the reducer's own result through the
+  // shared type parameter. The binding is one fixpoint per (parameter, call).
   function callbackBindings(callback, contract, call) {
     const bound = new Map();
     const contextual = contract.getNonNullableType().getCallSignatures()[0];
     for (const [index, parameter] of callback.parameters.entries()) {
       const subject = contextual?.parameters[index];
       bound.set(parameter, () =>
-        subject ? contextualSources(subject, callback, call, parameter) : []
+        subject
+          ? fixpoint(
+              `contextual:${nodeKey(parameter)}@${nodeKey(call)}`,
+              parameter,
+              () => contextualSources(subject, callback, call, parameter)
+            )
+          : []
       );
     }
     return bound;

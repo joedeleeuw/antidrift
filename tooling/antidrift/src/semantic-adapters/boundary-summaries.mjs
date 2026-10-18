@@ -472,8 +472,12 @@ export function declarationSummaries({ bodyRoots, observer, isActive }) {
     return roots;
   }
 
-  function summary(declaration) {
-    const existing = entries.get(declaration);
+  // One recursive result per key, iterated to a fixpoint: a key re-entered
+  // while computing reads its current roots and the outer computation repeats
+  // until the roots stop changing. `subject` is the node a non-converging
+  // result is attributed to.
+  function fixpoint(key, subject, compute) {
+    const existing = entries.get(key);
     if (existing?.state === "computing") {
       existing.reentered = true;
       recordCut(existing);
@@ -490,9 +494,9 @@ export function declarationSummaries({ bodyRoots, observer, isActive }) {
       iteration: 1,
       reentered: false,
     };
-    entries.set(declaration, entry);
+    entries.set(key, entry);
     for (;;) {
-      const { roots, cutAt } = collect(() => dedupe(bodyRoots(declaration)));
+      const { roots, cutAt } = collect(() => dedupe(compute()));
       cutAt.delete(entry);
       entry.cutAt = cutAt;
       const stable = !entry.reentered || sameRoots(roots, entry.roots);
@@ -502,13 +506,13 @@ export function declarationSummaries({ bodyRoots, observer, isActive }) {
       if (entry.iteration > SUMMARY_ITERATION_INVARIANT) {
         if (observer.enabled) {
           observer.boundFired(boundaryObservations.bounds.summaryIterations, {
-            declaration,
+            declaration: subject,
           });
         }
         entry.roots = [
           ...roots,
           ...unknownProvenance(
-            declaration,
+            subject,
             `recursive summary did not converge in ${SUMMARY_ITERATION_INVARIANT} iterations`
           ),
         ];
@@ -518,12 +522,19 @@ export function declarationSummaries({ bodyRoots, observer, isActive }) {
     entry.state = "done";
     propagate(entry.cutAt);
     if (entry.iteration > 1 && observer.enabled) {
-      observer.summaryFixpoint({ declaration, iterations: entry.iteration });
+      observer.summaryFixpoint({
+        declaration: subject,
+        iterations: entry.iteration,
+      });
     }
     return entry.roots;
   }
 
-  return { summary, recordCut, memoize };
+  function summary(declaration) {
+    return fixpoint(declaration, declaration, () => bodyRoots(declaration));
+  }
+
+  return { summary, fixpoint, recordCut, memoize };
 }
 
 export function aliasTarget(checker, symbol) {
