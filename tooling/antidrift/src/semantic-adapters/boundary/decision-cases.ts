@@ -261,4 +261,4 @@ export const nonForwardingOutputCases = [
     voidLike: true,
     reason: "A void return such as Array.forEach carries no output value.",
   },
-];
+] as const;

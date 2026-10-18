@@ -4,7 +4,7 @@ import { aliasTarget } from "../provenance/symbol-provenance.ts";
 import type { ContractProjections } from "./boundary-contracts.ts";
 import { enclosingFunction } from "./boundary-syntax.ts";
 import type { DeclarationFacts } from "./declaration-facts.ts";
-import type { rootAlgebra } from "./root-algebra.ts";
+import type { RootOperations } from "./root-algebra.ts";
 import type { Root } from "./root-domain.ts";
 import { unknownProvenance } from "./root-domain.ts";
 
@@ -17,7 +17,7 @@ type ReceiverContext = {
   readonly parameterRoots: (
     parameter: ts.ParameterDeclaration
   ) => readonly Root[];
-  readonly prefixed: ReturnType<typeof rootAlgebra>["prefixed"];
+  readonly prefixed: RootOperations["prefixed"];
 };
 
 function bindsThisToClass(ancestor: ts.SignatureDeclaration): boolean {

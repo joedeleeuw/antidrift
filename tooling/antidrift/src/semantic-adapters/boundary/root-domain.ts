@@ -51,7 +51,7 @@ export type RootCapture = {
 export type ConcreteRoot = RootMarks & {
   readonly kind: string;
   readonly root: ts.Node;
-  readonly declaration: ts.Node | null;
+  readonly declaration: ts.Node | null | undefined;
   readonly upstream?: Root | undefined;
   readonly path?: readonly string[] | undefined;
   readonly deep?: boolean | undefined;

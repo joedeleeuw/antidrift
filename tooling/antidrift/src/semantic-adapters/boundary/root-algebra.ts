@@ -415,6 +415,8 @@ class RootAlgebra {
   }
 }
 
+export type RootOperations = ReturnType<typeof rootAlgebra>;
+
 export function rootAlgebra(context: AlgebraContext) {
   const algebra = new RootAlgebra(context);
   return {

@@ -19,6 +19,12 @@ declare module "typescript" {
   interface Type {
     readonly intrinsicName?: string;
     readonly objectFlags?: ts.ObjectFlags;
+    readonly isThisType?: boolean;
+    readonly target?: ts.Type;
+    readonly templateType?: ts.Type;
+    readonly constraintType?: ts.Type;
+    readonly objectType?: ts.Type;
+    readonly indexType?: ts.Type;
   }
   interface GenericType {
     readonly readonly?: boolean;
@@ -29,6 +35,7 @@ declare module "typescript" {
   }
   interface TypeChecker {
     getTypeArguments(type: ts.Type): readonly ts.Type[];
+    getPromisedTypeOfPromise(type: ts.Type): ts.Type | undefined;
     getSignatureFromDeclaration(
       declaration: ts.SignatureDeclaration | ts.JSDocSignature
     ): ts.Signature | undefined;

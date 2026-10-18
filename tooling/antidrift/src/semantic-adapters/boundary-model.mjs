@@ -14,7 +14,8 @@ import {
 import { boundaryDeclarations } from "./boundary/boundary-declarations.ts";
 import { broad } from "./boundary/boundary-types.ts";
 import { excluded } from "./boundary/decision-cases.ts";
-import { signatureForwarding } from "./boundary-plan-roots.mjs";
+import { ContextualSources } from "./boundary/contextual-sources.ts";
+import { SignatureForwarding } from "./boundary/signature-forwarding.ts";
 import { boundarySinks } from "./boundary-sinks.mjs";
 import { boundarySources } from "./boundary/boundary-sources.ts";
 import { declarationSummaries } from "./boundary/declaration-summaries.ts";
@@ -172,7 +173,7 @@ export function boundaryModel(program, options = {}) {
     const index = ownerFn.parameters.indexOf(parameter);
     if (excluded({ decoderSubject: decoder?.parameter === index })) return [];
     if (ts.isExpression(ownerFn)) {
-      const contextual = forwarding.contextualParameterRoots(parameter);
+      const contextual = contextualSources.contextualParameterRoots(parameter);
       if (contextual.length) return contextual;
     }
     return [placeholder(parameter, declaredClaim(parameter))];
@@ -206,7 +207,7 @@ export function boundaryModel(program, options = {}) {
       argumentRootsAt(call, parameter, index)
     );
     if (callers.length) return resolveAll(callers);
-    return resolveAll(forwarding.contextualParameterRoots(parameter));
+    return resolveAll(contextualSources.contextualParameterRoots(parameter));
   }
 
   function resolveAll(roots) {
@@ -507,18 +508,25 @@ export function boundaryModel(program, options = {}) {
     isActive: (node) => visiting.has(node),
   });
 
-  const forwarding = signatureForwarding({
+  const contextualSources = new ContextualSources({
     checker,
-    observer,
     declarations,
     trace,
     summary,
     fixpoint,
     substituteAll,
-    flagged,
     prefixed,
     projected,
     elementStep,
+  });
+
+  const forwarding = new SignatureForwarding({
+    checker,
+    observer,
+    declarations,
+    trace,
+    flagged,
+    contextual: contextualSources,
   });
 
   const { classFieldRoots, superRoots, thisRoots } = classReceivers({
