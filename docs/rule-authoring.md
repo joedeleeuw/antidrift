@@ -103,7 +103,7 @@ These should start as warnings:
 - Add or update the corresponding provenance row in `docs/source-ledger.md` whenever a rule, ruleset, tool, or borrowed reference changes.
 - Do not mark `stable: true` in the rule registry until multiple independent real repositories replicate the behavior, with zero known false positives, zero known false negatives, no productionization concerns, and a grounded Claude Opus 4.8 advisory review.
 - Track any moved, deleted, or replaced lint rule in `docs/lint-rule-parity.md` with one enforcement owner, an explicit replacement, or an accepted gap.
-- Update `docs/policy-coverage.md` whenever a policy rule moves between spec-only, delegated, partial, and enforced.
+- Update `policyRuleReviews` in `policy/registries/rules.yaml` whenever a policy rule moves between spec-only, delegated, partial, and enforced.
 - Keep plugin exports, runtime ownership, severity, and corpus coverage aligned; `pnpm policy:check-rule-surface` fails when they drift.
 - Keep registry-backed options valid; `pnpm policy:check-registries` fails when owner or wrapper paths are stale.
 - Emit machine-readable reports for Sonar import.

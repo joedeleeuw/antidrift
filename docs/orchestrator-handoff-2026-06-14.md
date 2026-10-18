@@ -24,9 +24,9 @@ Edited in the current pass:
 
 - `docs/rule-roadmap.md`
 - `docs/rule-equivalence-audit.md`
-- `docs/policy-coverage.md`
+- `docs/policy-coverage.md` (since deleted; its per-rule facts live in `policy/registries/rules.yaml`)
 - `docs/rule-status-registry.md`
-- `docs/stable-promotion-inventory.md`
+- `docs/stable-promotion-inventory.md` (since deleted; its per-rule facts live in `policy/registries/rules.yaml`)
 - `docs/roadmap.md`
 - `policy/registries/rules.yaml`
 - `docs/orchestrator-handoff-2026-06-14.md`

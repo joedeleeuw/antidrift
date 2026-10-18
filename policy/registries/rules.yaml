@@ -1168,10 +1168,9 @@ rules:
       blockingThreshold: Scope-bound raw fetch calls under a JSX-returning lexical component frame report; module-scope helpers, PascalCase-only functions, and local/imported fetch lookalikes stay clean.
       ecosystemComparison: Generated no-restricted-syntax/no-restricted-globals selectors can ban fetch in broad globs, and @eslint-react/web-api-no-leaked-fetch covers abort cleanup for effect fetches, but neither proves raw transport ownership in a JSX-returning lexical component frame.
       corpusEvidence: Chaski and Codebase Atlas provide narrowed fetch-specific drift; Chaski, Sudocode, and Murderbox provide clean component/helper/API-boundary controls.
-      realCorpusInventory: docs/rule-investigations/no-raw-fetch-in-component.md and docs/stable-promotion-inventory.md record narrowed drift in Chaski and Codebase Atlas, plus clean controls from Chaski, Sudocode, Murderbox, and Taskme-era inventory.
+      realCorpusInventory: docs/rule-investigations/no-raw-fetch-in-component.md records narrowed drift in Chaski and Codebase Atlas, plus clean controls from Chaski, Sudocode, Murderbox, and Taskme-era inventory.
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-raw-fetch-in-component.md
-        - docs/stable-promotion-inventory.md
       claudeAdvisoryReview: docs/rule-investigations/no-raw-fetch-in-component.md records the prior scope review; the June 17 narrowing supersedes any stable-promotion clearance and requires a fresh narrowed inventory before blocking.
       claudeAdvisoryReviewRefs:
         - docs/rule-investigations/no-raw-fetch-in-component.md
@@ -1275,10 +1274,9 @@ rules:
       blockingThreshold: Same-schema reparse reports only when TypeScript proves the consumed value was already produced by or declared from that schema output.
       ecosystemComparison: Generic unsafe-assignment or Zod style rules do not track same-schema provenance from parsed values or declared schema-output parameters.
       corpusEvidence: Chaski, Codebase Atlas, and Murderbox provide same-schema drift plus first-boundary parse and test-contract clean controls.
-      realCorpusInventory: docs/rule-investigations/no-redundant-zod-parse.md and docs/stable-promotion-inventory.md record Chaski and Murderbox drift plus clean first-boundary and assertion-contract controls.
+      realCorpusInventory: docs/rule-investigations/no-redundant-zod-parse.md records Chaski and Murderbox drift plus clean first-boundary and assertion-contract controls.
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-redundant-zod-parse.md
-        - docs/stable-promotion-inventory.md
       claudeAdvisoryReview: reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md and docs/rule-investigations/no-redundant-zod-parse.md record the advisory review and accepted corpus edge.
       claudeAdvisoryReviewRefs:
         - reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md
@@ -1724,7 +1722,6 @@ rules:
       realCorpusInventory: docs/rule-investigations/no-contract-appeasement-projection.md records the widened rule shape, inherited selector-wrapper corpus, clean controls, and known false-negative gaps.
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-contract-appeasement-projection.md
-        - docs/stable-promotion-inventory.md
       claudeAdvisoryReview: docs/rule-investigations/no-contract-appeasement-projection.md records the inherited selector-wrapper scope and the widened cross-contract branch still needs review after real-corpus mining.
       claudeAdvisoryReviewRefs:
         - docs/rule-investigations/no-contract-appeasement-projection.md
@@ -1863,10 +1860,9 @@ rules:
       blockingThreshold: Broad parse inputs require string proof; unvalidated parsed results require schema validation before a declared contextual domain assignment.
       ecosystemComparison: "@typescript-eslint/no-unsafe-argument catches all current broad-input JSON.parse drift when forced on, but it is an unconfigurable any-argument-wide migration; the Antidrift rule is justified only as a narrower parse-boundary gate with lower unrelated inventory."
       corpusEvidence: Chaski, Codebase Atlas, Sudocode, and Opencode provide input drift and clean controls. Homer dc7d554d tools.ts line 1439 supplies authenticated domain-store result drift.
-      realCorpusInventory: docs/rule-investigations/no-unsafe-deserialize.md and docs/stable-promotion-inventory.md record Sudocode, Codebase Atlas, and Opencode parse-input drift plus Chaski, Codebase Atlas, Opencode, and Sudocode clean controls.
+      realCorpusInventory: docs/rule-investigations/no-unsafe-deserialize.md records Sudocode, Codebase Atlas, and Opencode parse-input drift plus Chaski, Codebase Atlas, Opencode, and Sudocode clean controls.
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-unsafe-deserialize.md
-        - docs/stable-promotion-inventory.md
       claudeAdvisoryReview: reports/claude-rule-review-no-unsafe-deserialize-20260604-145356.md and docs/rule-investigations/no-unsafe-deserialize.md record advisory review and the closed parser-service blocker.
       claudeAdvisoryReviewRefs:
         - reports/claude-rule-review-no-unsafe-deserialize-20260604-145356.md
@@ -1937,10 +1933,9 @@ rules:
       blockingThreshold: A React useEffect/useLayoutEffect call reports when no dependency array argument is provided.
       ecosystemComparison: react-hooks/exhaustive-deps intentionally starts after an array exists, while the small no-deps plugin is a weaker single-purpose replacement.
       corpusEvidence: Chaski, Codebase Atlas, Sudocode, Murderbox, and Claude Code Source provide missing-array drift and imported/non-React hook clean controls.
-      realCorpusInventory: docs/rule-investigations/require-effect-deps.md and docs/stable-promotion-inventory.md record Chaski and Claude Code Source drift plus clean controls in four repos.
+      realCorpusInventory: docs/rule-investigations/require-effect-deps.md records Chaski and Claude Code Source drift plus clean controls in four repos.
       realCorpusInventoryRefs:
         - docs/rule-investigations/require-effect-deps.md
-        - docs/stable-promotion-inventory.md
       claudeAdvisoryReview: docs/rule-investigations/require-effect-deps.md records grounded advisory review and the accepted every-render escape convention.
       claudeAdvisoryReviewRefs:
         - docs/rule-investigations/require-effect-deps.md

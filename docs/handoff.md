@@ -27,12 +27,10 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - `docs/build-patterns.md` is the positive construction guide. Use it before inventing a new domain, contract, API, UI resource, or gateway shape.
 - `docs/feature-slice-template.md` is the lightweight planning shape for new work.
 - `policy/registries/rules.yaml` is the canonical custom-rule status registry: active status, signal choice, corpus repositories, production concerns, and stable-promotion state.
-- `docs/rule-status-registry.md` is the readable index for the rule status registry.
+- `docs/rule-status-registry.md` defines the vocabulary the rule status registry uses.
 - `docs/source-ledger.md` records where pulled rules, custom rules, rulesets, tools, and borrowed repo references came from.
-- `docs/policy-coverage.md` tracks which policy rules are enforced, partial, delegated, or still spec-only.
 - `docs/real-corpus-validation.md` tracks which implemented custom rules have real Chaski-backed or fallback real-corpus evidence, and which rules remain under-proven.
 - `docs/gap-inventory.md` is the synthesized current gap surface across active rule maturity, broad policy coverage, real-corpus blockers, and retired/research boundaries.
-- `docs/stable-promotion-inventory.md` stack-ranks implemented rules for stable-promotion work and identifies the next advisory/inventory slice.
 - `docs/self-hosting-risks.md` records the self-linting failure modes and which layer owns each control.
 - `docs/roadmap.md` is limited to the hardened rules and chosen next scope: branded casts, appeasement casts, structural selector wrappers, status-triplet handling, unsafe-deserialize type signals, defensive shape probing, brand utilities, and cycle detection.
 

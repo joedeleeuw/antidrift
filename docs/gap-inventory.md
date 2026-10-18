@@ -4,10 +4,8 @@ Last updated: 2026-07-23.
 
 This is the synthesized gap surface for the current antidrift repository. It does not replace the source ledgers:
 
-- `policy/registries/rules.yaml` owns rule status, examples, external ownership, concerns, and next action.
-- `docs/rule-status-registry.md` is the readable rule table.
-- `docs/policy-coverage.md` owns broad policy-cluster coverage.
-- `docs/stable-promotion-inventory.md` owns stable-promotion blockers.
+- `policy/registries/rules.yaml` owns rule status, examples, external ownership, coverage, concerns, and next action.
+- `docs/rule-status-registry.md` defines the vocabulary the registry uses.
 - `docs/real-corpus-validation.md` owns real-program evidence.
 - `docs/lint-rule-parity.md` owns runtime assignment and migration parity.
 - `docs/rule-roadmap.md` owns the per-rule classification and keep/delegate/retire decisions.
@@ -148,7 +146,7 @@ These are implemented-rule gaps. They are not all implementation tasks; many are
 
 ## Policy Coverage Gaps
 
-These come from `docs/policy-coverage.md`. Do not implement them automatically; the scoped roadmap still controls work.
+These roll up `policyRuleReviews` in `policy/registries/rules.yaml`. Do not implement them automatically; the scoped roadmap still controls work.
 
 | Cluster                       | Current coverage | Gap                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ----------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

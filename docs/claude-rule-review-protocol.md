@@ -45,7 +45,6 @@ Read at least:
 - docs/rule-investigations/<candidate>.md
 - docs/real-corpus-validation.md
 - docs/roadmap.md
-- docs/policy-coverage.md
 - tooling/antidrift/src/eslint-plugin/index.js
 - tooling/antidrift/src/eslint-config/index.mjs
 - tooling/antidrift/src/policy/chaski-corpus.mjs

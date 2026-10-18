@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-14.
 
-This is the decision layer over `policy/registries/rules.yaml`. The registry owns per-rule status, evidence, accepted authority facts, and examples; `docs/rule-status-registry.md` is its readable index. Treat the registry as a project authority index, not a manually curated dependency allowlist: broad scans and repo analytics can propose owners, but blocking rules should rely on accepted or generated ownership facts. This document owns the product answer: which rules antidrift keeps as custom code, which it delegates, which it stops carrying, and what each kept rule must still prove. When this document and the registry disagree, fix the registry first and realign this file.
+This is the decision layer over `policy/registries/rules.yaml`. The registry owns per-rule status, evidence, accepted authority facts, and examples; `docs/rule-status-registry.md` defines the vocabulary it uses. Treat the registry as a project authority index, not a manually curated dependency allowlist: broad scans and repo analytics can propose owners, but blocking rules should rely on accepted or generated ownership facts. This document owns the product answer: which rules antidrift keeps as custom code, which it delegates, which it stops carrying, and what each kept rule must still prove. When this document and the registry disagree, fix the registry first and realign this file.
 
 The north star is `docs/semantic-drift-goal.md`: prove semantic associations from code, type, registry,
 graph, or corpus evidence first; keep agent-ops as the minimized fallback for session facts that code

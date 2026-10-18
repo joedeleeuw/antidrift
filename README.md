@@ -12,7 +12,7 @@ This template intentionally excludes the later package-publication surface gap w
 - Declarative source of truth in `policy/agent-guardrails.yaml`.
 - Positive build recipes in `docs/build-patterns.md` so agents import or derive concepts instead of duplicating them.
 - Feature planning template in `docs/feature-slice-template.md`.
-- Policy coverage tracking in `docs/policy-coverage.md`.
+- Per-rule coverage, status, and promotion tracking in `policy/registries/rules.yaml`.
 - Self-hosting risk controls in `docs/self-hosting-risks.md`.
 - Generated agent instruction targets: `AGENTS.md`, `CLAUDE.md`, Cursor rules, Claude hooks, Codex hooks, and Copilot instructions.
 - Sample packages that exercise the agreed rule families.

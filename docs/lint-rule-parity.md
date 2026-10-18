@@ -18,55 +18,7 @@ Each rule has one enforcement owner. Runtime migration must remove the old owner
 
 Generated code is excluded only when its file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Names such as `generated`, `_generated`, `*.gen.ts`, and `*.generated.ts` do not bypass lint on their own.
 
-The reduced ESLint pass currently enables:
-
-- `antidrift/no-contract-appeasement-projection`
-- `antidrift/react-max-component-props`
-- `antidrift/no-unsafe-deserialize`
-- `antidrift/no-appeasement-cast`
-- `antidrift/no-canonical-model-fork`
-- `antidrift/no-nullable-positional-tuple`
-- `antidrift/no-structural-type-fork`
-
-It also enables these portable syntax rules at error so `eslint-suppressions.json` ratchets existing debt (Oxlint has no baseline). The Oxlint plugin keeps exporting them but leaves them unconfigured:
-
-- `antidrift/no-calling-components-as-functions`
-- `antidrift/no-duplicated-conditional-classnames`
-- `antidrift/no-duplicated-object-field-blocks`
-- `antidrift/no-inline-structural-type-at-use-site`
-- `antidrift/no-nonindependent-test-oracle`
-- `antidrift/no-open-dictionary-at-boundary`
-- `antidrift/no-raw-fetch-in-component`
-- `antidrift/no-raw-react-native-touchables`
-- `antidrift/no-redeclared-owned-union`
-- `antidrift/no-schema-library-in-test`
-- `antidrift/no-sentinel-absence-fallback`
-- `antidrift/no-silent-empty-detection-fallback`
-- `antidrift/no-validator-output-oracle`
-- `antidrift/unknown-input-must-be-decoded`
-
-The structural and canonical rules receive generated, accepted package-owner, and domain-owner facts from the consumer policy registries. The Oxlint plugin enables `antidrift/require-effect-deps` and `antidrift/no-static-property-loop`. It also preserves these rules as default-off inventory:
-
-- `antidrift/no-async-array-method`
-- `antidrift/no-handrolled-resource-lifecycle-cells`
-- `antidrift/no-mocked-response-body-oracle`
-- `antidrift/no-query-data-type-parameters`
-- `antidrift/no-redundant-zod-parse`
-- `antidrift/no-shattered-ingested-entity-state`
-- `antidrift/no-status-literal-in-type`
-- `antidrift/require-authz-check`
-
-The ESLint pass preserves these TypeChecker-dependent or hybrid rules as default-off inventory:
-
-- `antidrift/no-defensive-shape-probing`
-- `antidrift/no-sql-string-concat`
-- `antidrift/no-underchecked-type-predicate`
-
-`antidrift/no-redundant-zod-parse` moved from the ESLint pass to the Oxlint plugin on 2026-08-13. It is a whole-rule migration, not a dual registration: the ESLint plugin no longer exports it, so `repo-corpus` — which derives its rule universe from the ESLint plugin's exports — no longer counts it, which is correct because ESLint no longer runs it. The detection mechanism changed with the tier, from TypeChecker symbol identity to canonical-path provenance over scope bindings, so it re-enters as default-off inventory.
-
-No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. The ESLint and Oxlint plugin exports are disjoint: there is no compatibility export of Oxlint-owned rules through ESLint. `policy:check-rule-surface` fails if a custom rule is _enabled_ by both runtimes. The check is severity-gated, not export-gated: ff50619 removed the duplicate-export check by owner decision, and rules configured `off` are skipped, so the single-owner guarantee it enforces is "no rule is enabled in two runtimes at once" rather than "no rule is exported twice". Disjoint plugin exports remain a convention this repository keeps, not something the check proves.
-No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. The ESLint and Oxlint plugin exports are disjoint: there is no compatibility export of Oxlint-owned rules through ESLint. `policy:check-rule-surface` fails if a custom rule is exported or enabled by both runtimes.
-No rule above is retired by this migration. Retirement requires a separate evidence review and an explicit registry decision. `antidrift/no-mocked-response-body-oracle` is deliberately exported by both syntax-capable plugin surfaces so ESLint-only and Oxlint consumers can opt in, while the shared Oxlint config is its only configured owner and keeps it off. `policy:check-rule-surface` permits dual export but fails if a custom rule is enabled by both runtimes.
+Per-rule runtime ownership, tier, severity, retirement, and promotion facts live in `policy/registries/rules.yaml`, and the runtime configs declare which rules each pass enables. `pnpm policy:check-rule-surface` fails when a custom rule is enabled by both runtimes, so this document does not restate the per-rule enablement and default-off inventory lists.
 
 Intentional baseline removals:
 
