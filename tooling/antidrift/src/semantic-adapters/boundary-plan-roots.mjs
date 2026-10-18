@@ -620,8 +620,9 @@ export function signatureForwarding({
 
   // A callback parameter bound from its host call can lead back to the same
   // binding: a reducer's state is fed by the reducer's own result through the
-  // shared type parameter. The binding is one fixpoint per (parameter, call).
-  function callbackBindings(callback, contract, call) {
+  // shared type parameter. The binding is one fixpoint per (parameter, host
+  // call argument), so one callback passed in two positions binds each apart.
+  function callbackBindings(callback, contract, argument) {
     const bound = new Map();
     const contextual = contract.getNonNullableType().getCallSignatures()[0];
     for (const [index, parameter] of callback.parameters.entries()) {
@@ -629,9 +630,10 @@ export function signatureForwarding({
       bound.set(parameter, () =>
         subject
           ? fixpoint(
-              `contextual:${nodeKey(parameter)}@${nodeKey(call)}`,
+              `contextual:${nodeKey(parameter)}@${nodeKey(argument)}`,
               parameter,
-              () => contextualSources(subject, callback, call, parameter)
+              () =>
+                contextualSources(subject, callback, argument.parent, parameter)
             )
           : []
       );
@@ -691,7 +693,7 @@ export function signatureForwarding({
     if (declared) {
       return substituteAll(
         summary(declared),
-        callbackBindings(declared, contract, call)
+        callbackBindings(declared, contract, argument)
       );
     }
     const roots = ts.isCallExpression(argument) ? [...trace(argument)] : [];

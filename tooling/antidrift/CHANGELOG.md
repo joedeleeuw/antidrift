@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `unknown-input-must-be-decoded` no longer crashes ESLint on two shapes. A declared callback whose parameter and result share its host call's type parameter (a `useReducer` reducer that returns `state`) rebound its parameter through the host call without end and overflowed the stack; each such binding is now one fixpoint per (parameter, host call), sharing the declaration-summary iteration cap and its incomplete root. Collecting a type's children read `checker.getTypeArguments` on non-reference types, where it returns `undefined` and threw `is not iterable`; it now reads type arguments only from type references. Reports on the controls, review probes and corpus probes are unchanged.
+- `unknown-input-must-be-decoded` no longer crashes ESLint on two shapes. A declared callback whose parameter and result share its host call's type parameter (a `useReducer` reducer that returns `state`) rebound its parameter through the host call without end and overflowed the stack; each such binding is now one fixpoint per (parameter, host call argument), sharing the declaration-summary iteration cap and its incomplete root, so one callback passed in two positions of a call is bound from each position. Collecting a type's children read `checker.getTypeArguments` on non-reference types, where it returns `undefined` and threw `is not iterable`; it now reads type arguments only from type references. Reports on the controls, review probes and corpus probes are unchanged.
 
 ## 0.18.1
 
