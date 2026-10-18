@@ -75,3 +75,5 @@ export function boundaryDeclarations(
     decode,
   };
 }
+
+export type BoundaryDeclarations = ReturnType<typeof boundaryDeclarations>;

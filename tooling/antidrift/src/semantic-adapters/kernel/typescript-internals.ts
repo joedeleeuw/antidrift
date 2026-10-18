@@ -28,6 +28,7 @@ declare module "typescript" {
     getCommonSourceDirectory(): string;
   }
   interface TypeChecker {
+    getTypeArguments(type: ts.Type): readonly ts.Type[];
     getSignatureFromDeclaration(
       declaration: ts.SignatureDeclaration | ts.JSDocSignature
     ): ts.Signature | undefined;

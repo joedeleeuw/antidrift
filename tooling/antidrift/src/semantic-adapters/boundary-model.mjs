@@ -16,7 +16,7 @@ import { broad } from "./boundary/boundary-types.ts";
 import { excluded } from "./boundary/decision-cases.ts";
 import { signatureForwarding } from "./boundary-plan-roots.mjs";
 import { boundarySinks } from "./boundary-sinks.mjs";
-import { boundarySources } from "./boundary-sources.mjs";
+import { boundarySources } from "./boundary/boundary-sources.ts";
 import { declarationSummaries } from "./boundary/declaration-summaries.ts";
 import { rootAlgebra } from "./boundary/root-algebra.ts";
 import {
