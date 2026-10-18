@@ -86,8 +86,8 @@
         "import": "./dist/semantic-adapters/react-state.mjs"
       },
       "./semantic-adapters/schema-provenance": {
-        "types": "./dist/semantic-adapters/schema-provenance.d.mts",
-        "import": "./dist/semantic-adapters/schema-provenance.mjs"
+        "types": "./dist/semantic-adapters/projection/schema-provenance.d.ts",
+        "import": "./dist/semantic-adapters/projection/schema-provenance.js"
       },
       "./semantic-adapters/sql": {
         "types": "./dist/semantic-adapters/sql.d.mts",
@@ -162,8 +162,8 @@
       "import": "./src/semantic-adapters/react-state.mjs"
     },
     "./semantic-adapters/schema-provenance": {
-      "types": "./src/semantic-adapters/schema-provenance.d.mts",
-      "import": "./src/semantic-adapters/schema-provenance.mjs"
+      "types": "./src/semantic-adapters/projection/schema-provenance.ts",
+      "import": "./src/semantic-adapters/projection/schema-provenance.ts"
     },
     "./semantic-adapters/sql": {
       "types": "./src/semantic-adapters/sql.d.mts",

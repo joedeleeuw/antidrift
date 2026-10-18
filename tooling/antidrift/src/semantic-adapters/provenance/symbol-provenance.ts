@@ -7,6 +7,31 @@ type SymbolDependencySearch = {
   readonly seen: Set<ts.Symbol>;
 };
 
+const NODE_MODULES_SEGMENT = "/node_modules/";
+
+export function aliasTarget(
+  checker: ts.TypeChecker,
+  symbol: ts.Symbol | undefined
+): ts.Symbol | undefined {
+  return symbol && (symbol.flags & ts.SymbolFlags.Alias) !== 0
+    ? checker.getAliasedSymbol(symbol)
+    : symbol;
+}
+
+export function declaredInInstalledPackage(
+  symbol: ts.Symbol | undefined,
+  matchesPackagePath: (packagePath: string) => boolean
+): boolean {
+  return (symbol?.declarations ?? []).some((declaration) => {
+    const fileName = declaration.getSourceFile().fileName.replace(/\\/gu, "/");
+    const marker = fileName.lastIndexOf(NODE_MODULES_SEGMENT);
+    return (
+      marker !== -1 &&
+      matchesPackagePath(fileName.slice(marker + NODE_MODULES_SEGMENT.length))
+    );
+  });
+}
+
 export function resolveAliasedSymbol(
   checker: ts.TypeChecker,
   symbol: ts.Symbol | null | undefined

@@ -39,17 +39,18 @@ export default {
       ["projection", "boundary", "callgraph"],
       "shape may only import kernel and provenance"
     ),
-    {
-      name: "domain-layers-are-siblings",
-      comment:
-        "projection, boundary, and callgraph are sibling domain layers and must not import each other",
-      severity: "error",
-      from: { path: `${semanticAdapters}/(projection|boundary|callgraph)/` },
-      to: {
-        path: `${semanticAdapters}/(projection|boundary|callgraph)/`,
-        pathNot: `${semanticAdapters}/$1/`,
-      },
-    },
+    layerRule(
+      "projection-never-imports-boundary-or-callgraph",
+      "projection",
+      ["boundary", "callgraph"],
+      "projection may only import kernel, provenance and shape"
+    ),
+    layerRule(
+      "boundary-never-imports-callgraph",
+      "boundary",
+      ["callgraph"],
+      "boundary may only import kernel, provenance, shape and projection"
+    ),
     {
       name: "primitives-never-import-rules",
       comment:

@@ -2,7 +2,7 @@ import { emitSemanticFact } from "../../policy/lib/semantic-facts.mjs";
 import {
   closedZodTransformInputKeys,
   zodTransformCallParts,
-} from "../../semantic-adapters/schema-provenance.mjs";
+} from "../../semantic-adapters/projection/schema-provenance.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 function staticPropertyKey(property) {

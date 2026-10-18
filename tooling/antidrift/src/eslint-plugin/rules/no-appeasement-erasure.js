@@ -1,6 +1,6 @@
 import ts from "typescript";
 
-import { schemaValidationCallParts } from "../../semantic-adapters/schema-provenance.mjs";
+import { schemaValidationCallParts } from "../../semantic-adapters/projection/schema-provenance.ts";
 import { noKnownValueWideningRule } from "../../oxlint-plugin/anti-slop/rules/no-known-value-widening.js";
 import { noWidenThenAssertRule } from "../../oxlint-plugin/anti-slop/rules/no-widen-then-assert.js";
 import {

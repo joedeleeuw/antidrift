@@ -876,11 +876,6 @@
       "count": 2
     }
   },
-  "tooling/antidrift/src/semantic-adapters/schema-provenance.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
   "tooling/antidrift/src/semantic-adapters/sql-syntax-analysis.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 1

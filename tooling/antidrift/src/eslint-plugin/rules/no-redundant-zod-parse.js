@@ -7,7 +7,7 @@ import {
   parsedSchemaSymbol,
   recordParsedConst,
   schemaValidationCallParts,
-} from "../../semantic-adapters/schema-provenance.mjs";
+} from "../../semantic-adapters/projection/schema-provenance.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 const testFilenamePattern =
