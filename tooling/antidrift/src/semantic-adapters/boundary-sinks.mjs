@@ -4,7 +4,7 @@ import {
   assertionKinds,
   logicalOperators,
   unresolvedType,
-} from "./boundary-contracts.mjs";
+} from "./boundary/boundary-contracts.ts";
 import { broad, typed } from "./boundary/boundary-types.ts";
 import { excluded } from "./boundary/decision-cases.ts";
 import { boundaryObservations } from "./boundary/boundary-observations.ts";

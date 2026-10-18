@@ -5,8 +5,8 @@ import {
   contractProjection,
   logicalOperators,
   unresolvedType,
-} from "./boundary-contracts.mjs";
-import { classReceivers } from "./boundary-classes.mjs";
+} from "./boundary/boundary-contracts.ts";
+import { classReceivers } from "./boundary/class-receivers.ts";
 import {
   boundaryObservations,
   BoundaryObserver,
@@ -17,15 +17,15 @@ import { excluded } from "./boundary/decision-cases.ts";
 import { signatureForwarding } from "./boundary-plan-roots.mjs";
 import { boundarySinks } from "./boundary-sinks.mjs";
 import { boundarySources } from "./boundary-sources.mjs";
+import { declarationSummaries } from "./boundary/declaration-summaries.ts";
+import { rootAlgebra } from "./boundary/root-algebra.ts";
 import {
-  aliasTarget,
-  declarationSummaries,
   dedupe,
   nodeKey,
   placeholder,
-  rootAlgebra,
   unknownProvenance,
-} from "./boundary-summaries.mjs";
+} from "./boundary/root-domain.ts";
+import { aliasTarget } from "./provenance/symbol-provenance.ts";
 import {
   callbackReturns,
   enclosingFunction,

@@ -54,6 +54,16 @@ function internalReadonlyCheckFlag(): number {
 
 const readonlyCheckFlag = internalReadonlyCheckFlag();
 
+export const primitiveTypeFlags =
+  ts.TypeFlags.StringLike |
+  ts.TypeFlags.NumberLike |
+  ts.TypeFlags.BigIntLike |
+  ts.TypeFlags.BooleanLike |
+  ts.TypeFlags.EnumLike |
+  ts.TypeFlags.ESSymbolLike |
+  ts.TypeFlags.VoidLike |
+  ts.TypeFlags.Null;
+
 export function isErrorType(type: ts.Type): boolean {
   return type.intrinsicName === "error";
 }

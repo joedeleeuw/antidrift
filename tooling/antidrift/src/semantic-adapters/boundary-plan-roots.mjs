@@ -3,10 +3,10 @@ import {
   collectionCases,
   nonForwardingOutputCases,
 } from "./boundary/decision-cases.ts";
-import { ELEMENT } from "./boundary-contracts.mjs";
+import { ELEMENT } from "./boundary/boundary-contracts.ts";
 import { broad, typed } from "./boundary/boundary-types.ts";
 import { boundaryObservations } from "./boundary/boundary-observations.ts";
-import { nodeKey } from "./boundary-summaries.mjs";
+import { nodeKey } from "./boundary/root-domain.ts";
 import {
   callbackReturns,
   unwrapExpression,
@@ -635,12 +635,17 @@ export function signatureForwarding({
       const subject = contextual?.parameters[index];
       bound.set(parameter, () =>
         subject
-          ? fixpoint(
-              `contextual:${nodeKey(parameter)}@${nodeKey(argument)}`,
-              parameter,
-              () =>
-                contextualSources(subject, callback, argument.parent, parameter)
-            )
+          ? fixpoint({
+              key: `contextual:${nodeKey(parameter)}@${nodeKey(argument)}`,
+              subject: parameter,
+              compute: () =>
+                contextualSources(
+                  subject,
+                  callback,
+                  argument.parent,
+                  parameter
+                ),
+            })
           : []
       );
     }
