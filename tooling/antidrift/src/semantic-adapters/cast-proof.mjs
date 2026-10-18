@@ -11,8 +11,8 @@ import {
 import {
   findUnresolvedProvenance,
   typeContainsCompilerError,
-  unresolvedModuleFinding,
-} from "./type-resolution-provenance.mjs";
+} from "./provenance/type-resolution-provenance.ts";
+import { unresolvedModuleFinding } from "./provenance/unresolved-reference.ts";
 
 const BROAD_ESTREE_ANNOTATIONS = new Set(["TSUnknownKeyword", "TSAnyKeyword"]);
 const CAST_ESTREE_TYPES = new Set(["TSAsExpression", "TSTypeAssertion"]);

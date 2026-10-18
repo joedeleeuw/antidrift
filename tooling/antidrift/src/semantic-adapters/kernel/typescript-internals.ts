@@ -43,6 +43,17 @@ export function isErrorType(type: ts.Type): boolean {
   return type.intrinsicName === "error";
 }
 
+function isTemplateLiteralType(type: ts.Type): type is ts.TemplateLiteralType {
+  return (type.flags & ts.TypeFlags.TemplateLiteral) !== 0;
+}
+
+export function memberTypes(type: ts.Type): readonly ts.Type[] {
+  if (type.isUnionOrIntersection() || isTemplateLiteralType(type)) {
+    return type.types;
+  }
+  return [];
+}
+
 export function isTypeReference(type: ts.Type): type is ts.TypeReference {
   return ((type.objectFlags ?? 0) & ts.ObjectFlags.Reference) !== 0;
 }
