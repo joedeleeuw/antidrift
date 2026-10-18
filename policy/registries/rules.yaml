@@ -1273,8 +1273,8 @@ rules:
       association: Values already proven as a schema output (via same-binding parse or declared schema-output parameter type) to later validation calls on the same schema.
       blockingThreshold: Same-schema reparse reports only when TypeScript proves the consumed value was already produced by or declared from that schema output.
       ecosystemComparison: Generic unsafe-assignment or Zod style rules do not track same-schema provenance from parsed values or declared schema-output parameters.
-      corpusEvidence: Chaski, Codebase Atlas, and Murderbox provide same-schema drift plus first-boundary parse and test-contract clean controls.
-      realCorpusInventory: docs/rule-investigations/no-redundant-zod-parse.md records Chaski and Murderbox drift plus clean first-boundary and assertion-contract controls.
+      corpusEvidence: Chaski provides same-schema drift; Codebase Atlas and Murderbox provide first-boundary parse and test-contract clean controls.
+      realCorpusInventory: docs/rule-investigations/no-redundant-zod-parse.md records Chaski drift plus clean first-boundary and assertion-contract controls.
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-redundant-zod-parse.md
       claudeAdvisoryReview: reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md and docs/rule-investigations/no-redundant-zod-parse.md record the advisory review and accepted corpus edge.

@@ -46,7 +46,10 @@ function enroll(request: z.infer<typeof enrollRequestSchema>) {
 Why: the declared contract already states `request` is schema output; the parse turns a compile-time contract into a runtime failure inside the callee.
 
 ```ts
-return enrollRequestSchema.parse({ machineId, ...row });
+return enrollRequestSchema.parse({
+  machineId: row.machineId,
+  hostname: row.hostname,
+});
 ```
 
 Why: the payload is reshaped inline to satisfy the schema. Define a named boundary decoder at the receiving adapter and parse once.
@@ -87,11 +90,24 @@ Chaski drift (`bff-sequence-count-router-redundant-zod-parse`), 2 findings:
 - `src/frontend/bff/api/routers/retool/sequence-count-router.ts` line 21 re-parses BigQuery gateway rows already typed as `CountSequenceRow[]`.
 - The same file line 26 parses flattened PostHog gateway rows already typed as `HogQLRow[]`.
 
-Chaski clean controls: `bigquery-gateway.ts` parses and coerces BigQuery rows at the boundary, `scenarios-service.ts` validates external gRPC responses, `erp-router.ts` validates locally assembled ERP records, and the PostHog router validates a stringified payload.
+Chaski clean controls: `bigquery-gateway.ts` parses and coerces BigQuery rows at the boundary, `scenarios-service.ts` validates external gRPC responses, and `erp-router.ts` validates locally assembled ERP records.
 
 Codebase Atlas clean: `services/generatedStateIntegrityService.ts` constructs schema-owned values, and `test/generatedStateDebugSimulation.test.ts` and `test/invariantService.test.ts` are schema-contract assertions. Deliberately clean (`under-proven`): `programs/persistenceCuration.ts` parses a plain `string` parameter with a refinement-carrying schema (`z.string().min(1)`), a real runtime check, and `programs/repo-ingestion/extractSemanticFacts.ts` parses a `z.input<typeof S>` parameter, the pre-validation contract.
 
 Murderbox clean: `apps/api/lib/server/workspace-projects.ts` normalises raw registry JSON at the boundary. The Murderbox drift for the declared-parameter shape this rule absorbed is inventoried in [`no-parse-as-cast.md`](no-parse-as-cast.md).
+
+Broad inventory (June 4, 2026, same-binding provenance):
+
+- Codebase Atlas `src`: the 6 test-file findings are clean inside `expect(() => Schema.parse(value)).not.toThrow()` schema-contract assertions.
+- Taskme `src`: 2 parse-candidate files, 0 findings.
+- Sudocode server/CLI: 46 parse-candidate files, 0 findings.
+- Murderbox shared, client, and asset pipeline: 18 parse-candidate files, 0 findings.
+
+## Scope Decision
+
+Tests that assert a generated product still satisfies a schema are legitimate schema-contract tests even when the value is statically typed. The rule uses an assertion-context exception, not a test-file override: a parse is ignored only when it is the direct expression checked by a function passed to `expect(...)` with a throw matcher such as `toThrow` or `not.toThrow`. A redundant parse in a test still reports when its result is assigned, returned, or otherwise consumed.
+
+Claude advisory review on June 4, 2026 (`reports/claude-rule-review-no-redundant-zod-parse-20260604-170153.md`) agreed the exception is the right shape and asked for a real negative gate for consumed assertion-callback parses or an explicit acceptance that the corpus lacks that edge. A follow-up scan over 50 Codebase Atlas, 30 Murderbox API, 132 Sudocode server and 11 Chaski BFF test files found no consumed assertion-callback reparse; all stayed clean. The edge is accepted as unrepresented in the corpus rather than blocked on a synthetic fixture.
 
 ## Ecosystem Check
 
