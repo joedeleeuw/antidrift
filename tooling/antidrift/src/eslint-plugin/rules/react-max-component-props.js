@@ -1,8 +1,8 @@
+import { functionReturnsJsx } from "../../semantic-adapters/local-ast-rules.mjs";
 import {
-  functionReturnsJsx,
   isFunctionLike,
   memberNodeTypes,
-} from "../../semantic-adapters/local-ast-rules.mjs";
+} from "../../semantic-adapters/kernel/syntax-function.ts";
 import ts from "typescript";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 

@@ -1,5 +1,5 @@
 import { findVariable } from "../../semantic-adapters/kernel/async-control-flow.ts";
-import { unwrapExpression } from "../../semantic-adapters/local-ast-rules.mjs";
+import { unwrapExpression } from "../../semantic-adapters/kernel/syntax-node.ts";
 
 function isOpenValue(node) {
   return node?.type === "TSAnyKeyword";

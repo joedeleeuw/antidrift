@@ -1,13 +1,13 @@
 import {
   safeIdentifierMemberSpecs,
   safeTemplateTagSpecs,
-} from "../../semantic-adapters/sql.mjs";
-import { createSqlProvenanceTracker } from "../../semantic-adapters/sql-provenance.mjs";
+} from "../../semantic-adapters/projection/sql.ts";
+import { SqlProvenanceTracker } from "../../semantic-adapters/projection/sql-provenance.ts";
 import {
   containsSqlStatement,
   SQL_PREFIX_PATTERN,
   templateText,
-} from "../../semantic-adapters/sql-syntax-analysis.mjs";
+} from "../../semantic-adapters/projection/sql-syntax.ts";
 import { requireTypeServices } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 export function ruleNoSqlStringConcat() {
@@ -75,7 +75,7 @@ export function ruleNoSqlStringConcat() {
       const safeTemplateTags = safeTemplateTagSpecs(context.options[0] ?? {});
       const services = requireTypeServices(context);
       const checker = services?.program?.getTypeChecker() ?? null;
-      const provenance = createSqlProvenanceTracker({
+      const provenance = new SqlProvenanceTracker({
         sourceCode,
         safeIdentifierMembers,
         safeTemplateTags,
@@ -94,17 +94,17 @@ export function ruleNoSqlStringConcat() {
           provenance.trackAssignment(node);
         },
         IfStatement(node) {
-          provenance.trackIfStatement(node);
+          provenance.identifiers.trackIfStatement(node);
         },
         "AssignmentExpression:exit"(node) {
-          provenance.trackMemberAssignmentExit(node);
+          provenance.identifiers.trackMemberAssignmentExit(node);
         },
         CallExpression(node) {
-          provenance.trackCallExpression(node);
+          provenance.fragments.trackCallExpression(node);
         },
         TaggedTemplateExpression(node) {
-          if (provenance.isTrustedSqlTemplateTag(node.tag)) {
-            for (const expression of provenance.unsafeTrustedRawSqlFragments(
+          if (provenance.trustedSources.isTrustedSqlTemplateTag(node.tag)) {
+            for (const expression of provenance.trustedSources.unsafeTrustedRawSqlFragments(
               node.quasi
             )) {
               context.report({
@@ -118,7 +118,7 @@ export function ruleNoSqlStringConcat() {
           if (
             node.quasi.expressions.length > 0 &&
             containsSqlStatement(templateText(node.quasi)) &&
-            provenance.hasUnsafeSqlInterpolation(node.quasi)
+            provenance.fragments.hasUnsafeSqlInterpolation(node.quasi)
           ) {
             context.report({
               node: node.quasi,
@@ -137,7 +137,7 @@ export function ruleNoSqlStringConcat() {
           if (
             node.expressions.length > 0 &&
             containsSqlStatement(templateText(node)) &&
-            provenance.hasUnsafeSqlInterpolation(node)
+            provenance.fragments.hasUnsafeSqlInterpolation(node)
           ) {
             context.report({
               node,

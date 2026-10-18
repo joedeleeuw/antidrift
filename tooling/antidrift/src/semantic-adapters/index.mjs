@@ -4,7 +4,7 @@ import * as broadInput from "./broad-input.mjs";
 import * as parseInput from "./parse-input.mjs";
 import * as reactState from "./react-state.mjs";
 import * as schemaProvenance from "./projection/schema-provenance.ts";
-import * as sql from "./sql.mjs";
+import * as sql from "./projection/sql.ts";
 import * as tupleShape from "./shape/tuple-shape.ts";
 import * as typeOwner from "./type-owner.mjs";
 import { SEMANTIC_FACT_KIND_CONTRACT_LIST } from "../policy/lib/semantic-facts.mjs";

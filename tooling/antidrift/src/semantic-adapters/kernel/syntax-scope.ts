@@ -40,18 +40,31 @@ function isLexicalScope(candidate: unknown): candidate is LexicalScope {
   );
 }
 
+function isBinding(candidate: unknown): candidate is object {
+  return typeof candidate === "object" && candidate !== null;
+}
+
 export function declaredVariables(
   variableSource: unknown,
   node: SyntaxNode
-): readonly unknown[] {
+): readonly object[] {
   if (!isDeclaredVariableSource(variableSource)) {
     return [];
   }
-  const variables = variableSource.getDeclaredVariables(node);
+  const variables: unknown = variableSource.getDeclaredVariables(node);
   if (!Array.isArray(variables)) {
     return [];
   }
-  return variables;
+  const candidates: readonly unknown[] = variables;
+  return candidates.filter(isBinding);
+}
+
+export function bindingDefinitions(binding: unknown): readonly unknown[] {
+  if (!isBinding(binding)) {
+    return [];
+  }
+  const definitions: unknown = Reflect.get(binding, "defs");
+  return Array.isArray(definitions) ? definitions : [];
 }
 
 export function variableName(binding: unknown): string | null {
@@ -73,7 +86,7 @@ export function resolveVariable(
   let scope = sourceCode.getScope(reference);
   while (isLexicalScope(scope)) {
     const binding = scope.set.get(name);
-    if (binding) {
+    if (isBinding(binding)) {
       return binding;
     }
     scope = scope.upper;

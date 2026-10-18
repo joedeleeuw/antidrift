@@ -9,6 +9,10 @@ declare module "typescript" {
     node: ts.EntityNameOrEntityNameExpression
   ): ts.Identifier;
   function hasType(node: ts.Node): node is ts.HasType;
+  interface Node {
+    readonly symbol?: ts.Symbol;
+    readonly localSymbol?: ts.Symbol;
+  }
   interface Type {
     readonly intrinsicName?: string;
     readonly objectFlags?: ts.ObjectFlags;

@@ -1,8 +1,6 @@
-import {
-  getFunctionNode,
-  isBoundary,
-  unwrapExpression,
-} from "../../semantic-adapters/local-ast-rules.mjs";
+import { isBoundary } from "../../semantic-adapters/local-ast-rules.mjs";
+import { getFunctionNode } from "../../semantic-adapters/kernel/syntax-function.ts";
+import { unwrapExpression } from "../../semantic-adapters/kernel/syntax-node.ts";
 import ts from "typescript";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 

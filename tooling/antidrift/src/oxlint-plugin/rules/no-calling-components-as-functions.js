@@ -1,11 +1,9 @@
 // Rule ported from getsentry/sentry static/eslint/eslintPluginSentry
 // (no-calling-components-as-functions). See that repo's LICENSE.
 import { findVariable } from "../../semantic-adapters/kernel/async-control-flow.ts";
-import {
-  functionReturnsJsx,
-  isFunctionLike,
-  unwrapExpression,
-} from "../../semantic-adapters/local-ast-rules.mjs";
+import { functionReturnsJsx } from "../../semantic-adapters/local-ast-rules.mjs";
+import { isFunctionLike } from "../../semantic-adapters/kernel/syntax-function.ts";
+import { unwrapExpression } from "../../semantic-adapters/kernel/syntax-node.ts";
 
 const IGNORED_NAMES = new Set(["OverrideOrDefault"]);
 const NOT_PASCAL_CASE_RE = /^[A-Z][A-Z\d]*_|^[A-Z][A-Z\d_]*$/u;

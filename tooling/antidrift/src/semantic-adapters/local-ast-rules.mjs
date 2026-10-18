@@ -16,14 +16,14 @@ import {
 } from "./kernel/async-control-flow.ts";
 import { createAuthBoundaryTracker } from "./auth-boundary.mjs";
 import { canonicalStatusLiteralOwner } from "./shape/status-literal.ts";
+import {
+  getFunctionNode,
+  isFunctionLike,
+  memberNodeTypes,
+} from "./kernel/syntax-function.ts";
+import { unwrapExpression } from "./kernel/syntax-node.ts";
 
 const exportedLocalNamesByProgram = new WeakMap();
-
-export const memberNodeTypes = new Set([
-  "MethodDefinition",
-  "PropertyDefinition",
-  "Property",
-]);
 
 function getFunctionName(node) {
   if (node.type === "FunctionDeclaration") return node.id?.name ?? "";
@@ -99,26 +99,6 @@ function isExported(node) {
   }
   const name = declarationName(node);
   return Boolean(name && exportedLocalNames(programNode(node)).has(name));
-}
-
-export function getFunctionNode(node) {
-  if (
-    node.type === "FunctionDeclaration" ||
-    node.type === "FunctionExpression" ||
-    node.type === "ArrowFunctionExpression"
-  ) {
-    return node;
-  }
-  if (node.type === "VariableDeclarator") return node.init;
-  // Class methods/fields and object members hold the function in `value`; ignore non-function fields.
-  if (memberNodeTypes.has(node.type)) {
-    const value = node.value;
-    return value?.type === "FunctionExpression" ||
-      value?.type === "ArrowFunctionExpression"
-      ? value
-      : null;
-  }
-  return null;
 }
 
 function enclosingClassExported(memberNode) {
@@ -311,28 +291,6 @@ export function isBoundary(node) {
     return false;
   }
   return enclosingClassExported(node);
-}
-
-export function unwrapExpression(expression) {
-  if (expression?.type === "ChainExpression") return expression.expression;
-  if (expression?.type === "TSAsExpression") {
-    return unwrapExpression(expression.expression);
-  }
-  if (expression?.type === "TSNonNullExpression") {
-    return unwrapExpression(expression.expression);
-  }
-  if (expression?.type === "TSSatisfiesExpression") {
-    return unwrapExpression(expression.expression);
-  }
-  return expression;
-}
-
-export function isFunctionLike(node) {
-  return (
-    node?.type === "FunctionDeclaration" ||
-    node?.type === "FunctionExpression" ||
-    node?.type === "ArrowFunctionExpression"
-  );
 }
 
 function functionForImplementationParameter(param) {

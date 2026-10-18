@@ -845,7 +845,7 @@
       "count": 2
     },
     "antidrift/no-vague-names": {
-      "count": 13
+      "count": 12
     }
   },
   "tooling/antidrift/src/semantic-adapters/parse-input.mjs": {
@@ -874,19 +874,6 @@
   "tooling/antidrift/src/semantic-adapters/schema-parse-shape.mjs": {
     "antidrift/no-vague-names": {
       "count": 2
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/sql-syntax-analysis.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 17
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/sql.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 13
     }
   },
   "tooling/antidrift/test/consumer-adoption.mjs": {

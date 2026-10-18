@@ -90,8 +90,8 @@
         "import": "./dist/semantic-adapters/projection/schema-provenance.js"
       },
       "./semantic-adapters/sql": {
-        "types": "./dist/semantic-adapters/sql.d.mts",
-        "import": "./dist/semantic-adapters/sql.mjs"
+        "types": "./dist/semantic-adapters/projection/sql.d.ts",
+        "import": "./dist/semantic-adapters/projection/sql.js"
       },
       "./semantic-adapters/tuple-shape": {
         "types": "./dist/semantic-adapters/shape/tuple-shape.d.ts",
@@ -166,8 +166,8 @@
       "import": "./src/semantic-adapters/projection/schema-provenance.ts"
     },
     "./semantic-adapters/sql": {
-      "types": "./src/semantic-adapters/sql.d.mts",
-      "import": "./src/semantic-adapters/sql.mjs"
+      "types": "./src/semantic-adapters/projection/sql.ts",
+      "import": "./src/semantic-adapters/projection/sql.ts"
     },
     "./semantic-adapters/tuple-shape": {
       "types": "./src/semantic-adapters/shape/tuple-shape.ts",
