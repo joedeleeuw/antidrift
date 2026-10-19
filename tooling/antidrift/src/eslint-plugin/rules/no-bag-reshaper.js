@@ -102,10 +102,11 @@ function propertyNameText(name) {
   if (!name) {
     return null;
   }
-  if (ts.isIdentifier(name) || ts.isPrivateIdentifier(name)) {
-    return name.text;
-  }
-  if (ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+  if (
+    ts.isIdentifier(name) ||
+    ts.isStringLiteral(name) ||
+    ts.isNumericLiteral(name)
+  ) {
     return name.text;
   }
   if (
@@ -137,103 +138,140 @@ function satisfiesTableTypeNodeForRow(containerNode) {
   return tableExpression.type;
 }
 
-function rowContractReturnType(checker, containerNode, tableTypeNode) {
-  const rowKey = propertyNameText(containerNode.name);
+function rowContractReturnType(checker, containerNode) {
+  const tableTypeNode = satisfiesTableTypeNodeForRow(containerNode);
+  const rowKey = tableTypeNode ? propertyNameText(containerNode.name) : null;
   if (rowKey === null) {
     return null;
   }
-  const tableType = checker.getTypeFromTypeNode(tableTypeNode);
-  const rowSymbol = checker.getPropertyOfType(tableType, rowKey);
+  const rowSymbol = checker.getPropertyOfType(
+    checker.getTypeFromTypeNode(tableTypeNode),
+    rowKey
+  );
   if (!rowSymbol) {
     return null;
   }
-  const rowType = checker.getTypeOfSymbolAtLocation(rowSymbol, containerNode);
-  const [signature] = rowType.getCallSignatures();
+  const [signature] = checker
+    .getTypeOfSymbolAtLocation(rowSymbol, containerNode)
+    .getCallSignatures();
   return signature ? checker.getReturnTypeOfSignature(signature) : null;
 }
 
-function constructsDeclaredUnionMember(
-  checker,
-  contractReturnType,
-  objectLiteral
-) {
-  const members = contractReturnType.types.filter(
-    (member) => (member.flags & ts.TypeFlags.Object) !== 0
+function isAnonymousObjectType(type) {
+  return (
+    !type.aliasSymbol &&
+    (type.flags & ts.TypeFlags.Object) !== 0 &&
+    type.symbol?.escapedName === ts.InternalSymbolName.Type
   );
-  if (members.length < 2) {
+}
+
+function namedContractFromType(checker, type) {
+  const definedType = checker.getNonNullableType(type);
+  const { aliasSymbol, aliasTypeArguments } = definedType;
+  if (aliasSymbol) {
+    const anonymousUtility =
+      ANONYMOUS_UTILITY_TYPE_NAMES.has(aliasSymbol.name) &&
+      aliasTypeArguments?.length === 1 &&
+      isAnonymousObjectType(aliasTypeArguments[0]);
+    return aliasSymbol.name === "Record" || anonymousUtility
+      ? null
+      : checker.typeToString(definedType);
+  }
+  if (definedType.isUnion()) {
+    for (const member of definedType.types) {
+      const contractName = namedContractFromType(checker, member);
+      if (contractName) {
+        return contractName;
+      }
+    }
+    return null;
+  }
+  const namedDeclarationFlags = ts.SymbolFlags.Interface | ts.SymbolFlags.Class;
+  return (definedType.symbol?.flags & namedDeclarationFlags) > 0
+    ? checker.typeToString(definedType)
+    : null;
+}
+
+function isDiscriminantLiteral(checker, unionMembers, property) {
+  if (!ts.isPropertyAssignment(property)) {
     return false;
   }
+  const discriminantName = propertyNameText(property.name);
+  const initializer = unwrapTransparent(property.initializer);
   if (
-    !checker.isTypeAssignableTo(
-      checker.getTypeAtLocation(objectLiteral),
-      contractReturnType
-    )
+    discriminantName === null ||
+    (!ts.isStringLiteralLike(initializer) && !ts.isNumericLiteral(initializer))
   ) {
     return false;
   }
-  return objectLiteral.properties.some((property) => {
-    if (!ts.isPropertyAssignment(property)) {
+  const initializerType = checker.getTypeAtLocation(initializer);
+  return unionMembers.some((member) => {
+    const memberProperty = checker.getPropertyOfType(member, discriminantName);
+    if (!memberProperty) {
       return false;
     }
-    const discriminantName = propertyNameText(property.name);
-    if (discriminantName === null) {
-      return false;
-    }
-    const discriminantInitializer = unwrapTransparent(property.initializer);
-    if (
-      !ts.isStringLiteralLike(discriminantInitializer) &&
-      !ts.isNumericLiteral(discriminantInitializer)
-    ) {
-      return false;
-    }
-    return members.some((member) => {
-      const memberProperty = checker.getPropertyOfType(
-        member,
-        discriminantName
-      );
-      if (!memberProperty) {
-        return false;
-      }
-      const memberPropertyType = checker.getTypeOfSymbolAtLocation(
-        memberProperty,
-        property.initializer
-      );
-      return (
-        memberPropertyType.isLiteral() &&
-        checker.isTypeAssignableTo(
-          checker.getTypeAtLocation(property.initializer),
-          memberPropertyType
-        )
-      );
-    });
+    const memberPropertyType = checker.getTypeOfSymbol(memberProperty);
+    return (
+      memberPropertyType.isLiteral() &&
+      checker.isTypeAssignableTo(initializerType, memberPropertyType)
+    );
   });
 }
 
-function satisfiesRowIsDomainConstruction(
-  checker,
-  containerNode,
-  returnExpressions
-) {
-  const tableTypeNode = satisfiesTableTypeNodeForRow(containerNode);
-  if (!tableTypeNode) {
+function passesParameterFieldUnchanged(checker, parameter, property) {
+  if (ts.isShorthandPropertyAssignment(property)) {
+    const boundDeclaration =
+      checker.getShorthandAssignmentValueSymbol(property)?.valueDeclaration;
+    return (
+      !property.objectAssignmentInitializer &&
+      boundDeclaration !== undefined &&
+      ts.isBindingElement(boundDeclaration) &&
+      boundDeclaration.parent === parameter.name &&
+      !boundDeclaration.propertyName &&
+      !boundDeclaration.initializer
+    );
+  }
+  if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(parameter.name)) {
     return false;
   }
-  const contractReturnType = rowContractReturnType(
-    checker,
-    containerNode,
-    tableTypeNode
+  const fieldRead = unwrapTransparent(property.initializer);
+  return (
+    ts.isPropertyAccessExpression(fieldRead) &&
+    fieldRead.name.text === propertyNameText(property.name) &&
+    ts.isIdentifier(fieldRead.expression) &&
+    checker.getSymbolAtLocation(fieldRead.expression) ===
+      checker.getSymbolAtLocation(parameter.name)
   );
-  if (!contractReturnType || !contractReturnType.isUnion()) {
+}
+
+function tagsUnionMemberWithParameterFields(
+  checker,
+  contractReturnType,
+  parameter,
+  returnExpressions
+) {
+  const unionMembers = contractReturnType.isUnion()
+    ? contractReturnType.types.filter(
+        (member) => (member.flags & ts.TypeFlags.Object) !== 0
+      )
+    : [];
+  if (unionMembers.length < 2) {
     return false;
   }
   return returnExpressions.every((returnExpression) => {
-    const unwrappedReturn = unwrapTransparent(returnExpression);
+    const objectLiteral = unwrapTransparent(returnExpression);
+    if (!ts.isObjectLiteralExpression(objectLiteral)) {
+      return false;
+    }
+    const discriminants = objectLiteral.properties.filter((property) =>
+      isDiscriminantLiteral(checker, unionMembers, property)
+    );
     return (
-      ts.isObjectLiteralExpression(unwrappedReturn) &&
-      constructsDeclaredUnionMember(
-        checker,
-        contractReturnType,
-        unwrappedReturn
+      discriminants.length === 1 &&
+      objectLiteral.properties.every(
+        (property) =>
+          discriminants.includes(property) ||
+          passesParameterFieldUnchanged(checker, parameter, property)
       )
     );
   });
@@ -253,7 +291,7 @@ function classifyBagReshaper(functionNode, containerNode, checker, sourceFile) {
   if (!bagParameter) {
     return null;
   }
-  const { scope } = bagParameter;
+  const { parameter, scope } = bagParameter;
   const returnExpressions = [];
   if (ts.isBlock(functionNode.body)) {
     if (
@@ -276,17 +314,25 @@ function classifyBagReshaper(functionNode, containerNode, checker, sourceFile) {
   if (returnExpressions.length === 0) {
     return null;
   }
+  const declaredReturnTypeNode =
+    functionNode.type ?? containerReturnTypeNode(containerNode);
+  const rowContract = declaredReturnTypeNode
+    ? null
+    : rowContractReturnType(checker, containerNode);
   if (
-    satisfiesRowIsDomainConstruction(checker, containerNode, returnExpressions)
+    rowContract &&
+    tagsUnionMemberWithParameterFields(
+      checker,
+      rowContract,
+      parameter,
+      returnExpressions
+    )
   ) {
     return null;
   }
-  const declaredReturnTypeNode =
-    functionNode.type ?? containerReturnTypeNode(containerNode);
-  let targetContract = namedContractFromTypeNode(
-    declaredReturnTypeNode,
-    sourceFile
-  );
+  let targetContract = rowContract
+    ? namedContractFromType(checker, rowContract)
+    : namedContractFromTypeNode(declaredReturnTypeNode, sourceFile);
   for (const returnExpression of returnExpressions) {
     const assertionTypeNode = explicitTypeNodeOnExpression(returnExpression);
     if (!targetContract && assertionTypeNode) {

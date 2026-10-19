@@ -187,7 +187,7 @@ export function resolveBagParameter(
       return null;
     }
     scope.rootSymbols.add(rootSymbol);
-    return { parameterName: parameter.name.text, scope };
+    return { parameterName: parameter.name.text, parameter, scope };
   }
   if (
     ts.isObjectBindingPattern(parameter.name) &&
@@ -196,6 +196,7 @@ export function resolveBagParameter(
   ) {
     return {
       parameterName: parameter.name.getText(sourceFile).replace(/\s+/gu, " "),
+      parameter,
       scope,
     };
   }
@@ -360,19 +361,19 @@ export function inspectBagValueExpression(
   return INVALID_READ;
 }
 
-function isBagFieldReference(
+function isWholeRootReference(
   scope: BagScope,
   expression: ts.Expression
 ): boolean {
   const unwrapped = unwrapTransparent(expression);
-  if (ts.isIdentifier(unwrapped)) {
-    const symbol = symbolAtNode(scope.checker, unwrapped);
-    return symbol !== null && scope.fieldSymbols.has(symbol);
+  if (!ts.isIdentifier(unwrapped)) {
+    return false;
   }
-  return isBagMemberChain(scope, unwrapped);
+  const symbol = symbolAtNode(scope.checker, unwrapped);
+  return symbol !== null && scope.rootSymbols.has(symbol);
 }
 
-export type BagProjectionOptions = {
+type BagProjectionOptions = {
   readonly wholeRootReferenceIsEnvelope?: boolean;
 };
 
@@ -386,9 +387,9 @@ function inspectBagProperty(
     if (!isBagObjectReference(scope, property.expression)) {
       return INVALID_READ;
     }
-    return isBagFieldReference(scope, property.expression) || !envelope
-      ? FIELD_READ
-      : STATIC_READ;
+    return envelope && isWholeRootReference(scope, property.expression)
+      ? STATIC_READ
+      : FIELD_READ;
   }
   if (ts.isShorthandPropertyAssignment(property)) {
     const fallback = property.objectAssignmentInitializer;
