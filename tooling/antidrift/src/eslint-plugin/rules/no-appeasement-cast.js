@@ -1,7 +1,7 @@
 import {
   inspectAppeasementCast,
   inspectImportSite,
-} from "../../semantic-adapters/cast-proof.mjs";
+} from "../../semantic-adapters/boundary/cast-proof.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 export function ruleNoAppeasementCast() {

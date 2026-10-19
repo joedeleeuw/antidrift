@@ -16,8 +16,9 @@ import {
 import {
   declaredOperandType,
   narrowingProvesTarget,
-  sameType,
-} from "./cast-narrowing-proof.mjs";
+} from "./boundary/narrowing-types.ts";
+
+import { sameType } from "./boundary/type-difference.ts";
 
 function branchesOf(expression) {
   if (ts.isConditionalExpression(expression)) {
