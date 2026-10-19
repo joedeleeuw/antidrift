@@ -98,6 +98,147 @@ function containerReturnTypeNode(containerNode) {
   return null;
 }
 
+function propertyNameText(name) {
+  if (!name) {
+    return null;
+  }
+  if (ts.isIdentifier(name) || ts.isPrivateIdentifier(name)) {
+    return name.text;
+  }
+  if (ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    return name.text;
+  }
+  if (
+    ts.isComputedPropertyName(name) &&
+    (ts.isStringLiteralLike(name.expression) ||
+      ts.isNumericLiteral(name.expression))
+  ) {
+    return name.expression.text;
+  }
+  return null;
+}
+
+function satisfiesTableTypeNodeForRow(containerNode) {
+  if (!containerNode || !ts.isPropertyAssignment(containerNode)) {
+    return null;
+  }
+  const tableLiteral = containerNode.parent;
+  if (!ts.isObjectLiteralExpression(tableLiteral)) {
+    return null;
+  }
+  const tableExpression = tableLiteral.parent;
+  if (
+    !tableExpression ||
+    !ts.isSatisfiesExpression(tableExpression) ||
+    tableExpression.expression !== tableLiteral
+  ) {
+    return null;
+  }
+  return tableExpression.type;
+}
+
+function rowContractReturnType(checker, containerNode, tableTypeNode) {
+  const rowKey = propertyNameText(containerNode.name);
+  if (rowKey === null) {
+    return null;
+  }
+  const tableType = checker.getTypeFromTypeNode(tableTypeNode);
+  const rowSymbol = checker.getPropertyOfType(tableType, rowKey);
+  if (!rowSymbol) {
+    return null;
+  }
+  const rowType = checker.getTypeOfSymbolAtLocation(rowSymbol, containerNode);
+  const [signature] = rowType.getCallSignatures();
+  return signature ? checker.getReturnTypeOfSignature(signature) : null;
+}
+
+function constructsDeclaredUnionMember(
+  checker,
+  contractReturnType,
+  objectLiteral
+) {
+  const members = contractReturnType.types.filter(
+    (member) => (member.flags & ts.TypeFlags.Object) !== 0
+  );
+  if (members.length < 2) {
+    return false;
+  }
+  if (
+    !checker.isTypeAssignableTo(
+      checker.getTypeAtLocation(objectLiteral),
+      contractReturnType
+    )
+  ) {
+    return false;
+  }
+  return objectLiteral.properties.some((property) => {
+    if (!ts.isPropertyAssignment(property)) {
+      return false;
+    }
+    const discriminantName = propertyNameText(property.name);
+    if (discriminantName === null) {
+      return false;
+    }
+    const discriminantInitializer = unwrapTransparent(property.initializer);
+    if (
+      !ts.isStringLiteralLike(discriminantInitializer) &&
+      !ts.isNumericLiteral(discriminantInitializer)
+    ) {
+      return false;
+    }
+    return members.some((member) => {
+      const memberProperty = checker.getPropertyOfType(
+        member,
+        discriminantName
+      );
+      if (!memberProperty) {
+        return false;
+      }
+      const memberPropertyType = checker.getTypeOfSymbolAtLocation(
+        memberProperty,
+        property.initializer
+      );
+      return (
+        memberPropertyType.isLiteral() &&
+        checker.isTypeAssignableTo(
+          checker.getTypeAtLocation(property.initializer),
+          memberPropertyType
+        )
+      );
+    });
+  });
+}
+
+function satisfiesRowIsDomainConstruction(
+  checker,
+  containerNode,
+  returnExpressions
+) {
+  const tableTypeNode = satisfiesTableTypeNodeForRow(containerNode);
+  if (!tableTypeNode) {
+    return false;
+  }
+  const contractReturnType = rowContractReturnType(
+    checker,
+    containerNode,
+    tableTypeNode
+  );
+  if (!contractReturnType || !contractReturnType.isUnion()) {
+    return false;
+  }
+  return returnExpressions.every((returnExpression) => {
+    const unwrappedReturn = unwrapTransparent(returnExpression);
+    return (
+      ts.isObjectLiteralExpression(unwrappedReturn) &&
+      constructsDeclaredUnionMember(
+        checker,
+        contractReturnType,
+        unwrappedReturn
+      )
+    );
+  });
+}
+
 function classifyBagReshaper(functionNode, containerNode, checker, sourceFile) {
   if (
     !functionNode?.body ||
@@ -135,6 +276,11 @@ function classifyBagReshaper(functionNode, containerNode, checker, sourceFile) {
   if (returnExpressions.length === 0) {
     return null;
   }
+  if (
+    satisfiesRowIsDomainConstruction(checker, containerNode, returnExpressions)
+  ) {
+    return null;
+  }
   const declaredReturnTypeNode =
     functionNode.type ?? containerReturnTypeNode(containerNode);
   let targetContract = namedContractFromTypeNode(
@@ -149,7 +295,9 @@ function classifyBagReshaper(functionNode, containerNode, checker, sourceFile) {
     const unwrappedReturn = unwrapTransparent(returnExpression);
     if (
       !ts.isObjectLiteralExpression(unwrappedReturn) ||
-      !inspectObjectLiteralBagProjection(scope, unwrappedReturn)
+      !inspectObjectLiteralBagProjection(scope, unwrappedReturn, {
+        wholeRootReferenceIsEnvelope: true,
+      })
     ) {
       return null;
     }

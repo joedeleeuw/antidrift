@@ -360,14 +360,35 @@ export function inspectBagValueExpression(
   return INVALID_READ;
 }
 
+function isBagFieldReference(
+  scope: BagScope,
+  expression: ts.Expression
+): boolean {
+  const unwrapped = unwrapTransparent(expression);
+  if (ts.isIdentifier(unwrapped)) {
+    const symbol = symbolAtNode(scope.checker, unwrapped);
+    return symbol !== null && scope.fieldSymbols.has(symbol);
+  }
+  return isBagMemberChain(scope, unwrapped);
+}
+
+export type BagProjectionOptions = {
+  readonly wholeRootReferenceIsEnvelope?: boolean;
+};
+
 function inspectBagProperty(
   scope: BagScope,
-  property: ts.ObjectLiteralElementLike
+  property: ts.ObjectLiteralElementLike,
+  options: BagProjectionOptions
 ): BagRead {
+  const envelope = options.wholeRootReferenceIsEnvelope === true;
   if (ts.isSpreadAssignment(property)) {
-    return isBagObjectReference(scope, property.expression)
+    if (!isBagObjectReference(scope, property.expression)) {
+      return INVALID_READ;
+    }
+    return isBagFieldReference(scope, property.expression) || !envelope
       ? FIELD_READ
-      : INVALID_READ;
+      : STATIC_READ;
   }
   if (ts.isShorthandPropertyAssignment(property)) {
     const fallback = property.objectAssignmentInitializer;
@@ -375,7 +396,15 @@ function inspectBagProperty(
       !fallback || isStaticScalarLiteral(fallback)
         ? symbolAtNode(scope.checker, property.name)
         : null;
-    return symbol && scope.fieldSymbols.has(symbol) ? FIELD_READ : INVALID_READ;
+    if (!symbol) {
+      return INVALID_READ;
+    }
+    if (scope.fieldSymbols.has(symbol)) {
+      return FIELD_READ;
+    }
+    return envelope && scope.rootSymbols.has(symbol)
+      ? STATIC_READ
+      : INVALID_READ;
   }
   if (
     !ts.isPropertyAssignment(property) ||
@@ -389,11 +418,12 @@ function inspectBagProperty(
 
 export function inspectObjectLiteralBagProjection(
   scope: BagScope,
-  objectLiteral: ts.ObjectLiteralExpression
+  objectLiteral: ts.ObjectLiteralExpression,
+  options: BagProjectionOptions = {}
 ): boolean {
   let readsBagField = false;
   for (const property of objectLiteral.properties) {
-    const propertyRead = inspectBagProperty(scope, property);
+    const propertyRead = inspectBagProperty(scope, property, options);
     if (!propertyRead.valid) {
       return false;
     }
