@@ -306,7 +306,7 @@ policyRuleReviews:
     status: merged
     mergedInto: react/no-handrolled-resource-lifecycle-cells
     coverage: Merged into antidrift/no-handrolled-resource-lifecycle-cells, which emits sourceMemberStateShardCandidate semantic facts alongside resourceLifecycleProof and stateSetterCoMutation.
-    reason: Both rules share the same per-component React state cell graph and transition pass in semantic-adapters/local-ast-rules.mjs; keeping a separate no-op rule entry that never emits diagnostics added rule-surface overhead without distinct enforcement.
+    reason: Both rules share the same per-component React state cell graph and transition pass in semantic-adapters/projection/react-state.ts; keeping a separate no-op rule entry that never emits diagnostics added rule-surface overhead without distinct enforcement.
     nextAction: Keep sourceMemberStateShardCandidate fact emission in antidrift/no-handrolled-resource-lifecycle-cells; do not maintain a separate rule entry.
   react/no-status-triplet-state:
     status: retired
@@ -2440,7 +2440,7 @@ rules:
     proofBuckets: [semantic-source-type-provenance]
     semanticAdapterStatus:
       status: inline-pending
-      reason: The shared boundary-model.mjs owner is an internal checker adapter behind unknown-input-must-be-decoded. Its public adapter manifest registration waits for the fresh post-rework measurement; both future parse-rule consumers can import the same owner directly.
+      reason: The shared semantic-adapters/boundary/boundary-model.ts owner is an internal checker adapter behind unknown-input-must-be-decoded. Its public adapter manifest registration waits for the fresh post-rework measurement; both future parse-rule consumers can import the same owner directly.
     referenceDoc: docs/rule-investigations/unknown-input-must-be-decoded.md
     corpusRepositories: [antidrift]
     concerns:

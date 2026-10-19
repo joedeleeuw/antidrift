@@ -7,7 +7,7 @@ const ruleModules = [
   "^tooling/antidrift/src/eslint-plugin/",
   "^tooling/antidrift/src/oxlint-plugin/",
   "^tooling/antidrift/src/syntax-rules\\.mjs$",
-  `${semanticAdapters}/local-ast-rules\\.`,
+  `${semanticAdapters}/syntax/`,
 ];
 const layerRule = (name, from, forbiddenLayers, comment) => ({
   name,

@@ -241,8 +241,8 @@ These 7 rules target high-frequency AI and architectural pathologies that **cann
 
 - **Pathology:** A component initializes `const [value, setValue] = useState(props.value)` (or from a query hook result `data.value`) and synchronizes it in `useEffect(() => { setValue(props.value); }, [props.value])`, while **no event handler or callback ever calls `setValue`**. The state cell is a redundant, tear-prone cache of a prop or query value that should be derived during render.
 - **Why ecosystem linters cannot enforce it:** `react/react-compiler` flags some effect derivations, and `eslint-plugin-you-might-not-need-an-effect` uses syntactic heuristics that false-positive when `setValue` is also called by an `onChange` handler (a legitimate resettable draft/form state).
-- **Deterministic proof on the React State Graph (`local-ast-rules.mjs`):**
-  1. Reuse the per-component state cell and setter reference graph in `src/semantic-adapters/local-ast-rules.mjs`.
+- **Deterministic proof on the React State Graph (`projection/react-state.ts`):**
+  1. Reuse the per-component state cell and setter reference graph in `src/semantic-adapters/projection/react-state.ts`.
   2. Identify any `useState(initialArg)` cell `[stateBinding, setterBinding]` where either `initialArg` references a component prop / hook result, or `setterBinding` is called inside a `useEffect` / `useLayoutEffect` callback with an expression derived from props or hook results.
   3. Classify every reference to `setterBinding` across the component scope:
      - If **`>= 1` call to `setterBinding` is inside an effect hook** (or `0` calls to `setterBinding` exist anywhere in the component) AND **`0` calls to `setterBinding` occur in event handlers, returned callbacks, or JSX props** (nor is `setterBinding` passed down as a prop/returned), report the state cell as a shadow mirror of already-owned state.
