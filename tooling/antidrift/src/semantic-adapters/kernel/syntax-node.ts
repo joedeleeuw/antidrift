@@ -1,3 +1,16 @@
+import type { AST_NODE_TYPES, TSESTree } from "@typescript-eslint/types";
+
+export type ParserNode = TSESTree.Node;
+export type ParserFunction = Extract<
+  ParserNode,
+  {
+    type:
+      | AST_NODE_TYPES.FunctionDeclaration
+      | AST_NODE_TYPES.FunctionExpression
+      | AST_NODE_TYPES.ArrowFunctionExpression;
+  }
+>;
+
 export type SyntaxNode = { readonly type: string };
 
 export function isSyntaxNode(candidate: unknown): candidate is SyntaxNode {

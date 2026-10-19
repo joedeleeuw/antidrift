@@ -6,7 +6,7 @@ import {
   shapeComparison,
   unresolvedDescription,
 } from "../../semantic-adapters/shape/shape-identity.ts";
-import { inlineStructuralTypeAtBoundary } from "../../semantic-adapters/local-ast-rules.mjs";
+import { inlineStructuralTypeAtBoundary } from "../../semantic-adapters/boundary/exported-syntax.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 const declarationsByProgram = new WeakMap();

@@ -827,14 +827,6 @@
       "count": 4
     }
   },
-  "tooling/antidrift/src/semantic-adapters/local-ast-rules.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 12
-    }
-  },
   "tooling/antidrift/src/semantic-adapters/schema-parse-shape.mjs": {
     "antidrift/no-vague-names": {
       "count": 2

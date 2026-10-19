@@ -1,4 +1,4 @@
-import { isBoundary } from "../../semantic-adapters/local-ast-rules.mjs";
+import { isBoundary } from "../../semantic-adapters/boundary/exported-syntax.ts";
 import { getFunctionNode } from "../../semantic-adapters/kernel/syntax-function.ts";
 import { unwrapExpression } from "../../semantic-adapters/kernel/syntax-node.ts";
 import ts from "typescript";

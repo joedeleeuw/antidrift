@@ -1,10 +1,8 @@
-import {
-  ruleNoAsyncArrayMethod,
-  ruleNoHandrolledResourceLifecycleCells,
-  ruleNoRawFetchInComponent,
-  ruleNoStatusLiteralInType,
-  ruleRequireAuthzCheck,
-} from "./semantic-adapters/local-ast-rules.mjs";
+import { ruleNoAsyncArrayMethod } from "./semantic-adapters/syntax/async-array.ts";
+import { ruleNoHandrolledResourceLifecycleCells } from "./semantic-adapters/syntax/resource-lifecycle.ts";
+import { ruleNoRawFetchInComponent } from "./semantic-adapters/syntax/raw-fetch.ts";
+import { ruleNoStatusLiteralInType } from "./semantic-adapters/syntax/status-literal.ts";
+import { ruleRequireAuthzCheck } from "./semantic-adapters/syntax/authz.ts";
 import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "./oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
@@ -24,25 +22,25 @@ import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-
 // be exported by ESLint while remaining enabled by at most one runtime.
 export function createSyntaxRules() {
   return {
-    "no-async-array-method": ruleNoAsyncArrayMethod(),
+    "no-async-array-method": ruleNoAsyncArrayMethod,
     "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
     "no-duplicated-conditional-classnames":
       ruleNoDuplicatedConditionalClassnames(),
     "no-duplicated-object-field-blocks": ruleNoDuplicatedObjectFieldBlocks(),
     "no-handrolled-resource-lifecycle-cells":
-      ruleNoHandrolledResourceLifecycleCells(),
+      ruleNoHandrolledResourceLifecycleCells,
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
     "no-open-dictionary-at-boundary": ruleNoOpenDictionaryAtBoundary(),
     "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
     "no-repo-state-mirror-assertion": ruleNoRepoStateMirrorAssertion(),
     "no-schema-library-in-test": ruleNoSchemaLibraryInTest(),
-    "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
+    "no-raw-fetch-in-component": ruleNoRawFetchInComponent,
     "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
     "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
     "no-static-property-loop": ruleNoStaticPropertyLoop(),
-    "no-status-literal-in-type": ruleNoStatusLiteralInType(),
+    "no-status-literal-in-type": ruleNoStatusLiteralInType,
     "no-validator-output-oracle": ruleNoValidatorOutputOracle(),
-    "require-authz-check": ruleRequireAuthzCheck(),
+    "require-authz-check": ruleRequireAuthzCheck,
     "require-effect-deps": ruleRequireEffectDeps,
   };
 }

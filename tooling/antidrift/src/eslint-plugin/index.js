@@ -25,7 +25,7 @@ import noWrappingFunctionsRule from "./rules/no-wrapping-functions.js";
 import noPassThroughParametersRule from "./rules/no-pass-through-parameters.js";
 import noVagueNamesRule from "./rules/no-vague-names.js";
 import noCompatNamesRule from "./rules/no-compat-names.js";
-import { ruleNoRawFetchInComponent } from "../semantic-adapters/local-ast-rules.mjs";
+import { ruleNoRawFetchInComponent } from "../semantic-adapters/syntax/raw-fetch.ts";
 import ruleNoCallingComponentsAsFunctions from "../oxlint-plugin/rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "../oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "../oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
@@ -77,7 +77,7 @@ const rules = {
     ruleNoInlineStructuralTypeAtUseSite(),
   "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
   "no-open-dictionary-at-boundary": ruleNoOpenDictionaryAtBoundary(),
-  "no-raw-fetch-in-component": ruleNoRawFetchInComponent(),
+  "no-raw-fetch-in-component": ruleNoRawFetchInComponent,
   "no-raw-react-native-touchables": ruleNoRawReactNativeTouchables(),
   "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
   "no-schema-library-in-test": ruleNoSchemaLibraryInTest(),

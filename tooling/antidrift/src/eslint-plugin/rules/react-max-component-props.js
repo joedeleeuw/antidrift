@@ -1,4 +1,4 @@
-import { functionReturnsJsx } from "../../semantic-adapters/local-ast-rules.mjs";
+import { functionReturnsJsx } from "../../semantic-adapters/kernel/jsx-returns.ts";
 import {
   isFunctionLike,
   memberNodeTypes,
