@@ -12,6 +12,10 @@ declare module "typescript" {
   function isNamedDeclaration(
     node: ts.Node
   ): node is ts.NamedDeclaration & { readonly name: ts.DeclarationName };
+  interface SourceFile {
+    readonly redirectInfo?: { readonly unredirected: ts.SourceFile };
+    readonly scriptKind: ts.ScriptKind;
+  }
   interface Node {
     readonly symbol?: ts.Symbol;
     readonly localSymbol?: ts.Symbol;

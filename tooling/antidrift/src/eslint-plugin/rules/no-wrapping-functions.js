@@ -1,5 +1,5 @@
 import { scopeProperties } from "../../semantic-adapters/kernel/rule-scope.ts";
-import { verifyHop } from "../../semantic-adapters/hop-inline-verification.mjs";
+import { verifyHop } from "../../semantic-adapters/callgraph/hop-inline-verification.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 function isCallee(node) {
