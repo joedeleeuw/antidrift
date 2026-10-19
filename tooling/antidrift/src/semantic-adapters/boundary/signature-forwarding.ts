@@ -47,7 +47,7 @@ export class SignatureForwarding {
   callOpaque(
     declaration: NonNullable<ts.Signature["declaration"]>,
     sourceOpaque: boolean | undefined,
-    call: HostCall | undefined
+    call: HostCall | ts.TaggedTemplateExpression
   ): boolean {
     const checker = this.#checker;
     const declaredSignature = checker.getSignatureFromDeclaration(declaration);
@@ -68,14 +68,18 @@ export class SignatureForwarding {
         checker.getTypeAtLocation(parameter)
       ) ?? []
     );
-    const receiverArguments =
-      call && ts.isPropertyAccessExpression(call.expression)
-        ? checker.getTypeArguments(
-            checker
-              .getTypeAtLocation(call.expression.expression)
-              .getNonNullableType()
-          )
-        : undefined;
+    if (ts.isTaggedTemplateExpression(call)) {
+      throw new TypeError(
+        "Boundary callOpaque does not support tagged-template receiver expressions"
+      );
+    }
+    const receiverArguments = ts.isPropertyAccessExpression(call.expression)
+      ? checker.getTypeArguments(
+          checker
+            .getTypeAtLocation(call.expression.expression)
+            .getNonNullableType()
+        )
+      : undefined;
     const narrowedReceiver =
       !sourceOpaque &&
       typeParameters.size > 0 &&
@@ -93,7 +97,10 @@ export class SignatureForwarding {
     );
   }
 
-  forwardedRoots(call: HostCall, signature: ts.Signature): Root[] {
+  forwardedRoots(
+    call: HostCall | ts.TaggedTemplateExpression,
+    signature: ts.Signature
+  ): Root[] {
     const returned = this.#checker.getReturnTypeOfSignature(signature);
     if (
       isNonForwardingReturn(returned) &&
@@ -104,10 +111,12 @@ export class SignatureForwarding {
     const { typeParameters: output, truncated } =
       this.#types.returnedTypeParameters(returned);
     const roots: Root[] = [];
-    const callArguments = call.arguments ?? [];
+    const callArguments = ts.isTaggedTemplateExpression(call)
+      ? []
+      : (call.arguments ?? []);
     for (const [index, parameter] of signature.parameters.entries()) {
       const argument = callArguments[index];
-      if (argument) {
+      if (argument && !ts.isTaggedTemplateExpression(call)) {
         roots.push(
           ...this.#forwardedArgumentRoots({
             call,
@@ -173,7 +182,7 @@ export class SignatureForwarding {
   }
 
   #receiverRoots(
-    call: HostCall,
+    call: HostCall | ts.TaggedTemplateExpression,
     signature: ts.Signature,
     output: TypeParameterSet
   ): readonly Root[] {
@@ -220,12 +229,14 @@ export class SignatureForwarding {
   }
 
   #truncatedRoots(
-    call: HostCall,
+    call: HostCall | ts.TaggedTemplateExpression,
     signature: ts.Signature,
     output: TypeParameterSet
   ): ConcreteRoot[] {
     return signature.parameters.flatMap((parameter, index) => {
-      const argument = call.arguments?.[index];
+      const argument = ts.isTaggedTemplateExpression(call)
+        ? undefined
+        : call.arguments?.[index];
       if (!argument) {
         return [];
       }

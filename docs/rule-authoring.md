@@ -2,13 +2,13 @@
 
 ## Engine decision
 
-Use Oxlint for baseline and type-aware ecosystem rules. Use its JavaScript plugin API (`tooling/antidrift/src/oxlint-plugin/`) for custom rules whose proof is available from AST, scope, or control-flow data. Author TypeChecker-backed rules in `tooling/antidrift/src/eslint-plugin/rules/` against the TypeScript-native **Semantic Kernel** (`defineTypeScriptRule` in `tooling/antidrift/src/semantic-adapters/ts-rule-kernel.mjs`, documented in `docs/adr/0001-typescript-native-semantic-rule-kernel.md`) and the five shared **Semantic Primitives** in `tooling/antidrift/src/semantic-adapters/`:
+Use Oxlint for baseline and type-aware ecosystem rules. Use its JavaScript plugin API (`tooling/antidrift/src/oxlint-plugin/`) for custom rules whose proof is available from AST, scope, or control-flow data. Author TypeChecker-backed rules in `tooling/antidrift/src/eslint-plugin/rules/` against the TypeScript-native **Semantic Kernel** (`defineTypeScriptRule` in `tooling/antidrift/src/semantic-adapters/kernel/rule-kernel.ts`, documented in `docs/adr/0001-typescript-native-semantic-rule-kernel.md`) and the five shared **Semantic Primitives** in `tooling/antidrift/src/semantic-adapters/`:
 
-1. **Shape Identity (`shape-identity.mjs`):** Deep structural comparison of `ts.Type`s with `any`-poisoning, `error`-type undecided tracking, generic parameter/constraint matching, and property mutability/optionality checks.
-2. **Symbol, Module & Package Surface Provenance (`ts-rule-kernel.mjs`, `package-entry-points.mjs`, `declared-dependencies.mjs`, `type-resolution-provenance.mjs`):** Alias resolution across imports/re-exports, package entry-point surface resolution, and external library symbol classification.
-3. **Boundary & Narrowing Dataflow (`boundary-model.mjs`, `cast-narrowing-proof.mjs`, `broad-input.mjs`):** Untrusted boundary sources, interprocedural summaries, demand paths, and control-flow narrowing proofs.
-4. **Program Call-Graph & Evaluation Order (`typescript-engine.mjs`, `hop-inline-verification.mjs`):** `ts.LanguageService`-backed cross-file reference discovery and expression evaluation-order stepping.
-5. **Domain Provenance Graphs (`schema-provenance.mjs`, `effect-schema.mjs`, `sql-provenance.mjs`, `sql-syntax-analysis.mjs`, `react-state-graph.js`):** Cross-library schema decode provenance (Zod, Effect Schema, Valibot, TypeBox), SQL fragment/identifier/escaper provenance, and React `useState` cell/transition provenance.
+1. **Shape Identity (`shape/shape-identity.ts`):** Deep structural comparison of `ts.Type`s with `any`-poisoning, `error`-type undecided tracking, generic parameter/constraint matching, and property mutability/optionality checks.
+2. **Symbol, Module & Package Surface Provenance (`kernel/rule-kernel.ts`, `provenance/package-entry-points.ts`, `provenance/declared-dependencies.ts`, `provenance/type-resolution-provenance.ts`):** Alias resolution across imports/re-exports, package entry-point surface resolution, and external library symbol classification.
+3. **Boundary & Narrowing Dataflow (`boundary/boundary-model.ts`, `boundary/narrowing-proof.ts`, `boundary/broad-input.ts`):** Untrusted boundary sources, interprocedural summaries, demand paths, and control-flow narrowing proofs.
+4. **Program Call-Graph & Evaluation Order (`callgraph/program-references.ts`, `callgraph/evaluation-order.ts`, `callgraph/hop-inline-verification.ts`):** `ts.LanguageService`-backed cross-file reference discovery and expression evaluation-order stepping.
+5. **Domain Provenance Graphs (`projection/schema-provenance.ts`, `projection/effect-schema.ts`, `projection/sql-provenance.ts`, `projection/sql-syntax.ts`, `projection/react-state.ts`):** Cross-library schema decode provenance (Zod, Effect Schema, Valibot, TypeBox), SQL fragment/identifier/escaper provenance, and React `useState` cell/transition provenance.
 
 Use the domain vocabulary in `GLOSSARY.md` and architectural decisions in `docs/adr/` throughout rule specs, investigations, and diagnostics. Use `docs/semantic-drift-goal.md` as the north-star requirement for new or migrated rules. A rule must recover a semantic association, authority fact, deterministic source construction, or repo/session proof surface (`docs/adr/0002-evidence-backed-provenance-over-name-heuristics.md`); every active rule in `policy/registries/rules.yaml` ships enabled by default at `"error"` (`defaultOff: false`). Use `docs/semantic-validation-matrix.md` to decide the rule's carrier, blocking threshold, and validation evidence before implementation or promotion.
 
@@ -40,7 +40,7 @@ This means a boolean predicate such as `isWebviewRoute` is not a type escape hat
 
 ### Type-aware deterministic rules
 
-These run through `defineTypeScriptRule` (`tooling/antidrift/src/semantic-adapters/ts-rule-kernel.mjs`) and require TypeScript's `Program` and `TypeChecker`:
+These run through `defineTypeScriptRule` (`tooling/antidrift/src/semantic-adapters/kernel/rule-kernel.ts`) and require TypeScript's `Program` and `TypeChecker`:
 
 - appeasement casts and erasures from `any`/`unknown` into named contracts
 - structural type forks and restated dependency types

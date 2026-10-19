@@ -88,7 +88,7 @@ export const boundaryObservations = {
 export type ObservationSink = (observation: object) => void;
 
 export type ObservedRoot = {
-  readonly kind: string;
+  readonly kind?: string | undefined;
   readonly root?: ts.Node | undefined;
   readonly incomplete?: string | undefined;
 };

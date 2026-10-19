@@ -1,6 +1,9 @@
 import ts from "typescript";
 
 declare module "typescript" {
+  function isFunctionLikeDeclaration(
+    node: ts.Node
+  ): node is ts.FunctionLikeDeclaration;
   function getCheckFlags(symbol: ts.Symbol): number;
   function getDeclarationModifierFlagsFromSymbol(
     symbol: ts.Symbol
@@ -104,4 +107,18 @@ export function isReadonlyProperty(property: ts.Symbol): boolean {
     ((property.flags & ts.SymbolFlags.GetAccessor) !== 0 &&
       (property.flags & ts.SymbolFlags.SetAccessor) === 0)
   );
+}
+
+export function nodeReader<Node extends ts.Node, Output>(
+  guard: (node: ts.Node) => node is Node,
+  read: (node: Node) => Output
+) {
+  return (node: ts.Node) => {
+    if (!guard(node)) {
+      throw new TypeError(
+        `TypeScript visitor received unexpected node ${ts.SyntaxKind[node.kind]}`
+      );
+    }
+    return read(node);
+  };
 }

@@ -1,6 +1,6 @@
 # unknown-input-must-be-decoded
 
-The shared `boundary-model.mjs` adapter owns I/O provenance, signature decoding and local value flow. `boundary-cases.mjs` declares every root source, contextual framework shape, decoder form and exclusion. Platform rows name their actual library/module and declaration symbol. Framework rows use contextual request shapes; their package names are examples, not matching filters. The rule's factory interface is unchanged.
+The shared `boundary/boundary-model.ts` adapter owns I/O provenance, signature decoding and local value flow. `boundary/source-cases.ts` and `boundary/decision-cases.ts` declare every root source, contextual framework shape, decoder form and exclusion. Platform rows name their actual library/module and declaration symbol. Framework rows use contextual request shapes; their package names are examples, not matching filters. The rule's factory interface is unchanged.
 
 `trace(expression)` returns provenance, including decoded and pending Result evidence; `decode(call)` classifies the checker signature; `unchecked(expression, target)` checks the receiving contract; `argumentType(call, index)` projects rest and tuple parameters onto each argument. The model does not treat dependency any/unknown declarations as outside input. A dependency operation must receive traced I/O through its declared generic argument, callback argument or method receiver, or remain unresolved.
 

@@ -1,6 +1,6 @@
 import { appendFileSync } from "node:fs";
 import ts from "typescript";
-import { boundaryModel } from "../../semantic-adapters/boundary-model.mjs";
+import { boundaryModel } from "../../semantic-adapters/boundary/boundary-model.ts";
 import { boundaryObservations } from "../../semantic-adapters/boundary/boundary-observations.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 

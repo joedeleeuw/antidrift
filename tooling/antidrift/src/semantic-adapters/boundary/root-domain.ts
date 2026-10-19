@@ -60,7 +60,7 @@ export type ConcreteRoot = RootMarks & {
   readonly parameter?: undefined;
 };
 
-export type PlaceholderRoot = {
+export type PlaceholderRoot = RootMarks & {
   readonly parameter: ts.ParameterDeclaration;
   readonly access: readonly AccessStep[];
   readonly deepAccess: boolean;
@@ -71,6 +71,10 @@ export type PlaceholderRoot = {
   readonly overrides: ReadonlySet<string> | undefined;
   readonly path: readonly string[];
   readonly deep: boolean;
+} & {
+  readonly kind?: undefined;
+  readonly root?: undefined;
+  readonly declaration?: undefined;
 };
 
 export type Root = ConcreteRoot | PlaceholderRoot;

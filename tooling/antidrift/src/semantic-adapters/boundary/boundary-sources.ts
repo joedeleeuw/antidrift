@@ -266,7 +266,7 @@ class BoundarySources {
     element: ts.Node,
     receiverType: ts.Type,
     keys: ReadonlySet<string> | null,
-    carrier: CarrierPath | null | undefined
+    carrier: Pick<CarrierPath, "parameter" | "path"> | null | undefined
   ): Root[] {
     const request = carrier && this.#frameworks.rootOf(carrier, element);
     if (request) {

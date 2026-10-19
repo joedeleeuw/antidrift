@@ -4,7 +4,7 @@
 
 `antidrift/no-appeasement-cast` is exported and enabled at `error` in the typed ESLint configuration. Its registry status is `ready`, with `stable: false`.
 
-The rule is type-aware. It visits `as` and angle-bracket casts and every import site, and derives each cast decision from `CAST_DECISION_TABLE` in `tooling/antidrift/src/semantic-adapters/cast-proof.mjs`. The first matching row decides:
+The rule is type-aware. It visits `as` and angle-bracket casts and every import site, and derives each cast decision from `CAST_DECISION_TABLE` in `tooling/antidrift/src/semantic-adapters/boundary/cast-proof.ts`. The first matching row decides:
 
 | Row | Kind                                | Decision   | Reason                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --: | ----------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

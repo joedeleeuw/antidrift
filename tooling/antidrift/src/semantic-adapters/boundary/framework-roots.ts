@@ -14,7 +14,10 @@ type HandlerSubject = {
   readonly declaration: ts.Declaration;
 };
 
-function startsWithShape(carrier: CarrierPath, shape: FrameworkShape) {
+function startsWithShape(
+  carrier: Pick<CarrierPath, "parameter" | "path">,
+  shape: FrameworkShape
+) {
   return (
     carrier.path.length > shape.path.length &&
     shape.path.every((segment, position) => carrier.path[position] === segment)
@@ -30,7 +33,10 @@ export class FrameworkRoots {
     this.#origin = origin;
   }
 
-  rootOf(carrier: CarrierPath, expression: ts.Node): ConcreteRoot | null {
+  rootOf(
+    carrier: Pick<CarrierPath, "parameter" | "path">,
+    expression: ts.Node
+  ): ConcreteRoot | null {
     const [head] = carrier.path;
     for (const subject of this.#handlerSubjects(
       carrier.parameter,
@@ -98,7 +104,7 @@ export class FrameworkRoots {
 
   #shapeRoot(
     match: {
-      readonly carrier: CarrierPath;
+      readonly carrier: Pick<CarrierPath, "parameter" | "path">;
       readonly expression: ts.Node;
       readonly subject: HandlerSubject;
     },
