@@ -12,6 +12,7 @@ const ABBREVIATION = /^([a-z]+)\d*$/;
 const SINGLE_LETTER = /^[a-hl-mo-wzA-HL-MO-WZ]$/;
 const EXEMPT_NAME =
   /^(?:te?mp_?(?:dir|directory|file|path|root|base|home)s?|formData|imageData)$/i;
+const CONTEXT_TYPE_NAME = /(?:Ctx|Context)$/;
 const FUNCTION_TYPES = new Set([
   "ArrowFunctionExpression",
   "FunctionDeclaration",
@@ -56,6 +57,36 @@ function vagueReason(name) {
   }
   if (FILLER_PREFIX.test(name)) return "a filler prefix";
   return null;
+}
+
+function* typeReferenceNames(typeNode) {
+  if (!typeNode) return;
+  switch (typeNode.type) {
+    case "TSTypeAnnotation":
+      yield* typeReferenceNames(typeNode.typeAnnotation);
+      return;
+    case "TSTypeReference": {
+      const { typeName } = typeNode;
+      yield typeName.type === "TSQualifiedName"
+        ? typeName.right.name
+        : typeName.name;
+      return;
+    }
+    case "TSUnionType":
+    case "TSIntersectionType":
+      for (const member of typeNode.types) yield* typeReferenceNames(member);
+      return;
+    default:
+  }
+}
+
+function* typeSymbolNames(type) {
+  if (!type) return;
+  if (type.isUnionOrIntersection()) {
+    for (const member of type.types) yield* typeSymbolNames(member);
+  }
+  if (type.aliasSymbol) yield type.aliasSymbol.name;
+  if (type.symbol) yield type.symbol.name;
 }
 
 function* patternIdentifiers(node) {
@@ -108,9 +139,30 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
+    const services =
+      context.sourceCode?.parserServices ?? context.parserServices;
+    const checker = services?.program?.getTypeChecker?.();
+
+    // `ctx` is a framework's own vocabulary when the binding's type says so:
+    // a declared `QueryCtx | MutationCtx`, a local alias such as `DatabaseCtx`,
+    // or, with type services, the context type a handler slot infers.
+    function isFrameworkContext(identifier) {
+      if (identifier.name !== "ctx") return false;
+      if (identifier.typeAnnotation) {
+        return [...typeReferenceNames(identifier.typeAnnotation)].some((name) =>
+          CONTEXT_TYPE_NAME.test(name)
+        );
+      }
+      const tsNode = services?.esTreeNodeToTSNodeMap?.get(identifier);
+      if (!checker || !tsNode) return false;
+      return [...typeSymbolNames(checker.getTypeAtLocation(tsNode))].some(
+        (name) => CONTEXT_TYPE_NAME.test(name)
+      );
+    }
 
     function check(identifier) {
       if (identifier?.type !== "Identifier") return;
+      if (isFrameworkContext(identifier)) return;
       const reason = vagueReason(identifier.name);
       if (reason) {
         context.report({
