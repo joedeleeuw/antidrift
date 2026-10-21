@@ -3904,6 +3904,7 @@ rules:
       - "Two-corpus precision check (October 2026; 84 TypeScript roots): 111,219 hits in 76 repositories (sentry 26,380), 19/20 true once the first sample's five analyzer, mock and synthetic fixture inputs are replaced by unseen eligible hits (14/15 plus 5/5), holding in 17 of 18 sampled repositories. The remaining false positive is a component props variable."
       - Runs in the ESLint pass so existing debt is pinned in eslint-suppressions.json; Oxlint has no baseline.
       - The first `props` parameter of a component or JSX-returning function is React's defined role and stays allowed.
+      - A `ctx` whose declared or inferred type is named `*Ctx` or `*Context` is the framework's own vocabulary and stays allowed; Homer's `convex/projects.ts` and `convex/conversations.ts` went from 54 hits (41 `ctx`) to 13 with none left.
       - Imports, property keys and type names are not declarations this rule owns.
     external:
       state: partial-overlap

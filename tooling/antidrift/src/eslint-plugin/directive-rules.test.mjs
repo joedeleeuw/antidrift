@@ -1,4 +1,11 @@
-import { rule, ruleTester } from "../../test/support/eslint-plugin-harness.mjs";
+import { resolve } from "node:path";
+
+import {
+  fixturesDir,
+  rule,
+  ruleTester,
+  typedRuleTester,
+} from "../../test/support/eslint-plugin-harness.mjs";
 
 ruleTester.run(
   "no-pass-through-parameters",
@@ -97,8 +104,19 @@ ruleTester.run("no-vague-names", rule("no-vague-names"), {
     "const X = horizontal;",
     "const tmp_path = mkdtempSync(prefix);",
     "const TempDir = mkdtempSync(prefix);",
+    "function load(ctx: QueryCtx) { return ctx.db; }",
+    "type DatabaseCtx = QueryCtx | MutationCtx; function load(ctx: DatabaseCtx) { return ctx.db; }",
+    "function load(ctx: QueryCtx | MutationCtx) { return ctx.db; }",
+    "function load(ctx: GenericQueryCtx<DataModel>) { return ctx.db; }",
+    "function load(ctx: Convex.QueryCtx) { return ctx.db; }",
   ],
   invalid: [
+    { code: "function load(ctx: Request) { return ctx.url; }", errors: 1 },
+    {
+      code: "function load(ctx: Ctxless<Model>) { return ctx.url; }",
+      errors: 1,
+    },
+    { code: 'const ctx = canvas.getContext("2d");', errors: 1 },
     {
       code: "const data = load();",
       errors: [
@@ -167,6 +185,46 @@ ruleTester.run("no-vague-names", rule("no-vague-names"), {
           data: { name: "props", reason: "an abbreviation of 'properties'" },
         },
       ],
+    },
+  ],
+});
+
+typedRuleTester.run("no-vague-names", rule("no-vague-names"), {
+  valid: [
+    {
+      code: `
+        type QueryCtx = { db: string };
+        declare function query(handler: (ctx: QueryCtx) => string): void;
+        query((ctx) => ctx.db);
+      `,
+      filename: resolve(fixturesDir, "vague-context-inferred.ts"),
+    },
+    {
+      code: `
+        type GenericQueryCtx<Model> = { db: Model };
+        declare function query(handler: (ctx: GenericQueryCtx<string> | null) => string): void;
+        query((ctx) => ctx?.db ?? "");
+      `,
+      filename: resolve(fixturesDir, "vague-context-generic.ts"),
+    },
+  ],
+  invalid: [
+    {
+      code: `
+        declare function run(handler: (ctx: number) => number): void;
+        run((ctx) => ctx + 1);
+      `,
+      filename: resolve(fixturesDir, "vague-context-number.ts"),
+      errors: 1,
+    },
+    {
+      code: `
+        type Request = { url: string };
+        declare function run(handler: (ctx: Request) => string): void;
+        run((ctx) => ctx.url);
+      `,
+      filename: resolve(fixturesDir, "vague-context-request.ts"),
+      errors: 1,
     },
   ],
 });
