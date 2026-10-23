@@ -207,8 +207,8 @@ clusters:
         detector: antidrift:no-fallback-to-empty
         message: Return a typed failure unless empty is the explicit contract.
 
-  - id: directive-smells # Shared AGENT.md directives that dotfiles enforces for Python, JSON and YAML.
-    owner: engineering-productivity # One directive ID per rule keeps antidrift and the dotfiles enforcement map in agreement.
+  - id: directive-smells # Shared AGENT.md directives that a configuration repository enforces for Python, JSON and YAML.
+    owner: engineering-productivity # One directive ID per rule keeps antidrift and that repository's enforcement map in agreement.
     rules:
       - id: naming/no-vague-names # G21 vague nouns, abbreviations, single letters and filler affixes.
         severity: error

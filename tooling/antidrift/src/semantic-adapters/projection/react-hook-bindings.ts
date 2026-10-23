@@ -1,4 +1,4 @@
-import { findVariable } from "../kernel/async-control-flow.ts";
+import { findVariable } from "../kernel/variable-lookup.ts";
 import {
   identifierName,
   isSyntaxNode,

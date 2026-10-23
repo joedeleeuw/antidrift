@@ -1,6 +1,6 @@
 ## Adversarial review — `antidrift/no-redundant-zod-parse`
 
-I read the rule (`index.js:1868–2015`), the corpus wiring, the investigation doc, the registry entry, the promotion/validation docs, and the four live corpus files (chaski `sequence-count-router.ts`, murderbox `setup/route.ts` + `workspace-projects.ts`, atlas `generatedStateDebugSimulation.test.ts`).
+I read the rule (`index.js:1868–2015`), the corpus wiring, the investigation doc, the registry entry, the promotion/validation docs, and the four live corpus files (a router file in a private app, a setup route and a registry module in a second private app, and a test file in a third private app).
 
 ### 1. Is the assertion-context exception soundly scoped?
 
@@ -23,30 +23,30 @@ Two narrower edges, both minor:
 ### 2. Most likely false positives / false negatives
 
 **False negatives (the bigger surface):**
-- **Inlined await defeats the rule.** Both report branches require `arg.type === "Identifier"`. `Schema.parse(await setupMachine(id))` — arg is an `AwaitExpression` — is missed. The murderbox drift can be trivially rewritten into this shape and slip through.
+- **Inlined await defeats the rule.** Both report branches require `arg.type === "Identifier"`. `Schema.parse(await call(id))` — arg is an `AwaitExpression` — is missed. The second private app's drift can be trivially rewritten into this shape and slip through.
 - **Sync helpers are invisible.** `callResultSymbols` is populated only from `isAwaitedCallInitializer` (`index.js:1942`, requires `await` + CallExpression). A synchronous helper returning schema output that is re-parsed is never caught.
 - **Destructuring / reassignment.** `const { data } = await call()` or `let`-rebinding bypass both provenance maps.
 
 **False positives:**
-- **Type-level provenance can lie.** The service-to-boundary branch trusts the *type* of the awaited result. A gateway typed `Promise<MachineSetupResponse>` that merely casts DB rows (no runtime validation) would make a genuine **first** boundary parse look redundant. Bidirectional assignability + the any/unknown guards mitigate structural drift but cannot detect "the annotation is a cast, not a validation." No corpus control exercises this case; it's the core philosophical risk of type-aware provenance and should be documented as a known limitation.
+- **Type-level provenance can lie.** The service-to-boundary branch trusts the *type* of the awaited result. A gateway with a declared `Promise<...>` return type that merely casts DB rows (no runtime validation) would make a genuine **first** boundary parse look redundant. Bidirectional assignability + the any/unknown guards mitigate structural drift but cannot detect "the annotation is a cast, not a validation." No corpus control exercises this case; it's the core philosophical risk of type-aware provenance and should be documented as a known limitation.
 - The any/unknown guard `typeStringIncludesAnyOrUnknown` is applied to `parseReturnType` only, not `argType` (`index.js:1946`). A structurally-`any`-bearing arg can still match. Niche.
 
 ### 3. Does it still catch the original production drift after the exception?
 
 **Yes — verified against live source.**
-- chaski `sequence-count-router.ts:21`: `z.array(CountSequenceRowSchema).parse(rows)` where `rows = await ctx.gateways!.bigquery.getCountSequenceRows(...)`. Schema callee is a CallExpression (so `schemaSym` is undefined and branch 1 is skipped), but branch 2 fires: awaited-call result + bidirectional `CountSequenceRow[]` match. Caught.
-- murderbox `setup/route.ts:27`: `machineSetupResponseSchema.parse(result)`, `result = await setupMachine(...)`. Branch 2 fires. Caught.
+- the private-app router: an inline array schema parses the awaited result of a gateway call. Schema callee is a CallExpression (so `schemaSym` is undefined and branch 1 is skipped), but branch 2 fires: awaited-call result + bidirectional match of the parsed and awaited array types. Caught.
+- the second private app's setup route: a response schema parses `result`, the awaited result of a setup call. Branch 2 fires. Caught.
 
 Neither sits inside an `expect(...).toThrow` callback, so the exception cannot touch them (`nearestFunctionExpression` hits the `async function POST`/`.query` arrow, whose parent is not an `expect` call). The exception is orthogonal to the drift gates. Good.
 
-The clean control `workspace-projects.ts` is correctly clean — its `workspaceProjectRegistrySchema.parse(registry)` (lines 158/179) operates on a **parameter** typed as the schema output, and the rule deliberately tracks neither parameter provenance nor write-boundary reparses. This confirms the rule is conservative rather than that the control is weak.
+The clean registry module is correctly clean — its two registry schema parses operate on a **parameter** typed as the schema output, and the rule deliberately tracks neither parameter provenance nor write-boundary reparses. This confirms the rule is conservative rather than that the control is weak.
 
 ### 4. Promote stable now?
 
-**Do not promote yet — promote after specific small changes.** The registry already sets `stable: false` pending advisory review, and the corpus is thin for a stable bar: drift is 2 repos × 1 finding each, and the *exception itself has no negative gate*. Every atlas exception case is a clean-pass; nothing proves a **consumed** parse inside a test still reports — which is precisely the claim that distinguishes this from a test-file blanket exemption.
+**Do not promote yet — promote after specific small changes.** The registry already sets `stable: false` pending advisory review, and the corpus is thin for a stable bar: drift is 2 repos × 1 finding each, and the *exception itself has no negative gate*. Every exception case in the third private app is a clean-pass; nothing proves a **consumed** parse inside a test still reports — which is precisely the claim that distinguishes this from a test-file blanket exemption.
 
 Conditions to promote:
-1. **Add a drift gate** (atlas or sudocode test file) where a Zod parse inside a test assigns/returns its result and is expected to **still report** — this locks the "not a blanket exemption" promise. If you don't enforce it in code, reconcile doc line 100 to match the purely-syntactic behavior instead.
+1. **Add a drift gate** (a test file from the third private app or sudocode) where a Zod parse inside a test assigns/returns its result and is expected to **still report** — this locks the "not a blanket exemption" promise. If you don't enforce it in code, reconcile doc line 100 to match the purely-syntactic behavior instead.
 2. **Document the two known FN/FP limits** in the investigation doc: inlined-`await` arg and sync-helper results are out of scope; type-provenance trusts annotations (cast-not-validation can false-positive).
 3. Optionally harden `isExpectCall` for aliased `expect` only if any corpus repo aliases it.
 

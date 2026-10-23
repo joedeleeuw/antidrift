@@ -134,7 +134,7 @@ function emittedSemanticFactKinds(repoRoot) {
     ["tooling/antidrift/src/eslint-plugin/rules", /\.js$/u],
     ["tooling/antidrift/src/oxlint-plugin/rules", /\.js$/u],
     ["tooling/antidrift/src/semantic-adapters", /\.(?:mjs|ts)$/u],
-    ["tooling/antidrift/src/change-scope", /\.mjs$/u],
+    ["tooling/antidrift/research/change-scope", /\.mjs$/u],
   ]) {
     addFactKindsFromDirectory(kinds, repoRoot, relativeDir, extension);
   }

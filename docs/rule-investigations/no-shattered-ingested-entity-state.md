@@ -26,7 +26,7 @@ The behavioral proof is AST plus local scope/control-flow:
 
 This deliberately excludes name-prefix inventory, raw state-cell count, and recombination alone. Those remain research/inventory signals for `react/no-use-state-waterfall`.
 
-There is no enforcement tier. An earlier type-owner tier — which resolved the awaited source's type against the domain/generated authority index (the same machinery as `no-structural-type-fork`) and blocked only owned-entity shatters — was removed after multi-repo scans (chaski, sudocode) found zero real human-authored owned-entity shatters; every semantic source-member hit was a response envelope, value object, or computed result, which the rule correctly leaves alone.
+There is no enforcement tier. An earlier type-owner tier — which resolved the awaited source's type against the domain/generated authority index (the same machinery as `no-structural-type-fork`) and blocked only owned-entity shatters — was removed after multi-repo scans (a private app, sudocode) found zero real human-authored owned-entity shatters; every semantic source-member hit was a response envelope, value object, or computed result, which the rule correctly leaves alone.
 
 The rule is inventory-only: semantic source-member fan-out is recorded as `sourceMemberStateShardCandidate` and never blocks. Rebuilding the enforcement tier requires several real owned-entity shatters across more than one repo (likely an agent-generated corpus).
 
@@ -53,7 +53,7 @@ No maintained React, React Hooks, or `typescript-eslint` rule was found that mod
 ## Current Evidence
 
 - No real-corpus enforcement positive yet: a type-aware scan of 335 portal components found zero owned-entity shatters. The one behavioral candidate was a response-envelope split, correctly not promoted beyond inventory. Synthetic source-shard examples exercise fact shape only; they are not promotion evidence.
-- Clean control: Chaski `src/frontend/monolithui/src/components/EditPOModal.tsx` keeps a controlled input draft cell clean.
+- Clean control: a component in the private app keeps a controlled input draft cell clean.
 - Next: mine real owned-entity shatters across multiple available repos before rebuilding any diagnostic tier.
 
 ## Validation Plan

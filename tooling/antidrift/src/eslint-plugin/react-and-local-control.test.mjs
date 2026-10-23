@@ -10,59 +10,6 @@ import {
   typedRuleTester,
 } from "../../test/support/eslint-plugin-harness.mjs";
 
-ruleTester.run("no-async-array-method", rule("no-async-array-method"), {
-  valid: [
-    fixture("programs/correct/async-map-promise-all.ts"),
-    fixture("programs/correct/async-map-delayed-promise-all.ts"),
-    {
-      ...fixture("programs/correct/async-map-promise-all.ts"),
-      options: [{ branches: ["requires-collection"] }],
-    },
-    {
-      ...fixture("programs/correct/async-map-delayed-promise-all.ts"),
-      options: [{ branches: ["requires-collection"] }],
-    },
-    {
-      code: "async function load(ids) { return ids.map(async (id) => fetch(id)); }",
-      options: [{ branches: ["requires-collection"] }],
-    },
-    {
-      code: "async function load(ids) { const pending = ids.map(async (id) => fetch(id)); return pending; }",
-      options: [{ branches: ["requires-collection"] }],
-    },
-    {
-      code: "const load = (ids) => ids.map(async (id) => fetch(id));",
-      options: [{ branches: ["requires-collection"] }],
-    },
-    {
-      code: "async function load(ids, ok) { return ok ? ids.map(async (id) => fetch(id)) : []; }",
-      options: [{ branches: ["requires-collection"] }],
-    },
-    fixture("programs/drift/async-map-without-promise-all.ts"),
-    "items.map((i) => i + 1);",
-    "async function f() { for (const i of items) { await work(i); } }",
-  ],
-  invalid: [
-    {
-      code: "async function load(ids) { const pending = ids.map(async (id) => fetch(id)); return pending.length; }",
-      options: [{ branches: ["requires-collection"] }],
-      errors: 1,
-    },
-    {
-      code: "async function load(ids) { const pending = ids.map(async (id) => fetch(id)); return pending.length; }",
-      options: [{ branches: ["never-await", "requires-collection"] }],
-      errors: 1,
-    },
-    { ...fixture("programs/drift/async-foreach-callback.ts"), errors: 1 },
-    {
-      ...fixture("programs/drift/async-foreach-callback.ts"),
-      options: [{ branches: ["requires-collection"] }],
-      errors: 1,
-    },
-    { ...fixture("programs/drift/async-filter-callback.ts"), errors: 1 },
-  ],
-});
-
 ruleTester.run("require-effect-deps", rule("require-effect-deps"), {
   valid: [
     fixture("programs/correct/effect-empty-deps.ts"),
@@ -100,93 +47,6 @@ ruleTester.run("require-effect-deps", rule("require-effect-deps"), {
   ],
 });
 
-ruleTester.run(
-  "no-calling-components-as-functions",
-  rule("no-calling-components-as-functions"),
-  {
-    valid: [
-      "function lower() {} lower();",
-      "const BREAKPOINTS = () => {}; BREAKPOINTS();",
-      'import { Schema } from "effect"; Schema.Struct({ id: 1 });',
-      'import { Widget } from "./w"; const ref = Widget;',
-      "unknownThing({ a: 1 });",
-      // Action creators are PascalCase functions that return plain objects.
-      'function EndTurnAction() { return { type: "end-turn" }; } dispatch(EndTurnAction());',
-      // A minified bundle calls PascalCase bindings that return no JSX.
-      "var Ab = function (e) { return e.a + 1; }; Ab(t);",
-      // A generated client endpoint is a function, not a component.
-      "const Endpoint0_0 = (raw) => ({ ...raw, kind: 'endpoint' }); Endpoint0_0(raw);",
-      // Imported callees cannot be resolved to a JSX-returning body.
-      'import { Card } from "./c"; Card();',
-      "function Widget() { return null; } Widget({ label: 'x' });",
-      "const Box = () => null; Box({ a: 1 });",
-      // Solid, Qwik, Vue and compat-less Preact JSX is not React.
-      {
-        code: 'import { createSignal } from "solid-js"; const Fallback = () => <span />; const value = Fallback();',
-        filename: "component.tsx",
-      },
-      {
-        code: 'import { component$ } from "@builder.io/qwik"; const Box = () => <span />; Box();',
-        filename: "component.tsx",
-      },
-      {
-        code: 'import { h } from "preact"; const Box = () => <span />; Box();',
-        filename: "component.tsx",
-      },
-      // A local helper spelled `memo` is not React's wrapper.
-      "function memo(fn) { return fn; } const Format = memo(value => value.name); Format(record);",
-    ],
-    invalid: [
-      {
-        code: "function Widget() { return <div />; } Widget({ label: 'x' });",
-        output: "function Widget() { return <div />; } <Widget label={'x'} />;",
-      },
-      {
-        code: "const Box = () => <span />; Box({ a: 1 });",
-        output: "const Box = () => <span />; <Box a={1} />;",
-      },
-      {
-        code: "const List = function () { return <></>; }; List();",
-        output: "const List = function () { return <></>; }; <List />;",
-      },
-      {
-        code: 'import { forwardRef } from "react"; const Field = forwardRef((props, ref) => <input ref={ref} />); Field(props);',
-        output:
-          'import { forwardRef } from "react"; const Field = forwardRef((props, ref) => <input ref={ref} />); <Field {...props} />;',
-      },
-      {
-        code: 'import React from "react"; const Row = React.memo(Item); Row({ id });',
-        output:
-          'import React from "react"; const Row = React.memo(Item); <Row id={id} />;',
-      },
-      {
-        code: 'import { memo as cache } from "react"; const Widget = cache(() => <div />); Widget(props);',
-        output:
-          'import { memo as cache } from "react"; const Widget = cache(() => <div />); <Widget {...props} />;',
-      },
-      {
-        code: "function Widget(ok) { if (ok) return <div />; throw new Error(); } Widget(props);",
-        output:
-          "function Widget(ok) { if (ok) return <div />; throw new Error(); } <Widget {...props} />;",
-      },
-      {
-        code: "const Widget = () => <div />; const Alias = Widget; Alias(props);",
-        output:
-          "const Widget = () => <div />; const Alias = Widget; <Alias {...props} />;",
-      },
-      {
-        code: 'import { h } from "preact"; import { memo } from "preact/compat"; const Box = () => <span />; Box();',
-        output:
-          'import { h } from "preact"; import { memo } from "preact/compat"; const Box = () => <span />; <Box />;',
-      },
-    ].map((testCase) => ({
-      ...testCase,
-      filename: "component.tsx",
-      errors: 1,
-    })),
-  }
-);
-
 const duplicatedClassnameControls = {
   attributes: ["class", "className"],
   helpers: [],
@@ -203,7 +63,7 @@ ruleTester.run(
         code: `
           <Pressable
             className={cn(
-              "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3",
+              "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3",
               sendDisabled ? "opacity-50" : "active:opacity-75",
             )}
           />;
@@ -213,7 +73,7 @@ ruleTester.run(
       {
         code: `
           <Pressable
-            className={\`h-9 items-center justify-center rounded-lg border border-mb-border-strong bg-mb-surface px-3 active:opacity-75 \${runtimeStatus.isFetching ? "opacity-50" : ""}\`}
+            className={\`h-9 items-center justify-center rounded-lg border border-app-border-strong bg-app-surface px-3 active:opacity-75 \${runtimeStatus.isFetching ? "opacity-50" : ""}\`}
           />;
         `,
         filename: "runtime-diagnostics.tsx",
@@ -223,8 +83,8 @@ ruleTester.run(
           <Pressable
             className={
               sendDisabled
-                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
-                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75"
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 active:opacity-75"
             }
           />;
         `,
@@ -235,8 +95,8 @@ ruleTester.run(
         code: `
           cx(
             sendDisabled
-              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
-              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 opacity-50"
+              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 active:opacity-75",
           );
         `,
         filename: "new-thread.tsx",
@@ -245,8 +105,8 @@ ruleTester.run(
         code: `
           cn(
             sendDisabled
-              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
-              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 opacity-50"
+              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 active:opacity-75",
           );
         `,
         filename: "new-thread.tsx",
@@ -258,8 +118,8 @@ ruleTester.run(
           <Pressable
             className={
               sendDisabled
-                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
-                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75"
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 active:opacity-75"
             }
           />;
         `,
@@ -271,8 +131,8 @@ ruleTester.run(
           <Pressable
             className={cn(
               sendDisabled
-                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
-                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 active:opacity-75",
             )}
           />;
         `,
@@ -284,8 +144,8 @@ ruleTester.run(
           <Pressable
             tw={
               sendDisabled
-                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
-                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75"
+                ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 opacity-50"
+                : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 active:opacity-75"
             }
           />;
         `,
@@ -297,8 +157,8 @@ ruleTester.run(
         code: `
           cx(
             sendDisabled
-              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 opacity-50"
-              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-mb-surface-2 px-3.5 py-3 active:opacity-75",
+              ? "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 opacity-50"
+              : "w-full flex-row items-center gap-2.5 rounded-[12px] bg-app-surface-2 px-3.5 py-3 active:opacity-75",
           );
         `,
         filename: "new-thread.tsx",
@@ -571,6 +431,45 @@ it("fails loud on partial duplicated object field block controls", async () => {
     )
   ).rejects.toThrow(/minRedundantDeclarations/u);
 });
+
+// The fixture tsconfig resolves relative specifiers against the fixtures directory.
+const firstPartyModule = "./programs/correct/abort-guarded-fetch";
+
+typedRuleTester.run(
+  "no-first-party-module-mock",
+  rule("no-first-party-module-mock"),
+  {
+    valid: [
+      // Third-party packages are the boundary a test may replace
+      'vi.mock("zod");',
+      'jest.mock("typescript", () => ({}));',
+      // Unresolvable and computed specifiers are not decided
+      'vi.mock("./programs/correct/does-not-exist");',
+      "declare const target: string;\nvi.mock(target);",
+      // `mock.module` counts only when `mock` comes from bun:test
+      `const mock = { module(_: string) {} };\nmock.module("${firstPartyModule}");`,
+    ],
+    invalid: [
+      {
+        code: `vi.mock("${firstPartyModule}");`,
+        errors: [{ messageId: "firstPartyMock" }],
+      },
+      {
+        code: `jest.mock("${firstPartyModule}", () => ({ load: jest.fn() }));`,
+        errors: [{ messageId: "firstPartyMock" }],
+      },
+      // A partial mock still replaces the module for every importer
+      {
+        code: `vi.mock(import("${firstPartyModule}"), async (importOriginal) => ({ ...(await importOriginal()) }));`,
+        errors: [{ messageId: "firstPartyMock" }],
+      },
+      {
+        code: `import { mock as moduleMock } from "bun:test";\nmoduleMock.module("${firstPartyModule}", () => ({}));`,
+        errors: [{ messageId: "firstPartyMock" }],
+      },
+    ],
+  }
+);
 
 ruleTester.run(
   "no-nonindependent-test-oracle",
@@ -934,7 +833,7 @@ ruleTester.run(
       "function formatLabel() { try { return readLabel(); } catch { return ''; } }",
       "function macosPlatformUuid() { const match = output.match(/UUID/); if (!match) throw new Error('missing UUID'); return match[1]; }",
       "const resolveHost = () => null;",
-      "const deviceId = () => process.env.AGENT_TRACE_DEVICE_ID ?? readMachineId();",
+      "const deviceId = () => process.env.TRACE_DEVICE_ID ?? readHardwareId();",
       "function getDisplayName() { return ''; }",
       "function isValid() { return ''; }",
       "function formatDeviceName(device) { return device.name ?? ''; }",
@@ -966,7 +865,7 @@ ruleTester.run(
         ],
       },
       {
-        code: "const deviceId = () => process.env.AGENT_TRACE_DEVICE_ID ?? '';",
+        code: "const deviceId = () => process.env.TRACE_DEVICE_ID ?? '';",
         errors: [
           {
             message:
@@ -984,7 +883,7 @@ ruleTester.run(
         ],
       },
       {
-        code: "function traceDevice() { return (readMachineId() || '') as string; }",
+        code: "function traceDevice() { return (readHardwareId() || '') as string; }",
         errors: [
           {
             message:

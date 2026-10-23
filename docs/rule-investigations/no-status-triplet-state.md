@@ -16,8 +16,8 @@ The preferred construction pattern in `docs/build-patterns.md` is one reducer/re
 
 Historical real evidence:
 
-- Drift: Chaski `src/frontend/crow-v2/hooks/useTeamMembers.ts` line 33.
-- Clean: Chaski `src/frontend/monolithui/src/components/Products.tsx` uses query state without local `data/loading/error` cells.
+- Drift: a hook in a private app.
+- Clean: a component in the private app uses query state without local `data/loading/error` cells.
 - Current inventory note: 2 findings across 2 files.
 
 ## Eliminated Approaches

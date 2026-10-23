@@ -1,12 +1,16 @@
 # Portable guardrails in 0.11.0
 
-51 new custom rules ship at error severity in the governance configuration. The plugin registers 80 rules in total. Eleven provisional rules are withdrawn; none ship as disabled implementations. The existing typed no-unsafe-deserialize owns parsed-JSON domain assignments, including the real tools.ts:1439 case.
+## Status
 
-All corpus content comes from Homer revision `dc7d554d9925f5a4e6adc73844e8cd1b6057c3fc`. The fixture stores complete source files and Git commit/tree/blob proofs. Tests authenticate each path against the pinned commit and pin diagnostic rule, line, column and message. The earlier 148 synthetic-sample claim is deleted. The live checkout advanced during the run; the final before/after comparison uses a scratch Git archive of the requested revision, with read-only dependency links.
+Moved. antidrift no longer ships these rules. `@joedeleeuw/typescript-tooling` runs the stella rules as `tooling/<name>` and the Rika Labs rules from the published `@rikalabs/oxlint-standards` package as `rikalabs/<name>`. `antidrift/no-as-never` is retired; `typescript/no-unsafe-type-assertion` reports its cases. The record below describes the rules as antidrift shipped them.
 
-Source attribution, per-module upstream digests, modified-file records and the verified upstream NOTICE are in [NOTICE](../../tooling/antidrift/NOTICE). Source labels below refer to those records.
+51 new custom rules ship at error severity in the governance configuration. The plugin registers 80 rules in total. Eleven provisional rules are withdrawn; none ship as disabled implementations. The existing typed no-unsafe-deserialize owns parsed-JSON domain assignments, including the real private-app case.
 
-| Rule                                             | Source          | Repair                                                                                                                       | Tests / Homer after                                            |
+The review below was run against a checkout of a private app. Its source files and sampled excerpts are not kept in this repository; each rule's tests are its valid and invalid cases and the packed consumer check.
+
+Source attribution, per-module upstream digests, modified-file records and the verified upstream NOTICE were in antidrift's NOTICE, which moved to typescript-tooling with the code. Source labels below refer to those records.
+
+| Rule                                             | Source          | Repair                                                                                                                       | Tests / private app after                                      |
 | ------------------------------------------------ | --------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | `antidrift/confine-owner`                        | Apache upstream | Typed entry item schema and configurable registry path and owners                                                            | Valid + invalid + packed; 0 hits (no positive corpus evidence) |
 | `antidrift/docs-source-policy`                   | Apache upstream | Validate only the single configured policyFile; default docs-sources.mjs; derive dependencies from the real package manifest | Valid + invalid + packed; 0 hits (no positive corpus evidence) |
@@ -62,7 +66,7 @@ Source attribution, per-module upstream digests, modified-file records and the v
 
 ## Per-rule agent-intent review
 
-The [machine-readable review](../../tooling/antidrift/test/corpus/homer-review.json) records each rule’s agent behavior, every sampled hit and its judgement, explanations, before/after counts and withdrawal reasons. Counts measure violations, not precision. The fixed black terminal surface, popup-policy probe and installed-fetch-double test have explicit, reviewed owner scopes in that report. Production files and network smoke tests remain loud. Both default and scoped configurations are reproducible.
+The table records each rule's before and after counts and its decision. Counts measure violations, not precision. The fixed black terminal surface, popup-policy probe and installed-fetch-double test had explicit, reviewed owner scopes. Production files and network smoke tests remain loud.
 
 | Rule                                   | Before |     After | Decision |
 | -------------------------------------- | -----: | --------: | -------- |
@@ -133,7 +137,7 @@ The [machine-readable review](../../tooling/antidrift/test/corpus/homer-review.j
 
 - `no-json-parse-default-fallback`: Subject defect: 4/5 samples are explicit invalid-input or discovery outcomes, not fabricated successful domain data. The syntax detector cannot establish that semantic distinction.
 - `no-json-stringify-default-fallback`: Subject defect: 4/5 samples catch network or stream failures, not serialization failures. Keeping only coalescing syntax would leave the promised catch detector unresolved.
-- `no-single-use-trivial-helpers`: Attempted repairs excluded predicates, imported return contracts, entrypoints and nested work (306 -> 239), but the remaining detector still mistakes the Machine timestamp-validation boundary and Linux NUL-separated process decoding for caller-owned work. Reference counts plus size cannot prove portable ownership. Keep arch/no-one-use-helper in research; genuine one-use drift remains unsolved, not silenced in a disabled shipped rule.
+- `no-single-use-trivial-helpers`: Attempted repairs excluded predicates, imported return contracts, entrypoints and nested work (306 -> 239), but the remaining detector still mistakes the private app's timestamp-validation boundary and Linux NUL-separated process decoding for caller-owned work. Reference counts plus size cannot prove portable ownership. Keep arch/no-one-use-helper in research; genuine one-use drift remains unsolved, not silenced in a disabled shipped rule.
 - `forbid-dev-runner-config-reads`: 4/5 samples are the actual CLI or build owner. The remaining launch drift has no existing runner configuration owner this diagnostic can name. A filename convention cannot prove that boundary.
 - `forbid-process-env-outside-env-ts`: 4/5 samples already own runtime or build environment handling or merely forward it. An env.ts basename is not a portable ownership contract.
 - `no-ambient-nondeterminism`: 5/5 samples own clocks, entropy or elapsed-time measurement. The detector cannot determine that a module is deterministic from an ambient API call.
@@ -147,8 +151,21 @@ The helper review changed the original blanket false-positive classification: el
 
 ## Native composition
 
-The adoption export composes 436 native In rule IDs in eleven named, opt-in presets, excluding eighteen Next entries. The source selection is regenerated from the original adoption data; the reviewer’s 433 count omitted the three existing complexity settings. Those three retain their existing budgets. Native counts and sampled classifications for every rule above fifty findings are in [native-review.json](../../tooling/antidrift/test/corpus/native-review.json). Native style findings are policy-conformance findings, not claims of runtime defects.
+The adoption export composes 436 native In rule IDs in eleven named, opt-in presets, excluding eighteen Next entries. The source selection is regenerated from the original adoption data; the reviewer’s 433 count omitted the three existing complexity settings. Those three retain their existing budgets. Native style findings are policy-conformance findings, not claims of runtime defects.
 
 ## Limits
 
 These portable checks use syntax and local bindings. Typed fetch detection recognizes typeof fetch annotations and default parameters; it does not claim arbitrary cross-file TypeScript type inference. The typed deserialization rule uses the TypeScript checker. Zero-hit rules are preventive and carry no positive-corpus precision claim. No out-of-scope application pack is copied.
+
+## Off by default by owner decision (October 2026)
+
+Six portable rules now ship `off` in the governance configuration. On 20 fresh reports per rule from BuilderIO/agent-native, cloudflare/agents, LibreChat and opencode, each judged by whether a reviewer would ask for the change, under half were real problems. Each rule stays in the plugin for projects that enable it explicitly.
+
+| Rule                                     | Real | What the other reports were                                                                      |
+| ---------------------------------------- | ---: | ------------------------------------------------------------------------------------------------ |
+| `antidrift/no-as-never`                  | 6/20 | 19 of the 20 were in tests, where partial doubles and deliberately invalid inputs dominate       |
+| `antidrift/no-physical-properties`       | 9/20 | 9 of 13 were real in apps that ship right-to-left locales; 0 of 7 in English-only code           |
+| `antidrift/no-raw-foreground-opacity`    | 0/20 | the app defines none of the token names the message suggests                                     |
+| `antidrift/no-unlisted-external-imports` | 6/20 | type imports covered by a listed `@types` package, tsconfig path aliases, root tooling and bun   |
+| `antidrift/require-fetch-timeout`        | 5/20 | 11 were tests calling a server the test started; 5 of 8 outside tests were real                  |
+| `antidrift/require-query-key-factory`    | 4/20 | tests seeding the cache, prefix invalidations and short keys repeated nearby, with no key helper |

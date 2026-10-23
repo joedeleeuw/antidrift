@@ -1,4 +1,4 @@
-import { findVariable } from "./kernel/async-control-flow.ts";
+import { findVariable } from "./kernel/variable-lookup.ts";
 
 // Canonical-path unification: reduce an expression such as
 // `contract.getPost.responses[200]` or an alias of it to a ⟨root binding⟩ plus

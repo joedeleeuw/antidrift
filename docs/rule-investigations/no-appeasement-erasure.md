@@ -1,14 +1,14 @@
 # no-appeasement-erasure Investigation
 
-Status: `ready`, shipped at error severity after the 2026-08-18 anti-slop catch-up.
+Status: `ready`, shipped at error severity.
 
 ## Problem Statement
 
 A value with a known type is widened to `unknown`, and a contract is then re-established from it:
 
 ```ts
-const result: unknown = auth.getAuthSnapshot(); // returns DesktopAuthSnapshot
-return readAuthStateMethod.resultSchema.parse(result);
+const result: unknown = getSnapshot(); // returns Snapshot
+return resultSchema.parse(result);
 ```
 
 The erasure discards what the compiler proved and converts a compile-time contract into a runtime check inside the handler. The parse below looks like a boundary parse, but the boundary is manufactured: the value never left the process.
@@ -17,15 +17,15 @@ This is the upstream half of `antidrift/no-appeasement-cast`. That rule owns the
 
 ## Signal
 
-The current rule combines three signals:
+The rule reports a known initializer widened to `unknown` and then passed to a Zod or Effect decoder or cast back to a named contract, and a case table annotated with `Record<K, V>` or a mapped type instead of `satisfies`.
 
-1. The original TypeChecker branch reports a known initializer widened to `unknown` and then passed to a Zod or Effect decoder or cast back to a named contract.
-2. Vendored `anti-slop/no-known-value-widening` reports syntactically established values assigned, returned, or asserted into broad targets.
-3. Vendored `anti-slop/no-widen-then-assert` reports local bindings that discard known evidence and later assert a narrower contract.
+The vendored `anti-slop/no-widen-then-assert` branch, which reported local bindings that discard known evidence and later assert a narrower contract, is removed: `typescript/no-unsafe-type-assertion`, which typescript-tooling enables in its type-aware tier, reports its cases.
 
-Genuine raw values remain clean because the initializer has no known evidence to discard. Bare widening of an object, array, literal, function, class, or otherwise syntactically established value now reports even without later re-establishment.
+Genuine raw values remain clean because the initializer has no known evidence to discard. Widening alone, without a later re-establishment, does not report.
 
-Chained assertions are owned separately by `antidrift/no-unsafe-cast-chain`, now backed by the vendored `anti-slop/no-chained-type-assertions` implementation.
+The vendored `anti-slop/no-known-value-widening` branch was removed. It reported known values assigned, returned or asserted into broad targets with no recovery requirement. In a labelled sample of 12 current-upstream hits across BuilderIO/agent-native, cloudflare/agents, LibreChat and opencode, none was drift: the annotations equalled the inferred type, named owner or public-API contracts, typed lookup tables indexed by runtime keys, or were guard parameters and parser returns. On 41 sampled cloudflare/agents files it produced 79 of this rule's 82 findings. The widen-then-assert branch, which requires the recovery, scored 5/5 in the same sample.
+
+Chained assertions belong to `typescript/no-unsafe-type-assertion` in typescript-tooling.
 
 ## Historical 2026-08-03 Investigation
 
@@ -33,7 +33,7 @@ The remaining measurements document the narrower TypeChecker-only implementation
 
 ## Why This Rule Is The Gate
 
-Run against Murderbox desktop (`apps/desktop`, worktree branch `chore/conversation-callgraph-drift`), 38 files in `src`:
+Run against a private app's desktop client, 38 files in `src`:
 
 | Rule                                           | Findings |
 | ---------------------------------------------- | -------- |
@@ -44,9 +44,9 @@ Run against Murderbox desktop (`apps/desktop`, worktree branch `chore/conversati
 | `antidrift/no-unsafe-deserialize`              | 0        |
 | `antidrift/no-defensive-shape-probing`         | 0        |
 
-`bridge.ts` alone holds 21 parse calls and `preload.ts` holds 18, yet five rules report nothing. The reason is mechanical: every masked site declares `unknown`, and each of those rules needs a type comparison that `unknown` defeats. The erasures are not one more smell alongside the others — they are why the others are silent.
+One module alone holds 21 parse calls and another holds 18, yet five rules report nothing. The reason is mechanical: every masked site declares `unknown`, and each of those rules needs a type comparison that `unknown` defeats. The erasures are not one more smell alongside the others — they are why the others are silent.
 
-Measured on 2026-08-03 (branch `desktop-erasure-remediation`): after removing the twelve `: unknown` annotations, `antidrift/no-redundant-zod-parse` went from **0 to 8 findings** — six in `bridge.ts`, two in `machine-workflows.ts` — with no rule changes on either side. The other four rules stayed at zero, which is honest: the erasures were masking redundant parses specifically, not those rules' defects. The gate claim is now counted, not expected: one erasure pattern was hiding eight findings from an already-shipped stable rule.
+Measured on 2026-08-03 on a remediation branch: after removing the twelve `: unknown` annotations, `antidrift/no-redundant-zod-parse` went from **0 to 8 findings** — six in one module, two in another — with no rule changes on either side. The other four rules stayed at zero, which is honest: the erasures were masking redundant parses specifically, not those rules' defects. The gate claim is now counted, not expected: one erasure pattern was hiding eight findings from an already-shipped stable rule.
 
 ## Escape-Hatch Displacement
 
@@ -56,28 +56,28 @@ That is the general lesson: guarding one escape hatch moves the pressure to the 
 
 ## Real-Corpus Results
 
-Murderbox desktop — **12 findings, 0 known false positives**:
+The private app's desktop client — **12 findings, 0 known false positives**:
 
-- `src/bridge.ts:63, 100, 111, 124, 138, 151`
-- `src/machine-workflows.ts:68, 78, 87`
-- `scripts/authenticated-smoke.ts:225, 304`
-- `scripts/smoke.ts:782`
+- six in one source module
+- three in a second source module
+- two in one smoke script
+- one in another smoke script
 
-Erased types include `boolean` (`bridge.ts:151`) and `string | null` (`bridge.ts:100`). Nobody defensively re-validates a boolean; the uniformity is what identifies this as an edge reflex rather than considered defensive validation.
+Erased types include `boolean` and `string | null`. Nobody defensively re-validates a boolean; the uniformity is what identifies this as an edge reflex rather than considered defensive validation.
 
-Codebase Atlas — **0 findings across 34 files that declare `: unknown`**. Every one is a genuine boundary: `JSON.parse` results, caught errors typed `(cause: unknown)`, and generic probe parameters. This repo contributes the clean-control population.
+Another private app — **0 findings across 34 files that declare `: unknown`**. Every one is a genuine boundary: `JSON.parse` results, caught errors typed `(cause: unknown)`, and generic probe parameters. This repo contributes the clean-control population.
 
 Zero-finding repositories, after the two narrowings below. The zod column is what decides whether a zero means anything: the parse branch cannot fire in a repository that does not use zod.
 
-| Repository        | zod-importing files | Candidate files | Findings | Counts as a control   |
-| ----------------- | ------------------- | --------------- | -------- | --------------------- |
-| Cloudflare Agents | 76                  | 371             | 0        | yes                   |
-| Codebase Atlas    | 17                  | 34              | 0        | yes                   |
-| Executor          | 5                   | 342             | 0        | no — 649 Effect files |
-| PowerSync Service | 1                   | 9               | 0        | no                    |
-| Agent Browser     | 0                   | 7               | 0        | no                    |
+| Repository          | zod-importing files | Candidate files | Findings | Counts as a control   |
+| ------------------- | ------------------- | --------------- | -------- | --------------------- |
+| Cloudflare Agents   | 76                  | 371             | 0        | yes                   |
+| Another private app | 17                  | 34              | 0        | yes                   |
+| Executor            | 5                   | 342             | 0        | no — 649 Effect files |
+| PowerSync Service   | 1                   | 9               | 0        | no                    |
+| Agent Browser       | 0                   | 7               | 0        | no                    |
 
-Chaski and LibreChat were skipped: no installed `node_modules`, so type-aware linting could not run.
+A third private app and LibreChat were skipped: no installed `node_modules`, so type-aware linting could not run.
 
 Secondary validation (2026-08-03, first 60 non-test files of `packages/agents/src`): Cloudflare Agents' zero is **displacement, not cleanliness**. The same files report 18 `no-appeasement-cast`, 1 `no-contract-appeasement-projection`, and 1 `no-unsafe-deserialize` findings, plus 89 `as unknown as` double casts counted earlier. The codebase expresses unearned contracts through casts rather than erased annotations, so it is a genuine clean control for THIS rule's idiom while carrying the defect class through the neighbor idiom — the escape-hatch displacement pattern, observed from the other side.
 
@@ -101,11 +101,11 @@ Executor is the useful negative result, for the opposite reason to the one first
 | `value as unknown` (pure widening)                            | correctly silent           | correctly silent |
 | `const result: unknown = getSnapshot(); schema.parse(result)` | silent                     | **reports**      |
 
-Two conclusions. The **parse branch is the unique contribution** — no ecosystem rule asks whether a schema re-establishes a contract from an erased binding, and that branch is where all 12 Murderbox positives live. The **named-cast branch is ecosystem-covered** wherever `no-unsafe-type-assertion` is enabled; it is retained for consumers who do not enable it, but earns no independent value otherwise.
+Two conclusions. The **parse branch is the unique contribution** — no ecosystem rule asks whether a schema re-establishes a contract from an erased binding, and that branch is where all 12 private-app positives live. The **named-cast branch is ecosystem-covered** wherever `no-unsafe-type-assertion` is enabled; it is retained for consumers who do not enable it, but earns no independent value otherwise.
 
 A custom `as unknown as T` rule should not be built. The 53 Executor and 89 Cloudflare Agents double casts are unreported in those repositories because they do not run this configuration, not because the stack lacks a rule.
 
-**Scope caveat.** `no-unsafe-type-assertion` lives in this repository's own `oxlint.config.mts`, not in the shipped `oxlint-config`, which exports only `antidriftComplexityRules` and `createGovernanceOxlintConfig`. Keeping the strict TypeScript baseline local was a deliberate 0.5.0 decision. The practical effect is that "ecosystem-covered" holds here and not for consumers: Murderbox's own `oxlint.config.ts` carries none of those rules, so the named-cast branch of this rule is load-bearing there and redundant only inside this repository.
+**Scope caveat.** `no-unsafe-type-assertion` lives in this repository's own `oxlint.config.mts`, not in the shipped `oxlint-config`, which exports only `antidriftComplexityRules` and `createGovernanceOxlintConfig`. Keeping the strict TypeScript baseline local was a deliberate 0.5.0 decision. The practical effect is that "ecosystem-covered" holds here and not for consumers: the private app's own Oxlint config carries none of those rules, so the named-cast branch of this rule is load-bearing there and redundant only inside this repository.
 
 ## Contract-Free Literal Narrowing
 
@@ -132,7 +132,7 @@ for (const segment of segments) {
 }
 ```
 
-This is a traversal cursor, not a boundary value: it is reassigned each iteration, and the cast narrows after a `typeof` guard rather than manufacturing a contract. Restricting the rule to `const` bindings removes it and costs nothing — all 12 Murderbox positives are `const`. The shape is now a permanent clean control in `fixtures/programs/correct/appeasement-erasure-real-boundaries.ts`.
+This is a traversal cursor, not a boundary value: it is reassigned each iteration, and the cast narrows after a `typeof` guard rather than manufacturing a contract. Restricting the rule to `const` bindings removes it and costs nothing — all 12 private-app positives are `const`. The shape is now a permanent clean control in `fixtures/programs/correct/appeasement-erasure-real-boundaries.ts`.
 
 A sweep-harness error is worth recording so it is not repeated: the first Executor run reported 26 findings. Twenty-five were ESLint config noise — `Definition for rule '@typescript-eslint/no-explicit-any' was not found`, emitted for disable directives in files linted under an override config that does not load that plugin. Those messages carry a truthy `ruleId`, so a harness that counts `message.ruleId` truthiness inflates the count. Filter on the exact rule id.
 
@@ -144,8 +144,8 @@ Known false negative: an erased binding passed to a parameter with a named contr
 
 ## Promotion Gate
 
-1. A second repository supplies real positives. Six repositories have been swept; only Murderbox desktop has any. The corpus is also the wrong flavor — it is almost entirely first-party, which cannot separate one team's habit from an idiom the ecosystem produces. Widen to large, actively maintained, widely depended-on OSS TypeScript repositories that use Zod and contain deliberate `unknown`-narrowing helpers (`isRecord`, `isPlainObject`, `asRecord`).
+1. A second repository supplies real positives. Six repositories have been swept; only the private app's desktop client has any. The corpus is also the wrong flavor — it is almost entirely first-party, which cannot separate one team's habit from an idiom the ecosystem produces. Widen to large, actively maintained, widely depended-on OSS TypeScript repositories that use Zod and contain deliberate `unknown`-narrowing helpers (`isRecord`, `isPlainObject`, `asRecord`).
 2. Each zero-finding repository is secondary-validated: run the full family plus a survey of `as unknown as T` double casts and guard-helper idioms. A zero that coexists with visible laundering through an unmatched idiom is a missing branch, not a clean control.
 3. The post-remediation family measurement is recorded, converting the gate claim from expected to counted.
-4. DONE 2026-08-03: branch desktop-erasure-remediation, commits ba30be1f + 07c2cea0. Twelve erasures removed, then the twenty runtime validations they masked or accompanied (8 redundant re-parses, 6 parse-as-cast parameters, 6 IPC result re-parses). Desktop lint green at --max-warnings=0 on antidrift 0.6.0; all 183 tests pass unchanged. Boundary parses of unknown[] IPC input retained.
+4. DONE 2026-08-03: on a private-app remediation branch, twelve erasures removed, then the twenty runtime validations they masked or accompanied (8 redundant re-parses, 6 parse-as-cast parameters, 6 IPC result re-parses). Desktop lint green at --max-warnings=0 on antidrift 0.6.0; all 183 tests pass unchanged. Boundary parses of unknown[] IPC input retained.
 5. Known false positives stay at zero under the chosen scope.

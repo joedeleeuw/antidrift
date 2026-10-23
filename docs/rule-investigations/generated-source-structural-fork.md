@@ -46,6 +46,6 @@ Do not treat broad installed-package structural matches as blocking. They are di
 
 ## Entry Conditions
 
-- Chaski BFF now supplies projection clean controls: `orders-ops-router.ts` declares `LineItemDetailRow` as a local subset of generated `LineItemDetail`, and `service-stop-router.ts` declares `LineItemCounts` as a local subset of generated `LineItemCountsByOrder`. Those are not exact owner copies and should stay clean.
-- Clean controls include generated imports, installed base-client aliases, local tuple aliases, projected DTOs, and `Omit<ViewState, "padding">` utility derivation.
+- A private app's backend now supplies projection clean controls: two of its routers each declare a local subset of a generated type. Those are not exact owner copies and should stay clean.
+- Clean controls include generated imports, installed base-client aliases, local tuple aliases, projected DTOs, and an `Omit` utility-type derivation.
 - Stable promotion still needs real exact generated-source or accepted package-owner copy drift, another independent repository, broad inventory classification when generated sources are configured, and real accepted package-owner evidence before package owners are added.

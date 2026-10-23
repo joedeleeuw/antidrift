@@ -255,6 +255,92 @@ function inScope(candidate, declaration) {
   );
 }
 
+// The report this rule makes for an inline object type literal, or null.
+// no-near-duplicate-type asks it too, so one site gets one report.
+export function inlineStructuralRepeat(
+  node,
+  { checker, program, services, cwd, sameShape }
+) {
+  if (node.members.length < 3 || !inlineStructuralTypeAtBoundary(node)) {
+    return null;
+  }
+  const declaration = services.esTreeNodeToTSNodeMap.get(node);
+  if (declaresGenerated(declaration.getSourceFile())) return null;
+  const type = checker.getTypeAtLocation(declaration);
+  const key = propertyKey(type, checker);
+  if (!key) return null;
+  const packageRoot = packageDirectory(declaration.getSourceFile().fileName);
+  const candidates = programDeclarations(program).get(key) ?? [];
+  const verdicts = candidates
+    .filter(
+      (candidate) =>
+        candidate.node !== declaration &&
+        (candidate.name ||
+          (packageRoot !== null && candidate.packageRoot === packageRoot))
+    )
+    .map((candidate) => ({
+      candidate,
+      verdict: sameShape(type, candidate.type),
+    }))
+    .filter(
+      ({ candidate, verdict }) =>
+        verdict !== false && !derivesFrom(candidate.node, declaration, checker)
+    );
+  const governing = overriddenParameter(declaration, checker);
+  if (
+    governing &&
+    sameShape(type, governing.type) === true &&
+    !derivesFrom(governing.node, declaration, checker)
+  ) {
+    return {
+      messageId: "overridden",
+      data: {
+        name: governing.name,
+        location: lineLocation(governing.node, cwd),
+      },
+    };
+  }
+  const matches = verdicts
+    .filter(({ verdict }) => verdict === true)
+    .map(({ candidate }) => candidate);
+  const named = matches.filter((candidate) => candidate.name);
+  const usable = named.filter(
+    (candidate) =>
+      inScope(candidate, declaration) ||
+      (candidate.node.getSourceFile() !== declaration.getSourceFile() &&
+        exported(candidate, checker))
+  );
+  const existing = [
+    ...usable.filter((candidate) => inScope(candidate, declaration)),
+    ...usable.filter((candidate) => candidate.packageRoot === packageRoot),
+    ...usable,
+    ...named,
+    ...matches,
+  ][0];
+  if (existing) {
+    let messageId = "repeated";
+    if (usable.includes(existing)) messageId = "named";
+    else if (existing.name) messageId = "unscoped";
+    return {
+      messageId,
+      data: {
+        name: existing.name,
+        location: lineLocation(existing.node, cwd),
+      },
+    };
+  }
+  const undecided = verdicts.find(({ verdict }) => typeof verdict === "object");
+  return undecided
+    ? {
+        messageId: "undecided",
+        data: {
+          location: lineLocation(undecided.candidate.node, cwd),
+          unresolved: unresolvedDescription(undecided.verdict, checker, cwd),
+        },
+      }
+    : null;
+}
+
 export function ruleNoInlineStructuralTypeAtUseSite() {
   return defineTypeScriptRule({
     ruleName: "no-inline-structural-type-at-use-site",
@@ -279,107 +365,17 @@ export function ruleNoInlineStructuralTypeAtUseSite() {
       },
     },
     visitors({ context, checker, program, services, cwd }) {
-      const sameShape = shapeComparison(program);
+      const environment = {
+        checker,
+        program,
+        services,
+        cwd,
+        sameShape: shapeComparison(program),
+      };
       return {
         TSTypeLiteral(node) {
-          if (
-            node.members.length < 3 ||
-            !inlineStructuralTypeAtBoundary(node)
-          ) {
-            return;
-          }
-          const declaration = services.esTreeNodeToTSNodeMap.get(node);
-          if (declaresGenerated(declaration.getSourceFile())) return;
-          const type = checker.getTypeAtLocation(declaration);
-          const key = propertyKey(type, checker);
-          if (!key) return;
-          const packageRoot = packageDirectory(
-            declaration.getSourceFile().fileName
-          );
-          const candidates = programDeclarations(program).get(key) ?? [];
-          const verdicts = candidates
-            .filter(
-              (candidate) =>
-                candidate.node !== declaration &&
-                (candidate.name ||
-                  (packageRoot !== null &&
-                    candidate.packageRoot === packageRoot))
-            )
-            .map((candidate) => ({
-              candidate,
-              verdict: sameShape(type, candidate.type),
-            }))
-            .filter(
-              ({ candidate, verdict }) =>
-                verdict !== false &&
-                !derivesFrom(candidate.node, declaration, checker)
-            );
-          const governing = overriddenParameter(declaration, checker);
-          if (
-            governing &&
-            sameShape(type, governing.type) === true &&
-            !derivesFrom(governing.node, declaration, checker)
-          ) {
-            context.report({
-              node,
-              messageId: "overridden",
-              data: {
-                name: governing.name,
-                location: lineLocation(governing.node, cwd),
-              },
-            });
-            return;
-          }
-          const matches = verdicts
-            .filter(({ verdict }) => verdict === true)
-            .map(({ candidate }) => candidate);
-          const named = matches.filter((candidate) => candidate.name);
-          const usable = named.filter(
-            (candidate) =>
-              inScope(candidate, declaration) ||
-              (candidate.node.getSourceFile() !== declaration.getSourceFile() &&
-                exported(candidate, checker))
-          );
-          const existing = [
-            ...usable.filter((candidate) => inScope(candidate, declaration)),
-            ...usable.filter(
-              (candidate) => candidate.packageRoot === packageRoot
-            ),
-            ...usable,
-            ...named,
-            ...matches,
-          ][0];
-          if (existing) {
-            let messageId = "repeated";
-            if (usable.includes(existing)) messageId = "named";
-            else if (existing.name) messageId = "unscoped";
-            context.report({
-              node,
-              messageId,
-              data: {
-                name: existing.name,
-                location: lineLocation(existing.node, cwd),
-              },
-            });
-            return;
-          }
-          const undecided = verdicts.find(
-            ({ verdict }) => typeof verdict === "object"
-          );
-          if (undecided) {
-            context.report({
-              node,
-              messageId: "undecided",
-              data: {
-                location: lineLocation(undecided.candidate.node, cwd),
-                unresolved: unresolvedDescription(
-                  undecided.verdict,
-                  checker,
-                  cwd
-                ),
-              },
-            });
-          }
+          const repeat = inlineStructuralRepeat(node, environment);
+          if (repeat) context.report({ node, ...repeat });
         },
       };
     },

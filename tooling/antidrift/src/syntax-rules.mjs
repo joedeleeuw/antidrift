@@ -1,9 +1,7 @@
-import { ruleNoAsyncArrayMethod } from "./semantic-adapters/syntax/async-array.ts";
 import { ruleNoHandrolledResourceLifecycleCells } from "./semantic-adapters/syntax/resource-lifecycle.ts";
 import { ruleNoRawFetchInComponent } from "./semantic-adapters/syntax/raw-fetch.ts";
 import { ruleNoStatusLiteralInType } from "./semantic-adapters/syntax/status-literal.ts";
 import { ruleRequireAuthzCheck } from "./semantic-adapters/syntax/authz.ts";
-import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "./oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
 import ruleNoNonindependentTestOracle from "./oxlint-plugin/rules/no-nonindependent-test-oracle.js";
@@ -22,8 +20,6 @@ import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-
 // be exported by ESLint while remaining enabled by at most one runtime.
 export function createSyntaxRules() {
   return {
-    "no-async-array-method": ruleNoAsyncArrayMethod,
-    "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
     "no-duplicated-conditional-classnames":
       ruleNoDuplicatedConditionalClassnames(),
     "no-duplicated-object-field-blocks": ruleNoDuplicatedObjectFieldBlocks(),

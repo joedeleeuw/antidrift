@@ -7,7 +7,7 @@
       "project": []
     },
     "tooling/antidrift": {
-      "entry": ["src/**/*.{js,mjs}", "test/**/*.mjs"],
+      "entry": ["src/**/*.{js,mjs}", "test/**/*.mjs", "research/**/*.mjs"],
       "project": ["src/**/*.ts", "!src/**/fixtures/**"]
     }
   }

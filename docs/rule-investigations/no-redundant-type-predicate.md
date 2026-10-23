@@ -7,9 +7,6 @@ Status: `ready`, enabled at error in the ESLint config, with an autofix that del
 A callback states its own type predicate even though its body is one native check that TypeScript 5.5+ already turns into that predicate:
 
 ```ts
-const tables = [summary, derogatory].filter(
-  (table): table is VaultVendorTableWire => table !== null
-);
 const texts = items.filter(
   (item): item is Extract<StreamItem, { kind: "assistant_message" }> =>
     item.kind === "assistant_message"
@@ -34,27 +31,27 @@ The autofix removes the return annotation and any import specifier whose only re
 
 Measured on the 70 local roots of the October 2026 rules review.
 
-| Run                                                                                                    | Hits | Repositories | Top 5                                                                              |
-| ------------------------------------------------------------------------------------------------------ | ---: | -----------: | ---------------------------------------------------------------------------------- |
-| Wide sweep, 473 predicate files, dependencies as checked out                                           |  146 |           10 | paseo 103, chatbiz-webapp 24, homer-production 7, fungible 3, ProRL-Agent-Server 2 |
-| Frozen-lockfile copies (chatbiz-webapp, fungible, sandcastle, codebase-atlas, paseo, homer-production) |  177 |            6 | paseo 133, chatbiz-webapp 30, homer-production 7, fungible 3, sandcastle 3         |
+| Run                                                                      | Hits | Repositories | Top 5                                                                                |
+| ------------------------------------------------------------------------ | ---: | -----------: | ------------------------------------------------------------------------------------ |
+| Wide sweep, 473 predicate files, dependencies as checked out             |  146 |           10 | paseo 103, a private app 24, another private app 7, fungible 3, ProRL-Agent-Server 2 |
+| Frozen-lockfile copies (three private apps, fungible, sandcastle, paseo) |  177 |            6 | paseo 133, a private app 30, another private app 7, fungible 3, sandcastle 3         |
 
 Check kinds among the fixed lines: null/undefined filters 89, literal tags 55, `typeof` 30; no `instanceof` callback qualified.
 
 Autofix proof: the fix was applied to all 177 findings (100 files) in the six installed copies, then each repository's own type check ran before and after.
 
-| Repository       | Command                          | Before        | After       |
-| ---------------- | -------------------------------- | ------------- | ----------- |
-| chatbiz-webapp   | `tsc --noEmit`                   | 0 errors      | 0 errors    |
-| fungible         | `tsc --noEmit`                   | 0 errors      | 0 errors    |
-| sandcastle       | `tsc --noEmit`                   | 0 errors      | 0 errors    |
-| homer-production | `pnpm -r typecheck`              | 0 errors      | 0 errors    |
-| codebase-atlas   | `tsc --noEmit`                   | 20 (existing) | the same 20 |
-| paseo            | `npm run typecheck --workspaces` | 19 (existing) | the same 19 |
+| Repository          | Command                          | Before        | After       |
+| ------------------- | -------------------------------- | ------------- | ----------- |
+| a private app       | `tsc --noEmit`                   | 0 errors      | 0 errors    |
+| fungible            | `tsc --noEmit`                   | 0 errors      | 0 errors    |
+| sandcastle          | `tsc --noEmit`                   | 0 errors      | 0 errors    |
+| another private app | `pnpm -r typecheck`              | 0 errors      | 0 errors    |
+| a third private app | `tsc --noEmit`                   | 20 (existing) | the same 20 |
+| paseo               | `npm run typecheck --workspaces` | 19 (existing) | the same 19 |
 
 The first pass left one new error in paseo: `acp-agent.ts` imported `AgentPromptContentBlock` only for the deleted annotation (TS6133). The fixer now removes such orphaned import specifiers; the second pass left the error sets identical.
 
-Precision: 177/177 type-checked through the autofix across six repositories, plus a hand check of 32 findings (25 sampled from the copies and the 7 findings outside them in mrp, ProRL-Agent-Server, joe-heavy-sleep and two llama.cpp forks, whose TypeScript versions are all 5.6 or newer).
+Precision: 177/177 type-checked through the autofix across six repositories, plus a hand check of 32 findings (25 sampled from the copies and the 7 findings outside them in a fourth private app, ProRL-Agent-Server, joe-heavy-sleep and two llama.cpp forks, whose TypeScript versions are all 5.6 or newer).
 
 The rule started at warn and moved to error: the type-checked precision held at 100% in all six repositories, above the promotion bar of 70% hand-checked precision in at least three repositories (80% until 2026-10-12).
 

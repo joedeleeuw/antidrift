@@ -11,7 +11,6 @@ import {
 const typeServiceMessage = /requires TypeScript parser services/u;
 const typeServiceGuardedRules = [
   "react-max-component-props",
-  "no-appeasement-cast",
   "no-canonical-model-fork",
   "no-contract-appeasement-projection",
   "no-defensive-shape-probing",
@@ -23,7 +22,6 @@ const typeServiceGuardedRules = [
   "no-appeasement-erasure",
   "no-structural-type-fork",
   "no-underchecked-type-predicate",
-  "no-unsafe-deserialize",
   "require-convex-return-validator",
 ];
 
@@ -34,7 +32,7 @@ typedRuleTester.run(
     valid: [
       `
         type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
-        export function selectedFor(configs: string[]): SelectedConfigData {
+        export function toSelection(configs: string[]): SelectedConfigData {
           const selectedId = "default";
           const selected = configs[0] ?? "default";
           return { configs, selectedId, selected };
@@ -43,68 +41,68 @@ typedRuleTester.run(
       `
         type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
         function build(configs: string[]) {
-          const selectedFor = (id: string): SelectedConfigData => {
+          const toSelection = (id: string): SelectedConfigData => {
             const selectedId = id;
             const selected = configs[0] ?? id;
             return { configs, selectedId, selected };
           };
-          return selectedFor("default");
+          return toSelection("default");
         }
       `,
       `
         type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
         function build(configs: string[]) {
-          const selectedFor = (id: string): SelectedConfigData => {
+          const toSelection = (id: string): SelectedConfigData => {
             const selectedId = id;
             const selected = configs[0] ?? id;
             if (selected === "again") return { configs, selectedId, selected };
             return { configs, selectedId, selected };
           };
-          return selectedFor("default");
+          return toSelection("default");
         }
       `,
       `
         type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
         function build(configs: string[], ids: string[]) {
-          const selectedFor = (id: string): SelectedConfigData => {
+          const toSelection = (id: string): SelectedConfigData => {
             const selectedId = id;
             const selected = configs[0] ?? id;
             return { configs, selectedId, selected };
           };
-          return ids.map(selectedFor);
+          return ids.map(toSelection);
         }
       `,
       `
         type SelectedConfigData = { readonly configs: string[]; selectedId: string; selected: string };
         function build(configs: string[]) {
-          const selectedFor = (id: string): SelectedConfigData => {
+          const toSelection = (id: string): SelectedConfigData => {
             const selectedId = id;
             const selected = configs[0] ?? id;
             return { configs, selectedId, selected };
           };
-          return selectedFor("default");
+          return toSelection("default");
         }
       `,
       `
         type SelectedConfigData = { configs: string[]; selectedId: string; selected?: string };
         function build(configs: string[]) {
-          const selectedFor = (id: string): SelectedConfigData => {
+          const toSelection = (id: string): SelectedConfigData => {
             const selectedId = id;
             const selected = configs[0] ?? id;
             return { configs, selectedId, selected };
           };
-          return selectedFor("default");
+          return toSelection("default");
         }
       `,
       `
         type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
         function build(configs: string[]) {
-          const selectedFor: (id: string) => SelectedConfigData = (id): SelectedConfigData => {
+          const toSelection: (id: string) => SelectedConfigData = (id): SelectedConfigData => {
             const selectedId = id;
             const selected = configs[0] ?? id;
             return { configs, selectedId, selected };
           };
-          return selectedFor("default");
+          return toSelection("default");
         }
       `,
       `
@@ -121,35 +119,35 @@ typedRuleTester.run(
       `
         type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
         export function createSelector(configs: string[]) {
-          const selectedFor = (id: string): SelectedConfigData => {
+          const toSelection = (id: string): SelectedConfigData => {
             const selectedId = id;
             const selected = configs[0] ?? id;
             return { configs, selectedId, selected };
           };
-          return { selectedFor };
+          return { toSelection };
         }
       `,
       `
         type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
         export function createSelector(configs: string[]) {
-          const selectedFor = (id: string): SelectedConfigData => {
+          const toSelection = (id: string): SelectedConfigData => {
             const selectedId = id;
             const selected = configs[0] ?? id;
             return { configs, selectedId, selected };
           };
-          return selectedFor;
+          return toSelection;
         }
       `,
       `
         type Result = { value: number };
         function build() {
-          function selectedFor(value: number): Result;
-          function selectedFor(value: number | string): Result;
-          function selectedFor(input: number | string): Result {
+          function toSelection(value: number): Result;
+          function toSelection(value: number | string): Result;
+          function toSelection(input: number | string): Result {
             const value = Number(input);
             return { value };
           }
-          return selectedFor(1);
+          return toSelection(1);
         }
       `,
       `
@@ -180,11 +178,11 @@ typedRuleTester.run(
       `
         type Status = { status: string };
         function build() {
-          const selectedFor = (): Status => {
+          const toSelection = (): Status => {
             const status = "ready" as const;
             return { status };
           };
-          return selectedFor();
+          return toSelection();
         }
       `,
       `
@@ -227,12 +225,12 @@ typedRuleTester.run(
         code: `
           type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
           function build(configs: string[]): SelectedConfigData {
-            const selectedFor = (id: string): SelectedConfigData => {
+            const toSelection = (id: string): SelectedConfigData => {
               const selectedId = id;
               const selected = configs[0] ?? id;
               return { configs, selectedId, selected };
             };
-            return selectedFor("default");
+            return toSelection("default");
           }
         `,
         errors: [{ messageId: "redundantLocalReturnType" }],
@@ -241,12 +239,12 @@ typedRuleTester.run(
         code: `
           type SelectedConfigData = { configs: string[]; selectedId: string; selected: string };
           function build(configs: string[]): SelectedConfigData {
-            function selectedFor(id: string): SelectedConfigData {
+            function toSelection(id: string): SelectedConfigData {
               const selectedId = id;
               const selected = configs[0] ?? id;
               return { configs, selectedId, selected };
             }
-            return selectedFor("default");
+            return toSelection("default");
           }
         `,
         errors: [{ messageId: "redundantLocalReturnType" }],
@@ -256,15 +254,15 @@ typedRuleTester.run(
           type VideoModelId = "first" | "second";
           type SelectedConfigData = { configs: VideoModelId[]; selectedId: VideoModelId; selected: VideoModelId };
           function selectedVideoConfigDataFor(): Record<VideoModelId, SelectedConfigData> {
-            const selectedFor = (id: VideoModelId): SelectedConfigData => {
+            const toSelection = (id: VideoModelId): SelectedConfigData => {
               const configs = [id];
               const selectedId = id;
               const selected = configs[0] ?? id;
               return { configs, selectedId, selected };
             };
             return {
-              first: selectedFor("first"),
-              second: selectedFor("second"),
+              first: toSelection("first"),
+              second: toSelection("second"),
             };
           }
         `,
@@ -533,8 +531,44 @@ typedRuleTester.run(
           },
         ],
       },
+      // A tag that returns rows, not a string, binds its values: by its declared signature alone
+      "type SqlTaggedTemplate = { <T = Record<string, unknown>>(strings: TemplateStringsArray, ...values: (string | number | boolean | null)[]): T[] };\ndeclare const sql: SqlTaggedTemplate;\ndeclare const id: string;\nconst rows = sql`SELECT * FROM users WHERE id = ${id}`;\nvoid rows;",
+      // ...and when its body builds `?` placeholders and passes the values to the driver
+      "declare const storage: { exec(query: string, ...values: unknown[]): Iterable<Record<string, unknown>> };\nclass Agent {\n  sql<T>(strings: TemplateStringsArray, ...values: (string | number | boolean | null)[]): T[] {\n    const query = strings.reduce((acc, str, i) => acc + str + (i < values.length ? '?' : ''), '');\n    return [...storage.exec(query, ...values)] as T[];\n  }\n  load(id: string) { return this.sql`SELECT * FROM users WHERE id = ${id}`; }\n}\nvoid Agent;",
+      "interface SqlTag { (strings: TemplateStringsArray, ...values: unknown[]): { text: string; values: unknown[] }; raw(value: string): { text: string; values: unknown[] }; }\ndeclare const sql: SqlTag;\nconst rows = sql`SELECT ${sql.raw('CURRENT_TIMESTAMP')}`;\nvoid rows;",
     ],
     invalid: [
+      {
+        code: "async function sql(strings: TemplateStringsArray, ...values: unknown[]) { return String.raw({ raw: strings }, ...values); }\ndeclare const id: string;\nconst row = sql`SELECT * FROM users WHERE id = ${id}`;\nvoid row;",
+        errors: [{ message: /Do not interpolate values into SQL strings/u }],
+      },
+      {
+        code: "interface SqlTag { (strings: TemplateStringsArray, ...values: unknown[]): { text: string; values: unknown[] }; raw(value: string): { text: string; values: unknown[] }; }\ndeclare const sql: SqlTag;\ndeclare const columnName: string;\nconst rows = sql`SELECT ${sql.raw(columnName)} FROM users`;\nvoid rows;",
+        errors: [{ message: /raw SQL builder fragments/u }],
+      },
+      // A tag whose type depends on a module that does not resolve is undecided, not proven unsafe
+      {
+        code: "import { Agent } from 'agents-not-installed';\ndeclare const id: string;\nclass Chat extends Agent { load() { return this.sql`SELECT * FROM users WHERE id = ${id}`; } }\nvoid Chat;",
+        errors: [
+          {
+            message:
+              /^Incomplete analysis: TypeScript could not resolve 'this\.sql', and this SQL tag's type depends on it/u,
+          },
+        ],
+      },
+      {
+        code: "import { sql } from 'sql-lib-not-installed';\ndeclare const id: string;\nconst rows = sql`SELECT * FROM users WHERE id = ${id}`;\nvoid rows;",
+        errors: [
+          {
+            message:
+              /^Incomplete analysis: TypeScript could not resolve module 'sql-lib-not-installed'/u,
+          },
+        ],
+      },
+      {
+        code: "declare const sql: any;\ndeclare const id: string;\nconst rows = sql`SELECT * FROM users WHERE id = ${id}`;\nvoid rows;",
+        errors: [{ message: /Do not interpolate values into SQL strings/u }],
+      },
       {
         code: "declare const id: string;\nclass UntrustedDatabase { sql(strings: TemplateStringsArray, ...values: unknown[]) { return String.raw({ raw: strings }, ...values); } }\ndeclare const db: UntrustedDatabase;\nconst row = db.sql`SELECT * FROM users WHERE id = ${id}`;\nvoid row;",
         options: [
@@ -586,25 +620,6 @@ typedRuleTester.run(
   }
 );
 
-typedRuleTester.run("no-unsafe-deserialize", rule("no-unsafe-deserialize"), {
-  valid: [
-    fixture("programs/correct/json-parse-string.ts"),
-    fixture("programs/correct/schema-parse-unknown.ts"),
-    fixture("programs/correct/json-domain-validation.ts"),
-  ],
-  invalid: [
-    { ...fixture("programs/drift/json-parse-unknown.ts"), errors: 1 },
-    { ...fixture("programs/drift/json-parse-any.ts"), errors: 1 },
-    {
-      ...fixture("programs/drift/json-domain-store.ts"),
-      errors: [4, 5, 8, 10, 12].map((line) => ({
-        line,
-        message: /Validate parsed JSON against the schema for 'Settings'/u,
-      })),
-    },
-  ],
-});
-
 // ─── no-appeasement-erasure fixture suite ─────────────────────────────────────
 // Fires when a known type is widened to a broad contract, including local flows
 // that later re-establish a narrower contract.
@@ -626,19 +641,6 @@ typedRuleTester.run("no-appeasement-erasure", rule("no-appeasement-erasure"), {
         { message: /Appeasement erasure/u },
         { message: /Appeasement erasure/u },
         { message: /Appeasement erasure/u },
-        { messageId: "widening" },
-        { messageId: "widening" },
-      ],
-    },
-    {
-      code: `
-        const value = { id: "user-1" } as unknown;
-        export const user = value as { id: string };
-      `,
-      errors: [
-        { messageId: "widening" },
-        { messageId: "widening" },
-        { messageId: "widenThenAssert" },
       ],
     },
     // Erasure re-established through a curried Effect Schema decoder
@@ -817,6 +819,178 @@ ruleTester.run("require-authz-check", rule("require-authz-check"), {
       `,
       options: [{ authzFunctions: ["approvedAuthorize"] }],
       errors: 1,
+    },
+  ],
+});
+
+typedRuleTester.run("no-near-duplicate-type", rule("no-near-duplicate-type"), {
+  valid: [
+    fixture("programs/drift/near-duplicate-type/geometry.ts"),
+    fixture("programs/correct/near-duplicate-type/panel.ts"),
+    `
+      export type Row = { id: string; name: string; status: string };
+      export type Ticket = { id: string; name: string; status: "open" | "closed" };
+    `,
+    `
+      export interface Transaction {
+        userId: string;
+        conversationId: string;
+        messageId: string;
+        amount: number;
+        currency: string;
+        model: string;
+        endpoint: string;
+      }
+      export interface MessageFilter {
+        userId: string;
+        conversationId: string;
+        messageId: string;
+      }
+    `,
+    `
+      export interface Bounds { left: number; top: number; width: number; height: number }
+      export interface Box extends Bounds { id: string; left: number; top: number; width: number }
+    `,
+    `
+      export interface Lifecycle {
+        close(input: { showExit: boolean; title?: string; sessionId?: string }): Promise<void>;
+      }
+      export function createLifecycle(): Lifecycle {
+        const close = async (next: { showExit: boolean; title?: string; sessionId?: string }) => {
+          void next;
+        };
+        return { close };
+      }
+    `,
+    `
+      export interface BindingAccess {
+        binding: string;
+        accountId?: never;
+        apiToken?: never;
+        gateway: string;
+      }
+      export interface AccountAccess {
+        binding?: never;
+        accountId: string;
+        apiToken: string;
+        gateway: string;
+      }
+    `,
+  ],
+  invalid: [
+    {
+      ...fixture("programs/drift/near-duplicate-type/layout.ts"),
+      errors: [
+        {
+          message:
+            /^This interface repeats all 4 fields of `Bounds` at \S+geometry\.ts:1\. Extend `Bounds` and declare only the 1 field it adds\.$/u,
+        },
+      ],
+    },
+    {
+      code: `
+        export interface Options {
+          staleMs?: number;
+          timeoutMs?: number;
+          baseDelayMs?: number;
+          maxDelayMs?: number;
+          signal?: AbortSignal;
+          onWait?: () => void;
+        }
+        type Opts = { staleMs: number; timeoutMs: number; baseDelayMs: number; maxDelayMs: number };
+        export const defaults: Opts = { staleMs: 1, timeoutMs: 1, baseDelayMs: 1, maxDelayMs: 1 };
+      `,
+      errors: [
+        {
+          message:
+            /^This type repeats 4 of the 6 fields of `Options` at \S+:2\. Derive it as Required<Omit<Options, "signal" \| "onWait">>\.$/u,
+        },
+      ],
+    },
+    {
+      code: `
+        export interface Lifecycle {
+          close(input: { showExit: boolean; title?: string; sessionId?: string }): Promise<void>;
+        }
+        class TerminalLifecycle implements Lifecycle {
+          async close(next: { showExit: boolean; title?: string; sessionId?: string }) {
+            void next;
+          }
+        }
+        export const lifecycle: Lifecycle = new TerminalLifecycle();
+      `,
+      errors: [
+        {
+          message:
+            /^This parameter type repeats all 3 fields of the `input` parameter of `close` at \S+:3\. Name that type once and use the name in both places\.$/u,
+        },
+      ],
+    },
+    {
+      code: `
+        export type PresentationFileDiff = {
+          file?: string;
+          patch?: string;
+          additions: number;
+          deletions: number;
+        };
+        type LegacyDiff = { file: string; patch?: string; additions: number; deletions: number };
+        export const legacy: LegacyDiff[] = [];
+      `,
+      errors: [
+        {
+          message:
+            /^This type repeats all 4 fields of `PresentationFileDiff` at \S+:2\. Derive it as PresentationFileDiff & Required<Pick<PresentationFileDiff, "file">>\.$/u,
+        },
+      ],
+    },
+    {
+      code: `
+        interface ModelOptions { model: string }
+        export interface PiImagesModelOptions extends ModelOptions {
+          name?: string;
+          width?: number;
+          height?: number;
+          steps?: number;
+        }
+        interface ImagesOptions { prompt: string }
+        export interface PiImagesCallOptions extends ImagesOptions {
+          width?: number;
+          height?: number;
+          steps?: number;
+        }
+      `,
+      errors: [
+        {
+          message:
+            /^This interface repeats 3 of the 4 fields of `PiImagesModelOptions` at \S+:3\. Extend Pick<PiImagesModelOptions, "width" \| "height" \| "steps"> and drop the 3 fields it repeats\.$/u,
+        },
+      ],
+    },
+    {
+      code: `
+        export interface PullOptions { remote?: string; ref?: string; dir?: string; token?: string; author?: string }
+        export interface PushOptions { remote?: string; ref?: string; dir?: string; token?: string; force?: boolean }
+      `,
+      errors: [
+        {
+          message:
+            /^This interface repeats 4 of the 5 fields of `PullOptions` at \S+:2\. Move the 4 fields they share into one type that both extend, or take them from Pick<PullOptions, "remote" \| "ref" \| "dir" \| "token">\.$/u,
+        },
+      ],
+    },
+    {
+      code: `
+        import type { RetryOptions } from "./missing-module";
+        export interface ScheduledTask { name: string; cron: string; retry: RetryOptions }
+        export interface ScheduledTaskForTest { name: string; cron: string; retry: RetryOptions }
+      `,
+      errors: [
+        {
+          message:
+            /^Whether this interface repeats all 3 fields of `ScheduledTask` at \S+:3 is undecided because RetryOptions imported from '\.\/missing-module' \(\S+:2\) at property retry does not resolve\.$/u,
+        },
+      ],
     },
   ],
 });

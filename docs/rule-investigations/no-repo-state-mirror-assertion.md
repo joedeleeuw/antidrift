@@ -13,8 +13,8 @@ The rule is AST-only and runs only on test filenames (`*.test.*`, `*.spec.*`, `t
   "error",
   {
     sources: [
-      { module: "lib/server/conf" },
-      { module: "@murderbox/shared/model-registry", names: ["getChatModelMeta"] },
+      { module: "lib/config" },
+      { module: "@scope/shared/registry", names: ["getEntry"] },
     ],
   },
 ]
@@ -27,7 +27,7 @@ Imports from those modules taint the local binding. Taint propagates through loc
 
 ## Controls
 
-The rule reports nothing until at least one `sources` entry is configured, so a repository opts in by naming its own state modules. `names` narrows a module to specific exports; omitting it taints every import from that module. Malformed options fail loudly through the rule schema.
+Without `sources` the rule still reports assertions on file contents a test reads with `readFile` or `readFileSync`; configured `sources` add imported state modules. `names` narrows a module to specific exports; omitting it taints every import from that module. Malformed options fail loudly through the rule schema.
 
 ## Ecosystem
 
@@ -35,6 +35,10 @@ The rule reports nothing until at least one `sources` entry is configured, so a 
 
 ## Corpus
 
-First drift case is the Murderbox client conf/profile suite: tests compared `getChatProfileManifest()`, `getChatRuntimeProfiles()`, and `getChatRuntimeProfile(id)` output against literal profile objects and pinned specific `confFile`/`scope` values. The corrected forms assert relative invariants (manifest ids equal runtime-profile ids) or owned fixtures. Murderbox is the first clean external-corpus control.
+First drift case is a private app's client configuration and profile suite: tests compared the output of its profile-manifest and runtime-profile functions against literal profile objects and pinned specific configuration-file and scope values. The corrected forms assert relative invariants (manifest ids equal runtime-profile ids) or owned fixtures. That private app is the first clean external-corpus control.
 
 Keep the rule default-off until taint-coverage pressure (re-exports, dynamic access, fixture helpers) is inventoried on at least one more repository.
+
+## Off by default by owner decision (October 2026)
+
+On 20 fresh reports from BuilderIO/agent-native, cloudflare/agents, LibreChat and opencode, each judged by whether a reviewer would ask for the change, 10 were real problems, all tests that read the repository's source as text and pin a fragment of it. The other 10 were tests reading back files the test itself wrote (6), must-not-contain checks (2) and pinned public type names (2). The preset now ships the rule `off`; a project enables it explicitly. Limiting the rule to tests that read the repository's own source is the candidate fix before it returns to the default.

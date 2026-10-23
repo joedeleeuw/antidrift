@@ -14,14 +14,14 @@ an implementation detail silently becomes the public contract.
 ```ts
 // drift: no returns validator; the generated type follows the handler
 export const get = query({
-  args: { id: v.id("machines") },
+  args: { id: v.id("tasks") },
   handler: async (ctx, args) => { ... },
 });
 
 // allowed: the validator owns the contract
 export const get = query({
-  args: { id: v.id("machines") },
-  returns: v.union(machineResult, v.null()),
+  args: { id: v.id("tasks") },
+  returns: v.union(taskResult, v.null()),
   handler: async (ctx, args) => { ... },
 });
 ```
@@ -64,7 +64,7 @@ imports (`import { query as publicQuery }`) still resolve and are flagged.
 
 ## Ecosystem check (2026-08-10)
 
-`@convex-dev/eslint-plugin` (v2.0.0 inspected in the Murderbox install) ships
+`@convex-dev/eslint-plugin` (v2.0.0 inspected in a private app's install) ships
 `require-args-validator`, which enforces the `args` property only; no
 returns-validator rule exists in the plugin, and its registrar detection is
 name-matched (`CONVEX_REGISTRARS`) rather than symbol-resolved. No maintained
@@ -72,10 +72,9 @@ rule covers the returns-validator half of the registration contract.
 
 ## Corpus
 
-- Murderbox (`apps/client/convex`): real drift control — 18 registered
-  functions across `conversations.ts` (12), `littleBird.ts` (3),
-  `machines.ts` (2), and `health.ts` (1), all missing `returns` validators,
-  all flagged; `ctx.db.query(...)` calls correctly ignored. Measured
+- A private app's Convex functions: real drift control — 18 registered
+  functions across four modules (12, 3, 2 and 1), all missing `returns`
+  validators, all flagged; `ctx.db.query(...)` calls correctly ignored. Measured
   2026-08-10 with the rule enabled standalone over the whole convex directory
   (18 errors, 0 false positives).
 - Synthetic fixtures cover validator-covered registrations, aliased imports,

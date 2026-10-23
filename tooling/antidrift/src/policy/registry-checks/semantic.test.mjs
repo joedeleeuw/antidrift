@@ -403,7 +403,7 @@ rules:
       { schemaProvenance: {} },
       new Set([
         "antidrift/no-redundant-zod-parse",
-        "antidrift/no-unsafe-deserialize",
+        "antidrift/no-identity-schema-transform",
       ]),
       messages,
       "test semantic adapter contracts",
@@ -412,14 +412,14 @@ rules:
           stable: true,
           promotion: { proofBucket: "semantic-source-type-provenance" },
         },
-        "antidrift/no-unsafe-deserialize": {
+        "antidrift/no-identity-schema-transform": {
           stable: true,
           promotion: { proofBucket: "semantic-source-type-provenance" },
         },
       }
     );
     expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts must claim stable semantic-source-type-provenance rule antidrift/no-unsafe-deserialize."
+      "test semantic adapter contracts must claim stable semantic-source-type-provenance rule antidrift/no-identity-schema-transform."
     );
   });
   it("rejects semantic adapter aggregate runtime surfaces missing contract adapters", () => {

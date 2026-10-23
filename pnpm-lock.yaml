@@ -78,8 +78,8 @@ importers:
         specifier: workspace:*
         version: link:tooling/antidrift
       "@joedeleeuw/typescript-tooling":
-        specifier: github:joedeleeuw/typescript-tooling#4388458794287c49242ca250ba27812d9553d78b
-        version: https://codeload.github.com/joedeleeuw/typescript-tooling/tar.gz/4388458794287c49242ca250ba27812d9553d78b(dependency-cruiser@18.5.0)(eslint@9.39.4(jiti@2.7.0))(oxlint@1.78.0(oxlint-tsgolint@7.0.2001))(prettier@3.8.3)(typescript@6.0.3)
+        specifier: github:joedeleeuw/typescript-tooling
+        version: https://codeload.github.com/joedeleeuw/typescript-tooling/tar.gz/f0cffe10c48710ed1ebde75d1b8e7055354a07fa(dependency-cruiser@18.5.0)(eslint@9.39.4(jiti@2.7.0))(oxlint@1.78.0(oxlint-tsgolint@7.0.2001))(prettier@3.8.3)(typescript@6.0.3)
       "@types/node":
         specifier: catalog:core
         version: 22.19.19
@@ -250,23 +250,20 @@ importers:
 
   tooling/antidrift:
     dependencies:
-      "@eslint-community/eslint-plugin-eslint-comments":
-        specifier: ^4.7.2
-        version: 4.7.2(eslint@9.39.4(jiti@2.7.0))
       "@eslint/json":
-        specifier: 0.14.0
+        specifier: ^0.14.0
         version: 0.14.0
       "@oxlint/plugins":
-        specifier: 1.78.0
+        specifier: ^1.78.0
         version: 1.78.0
       "@typescript-eslint/types":
-        specifier: 8.60.1
-        version: 8.60.1
+        specifier: ^8.60.1
+        version: 8.61.0
       eslint:
         specifier: ">=9.38.0 <11"
         version: 9.39.4(jiti@2.7.0)
       oxlint:
-        specifier: 1.78.0
+        specifier: ^1.78.0
         version: 1.78.0(oxlint-tsgolint@7.0.2001)
       yaml:
         specifier: ^2.6.1
@@ -275,6 +272,9 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      "@eslint-community/eslint-plugin-eslint-comments":
+        specifier: ^4.7.2
+        version: 4.7.2(eslint@9.39.4(jiti@2.7.0))
       "@tanstack/react-query":
         specifier: ^5.101.4
         version: 5.101.4(react@19.2.6)
@@ -297,7 +297,7 @@ importers:
         specifier: ^11.0.0
         version: 11.10.0
       typescript:
-        specifier: 6.0.3
+        specifier: ~6.0.3
         version: 6.0.3
       typescript-eslint:
         specifier: ^8.60.1
@@ -1861,11 +1861,12 @@ packages:
       }
     engines: { node: ">=18.18" }
 
-  "@joedeleeuw/typescript-tooling@https://codeload.github.com/joedeleeuw/typescript-tooling/tar.gz/4388458794287c49242ca250ba27812d9553d78b":
+  "@joedeleeuw/typescript-tooling@https://codeload.github.com/joedeleeuw/typescript-tooling/tar.gz/f0cffe10c48710ed1ebde75d1b8e7055354a07fa":
     resolution:
       {
         gitHosted: true,
-        tarball: https://codeload.github.com/joedeleeuw/typescript-tooling/tar.gz/4388458794287c49242ca250ba27812d9553d78b,
+        integrity: sha512-2e+4w6MZcYCh9O1IAtAywt//yGGfkN2N5zqmbfQZldzCA0tXF5GrChVsxlcNkYWPqYa9XEAKs8JzXltDO8eveQ==,
+        tarball: https://codeload.github.com/joedeleeuw/typescript-tooling/tar.gz/f0cffe10c48710ed1ebde75d1b8e7055354a07fa,
       }
     version: 0.2.0
     engines: { node: ">=24" }
@@ -6135,7 +6136,7 @@ snapshots:
 
   "@humanwhocodes/retry@0.4.3": {}
 
-  "@joedeleeuw/typescript-tooling@https://codeload.github.com/joedeleeuw/typescript-tooling/tar.gz/4388458794287c49242ca250ba27812d9553d78b(dependency-cruiser@18.5.0)(eslint@9.39.4(jiti@2.7.0))(oxlint@1.78.0(oxlint-tsgolint@7.0.2001))(prettier@3.8.3)(typescript@6.0.3)":
+  "@joedeleeuw/typescript-tooling@https://codeload.github.com/joedeleeuw/typescript-tooling/tar.gz/f0cffe10c48710ed1ebde75d1b8e7055354a07fa(dependency-cruiser@18.5.0)(eslint@9.39.4(jiti@2.7.0))(oxlint@1.78.0(oxlint-tsgolint@7.0.2001))(prettier@3.8.3)(typescript@6.0.3)":
     dependencies:
       "@eslint-community/eslint-plugin-eslint-comments": 4.7.2(eslint@9.39.4(jiti@2.7.0))
       "@typescript-eslint/parser": 8.61.0(eslint@9.39.4(jiti@2.7.0))(typescript@6.0.3)

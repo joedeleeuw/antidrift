@@ -14,7 +14,7 @@ The disputed boolean-helper branch was removed from this rule. Real corpus revie
 
 Adjacent ecosystem rules:
 
-- `@typescript-eslint/no-unsafe-member-access`, `@typescript-eslint/no-unsafe-return`, and `@typescript-eslint/no-unsafe-assignment` catch many `any` leakage symptoms. `pnpm policy:inventory-defensive-shape` now makes that comparison reproducible over Chaski BFF, Chaski Portal, Codebase Atlas, Sudocode CLI/server, and Opencode console app. The current parser-clean report checks 1,680 type-aware files, records 72 `Object.entries` transform syntax candidates, finds 1 antidrift finding, 1,508 unsafe-member-access findings, 113 unsafe-return findings, and 977 unsafe-assignment findings. The Chaski drift is partially overlapped: antidrift reports the `Object.entries` callback at line 706, while upstream reports unsafe access in the same file.
+- `@typescript-eslint/no-unsafe-member-access`, `@typescript-eslint/no-unsafe-return`, and `@typescript-eslint/no-unsafe-assignment` catch many `any` leakage symptoms. `pnpm policy:inventory-defensive-shape` now makes that comparison reproducible over two programs in a private app, another private app, Sudocode CLI/server, and Opencode console app. The current parser-clean report checks 1,680 type-aware files, records 72 `Object.entries` transform syntax candidates, finds 1 antidrift finding, 1,508 unsafe-member-access findings, 113 unsafe-return findings, and 977 unsafe-assignment findings. The private-app drift is partially overlapped: antidrift reports the `Object.entries` callback, while upstream reports unsafe access in the same file.
 - `@typescript-eslint/no-unsafe-type-assertion` catches unsafe narrowing assertions, but does not catch broad-object probing or normalizer callbacks.
 - `@typescript-eslint/no-unnecessary-condition` catches impossible or redundant conditions once type information proves them unnecessary.
 - `@typescript-eslint/switch-exhaustiveness-check` covers discriminated-union exhaustiveness, not broad-object normalization.
@@ -43,7 +43,7 @@ Object.entries(raw).map(([key, value]) => {
 });
 ```
 
-The important detail is the type of `value`: in the Chaski drift case, TypeScript reports it as `any` because the source map comes from generated protobuf `globalParams?: { [key: string]: any }`.
+The important detail is the type of `value`: in the private-app drift case, TypeScript reports it as `any` because the source map comes from a generated protobuf field typed `{ [key: string]: any }`.
 
 The rule does not report ordinary typed `Object.entries(...).map` transformations, schema-backed parsing, or type-predicate helpers. If TypeScript parser services are unavailable, the rule does not report.
 
@@ -63,19 +63,19 @@ Current result:
 - 72 `Object.entries` transform syntax candidates.
 - 0 parser errors.
 - 1 `antidrift/no-defensive-shape-probing` finding.
-- 1 drift repository: Chaski BFF `src/frontend/bff/api/services/scenarios-service.ts` line 706.
-- 0 additional custom findings across Chaski Portal, Codebase Atlas, Sudocode CLI/server, and Opencode console app.
+- 1 drift repository: the private app.
+- 0 additional custom findings across the private app's other program, another private app, Sudocode CLI/server, and Opencode console app.
 - Same-line overlap with upstream unsafe rules: 0. Same-file upstream overlap for custom findings: 1.
 
 Decision: block at error with the bulk-suppression baseline. It should not move toward stable promotion without a second real drift repository, preferably an `unknown`-typed broad-value mini-parser that upstream unsafe rules do not already explain.
 
 ## Earlier Corpus Sweep 2026-06-09
 
-A syntax-first sweep over Chaski, Codebase Atlas, Sudocode, Opencode, Cloudflare Agents, and Murderbox found no second drift repository for this exact extractor signal. The sweep did find useful clean controls:
+A syntax-first sweep over the private app, Sudocode, Opencode, Cloudflare Agents, and two other private apps found no second drift repository for this exact extractor signal. The sweep did find useful clean controls:
 
-- Chaski `src/frontend/portal/modules/scenarios/agent-configuration/lib/agent-config.ts` has many `patch.* !== undefined` checks inside `Object.entries(patches).map(...)`, but `patch` is a typed `MutableAgentFields`, not broad inbound data.
+- A private-app module has many `!== undefined` checks on patch fields inside an `Object.entries(...).map(...)` over patches, but each patch is typed, not broad inbound data.
 - Opencode `packages/console/app/src/routes/zen/util/handler.ts` recursively rewrites a provider payload template and checks arrays/objects/strings, but the value is not decoded into a domain contract and the rule stays quiet.
-- Murderbox API candidates with object/array guards stayed quiet under the rule.
+- API candidates with object/array guards in another private app stayed quiet under the rule.
 
 The 2026-06-15 reproducible sweep above supersedes this ad hoc sweep as the current promotion evidence.
 
@@ -84,9 +84,9 @@ The 2026-06-15 reproducible sweep above supersedes this ad hoc sweep as the curr
 1. Removed the callable boolean-helper visitor from `no-defensive-shape-probing`.
 2. Kept only `CallExpression` handling for `Object.entries(...).map`/`flatMap`/related transforms.
 3. Added TypeChecker evidence: the entry value binding must be broad (`any`/`unknown`) before the shape-probe count matters.
-4. Added external clean corpus pressure for typed entries maps in Sudocode and Codebase Atlas.
+4. Added external clean corpus pressure for typed entries maps in Sudocode and another private app.
 5. Kept the rule `stable: false`.
-6. Added clean real-program controls for Chaski typed patch application and Opencode provider payload rewriting after a broad syntax sweep found no second drift repo.
+6. Added clean real-program controls for private-app typed patch application and Opencode provider payload rewriting after a broad syntax sweep found no second drift repo.
 
 ## Known Risks
 

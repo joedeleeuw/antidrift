@@ -72,17 +72,16 @@ The shared config already enforces disable descriptions through `@eslint-communi
 
 Drift:
 
-- `/Users/sushi/code/chaski/src/frontend/portal/lib/hooks/useLatestCallbackRef.ts` line 26 omits the dependency array.
-- `/Users/sushi/code/claude-code-source-code/src/hooks/useAssistantHistory.ts` lines 199 and 218 omit dependency arrays.
-- `/Users/sushi/code/claude-code-source-code/src/hooks/useVirtualScroll.ts` lines 591 and 619 omit dependency arrays.
+- A hook in a private app omits the dependency array.
+- `claude-code-source-code/src/hooks/useAssistantHistory.ts` lines 199 and 218 omit dependency arrays.
+- `claude-code-source-code/src/hooks/useVirtualScroll.ts` lines 591 and 619 omit dependency arrays.
 
 Clean:
 
-- `/Users/sushi/code/chaski/src/frontend/portal/lib/hooks/useDebounce.ts`
-- `/Users/sushi/code/chaski/src/frontend/portal/modules/scenarios/hooks/use-sticky-column-offsets.ts`
-- `/Users/sushi/code/sudocode-main/frontend/src/pages/IssueDetailPage.tsx`
-- `/Users/sushi/code/codebase-atlas/src/components/AtlasGameStateShell.tsx`
-- `/Users/sushi/code/murderbox/apps/client/src/lib/theme.ts`
+- Two hooks in the private app
+- `sudocode-main/frontend/src/pages/IssueDetailPage.tsx`
+- A component in another private app
+- A module in a third private app
 
 ## Promotion State
 

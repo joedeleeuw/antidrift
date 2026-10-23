@@ -1,7 +1,5 @@
-import * as asyncControlFlow from "./kernel/async-control-flow.ts";
 import * as authBoundary from "./boundary/auth-boundary.ts";
 import * as broadInput from "./boundary/broad-input.ts";
-import * as parseInput from "./boundary/parse-input.ts";
 import * as reactState from "./projection/react-state.ts";
 import * as schemaProvenance from "./projection/schema-provenance.ts";
 import * as sql from "./projection/sql.ts";
@@ -10,10 +8,8 @@ import * as typeOwner from "./type-owner.mjs";
 import { SEMANTIC_FACT_KIND_CONTRACT_LIST } from "../policy/lib/semantic-facts.mjs";
 
 export {
-  asyncControlFlow,
   authBoundary,
   broadInput,
-  parseInput,
   reactState,
   schemaProvenance,
   sql,
@@ -22,10 +18,8 @@ export {
 };
 
 export const SEMANTIC_ADAPTERS = Object.freeze({
-  asyncControlFlow,
   authBoundary,
   broadInput,
-  parseInput,
   reactState,
   schemaProvenance,
   sql,
@@ -34,23 +28,6 @@ export const SEMANTIC_ADAPTERS = Object.freeze({
 });
 
 export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
-  asyncControlFlow: Object.freeze({
-    id: "async-control-flow",
-    exportName: "asyncControlFlow",
-    subpath: "@joedeleeuw/antidrift/semantic-adapters/async-control-flow",
-    rules: Object.freeze(["antidrift/no-async-array-method"]),
-    proofBuckets: Object.freeze([
-      "local-ast-source-shape",
-      "semantic-source-type-provenance",
-    ]),
-    semanticFactAdapterIds: Object.freeze([]),
-    semanticFactKinds: Object.freeze([]),
-    associations: Object.freeze([
-      "async array callback to collection method semantics",
-      "map or flatMap promise collection to later Promise combinator consumption",
-    ]),
-    carrier: "AST callback shape plus local scope binding",
-  }),
   authBoundary: Object.freeze({
     id: "auth-boundary",
     exportName: "authBoundary",
@@ -73,7 +50,6 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     exportName: "broadInput",
     subpath: "@joedeleeuw/antidrift/semantic-adapters/broad-input",
     rules: Object.freeze([
-      "antidrift/no-appeasement-cast",
       "antidrift/no-defensive-shape-probing",
       "antidrift/no-redundant-type-predicate",
       "antidrift/no-underchecked-type-predicate",
@@ -87,21 +63,6 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
       "broad Object.entries value to mini-parser probe cluster",
     ]),
     carrier: "TypeChecker plus AST/control-flow checks",
-  }),
-  parseInput: Object.freeze({
-    id: "parse-input",
-    exportName: "parseInput",
-    subpath: "@joedeleeuw/antidrift/semantic-adapters/parse-input",
-    rules: Object.freeze(["antidrift/no-unsafe-deserialize"]),
-    proofBuckets: Object.freeze(["semantic-source-type-provenance"]),
-    semanticFactAdapterIds: Object.freeze([]),
-    semanticFactKinds: Object.freeze([]),
-    associations: Object.freeze([
-      "JSON.parse input provenance to broad any or unknown values",
-      "parse input to local string-boundary proof",
-      "JSON.parse input provenance, local string proof, and parsed-result flow into declared contextual domain types.",
-    ]),
-    carrier: "TypeChecker plus local parse-input control flow",
   }),
   reactState: Object.freeze({
     id: "react-state",

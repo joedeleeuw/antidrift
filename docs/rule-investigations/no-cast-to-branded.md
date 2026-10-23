@@ -31,18 +31,18 @@ That makes the rule precise for adopters of the antidrift brand utility, but wea
 
 ## Real Corpus Evidence
 
-Codebase Atlas uses Zod brands heavily:
+A private app uses Zod brands heavily:
 
-- `/Users/sushi/code/codebase-atlas/src/schemas/atlasGameState.ts` defines many `z.string().min(1).brand<...>()` schemas.
-- `/Users/sushi/code/codebase-atlas/src/services/atlasIdService.ts` constructs those branded IDs through schema parses and stays clean.
+- One schema module defines many `z.string().min(1).brand<...>()` schemas.
+- An ID service constructs those branded IDs through schema parses and stays clean.
 
 Current limitation: this is only a clean parse-boundary control after the rule understands Zod-branded targets. Today it passes because the implementation does not detect Zod brands.
 
 Known cast inventory:
 
-- `/Users/sushi/code/codebase-atlas/src/routes/atlas.city3d.tsx` casts a checked scene literal to `GeneratedRepoId`, but that type is a literal union, not a brand.
-- Several Codebase Atlas test files cast impossible branded IDs to assert runtime behavior. Those are test-only and not promotion evidence.
-- `/Users/sushi/code/murderbox/apps/client/app/(chat)/index.tsx` casts a fallback string to `MachineId`; this is a branded/opaque-looking ID surface to inspect, but not yet confirmed as a Zod or antidrift brand target.
+- A route in that private app casts a checked literal to an ID type, but that type is a literal union, not a brand.
+- Several of its test files cast impossible branded IDs to assert runtime behavior. Those are test-only and not promotion evidence.
+- A screen in another private app casts a fallback string to an ID type; this is a branded/opaque-looking ID surface to inspect, but not yet confirmed as a Zod or antidrift brand target.
 
 ## Claude Advisory Review
 
@@ -84,4 +84,4 @@ A second prospect review completed on June 8, 2026 (`reports/claude-prospect-rev
 
 Retired.
 
-The intended contract is understandable, but the current corpus gives it no work: Codebase Atlas uses Zod brands through parse boundaries, and the real non-test forged-cast count is still zero. Reopen only if a real repository has adopted branded validation boundaries and a non-test forged branded cast appears. Until then, keep the brand utility and let `@typescript-eslint/no-unsafe-type-assertion` own the broad assertion surface.
+The intended contract is understandable, but the current corpus gives it no work: the private app with Zod brands uses them through parse boundaries, and the real non-test forged-cast count is still zero. Reopen only if a real repository has adopted branded validation boundaries and a non-test forged branded cast appears. Until then, keep the brand utility and let `@typescript-eslint/no-unsafe-type-assertion` own the broad assertion surface.

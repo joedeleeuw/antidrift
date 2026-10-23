@@ -34,6 +34,6 @@ Generic duplicate-branch rules cover identical conditional branches, and duplica
 
 ## Corpus
 
-Murderbox's current `apps/client/src/components/thread/live-turn.tsx` reports at line 180, where both branches repeat five button-layout classes and differ only by interaction state. The earlier client send-button case remains the original evidence.
+A current component in a private app's client reports one conditional whose branches repeat five button-layout classes and differ only by interaction state. The earlier client send-button case remains the original evidence.
 
 Keep the rule default-off until more real UI files are classified for clean pressure and false positives.

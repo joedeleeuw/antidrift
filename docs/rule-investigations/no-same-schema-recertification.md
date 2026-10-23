@@ -12,25 +12,9 @@ Status: `research`, leaning drop. Do not implement or enable without a second in
 
 The suspicious shape is a function that accepts a value already typed as a schema output, rebuilds a mostly equivalent object, then parses that object through the same schema and returns the same output type.
 
-Real anchor:
+Real anchor: an exported function in a private app takes a schema output value, spreads it into a new object that sets two boolean flags on the matching element of one array, parses that object with the same schema, and returns the same output type.
 
-```ts
-export function markExplorationTileUnderstood(
-  exploration: ExplorationState,
-  terrainNodeId: TerrainNodeId
-): ExplorationState {
-  return ExplorationStateSchema.parse({
-    ...exploration,
-    tiles: exploration.tiles.map((tile) =>
-      tile.terrainNodeId === terrainNodeId
-        ? { ...tile, seen: true, understood: true }
-        : tile
-    ),
-  });
-}
-```
-
-This is not a thin factory wrapper. It is not a generic "single returned call" smell. It is a possible same-contract recertification smell: `ExplorationState` in, `ExplorationStateSchema.parse(...)`, `ExplorationState` out.
+This is not a thin factory wrapper. It is not a generic "single returned call" smell. It is a possible same-contract recertification smell: schema output in, the same schema's `parse(...)`, schema output out.
 
 ## Current Coverage
 
@@ -52,16 +36,16 @@ Run:
 pnpm policy:inventory-schema-roundtrip
 ```
 
-This is a non-blocking policy inventory, not an ESLint rule. It scans real Codebase Atlas TypeScript programs for `Schema.parse({ ...alreadyTypedSchemaOutput, overrides })`, then classifies each hit by override provenance:
+This is a non-blocking policy inventory, not an ESLint rule. It scans real TypeScript programs from that private app for `Schema.parse({ ...alreadyTypedSchemaOutput, overrides })`, then classifies each hit by override provenance:
 
 - `owned-only`: overrides derive from the schema-owned value or literals.
 - `cross-source`: at least one top-level override derives from another source.
 - `export-boundary`: the parse is inside an exported function or public method of an exported class.
 
-The broad Codebase Atlas inventory currently checks 225 files and finds 9 roundtrip shapes: 3 `owned-only` and 6 `cross-source`. The focused regression assertion classifies:
+The broad inventory of that private app currently checks 225 files and finds 9 roundtrip shapes: 3 `owned-only` and 6 `cross-source`. The focused regression assertion classifies:
 
-- `LanternController.moveTo` as `cross-source` and `export-boundary`.
-- `markExplorationTileUnderstood` as `owned-only` and `export-boundary`.
+- an exported class method that rebuilds state from another source as `cross-source` and `export-boundary`.
+- the real anchor above as `owned-only` and `export-boundary`.
 
 That split is intentional. The inventory gives us evidence for future promotion or retirement without pretending the direct rule is production-safe today.
 
@@ -74,10 +58,10 @@ Zod parses are not only TypeScript type assertions. They can enforce runtime con
 - `.default(...)`, `.catch(...)`, `.transform(...)`, and preprocessors can change the returned value.
 - Schema parses can serve as intentional invariant checkpoints after cross-source joins or state reconstruction.
 
-Codebase Atlas already has the key pair of examples in one file:
+The private app already has the key pair of examples in one file:
 
-- `/Users/sushi/code/codebase-atlas/src/programs/lanternController.ts` lines 48-59: `markExplorationTileUnderstood` mutates only boolean flags on existing typed tiles, so this may be redundant.
-- `/Users/sushi/code/codebase-atlas/src/programs/lanternController.ts` lines 13-45: `LanternController.moveTo` rebuilds exploration tiles from terrain state and previous exploration state, so the parse may be an intentional invariant checkpoint.
+- The real anchor mutates only boolean flags on existing typed elements, so this may be redundant.
+- The class method rebuilds those elements from another state source and the previous state, so the parse may be an intentional invariant checkpoint.
 
 Those two cases point in opposite directions. That makes this a code-review question today, not a production rule.
 
@@ -94,7 +78,7 @@ Potentially report only when:
 5. Every override is a literal or already-typed value for a refinement-free field, such as bare `z.boolean()`.
 6. No changed field depends on `any`, `unknown`, IO, JSON, request data, storage, DB rows, or broad external values.
 
-This is the only slice that might eventually report the `markExplorationTileUnderstood` shape.
+This is the only slice that might eventually report the real anchor's shape.
 
 ### Slice B: Array Element Rebuilds
 
@@ -104,7 +88,7 @@ This is much more fragile than Slice A because branches, filtering, joining, and
 
 ### Slice C: Cross-Source Rebuilds
 
-Out of scope. Cross-source assembly, such as rebuilding exploration tiles from terrain nodes plus previous exploration state, must stay clean unless real corpus evidence proves a narrower violation.
+Out of scope. Cross-source assembly, such as rebuilding elements from another state source plus the previous state, must stay clean unless real corpus evidence proves a narrower violation.
 
 ## Ecosystem Check
 
@@ -145,7 +129,7 @@ Likely escape shapes:
 
 - Assign the rebuilt object to a `const`, then parse the identifier.
 - Build through `Object.assign`, helper functions, or builders.
-- Move the parse behind a wrapper such as `parseExplorationState(...)`.
+- Move the parse behind a wrapper such as `parseState(...)`.
 - Add a trivial runtime check or branch.
 
 False negatives are acceptable for this candidate. False positives are not.
@@ -154,7 +138,7 @@ False negatives are acceptable for this candidate. False positives are not.
 
 Keep this candidate in `research` until all of these are true:
 
-1. `markExplorationTileUnderstood` and `LanternController.moveTo` are classified as accepted drift vs accepted clean controls.
+1. The real anchor and the cross-source class method are classified as accepted drift vs accepted clean controls.
 2. At least two independent repositories contain accepted real non-test drift anchors that were not added to satisfy the rule.
 3. Each accepted drift anchor has a real remediation showing that removing the parse or restructuring the state update improves the code without losing a runtime guarantee.
 4. Clean controls explicitly cover schema-owned construction, cross-source rebuilds, default/transform schemas, branded fields, and refinement-bearing overrides.

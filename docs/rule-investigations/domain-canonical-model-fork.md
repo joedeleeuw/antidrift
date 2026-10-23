@@ -31,13 +31,13 @@ The current proof is exact-owner-copy only: local and owner property names, prop
 
 ## Real Corpus Evidence
 
-Chaski report types provide the primary real-program gate:
+Report types in a private app provide the primary real-program gate:
 
-- Drift: `src/frontend/portal/components/reports/action-items/types.ts` redeclares `ActionItem`, `Stop`, and `ActionItemsReport` from `src/frontend/portal/types/reports.ts`.
-- Clean owner: `src/frontend/portal/types/reports.ts`.
-- Clean sibling model: `src/frontend/portal/components/reports/weekly-digest/types.ts` imports shared report primitives but defines a different weekly digest report shape.
+- Drift: a report component's types file redeclares three models from the report-types owner.
+- Clean owner: the report-types owner file.
+- Clean sibling model: a sibling report's types file imports shared report primitives but defines a different report shape.
 
-The local `Account` and `TDay` declarations in the drift file are not asserted: `Account` is not exported by the canonical owner, and `TDay` has fewer than four comparable properties.
+Two other local declarations in the drift file are not asserted: one is not exported by the canonical owner, and the other has fewer than four comparable properties.
 
 Sudocode provides second-repo configured-owner evidence:
 
@@ -49,17 +49,16 @@ Sudocode provides second-repo configured-owner evidence:
 Current focused evidence:
 
 ```bash
-pnpm exec antidrift chaski-corpus --slice canonical-model-fork-review --rules antidrift/no-canonical-model-fork --require
-pnpm exec antidrift external-corpus --all --slice canonical-model-fork-review --rules antidrift/no-canonical-model-fork --require --min-repositories 1
+node tooling/antidrift/research/cli.mjs external-corpus --all --slice canonical-model-fork-review --rules antidrift/no-canonical-model-fork --require --min-repositories 1
 ```
 
-Both commands pass against the local real repositories. The stricter external-only bar does not pass yet:
+The private-app evidence came from a private-app corpus run that is no longer in the repository. The external command passes against the local real repositories. The stricter external-only bar does not pass yet:
 
 ```bash
-pnpm exec antidrift external-corpus --all --slice canonical-model-fork-review --rules antidrift/no-canonical-model-fork --require --min-repositories 2
+node tooling/antidrift/research/cli.mjs external-corpus --all --slice canonical-model-fork-review --rules antidrift/no-canonical-model-fork --require --min-repositories 2
 ```
 
-That fails because only Sudocode currently has matching external canonical-model-fork cases; Chaski is covered by the separate Chaski corpus.
+That fails because only Sudocode currently has matching external canonical-model-fork cases; the private app was covered by its separate corpus run.
 
 ## Decision
 

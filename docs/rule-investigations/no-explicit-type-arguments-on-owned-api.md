@@ -13,14 +13,14 @@ to the registration when the registration changes).
 
 ```ts
 // drift: the reference type is restated; the registration already owns it
-useQuery<typeof api.machines.list>(api.machines.list);
+useQuery<typeof api.tasks.list>(api.tasks.list);
 
-// drift: a handwritten result type forks machinesQuery's queryFn return
-useQuery<HandwrittenMachine[]>(machinesQuery);
-queryClient.getQueryData<HandwrittenMachine[]>(machinesQuery.queryKey);
+// drift: a handwritten result type forks tasksQuery's queryFn return
+useQuery<HandwrittenTask[]>(tasksQuery);
+queryClient.getQueryData<HandwrittenTask[]>(tasksQuery.queryKey);
 
 // allowed: inference flows from the owner
-useQuery(api.machines.list);
+useQuery(api.tasks.list);
 ```
 
 ## Signal
@@ -44,7 +44,7 @@ to the real package.
 
 ## Deliberate boundaries (false negatives by design)
 
-- Ad-hoc TanStack key arrays (`getQueryData<T>(["machines"])`) stay silent: no
+- Ad-hoc TanStack key arrays (`getQueryData<T>(["tasks"])`) stay silent: no
   registration exists to own the result.
 - Inline options objects (`useQuery<T>({ queryKey, queryFn })`) stay silent:
   the call site is the definition site, not a registered owner.
@@ -60,7 +60,7 @@ No other maintained rule models generated-API or registration ownership.
 
 ## Corpus
 
-- Murderbox (`apps/client`): clean-run control — zero explicit type arguments
+- A private app's client: clean-run control — zero explicit type arguments
   on Convex or TanStack owned calls across the app.
 - Synthetic drift fixtures cover both owner sources and the name-collision
   guard.

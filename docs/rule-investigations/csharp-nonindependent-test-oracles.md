@@ -24,16 +24,16 @@ review concern until independent C# evidence satisfies the promotion gate below.
 
 ## Confirmed Example
 
-The removed test was:
+The removed test was (repository references and commit hashes replaced with placeholders):
 
 ```csharp
 [Fact]
 public void ProposalModelPreservesDevelopmentAndImpactEvidence()
 {
     var development = new DevelopmentSnapshot(
-        "joedeleeuw/mrp",
+        "owner/repo",
         "refs/heads/development",
-        "12cf3dece91d02047654d0598f67cacae4856eee");
+        "<development-commit>");
     var touched = new ImpactFact(
         ImpactKind.Touched,
         "src/routes/releases.tsx",
@@ -50,12 +50,12 @@ public void ProposalModelPreservesDevelopmentAndImpactEvidence()
         "The unmerged proposal has no post-merge record",
         [new EvidenceRef("analysis.boundary", "pre-merge")]);
     var proposal = new ProposalState(
-        "mrp-44",
+        "repo-44",
         44,
         "Add release route",
-        "https://github.com/joedeleeuw/mrp/pull/44",
+        "https://github.com/owner/repo/pull/44",
         development.Commit,
-        "9dbc15570cfe0df5335831b8fa7b85dd458316fd",
+        "<head-commit>",
         [touched, reached, unknown],
         null);
 
@@ -82,7 +82,7 @@ test's own arrangement.
 
 Provenance is confirmed from the local Codex session rather than Git history.
 
-- Repository: `/Users/sushi/code/sledge`
+- Repository: `sledge`
 - Worktree branch: `foundation/proposal-state-reset`
 - Intended file: `engine/tests/Sledge.Engine.Tests/EngineProperties.cs`
 - Session: `019f7025-41a9-7833-95bf-63780271f383`

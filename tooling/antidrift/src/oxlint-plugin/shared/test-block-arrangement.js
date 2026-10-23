@@ -1,4 +1,4 @@
-import { findVariable } from "../../semantic-adapters/kernel/async-control-flow.ts";
+import { findVariable } from "../../semantic-adapters/kernel/variable-lookup.ts";
 import { staticPropertyName } from "./test-files.js";
 
 export const booleanValues = new Set([true, false]);

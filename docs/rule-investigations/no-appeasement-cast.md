@@ -1,5 +1,9 @@
 # no-appeasement-cast Investigation
 
+## Status
+
+Retired. `typescript/no-unsafe-type-assertion`, which typescript-tooling enables in its type-aware tier, reports every invalid case of this rule's tests. The investigation below is kept as a record.
+
 ## Current Rule
 
 `antidrift/no-appeasement-cast` is exported and enabled at `error` in the typed ESLint configuration. Its registry status is `ready`, with `stable: false`.
@@ -20,7 +24,7 @@ The rule is type-aware. It visits `as` and angle-bracket casts and every import 
 |  10 | `unresolved_proof_candidate`        | incomplete | An expression that tests this value before the cast (a call, `instanceof` or comparison) depends on a module or name the program cannot resolve, so a proof TypeScript cannot see may exist.                                                                                                                                                                                                                  |
 |  11 | `broad_source_to_unproven_contract` | report     | An `any` or `unknown` value is cast to a contract that no checker-visible proof establishes.                                                                                                                                                                                                                                                                                                                  |
 
-A proof counts only when TypeScript itself narrows the cast operand. An `expect(...)` matcher, a `Map.has` check, a function named `assert` without an `asserts` signature, an ignored predicate call or a discarded decoder call does not narrow the value, so the cast reports. A narrowing that does not reach the target also reports, such as `unknown` narrowed to `object`, `{}`, `string` or `any[]` and then cast to a named contract. Identity is checked first: a flow type that is the target, or the same generic reference with pairwise identical arguments, proves it. Otherwise assignability counts only when no `any` anywhere in the flow type (type arguments, properties, index signatures, array elements, at any depth) is what makes a concrete part of the target admissible, so `{ id: any }` does not prove `{ id: string }`, `any[]` does not prove `string[]`, and `Map<any, any>` does not prove `Map<string, Contract>`. `Array.isArray` proves `unknown[]` but not `string[]`, and an object narrowing never proves an array target. An unconstrained type parameter is as broad as `unknown`.
+A proof counts only when TypeScript itself narrows the cast operand. An `expect(...)` matcher, a `Map.has` check, a function named `assert` without an `asserts` signature, an ignored predicate call or a discarded decoder call does not narrow the value, so the cast reports. A narrowing that does not reach the target also reports, such as `unknown` narrowed to `object`, `{}`, `string` or `any[]` and then cast to a named contract. Identity is checked first: a flow type that is the target, or the same generic reference with pairwise identical arguments, proves it. Otherwise assignability counts only when no `any` anywhere in the flow type (type arguments, properties, index signatures, array elements, at any depth) is what makes a concrete part of the target admissible, so `{ id: any }` does not prove `{ id: string }`, `any[]` does not prove `string[]`, and `Map<any, any>` does not prove `Map<string, Contract>`. `Array.isArray` proves `unknown[]` but not `string[]`, and an object narrowing never proves an array target. An unconstrained type parameter is as broad as `unknown`. A fallback does not prove its left operand: TypeScript types `details ?? fallback` and `details || fallback` as `{}` when `details` is `unknown`, but the result can be `details` itself, so row 6 judges the operand by the left side's declared type when that is broad.
 
 Type provenance is followed without a depth limit and without a dependency-path exception. The walk follows declarations, inferred returns of block-bodied functions, `for...of` sources, and the contextual call, JSX element or annotated declaration that types an unannotated callback parameter. A declared type annotation is conclusive: a parameter or variable annotated `unknown`, `any` or any other type takes its type from the annotation, so the walk does not enter its initializer, and an `as T` initializer is conclusive in the same way, so the walk follows `T` and not the asserted operand. Only declarations in TypeScript's default library are skipped, because the program owns them. A module counts as resolved only when the owning program's checker returns a module symbol for the specifier and that symbol has a body: a shorthand ambient module (`declare module "untyped";` or `declare module "*.raw";` without braces) types every import from it as `any`, so a cast whose type depends on such an import is incomplete and names the module, while a pattern module with a body stays a resolved, typed source. The source side (row 5) and the target side (row 7) are walked separately, so a typed operand clears before an unresolved target is considered, and a cast to `any` or `unknown` clears before either side is walked.
 
@@ -36,7 +40,7 @@ Closest supported rule:
 
 - `@typescript-eslint/no-unsafe-type-assertion`
 
-That upstream rule is real and high support. It catches some of the same bad assertions, but it is broader than the antidrift rule. In Chaski, the upstream rule also reports typed SDK/API conversion patterns that this package currently treats as clean controls because their source value is already typed. So the ecosystem rule is not an equivalent replacement for this project scope.
+That upstream rule is real and high support. It catches some of the same bad assertions, but it is broader than the antidrift rule. In a private app, the upstream rule also reports typed SDK/API conversion patterns that this package currently treats as clean controls because their source value is already typed. So the ecosystem rule is not an equivalent replacement for this project scope.
 
 ## Upstream Delta Benchmark
 
@@ -46,7 +50,7 @@ Run:
 pnpm policy:benchmark-unsafe-type-assertion
 ```
 
-The benchmark runs `@typescript-eslint/no-unsafe-type-assertion` beside `antidrift/no-appeasement-cast` over real Chaski, Codebase Atlas, and Sudocode TypeScript programs. An earlier source scan checked 2,585 files, with 274 parser errors recorded separately, and produced:
+The benchmark runs `@typescript-eslint/no-unsafe-type-assertion` beside `antidrift/no-appeasement-cast` over real TypeScript programs from two private apps and Sudocode. An earlier source scan checked 2,585 files, with 274 parser errors recorded separately, and produced:
 
 | Rule                                          | Findings |
 | --------------------------------------------- | -------: |
@@ -67,9 +71,9 @@ Interpretation: upstream is a strict superset on the measured corpus, but too br
 
 ### Drift
 
-Chaski:
+A private app:
 
-- `chaski/src/frontend/portal/api/apiService.ts` line 81 casts an unknown caught error to `AxiosError` only to read `response.status`.
+- An API service module casts an unknown caught error to `AxiosError` only to read `response.status`.
 
 Expected repair:
 
@@ -79,30 +83,23 @@ if (axios.isAxiosError(err)) {
 }
 ```
 
-Codebase Atlas:
+Another private app:
 
-- `codebase-atlas/src/needle/AtlasNeedleRenderer.ts` line 205 casts `mesh.userData.baseEmissive` to `ThreeColor`.
-- `codebase-atlas/src/programs/persistenceCuration.ts` line 1269 casts broad input to `TerrainLayoutAnchor` before checking fields.
+- A renderer module casts a Three.js mesh's `userData` value to a color type.
+- A persistence module casts broad input to a layout contract before checking fields.
 
-Expected repair:
-
-```ts
-const baseEmissive = mesh.userData.baseEmissive;
-if (baseEmissive instanceof this.THREE.Color) {
-  material.emissive.copy(baseEmissive);
-}
-```
+Expected repair: guard the `userData` value with `instanceof` against the Three.js `Color` class before copying it into the material.
 
 ### Clean Controls
 
-Chaski:
+The private app:
 
-- `chaski/src/frontend/portal/lib/firebase/server.ts` converts `currentUser.toJSON()` to Firebase `User`. This stays clean because the source is typed, not because the rule has an SDK/API allowlist.
+- A server module converts the current Firebase user's `toJSON()` result to Firebase `User`. This stays clean because the source is typed, not because the rule has an SDK/API allowlist.
 
-Codebase Atlas adjacent clean pressure:
+The other private app, adjacent clean pressure:
 
-- `codebase-atlas/src/programs/persistenceCuration.ts` has `isTerrainLayoutAnchor` as a legitimate predicate shape once it checks through a guard or delegates to the owning schema. The current live repo implementation is still flagged because it casts before checking.
-- `codebase-atlas/src/bridge/AtlasSceneBridge.ts` casts a typed DOM `Event` to `CustomEvent<AtlasSceneEvent>` and stays clean because the source is not `any` or `unknown`.
+- The persistence module has a type predicate for the layout contract that is a legitimate predicate shape once it checks through a guard or delegates to the owning schema. The current live repo implementation is still flagged because it casts before checking.
+- A scene bridge module casts a typed DOM `Event` to a `CustomEvent` of its scene event type and stays clean because the source is not `any` or `unknown`.
 
 ## Remediation Evidence (2026-06-04)
 
@@ -112,54 +109,54 @@ Four production repairs have been applied in bracket-prefixed copies so the live
 pnpm policy:validate-appeasement-remediation
 ```
 
-| Repo                | File                                                                                                    | Old pattern                                                                 | Repair                                                                                                                             | Validation                                                                                                                                    |
-| ------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chaski copy         | `[antidrift-no-appeasement-remediation]-chaski/src/frontend/portal/api/apiService.ts`                   | `err as AxiosError` on a caught `unknown`                                   | `isAxiosError(err)` guard before reading `response.status`                                                                         | `policy:validate-appeasement-remediation` passes; the copied file is a clean case.                                                            |
-| Chaski copy         | `[antidrift-no-appeasement-remediation]-chaski/src/frontend/portal/components/ImpersonationWarning.tsx` | Three `JSON.parse(...) as ImpersonationData` storage casts                  | `parseStoredImpersonationData` parses into `unknown` and checks optional string/number fields before returning `ImpersonationData` | `policy:validate-appeasement-remediation` passes; the copied file is a clean case for serialized browser storage.                             |
-| Codebase Atlas copy | `[antidrift-no-appeasement-remediation]-codebase-atlas/src/programs/persistenceCuration.ts`             | `value as TerrainLayoutAnchor` before checking fields                       | `TerrainLayoutAnchorSchema.safeParse(value).success`                                                                               | `policy:validate-appeasement-remediation` passes; the copied file is a clean case while `AtlasNeedleRenderer.ts` still proves adjacent drift. |
-| Codebase Atlas copy | `[antidrift-no-appeasement-remediation]-codebase-atlas/src/needle/AtlasNeedleRenderer.ts`               | `mesh.userData.baseEmissive as ThreeColor` from a third-party user-data bag | `baseEmissive instanceof this.THREE.Color` guard before copying into the material                                                  | `policy:validate-appeasement-remediation` passes; the copied file is a clean case for third-party bag narrowing.                              |
+| Repo                   | File                                    | Old pattern                                                                 | Repair                                                                                               | Validation                                                                                                                               |
+| ---------------------- | --------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Private app copy       | API service module                      | `err as AxiosError` on a caught `unknown`                                   | `isAxiosError(err)` guard before reading `response.status`                                           | `policy:validate-appeasement-remediation` passes; the copied file is a clean case.                                                       |
+| Private app copy       | UI component that reads browser storage | Three `JSON.parse(...) as T` storage casts                                  | A storage parser parses into `unknown` and checks optional string/number fields before returning `T` | `policy:validate-appeasement-remediation` passes; the copied file is a clean case for serialized browser storage.                        |
+| Other private app copy | Persistence module                      | `value as T` on the layout contract before checking fields                  | The owning schema's `safeParse(value).success`                                                       | `policy:validate-appeasement-remediation` passes; the copied file is a clean case while the renderer module still proves adjacent drift. |
+| Other private app copy | Renderer module                         | `mesh.userData` value cast to a color type from a third-party user-data bag | `instanceof` Three.js `Color` guard before copying into the material                                 | `policy:validate-appeasement-remediation` passes; the copied file is a clean case for third-party bag narrowing.                         |
 
 The copied repos use `node_modules` symlinks back to the originals so type-aware rules resolve the same external contracts without changing the original working trees.
 
 Focused inventory deltas after the repairs:
 
-| Scope                                     | Before | After |
-| ----------------------------------------- | -----: | ----: |
-| Chaski targeted remediation files         |      4 |     0 |
-| Codebase Atlas targeted remediation files |      2 |     0 |
+| Scope                                        | Before | After |
+| -------------------------------------------- | -----: | ----: |
+| Private-app targeted remediation files       |      4 |     0 |
+| Other private app targeted remediation files |      2 |     0 |
 
 ## Broad Inventory
 
-Focused Chaski and external corpus gates pass for the known drift and clean controls. A broader rule-only inventory found more real programs to classify before stable promotion:
+Focused private-app and external corpus gates pass for the known drift and clean controls. A broader rule-only inventory found more real programs to classify before stable promotion:
 
-| Corpus               | Files checked | Rule findings | Notes                                                                             |
-| -------------------- | ------------: | ------------: | --------------------------------------------------------------------------------- |
-| Local antidrift repo |            50 |             0 | Maintained package surface stays clean.                                           |
-| Chaski portal        |           802 |             9 | Includes the accepted Axios drift plus additional production casts.               |
-| Chaski BFF           |           205 |             1 | Finding is in a test file. Generated files caused harness noise outside the rule. |
-| Chaski monolithui    |           232 |             2 | Production findings need classification.                                          |
-| Chaski crow-v2       |           223 |             3 | Production findings need classification.                                          |
-| Codebase Atlas       |           168 |             3 | Two accepted drift cases plus one test finding.                                   |
-| Sudocode server      |           260 |            37 | Likely generic/API-wrapper pressure; requires classification.                     |
-| Sudocode frontend    |           360 |            14 | Requires classification.                                                          |
-| Sudocode CLI         |           132 |            15 | Requires classification.                                                          |
-| Sudocode MCP         |            26 |             1 | Requires classification.                                                          |
+| Corpus                 | Files checked | Rule findings | Notes                                                                             |
+| ---------------------- | ------------: | ------------: | --------------------------------------------------------------------------------- |
+| Local antidrift repo   |            50 |             0 | Maintained package surface stays clean.                                           |
+| Private app frontend A |           802 |             9 | Includes the accepted Axios drift plus additional production casts.               |
+| Private app backend    |           205 |             1 | Finding is in a test file. Generated files caused harness noise outside the rule. |
+| Private app frontend B |           232 |             2 | Production findings need classification.                                          |
+| Private app frontend C |           223 |             3 | Production findings need classification.                                          |
+| Another private app    |           168 |             3 | Two accepted drift cases plus one test finding.                                   |
+| Sudocode server        |           260 |            37 | Likely generic/API-wrapper pressure; requires classification.                     |
+| Sudocode frontend      |           360 |            14 | Requires classification.                                                          |
+| Sudocode CLI           |           132 |            15 | Requires classification.                                                          |
+| Sudocode MCP           |            26 |             1 | Requires classification.                                                          |
 
 The broad inventory was run with an ad-hoc ESLint API harness. Some subprojects emitted tsconfig/generated-file parser messages, so only `antidrift/no-appeasement-cast` findings count as rule evidence. These findings are not labeled false positives yet, but none can count toward stable promotion until they are classified.
 
 ## Full Classification (2026-06-04)
 
-The broad inventory was rerun with `reports/no-appeasement-inventory.mjs` on June 4, 2026. It still reports 85 findings across the live Chaski, Codebase Atlas, and Sudocode repos. Every finding has a classification bucket. No production false-positive category was found; the remaining blocker is adoption/cleanup in real consumer repositories, not rule narrowing. The separate copy-backed remediation corpus demonstrates four accepted repair patterns without changing those live repos.
+The broad inventory was rerun with `reports/no-appeasement-inventory.mjs` on June 4, 2026. It still reports 85 findings across the live repos of two private apps and Sudocode. Every finding has a classification bucket. No production false-positive category was found; the remaining blocker is adoption/cleanup in real consumer repositories, not rule narrowing. The separate copy-backed remediation corpus demonstrates four accepted repair patterns without changing those live repos.
 
-| Classification                       | Count | Examples                                                                                                             | Current decision                                                                                                                                                                                                                                      |
-| ------------------------------------ | ----: | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Caught-error normalization casts     |    21 | Chaski `portal/api/apiService.ts`, Chaski `crow-v2/app/_layout.tsx`, Sudocode executor/worktree/repo-info catches    | Drift. Use `instanceof`, `axios.isAxiosError`, typed error guards, or a shared `normalizeError` helper. The Chaski remediation copy proves the `isAxiosError` repair pattern.                                                                         |
-| Unvalidated serialized data casts    |    27 | Chaski `ImpersonationWarning.tsx`; Sudocode config, JSONL, YAML, workflow, sidecar, and `response.json()` readers    | Drift. Parse into `unknown`, then validate with a schema, generated decoder, or owned mapper before assigning the contract. The Chaski remediation copy proves the browser storage parser pattern.                                                    |
-| Row/model/object contract casts      |    12 | Chaski PowerSync rows and TanStack table rows; Codebase Atlas `mesh.userData`; Sudocode DB rows and Claude tool args | Drift. Fix source generics, add typed row mappers, or guard third-party bags before claiming the model. The Codebase Atlas remediation copy proves both the schema-backed `TerrainLayoutAnchor` repair and the `THREE.Color` user-data guard pattern. |
-| String-union / enum value casts      |    12 | Chaski toggle/select values; Sudocode editor, entity, relationship, agent, and narration priority values             | Drift. Validate against an allowed-value set or make the UI/router source carry the literal type.                                                                                                                                                     |
-| Transport/API message contract casts |     5 | Sudocode websocket payloads and generic `ApiResponse<any>` unwrap                                                    | Drift. Use discriminated event schemas, generated clients, or response decoders. Generic wrappers are not a built-in exception.                                                                                                                       |
-| Request-body boundary casts          |     5 | Sudocode import/config route bodies                                                                                  | Drift. Validate request bodies at the route boundary before destructuring.                                                                                                                                                                            |
-| Test setup / impossible-state casts  |     3 | Chaski PostHog gateway test, Codebase Atlas persisted-project test, Sudocode hook test                               | Still reported. Tests are not production promotion evidence, but type-escape hatches in real tests should use typed builders, schema-validated fixture loaders, or focused local suppression with a reason.                                           |
+| Classification                       | Count | Examples                                                                                                                         | Current decision                                                                                                                                                                                                                                     |
+| ------------------------------------ | ----: | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Caught-error normalization casts     |    21 | Private-app API service and app layout catches, Sudocode executor/worktree/repo-info catches                                     | Drift. Use `instanceof`, `axios.isAxiosError`, typed error guards, or a shared `normalizeError` helper. The private-app remediation copy proves the `isAxiosError` repair pattern.                                                                   |
+| Unvalidated serialized data casts    |    27 | A private-app browser-storage reader; Sudocode config, JSONL, YAML, workflow, sidecar, and `response.json()` readers             | Drift. Parse into `unknown`, then validate with a schema, generated decoder, or owned mapper before assigning the contract. The private-app remediation copy proves the browser storage parser pattern.                                              |
+| Row/model/object contract casts      |    12 | Private-app PowerSync rows and TanStack table rows; another private app's `mesh.userData`; Sudocode DB rows and Claude tool args | Drift. Fix source generics, add typed row mappers, or guard third-party bags before claiming the model. The other private app's remediation copy proves both the schema-backed layout-contract repair and the `THREE.Color` user-data guard pattern. |
+| String-union / enum value casts      |    12 | Private-app toggle/select values; Sudocode editor, entity, relationship, agent, and narration priority values                    | Drift. Validate against an allowed-value set or make the UI/router source carry the literal type.                                                                                                                                                    |
+| Transport/API message contract casts |     5 | Sudocode websocket payloads and generic `ApiResponse<any>` unwrap                                                                | Drift. Use discriminated event schemas, generated clients, or response decoders. Generic wrappers are not a built-in exception.                                                                                                                      |
+| Request-body boundary casts          |     5 | Sudocode import/config route bodies                                                                                              | Drift. Validate request bodies at the route boundary before destructuring.                                                                                                                                                                           |
+| Test setup / impossible-state casts  |     3 | Private-app analytics gateway test, another private app's persisted-project test, Sudocode hook test                             | Still reported. Tests are not production promotion evidence, but type-escape hatches in real tests should use typed builders, schema-validated fixture loaders, or focused local suppression with a reason.                                          |
 
 No rule narrowing is justified from this inventory. Generic/API wrappers are not an exception to the rule: `response.json() as APIResponse<T>`, `response.data as ApiResponse<any>`, request-body casts, DB/YAML row casts, and websocket payload casts are boundary contract assertions and should be repaired with schema validation, a generated client/decoder, or a typed mapper.
 
@@ -183,7 +180,7 @@ can be type-checked.
 
 ## Promotion State
 
-This remains a strong promotion candidate because it has real drift replication in Chaski, Codebase Atlas, and Sudocode, plus remediation-pattern evidence in bracket-prefixed Chaski and Codebase Atlas copies.
+This remains a strong promotion candidate because it has real drift replication in two private apps and Sudocode, plus remediation-pattern evidence in bracket-prefixed copies of both private apps.
 
 It is not stable yet. Current state: ready, default-on, remediation patterns proven.
 
@@ -229,7 +226,7 @@ The round 2 scan selected 59 repositories from earlier install receipts instead 
 
 ## Round 3 course-corrected measurement on October 14, 2026
 
-The round 3 scan inventories three corpus roots instead of selecting repositories from install receipts: `oss-corpus` (44 repositories), `oss-corpus-agents` (27) and `oss-corpus-boundaries` (26), 97 repositories in all. Four directory entries are not git repositories and are excluded by that fact (`oss-corpus/.package-manager-cache`, `oss-corpus/.package-store`, `oss-corpus-boundaries/.tools`, `oss-corpus-boundaries/sushi-praxis`). Every scan exits 0. Of 162,330 tracked TypeScript files, 2,558 declare themselves generated and 159,768 of the remaining 159,772 are linted. The four unanalysed files fail to parse: valibot `website/src/routes/guides/(migration)/migrate-from-zod/zod/v3/index.d.ts`, vite `packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error.ts`, vitest `test/e2e/fixtures/list-parse-error/broken.test.ts` and AgentVerse `packages/service-bus-portal/examples/iframe-example.ts`. Sixteen repositories carry at least one tsconfig that fails to load, and twenty have at least one file group linted under default compiler options; both are recorded per repository in `coverage-table-b.md` and neither excludes a file.
+The round 3 scan inventories three corpus roots instead of selecting repositories from install receipts: `oss-corpus` (44 repositories), `oss-corpus-agents` (27) and `oss-corpus-boundaries` (26), 97 repositories in all. Four directory entries are not git repositories and are excluded by that fact (`oss-corpus/.package-manager-cache`, `oss-corpus/.package-store`, `oss-corpus-boundaries/.tools` and another directory in `oss-corpus-boundaries`). Every scan exits 0. Of 162,330 tracked TypeScript files, 2,558 declare themselves generated and 159,768 of the remaining 159,772 are linted. The four unanalysed files fail to parse: valibot `website/src/routes/guides/(migration)/migrate-from-zod/zod/v3/index.d.ts`, vite `packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error.ts`, vitest `test/e2e/fixtures/list-parse-error/broken.test.ts` and AgentVerse `packages/service-bus-portal/examples/iframe-example.ts`. Sixteen repositories carry at least one tsconfig that fails to load, and twenty have at least one file group linted under default compiler options; both are recorded per repository in `coverage-table-b.md` and neither excludes a file.
 
 | corpus                | repositories | tracked | generated |  linted | unanalysed |   hits | incomplete |
 | --------------------- | -----------: | ------: | --------: | ------: | ---------: | -----: | ---------: |

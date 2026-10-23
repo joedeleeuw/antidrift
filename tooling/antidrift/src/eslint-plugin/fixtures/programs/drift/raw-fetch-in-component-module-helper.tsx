@@ -1,9 +1,9 @@
-async function downloadQrCode(url: string) {
+async function downloadFile(url: string) {
   return fetch(url);
 }
 
-export function QrActionCard() {
+export function FileActionCard() {
   return (
-    <button onClick={() => void downloadQrCode("/qr.png")}>Download</button>
+    <button onClick={() => void downloadFile("/file.png")}>Download</button>
   );
 }

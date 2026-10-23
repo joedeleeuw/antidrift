@@ -47,8 +47,7 @@ Read at least:
 - docs/roadmap.md
 - tooling/antidrift/src/eslint-plugin/index.js
 - tooling/antidrift/src/eslint-config/index.mjs
-- tooling/antidrift/src/policy/chaski-corpus.mjs
-- tooling/antidrift/src/policy/external-corpus.mjs
+- tooling/antidrift/research/policy/external-corpus.mjs
 
 Rule or candidate under review:
 - <rule-id>

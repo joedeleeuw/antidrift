@@ -1,7 +1,7 @@
 import {
   findVariable,
   getDeclaredVariable,
-} from "../kernel/async-control-flow.ts";
+} from "../kernel/variable-lookup.ts";
 import {
   isSyntaxNode,
   isSyntaxType,

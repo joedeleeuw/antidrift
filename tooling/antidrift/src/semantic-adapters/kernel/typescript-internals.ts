@@ -69,16 +69,6 @@ function internalReadonlyCheckFlag(): number {
 
 const readonlyCheckFlag = internalReadonlyCheckFlag();
 
-export const primitiveTypeFlags =
-  ts.TypeFlags.StringLike |
-  ts.TypeFlags.NumberLike |
-  ts.TypeFlags.BigIntLike |
-  ts.TypeFlags.BooleanLike |
-  ts.TypeFlags.EnumLike |
-  ts.TypeFlags.ESSymbolLike |
-  ts.TypeFlags.VoidLike |
-  ts.TypeFlags.Null;
-
 export function isErrorType(type: ts.Type): boolean {
   return type.intrinsicName === "error";
 }
@@ -107,18 +97,4 @@ export function isReadonlyProperty(property: ts.Symbol): boolean {
     ((property.flags & ts.SymbolFlags.GetAccessor) !== 0 &&
       (property.flags & ts.SymbolFlags.SetAccessor) === 0)
   );
-}
-
-export function nodeReader<Node extends ts.Node, Output>(
-  guard: (node: ts.Node) => node is Node,
-  read: (node: Node) => Output
-) {
-  return (node: ts.Node) => {
-    if (!guard(node)) {
-      throw new TypeError(
-        `TypeScript visitor received unexpected node ${ts.SyntaxKind[node.kind]}`
-      );
-    }
-    return read(node);
-  };
 }

@@ -33,6 +33,6 @@ ESLint's `no-dupe-keys` rule catches duplicate keys inside one object literal, n
 
 ## Corpus
 
-The first drift case is Murderbox client `apps/client/src/lib/voice-openai-session.native.ts`. Three sibling `z.object(...)` event schemas repeated `item_id: z.string()` and `content_index: z.number()`. The corrected form declares `transcriptItemFields` once and spreads it into each event shape; the fixed file is the first clean external-corpus control.
+The first drift case is a module in a private app's client. Three sibling `z.object(...)` event schemas repeated the same two fields. The corrected form declares those fields once and spreads them into each event shape; the fixed file is the first clean external-corpus control.
 
 Keep the rule default-off until additional schema-heavy repositories quantify true-positive and false-positive pressure.

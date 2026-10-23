@@ -128,14 +128,13 @@ export function dependencyManifest(
   );
 }
 
-export function declaredDependencies(packageRoot: string): string[] {
+export function declaredDependencies(
+  packageRoot: string,
+  fields: readonly (typeof manifestDependencyFields)[number][] = manifestDependencyFields
+): string[] {
   const manifest = readManifest(join(packageRoot, "package.json"));
   return [
-    ...new Set(
-      manifestDependencyFields.flatMap((field) =>
-        Object.keys(manifest[field] ?? {})
-      )
-    ),
+    ...new Set(fields.flatMap((field) => Object.keys(manifest[field] ?? {}))),
   ];
 }
 
@@ -160,7 +159,7 @@ function exportTargets(entry: unknown): string[] {
   return Object.values(entry).flatMap(exportTargets);
 }
 
-export function scriptPath(path: string): boolean {
+function scriptPath(path: string): boolean {
   const extension = extname(path);
   return extension === "" || scriptExtensions.has(extension);
 }
@@ -288,7 +287,7 @@ export function publicEntries(name: string, manifestPath: string) {
   return { specifiers: [...specifiers], undecided };
 }
 
-export function resolvedModule(
+function resolvedModule(
   specifier: string,
   containingFile: string,
   options: ts.CompilerOptions,
@@ -305,7 +304,7 @@ export function resolvedModule(
   ).resolvedModule;
 }
 
-export function resolvesToTypes(
+function resolvesToTypes(
   specifier: string,
   containingFile: string,
   options: ts.CompilerOptions,
@@ -315,13 +314,18 @@ export function resolvesToTypes(
   return resolved !== undefined && typedExtensions.has(resolved.extension);
 }
 
+// A workspace or linked package: its real path lies outside node_modules.
+function isLinkedPackage(manifestPath: string): boolean {
+  return !installedArtifact.test(realPath(dirname(manifestPath)));
+}
+
 export function unresolvedEntries(
   packageRoot: string,
   name: string,
   manifestPath: string,
   options: ts.CompilerOptions
 ): string[] {
-  if (installedArtifact.test(realPath(dirname(manifestPath)))) {
+  if (!isLinkedPackage(manifestPath)) {
     return [];
   }
   const { specifiers, undecided } = publicEntries(name, manifestPath);

@@ -1,5 +1,5 @@
-function isWebviewRoute(pathname: string): boolean {
-  return pathname.includes("/reports/weekly-digest");
+function isSummaryRoute(pathname: string): boolean {
+  return pathname.includes("/reports/summary");
 }
 
 function hasRoutePrefix(pathname: string): boolean {
@@ -13,5 +13,5 @@ function isRouteLike(value: unknown): value is RouteLike {
 }
 
 export function shouldProxy(pathname: string): boolean {
-  return isWebviewRoute(pathname) || hasRoutePrefix(pathname);
+  return isSummaryRoute(pathname) || hasRoutePrefix(pathname);
 }

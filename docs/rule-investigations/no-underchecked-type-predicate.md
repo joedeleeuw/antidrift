@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented as `antidrift/no-underchecked-type-predicate`, enabled at error in the ESLint config (directive G2). A literal tag proves a variant, and so its payload, only when the value it is read from is already a closed union; read from raw `any`/`unknown`/open-record input, or through a type assertion, the predicate must also check the asserted payload fields. On the 70 local roots of the October 2026 rules review it reports 9 findings in 4 repositories with resolved dependencies, 8 true positives, plus 1 true positive in mrp (89%, every repository at or above 80%). See [Tag checks on raw input](#tag-checks-on-raw-input).
+Implemented as `antidrift/no-underchecked-type-predicate`, enabled at error in the ESLint config (directive G2). A literal tag proves a variant, and so its payload, only when the value it is read from is already a closed union; read from raw `any`/`unknown`/open-record input, or through a type assertion, the predicate must also check the asserted payload fields. On the 70 local roots of the October 2026 rules review it reports 9 findings in 4 repositories with resolved dependencies, 8 true positives, plus 1 true positive in a private app (89%, every repository at or above 80%). See [Tag checks on raw input](#tag-checks-on-raw-input).
 
 ## Scope
 
@@ -21,7 +21,7 @@ The implemented v1 reports only when all of these are true:
 
 The September 2026 evidence change counted a literal equality on a discriminant property of the asserted type as proof. That is sound for a closed union: `item.kind === "text"` on an `Item` proves the `TextItem` payload because TypeScript already knows every variant. On raw input it proves only the tag. Codex's October 2026 review found two missed true positives:
 
-- `chatbiz-webapp/src/embed/protocol.ts:94-100`: `isEmbedMessage(data: unknown): data is EmbedMessage` checks `source` and that `type` is a string, through `data as { source?: unknown; type?: unknown }`. `{ source: "chatbiz-embed", type: "resize" }` passes as a resize message without its required `height`.
+- An embed protocol module in a private app: an embed-message predicate over `data: unknown` checks `source` and that `type` is a string, through `data as { source?: unknown; type?: unknown }`. A message with the expected `source` and `type: "resize"` passes as a resize message without its required `height`.
 - `deep-seek/tools/server/webui/src/lib/stores/tools.svelte.ts:67-73`: `(t: unknown): t is OpenAIToolDefinition` checks `type === "function"` and `function.name`, but not the required `function.parameters`. The `llama.cpp-rocmfpx` fork carries the same guard.
 
 Changes:
@@ -36,18 +36,18 @@ The other proof exemptions are unchanged: `instanceof`, delegated type predicate
 
 ### Measurement
 
-Corpus: the 70 local roots in `/tmp/rules-review/corpus-local.txt`, with cloud-rl-train `tasks/*/*`, `configs/eval-panel-qwen36.json` and `tasks/grader_process.py` excluded before parsing; 473 files containing a type predicate, 464 type-checked.
+Corpus: the 70 local roots in `/tmp/rules-review/corpus-local.txt`, with a private project's task and configuration files excluded before parsing; 473 files containing a type predicate, 464 type-checked.
 
-Dependencies matter for this rule: in a checkout without `node_modules` an unresolved import turns a callback's contextual type into `any`, which then reads as raw input. Precision was therefore measured on frozen-lockfile copies of chatbiz-webapp, fungible, sandcastle, codebase-atlas, paseo, homer-production and the deep-seek and llama.cpp-rocmfpx web UIs, plus the explicit-`unknown` finding in mrp.
+Dependencies matter for this rule: in a checkout without `node_modules` an unresolved import turns a callback's contextual type into `any`, which then reads as raw input. Precision was therefore measured on frozen-lockfile copies of three private apps, fungible, sandcastle, paseo and the deep-seek and llama.cpp-rocmfpx web UIs, plus the explicit-`unknown` finding in a fourth private app.
 
-| Version | Hits | Repositories | Top 5                                                              | Precision |
-| ------- | ---: | -----------: | ------------------------------------------------------------------ | --------- |
-| Before  |    2 |            1 | paseo 2                                                            | 1/2       |
-| After   |   10 |            5 | paseo 6, chatbiz-webapp 1, deep-seek 1, llama.cpp-rocmfpx 1, mrp 1 | 9/10      |
+| Version | Hits | Repositories | Top 5                                                                             | Precision |
+| ------- | ---: | -----------: | --------------------------------------------------------------------------------- | --------- |
+| Before  |    2 |            1 | paseo 2                                                                           | 1/2       |
+| After   |   10 |            5 | paseo 6, a private app 1, deep-seek 1, llama.cpp-rocmfpx 1, another private app 1 | 9/10      |
 
-After, true positives: `chatbiz-webapp src/embed/protocol.ts:94`, `deep-seek .../stores/tools.svelte.ts:67` and its rocmfpx fork, `mrp src/domain/notifications.ts:217` (tag-only check of a three-variant failure union whose payloads go unchecked), paseo `split-container.tsx:142,146` (drag data narrowed by `kind` without `paneId`/`tabId`), `snapshot-engine.ts:157` (`ok: false` never checked), `session-stubs.ts:120` (`"type" in m` claims the whole outbound-message union), `terminal-emulator.tsx:134` (`scrollback` and `cursor` unchecked). False positive: paseo `agent-response-loop.ts:108`, a `typeof value.safeParse === "function"` capability probe asserting `z.ZodType`.
+After, true positives: the embed-message predicate in a private app, `deep-seek .../stores/tools.svelte.ts:67` and its rocmfpx fork, a notifications-module predicate in another private app (tag-only check of a three-variant failure union whose payloads go unchecked), paseo `split-container.tsx:142,146` (drag data narrowed by `kind` without `paneId`/`tabId`), `snapshot-engine.ts:157` (`ok: false` never checked), `session-stubs.ts:120` (`"type" in m` claims the whole outbound-message union), `terminal-emulator.tsx:134` (`scrollback` and `cursor` unchecked). False positive: paseo `agent-response-loop.ts:108`, a `typeof value.safeParse === "function"` capability probe asserting `z.ZodType`.
 
-Per repository: paseo 5/6, chatbiz-webapp 1/1, deep-seek 1/1, llama.cpp-rocmfpx 1/1, mrp 1/1. Before the change the two copies of the deep-seek UI also reported two `DatabaseMessageExtra` filters whose parameter type is the error type (the global re-export in `app.d.ts` does not resolve); the error-type exemption removed them.
+Per repository: paseo 5/6, a private app 1/1, deep-seek 1/1, llama.cpp-rocmfpx 1/1, another private app 1/1. Before the change the two copies of the deep-seek UI also reported two `DatabaseMessageExtra` filters whose parameter type is the error type (the global re-export in `app.d.ts` does not resolve); the error-type exemption removed them.
 
 The same scan without installed dependencies reports 25 findings in 11 repositories before (0 true positives: all 25 are `any` from unresolved imports) and 18 in 6 after (6 true positives). Lint the rule only on a program whose dependencies resolve.
 
@@ -73,23 +73,23 @@ Use TypeChecker plus AST/control-flow evidence:
 
 ## Real Corpus Evidence
 
-Former Chaski candidate, now clean:
+Former private-app candidate, now clean:
 
-- `src/frontend/bff/api/routers/retool/service-stop-router.ts` line 394: `z.custom<RetoolLineItemData>` uses `(value): value is RetoolLineItemData => value != null && typeof value === "object"`. The asserted type resolves as an optional-heavy intersection (`Partial<LineItemData> & { ... }`). This remains useful inventory, but it is not a blocking finding under the current required-property proof floor.
+- A router passes `z.custom` a type predicate that only checks `value != null && typeof value === "object"`. The asserted type resolves as an optional-heavy intersection (`Partial<T> & { ... }`). This remains useful inventory, but it is not a blocking finding under the current required-property proof floor.
 
-Chaski clean controls:
+Private-app clean controls:
 
-- `src/frontend/bff/shared/date.ts`: `isDateMessage` checks `year`, `month`, and `day`.
-- `src/frontend/bff/api/schemas/powersync.ts`: discriminant predicates narrow already-typed unions by table/data shape.
-- `src/frontend/monolithui/src/components/AccountDetails.tsx`: `isDateStruct` destructures `year`, `month`, and `day` from `Record<string, unknown>` before checking each primitive. This is a clean guard that protects the destructured-field-check edge.
+- A shared date module: a date predicate checks `year`, `month`, and `day`.
+- A PowerSync schema module: discriminant predicates narrow already-typed unions by table/data shape.
+- A UI component: a second date predicate destructures `year`, `month`, and `day` from `Record<string, unknown>` before checking each primitive. This is a clean guard that protects the destructured-field-check edge.
 
-Broad Chaski BFF inventory originally reported exactly one candidate across 177 files: the `RetoolLineItemData` predicate. The required-property narrowing demoted it from blocking evidence.
+Broad inventory of the private app's backend originally reported exactly one candidate across 177 files: the `z.custom` predicate above. The required-property narrowing demoted it from blocking evidence.
 
-Codebase Atlas clean controls:
+Clean controls in another private app:
 
-- `src/programs/persistenceCuration.ts`: `isTerrainLayoutAnchor` checks `q`, `r`, and `position` through a local alias before claiming the object type. This forced the rule to follow direct aliases when counting checked properties.
-- `src/programs/repoComprehensionSurfaces.ts`: a primitive `value is string` predicate stays clean because this rule is limited to nontrivial object contracts.
-- `src/needle/AtlasNeedleRenderer.ts`: `isMeshStandardMaterial` narrows a third-party material union with `emissive` and `roughness` probes. This is valid interop narrowing, not broad-input contract laundering.
+- A persistence module: a layout-anchor predicate checks `q`, `r`, and `position` through a local alias before claiming the object type. This forced the rule to follow direct aliases when counting checked properties.
+- Another module: a primitive `value is string` predicate stays clean because this rule is limited to nontrivial object contracts.
+- A renderer module: a predicate for the Three.js `MeshStandardMaterial` narrows a third-party material union with `emissive` and `roughness` probes. This is valid interop narrowing, not broad-input contract laundering.
 
 Sudocode clean controls:
 
@@ -117,7 +117,7 @@ Current result:
 - 0 drift repositories.
 - 0 same-line overlaps with adjacent TypeScript ESLint unsafe rules.
 
-This does not satisfy the old "second evaluable drift" blocker. The prior Chaski and Opencode findings are now clean controls for the stricter required-field proof floor.
+This does not satisfy the old "second evaluable drift" blocker. The prior private-app and Opencode findings are now clean controls for the stricter required-field proof floor.
 
 ## Known Risks
 
@@ -150,5 +150,5 @@ Claude Opus 4.8 advisory review on June 15, 2026 (`reports/claude-rule-review-no
 ## Promotion Conditions
 
 - Another real repository contains an under-checked `x is T` or `asserts x is T` drift case that misses required asserted fields. Current status: unsatisfied.
-- Another real repository contains clean validator-backed and discriminant-only controls. Codebase Atlas now supplies additional clean controls for alias-backed field checks, primitive predicates, and third-party union predicates.
+- Another real repository contains clean validator-backed and discriminant-only controls. Another private app now supplies additional clean controls for alias-backed field checks, primitive predicates, and third-party union predicates.
 - Claude Opus 4.8 review has read the narrowed rule code and corpus cases; rerun advisory review before promotion if new required-field drift appears.

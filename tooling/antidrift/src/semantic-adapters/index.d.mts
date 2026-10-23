@@ -1,7 +1,5 @@
-import * as asyncControlFlow from "./kernel/async-control-flow.ts";
 import * as authBoundary from "./boundary/auth-boundary.ts";
 import * as broadInput from "./boundary/broad-input.ts";
-import * as parseInput from "./boundary/parse-input.ts";
 import * as reactState from "./projection/react-state.ts";
 import * as schemaProvenance from "./projection/schema-provenance.ts";
 import * as sql from "./projection/sql.ts";
@@ -13,10 +11,8 @@ import type {
 } from "../policy/index.mjs";
 
 export {
-  asyncControlFlow,
   authBoundary,
   broadInput,
-  parseInput,
   reactState,
   schemaProvenance,
   sql,
@@ -25,10 +21,8 @@ export {
 };
 
 export const SEMANTIC_ADAPTERS: Readonly<{
-  asyncControlFlow: typeof asyncControlFlow;
   authBoundary: typeof authBoundary;
   broadInput: typeof broadInput;
-  parseInput: typeof parseInput;
   reactState: typeof reactState;
   schemaProvenance: typeof schemaProvenance;
   sql: typeof sql;
@@ -37,10 +31,8 @@ export const SEMANTIC_ADAPTERS: Readonly<{
 }>;
 
 export type SemanticAdapterContractKey =
-  | "asyncControlFlow"
   | "authBoundary"
   | "broadInput"
-  | "parseInput"
   | "reactState"
   | "schemaProvenance"
   | "sql"

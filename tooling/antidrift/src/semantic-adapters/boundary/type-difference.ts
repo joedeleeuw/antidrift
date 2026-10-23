@@ -20,7 +20,7 @@ type ParameterShape = {
   readonly [Part in (typeof SHAPE_PARTS)[number]]: readonly Segment[];
 } & { readonly receiver: ts.Type | undefined };
 
-export function unionConstituents(type: ts.Type): readonly ts.Type[] {
+function unionConstituents(type: ts.Type): readonly ts.Type[] {
   return type.isUnion() ? type.types : [type];
 }
 
@@ -28,7 +28,7 @@ function isObjectReference(type: ts.Type): type is ts.TypeReference {
   return (type.flags & ts.TypeFlags.Object) !== 0 && isTypeReference(type);
 }
 
-export function sameType(
+function sameType(
   checker: ts.TypeChecker,
   left: ts.Type,
   right: ts.Type

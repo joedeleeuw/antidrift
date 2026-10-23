@@ -10,14 +10,8 @@ import {
 
 describe("semantic adapter manifest", () => {
   it("composes adapter contracts with their owned semantic fact contracts", () => {
-    expect(
-      semanticAdapterManifestForAdapterId("async-control-flow")?.rules
-    ).toContain("antidrift/no-async-array-method");
-    expect(semanticAdapterManifestForAdapterId("parse-input")?.rules).toEqual([
-      "antidrift/no-unsafe-deserialize",
-    ]);
     expect(semanticAdapterManifestForAdapterId("broad-input")?.rules).toContain(
-      "antidrift/no-appeasement-cast"
+      "antidrift/no-defensive-shape-probing"
     );
     expect(
       semanticAdapterManifestForAdapterId(
@@ -53,16 +47,6 @@ describe("semantic adapter manifest", () => {
         "antidrift/no-handrolled-resource-lifecycle-cells"
       ).map((entry) => entry.id)
     ).toEqual(["react-state"]);
-    expect(
-      semanticAdapterManifestForRule("antidrift/no-unsafe-deserialize").map(
-        (entry) => entry.id
-      )
-    ).toEqual(["parse-input"]);
-    expect(
-      semanticAdapterManifestForRule("antidrift/no-async-array-method").map(
-        (entry) => entry.id
-      )
-    ).toEqual(["async-control-flow"]);
     expect(
       semanticAdapterManifestForProofBucket("authority-index-ownership").map(
         (entry) => entry.id

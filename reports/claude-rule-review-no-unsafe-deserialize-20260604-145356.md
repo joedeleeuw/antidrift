@@ -38,7 +38,7 @@ Once that is recorded and the FN surface in §4 (aliased parse, helper-based gua
 
 - **parserServices no-op (highest).** `index.js:1054-1055` silently disables the rule. All four corpus cases set `typeAware: true` (`external-corpus.mjs:60-61` etc.), so the gate never exercises the no-op path — the gate cannot detect a misconfigured consumer. Address explicitly.
 - **Performance.** One `getTypeAtLocation` per `JSON.parse` call only; negligible beyond the inherent cost of type-aware linting.
-- **Path/corpus.** Discovery is hardcoded to `/Users/sushi/code/*` with env overrides (`external-corpus.mjs:6-21`); portable via skip when absent. Drift evidence is in genuinely external repos — satisfies "not introduced for test."
+- **Path/corpus.** Discovery is hardcoded to a local checkout directory with env overrides (`external-corpus.mjs:6-21`); portable via skip when absent. Drift evidence is in genuinely external repos — satisfies "not introduced for test."
 - **Duplicate reports.** None — one report per `CallExpression` (`index.js:1068`). Note drift cases assert a single line (e.g. `199`) though the file has 8 findings (`no-unsafe-deserialize.md:74`); this under-asserts but does not over-report.
 - **String-boundary exemption.** Sound and narrow (`index.js:1034-1048`), correctly does *not* exempt parsed subfields like `JSON.parse(msg.event)` (`no-unsafe-deserialize.md:102`), proven by the Cloudflare drift case. Its narrowness is the main residual FP risk per §4.
 

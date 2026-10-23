@@ -1,5 +1,5 @@
 import { hasIndependentExpectation } from "../shared/oracle-dependencies.js";
-import { findVariable } from "../../semantic-adapters/kernel/async-control-flow.ts";
+import { findVariable } from "../../semantic-adapters/kernel/variable-lookup.ts";
 import {
   hasRuntimeSchemaProvenance,
   isRuntimeSchemaLibraryFile,

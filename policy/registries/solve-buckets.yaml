@@ -89,13 +89,6 @@ rules:
       target: dataflow-taint,
       note: "SQL injection is a taint property; the single-file escaper/reachability rule remains useful default-off inventory, but unresolved SQL-builder APIs need import/declaration-source provenance or delegated taint before blocking.",
     }
-  antidrift/no-unsafe-deserialize:
-    {
-      current: semantic-ast,
-      fit: proven,
-      target: semantic-ast,
-      note: "scoped parse-input rule: TypeChecker proves broad any/unknown JSON.parse input and local control flow proves string-boundary clean cases. Broader deserialization taint remains out of scope.",
-    }
   antidrift/no-canonical-model-fork:
     {
       current: semantic-ast,
@@ -116,13 +109,6 @@ rules:
       fit: proven,
       target: semantic-ast,
       note: "authority-index domain-vocabulary with exact/composed owner context; default-off until independent configured status drift replicates.",
-    }
-  antidrift/no-appeasement-cast:
-    {
-      current: semantic-ast,
-      fit: proven,
-      target: semantic-ast,
-      note: "type-escape-hatch; type-provenance; default-on for the narrow broad-input authority proof while broad inventory after real consumer cleanup still gates stable promotion.",
     }
   antidrift/no-redundant-zod-parse:
     {
@@ -151,13 +137,6 @@ rules:
       fit: proven,
       target: semantic-ast,
       note: "type-contract-shape; AST + TypeChecker; default-on as a narrow construction rule while a second real nullable tuple still gates stable promotion.",
-    }
-  antidrift/no-async-array-method:
-    {
-      current: semantic-ast,
-      fit: proven,
-      target: semantic-ast,
-      note: "promise-control-flow; default branch is deterministic never-await AST, while collection flow is explicit opt-in pending separate evidence.",
     }
   antidrift/require-effect-deps:
     {
@@ -199,7 +178,7 @@ rules:
       current: semantic-ast,
       fit: proven,
       target: semantic-ast,
-      note: "fixed proof catches Chaski/Sudocode/Cloudflare lifecycle diagnostics while keeping broad co-mutation and sourceMemberStateShardCandidate inventory-only.",
+      note: "fixed proof catches private-app/Sudocode/Cloudflare lifecycle diagnostics while keeping broad co-mutation and sourceMemberStateShardCandidate inventory-only.",
     }
   antidrift/no-service-constructor-imports:
     {

@@ -4,13 +4,13 @@
 
 Implement a new default-off rule for one narrow TypeChecker proof. Keep the retired `antidrift/no-explicit-return-type-private-helper` decision locked.
 
-The old rule treated nearly every non-exported explicit return annotation as suspicious. Real Chaski code disproved that premise: private error mappers, `never` helpers, optional results, URL builders, predicates, hooks, builders, and gateway APIs can own legitimate contracts.
+The old rule treated nearly every non-exported explicit return annotation as suspicious. Real code in a private app disproved that premise: private error mappers, `never` helpers, optional results, URL builders, predicates, hooks, builders, and gateway APIs can own legitimate contracts.
 
 The new `antidrift/no-redundant-local-return-type` rule asks a different question: can TypeScript prove both that removing a nested implementation's annotation leaves the same object return shape and that a real enclosing return contract still owns every call result?
 
 ## First Real Drift
 
-Murderbox `apps/client/src/components/chat/model-selector-menu-data.ts` supplied the first anchor. At committed source line 311, the nested `selectedFor` arrow returned `{ configs, selectedConfigId, selectedConfig }` and declared `SelectedVideoConfigData`. Each returned shorthand binding had the identical TypeChecker type as the corresponding required mutable property in the directly declared type literal. Every call feeds the object returned by `selectedVideoConfigDataFor(...): Record<VideoModelId, SelectedVideoConfigData>`, and that result in turn feeds `deriveModelSelectorMenuData(...): ModelSelectorMenuData` through `selectedVideoConfigByModel`. Removing only the nested annotation therefore preserves both inferred property types and an independently declared enclosing owner.
+A client module in a private app supplied the first anchor. A nested arrow returned a three-property shorthand object and declared a local object type alias as its return type. Each returned shorthand binding had the identical TypeChecker type as the corresponding required mutable property in the directly declared type literal. Every call feeds the object returned by an enclosing function annotated as a `Record` of that alias, and that result in turn feeds another explicitly annotated function through one property. Removing only the nested annotation therefore preserves both inferred property types and an independently declared enclosing owner.
 
 ## Blocking Proof
 

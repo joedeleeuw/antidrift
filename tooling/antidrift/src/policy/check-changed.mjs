@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 
 import { protectedPolicyFiles } from "./lib/generated-targets.mjs";
 import { changedFiles } from "./lib/git.mjs";
-import { runOxlint } from "./oxlint.mjs";
 
 export function checkChanged() {
   const changed = changedFiles();
@@ -35,11 +34,12 @@ export function checkChanged() {
     return;
   }
 
-  const oxlintStatus = runOxlint({
-    argv: codeFiles,
-    exit: (status) => status,
-  });
-  if (oxlintStatus !== 0) process.exit(oxlintStatus);
+  const oxlintResult = spawnSync(
+    "pnpm",
+    ["exec", "oxlint", "--disable-nested-config", ...codeFiles],
+    { stdio: "inherit" }
+  );
+  if (oxlintResult.status !== 0) process.exit(oxlintResult.status ?? 1);
 
   const eslintResult = spawnSync(
     "pnpm",

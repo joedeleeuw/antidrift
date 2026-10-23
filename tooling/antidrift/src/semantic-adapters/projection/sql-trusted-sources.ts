@@ -1,7 +1,7 @@
-import type ts from "typescript";
+import ts from "typescript";
 
-import { findVariable } from "../kernel/async-control-flow.ts";
-import type { TypeScriptParserServices } from "../kernel/rule-kernel.ts";
+import { findVariable } from "../kernel/variable-lookup.ts";
+import type { TypeServices } from "../kernel/rule-kernel.ts";
 import type { SyntaxNode } from "../kernel/syntax-node.ts";
 import {
   fieldOf,
@@ -12,6 +12,8 @@ import {
   syntaxField,
 } from "../kernel/syntax-node.ts";
 import { bindingDefinitions } from "../kernel/syntax-scope.ts";
+import { findUnresolvedProvenance } from "../provenance/type-resolution-provenance.ts";
+import type { UnresolvedFinding } from "../provenance/unresolved-reference.ts";
 import type {
   SafeIdentifierMemberSpec,
   SafeTemplateMemberTagSpec,
@@ -23,11 +25,19 @@ export type SqlProvenanceContext = {
   readonly sourceCode: unknown;
   readonly safeIdentifierMembers: readonly SafeIdentifierMemberSpec[];
   readonly safeTemplateTags: SafeTemplateTagSpecs;
-  readonly services: TypeScriptParserServices | null;
+  readonly services: Pick<
+    TypeServices,
+    "esTreeNodeToTSNodeMap" | "program"
+  > | null;
   readonly checker: ts.TypeChecker | null;
 };
 
 type TrustedMemberSpec = SafeIdentifierMemberSpec | SafeTemplateMemberTagSpec;
+
+type ResolvedTag = {
+  readonly template: ts.TaggedTemplateExpression;
+  readonly returned: ts.Type;
+};
 
 const RAW_FRAGMENT_EXPRESSION_WRAPPERS = new Set([
   "TSAsExpression",
@@ -152,6 +162,33 @@ function importSourceSpecifier(definition: unknown): unknown {
   );
 }
 
+const UNRESOLVED_TAG_CAUSE = {
+  module: (name) => `TypeScript could not resolve module '${name}'`,
+  shorthandModule: (name) =>
+    `the shorthand ambient module '${name}' declares no body, so everything imported from it is any`,
+  name: (name) => `TypeScript could not resolve '${name}'`,
+} satisfies Record<UnresolvedFinding["kind"], (name: string) => string>;
+
+function isStringValued(type: ts.Type): boolean {
+  return (type.isUnion() ? type.types : [type]).some((constituent) =>
+    constituent.isIntersection()
+      ? constituent.types.some(isStringValued)
+      : (constituent.flags & ts.TypeFlags.StringLike) !== 0
+  );
+}
+
+// Interpolations reach a tag as separate arguments, never as SQL text. A tag
+// that returns a string hands its caller SQL text that may contain them; one
+// that returns rows, a query object or a promise of either is a query API, and
+// whether it binds them is decided in its own body, not at the call site.
+function isBoundQueryType(checker: ts.TypeChecker, returned: ts.Type): boolean {
+  const settled = checker.getAwaitedType(returned) ?? returned;
+  return (
+    (settled.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) === 0 &&
+    !isStringValued(settled)
+  );
+}
+
 function declarationOwnerNames(
   declaration: ts.Declaration
 ): ReadonlySet<string> {
@@ -241,6 +278,62 @@ export class SqlTrustedSources {
     );
   }
 
+  #resolvedTag(taggedTemplate: unknown): ResolvedTag | null {
+    const { checker, services } = this.#context;
+    const template = services?.esTreeNodeToTSNodeMap.get(taggedTemplate);
+    if (!checker || !template || !ts.isTaggedTemplateExpression(template)) {
+      return null;
+    }
+    const signature = checker.getResolvedSignature(template);
+    return signature
+      ? { template, returned: checker.getReturnTypeOfSignature(signature) }
+      : null;
+  }
+
+  bindsTemplateValues(taggedTemplate: unknown): boolean {
+    const { checker } = this.#context;
+    const resolved = this.#resolvedTag(taggedTemplate);
+    return Boolean(
+      checker && resolved && isBoundQueryType(checker, resolved.returned)
+    );
+  }
+
+  unresolvedTagMessage(taggedTemplate: unknown): string | null {
+    const { checker, services } = this.#context;
+    const resolved = this.#resolvedTag(taggedTemplate);
+    if (
+      !checker ||
+      !services ||
+      !resolved ||
+      (resolved.returned.flags & ts.TypeFlags.Any) === 0
+    ) {
+      return null;
+    }
+    const finding = findUnresolvedProvenance(services.program, checker, [
+      resolved.template.tag,
+    ]);
+    return finding
+      ? `Incomplete analysis: ${UNRESOLVED_TAG_CAUSE[finding.kind](finding.name)}, and this SQL tag's type depends on it, so whether the tag binds its interpolated values is undecided.`
+      : null;
+  }
+
+  #isBindingTagExpression(node: unknown): boolean {
+    const { checker, services } = this.#context;
+    const tsExpression = services?.esTreeNodeToTSNodeMap.get(node);
+    if (!checker || !tsExpression) {
+      return false;
+    }
+    const signatures = checker
+      .getTypeAtLocation(tsExpression)
+      .getCallSignatures();
+    return (
+      signatures.length > 0 &&
+      signatures.every((signature) =>
+        isBoundQueryType(checker, checker.getReturnTypeOfSignature(signature))
+      )
+    );
+  }
+
   isTrustedSqlTemplateTag(node: unknown): boolean {
     if (isSyntaxNode(node) && TEMPLATE_TAG_WRAPPERS.has(node.type)) {
       return this.isTrustedSqlTemplateTag(syntaxField(node, "expression"));
@@ -261,7 +354,8 @@ export class SqlTrustedSources {
     const builder = methodReceiver(node, "raw");
     return (
       (this.isTrustedImportedTemplateTag(builder) ||
-        this.isTrustedMemberOnReceiver(builder, true)) &&
+        this.isTrustedMemberOnReceiver(builder, true) ||
+        this.#isBindingTagExpression(builder)) &&
       syntaxChildren(node, "arguments").some(
         (argument) => staticString(argument) === null
       )

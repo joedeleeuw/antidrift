@@ -68,7 +68,6 @@ type TypeScriptRuleDefinition = TypeScriptRuleListeners & {
   readonly meta: Rule.RuleMetaData;
   readonly skipGenerated?: boolean;
   readonly skipNonRuleFile?: boolean;
-  readonly documentVisitors?: (context: Rule.RuleContext) => Rule.RuleListener;
 };
 
 function isTypeServices(candidate: unknown): candidate is TypeServices {
@@ -153,10 +152,6 @@ export function defineTypeScriptRule(
   return {
     meta: definition.meta,
     create(context) {
-      const rootType: string = context.sourceCode.ast.type;
-      if (definition.documentVisitors && rootType === "Document") {
-        return definition.documentVisitors(context);
-      }
       if (
         (definition.skipNonRuleFile && !isRuleFile(context)) ||
         (skipGenerated && isDeclaredGeneratedSource(context.sourceCode.text))

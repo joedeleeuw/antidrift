@@ -13,7 +13,7 @@ When we finally measured:
   co-mutation pattern (`broadSetterCoMutation`) but **0** of the rule's enforcement shape
   (`resourceLifecycleProof`). The enforcement proof is mis-shaped, not the pattern absent.
 - **Shard**: a type-aware scan of 335 components + a wider AST detector across **two** repos
-  (chaski, sudocode) found **0** real owned-entity shatters; every hit is an envelope /
+  (a private app, sudocode) found **0** real owned-entity shatters; every hit is an envelope /
   value-object / computed-result split, which the rule correctly leaves alone.
 
 Decisions already taken (committed): shard rule demoted to inventory-only (`064142a`). Lesson:
@@ -68,14 +68,14 @@ on `frame.isTransition` frames only.
 **Current acceptance set:**
 
 - Catches the existing `handrolled-resource-lifecycle.ts` fixture and derived-catch/member-payload regression.
-- Current pinned fixed-proof corpus covers 9 real diagnostics across Chaski, Sudocode, and Cloudflare Agents, including `src/frontend/crow-v2/app/(drawer)/reporting/action-items/index.tsx:78`, `frontend/src/components/executions/ExecutionView.tsx:463`, and `examples/worker-bundler-playground/src/client.tsx:76`.
+- Current pinned fixed-proof corpus covers 9 real diagnostics across the private app, Sudocode, and Cloudflare Agents, including one private-app reporting screen, `frontend/src/components/executions/ExecutionView.tsx:463`, and `examples/worker-bundler-playground/src/client.tsx:76`.
 - Must still IGNORE (→ inventory or nothing): stale-while-revalidate (no catch), pagination
   (updater), UI-cleanup (no transition), abort-guarded (requestGuard), owned-resource-hook
   (no local useState cells).
 
 ## 4. Direction / promotion path
 
-The rewrite makes the proof less synthetic, but it did **not** turn broad co-mutations into blocking diagnostics. Current fixed-proof inventory checked 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; kept 230 broad co-mutation facts as inventory; and the pinned corpus now covers 9 `resourceLifecycleProof` diagnostics across Chaski, Sudocode, and Cloudflare Agents. Whether to **enable** the rule as blocking (`severity: error`) is a separate promotion decision requiring the must-catch/must-ignore set to hold cleanly across independent repos. Under-proven means default-off until then. The shard rule stays inventory-only; option B (keep a type-owner tier as a non-blocking measurement tag) and an agent-generated-corpus revisit are future, additive.
+The rewrite makes the proof less synthetic, but it did **not** turn broad co-mutations into blocking diagnostics. Current fixed-proof inventory checked 3,323 files across the private app, Sudocode, two other private apps, Opencode UI/console, Cloudflare Agents, and PowerSync; kept 230 broad co-mutation facts as inventory; and the pinned corpus now covers 9 `resourceLifecycleProof` diagnostics across the private app, Sudocode, and Cloudflare Agents. Whether to **enable** the rule as blocking (`severity: error`) is a separate promotion decision requiring the must-catch/must-ignore set to hold cleanly across independent repos. Under-proven means default-off until then. The shard rule stays inventory-only; option B (keep a type-owner tier as a non-blocking measurement tag) and an agent-generated-corpus revisit are future, additive.
 
 ## 5. Concerns / open questions (attack these)
 
@@ -86,9 +86,9 @@ The rewrite makes the proof less synthetic, but it did **not** turn broad co-mut
    submit handlers)? Where does errorCell over-match?
 3. **payloadCell = member-of-awaited** — does reusing `sourceMemberWrites` pull in cases where the
    "payload" cells are actually independent view state seeded from one response (the envelope case
-   the shard rule deliberately ignores)? Could the lifecycle rule now fire on weekly-digest _because_
-   of the envelope split, conflating two different patterns?
-4. **Multi-repo**: the fixed-proof positives now replicate in Sudocode and Cloudflare Agents. Do those positives survive review, and do Murderbox/form-like controls stay quiet for the right reason?
+   the shard rule deliberately ignores)? Could the lifecycle rule now fire on an envelope-split component
+   _because_ of that split, conflating two different patterns?
+4. **Multi-repo**: the fixed-proof positives now replicate in Sudocode and Cloudflare Agents. Do those positives survive review, and do controls from another private app and form-like controls stay quiet for the right reason?
 5. **Contract churn**: payloadCells + schema bump ripples through the frozen contract, manifest,
    types, consumer-monorepo, docs. Is the value worth the breaking change, or should payload stay
    singular (first sorted cell)?

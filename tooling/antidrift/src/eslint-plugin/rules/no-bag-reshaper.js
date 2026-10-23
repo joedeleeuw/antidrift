@@ -1,7 +1,7 @@
 import ts from "typescript";
 
 import { scopeProperties } from "../../semantic-adapters/kernel/rule-scope.ts";
-import { isTestFilename } from "../../oxlint-plugin/portable/syntax.js";
+import { isTestPath } from "../../oxlint-plugin/shared/test-files.js";
 import {
   collectReturnExpressionsFromExpression,
   collectStatementReturnExpressions,
@@ -401,7 +401,7 @@ export function ruleNoBagReshaper() {
       },
     },
     run({ sourceFile, checker, filename, reportNode }) {
-      if (isTestFilename(filename)) {
+      if (isTestPath(filename)) {
         return {};
       }
       function inspectCandidateNode(candidateNode) {

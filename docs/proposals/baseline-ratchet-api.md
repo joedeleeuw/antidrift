@@ -10,9 +10,9 @@ pre-existing code. Those findings need intent review: a diagnostic is not proof
 of a defect, and a registry promotion label is not fresh consumer FP evidence.
 A baseline must not turn detector mistakes into accepted historical debt.
 
-Homer implements a consumer ratchet in `scripts/oxlint/antidrift-ratchet.mjs`
-and per-file overrides in `oxlint.config.ts`. This proposal would package a
-count-based adoption budget rather than require each consumer to build one.
+A private app implements a consumer ratchet script and per-file overrides in
+its Oxlint configuration. This proposal would package a count-based adoption
+budget rather than require each consumer to build one.
 The chosen representation has a deliberate limitation: it prevents growth in
 per-rule, per-file counts, not the introduction of every new finding identity.
 
@@ -41,8 +41,8 @@ requires an explicit reviewed adoption operation, whose interface remains open.
   "version": 1,
   "rules": {
     "antidrift/no-structural-type-fork": {
-      "apps/api/lib/tools.ts": 3,
-      "apps/machine/src/cli.ts": 1,
+      "src/api/tools.ts": 3,
+      "src/cli.ts": 1,
     },
   },
 }
@@ -101,7 +101,7 @@ an unproven detector merely to obtain an empty census.
 
 ## Relationship to existing doctrine
 
-- Pins-only-down is Homer doctrine; this packages count-budget paydown.
+- Pins-only-down is a private app's doctrine; this packages count-budget paydown.
 - `policy/check-changed` blocks protected configuration/generated changes without
   policy-source changes or an explicitly declared policy task; unchanged.
 - Invalid configuration and incomplete measurements fail loudly. A stale

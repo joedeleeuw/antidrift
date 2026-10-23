@@ -4,8 +4,8 @@
 
 This document records:
 
-1. **The repository boundary between `dotfiles` (`code-health` / `process-review`) and `antidrift`** — why two repositories exist, where ownership blurred, and which repository owns each enforcement surface.
-2. **Directive Parity Rules (Tier 1 & Tier 2)** — the 9 rules required to close gaps between `ai-contexts/AGENT.md` / `dotfiles/docs/enforcement-map.md` and `@joedeleeuw/antidrift`, including their required compiler/AST context, false-positive boundaries learned from the `dotfiles` two-corpus studies, and exact implementation specifications.
+1. **The repository boundary between a private configuration repository (`code-health` / `process-review`) and `antidrift`** — why two repositories exist, where ownership blurred, and which repository owns each enforcement surface.
+2. **Directive Parity Rules (Tier 1 & Tier 2)** — the 9 rules required to close gaps between `AGENT.md` / the private configuration repository's enforcement map and `@joedeleeuw/antidrift`, including their required compiler/AST context, false-positive boundaries learned from that repository's two-corpus studies, and exact implementation specifications.
 3. **Ecosystem-Unique Pathological & Pattern Smells (Tier 3)** — 7 high-signal architectural and AI-drift smells that no maintained ecosystem linter (`oxlint`, `eslint`, `typescript-eslint`, `unicorn`, `sonarjs`, `anti-slop`, `biome`) can enforce because they require whole-program `TypeChecker`, schema provenance, call-graph, or React state-transition proof.
 
 ---
@@ -14,23 +14,23 @@ This document records:
 
 ### Different Runtime Engines and Distribution Models
 
-- **`code-health` and `process-review` (in `dotfiles`)** are host-installed polyglot CLIs (`~/.local/bin/code-health`, `~/.local/bin/process-review`).
-  - `code-health` is a Python `uv run --script` executable built around Python's `ast` module, `vulture`, `ast-grep`, and Python virtual-environment introspection (`--dependency-shapes PYTHON`). It enforces Python structural metrics (`file_lines`, `complexity`, `nesting`, `params`, `clone_pairs`, `cycles`, `passthrough_params`, `single_call_hops`, `single_adapter_seams`, `test_only_seams`), polyglot config/prose hygiene (`dead_paths`, `shadow_key_prose`, `s9-approval-key`), and ratchets existing debt in `.code-health.json`.
-  - `process-review` runs the semantic LLM judgment pass (`Jev` typed yes/no per changed unit) over rules in `config/process-review/rules/*.md`.
+- **`code-health` and `process-review` (in the private configuration repository)** are host-installed polyglot CLIs.
+  - `code-health` is a Python `uv run --script` executable built around Python's `ast` module, `vulture`, `ast-grep`, and Python virtual-environment introspection. It enforces Python structural metrics (file length, complexity, nesting, parameter count, clone pairs, cycles, pass-through parameters, single-call hops, single-adapter seams and test-only seams), polyglot config/prose hygiene (dead paths, shadow-key prose and the S9 approval key), and ratchets existing debt in a baseline file.
+  - `process-review` runs the semantic LLM judgment pass (a typed yes/no per changed unit) over its Markdown rule files.
 - **`@joedeleeuw/antidrift` (in `antidrift`, paired with `@joedeleeuw/typescript-tooling`)** is a versioned npm package consumed inside TypeScript and JavaScript repositories.
   - TypeScript semantic enforcement requires an in-process TypeScript `ts.Program` and `TypeChecker` resolved against the consumer's `tsconfig.json` and `node_modules`, plus ESLint `SourceCode` scope graphs and `eslint-suppressions.json` ratcheting (and native `oxlint` / `tsgolint` execution). A Python `ast` script cannot resolve TypeScript types, symbol aliases, generic instantiations, or declaration files.
 
 ### Where Ownership Blurred
 
-Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`, `W4`, `D1`–`D2` in `dotfiles/docs/enforcement-map.md`), two seams blurred:
+Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`, `W4`, `D1`–`D2` in the private configuration repository's enforcement map), two seams blurred:
 
-1. **Regex-based TypeScript scanning inside `code-health`:** `dotfiles/local/bin/code_health/seams.py` (`typescript_single_adapters`) shells out to `ast-grep` and parses matches with Python regular expressions (`re.match(r"(?:export\s+)?interface\s+(\w+)")`). That bypasses TypeScript symbol resolution, misses cross-module imports and generic implements clauses, and splits TypeScript static enforcement across two tools.
-2. **Asymmetric directive ports:** Directives `G5`, `G7`, `G8`, `G9` (`elif`), `G10` (function hops), `G21`, `G22`, `S1`, `S4`, `S5`, and `W4` were ported to Antidrift, while `G3` (case-table `: Record` annotation ban), `G4` (inline parse reshape ban), `G9` (`g9-closed-string`), `G10` (`g10-reexport-module`), `G11` (`single_adapter_seams` & `test_only_seams`), `G15` (source-file `readFileSync` in tests), `G18` (`g18-secret-call`), and `D2` (`d2-dict-argument-write`) remained Python/Bash-only or prose-only.
+1. **Regex-based TypeScript scanning inside `code-health`:** its seam scanner's TypeScript single-adapter check shells out to `ast-grep` and parses matches with Python regular expressions. That bypasses TypeScript symbol resolution, misses cross-module imports and generic implements clauses, and splits TypeScript static enforcement across two tools.
+2. **Asymmetric directive ports:** Directives `G5`, `G7`, `G8`, `G9` (`elif`), `G10` (function hops), `G21`, `G22`, `S1`, `S4`, `S5`, and `W4` were ported to Antidrift, while `G3` (case-table `: Record` annotation ban), `G4` (inline parse reshape ban), `G9` (closed-string check), `G10` (re-export module check), `G11` (single-adapter and test-only seams), `G15` (source-file `readFileSync` in tests), `G18` (secret-call check), and `D2` (dictionary-argument write check) remained Python/Bash-only or prose-only.
 
 ### Clean Ownership Boundary
 
-- **`antidrift` owns 100% of TypeScript and JavaScript static source/type enforcement.** Once `antidrift/no-single-adapter-seam` and `antidrift/no-test-only-seam` ship on the Semantic Kernel (`ts-rule-kernel.mjs`), `typescript_single_adapters` in `dotfiles/local/bin/code_health/seams.py` should be retired so `code-health` never parses TypeScript source.
-- **`dotfiles` (`code-health` + `process-review`) owns Python static analysis, repo-wide non-JS/TS config/markdown/shell checks (`Json`, `Yaml`, `Markdown`, `Bash`), and the cross-language `process-review` judgment pass.**
+- **`antidrift` owns 100% of TypeScript and JavaScript static source/type enforcement.** Once `antidrift/no-single-adapter-seam` and `antidrift/no-test-only-seam` ship on the Semantic Kernel (`ts-rule-kernel.mjs`), the TypeScript single-adapter check in `code-health`'s seam scanner should be retired so `code-health` never parses TypeScript source.
+- **The private configuration repository (`code-health` + `process-review`) owns Python static analysis, repo-wide non-JS/TS config/markdown/shell checks (`Json`, `Yaml`, `Markdown`, `Bash`), and the cross-language `process-review` judgment pass.**
 
 ---
 
@@ -118,16 +118,16 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
      - **Schema decoders / boundary parsers:** Functions that call `.parse` / `.safeParse` / `Schema.decode*`.
      - **State reducers:** Functions matching `(state, action) => ({ ...state, ... })` passed to `useReducer` or state stores where `action` is a discriminated union.
 
-### 2.5 `antidrift/no-test-only-seam` (Directive G11 — `test_only_seams` Parity)
+### 2.5 `antidrift/no-test-only-seam` (Directive G11 — Test-Only Seam Parity)
 
-- **Directive (`AGENT.md` § Code Design & `dotfiles/docs/enforcement-map.md` G11):**
+- **Directive (`AGENT.md` § Code Design & the enforcement map's G11):**
   > _"One adapter means a hypothetical seam; two means a real one, so no port unless a production and a test adapter are both justified."_
-  > In `dotfiles/local/bin/code_health/seams.py`, `test_only_seams` scored **27/27 (100% precision)** across 4 repositories, but is implemented only for Python ASTs.
+  > In the private configuration repository's seam scanner, the test-only seam check scored **27/27 (100% precision)** across 4 repositories, but is implemented only for Python ASTs.
 - **Current gap:** TypeScript functions and constructors that add default dependency parameters (`function deploy(id: string, exec = execFileSync)` or `constructor(private readonly now: () => number = Date.now)`) solely so a unit test can pass a fake, while zero production call sites ever pass that parameter.
 - **Required context:** `defineTypeScriptRule` (`ts-rule-kernel.mjs`) + program-wide call-site indexing (`wrapping-functions.mjs`).
 - **Implementation specification:**
   1. In production files (non-test, non-generated), inspect function declarations, method declarations, and class constructors that declare a parameter with a default initializer (`param = defaultExpr`) or an options-bag property default (`{ exec = execFileSync } = {}`).
-  2. Verify that `defaultExpr` is an **effectful dependency** (matching `seams.py#is_dependency`):
+  2. Verify that `defaultExpr` is an **effectful dependency** (matching the seam scanner's dependency test):
      - A first-party function imported or declared at module scope, OR
      - A callable from an effectful runtime module or global (`node:fs`, `node:fs/promises`, `node:child_process`, `node:net`, `node:http`, `node:https`, `node:crypto`, `fetch`, `Date.now`, `performance.now`, `crypto.randomUUID`, `Math.random`, `setTimeout`).
      - Pure configuration values (numbers, strings, booleans, options objects, class constructors, schema objects) are skipped.
@@ -136,41 +136,41 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
   5. Collect all call sites of the function/class across `program.getSourceFiles()`:
      - Report when **0 production call sites** supply an explicit argument for `param` and **`>= 1` test call sites** supply it (or `0` callers anywhere supply it).
 
-### 2.6 `antidrift/no-single-adapter-seam` (Directive G11 — `single_adapter_seams` Parity)
+### 2.6 `antidrift/no-single-adapter-seam` (Directive G11 — Single-Adapter Seam Parity)
 
-- **Directive (`AGENT.md` § Code Design & `dotfiles/docs/enforcement-map.md` G11):**
-  In `dotfiles/local/bin/code_health/seams.py`, `single_adapter_seams` scored **20/20 (100% precision)** across 22 repositories. Currently `seams.py` scans TypeScript via `ast-grep` regexes over raw text.
+- **Directive (`AGENT.md` § Code Design & the enforcement map's G11):**
+  In the private configuration repository's seam scanner, the single-adapter seam check scored **20/20 (100% precision)** across 22 repositories. Currently that scanner scans TypeScript via `ast-grep` regexes over raw text.
 - **Current gap:** Regex scanning over `interface` and `implements` cannot resolve imported symbols, aliased interfaces, generic `implements Foo<T>` clauses, or TypeScript structural satisfaction across modules, and splits TypeScript static enforcement outside Antidrift.
 - **Required context:** `defineTypeScriptRule` (`ts-rule-kernel.mjs`) program-wide symbol & type analysis.
 - **Implementation specification:**
   1. Index all non-test, non-generated `abstract class` declarations and `interface` declarations across `program.getSourceFiles()` (excluding `.d.ts` files and exported public package entrypoints).
-  2. An `interface` is a **seam** (rather than a plain data shape) only when at least one class in the program `implements` it (matching `seams.py` line 6: _"a TypeScript interface that some class implements (an interface nothing implements is a data shape)"_).
+  2. An `interface` is a **seam** (rather than a plain data shape) only when at least one class in the program `implements` it, matching the seam scanner, for which an interface nothing implements is a data shape.
   3. Count adapters across `program.getSourceFiles()` (including test files) by resolved `ts.Symbol` identity:
      - `class C implements Seam` or `class C extends AbstractSeam` (ignoring subclasses that are themselves extended by further subclasses),
      - Object literals annotated with `: Seam` or `satisfies Seam`,
      - Test files passing a non-`new` fake to a parameter or property typed as `Seam`.
   4. Report when a production seam has **exactly 1 adapter** in the entire program and that adapter is in production code (i.e., there is neither a second production adapter nor a test adapter).
 
-### 2.7 `antidrift/no-closed-string-parameter` (Directive G9 — `g9-closed-string` Parity)
+### 2.7 `antidrift/no-closed-string-parameter` (Directive G9 — Closed-String Parity)
 
-- **Directive (`AGENT.md` § Code Design & `dotfiles/config/code-health/rules/g9-closed-string.yml`):**
+- **Directive (`AGENT.md` § Code Design & the private configuration repository's G9 closed-string check):**
   > _"Declare the case space first."_
-  > In `dotfiles`, `g9-closed-string` scored **19/20 (95% precision)** across 19 repositories.
+  > In the private configuration repository, the closed-string check scored **19/20 (95% precision)** across 19 repositories.
 - **Current gap:** Antidrift enforces `no-else-if-chain` (G9), but does not flag functions or class fields typed as widened `string` that immediately validate membership against a closed literal set at runtime and throw.
 - **Required context:** `defineTypeScriptRule` (`ts-rule-kernel.mjs`) — `sourceFile` and `checker`.
 - **Implementation specification:**
   1. In non-test, non-generated files, inspect any function/method parameter `param` or class property `this.field` whose explicit type annotation is `ts.SyntaxKind.StringKeyword` (`string`).
   2. Skip functions that implement or override a signature from a class heritage clause, contextual callback type, or untrusted boundary decoder (e.g., functions that also accept `unknown` or parse CLI `process.argv` / `URLSearchParams` / `req.query` / `headers`).
   3. Match an `if` statement in the function body whose consequent `throw`s (or returns an error) and whose condition negates membership of `param` (or `this.field`) in a closed literal set:
-     - `!LITERAL_ARRAY.includes(param)` or `!LITERAL_SET.has(param)` where `LITERAL_ARRAY` / `LITERAL_SET` resolves to a module-scope constant of `>= 2` string literals (excluding `Record` / `Map` / object registries, matching `g9-closed-string.yml` line 26), OR
+     - `!LITERAL_ARRAY.includes(param)` or `!LITERAL_SET.has(param)` where `LITERAL_ARRAY` / `LITERAL_SET` resolves to a module-scope constant of `>= 2` string literals (excluding `Record` / `Map` / object registries, matching the closed-string check), OR
      - `param !== "a" && param !== "b"` (`>= 2` string literal inequality conjunctions).
   4. Report the `string` annotation: declare the literal union type on the parameter or field so callers and the type checker see the case space.
 
-### 2.8 `antidrift/no-reexport-only-module` (Directive G10 — `g10-reexport-module` Parity)
+### 2.8 `antidrift/no-reexport-only-module` (Directive G10 — Re-Export Module Parity)
 
-- **Directive (`AGENT.md` § Code Design & `dotfiles/config/code-health/rules/g10-reexport-module.yml`):**
+- **Directive (`AGENT.md` § Code Design & the private configuration repository's G10 re-export module check):**
   > _"A function whose body is one call is a hop, not an owner; delete it and let the caller name the owner. The same goes for a module that re-exports one symbol... A split moves code and updates every importer in the same commit: no re-export shims."_
-  > In `dotfiles`, `g10-reexport-module` scored **15/17 (88% precision)** across 8 repositories.
+  > In the private configuration repository, the re-export module check scored **15/17 (88% precision)** across 8 repositories.
 - **Current gap:** Antidrift enforces `no-wrapping-functions` for function hops, but has no rule for barrel/shim modules whose only statements re-export symbols from other modules.
 - **Required context:** Oxlint / portable AST + package entrypoint resolution (`package.json` `exports` / `main` / `bin`).
 - **Implementation specification:**
@@ -178,27 +178,27 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
   2. Ignore files declared as public package entrypoints in the enclosing `package.json` (`exports`, `main`, `module`, `bin`) and public facade files that only re-export from an underscore-prefixed private sibling (`export * from "./_internal"`).
   3. Report the module when `Program.body` is non-empty and every statement is an `ExportNamedDeclaration` with `source !== null` (`export { a } from "./b"`), an `ExportAllDeclaration` (`export * from "./b"`), or an `ImportDeclaration` whose bindings are only used in `export { a }`.
 
-### 2.9 `antidrift/no-argument-mutation-side-effect` (Directive D2 — `d2-dict-argument-write` Parity)
+### 2.9 `antidrift/no-argument-mutation-side-effect` (Directive D2 — Dictionary-Argument Write Parity)
 
-- **Directive (`skills/codebase-design` § Designing for Testability & `dotfiles/config/code-health/rules/d2-dict-argument-write.yml`):**
+- **Directive (`skills/codebase-design` § Designing for Testability & the private configuration repository's D2 dictionary-argument write check):**
   > _"Return results, don't produce side effects."_
-  > In `dotfiles`, `d2-dict-argument-write` scored **17/20 (85% precision)** across 15 repositories.
+  > In the private configuration repository, the dictionary-argument write check scored **17/20 (85% precision)** across 15 repositories.
 - **Current gap:** Standalone TypeScript functions that return `void` / `Promise<void>` and write their computed output into named keys of a plain object, `Record`, or `Map` argument instead of returning a value.
 - **Required context:** `defineTypeScriptRule` (`ts-rule-kernel.mjs`) — `sourceFile` and `checker`.
 - **Implementation specification:**
   1. In non-test, non-generated files, match standalone module-level function declarations (or exported arrow/function expressions) that are **not** class methods, generators, or framework middleware/callbacks (e.g., Express `(req, res, next)` or DOM event listeners).
   2. Require that the function returns no value (`return;` or no `return` statement; return type `void` or `Promise<void>`).
   3. Check whether the function body mutates a parameter `param` via `param.field = value`, `param[key] = value`, or `param.set(key, value)` where:
-     - `param` is **not** named `cache`, `memo`, `ctx`, `context`, `store`, `state`, `headers`, `res`, `response`, or `target` (matching the `d2-dict-argument-write.yml` narrowings),
+     - `param` is **not** named `cache`, `memo`, `ctx`, `context`, `store`, `state`, `headers`, `res`, `response`, or `target` (matching the dictionary-argument write check's narrowings),
      - `param` is **not** rebound to a local clone (`param = { ...param }` or `param = structuredClone(param)`), and
      - `checker.getTypeAtLocation(param)` is a plain object literal type, an interface with only data properties (no methods), `Record<K, V>`, or `Map<K, V>` (excluding class instances, streams, DOM nodes, and `Set`).
   4. Report the parameter write and instruct returning the computed result instead.
 
-### 2.10 `antidrift/no-direct-secret-cli-call` (Directive G18 — `g18-secret-call` Parity)
+### 2.10 `antidrift/no-direct-secret-cli-call` (Directive G18 — Secret-Call Parity)
 
-- **Directive (`AGENT.md` § Secrets & `dotfiles/config/code-health/rules/g18-secret-call.yml`):**
+- **Directive (`AGENT.md` § Secrets & the private configuration repository's G18 secret-call check):**
   > _"Resolve automation secrets with `~/.local/bin/secret-resolve` — never hardcode keys or call `secret-tool`/`op` directly."_
-- **Current gap:** `g18-secret-call.yml` enforces this in `Bash` and `Python`, leaving TypeScript/JavaScript scripts (`execSync`, `execFileSync`, `spawn`, `Bun.spawn`, `Bun.$`, `execa`) unchecked.
+- **Current gap:** the secret-call check enforces this in `Bash` and `Python`, leaving TypeScript/JavaScript scripts (`execSync`, `execFileSync`, `spawn`, `Bun.spawn`, `Bun.$`, `execa`) unchecked.
 - **Required context:** Oxlint / portable AST.
 - **Implementation specification:**
   1. Outside `secret-resolve*` and `secret-provision*` scripts and test files, inspect call expressions and tagged templates that execute subprocesses (`exec`, `execSync`, `execFile`, `execFileSync`, `spawn`, `spawnSync`, `Bun.spawn`, `Bun.spawnSync`, `$`).

@@ -32,10 +32,10 @@ Import the owner type when a library already owns the tuple shape.
 
 | Case                                                                               |        Should report | Reason                                                                        |
 | ---------------------------------------------------------------------------------- | -------------------: | ----------------------------------------------------------------------------- |
-| `type CustomRange = [Date \| null, Date \| null]`                                  |                  yes | Two nullable positional slots hide `start`/`end` meaning.                     |
-| `type CustomRange = readonly [Date \| null, Date \| null]`                         |                  yes | Readonly does not remove the positional partial-state smell.                  |
-| `type CustomRange = [start: Date \| null, end: Date \| null]`                      |                  yes | Labels help readers, but the type is still a nullable positional state model. |
-| `type MaybeDate = Date \| null; type CustomRange = [MaybeDate, MaybeDate]`         | yes, when type-aware | Alias chains should not dodge the rule when parser services are available.    |
+| `type DateRange = [Date \| null, Date \| null]`                                    |                  yes | Two nullable positional slots hide `start`/`end` meaning.                     |
+| `type DateRange = readonly [Date \| null, Date \| null]`                           |                  yes | Readonly does not remove the positional partial-state smell.                  |
+| `type DateRange = [start: Date \| null, end: Date \| null]`                        |                  yes | Labels help readers, but the type is still a nullable positional state model. |
+| `type MaybeDate = Date \| null; type DateRange = [MaybeDate, MaybeDate]`           | yes, when type-aware | Alias chains should not dodge the rule when parser services are available.    |
 | `function select(range: [Date \| null, Date \| null]) {}`                          |                  yes | Inline tuple contracts are the same smell.                                    |
 | `type Point = [number, number]`                                                    |                   no | Non-null numeric coordinate pairs are ordinary tuple use.                     |
 | `type HookResult = [value: Date \| null, setValue: (value: Date \| null) => void]` |                   no | Only one slot is nullable; common hook tuple shape stays out of scope.        |
@@ -45,21 +45,21 @@ Import the owner type when a library already owns the tuple shape.
 
 ## Real Corpus Evidence
 
-Chaski drift:
+Drift in a private app:
 
-- `src/frontend/portal/modules/service-stop/route-assignments/types.ts` line 6: `CustomRange = [Date | null, Date | null]`.
+- One range type alias shaped `[Date | null, Date | null]`.
 
-Chaski clean control:
+Clean control in the private app:
 
-- `src/frontend/crow-v2/hooks/useCountingTasks.ts`: `convertUnitsToCases(): [number, number]`.
+- A hook-module function that returns a non-null `[number, number]` tuple.
 
-The latest documented broad Chaski frontend inventory recorded one finding across 1,533 files: the `CustomRange` type above. No saved inventory artifact is currently checked in for this count, so it is supporting context, not promotion-grade evidence.
+The latest documented broad frontend inventory of the private app recorded one finding across 1,533 files: the range type above. No saved inventory artifact is currently checked in for this count, so it is supporting context, not promotion-grade evidence.
 
 ## Decision
 
 Keep `antidrift/no-nullable-positional-tuple` ready and default-on while `stable` remains false. The detector is real local AST/source-shape proof, with TypeChecker alias resolution when parser services exist, and it is not replaced by a maintained ecosystem rule.
 
-The evidence is precise but Chaski-only and low-yield: one real tuple across 1,533 frontend files. A second real tuple plus clean controls still gates stable promotion.
+The evidence is precise but from one private app only and low-yield: one real tuple across 1,533 frontend files. A second real tuple plus clean controls still gates stable promotion.
 
 ## Boundaries
 

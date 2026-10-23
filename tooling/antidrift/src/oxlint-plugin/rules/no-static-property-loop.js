@@ -1,4 +1,4 @@
-import { findVariable } from "../../semantic-adapters/kernel/async-control-flow.ts";
+import { findVariable } from "../../semantic-adapters/kernel/variable-lookup.ts";
 
 const equalityMatchers = new Set(["toBe", "toEqual", "toStrictEqual"]);
 const testBlockNames = new Set(["it", "test", "xit", "xtest", "fit"]);

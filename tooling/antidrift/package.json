@@ -65,10 +65,6 @@
         "types": "./dist/semantic-adapters/index.d.mts",
         "import": "./dist/semantic-adapters/index.mjs"
       },
-      "./semantic-adapters/async-control-flow": {
-        "types": "./dist/semantic-adapters/kernel/async-control-flow.d.ts",
-        "import": "./dist/semantic-adapters/kernel/async-control-flow.js"
-      },
       "./semantic-adapters/auth-boundary": {
         "types": "./dist/semantic-adapters/boundary/auth-boundary.d.ts",
         "import": "./dist/semantic-adapters/boundary/auth-boundary.js"
@@ -76,10 +72,6 @@
       "./semantic-adapters/broad-input": {
         "types": "./dist/semantic-adapters/boundary/broad-input.d.ts",
         "import": "./dist/semantic-adapters/boundary/broad-input.js"
-      },
-      "./semantic-adapters/parse-input": {
-        "types": "./dist/semantic-adapters/boundary/parse-input.d.ts",
-        "import": "./dist/semantic-adapters/boundary/parse-input.js"
       },
       "./semantic-adapters/react-state": {
         "types": "./dist/semantic-adapters/projection/react-state.d.ts",
@@ -141,10 +133,6 @@
       "types": "./src/semantic-adapters/index.d.mts",
       "import": "./src/semantic-adapters/index.mjs"
     },
-    "./semantic-adapters/async-control-flow": {
-      "types": "./src/semantic-adapters/kernel/async-control-flow.ts",
-      "import": "./src/semantic-adapters/kernel/async-control-flow.ts"
-    },
     "./semantic-adapters/auth-boundary": {
       "types": "./src/semantic-adapters/boundary/auth-boundary.ts",
       "import": "./src/semantic-adapters/boundary/auth-boundary.ts"
@@ -152,10 +140,6 @@
     "./semantic-adapters/broad-input": {
       "types": "./src/semantic-adapters/boundary/broad-input.ts",
       "import": "./src/semantic-adapters/boundary/broad-input.ts"
-    },
-    "./semantic-adapters/parse-input": {
-      "types": "./src/semantic-adapters/boundary/parse-input.ts",
-      "import": "./src/semantic-adapters/boundary/parse-input.ts"
     },
     "./semantic-adapters/react-state": {
       "types": "./src/semantic-adapters/projection/react-state.ts",
@@ -188,18 +172,15 @@
   "files": [
     "CHANGELOG.md",
     "LICENSE",
-    "NOTICE",
-    "licenses",
     "README.md",
     "ast-grep",
     "dist"
   ],
   "dependencies": {
-    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
-    "@eslint/json": "0.14.0",
-    "@oxlint/plugins": "1.78.0",
-    "@typescript-eslint/types": "8.60.1",
-    "oxlint": "1.78.0",
+    "@eslint/json": "^0.14.0",
+    "@oxlint/plugins": "^1.78.0",
+    "@typescript-eslint/types": "^8.60.1",
+    "oxlint": "^1.78.0",
     "yaml": "^2.6.1",
     "zod": "^3.24.1"
   },
@@ -210,6 +191,7 @@
     "typescript-eslint": ">=8"
   },
   "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
     "@tanstack/react-query": "^5.101.4",
     "@types/node": "^22.10.2",
     "@typescript-eslint/parser": "^8.60.1",
@@ -217,7 +199,7 @@
     "convex": "^1.43.0",
     "effect": "^3.22.1",
     "firebase": "^11.0.0",
-    "typescript": "6.0.3",
+    "typescript": "~6.0.3",
     "typescript-eslint": "^8.60.1",
     "vitest": "^2.1.8"
   }

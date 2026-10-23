@@ -7,6 +7,7 @@ import {
   importedName,
   packageDirectory,
   publicEntries,
+  specifierPackage,
 } from "../../semantic-adapters/provenance/declared-dependencies.ts";
 import {
   shapeComparison,
@@ -14,23 +15,31 @@ import {
 } from "../../semantic-adapters/shape/shape-identity.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
+const sourcesByProgram = new WeakMap();
 const inventoryByProgram = new WeakMap();
 const ownerSymbols = ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias;
 
-function packageEntries(packageRoot, modes, options, entriesByManifest) {
+// Runtime and peer dependencies are the package's contract, so their exported
+// types are inventoried. A development dependency, such as a tool or a test
+// library, is inventoried only when the package's own files import it.
+function packageEntries(packageRoot, modes, options, importedPackages) {
+  const contract = new Set(
+    declaredDependencies(packageRoot, ["dependencies", "peerDependencies"])
+  );
   const entries = [];
   for (const dependency of declaredDependencies(packageRoot)) {
+    if (
+      !contract.has(dependency) &&
+      !importedPackages.has(importedName(dependency))
+    ) {
+      continue;
+    }
     const manifestPath = dependencyManifest(packageRoot, dependency, options);
     if (!manifestPath) continue;
     const reverses = dependsBack(packageRoot, manifestPath);
-    if (!entriesByManifest.has(manifestPath)) {
-      entriesByManifest.set(
-        manifestPath,
-        publicEntries(dependency, manifestPath).specifiers
-      );
-    }
+    const { specifiers } = publicEntries(dependency, manifestPath);
     for (const mode of modes) {
-      for (const specifier of entriesByManifest.get(manifestPath)) {
+      for (const specifier of specifiers) {
         const resolved = ts.resolveModuleName(
           specifier,
           join(packageRoot, "package.json"),
@@ -55,10 +64,13 @@ function packageEntries(packageRoot, modes, options, entriesByManifest) {
   return entries;
 }
 
-function programWithEntries(program, fileNames) {
+// The second program needs the linted package's files, the root declaration
+// files that may declare its globals, and the missing entries. Other packages'
+// sources in a program that spans a whole workspace would only be resolved again.
+function programWithEntries(program, packageFileNames, entryFileNames) {
   const missing = [
     ...new Set(
-      fileNames.filter((fileName) => !program.getSourceFile(fileName))
+      entryFileNames.filter((fileName) => !program.getSourceFile(fileName))
     ),
   ];
   if (missing.length === 0) return program;
@@ -68,8 +80,13 @@ function programWithEntries(program, fileNames) {
   host.getSourceFile = (fileName, languageVersion, onError, recreate) =>
     program.getSourceFile(fileName) ??
     parseSourceFile(fileName, languageVersion, onError, recreate);
+  const declarationRoots = program
+    .getRootFileNames()
+    .filter((fileName) => program.getSourceFile(fileName)?.isDeclarationFile);
   return ts.createProgram({
-    rootNames: [...program.getRootFileNames(), ...missing],
+    rootNames: [
+      ...new Set([...declarationRoots, ...packageFileNames, ...missing]),
+    ],
     options,
     host,
     projectReferences: program.getProjectReferences(),
@@ -125,10 +142,10 @@ function exportedOwners(checker, sourceFile, entry) {
   return owners;
 }
 
-function dependencyInventory(program) {
-  const cached = inventoryByProgram.get(program);
+function packageSources(program) {
+  const cached = sourcesByProgram.get(program);
   if (cached) return cached;
-  const modesByPackageRoot = new Map();
+  const sourcesByPackageRoot = new Map();
   for (const source of program.getSourceFiles()) {
     if (
       program.isSourceFileDefaultLibrary(source) ||
@@ -138,58 +155,74 @@ function dependencyInventory(program) {
     }
     const packageRoot = packageDirectory(source.fileName);
     if (packageRoot === null) continue;
-    const modes = modesByPackageRoot.get(packageRoot) ?? new Set();
-    modes.add(source.impliedNodeFormat);
-    modesByPackageRoot.set(packageRoot, modes);
+    const sources = sourcesByPackageRoot.get(packageRoot) ?? {
+      modes: new Set(),
+      fileNames: [],
+      importedPackages: new Set(),
+    };
+    sources.modes.add(source.impliedNodeFormat);
+    sources.fileNames.push(source.fileName);
+    for (const specifier of source.imports ?? []) {
+      const imported = specifierPackage(specifier.text);
+      if (imported) sources.importedPackages.add(imported);
+    }
+    sourcesByPackageRoot.set(packageRoot, sources);
   }
-  const options = program.getCompilerOptions();
-  const entriesByManifest = new Map();
-  const packages = new Map(
-    [...modesByPackageRoot].map(([packageRoot, modes]) => [
-      packageRoot,
-      packageEntries(packageRoot, modes, options, entriesByManifest),
-    ])
+  sourcesByProgram.set(program, sourcesByPackageRoot);
+  return sourcesByPackageRoot;
+}
+
+// A program spanning several workspace packages loads every package's
+// dependencies, but a file is only compared with its own package's. Each
+// program keeps the inventory of the package it last linted: files lint in path
+// order, so a package's files arrive together, and the second program behind an
+// inventory is not held for packages already finished.
+function dependencyInventory(program, packageRoot) {
+  const cached = inventoryByProgram.get(program);
+  if (cached?.packageRoot === packageRoot) return cached.inventory;
+  const sources = packageSources(program).get(packageRoot);
+  if (!sources) return null;
+  const entries = packageEntries(
+    packageRoot,
+    sources.modes,
+    program.getCompilerOptions(),
+    sources.importedPackages
   );
   const expanded = programWithEntries(
     program,
-    [...packages.values()].flatMap((entries) =>
-      entries.map((entry) => entry.fileName)
-    )
+    sources.fileNames,
+    entries.map((entry) => entry.fileName)
   );
   const checker = expanded.getTypeChecker();
   const ownersByEntry = new Map();
-  const ownersByScope = new Map();
-  for (const [packageRoot, entries] of packages) {
-    const scopes = new Map();
-    for (const entry of entries) {
-      const entryKey = `${entry.packageName}\0${entry.specifier}\0${entry.fileName}`;
-      if (!ownersByEntry.has(entryKey)) {
-        ownersByEntry.set(
-          entryKey,
-          exportedOwners(checker, expanded.getSourceFile(entry.fileName), entry)
-        );
-      }
-      const owners = scopes.get(entry.mode) ?? new Map();
-      for (const owner of ownersByEntry.get(entryKey)) {
-        const bucket = owners.get(owner.key) ?? [];
-        bucket.push(owner);
-        owners.set(owner.key, bucket);
-      }
-      scopes.set(entry.mode, owners);
+  const scopes = new Map();
+  for (const entry of entries) {
+    const entryKey = `${entry.packageName}\0${entry.specifier}\0${entry.fileName}`;
+    if (!ownersByEntry.has(entryKey)) {
+      ownersByEntry.set(
+        entryKey,
+        exportedOwners(checker, expanded.getSourceFile(entry.fileName), entry)
+      );
     }
-    for (const owners of scopes.values()) {
-      for (const bucket of owners.values()) {
-        bucket.sort(
-          (left, right) =>
-            left.name.split(".").length - right.name.split(".").length ||
-            left.specifier.length - right.specifier.length
-        );
-      }
+    const owners = scopes.get(entry.mode) ?? new Map();
+    for (const owner of ownersByEntry.get(entryKey)) {
+      const bucket = owners.get(owner.key) ?? [];
+      bucket.push(owner);
+      owners.set(owner.key, bucket);
     }
-    ownersByScope.set(packageRoot, scopes);
+    scopes.set(entry.mode, owners);
   }
-  const inventory = { program: expanded, checker, ownersByScope };
-  inventoryByProgram.set(program, inventory);
+  for (const owners of scopes.values()) {
+    for (const bucket of owners.values()) {
+      bucket.sort(
+        (left, right) =>
+          left.name.split(".").length - right.name.split(".").length ||
+          left.specifier.length - right.specifier.length
+      );
+    }
+  }
+  const inventory = { program: expanded, checker, scopes };
+  inventoryByProgram.set(program, { packageRoot, inventory });
   return inventory;
 }
 
@@ -217,10 +250,9 @@ export function ruleNoRestatedDependencyType() {
     run({ sourceFile, program, cwd, reportNode }) {
       const packageRoot = packageDirectory(sourceFile.fileName);
       if (!packageRoot) return;
-      const inventory = dependencyInventory(program);
-      const scopes = inventory.ownersByScope.get(packageRoot);
-      if (!scopes) return;
-      const { checker } = inventory;
+      const inventory = dependencyInventory(program, packageRoot);
+      if (!inventory) return;
+      const { checker, scopes } = inventory;
       const sameShape = shapeComparison(inventory.program);
       function check(declaration) {
         if (declaration.members.length < 3) return;

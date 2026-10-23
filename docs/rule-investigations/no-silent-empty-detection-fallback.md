@@ -9,7 +9,7 @@ The rule is AST-only and name-scoped. It reports empty-string `return` values, `
 ## Evidence
 
 - Historical drift shape: a macOS platform UUID helper returned `""` for non-Darwin, regex miss, and catch failure paths.
-- Real clean corpus: dotfiles `config/opencode/plugins/sleepernet-agent-traces.js` now throws when no stable device id can be detected and is validated through the dotfiles external corpus case.
+- Real clean corpus: an opencode trace plugin in a private repository now throws when no stable device id can be detected and is validated through that repository's external corpus case.
 
 ## Status
 

@@ -1,7 +1,7 @@
 # Spec: type-owner tier for `antidrift/no-shattered-ingested-entity-state`
 
 > **SUPERSEDED (historical).** The type-owner enforcement tier specified below was built, then
-> removed after multi-repo scans (chaski, sudocode) found zero real human-authored owned-entity
+> removed after multi-repo scans (a private app, sudocode) found zero real human-authored owned-entity
 > shatters. The rule is now **inventory-only** (records `sourceMemberStateShardCandidate`, never
 > blocks). This document is kept as the design record; the live status is in the referenceDoc and
 > `policy/registries/rules.yaml`. Rebuilding this tier needs real cross-repo positives (likely an
@@ -67,7 +67,7 @@ This rule becomes type-aware, so follow the existing typed-rule pattern, NOT sil
 ## KEY decision — what counts as an "entity" (the xhigh review changed this)
 
 Domain/generated-only **empties the drift set**: registries hold only `User`/`Project`
-(`domain.yaml`), generated sources are empty (`generated.yaml`), and a pinned Chaski candidate's
+(`domain.yaml`), generated sources are empty (`generated.yaml`), and a pinned private-app candidate's
 source (an ad-hoc API response envelope) is not registered. So scope (b)
 catches ~nothing real, and "any named type" re-admits the envelope FP (a view response IS a named
 type).

@@ -10,11 +10,11 @@ Distilled, cited learnings from the 2026 antidrift research pass: the whitepaper
 
 Real catch blocks store a derived error code or message (`setErrorCode("DATA_INVALID")`, `setErrorCode(deriveCode(err))`), not the raw caught-error parameter. Real payload cells receive a member of the awaited object (`setData(resp.items)`), not the bare awaited value. The fixed `lifecycleProof` now accepts catch-scope error setters and first-level awaited source-member payload setters, while updater setters invalidate the proof to keep pagination clean.
 
-Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2-4; corroborated by both external reviewers (codex-out.md §2a; opencode-out.md §2a). Current fixed-proof measurement: 3,323 files across Chaski, Sudocode, Murderbox, Codebase Atlas, Opencode UI/console, Cloudflare Agents, and PowerSync; 230 broadSetterCoMutation inventory facts; and a pinned corpus covering 9 resourceLifecycleProof diagnostics across Chaski, Sudocode, and Cloudflare Agents.
+Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.md` §2-4; corroborated by both external reviewers (codex-out.md §2a; opencode-out.md §2a). Current fixed-proof measurement: 3,323 files across a private app, Sudocode, two other private apps, Opencode UI/console, Cloudflare Agents, and PowerSync; 230 broadSetterCoMutation inventory facts; and a pinned corpus covering 9 resourceLifecycleProof diagnostics across the private app, Sudocode, and Cloudflare Agents.
 
 Applies to:
 
-- `antidrift/no-handrolled-resource-lifecycle-cells` — **proof rewrite implemented, still default-off**. Next proof work is not another adapter rewrite; it is human review of the Chaski, Sudocode, and Cloudflare positives plus clean-control pressure.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — **proof rewrite implemented, still default-off**. Next proof work is not another adapter rewrite; it is human review of the private-app, Sudocode, and Cloudflare positives plus clean-control pressure.
 
 ---
 
@@ -45,7 +45,7 @@ Applies to:
 
 **4. The shard rule found zero real owned-entity shatters across two repos; the pattern is an agent-authored hypothesis**
 
-A type-aware scan of 335 components (chaski) and a wider AST scan across two repos (chaski, sudocode) found zero instances where an accepted domain/generated owned entity's fields were split across sibling `useState` cells. Every hit was a response envelope, value object, or computed-result split — patterns the rule correctly ignores via `sourceShardOwnedEntityProof`. The enforcing tier was removed; the rule is now inventory-only.
+A type-aware scan of 335 components (the private app) and a wider AST scan across two repos (the private app, sudocode) found zero instances where an accepted domain/generated owned entity's fields were split across sibling `useState` cells. Every hit was a response envelope, value object, or computed-result split — patterns the rule correctly ignores via `sourceShardOwnedEntityProof`. The enforcing tier was removed; the rule is now inventory-only.
 
 Basis: `docs/rule-investigations/no-shattered-ingested-entity-state.md` §Current Evidence ("No real-corpus enforcement positive yet"); `docs/rule-investigations/no-shattered-type-owner-tier-spec.md` header note ("SUPERSEDED — zero real human-authored owned-entity shatters"); `rules.yaml` antidrift/no-shattered-ingested-entity-state concerns block; codex-out.md §3a; opencode-out.md §3a.
 
@@ -63,7 +63,7 @@ Basis: `docs/rule-investigations/no-handrolled-resource-lifecycle-proof-rewrite.
 
 Applies to:
 
-- `antidrift/no-handrolled-resource-lifecycle-cells` — the rewrite is validated against Chaski, Sudocode, and Cloudflare and now pins 9 fixed-proof diagnostics, not a broad co-mutation flood. Promotion still requires review of the positives plus real clean controls, not synthetic fixtures.
+- `antidrift/no-handrolled-resource-lifecycle-cells` — the rewrite is validated against the private app, Sudocode, and Cloudflare and now pins 9 fixed-proof diagnostics, not a broad co-mutation flood. Promotion still requires review of the positives plus real clean controls, not synthetic fixtures.
 - `antidrift/no-shattered-ingested-entity-state` — the existing `nextAction` in `rules.yaml` mandates an agent-generated corpus before any enforcement tier rebuild.
 - All `under-proven` rules — the lesson is general: no rule moves from `under-proven` to `error` on synthetic fixtures alone.
 
@@ -204,10 +204,10 @@ Two axes come apart, and conflating them is the recurring failure mode:
 
 The proof does not factor across libraries. Effect Schema needs `Schema.Schema.Type<typeof S>` resolution, curried decode call shapes, and its own filter semantics; `sql<T>` needs co-location of an asserted generic with a corrective cast, an unrelated proof. Only `as unknown as T` genuinely shares the declared-vs-inferred proof. Two of five surfaces share evidence — that is not a family with one spine.
 
-Basis: every false positive found during the 2026-08-03 sweep came from missing library or value semantics, never from a missing surface — `z.string().min(1)` parsed on a `string` parameter (Codebase Atlas `persistenceCuration.ts:1073`), a `z.input` parameter (`extractSemanticFacts.ts:56`), a `{} as unknown` generic-default sentinel (Cloudflare Agents `index.ts:963`), and a `let` traversal cursor (Executor `openapi-utils.ts:42`). The first `no-parse-as-cast` implementation keyed on structural type identity and produced three false positives in four Codebase Atlas findings; the fix was a narrower proof (schema-derivation provenance), not a narrower surface. `docs/rule-investigations/no-thin-typed-factory-wrapper.md` is retired for the same reason at larger scale.
+Basis: every false positive found during the 2026-08-03 sweep came from missing library or value semantics, never from a missing surface — `z.string().min(1)` parsed on a `string` parameter (a private app), a `z.input` parameter (the same private app), a `{} as unknown` generic-default sentinel (Cloudflare Agents `index.ts:963`), and a `let` traversal cursor (Executor `openapi-utils.ts:42`). The first `no-parse-as-cast` implementation keyed on structural type identity and produced three false positives in four findings from that private app; the fix was a narrower proof (schema-derivation provenance), not a narrower surface. `docs/rule-investigations/no-thin-typed-factory-wrapper.md` is retired for the same reason at larger scale.
 
 Applies to:
 
 - Coverage gaps are closed by adding specific rules, not by generalizing existing ones. An Effect rule should know Effect as precisely as `no-redundant-zod-parse` knows Zod.
-- Escape-hatch displacement is real and argues for coverage, not looseness: Murderbox desktop carries 2 `as unknown` casts against 12 annotation erasures, so a cast-scoped rule reports zero on a codebase with the defect twelve times over.
+- Escape-hatch displacement is real and argues for coverage, not looseness: a private app's desktop client carries 2 `as unknown` casts against 12 annotation erasures, so a cast-scoped rule reports zero on a codebase with the defect twelve times over.
 - The only legitimate sharing is mechanism — checker queries, symbol resolution, alias tracing in `semantic-adapters/schema-provenance.mjs`. That is deduplication, not generalization.

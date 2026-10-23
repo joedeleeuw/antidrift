@@ -34,7 +34,7 @@ Use the strongest available signal. Do not start with AST shape unless the synta
 4. **AST shape only when deterministic by construction**: the syntax is the bad behavior, not a proxy for intent.
 5. **Do not implement yet** when the rule needs human judgment and no stronger signal exists.
 
-This means a boolean predicate such as `isWebviewRoute` is not a type escape hatch by itself. A type escape hatch needs evidence such as a `TSAsExpression`, `as unknown as`, `any`/`unknown` movement into a trusted value, branded target forging, `JSON.parse` into a trusted shape, or a `value is X`/`asserts value is X` predicate that manufactures authority without an owned validator.
+This means a boolean route predicate is not a type escape hatch by itself. A type escape hatch needs evidence such as a `TSAsExpression`, `as unknown as`, `any`/`unknown` movement into a trusted value, branded target forging, `JSON.parse` into a trusted shape, or a `value is X`/`asserts value is X` predicate that manufactures authority without an owned validator.
 
 ## Rule categories
 
@@ -97,7 +97,7 @@ These should start as warnings:
 - Use syntax-only checks only when syntax is the violation.
 - Use the signal definitions in `docs/rule-status-registry.md` before choosing a rule approach. Syntax can be the violation for construction-pattern bans like `as unknown as T`, but it is not enough for ownership, trust, type authority, or domain meaning.
 - Use `typescript-eslint` parser services for rules that need symbol identity, inferred types, assignability, imported declarations, or schema/type provenance.
-- Use real corpus assertions first when available. For this repo, `pnpm policy:validate-chaski` is the local Chaski-backed gate for real frontend/BFF behavior. If Chaski has only clean controls for a rule, run a named external corpus with `pnpm policy:research-external-corpus -- --corpus <name>` and document that research evidence in `docs/real-corpus-validation.md`.
+- Use real corpus assertions first when available. For this repo, the local gate for real frontend behavior was a private-app corpus run that is no longer in the repository. If the private app has only clean controls for a rule, run a named external corpus with `pnpm policy:research-external-corpus -- --corpus <name>` and document that research evidence in `docs/real-corpus-validation.md`.
 - Do not use reduced fixture programs as a completion gate. Real project files are the assertion surface for rule promotion.
 - Add or update the rule row in `policy/registries/rules.yaml` whenever a rule is added, retired, narrowed, reclassified, or considered for stable promotion.
 - Add or update the corresponding provenance row in `docs/source-ledger.md` whenever a rule, ruleset, tool, or borrowed reference changes.

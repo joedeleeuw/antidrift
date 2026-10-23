@@ -9,10 +9,10 @@ pnpm policy:reports
 pnpm sonar:prepare
 ```
 
-`pnpm sonar:prepare` converts the reduced custom typed-rule ESLint JSON into Sonar generic external issue format at:
+`pnpm sonar:prepare` writes the ESLint JSON report, which Sonar imports natively:
 
 ```txt
-reports/antidrift-sonar.json
+reports/eslint-antidrift.json
 ```
 
 ## Sonar scanner properties
@@ -22,7 +22,7 @@ See `sonar-project.properties`.
 The template imports external policy findings with:
 
 ```properties
-sonar.externalIssuesReportPaths=reports/antidrift-sonar.json
+sonar.eslint.reportPaths=reports/eslint-antidrift.json
 ```
 
 ## Non-TypeScript Tooling
@@ -40,7 +40,7 @@ This is the Antidrift-branded Sonar recommendation for broad AI-assisted code qu
 - `rules`: native Sonar rule keys grouped by Antidrift intent. These decide what Sonar reports.
 - `gate`: Sonar metrics and thresholds. These decide what blocks merge.
 
-Native Sonar rule keys remain authoritative. Antidrift curates the posture and imports custom `antidrift/*` ESLint findings through `sonar.externalIssuesReportPaths`; it does not rebrand Sonar-owned rules as custom Antidrift rules.
+Native Sonar rule keys remain authoritative. Antidrift curates the posture and imports custom `antidrift/*` ESLint findings through Sonar's ESLint report import (`sonar.eslint.reportPaths`); it does not rebrand Sonar-owned rules as custom Antidrift rules.
 
 The preset also records the selection boundary:
 
@@ -80,7 +80,7 @@ Small additive gap matrix:
 | Surface                      | Local owner                                | Sonar posture                                                                                                                           | Current gap                                                    |
 | ---------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | React correctness            | Oxlint React and React Compiler plugins    | Do not add native Sonar React rules while local Oxlint owns the equivalent check.                                                       | None recorded; `S6441` overlaps React nested-component checks. |
-| Local complexity budget      | `antidrift oxlint`                         | Keep native Sonar cognitive complexity and duplication metrics active; they are not duplicates of local cyclomatic/depth/params checks. | Exact Sonar S3776 behavior is server-side only.                |
+| Local complexity budget      | `@joedeleeuw/typescript-tooling` Oxlint    | Keep native Sonar cognitive complexity and duplication metrics active; they are not duplicates of local cyclomatic/depth/params checks. | Exact Sonar S3776 behavior is server-side only.                |
 | Module size                  | Oxlint `max-lines`                         | Exclude `S104` as an exact local duplicate; Sonar still owns portfolio metrics and server-side quality gates.                           | None for JavaScript and TypeScript modules.                    |
 | Accessibility                | None; `jsx-a11y` is not shipped.           | Keep native Sonar accessibility keys through `accessibility-without-jsx-a11y`.                                                          | Maintained UI accessibility scanning.                          |
 | Antidrift-specific contracts | `antidrift/*` imported as external issues. | Report imported findings, but do not rebrand native Sonar rules.                                                                        | Repo-specific and agent-specific semantics.                    |

@@ -10,7 +10,12 @@ export function isTestFilename(filename) {
   if (!filename || filename === "<input>" || filename === "<text>") {
     return true;
   }
-  return testFilenamePattern.test(filename);
+  return isTestPath(filename);
+}
+
+// Unlike isTestFilename, a snippet without a file name is not a test.
+export function isTestPath(filename) {
+  return typeof filename === "string" && testFilenamePattern.test(filename);
 }
 
 export function staticPropertyName(member) {

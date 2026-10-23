@@ -3,7 +3,7 @@ import type ts from "typescript";
 import {
   findVariable,
   getDeclaredVariable,
-} from "../kernel/async-control-flow.ts";
+} from "../kernel/variable-lookup.ts";
 import {
   getFunctionNode,
   isFunctionLike,

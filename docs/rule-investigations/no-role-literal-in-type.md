@@ -36,7 +36,7 @@ This rule stays custom by parity with `no-status-literal-in-type`, but its evide
 
 ## Real Corpus Evidence
 
-Current Chaski evidence is clean-control-heavy rather than drift-heavy:
+Current evidence from a private app is clean-control-heavy rather than drift-heavy:
 
 - Canonical role definitions live in their owner.
 - Consumers import the canonical role values instead of redeclaring the union.

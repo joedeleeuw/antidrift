@@ -39,12 +39,6 @@ export interface ShellGuardrailsArgs {
   help: boolean;
 }
 
-export interface OxlintArgs {
-  targets: string[];
-  passthrough: string[];
-  help: boolean;
-}
-
 export type SemanticFactConfidence =
   | "deterministic-enforcement"
   | "deterministic-inventory"
@@ -120,14 +114,6 @@ export interface RuleStatusExamples {
   flags: readonly string[];
   allows: readonly string[];
 }
-
-export type SqlParserServiceDeltaClassification =
-  | "not-applicable"
-  | "equivalent-without-parser-services"
-  | "conservative-inventory-without-parser-services"
-  | "blocking-false-negative-without-parser-services"
-  | "mixed-parser-service-delta"
-  | "parser-error";
 
 export interface SemanticFactLocation {
   line: number;
@@ -238,14 +224,6 @@ export type SemanticFactKind =
   | "structuralMatch"
   | "changeContractConformance";
 
-export interface SqlParserServiceDeltaInput {
-  parserErrors?: number;
-  comparisonWithTypeAware?: {
-    extraWithoutTypeServices?: string[];
-    missingWithoutTypeServices?: string[];
-  };
-}
-
 export function loadRegistriesSync(policyDir?: string): AntidriftRegistries;
 export const SEMANTIC_FACT_SCHEMA_VERSION: 1;
 export const SEMANTIC_FACT_KINDS: Readonly<
@@ -315,56 +293,8 @@ export function checkGenerated(options?: PolicyCommandOptions): unknown;
 export function checkChanged(options?: PolicyCommandOptions): unknown;
 export function checkRegistries(options?: PolicyCommandOptions): unknown;
 export function checkRuleSurface(options?: PolicyCommandOptions): unknown;
-export function defensiveShapeInventory(
-  options?: PolicyCommandOptions
-): Promise<unknown>;
-export function declarationCloneInventory(
-  options?: PolicyCommandOptions
-): Promise<unknown>;
-export function repoCorpus(options?: PolicyCommandOptions): Promise<unknown>;
-export function chaskiCorpus(options?: PolicyCommandOptions): Promise<unknown>;
-export function externalCorpus(
-  options?: PolicyCommandOptions
-): Promise<unknown>;
 export function defaultAstGrepBinary(): string;
 export const DEFAULT_AST_GREP_CONFIG: string;
 export function parseShellGuardrailsArgs(argv?: string[]): ShellGuardrailsArgs;
 export function shellGuardrails(options?: PolicyCommandOptions): number;
-export function parseOxlintArgs(
-  argv: string[],
-  options?: {
-    cwd?: string;
-    exists?: (path: string) => boolean;
-  }
-): OxlintArgs;
-export function runOxlint(options?: PolicyCommandOptions): number;
 export function verifySession(): void;
-export function eslintJsonToSonar(
-  inputPath?: string,
-  outputPath?: string
-): Promise<void>;
-export function unsafeTypeAssertionBenchmark(
-  options?: PolicyCommandOptions
-): Promise<unknown>;
-export function sqlQueryBenchmark(
-  options?: PolicyCommandOptions
-): Promise<unknown>;
-export function classifySqlParserServiceDelta(
-  probe?: SqlParserServiceDeltaInput | null
-): SqlParserServiceDeltaClassification;
-export function sqlBroadInventory(
-  options?: PolicyCommandOptions
-): Promise<unknown>;
-export function reactStateInventory(
-  options?: PolicyCommandOptions
-): Promise<unknown>;
-export function classifyReactStateFact(fact: SemanticFact): string;
-export function schemaRoundtripInventory(
-  options?: PolicyCommandOptions
-): unknown;
-export function typeOwnerInventory(
-  options?: PolicyCommandOptions
-): Promise<unknown>;
-export function undercheckedPredicateInventory(
-  options?: PolicyCommandOptions
-): Promise<unknown>;

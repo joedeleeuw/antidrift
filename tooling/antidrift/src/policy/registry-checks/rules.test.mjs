@@ -154,7 +154,7 @@ ${lockedRuleSections(root)}
     writeFileSync(
       existing,
       text.replace(
-        /(  antidrift\/no-appeasement-cast:\n[\s\S]*?)    proofBuckets: \[local-ast-source-shape\]\n/u,
+        /(  antidrift\/no-redundant-zod-parse:\n[\s\S]*?)    proofBuckets: \[local-ast-source-shape\]\n/u,
         "$1"
       )
     );
@@ -166,7 +166,7 @@ ${lockedRuleSections(root)}
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-appeasement-cast.proofBuckets must be an array of strings."
+      "policy/registries/rules.yaml rules.antidrift/no-redundant-zod-parse.proofBuckets must be an array of strings."
     );
   });
   it("rejects diff-relative proof buckets in active rule registry rows", () => {
@@ -177,7 +177,7 @@ ${lockedRuleSections(root)}
     writeFileSync(
       existing,
       text.replace(
-        /(  antidrift\/no-appeasement-cast:\n[\s\S]*?)    proofBuckets: \[local-ast-source-shape\]\n/u,
+        /(  antidrift\/no-redundant-zod-parse:\n[\s\S]*?)    proofBuckets: \[local-ast-source-shape\]\n/u,
         "$1    proofBuckets: [diff-relative]\n"
       )
     );
@@ -189,7 +189,7 @@ ${lockedRuleSections(root)}
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-appeasement-cast.proofBuckets contains unsupported value 'diff-relative'"
+      "policy/registries/rules.yaml rules.antidrift/no-redundant-zod-parse.proofBuckets contains unsupported value 'diff-relative'"
     );
   });
   it("rejects diff-relative proof buckets in stable active rule registry rows", () => {
@@ -202,7 +202,7 @@ ${lockedRuleSections(root)}
     writeFileSync(
       registry,
       registryText.replace(
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: false
     signal: test-signal
@@ -211,7 +211,7 @@ ${lockedRuleSections(root)}
     referenceDoc: docs/rule-roadmap.md
     corpusRepositories: []
 `,
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: true
     signal: test-signal
@@ -221,7 +221,7 @@ ${lockedRuleSections(root)}
     corpusRepositories: [repo-one, repo-two]
     promotion:
       proofBucket: local-ast-source-shape
-      association: async array callback to collection method semantics
+      association: test association
       blockingThreshold: Test threshold.
       ecosystemComparison: Test ecosystem comparison.
       corpusEvidence: Test corpus evidence.
@@ -246,7 +246,7 @@ ${lockedRuleSections(root)}
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.proofBuckets contains unsupported value 'diff-relative'"
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.proofBuckets contains unsupported value 'diff-relative'"
     );
   });
   it("accepts diff-relative proof buckets in research candidate rows", () => {
@@ -402,7 +402,7 @@ ${lockedRuleSections(root)}
       .sort((a, b) => a.localeCompare(b))
       .map((rule) => {
         const referenceDoc =
-          rule === "no-async-array-method"
+          rule === "require-effect-deps"
             ? ""
             : "    referenceDoc: docs/rule-roadmap.md\n";
         return `  antidrift/${rule}:
@@ -463,7 +463,7 @@ ${lockedRuleSections(root)}
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.referenceDoc must be a non-empty string."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.referenceDoc must be a non-empty string."
     );
   });
   it("rejects rule-family subsets that reference unknown rules", () => {
@@ -541,11 +541,11 @@ ruleFamilies:
     writeFileSync(
       existing,
       text.replace(
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: false
 `,
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: true
 `
@@ -559,7 +559,7 @@ ruleFamilies:
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion must be a mapping for stable rules."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion must be a mapping for stable rules."
     );
   });
   it("requires stable active rules to document a reference investigation", () => {
@@ -572,7 +572,7 @@ ruleFamilies:
     writeFileSync(
       existing,
       text.replace(
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: false
     signal: test-signal
@@ -581,7 +581,7 @@ ruleFamilies:
     referenceDoc: docs/rule-roadmap.md
     corpusRepositories: []
 `,
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: true
     signal: test-signal
@@ -614,7 +614,7 @@ ruleFamilies:
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.referenceDoc must be a non-empty string."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.referenceDoc must be a non-empty string."
     );
   });
   it("requires stable active rules to be owned by Antidrift instead of delegated externally", () => {
@@ -624,7 +624,7 @@ ruleFamilies:
     writeValidRulesRegistry(root);
     const existing = join(root, "policy", "registries", "rules.yaml");
     const text = readFileSync(existing, "utf8");
-    const ruleHeader = "  antidrift/no-async-array-method:\n";
+    const ruleHeader = "  antidrift/no-bag-reshaper:\n";
     const nextRuleHeader = "  antidrift/no-canonical-model-fork:\n";
     const ruleStart = text.indexOf(ruleHeader);
     const nextRuleStart = text.indexOf(nextRuleHeader, ruleStart);
@@ -633,7 +633,7 @@ ruleFamilies:
     const ruleBlock = text.slice(ruleStart, nextRuleStart);
     const invalidRuleBlock = ruleBlock
       .replace(
-        `  antidrift/no-async-array-method:
+        `  antidrift/no-bag-reshaper:
     status: ready
     stable: false
     signal: test-signal
@@ -642,7 +642,7 @@ ruleFamilies:
     referenceDoc: docs/rule-roadmap.md
     corpusRepositories: []
 `,
-        `  antidrift/no-async-array-method:
+        `  antidrift/no-bag-reshaper:
     status: ready
     stable: true
     signal: test-signal
@@ -689,7 +689,7 @@ ruleFamilies:
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.external.decision must be own-antidrift for stable active rules."
+      "policy/registries/rules.yaml rules.antidrift/no-bag-reshaper.external.decision must be own-antidrift for stable active rules."
     );
   });
   it("requires non-stable active rules to document a blocker and next action", () => {
@@ -697,7 +697,7 @@ ruleFamilies:
     writeValidRulesRegistry(root);
     const existing = join(root, "policy", "registries", "rules.yaml");
     const text = readFileSync(existing, "utf8");
-    const ruleHeader = "  antidrift/no-async-array-method:\n";
+    const ruleHeader = "  antidrift/require-effect-deps:\n";
     const nextActionLine = "    nextAction: Test action.\n";
     const ruleStart = text.indexOf(ruleHeader);
     const nextActionStart = text.indexOf(nextActionLine, ruleStart);
@@ -726,10 +726,10 @@ ruleFamilies:
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.nextAction must be a non-empty string."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.nextAction must be a non-empty string."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method must document at least one non-stable blocker in concerns, unproven, or openReviewConcerns."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps must document at least one non-stable blocker in concerns, unproven, or openReviewConcerns."
     );
   });
   it("requires stable active rules to meet the minimum independent repo count", () => {
@@ -742,7 +742,7 @@ ruleFamilies:
     writeFileSync(
       existing,
       text.replace(
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: false
     signal: test-signal
@@ -750,7 +750,7 @@ ruleFamilies:
     proofBuckets: [local-ast-source-shape]
     referenceDoc: docs/rule-roadmap.md
 `,
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: true
     signal: test-signal
@@ -783,7 +783,7 @@ ruleFamilies:
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.corpusRepositories must list at least 2 independent repositories for stable promotion."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.corpusRepositories must list at least 2 independent repositories for stable promotion."
     );
   });
   it("requires stable active rules to satisfy configured promotion evidence gates", () => {
@@ -794,7 +794,7 @@ ruleFamilies:
     writeFileSync(
       existing,
       text.replace(
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: false
     signal: test-signal
@@ -803,7 +803,7 @@ ruleFamilies:
     referenceDoc: docs/rule-roadmap.md
     corpusRepositories: []
 `,
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: true
     signal: test-signal
@@ -830,28 +830,28 @@ ruleFamilies:
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.replicationsNotIntroducedForTest must be true for stable promotion."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.replicationsNotIntroducedForTest must be true for stable promotion."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.knownFalsePositives must be 0 for stable promotion."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.knownFalsePositives must be 0 for stable promotion."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.knownFalseNegatives must be 0 for stable promotion."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.knownFalseNegatives must be 0 for stable promotion."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.productionConcerns must be 'none' for stable promotion."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.productionConcerns must be 'none' for stable promotion."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.claudeAdvisoryReview must be a non-empty string."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.claudeAdvisoryReview must be a non-empty string."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventory must be a non-empty string."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.realCorpusInventory must be a non-empty string."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.claudeAdvisoryReviewRefs must be an array of strings."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.claudeAdvisoryReviewRefs must be an array of strings."
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventoryRefs must be an array of strings."
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.realCorpusInventoryRefs must be an array of strings."
     );
   });
   it("requires stable promotion evidence references to exist", () => {
@@ -862,7 +862,7 @@ ruleFamilies:
     writeFileSync(
       existing,
       text.replace(
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: false
     signal: test-signal
@@ -871,7 +871,7 @@ ruleFamilies:
     referenceDoc: docs/rule-roadmap.md
     corpusRepositories: []
 `,
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: true
     signal: test-signal
@@ -906,10 +906,10 @@ ruleFamilies:
     ).toBe(false);
     const output = messages.join("\n");
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.claudeAdvisoryReviewRefs entry path does not exist: reports/missing-advisory.md"
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.claudeAdvisoryReviewRefs entry path does not exist: reports/missing-advisory.md"
     );
     expect(output).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventoryRefs entry path does not exist: docs/missing-corpus.md"
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.realCorpusInventoryRefs entry path does not exist: docs/missing-corpus.md"
     );
   });
   it("rejects fixture paths as stable real-corpus promotion evidence", () => {
@@ -922,7 +922,7 @@ ruleFamilies:
     writeFileSync(
       existing,
       text.replace(
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: false
     signal: test-signal
@@ -931,7 +931,7 @@ ruleFamilies:
     referenceDoc: docs/rule-roadmap.md
     corpusRepositories: []
 `,
-        `  antidrift/no-async-array-method:
+        `  antidrift/require-effect-deps:
     status: ready
     stable: true
     signal: test-signal
@@ -965,7 +965,7 @@ ruleFamilies:
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "policy/registries/rules.yaml rules.antidrift/no-async-array-method.promotion.realCorpusInventoryRefs entry must not point at fixture evidence: tooling/antidrift/src/eslint-plugin/fixtures/drift.ts"
+      "policy/registries/rules.yaml rules.antidrift/require-effect-deps.promotion.realCorpusInventoryRefs entry must not point at fixture evidence: tooling/antidrift/src/eslint-plugin/fixtures/drift.ts"
     );
   });
   it("requires a review row for every policy-scoped rule", () => {

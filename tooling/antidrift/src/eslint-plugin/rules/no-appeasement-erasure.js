@@ -1,33 +1,65 @@
 import ts from "typescript";
 
 import { schemaValidationCallParts } from "../../semantic-adapters/projection/schema-provenance.ts";
-import { noKnownValueWideningRule } from "../../oxlint-plugin/anti-slop/rules/no-known-value-widening.js";
-import { noWidenThenAssertRule } from "../../oxlint-plugin/anti-slop/rules/no-widen-then-assert.js";
-import {
-  isMutatedObjectBinding,
-  isPopulatedObjectExpression,
-} from "../../oxlint-plugin/anti-slop/shared/dictionary-types.js";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 
 const TS_TYPE_FLAG_ANY = 1;
 const TS_TYPE_FLAG_UNKNOWN = 2;
 
-function mergeVisitors(...visitors) {
-  const handlers = new Map();
-  for (const visitor of visitors) {
-    for (const [selector, handler] of Object.entries(visitor)) {
-      const selectorHandlers = handlers.get(selector) ?? [];
-      selectorHandlers.push(handler);
-      handlers.set(selector, selectorHandlers);
-    }
+const TRANSPARENT_WRAPPERS = new Set([
+  "ParenthesizedExpression",
+  "TSAsExpression",
+  "TSTypeAssertion",
+  "TSNonNullExpression",
+]);
+
+function isGlobalMethodCall(node, objectName, methodName) {
+  const callee = node?.type === "CallExpression" ? node.callee : null;
+  return (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object.type === "Identifier" &&
+    callee.object.name === objectName &&
+    callee.property.type === "Identifier" &&
+    callee.property.name === methodName
+  );
+}
+
+// A case table is an object literal with entries, optionally frozen.
+function isCaseTableLiteral(expression) {
+  let current = expression;
+  while (current && TRANSPARENT_WRAPPERS.has(current.type)) {
+    current = current.expression;
   }
-  return Object.fromEntries(
-    [...handlers].map(([selector, selectorHandlers]) => [
-      selector,
-      (node) => {
-        for (const handler of selectorHandlers) handler(node);
-      },
-    ])
+  if (isGlobalMethodCall(current, "Object", "freeze")) {
+    [current] = current.arguments;
+  }
+  return current?.type === "ObjectExpression" && current.properties.length > 0;
+}
+
+function writesThroughMember(identifier) {
+  const member = identifier.parent;
+  if (member?.type !== "MemberExpression" || member.object !== identifier) {
+    return false;
+  }
+  const writer = member.parent;
+  return (
+    (writer?.type === "AssignmentExpression" && writer.left === member) ||
+    (writer?.type === "UpdateExpression" && writer.argument === member) ||
+    (writer?.type === "UnaryExpression" &&
+      writer.operator === "delete" &&
+      writer.argument === member)
+  );
+}
+
+// A table written after its declaration is state, not a case table.
+function isWrittenAfterDeclaration(binding) {
+  return binding.references.some(
+    (reference) =>
+      (!reference.init && reference.isWrite()) ||
+      writesThroughMember(reference.identifier) ||
+      (isGlobalMethodCall(reference.identifier.parent, "Object", "assign") &&
+        reference.identifier.parent.arguments[0] === reference.identifier)
   );
 }
 
@@ -216,26 +248,22 @@ export function ruleNoAppeasementErasure() {
       type: "problem",
       docs: {
         description:
-          "Detect known values widened into broad contracts, including flows that later re-establish a narrower contract and case tables annotated with Record<K, V> or mapped types instead of satisfies.",
+          "Detect known values widened to unknown and then re-established by a parse or cast, and case tables annotated with Record<K, V> or mapped types instead of satisfies.",
       },
       messages: {
-        widening:
-          "The explicit {{target}} type on {{subject}} discards known type evidence. Keep inference, validate with `satisfies`, or use a named owner contract.",
-        widenThenAssert:
-          'Binding "{{name}}" discards type evidence and later recreates it with an assertion. Keep the precise type from initialization through use; parse boundary input once.',
         caseTableAnnotation:
           'Annotating case table "{{name}}" with a {{annotationKind}} widens its per-key entry types and erases literal evidence. Remove the variable type annotation and validate with `satisfies` (`const {{name}} = { ... } satisfies ...`) instead.',
       },
       schema: [],
     },
     visitors({ context, checker, services }) {
-      const localVisitors = {
+      return {
         VariableDeclarator(node) {
           if (node.id.type !== "Identifier" || node.parent?.kind !== "const") {
             return;
           }
           const typeAnnotationNode = node.id.typeAnnotation?.typeAnnotation;
-          if (typeAnnotationNode && isPopulatedObjectExpression(node.init)) {
+          if (typeAnnotationNode && isCaseTableLiteral(node.init)) {
             const tsTypeNode =
               services.esTreeNodeToTSNodeMap.get(typeAnnotationNode);
             const annotationKind =
@@ -244,7 +272,10 @@ export function ruleNoAppeasementErasure() {
             if (annotationKind) {
               const [declaredBinding] =
                 context.sourceCode.getDeclaredVariables(node);
-              if (declaredBinding && !isMutatedObjectBinding(declaredBinding)) {
+              if (
+                declaredBinding &&
+                !isWrittenAfterDeclaration(declaredBinding)
+              ) {
                 context.report({
                   node: node.id.typeAnnotation,
                   messageId: "caseTableAnnotation",
@@ -284,11 +315,6 @@ export function ruleNoAppeasementErasure() {
           });
         },
       };
-      return mergeVisitors(
-        noKnownValueWideningRule.createOnce(context),
-        noWidenThenAssertRule.createOnce(context),
-        localVisitors
-      );
     },
   });
 }

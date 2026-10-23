@@ -20,9 +20,9 @@ Implementation status: v0 inventory is now built and wired into the shipped pack
 `antidrift change-contract`, `policy:inventory-change-contract`, the command-owned
 `changeContractConformance` semantic fact, TS export-surface extraction, diff-scoped adapter
 inventory, module graph radius inventory, package consumer verification, and `policy:verify-session`.
-The documented 5 gold TPs + 7 TN controls are replayed by
-`pnpm policy:validate-change-contract-evidence` against local frozen `sudocode-main` and `chaski`
-copies.
+Of the documented 5 gold TPs + 7 TN controls, the 4 gold TPs and 3 TN controls from `sudocode-main`
+are replayed by `pnpm policy:validate-change-contract-evidence` against a local frozen copy. The
+other gold TP and 4 TN controls came from a private app and are no longer in the tool.
 
 **NO — to any blocking gate or stable-promotion claim.** FP rate is uncharacterized (zero freshly
 mined clean controls), the violation taxonomy is concentrated/singleton-heavy, and the high-yield
@@ -33,15 +33,15 @@ FP-characterized, no-known-FP/FN evidence. v0 stays inventory-only and non-block
 
 ## Gold TPs (5) — codex-confirmed, unanimous, structural, non-fuzzy
 
-| repo @ sha                 | subject (frozen intent)                                       | violation                                                                                                                                      | vote |
-| -------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| sudocode-main @ `cf3d9ccf` | "add spec-kit deps"                                           | adds `@copilotkit/react-core`/`react-ui`/`runtime` — a different dependency family; undeclared runtime dependency                              | 3:0  |
-| sudocode-main @ `6c7c672`  | "update claude.md"                                            | also strips `.gitmodules` and deletes gitlink `references/beads` — structural repo-surface change                                              | 3:0  |
-| sudocode-main @ `c2fcd1d`  | "update version incrementing script…minor version bump"       | creates **five** git submodules under `references/*` (vibe-kanban, beads, CodeMachine-CLI, claude-flow, agentapi)                              | 3:0  |
-| sudocode-main @ `f722716`  | "update skill content…direct md changes"                      | adds two git submodules (`references/toad`, `references/vibe-kanban`)                                                                          | 3:0  |
-| chaski @ `7f871d2`         | "fix(app): let missing-estimation items reach zero [GE-1147]" | bundles Sentry env init in `main.dart`, new `sentryEnvironmentName()`, session props, promotion-modal UX — outside the frozen pricing contract | 3:0  |
+| repo @ sha                 | subject (frozen intent)                                 | violation                                                                                                                       | vote |
+| -------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| sudocode-main @ `cf3d9ccf` | "add spec-kit deps"                                     | adds `@copilotkit/react-core`/`react-ui`/`runtime` — a different dependency family; undeclared runtime dependency               | 3:0  |
+| sudocode-main @ `6c7c672`  | "update claude.md"                                      | also strips `.gitmodules` and deletes gitlink `references/beads` — structural repo-surface change                               | 3:0  |
+| sudocode-main @ `c2fcd1d`  | "update version incrementing script…minor version bump" | creates **five** git submodules under `references/*` (vibe-kanban, beads, CodeMachine-CLI, claude-flow, agentapi)               | 3:0  |
+| sudocode-main @ `f722716`  | "update skill content…direct md changes"                | adds two git submodules (`references/toad`, `references/vibe-kanban`)                                                           | 3:0  |
+| a private app              | a pricing fix                                           | bundles Sentry env init, a new environment-name helper, session props, promotion-modal UX — outside the frozen pricing contract | 3:0  |
 
-These span **2 repos** (sudocode-main ×4, chaski ×1). The dependency-family and submodule cases are
+These span **2 repos** (sudocode-main ×4, a private app ×1). The dependency-family and submodule cases are
 the cleanest possible deterministic proofs: a `package.json`/`.gitmodules` diff vs a narrow frozen
 subject is trivially machine-checkable.
 
@@ -61,9 +61,9 @@ repo-convention check (CONTRIBUTING/PR template) before it can be a TP, let alon
 
 `sudocode-main@52dec81e` (README-only) · `sudocode-main@d0ea172b` (declared js-yaml dep;
 `.sudocode/issues.jsonl` auxiliary) · `sudocode-main@0402e9eb` (declared yaml-converter src+tests) ·
-`chaski@b5e18da03` (declared eslint --fix/prettier ×78) · `chaski@d6c56c0d5` (declared proto comments
-and regenerated bindings) · `chaski@59e1bee78` (declared mock ERP removal) · `chaski@9da69cc59`
-(declared docs diagrams). The detector did not over-fire on any.
+four private-app commits (declared eslint --fix/prettier ×78; declared proto comments and
+regenerated bindings; declared mock removal; declared docs diagrams). The detector did not over-fire
+on any. The four private-app controls are no longer in the evidence tool.
 
 ## Caveats carried forward (block enforcement, not v0 inventory)
 
@@ -75,8 +75,8 @@ and regenerated bindings) · `chaski@59e1bee78` (declared mock ERP removal) · `
 
 ## Next move
 
-1. **Run `pnpm policy:validate-change-contract-evidence`** after change-contract edits to keep the 5
-   gold TPs + 7 TN controls executable against the built v0 spine. Quarantine the opencode cases as
-   ambiguous inventory, never gold.
+1. **Run `pnpm policy:validate-change-contract-evidence`** after change-contract edits to keep the 4
+   gold TPs + 3 TN controls it still holds executable against the built v0 spine. Quarantine the
+   opencode cases as ambiguous inventory, never gold.
 2. **Before any enforcement mode:** a second targeted mine over `refactor:*` / `test:*` / `ci:*`/`build:*`
    subjects **plus a clean-control sweep** of mined non-TPs — the missing FP-characterization step.

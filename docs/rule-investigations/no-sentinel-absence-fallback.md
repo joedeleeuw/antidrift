@@ -16,7 +16,7 @@ The previous implementation exempts console calls and rendered children. This ch
 
 The earlier two-corpus study reports 286 hits in 29 repositories and 6 true hits in a sample of 20. A display exemption reduces the population to 265 hits in 25 repositories. A later sample labels 8 of 20 hits true. Those labels treat display-only fallbacks as allowed. The October 12 owner ruling supersedes that interpretation. The fresh measurement below uses G7 and the owner ruling.
 
-The first recorded examples come from the murderbox runtime status readers. The rule is enabled in the ESLint pass. Its match depends on syntax and a fixed set of strings; it does not prove whether a fallback can run.
+The first recorded examples come from a private app's runtime status readers. The rule is enabled in the ESLint pass. Its match depends on syntax and a fixed set of strings; it does not prove whether a fallback can run.
 
 ## Superseded measurement on October 13, 2026: no-sentinel-absence-fallback
 
@@ -28,7 +28,7 @@ Sampled repositories at 70% or more: payloadcms-payload, withastro-astro, arktyp
 
 The dropped-hit sample contains 0 true reports out of 0. There are no dropped hits. Display-only fallbacks remain violations under the owner ruling of October 12, 2026. The implementation removes its earlier display exemption. It makes no other pattern change. The false report has a preceding guard that makes the fallback unreachable; the rule does not prove that control flow.
 
-This superseded evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix/superseded-owner-fix-round`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+This superseded evidence is kept as local evidence outside the repository. The measurement report lists every sampled location, repository result, and dropped-hit label.
 
 - Label file: `new-no-sentinel-absence-fallback.labels.tsv`. SHA256: `d73ba8cc2c68d71be8cde0667646876263fe1b0b374e8c4e23ed8a0e2867ea64`. Frozen at 2026-10-13T05:07:01.009228+00:00.
 - Label file: `dropped-no-sentinel-absence-fallback.labels.tsv`. SHA256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. Frozen at 2026-10-13T05:07:17.062187+00:00.
@@ -43,7 +43,7 @@ Sampled repositories at 70% or more: twentyhq-twenty, payloadcms-payload, formbr
 
 The dropped-hit sample contains 0 true reports out of 0. There are no dropped hits. G7 requires absence to stay absence. Display-only fallbacks remain violations. The earlier display exemption is removed; no other sentinel match changes. False reports include declared domain modes and an unreachable fallback on a required expression. These are not display exemptions. No further source change is made in this round.
 
-Evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+Evidence is kept as local evidence outside the repository. The measurement report lists every sampled location, repository result, and dropped-hit label.
 
 - Label file: `new-no-sentinel-absence-fallback.labels.tsv`. SHA256: `4ff282f6e0ec44ff73174bdf3d4902a1119b70ceff7d62acf95ec6b6f6b4292e`. Frozen at 2026-10-13T07:14:23.636400+00:00.
 - Label file: `dropped-no-sentinel-absence-fallback.labels.tsv`. SHA256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. Frozen at 2026-10-13T07:15:30.228969+00:00.

@@ -20,7 +20,7 @@ Sampled repositories at 70% or more: sveltejs-kit, calcom-cal.com, vitest-dev-vi
 
 The dropped-hit sample contains 0 true reports out of 10. The two false reports are a hidden implementation annotation behind a named exported signature and a generic constraint nested in a variable annotation. These remain limitations.
 
-This superseded evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix/superseded-owner-fix-round`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+This superseded evidence is kept as local evidence outside the repository. The measurement report lists every sampled location, repository result, and dropped-hit label.
 
 - Label file: `new-no-open-dictionary-at-boundary.labels.tsv`. SHA256: `0e803349e71f37f9e8c4533109cec7b6e091cd8ac13c9532582b209f582d27cc`. Frozen at 2026-10-13T05:07:01.008738+00:00.
 - Label file: `dropped-no-open-dictionary-at-boundary.labels.tsv`. SHA256: `a464755f9945d2910dca3e5185f53251d2df679e2aff015b7398d340727cc6c6`. Frozen at 2026-10-13T05:07:17.061958+00:00.
@@ -29,7 +29,7 @@ This superseded evidence remains at `/home/joedeleeuw/.local/state/lanes/antidri
 
 Superseded October 12, 2026 study. Before excluding type parameters, 403 hits in 30 repositories scored 11/20. After that change, 356 hits in 29 repositories scored 10/20. Both samples fell below 70%. The current rule checks only dictionaries of any.
 
-The October 12 study uses 84 TypeScript roots: 40 local roots and 44 on sushi. It excludes vendor, build, generated, fixture, mock, snapshot, and analyzer input trees. The October 13 fix round uses a different fresh corpus and the shipped lint population. These studies are not interchangeable.
+The October 12 study uses 84 TypeScript roots: 40 local roots and 44 on another local machine. It excludes vendor, build, generated, fixture, mock, snapshot, and analyzer input trees. The October 13 fix round uses a different fresh corpus and the shipped lint population. These studies are not interchangeable.
 
 ## Fresh measurement on October 13, 2026: no-open-dictionary-at-boundary
 
@@ -41,7 +41,7 @@ Sampled repositories at 70% or more: TanStack-router, formbricks-formbricks, Tan
 
 The dropped-hit sample contains 0 true reports out of 10. The rule checks explicit any-valued dictionaries at exported signatures and variable annotations. It does not resolve the intended owner type.
 
-Evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+Evidence is kept as local evidence outside the repository. The measurement report lists every sampled location, repository result, and dropped-hit label.
 
 - Label file: `new-no-open-dictionary-at-boundary.labels.tsv`. SHA256: `1123ca2d59ead782e0da1f5556cdf05ecc9ad213f7783578e194c96619ed2f17`. Frozen at 2026-10-13T07:14:23.635868+00:00.
 - Label file: `dropped-no-open-dictionary-at-boundary.labels.tsv`. SHA256: `e177e52a401adaa0cc7de4c4bad685b806988b754ddcfd92d47187e0e4de17c9`. Frozen at 2026-10-13T07:15:30.228746+00:00.

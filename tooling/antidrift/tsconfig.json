@@ -19,7 +19,9 @@
     "src/**/*.mts",
     "src/**/*.mjs",
     "src/**/*.js",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "research/**/*.mjs",
+    "research/**/*.mts"
   ],
-  "exclude": ["src/**/fixtures/**", "src/**/*.test.*"]
+  "exclude": ["src/**/fixtures/**", "src/**/*.test.*", "research/**/*.test.*"]
 }

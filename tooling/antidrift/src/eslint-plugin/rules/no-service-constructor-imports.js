@@ -1,7 +1,7 @@
 import ts from "typescript";
 
 import { scopeProperties } from "../../semantic-adapters/kernel/rule-scope.ts";
-import { isTestFilename } from "../../oxlint-plugin/portable/syntax.js";
+import { isTestPath } from "../../oxlint-plugin/shared/test-files.js";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
 import {
   isLayerConstructionCall,
@@ -103,7 +103,7 @@ export function ruleNoServiceConstructorImports() {
       },
     },
     run({ sourceFile, checker, program, filename, reportNode }) {
-      if (isTestFilename(filename)) {
+      if (isTestPath(filename)) {
         return {};
       }
       return {

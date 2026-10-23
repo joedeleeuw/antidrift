@@ -54,7 +54,7 @@ The import is itself the policy surface. In test/spec files the rule rejects val
 - `arktype` and subpaths;
 - `@sinclair/typebox` and subpaths.
 
-The broader set comes from the same runtime-schema API family reviewed during the Murderbox test cleanup. Type-only imports are clean.
+The broader set comes from the same runtime-schema API family reviewed during a private app's test cleanup. Type-only imports are clean.
 
 ### `antidrift/no-validator-output-oracle`
 
@@ -84,7 +84,7 @@ The import rule therefore has partial configuration overlap; both oracle rules a
 
 ## Evidence and limits
 
-The motivating real corpus was the Murderbox cleanup and its accompanying high-effort advisory review: direct schema assertions, test-authored schema readers, safe-parse outcome checks, issue projections, and validator-only throw tests were removed. The current Murderbox checkout is intentionally clean after that removal, so no stale external-corpus drift path is registered. Reduced Oxlint programs lock the accepted syntax boundaries but are not promotion evidence.
+The motivating real corpus was the private app's test cleanup and its accompanying high-effort advisory review: direct schema assertions, test-authored schema readers, safe-parse outcome checks, issue projections, and validator-only throw tests were removed. The app's current checkout is intentionally clean after that removal, so no stale external-corpus drift path is registered. Reduced Oxlint programs lock the accepted syntax boundaries but are not promotion evidence.
 
 The validator-output rule is enabled and remains unstable. Its fresh measurement must judge independent application behavior. A different binding name or a separate copy of the input does not supply that evidence. The other two rules keep their own registry settings.
 
@@ -98,7 +98,7 @@ Sampled repositories at 70% or more: anatine-zod-plugins, vercel-ai, drizzle-tea
 
 The dropped-hit sample contains 10 true reports out of 10. The false report occurs in a real database-backed request test with an independently arranged page ID. Dropped-hit labels expose missed contract tests and factory or constructor echoes. Imported function bodies remain outside the local analysis. Direct literal inputs and literal act arguments are compared by value. Schema receivers and schema-builder arguments do not seed validated input dependencies.
 
-This superseded evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix/superseded-owner-fix-round`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+This superseded evidence is kept as local evidence outside the repository. The measurement report lists every sampled location, repository result, and dropped-hit label.
 
 - Label file: `new-no-validator-output-oracle.labels.tsv`. SHA256: `e6ff4d3789ffb334db711e56e418dbd89ee7e99627b5a85fe4b2a68ba70e48a0`. Frozen at 2026-10-13T05:07:01.008990+00:00.
 - Label file: `dropped-no-validator-output-oracle.labels.tsv`. SHA256: `f85df55980285c478ffecafba1ec3e53b3ec5f64ae0b250b4251da96bca48cbe`. Frozen at 2026-10-13T05:07:17.062079+00:00.
@@ -113,7 +113,7 @@ Sampled repositories at 70% or more: inngest-inngest-js, Effect-TS-effect, paylo
 
 The dropped-hit sample contains 10 true reports out of 10. The rule follows local dependencies and compares literal input echoes. Only validated arguments count as input. Schema receivers and builder arguments do not. Imported helper bodies remain outside the analysis. Absence-only assertions, injected fakes, property tests, and contract tests are violations under the owner ruling. All ten sampled dropped reports remain violations. This exposes incomplete analysis of builder calls and transformed contract expectations.
 
-Evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+Evidence is kept as local evidence outside the repository. The measurement report lists every sampled location, repository result, and dropped-hit label.
 
 - Label file: `new-no-validator-output-oracle.labels.tsv`. SHA256: `6fb1a039eb42426af74985fa7b1539f6b0722a5bde430572244da51c931b6fa0`. Frozen at 2026-10-13T07:14:23.636138+00:00.
 - Label file: `dropped-no-validator-output-oracle.labels.tsv`. SHA256: `0b0572fe3c39c923a90fb93c0861f978bb49a635752e4135dea47ef16630c7a9`. Frozen at 2026-10-13T07:15:30.228863+00:00.

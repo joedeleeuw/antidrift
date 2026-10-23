@@ -1,5 +1,9 @@
 # `antidrift/no-async-array-method`
 
+## Status
+
+Retired. typescript-tooling reports the default branch: its ESLint restricted syntax catches async `forEach` callbacks, and `typescript/no-misused-promises` catches async `filter`, `some`, `every` and `find` callbacks in the type-aware tier. The opt-in `requires-collection` branch, an async `map` result that is neither awaited nor returned, has no replacement. The investigation below is kept as a record.
+
 ## Definition
 
 Disallow async callbacks in array methods that do not await callback promises. The default branch covers never-await methods. The `.map` / `.flatMap` collection-flow branch is explicit opt-in because it carries a separate dataflow proof burden.
@@ -76,20 +80,20 @@ Closest online references checked:
 
 Drift:
 
-- `/Users/sushi/code/sudocode-main/server/tests/integration/multi-project.test.ts` line 142 uses `openedProjectIds.forEach(async ...)`, starting cleanup requests without awaiting them.
+- `sudocode-main/server/tests/integration/multi-project.test.ts` line 142 uses `openedProjectIds.forEach(async ...)`, starting cleanup requests without awaiting them.
 
 Clean:
 
-- `/Users/sushi/code/chaski/src/frontend/bff/api/gateways/google-maps-gateway.ts` assigns `.map(async ...)` to `detailsPromises` and awaits `Promise.all(detailsPromises)`.
-- `/Users/sushi/code/chaski/src/frontend/bff/api/routers/scenarios-router.ts` wraps `.map(async ...)` directly in `Promise.all`.
-- `/Users/sushi/code/chaski/src/frontend/bff/api/routers/product-set-router.ts` uses `Promise.allSettled`.
-- `/Users/sushi/code/codebase-atlas/src/services/debugBundleService.ts` wraps `files.map(async ...)` directly in `Promise.all`.
-- `/Users/sushi/code/sudocode-main/server/src/routes/projects.ts` wraps async directory reads in `Promise.all`.
+- A gateway module in a private app assigns `.map(async ...)` to a local and awaits `Promise.all` over it.
+- A router in the private app wraps `.map(async ...)` directly in `Promise.all`.
+- Another router in the private app uses `Promise.allSettled`.
+- A service in another private app wraps `files.map(async ...)` directly in `Promise.all`.
+- `sudocode-main/server/src/routes/projects.ts` wraps async directory reads in `Promise.all`.
 
 Broad inventory on 2026-06-04:
 
-- Chaski `src`: 1,580 checked files, 0 findings.
-- Codebase Atlas `src`: 152 checked files, 0 findings.
+- Private app `src`: 1,580 checked files, 0 findings.
+- Another private app's `src`: 152 checked files, 0 findings.
 - Sudocode app and test source: 561 checked files, 1 finding.
 
 ## Promotion State

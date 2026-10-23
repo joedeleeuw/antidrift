@@ -12,8 +12,7 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { provePortableRules } from "./consumer-portable.mjs";
-import { proveAdoptionPresets } from "./consumer-adoption.mjs";
+import { proveDirectiveRules } from "./consumer-directive-rules.mjs";
 
 import { scaffoldConsumerWorkspace } from "./consumer-workspace.mjs";
 
@@ -180,13 +179,13 @@ try {
         pnpmBinary,
         [
           "exec",
-          "antidrift",
           "oxlint",
-          "--",
+          "--disable-nested-config",
           "--format",
           "json",
           "--config",
           "oxlint.config.mjs",
+          ".",
         ],
         work
       );
@@ -210,12 +209,9 @@ try {
     });
   }
 
-  provePortableRules({ file, lintOxlint, packedFiles });
-  proveAdoptionPresets({ file, runJson, lintOxlint, work });
-  rmSync(join(work, "portable-proofs"), { recursive: true, force: true });
-  rmSync(join(work, "portable.config.json"));
-  rmSync(join(work, "adoption-proof.tsx"));
-  rmSync(join(work, "adoption.config.json"));
+  proveDirectiveRules({ file, lintOxlint, packedFiles });
+  rmSync(join(work, "directive-proofs"), { recursive: true, force: true });
+  rmSync(join(work, "directive.config.json"));
 
   const repositoryDiagnostics = lintOxlintRepository().diagnostics ?? [];
   const moduleSizeDiagnostics = repositoryDiagnostics.filter(
@@ -242,22 +238,8 @@ try {
       `default packed Oxlint config should report max-lines for ordinary code even when generated-looking names are undeclared, got: ${JSON.stringify(moduleSizeDiagnostics)}`
     );
   }
-  const asyncRepositoryDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) => code === "antidrift(no-async-array-method)"
-  );
-  if (
-    JSON.stringify(
-      asyncRepositoryDiagnostics.map(({ filename }) => filename)
-    ) !== JSON.stringify(["packages/app/src/async-foreach-drift.ts"])
-  ) {
-    fail(
-      `default packed Oxlint config should report no-async-array-method on async-foreach-drift.ts, got: ${JSON.stringify(asyncRepositoryDiagnostics)}`
-    );
-  }
   const sharedRuleDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) =>
-      code !== "eslint(max-lines)" &&
-      code !== "antidrift(no-async-array-method)"
+    ({ code }) => code !== "eslint(max-lines)"
   );
   if (sharedRuleDiagnostics.length > 0) {
     fail(
@@ -291,33 +273,6 @@ try {
     );
   }
 
-  const restrictedSyntaxMessages = lint(
-    "packages/app/src/restricted-syntax-drift.ts"
-  ).flatMap((r) =>
-    r.messages
-      .filter((m) => m.ruleId === "no-restricted-syntax")
-      .map((m) => m.message)
-  );
-  const declaresEnum = restrictedSyntaxMessages.some((m) =>
-    m.includes("Do not declare enums")
-  );
-  const usesForwardRef = restrictedSyntaxMessages.some((m) =>
-    m.includes("forwardRef is deprecated")
-  );
-  if (!declaresEnum || !usesForwardRef) {
-    fail(
-      `default config must report the enum declaration and the forwardRef call, got: ${JSON.stringify(restrictedSyntaxMessages)}`
-    );
-  }
-  if (
-    defaultCleanRules.includes("no-restricted-syntax") ||
-    restrictedSyntaxMessages.length !== 2
-  ) {
-    fail(
-      `no-restricted-syntax must fire exactly twice on the probe and stay off clean.ts, got: ${JSON.stringify({ clean: defaultCleanRules, probe: restrictedSyntaxMessages })}`
-    );
-  }
-
   const packageCopyRules = lint("packages/app/src/package-copy.ts").flatMap(
     (r) => r.messages.map((m) => m.ruleId)
   );
@@ -335,52 +290,6 @@ try {
   if (!undercheckedPredicateRules.includes(UNDERCHECKED_PREDICATE_RULE)) {
     fail(
       `TypeScript 6 consumer should report ${UNDERCHECKED_PREDICATE_RULE} for an under-checked object predicate, got: ${JSON.stringify(undercheckedPredicateRules)}`
-    );
-  }
-
-  const ASYNC_RULE = "antidrift/no-async-array-method";
-  const asyncDefaultConfig = "oxlint.async-array.config.mjs";
-  const asyncCollectionConfig = "oxlint.async-array-collection.config.mjs";
-  const asyncForEachRules = oxlintRuleIds(
-    lintOxlint("packages/app/src/async-foreach-drift.ts", asyncDefaultConfig)
-  );
-  const asyncMapDefaultRules = oxlintRuleIds(
-    lintOxlint(
-      "packages/app/src/async-map-collection-drift.ts",
-      asyncDefaultConfig
-    )
-  );
-  const asyncMapCollectionRules = oxlintRuleIds(
-    lintOxlint(
-      "packages/app/src/async-map-collection-drift.ts",
-      asyncCollectionConfig
-    )
-  );
-  const asyncMapReturnRules = oxlintRuleIds(
-    lintOxlint(
-      "packages/app/src/async-map-return-clean.ts",
-      asyncCollectionConfig
-    )
-  );
-
-  if (!asyncForEachRules.includes(ASYNC_RULE)) {
-    fail(
-      `explicit async-array config should report forEach drift, got: ${JSON.stringify(asyncForEachRules)}`
-    );
-  }
-  if (asyncMapDefaultRules.includes(ASYNC_RULE)) {
-    fail(
-      `default async-array branch must not report map collection flow, got: ${JSON.stringify(asyncMapDefaultRules)}`
-    );
-  }
-  if (!asyncMapCollectionRules.includes(ASYNC_RULE)) {
-    fail(
-      `opt-in async-array collection branch should report unjoined map flow, got: ${JSON.stringify(asyncMapCollectionRules)}`
-    );
-  }
-  if (asyncMapReturnRules.includes(ASYNC_RULE)) {
-    fail(
-      `opt-in async-array collection branch must not report returned promise arrays, got: ${JSON.stringify(asyncMapReturnRules)}`
     );
   }
 
@@ -442,17 +351,6 @@ try {
     ],
     work
   );
-  const asyncControlSemanticManifest = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "semantic-manifest",
-      "--rule",
-      "antidrift/no-async-array-method",
-    ],
-    work
-  );
   const tupleShapeSemanticManifest = runJson(
     pnpmBinary,
     [
@@ -501,8 +399,6 @@ try {
   if (
     reactStateSemanticManifest.map((entry) => entry.id).join(",") !==
       "react-state" ||
-    asyncControlSemanticManifest.map((entry) => entry.id).join(",") !==
-      "async-control-flow" ||
     tupleShapeSemanticManifest.map((entry) => entry.id).join(",") !==
       "tuple-shape" ||
     authoritySemanticManifest.map((entry) => entry.id).join(",") !==
@@ -513,7 +409,7 @@ try {
       "type-owner"
   ) {
     fail(
-      `semantic-manifest filters should expose rule/proof/fact slices, got: ${JSON.stringify({ reactStateSemanticManifest, asyncControlSemanticManifest, tupleShapeSemanticManifest, authoritySemanticManifest, structuralFactSemanticManifest, typeOwnerFactSemanticManifest })}`
+      `semantic-manifest filters should expose rule/proof/fact slices, got: ${JSON.stringify({ reactStateSemanticManifest, tupleShapeSemanticManifest, authoritySemanticManifest, structuralFactSemanticManifest, typeOwnerFactSemanticManifest })}`
     );
   }
   const ruleStatus = runJson(
@@ -546,18 +442,6 @@ try {
       "policy",
       "--semantic-adapter",
       "type-owner",
-    ],
-    work
-  );
-  const asyncControlRuleStatus = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "rule-status",
-      "policy",
-      "--semantic-adapter",
-      "async-control-flow",
     ],
     work
   );
@@ -644,15 +528,10 @@ try {
   if (
     typeOwnerRuleStatus.entries.map((entry) => entry.id).join(",") !==
       "antidrift/no-structural-type-fork" ||
-    asyncControlRuleStatus.entries.map((entry) => entry.id).join(",") !==
-      "antidrift/no-async-array-method" ||
     tupleShapeRuleStatus.entries.map((entry) => entry.id).join(",") !==
       "antidrift/no-nullable-positional-tuple" ||
     authorityRuleStatus.entries.map((entry) => entry.id).join(",") !==
       "antidrift/no-structural-type-fork" ||
-    !localAstRuleStatus.entries.some(
-      (entry) => entry.id === "antidrift/no-async-array-method"
-    ) ||
     !localAstRuleStatus.entries.some(
       (entry) => entry.id === "antidrift/no-nullable-positional-tuple"
     ) ||
@@ -672,11 +551,6 @@ try {
       "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" ||
     !localAstSemanticSummary.summaries?.some(
       (summary) =>
-        summary.entry.id === "antidrift/no-async-array-method" &&
-        summary.semanticAdapters[0]?.id === "async-control-flow"
-    ) ||
-    !localAstSemanticSummary.summaries?.some(
-      (summary) =>
         summary.entry.id === "antidrift/no-nullable-positional-tuple" &&
         summary.semanticAdapters[0]?.id === "tuple-shape"
     ) ||
@@ -687,7 +561,7 @@ try {
     )
   ) {
     fail(
-      `rule-status filters should expose adapter/proof-bucket/status/semantic-summary slices, got: ${JSON.stringify({ typeOwnerRuleStatus, asyncControlRuleStatus, tupleShapeRuleStatus, authorityRuleStatus, localAstRuleStatus, retiredRuleStatus, ecosystemCoveredRuleStatus, reactStateSemanticSummary, localAstSemanticSummary })}`
+      `rule-status filters should expose adapter/proof-bucket/status/semantic-summary slices, got: ${JSON.stringify({ typeOwnerRuleStatus, tupleShapeRuleStatus, authorityRuleStatus, localAstRuleStatus, retiredRuleStatus, ecosystemCoveredRuleStatus, reactStateSemanticSummary, localAstSemanticSummary })}`
     );
   }
 
@@ -712,7 +586,7 @@ try {
     `\n✓ tarball installs, type-checks, imports, and enforces in a consumer monorepo`
   );
   console.log(
-    `  composed tooling and governance rejected oversized root, Convex, script, fixture, test, and undeclared generated-looking modules while ignoring registry-declared generated code, declarations, and raw JSON; consumer precedence disabled max-lines, the default typed config loaded registry owners and fired ${RULE} on drift.ts, the default typed config checked a TypeScript 6 broad-input predicate, async-array shipped behavior matched default and opt-in branch expectations, a structuralMatch fact was emitted, and clean.ts/package-copy.ts stayed clean; public exports and semantic adapters passed Bundler and NodeNext.`
+    `  composed tooling and governance rejected oversized root, Convex, script, fixture, test, and undeclared generated-looking modules while ignoring registry-declared generated code, declarations, and raw JSON; consumer precedence disabled max-lines, the default typed config loaded registry owners and fired ${RULE} on drift.ts, the default typed config checked a TypeScript 6 broad-input predicate, a structuralMatch fact was emitted, and clean.ts/package-copy.ts stayed clean; public exports and semantic adapters passed Bundler and NodeNext.`
   );
   rmSync(work, { recursive: true, force: true });
 } catch (error) {

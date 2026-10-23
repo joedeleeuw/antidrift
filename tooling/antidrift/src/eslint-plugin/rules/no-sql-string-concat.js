@@ -103,7 +103,10 @@ export function ruleNoSqlStringConcat() {
           provenance.fragments.trackCallExpression(node);
         },
         TaggedTemplateExpression(node) {
-          if (provenance.trustedSources.isTrustedSqlTemplateTag(node.tag)) {
+          if (
+            provenance.trustedSources.isTrustedSqlTemplateTag(node.tag) ||
+            provenance.trustedSources.bindsTemplateValues(node)
+          ) {
             for (const expression of provenance.trustedSources.unsafeTrustedRawSqlFragments(
               node.quasi
             )) {
@@ -123,6 +126,7 @@ export function ruleNoSqlStringConcat() {
             context.report({
               node: node.quasi,
               message:
+                provenance.trustedSources.unresolvedTagMessage(node) ??
                 "Do not interpolate values into SQL strings. Use parameterized queries / bound parameters.",
             });
           }

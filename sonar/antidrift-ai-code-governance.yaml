@@ -11,7 +11,7 @@ profile:
   purpose: What Sonar should report.
   notes:
     - Native Sonar rule keys stay authoritative; Antidrift only curates the posture.
-    - Antidrift custom rules are imported through sonar.externalIssuesReportPaths, not redefined in the Sonar profile.
+    - Antidrift custom rules are imported through Sonar's ESLint report import (sonar.eslint.reportPaths), not redefined in the Sonar profile.
     - Review Sonar agentic AI profile diffs before switching bases because Sonar owns that profile content.
 selection:
   researchedAt: 2026-07-07

@@ -58,7 +58,7 @@ describe("package surface", () => {
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json exports missing semantic adapter subpath: ./semantic-adapters/parse-input"
+      "tooling/antidrift/package.json exports missing semantic adapter subpath: ./semantic-adapters/tuple-shape"
     );
   });
   it("rejects shipped semantic adapter package exports whose files are missing", () => {
@@ -68,7 +68,7 @@ describe("package surface", () => {
     touch(root, "tooling/antidrift/src/semantic-adapters/index.d.mts");
     touch(root, "tooling/antidrift/src/semantic-adapters/index.mjs");
     for (const contract of Object.values(SEMANTIC_ADAPTER_CONTRACTS)) {
-      if (contract.id === "parse-input") {
+      if (contract.id === "tuple-shape") {
         continue;
       }
       touch(
@@ -85,7 +85,7 @@ describe("package surface", () => {
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json exports./semantic-adapters/parse-input.import path does not exist: ./src/semantic-adapters/parse-input.mjs"
+      "tooling/antidrift/package.json exports./semantic-adapters/tuple-shape.import path does not exist: ./src/semantic-adapters/tuple-shape.mjs"
     );
   });
   it("rejects semantic adapter runtime exports missing type declarations", () => {
@@ -100,7 +100,7 @@ describe("package surface", () => {
         "antidrift",
         "src",
         "semantic-adapters",
-        "parse-input.mjs"
+        "tuple-shape.mjs"
       ),
       "export function runtimeOnly() {}\n"
     );
@@ -111,7 +111,7 @@ describe("package surface", () => {
         "antidrift",
         "src",
         "semantic-adapters",
-        "parse-input.d.mts"
+        "tuple-shape.d.mts"
       ),
       "export function declaredOnly(): void;\n"
     );
@@ -123,7 +123,7 @@ describe("package surface", () => {
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json exports./semantic-adapters/parse-input.import runtime export runtimeOnly is missing from types path ./src/semantic-adapters/parse-input.d.mts"
+      "tooling/antidrift/package.json exports./semantic-adapters/tuple-shape.import runtime export runtimeOnly is missing from types path ./src/semantic-adapters/tuple-shape.d.mts"
     );
   });
   it("rejects semantic adapter type declarations missing runtime exports", () => {
@@ -138,7 +138,7 @@ describe("package surface", () => {
         "antidrift",
         "src",
         "semantic-adapters",
-        "parse-input.mjs"
+        "tuple-shape.mjs"
       ),
       "export function runtimeOnly() {}\n"
     );
@@ -149,7 +149,7 @@ describe("package surface", () => {
         "antidrift",
         "src",
         "semantic-adapters",
-        "parse-input.d.mts"
+        "tuple-shape.d.mts"
       ),
       [
         "export function runtimeOnly(): void;",
@@ -166,7 +166,7 @@ describe("package surface", () => {
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/package.json exports./semantic-adapters/parse-input.types declaration declaredOnly is missing from runtime import path ./src/semantic-adapters/parse-input.mjs"
+      "tooling/antidrift/package.json exports./semantic-adapters/tuple-shape.types declaration declaredOnly is missing from runtime import path ./src/semantic-adapters/tuple-shape.mjs"
     );
     expect(messages.join("\n")).not.toContain("TypeOnlyDeclaration");
   });
@@ -290,7 +290,7 @@ describe("package surface", () => {
     writeFileSync(
       join(root, "tooling", "antidrift", "README.md"),
       Object.keys(semanticAdapterPackageExports())
-        .filter((exportKey) => exportKey !== "./semantic-adapters/parse-input")
+        .filter((exportKey) => exportKey !== "./semantic-adapters/tuple-shape")
         .map((exportKey) =>
           exportKey === "."
             ? "- `@joedeleeuw/antidrift`"
@@ -306,7 +306,7 @@ describe("package surface", () => {
       })
     ).toBe(false);
     expect(messages.join("\n")).toContain(
-      "tooling/antidrift/README.md public entry points missing package export: @joedeleeuw/antidrift/semantic-adapters/parse-input"
+      "tooling/antidrift/README.md public entry points missing package export: @joedeleeuw/antidrift/semantic-adapters/tuple-shape"
     );
   });
   it("rejects stale package README public entry points that are not shipped exports", () => {

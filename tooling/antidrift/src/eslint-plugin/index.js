@@ -3,13 +3,11 @@ import packageMetadata from "../../package.json" with { type: "json" };
 
 import { ruleReactMaxComponentProps } from "./rules/react-max-component-props.js";
 import { ruleNoContractAppeasementProjection } from "./rules/no-contract-appeasement-projection.js";
-import { ruleNoAppeasementCast } from "./rules/no-appeasement-cast.js";
 import { ruleNoNullablePositionalTuple } from "./rules/no-nullable-positional-tuple.js";
 import { ruleNoUndercheckedTypePredicate } from "./rules/no-underchecked-type-predicate.js";
 import { ruleNoRedundantTypePredicate } from "./rules/no-redundant-type-predicate.js";
 import { ruleNoDefensiveShapeProbing } from "./rules/no-defensive-shape-probing.js";
 import { ruleNoSqlStringConcat } from "./rules/no-sql-string-concat.js";
-import { ruleNoUnsafeDeserialize } from "./rules/no-unsafe-deserialize.js";
 import { ruleNoStructuralTypeFork } from "./rules/no-structural-type-fork.js";
 import { ruleNoCanonicalModelFork } from "./rules/no-canonical-model-fork.js";
 import { ruleNoRedundantZodParse } from "./rules/no-redundant-zod-parse.js";
@@ -26,7 +24,6 @@ import noPassThroughParametersRule from "./rules/no-pass-through-parameters.js";
 import noVagueNamesRule from "./rules/no-vague-names.js";
 import noCompatNamesRule from "./rules/no-compat-names.js";
 import { ruleNoRawFetchInComponent } from "../semantic-adapters/syntax/raw-fetch.ts";
-import ruleNoCallingComponentsAsFunctions from "../oxlint-plugin/rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "../oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "../oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
 import ruleNoNonindependentTestOracle from "../oxlint-plugin/rules/no-nonindependent-test-oracle.js";
@@ -38,20 +35,20 @@ import ruleNoSentinelAbsenceFallback from "../oxlint-plugin/rules/no-sentinel-ab
 import ruleNoSilentEmptyDetectionFallback from "../oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
 import ruleNoValidatorOutputOracle from "../oxlint-plugin/rules/no-validator-output-oracle.js";
 import { ruleNoServiceConstructorImports } from "./rules/no-service-constructor-imports.js";
+import { ruleNoFirstPartyModuleMock } from "./rules/no-first-party-module-mock.js";
 import { ruleNoBagReshaper } from "./rules/no-bag-reshaper.js";
-import ruleUnknownInputMustBeDecoded from "./rules/unknown-input-must-be-decoded.js";
+import { ruleNoNearDuplicateType } from "./rules/no-near-duplicate-type.js";
+import { ruleNoRoundTripWidening } from "./rules/no-round-trip-widening.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
   "no-contract-appeasement-projection": ruleNoContractAppeasementProjection(),
   "no-bag-reshaper": ruleNoBagReshaper(),
-  "no-appeasement-cast": ruleNoAppeasementCast(),
   "no-nullable-positional-tuple": ruleNoNullablePositionalTuple(),
   "no-underchecked-type-predicate": ruleNoUndercheckedTypePredicate(),
   "no-redundant-type-predicate": ruleNoRedundantTypePredicate(),
   "no-defensive-shape-probing": ruleNoDefensiveShapeProbing(),
   "no-sql-string-concat": ruleNoSqlStringConcat(),
-  "no-unsafe-deserialize": ruleNoUnsafeDeserialize(),
   "no-structural-type-fork": ruleNoStructuralTypeFork(),
   "no-canonical-model-fork": ruleNoCanonicalModelFork(),
   "no-redundant-zod-parse": ruleNoRedundantZodParse(),
@@ -65,11 +62,11 @@ const rules = {
   "no-unresolved-dependency-types": ruleNoUnresolvedDependencyTypes(),
   "no-redundant-local-return-type": ruleNoRedundantLocalReturnType(),
   "no-service-constructor-imports": ruleNoServiceConstructorImports(),
+  "no-first-party-module-mock": ruleNoFirstPartyModuleMock(),
   "no-wrapping-functions": noWrappingFunctionsRule,
   "no-pass-through-parameters": noPassThroughParametersRule,
   "no-vague-names": noVagueNamesRule,
   "no-compat-names": noCompatNamesRule,
-  "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
   "no-duplicated-conditional-classnames":
     ruleNoDuplicatedConditionalClassnames(),
   "no-duplicated-object-field-blocks": ruleNoDuplicatedObjectFieldBlocks(),
@@ -84,7 +81,8 @@ const rules = {
   "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
   "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
   "no-validator-output-oracle": ruleNoValidatorOutputOracle(),
-  "unknown-input-must-be-decoded": ruleUnknownInputMustBeDecoded(),
+  "no-near-duplicate-type": ruleNoNearDuplicateType(),
+  "no-round-trip-widening": ruleNoRoundTripWidening(),
 };
 
 export default {

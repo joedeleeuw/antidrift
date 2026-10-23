@@ -8,11 +8,9 @@ import aiPolicy from "../eslint-plugin/index.js";
 import { loadRegistriesSync } from "../policy/lib/registries.mjs";
 
 const ratchetedRules = {
-  "antidrift/no-calling-components-as-functions": "error",
   "antidrift/no-compat-names": "error",
   "antidrift/no-duplicated-conditional-classnames": "error",
   "antidrift/no-duplicated-object-field-blocks": "error",
-  "antidrift/no-nonindependent-test-oracle": "error",
   "antidrift/no-open-dictionary-at-boundary": "error",
   "antidrift/no-pass-through-parameters": "error",
   "antidrift/no-raw-fetch-in-component": "error",
@@ -21,14 +19,19 @@ const ratchetedRules = {
   "antidrift/no-schema-library-in-test": "error",
   "antidrift/no-sentinel-absence-fallback": "error",
   "antidrift/no-silent-empty-detection-fallback": "error",
-  "antidrift/no-vague-names": "error",
   "antidrift/no-validator-output-oracle": "error",
+};
+
+// Root-level TypeScript files outside every tsconfig (tool configs) use a default project.
+const defaultProjectService = {
+  allowDefaultProject: ["*.ts", "*.mts", "*.cts"],
 };
 
 export function createConfig({
   tsconfigRootDir = process.cwd(),
   policyDir = "policy",
   semanticFacts,
+  projectService = defaultProjectService,
 } = {}) {
   const registries = loadRegistriesSync(resolve(tsconfigRootDir, policyDir));
   const generatedSources = registries.generated?.generatedSources ?? {};
@@ -54,10 +57,7 @@ export function createConfig({
       languageOptions: {
         parser,
         parserOptions: {
-          projectService: {
-            allowDefaultProject: ["*.ts", "apps/*/vite.config.ts"],
-            defaultProject: "./tsconfig.base.json",
-          },
+          projectService,
           tsconfigRootDir,
         },
       },
@@ -76,10 +76,7 @@ export function createConfig({
         "antidrift/no-bag-reshaper": "error",
         "antidrift/no-redundant-zod-parse": "error",
         "antidrift/react-max-component-props": ["error", { max: 12 }],
-        "antidrift/no-unsafe-deserialize": "error",
         "antidrift/no-inline-structural-type-at-use-site": "error",
-        "antidrift/unknown-input-must-be-decoded": "error",
-        "antidrift/no-appeasement-cast": "error",
         "antidrift/no-nullable-positional-tuple": "error",
         "antidrift/no-underchecked-type-predicate": "error",
         "antidrift/no-redundant-type-predicate": "error",
@@ -95,11 +92,17 @@ export function createConfig({
         "antidrift/no-explicit-type-arguments-on-owned-api": "error",
         "antidrift/no-schema-validator-transcoding": "error",
         "antidrift/no-restated-dependency-type": "error",
-        "antidrift/no-unresolved-dependency-types": "error",
+        "antidrift/no-near-duplicate-type": "error",
         "antidrift/no-wrapping-functions": "error",
         "antidrift/no-redundant-local-return-type": "error",
         "antidrift/no-service-constructor-imports": "error",
+        "antidrift/no-first-party-module-mock": "error",
         "antidrift/no-sql-string-concat": "error",
+        // Opt-in: 1 of 20 sampled reports on four public repositories was a real problem.
+        "antidrift/no-vague-names": "off",
+        // Opt-in: 3 of 20 sampled reports on four public repositories were real problems.
+        "antidrift/no-nonindependent-test-oracle": "off",
+        "antidrift/no-round-trip-widening": "off",
         ...ratchetedRules,
       },
     },

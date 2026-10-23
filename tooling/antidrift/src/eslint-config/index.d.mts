@@ -1,3 +1,4 @@
+import type { ParserOptions } from "@typescript-eslint/types";
 import type { Linter } from "eslint";
 import type { SemanticFact, SemanticFactSink } from "../policy/index.mjs";
 
@@ -13,6 +14,7 @@ export interface AntidriftConfigOptions {
   tsconfigRootDir?: string;
   policyDir?: string;
   semanticFacts?: SemanticFactSetting;
+  projectService?: ParserOptions["projectService"];
 }
 
 export function createConfig(options?: AntidriftConfigOptions): Linter.Config[];

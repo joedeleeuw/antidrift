@@ -73,23 +73,21 @@ Why: this is behavior routing with different output literals, not projection of 
 
 Inherited selector-wrapper drift:
 
-- Chaski `src/frontend/portal/modules/scenarios/agent-configuration/components/table/use-agent-table-data.ts` line 15.
-- Chaski `src/frontend/portal/modules/scenarios/service-time-influence/components/table/service-time-influence-table.tsx` line 39.
-- Codebase Atlas `src/parsing/treeSitterRealProgramParser.ts` line 916 defines `fullExcerpt(file: ParsedFile): string { return file.source }`.
+- Two selector wrappers in a private app.
+- One selector wrapper in a second private app returns a single property of its parameter under an explicit `string` return type.
 
-Murderbox's former `chatItemKey(item: ChatItem): string` drift was remediated in commit `d02b615e` by inlining the key extractor. A current scan of its 341 client TypeScript files reports no findings, so that stale corpus case was deleted rather than relabeled.
+A third private app's former key-extractor drift was remediated by inlining the key extractor. A current scan of its 341 client TypeScript files reports no findings, so that stale corpus case was deleted rather than relabeled.
 
 Inherited selector-wrapper clean controls:
 
-- Chaski `src/frontend/bff/api/services/helpers.ts`.
-- Chaski `src/frontend/portal/modules/Accounts/formatters.ts`.
-- Adjacent Codebase Atlas helpers such as `compactText` transform the returned text and stay outside the bare-member shape.
+- A helper module and a formatter module in the private app.
+- Adjacent helpers in the second private app transform the returned text and stay outside the bare-member shape.
 - Inline adapter callbacks such as `keyExtractor={(item) => item.kind}` have no explicit return type and remain outside this rule's contract-appeasement scope.
 
 Single-property adapter callbacks can stay named for an external API, but they do not need explicit return annotations when the body already infers the adapter contract:
 
 ```ts
-function chatItemKey(item: ChatItem) {
+function itemKey(item: ListItem) {
   return item.id;
 }
 ```
@@ -98,7 +96,7 @@ Use a local directive only when an external API genuinely requires a separately 
 
 ```ts
 // eslint-disable-next-line antidrift/no-contract-appeasement-projection -- external adapter type requires annotated callback signature
-function chatItemKey(item: ChatItem): string {
+function itemKey(item: ListItem): string {
   return item.id;
 }
 ```

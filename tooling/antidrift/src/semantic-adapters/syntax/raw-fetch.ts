@@ -5,7 +5,7 @@ import {
 } from "../kernel/syntax-node.ts";
 import type { Rule } from "eslint";
 import { bindingDefinitions } from "../kernel/syntax-scope.ts";
-import { findVariable } from "../kernel/async-control-flow.ts";
+import { findVariable } from "../kernel/variable-lookup.ts";
 import { containsJsxNode } from "../kernel/jsx-returns.ts";
 
 type FetchFunction =

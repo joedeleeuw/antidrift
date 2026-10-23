@@ -1,10 +1,16 @@
 # `antidrift/no-unsafe-deserialize`
 
+## Status
+
+Retired. `typescript/no-unsafe-argument`, `typescript/no-unsafe-assignment` and `typescript/no-unsafe-return`, which typescript-tooling enables in its type-aware tier, and the compiler report every invalid case of this rule's tests. The investigation below is kept as a record.
+
 ## Definition
 
 Disallow `JSON.parse` when its argument has broad `any`/`unknown` type without a string boundary, or when its unvalidated result flows into a declared domain contract. The 0.11.0 result check follows direct calls and immutable aliases using contextual TypeScript types; schema-validated results and unknown staging values remain valid.
 
-The complete Homer `apps/api/lib/tools.ts` file at revision `dc7d554d9925f5a4e6adc73844e8cd1b6057c3fc` reproduces the domain-store finding at line 1439. The receiving owner is `Record<string, string>` and the existing imported `z` validator can validate that record before assignment. The authenticated corpus and typed regression pin this location and its message.
+A complete source file from a private app, pinned at a fixed revision, reproduces the domain-store finding. The receiving owner is `Record<string, string>` and the existing imported `z` validator can validate that record before assignment. The authenticated corpus and typed regression pin this location and its message.
+
+A parsed result that is the operand of a cast (`JSON.parse(text) as Settings`, or a `const` alias of parsed JSON cast later) is left to `antidrift/no-appeasement-cast`, which reports the cast unless a checker-visible proof narrows the value to the target. On cloudflare/agents, 330 of this rule's 512 reports were such casts, at the node where the cast rule already reported; LibreChat had 7 of 15.
 
 This is a TypeChecker rule, not a route-name or request-name heuristic. It does not try to prove taint. It enforces the narrower parse-at-edge pattern: broad values must be narrowed before parsing, and parsed shapes should be validated into contracts.
 
@@ -36,7 +42,7 @@ Why: `unknown` must be narrowed before parsing.
 ```ts
 const contents = await fs.readFile(path, "utf8");
 const value: unknown = JSON.parse(contents);
-const project = parsePersistedProject(value);
+const project = parseProject(value);
 ```
 
 Why: the parser consumes a typed string and the result is explicitly treated as `unknown` before validation.
@@ -67,7 +73,7 @@ Why: the parse consumes a typed string and immediately validates the resulting s
 ## Ecosystem
 
 `@typescript-eslint/no-unsafe-argument` is a real superset signal for the current
-drift: when forced on against Sudocode, Codebase Atlas, and Opencode, it reports
+drift: when forced on against Sudocode, a private app, and Opencode, it reports
 the same broad-input `JSON.parse` lines that Antidrift reports. That means this
 rule is not justified by unique detection.
 
@@ -87,10 +93,10 @@ except for a more specific diagnostic message.
 
 Drift:
 
-- `/Users/sushi/code/sudocode-main/server/src/routes/workflows.ts` line 199 parses `row.source` where the checker type is `any`.
+- `sudocode-main/server/src/routes/workflows.ts` line 199 parses `row.source` where the checker type is `any`.
 - The same file also reports broad row parses at lines 201, 208, 793, 1010, 1012, 1019, and 1598.
-- Historical Codebase Atlas EventSource drift in `src/routes/atlas.city3d.tsx` was removed upstream; the current live external corpus keeps Codebase Atlas as clean pressure for this rule.
-- `/Users/sushi/code/opencode/packages/console/resource/resource.cloudflare.ts` line 19 parses `env.SST_RESOURCE_App` without the string guard used by the adjacent resource branches.
+- Historical EventSource drift in a private app's route module was removed upstream; the current live external corpus keeps that app as clean pressure for this rule.
+- `opencode/packages/console/resource/resource.cloudflare.ts` line 19 parses `env.SST_RESOURCE_App` without the string guard used by the adjacent resource branches.
 - Opencode benchmark route parses remain real parse-output contract debt, but they are not current-rule drift because the rule is scoped to the parse input. Those rows belong to `antidrift/no-appeasement-cast`.
 - Cloudflare Agents previously supplied drift in `examples/assistant/src/server.ts` and `experimental/gadgets-chat/src/client.tsx`, but the current checkout no longer evaluates those as blocking evidence: the assistant file changed substantially, and the Cloudflare tsconfigs extend `agents/tsconfig` without an install-resolvable package path in this external clone.
 - Nested parsed-subfield drift splits into two rule owners. If the nested parse argument is still checker-typed `any` or `unknown`, this rule owns it. If the outer parse is immediately asserted into a named contract and that assertion makes the nested field appear typed, the root violation is `antidrift/no-appeasement-cast`.
@@ -99,22 +105,22 @@ Drift:
 
 Clean:
 
-- `/Users/sushi/code/chaski/src/frontend/bff/api/gateways/posthog-schema.ts` narrows or coerces values to string before parsing.
-- `/Users/sushi/code/chaski/src/frontend/portal/components/ImpersonationWarning.tsx` parses typed localStorage strings.
-- `/Users/sushi/code/sudocode-main/server/src/workflow/base-workflow-engine.ts` parses typed string row fields.
-- `/Users/sushi/code/sudocode-main/server/src/routes/config.ts` parses file content strings.
-- `/Users/sushi/code/codebase-atlas/src/programs/persistenceCuration.ts` parses file contents into `unknown` and then validates with `parsePersistedProject`.
-- `/Users/sushi/code/opencode/packages/console/resource/resource.cloudflare.ts` lines 11 and 16 guard `env` values with `typeof value === "string"` before parsing; the unguarded `App` branch at line 19 remains the matching drift.
-- `/Users/sushi/code/cloudflare-agents/packages/voice/src/text-stream.ts` parses a decoded `json: string` line and returns `Record<string, unknown>`; this remains a useful clean-control shape, but the current external checkout is config-blocked for type-aware linting.
-- `/Users/sushi/code/cloudflare-agents/voice-providers/twilio/src/index.ts` guards `event.data` with `typeof event.data === "string"` and an early-return `typeof event.data !== "string"` guard before parsing WebSocket messages; this also remains useful but config-blocked in the current external checkout.
+- A schema module in a private app narrows or coerces values to string before parsing.
+- A component in the private app parses typed localStorage strings.
+- `sudocode-main/server/src/workflow/base-workflow-engine.ts` parses typed string row fields.
+- `sudocode-main/server/src/routes/config.ts` parses file content strings.
+- A persistence module in another private app parses file contents into `unknown` and then validates them with its project parser.
+- `opencode/packages/console/resource/resource.cloudflare.ts` lines 11 and 16 guard `env` values with `typeof value === "string"` before parsing; the unguarded `App` branch at line 19 remains the matching drift.
+- `cloudflare-agents/packages/voice/src/text-stream.ts` parses a decoded `json: string` line and returns `Record<string, unknown>`; this remains a useful clean-control shape, but the current external checkout is config-blocked for type-aware linting.
+- `cloudflare-agents/voice-providers/twilio/src/index.ts` guards `event.data` with `typeof event.data === "string"` and an early-return `typeof event.data !== "string"` guard before parsing WebSocket messages; this also remains useful but config-blocked in the current external checkout.
 
 Split TypeChecker inventory on June 4, 2026:
 
-- Chaski BFF: 4 JSON.parse files, 0 findings.
-- Chaski portal: 6 JSON.parse files, 0 findings.
-- Chaski monolithui: 10 JSON.parse files, 0 findings in project-included files.
-- Chaski crow-v2: 4 JSON.parse files, 0 findings.
-- Codebase Atlas `src`: previously 6 JSON.parse files, 0 findings; the deleted EventSource route is no longer live corpus drift.
+- Private app backend: 4 JSON.parse files, 0 findings.
+- Private app frontend A: 6 JSON.parse files, 0 findings.
+- Private app frontend B: 10 JSON.parse files, 0 findings in project-included files.
+- Private app frontend C: 4 JSON.parse files, 0 findings.
+- Another private app's source: previously 6 JSON.parse files, 0 findings; the deleted EventSource route is no longer live corpus drift.
 - Sudocode server: 57 JSON.parse files, 8 findings, all in `server/src/routes/workflows.ts`.
 - Opencode console resource: 1 unguarded `env` parse-input finding plus adjacent guarded clean controls.
 - Cloudflare Agents focused corpus: now recorded as known-gap rather than blocking evidence because the external example checkout cannot currently resolve `agents/tsconfig` for type-aware linting.
@@ -128,7 +134,7 @@ Cloudflare WebSocket handlers proved the TypeChecker-only version was too blunt:
 
 Status: `ready`, `stable: true`.
 
-The rule is type-aware and has Sudocode, Codebase Atlas, and Opencode drift plus
+The rule is type-aware and has Sudocode, private-app, and Opencode drift plus
 multiple clean controls. The guarded-`any` concern is resolved, and the former
 nested parsed-subfield blocker is reclassified: input-side broad nested parses
 remain covered here, while output-side contract assertions belong to
@@ -152,3 +158,7 @@ Accepted stable limitations:
 Next slice: monitor whether enabling `@typescript-eslint/no-unsafe-argument` is
 practical for package consumers. Retire or demote this rule if ecosystem
 coverage becomes acceptable without producing unrelated any-argument inventory.
+
+## Off by default by owner decision (October 2026)
+
+On 20 fresh reports from BuilderIO/agent-native, cloudflare/agents, LibreChat and opencode, each judged by whether a reviewer would ask for the change, 3 were real problems: storage, model tool arguments and a client cursor parsed and used without a check. Of the other 17, 8 were tests reading output from the code under test and 8 parsed JSON the code had produced itself or already checked. After casts of parsed output moved to `antidrift/no-appeasement-cast`, 2 of the 8 sampled reports that still fire are real. The preset now ships the rule `off`; a project enables it explicitly. This replaces the default-on recommendation above.

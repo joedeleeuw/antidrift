@@ -5,7 +5,7 @@ const options = [
     sources: [
       { module: "lib/server/conf" },
       {
-        module: "@murderbox/shared/model-registry",
+        module: "@app/shared/model-registry",
         names: ["getChatModelMeta"],
       },
     ],
@@ -68,7 +68,7 @@ ruleTester.run(
       },
       {
         code: `
-          import { getChatModelMeta, otherHelper } from "@murderbox/shared/model-registry";
+          import { getChatModelMeta, otherHelper } from "@app/shared/model-registry";
           const value = otherHelper("id");
           expect(value.title).toBe("Literal Title");
         `,
@@ -147,7 +147,7 @@ ruleTester.run(
       },
       {
         code: `
-          import { getChatModelMeta } from "@murderbox/shared/model-registry";
+          import { getChatModelMeta } from "@app/shared/model-registry";
           expect(getChatModelMeta("some-id")?.subtitle).toBe(
             "BF16 GGUF · draft-mtp · thinking off"
           );

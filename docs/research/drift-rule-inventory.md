@@ -1,6 +1,6 @@
 # Drift Rule Inventory — Adversarial Analysis
 
-Drift version inspected: `/Users/sushi/code/drift` (2026-06-16 checkout).
+Drift version inspected: `drift` (2026-06-16 checkout).
 Reference taxonomy: `policy/registries/solve-buckets.yaml`, `docs/research-learnings.md`.
 
 Signals are the primary detection unit in drift (`src/drift/signals/`). There are **25 signals**

@@ -1,120 +1,87 @@
 {
-  "apps/web/src/features/user/UserPanel.tsx": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "packages/ui/src/Button.tsx": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/brand/index.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/brand/index.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/change-scope/analyze.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 9
-    },
-    "antidrift/no-vague-names": {
-      "count": 14
-    }
-  },
-  "tooling/antidrift/src/change-scope/change-context.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 4
-    }
-  },
-  "tooling/antidrift/src/change-scope/change-context.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 4
-    },
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/change-scope/change-contract-evidence.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 17
-    }
-  },
-  "tooling/antidrift/src/change-scope/change-contract.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/change-scope/change-contract.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 5
-    }
-  },
-  "tooling/antidrift/src/change-scope/contract-schema.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 6
-    }
-  },
-  "tooling/antidrift/src/change-scope/contract-schema.test.mjs": {
+  "tooling/antidrift/research/change-scope/change-contract-evidence.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
     }
   },
-  "tooling/antidrift/src/change-scope/diff-scoped-adapters.mjs": {
+  "tooling/antidrift/research/change-scope/change-contract.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 3
+    }
+  },
+  "tooling/antidrift/research/change-scope/contract-schema.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 3
+    }
+  },
+  "tooling/antidrift/research/change-scope/contract-schema.test.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 1
+    }
+  },
+  "tooling/antidrift/research/change-scope/diff-scoped-adapters.mjs": {
     "antidrift/no-sentinel-absence-fallback": {
       "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 6
     }
   },
-  "tooling/antidrift/src/change-scope/exports.mjs": {
+  "tooling/antidrift/research/change-scope/exports.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 3
     }
   },
-  "tooling/antidrift/src/change-scope/exports.test.mjs": {
+  "tooling/antidrift/research/change-scope/exports.test.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 1
     }
   },
-  "tooling/antidrift/src/change-scope/module-graph.mjs": {
+  "tooling/antidrift/research/change-scope/module-graph.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 5
-    },
-    "antidrift/no-vague-names": {
+    }
+  },
+  "tooling/antidrift/research/policy/declaration-clone-inventory.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 2
+    }
+  },
+  "tooling/antidrift/research/policy/declaration-clone-inventory.test.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 2
+    }
+  },
+  "tooling/antidrift/research/policy/defensive-shape-inventory.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 2
+    }
+  },
+  "tooling/antidrift/research/policy/external-corpus/runner.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 1
+    }
+  },
+  "tooling/antidrift/research/policy/react-state-inventory.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 2
+    }
+  },
+  "tooling/antidrift/research/policy/sql-broad-inventory.mjs": {
+    "antidrift/no-pass-through-parameters": {
       "count": 3
     }
   },
-  "tooling/antidrift/src/change-scope/module-graph.test.mjs": {
-    "antidrift/no-vague-names": {
+  "tooling/antidrift/research/policy/sql-query-benchmark.mjs": {
+    "antidrift/no-pass-through-parameters": {
       "count": 3
+    }
+  },
+  "tooling/antidrift/research/policy/type-owner-inventory.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 2
+    }
+  },
+  "tooling/antidrift/research/policy/underchecked-predicate-inventory.mjs": {
+    "antidrift/no-pass-through-parameters": {
+      "count": 2
     }
   },
   "tooling/antidrift/src/eslint-plugin/rules/no-canonical-model-fork.js": {
@@ -125,34 +92,15 @@
   "tooling/antidrift/src/eslint-plugin/rules/no-contract-appeasement-projection.js": {
     "antidrift/no-pass-through-parameters": {
       "count": 21
-    },
-    "antidrift/no-vague-names": {
-      "count": 15
-    }
-  },
-  "tooling/antidrift/src/eslint-plugin/rules/no-defensive-shape-probing.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
     }
   },
   "tooling/antidrift/src/eslint-plugin/rules/no-identity-schema-transform.js": {
     "antidrift/no-pass-through-parameters": {
       "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/eslint-plugin/rules/no-pass-through-parameters.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
     }
   },
   "tooling/antidrift/src/eslint-plugin/rules/no-redundant-local-return-type.js": {
     "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
       "count": 2
     }
   },
@@ -161,534 +109,49 @@
       "count": 1
     }
   },
-  "tooling/antidrift/src/eslint-plugin/rules/no-underchecked-type-predicate.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/eslint-plugin/rules/react-max-component-props.js": {
-    "antidrift/no-vague-names": {
-      "count": 10
-    }
-  },
   "tooling/antidrift/src/eslint-plugin/semantic-facts.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 7
-    },
     "antidrift/no-pass-through-parameters": {
       "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 16
-    }
-  },
-  "tooling/antidrift/src/oxlint-config/deserialization-coverage.test.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-config/root-typescript-scopes.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/anti-slop/rules/no-known-value-widening.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 5
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/anti-slop/rules/no-widen-then-assert.js": {
-    "antidrift/no-vague-names": {
-      "count": 6
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/index.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 12
-    },
-    "antidrift/no-vague-names": {
-      "count": 16
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/owned-union-source.js": {
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/class-value.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/confine-owner.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 5
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/docs-source-policy.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/homer-corpus.test.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/icon-button-requires-tooltip.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/imported-owner.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-adhoc-loader.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-ai-debt-comments.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-auth-token-in-web-storage.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 9
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-centered-scroll-column.js": {
-    "antidrift/no-vague-names": {
-      "count": 4
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-dialog-trigger-menu-item.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-disabled-tooltip-trigger.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-fallback-to-empty.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-inline-style-colors.js": {
-    "antidrift/no-vague-names": {
-      "count": 10
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-omitted-prop-respread.js": {
-    "antidrift/no-vague-names": {
-      "count": 7
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-path-prefix-containment.js": {
-    "antidrift/no-vague-names": {
-      "count": 4
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-physical-properties.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-portal-under-interactive-ancestor.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-raw-filename-write.js": {
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-raw-foreground-opacity.js": {
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-spread-input-in-query-key.js": {
-    "antidrift/no-vague-names": {
-      "count": 6
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-todo-without-issue.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-trivial-property-helpers.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-unformatted-number.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-unsafe-inner-html.js": {
-    "antidrift/no-vague-names": {
-      "count": 4
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/owner-repairs.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/package-owner.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/physical-properties.js": {
-    "antidrift/no-vague-names": {
-      "count": 24
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/portable.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/require-dir-on-rendered-name.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/require-fetch-timeout.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 7
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/require-function-replacer.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/require-query-key-factory.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/require-query-signal.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 12
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/require-safe-window-open.js": {
-    "antidrift/no-vague-names": {
-      "count": 5
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/require-secure-document-response.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/require-stable-snapshot.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/require-stream-reader-disposal.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 13
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/syntax.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 24
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-calling-components-as-functions.js": {
-    "antidrift/no-compat-names": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-duplicated-conditional-classnames.js": {
-    "antidrift/no-vague-names": {
-      "count": 11
     }
   },
   "tooling/antidrift/src/oxlint-plugin/rules/no-duplicated-object-field-blocks.js": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 6
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-nonindependent-test-oracle.js": {
-    "antidrift/no-vague-names": {
-      "count": 12
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-open-dictionary-at-boundary.js": {
-    "antidrift/no-vague-names": {
-      "count": 4
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-raw-react-native-touchables.js": {
-    "antidrift/no-vague-names": {
-      "count": 5
     }
   },
   "tooling/antidrift/src/oxlint-plugin/rules/no-redeclared-owned-union.js": {
     "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-schema-library-in-test.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-sentinel-absence-fallback.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-static-property-loop.js": {
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-validator-output-oracle.js": {
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/shared/runtime-schema-libraries.js": {
-    "antidrift/no-vague-names": {
       "count": 1
     }
   },
   "tooling/antidrift/src/oxlint-plugin/unknown-sinks.js": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 4
-    }
-  },
-  "tooling/antidrift/src/policy/chaski-corpus.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 8
-    }
-  },
-  "tooling/antidrift/src/policy/chaski-corpus.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 10
-    },
-    "antidrift/no-vague-names": {
-      "count": 13
-    }
-  },
-  "tooling/antidrift/src/policy/check-generated-policy-artifacts.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 1
     }
   },
   "tooling/antidrift/src/policy/check-rule-surface.mjs": {
     "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 10
-    }
-  },
-  "tooling/antidrift/src/policy/check-rule-surface.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 9
-    }
-  },
-  "tooling/antidrift/src/policy/cli.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 4
-    }
-  },
-  "tooling/antidrift/src/policy/declaration-clone-inventory.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 15
-    }
-  },
-  "tooling/antidrift/src/policy/declaration-clone-inventory.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 6
-    },
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 4
-    }
-  },
-  "tooling/antidrift/src/policy/defensive-shape-inventory.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 19
-    }
-  },
-  "tooling/antidrift/src/policy/defensive-shape-inventory.test.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/policy/external-corpus.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/policy/external-corpus/runner.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 17
-    }
-  },
-  "tooling/antidrift/src/policy/generate-policy-artifacts.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/policy/lib/git.mjs": {
-    "antidrift/no-vague-names": {
       "count": 1
     }
   },
   "tooling/antidrift/src/policy/lib/rule-status.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/policy/lib/semantic-facts.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/policy/lib/semantic-facts.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 8
     }
   },
   "tooling/antidrift/src/policy/lib/type-index.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 5
-    },
-    "antidrift/no-vague-names": {
-      "count": 13
-    }
-  },
-  "tooling/antidrift/src/policy/no-appeasement-remediation-corpus.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/policy/oxlint.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/policy/oxlint.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/policy/react-state-inventory.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 6
-    }
-  },
-  "tooling/antidrift/src/policy/react-state-inventory.test.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
     }
   },
   "tooling/antidrift/src/policy/registry-checks/domain.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 11
-    },
-    "antidrift/no-vague-names": {
-      "count": 8
-    }
-  },
-  "tooling/antidrift/src/policy/registry-checks/domain.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 8
     }
   },
   "tooling/antidrift/src/policy/registry-checks/package-surface.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 6
-    },
-    "antidrift/no-vague-names": {
-      "count": 4
-    }
-  },
-  "tooling/antidrift/src/policy/registry-checks/package.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 11
     }
   },
   "tooling/antidrift/src/policy/registry-checks/rules.mjs": {
@@ -697,162 +160,21 @@
     },
     "antidrift/no-pass-through-parameters": {
       "count": 14
-    },
-    "antidrift/no-vague-names": {
-      "count": 17
-    }
-  },
-  "tooling/antidrift/src/policy/registry-checks/rules.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 39
-    },
-    "antidrift/no-vague-names": {
-      "count": 6
     }
   },
   "tooling/antidrift/src/policy/registry-checks/semantic-contracts.mjs": {
     "antidrift/no-pass-through-parameters": {
       "count": 10
-    },
-    "antidrift/no-vague-names": {
-      "count": 15
-    }
-  },
-  "tooling/antidrift/src/policy/registry-checks/semantic.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 34
-    }
-  },
-  "tooling/antidrift/src/policy/repo-corpus.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 16
-    }
-  },
-  "tooling/antidrift/src/policy/repo-corpus.test.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/policy/schema-roundtrip-inventory.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 14
-    }
-  },
-  "tooling/antidrift/src/policy/schema-roundtrip-inventory.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/policy/shell-guardrails.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/policy/shell-guardrails.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/policy/sql-broad-inventory.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 15
-    }
-  },
-  "tooling/antidrift/src/policy/sql-query-benchmark.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 3
-    },
-    "antidrift/no-vague-names": {
-      "count": 31
-    }
-  },
-  "tooling/antidrift/src/policy/type-owner-inventory.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 11
-    }
-  },
-  "tooling/antidrift/src/policy/type-owner-inventory.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/policy/underchecked-predicate-inventory.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 21
-    }
-  },
-  "tooling/antidrift/src/policy/underchecked-predicate-inventory.test.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/policy/unsafe-type-assertion-benchmark.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 12
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/canonical-path.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 12
     }
   },
   "tooling/antidrift/src/semantic-adapters/cross-module-identity.mjs": {
     "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/index.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 4
-    }
-  },
-  "tooling/antidrift/src/semantic-adapters/schema-parse-shape.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/test/consumer-adoption.mjs": {
-    "antidrift/no-vague-names": {
       "count": 1
     }
   },
   "tooling/antidrift/test/consumer-monorepo.mjs": {
     "antidrift/no-compat-names": {
       "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 15
-    }
-  },
-  "tooling/antidrift/test/consumer-workspace.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/test/reproduce-homer-json.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 1
     }
   },
   "tooling/antidrift/test/support/registry-workspace.mjs": {
@@ -861,9 +183,6 @@
     },
     "antidrift/no-pass-through-parameters": {
       "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 8
     }
   }
 }

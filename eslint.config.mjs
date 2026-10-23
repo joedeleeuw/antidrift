@@ -9,7 +9,13 @@ export default [
     ...config,
     files: ["**/*.{ts,tsx}"],
   })),
-  ...antidrift({ tsconfigRootDir: import.meta.dirname }),
+  ...antidrift({
+    tsconfigRootDir: import.meta.dirname,
+    projectService: {
+      allowDefaultProject: ["*.ts", "apps/*/vite.config.ts"],
+      defaultProject: "./tsconfig.base.json",
+    },
+  }),
   {
     files: ["tooling/antidrift/src/**/*.ts"],
     plugins: { sonarjs },

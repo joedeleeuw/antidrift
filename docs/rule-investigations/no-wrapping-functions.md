@@ -25,10 +25,6 @@ The initial advisory argued against broad enforcement because a wrapper can name
 A named synchronous, non-generator function whose body is one returned call, one call statement, or an arrow call expression is a candidate. The callee is an identifier or a noncomputed member path, and it may itself be a call (composed calls count). Arguments are references, literals, templates, object and array literals built from forwarded values, spreads of those, or nested calls of the same shape. Parameter defaults and destructuring, generic specialization, type predicates and optional calls are outside the candidate stage. The typed stage then decides: a candidate reports only when its inline verifies at every reference.
 
 ```ts
-export function useMachines() {
-  return useConvexQuery(convexApi.machines.list, {});
-}
-
 export const loadItem = (id) => owner.load(id);
 
 function closeItem(id) {
@@ -36,7 +32,7 @@ function closeItem(id) {
 }
 ```
 
-All three report when the typed stage verifies them. A name, an export, or changing a declaration into a named arrow does not exempt the wrapper. A reference that is not a direct call (a callback, a registered listener, a value stored in an object) keeps the function, because it is passed by identity. An exported function with no caller in the program gets an incomplete-analysis diagnostic instead of a hop report, because its consumers outside the program are unknown.
+Both report when the typed stage verifies them. A name, an export, or changing a declaration into a named arrow does not exempt the wrapper. A reference that is not a direct call (a callback, a registered listener, a value stored in an object) keeps the function, because it is passed by identity. An exported function with no caller in the program gets an incomplete-analysis diagnostic instead of a hop report, because its consumers outside the program are unknown.
 
 These stay clean, because they compute, branch or are anonymous:
 
@@ -50,19 +46,19 @@ function readRequired(id) {
 }
 ```
 
-Class and object methods are outside this initial function-declaration/variable scope. The rule has no autofix. Inline the existing call at its callers while preserving argument order, timing, receiver and hook position. When an API requires a callback, preserve both its signature and stable identity: direct callback substitution is valid only when the existing owner already has the exact compatible signature and receiver behavior. For example, replace `const subscribe = (onStoreChange) => subscribeToConsent(onStoreChange)` with `useSyncExternalStore(subscribeToConsent, getSnapshot)` only when `subscribeToConsent` is the compatible owner; this keeps a module-level callback identity instead of creating a new adapter on every render. Do not replace a required stable adapter with an inline arrow, `.bind`, or a fake statement just to silence the diagnostic. If argument adaptation, receiver binding, hook position, or a named callback identity is required, retain the boundary through the repository's existing documented exception process; the shared rule stays enabled.
+Class and object methods are outside this initial function-declaration/variable scope. The rule has no autofix. Inline the existing call at its callers while preserving argument order, timing, receiver and hook position. When an API requires a callback, preserve both its signature and stable identity: direct callback substitution is valid only when the existing owner already has the exact compatible signature and receiver behavior. For example, pass an existing subscription function straight to `useSyncExternalStore` in place of a `subscribe` arrow that only forwards `onStoreChange` to it, and only when that function is the compatible owner; this keeps a module-level callback identity instead of creating a new adapter on every render. Do not replace a required stable adapter with an inline arrow, `.bind`, or a fake statement just to silence the diagnostic. If argument adaptation, receiver binding, hook position, or a named callback identity is required, retain the boundary through the repository's existing documented exception process; the shared rule stays enabled.
 
 ## Real source evidence
 
-The first inventory ran the actual portable rule with the TypeScript ESLint parser against tracked, non-test, non-generated source. It inspected 692 Homer files, 1,207 ChatBiz files and 204 Antidrift files. Receipt files include repository revisions, source hashes and exact diagnostics under `/Users/sushi/code/homer-recovery/2026-09-08/wrapping-rule-corpus-*.json`. The initial ChatBiz inventory also surfaced two unrelated inline-disable references to plugins not loaded by the isolated harness; those are not wrapper diagnostics or parser failures.
+The first inventory ran the actual portable rule with the TypeScript ESLint parser against tracked, non-test, non-generated source. It inspected 692 files from a private app, 1,207 files from another private app and 204 Antidrift files. Receipt files with repository revisions, source hashes and exact diagnostics are kept as local evidence outside the repository. The initial inventory of the second private app also surfaced two unrelated inline-disable references to plugins not loaded by the isolated harness; those are not wrapper diagnostics or parser failures.
 
-- Homer at `b5636395`: `apps/client/src/lib/data.ts:124`, `useMachines`, is the motivating exported nullary wrapper. Seven callers can name the generated query directly. The existing lint configuration did not catch it. The isolated Homer change removes it and retains generated types.
-- Homer: the other five custom Convex query hooks combine queries, derive state, own writes or handle a platform contract. They are clean controls. `useClerkAuthForConvex` is currently clean only because its non-empty options object is outside this initial argument-shape subset; the detector does not understand that it is passed as the required `useAuth` callback to `ConvexProviderWithClerk`. A zero-argument or empty-object version of the same provider hook would report and would need the callback boundary exception, not an inline hook call.
-- ChatBiz: `src/app/(guest)/onboarding/scheduling/use-scheduling.ts:67`, `useSchedulingOptional`, delegates to `useContext(SchedulingContext)`; the adjacent `useScheduling` owns a missing-provider check and stays clean.
-- ChatBiz: `src/components/analytics/brevo-tracker.tsx:17`, `subscribe`, delegates directly to `subscribeToConsent`. The default policy reports this named layer; replacing it is safe only by passing `subscribeToConsent` directly when its callback signature and receiver behavior match `useSyncExternalStore`. That direct substitution preserves the stable module-level identity; a newly created inline adapter would change subscription timing and identity.
+- The first private app: a query hook in its client data module is the motivating exported nullary wrapper. Seven callers can name the generated query directly. The existing lint configuration did not catch it. The isolated change in that app removes it and retains generated types.
+- The first private app: the other five custom Convex query hooks combine queries, derive state, own writes or handle a platform contract. They are clean controls. Its Clerk auth hook for Convex is currently clean only because its non-empty options object is outside this initial argument-shape subset; the detector does not understand that it is passed as the required `useAuth` callback to `ConvexProviderWithClerk`. A zero-argument or empty-object version of the same provider hook would report and would need the callback boundary exception, not an inline hook call.
+- The second private app: an optional context hook delegates to `useContext` on its context; the adjacent required hook owns a missing-provider check and stays clean.
+- The second private app: in an analytics tracker component, `subscribe` delegates directly to a consent-subscription function. The default policy reports this named layer; replacing it is safe only by passing that function directly when its callback signature and receiver behavior match `useSyncExternalStore`. That direct substitution preserves the stable module-level identity; a newly created inline adapter would change subscription timing and identity.
 - Antidrift's real default gate found 25 named wrappers. The change removes the extra layers and drives the existing callees directly. Internal implementations are consolidated where an existing public function already owns the operation.
 
-These are style-policy matches, not a claim that all reported functions are semantic bugs. No second repository was modified merely to create a positive example. Codebase Atlas was not used as a fresh corpus: the available directory was not a Git checkout. Its historical derived-constructor controls remain recorded in the retired investigation.
+These are style-policy matches, not a claim that all reported functions are semantic bugs. No second repository was modified merely to create a positive example. A third private app was not used as a fresh corpus: the available directory was not a Git checkout. Its historical derived-constructor controls remain recorded in the retired investigation.
 
 ## Ecosystem and runtime ownership
 
@@ -84,7 +80,7 @@ Sampled repositories at 70% or more: vitejs-vite, StefanTerdell-zod-to-json-sche
 
 The dropped-hit sample contains 0 true reports out of 0. There are no dropped hits. The false reports preserve a named receiving decoder or listener identity needed for cleanup. A short name alone does not justify a one-call function. The implementation is unchanged.
 
-This superseded evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix/superseded-owner-fix-round`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+This superseded evidence is kept as local evidence outside the repository. The measurement report lists every sampled location, repository result, and dropped-hit label.
 
 - Label file: `new-no-wrapping-functions.labels.tsv`. SHA256: `3c2690900414cdb5938d7ab4a297c4465990b4fb3309566107ff18ef3bfa1c95`. Frozen at 2026-10-13T05:07:01.009109+00:00.
 - Label file: `dropped-no-wrapping-functions.labels.tsv`. SHA256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. Frozen at 2026-10-13T05:07:17.062133+00:00.
@@ -99,7 +95,7 @@ Sampled repositories at 70% or more: StefanTerdell-zod-to-json-schema, elysiajs-
 
 The dropped-hit sample contains 0 true reports out of 0. There are no dropped hits. G10 treats a function whose body is one call as a hop unless it preserves a stated capability. The implementation is unchanged. The six false reports preserve a callback convention, deferred execution, callback identity, or a bound compiler interface.
 
-Evidence remains at `/home/joedeleeuw/.local/state/lanes/antidrift-fix`. The measurement report lists every sampled location, repository result, and dropped-hit label.
+The evidence is kept as local evidence outside the repository. The measurement report lists every sampled location, repository result, and dropped-hit label.
 
 - Label file: `new-no-wrapping-functions.labels.tsv`. SHA256: `d7de530f417ffcca03b65b8ae46e1555b6cf0f91f54f7b8bea8c77938e3714b1`. Frozen at 2026-10-13T07:14:23.636270+00:00.
 - Label file: `dropped-no-wrapping-functions.labels.tsv`. SHA256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. Frozen at 2026-10-13T07:15:30.228917+00:00.

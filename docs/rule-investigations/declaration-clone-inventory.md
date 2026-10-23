@@ -14,8 +14,8 @@ The output is deliberately non-blocking. It separates generated-only, mixed gene
 
 The June 17, 2026 source-fleet run checked four local real-code repositories:
 
-- `chaski`
-- `codebase-atlas`
+- a private app
+- another private app
 - `sudocode-main`
 - `opencode`
 
@@ -33,26 +33,23 @@ Clone group split:
 
 Source-only examples:
 
-| Repo            | Declarations                                                                                                        | Interpretation                                                                         |
-| --------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `sudocode-main` | `frontend/src/lib/api.ts:667` `BatchImportResponse`; `server/src/routes/import.ts:169` `BatchImportResponse`        | Likely frontend/server contract duplication. Needs owner direction before enforcement. |
-| `sudocode-main` | `frontend/src/lib/api.ts:628` `ImportSearchRequest`; `server/src/routes/import.ts:105` `ImportSearchRequest`        | Likely request contract duplication across boundary.                                   |
-| `sudocode-main` | `frontend/src/types/api.ts:27` `RepositoryInfo`; `server/src/services/repo-info.ts:8` `RepositoryInfo`              | Likely shared API model fork.                                                          |
-| `chaski`        | Five `OrdersOpsV2` dialog prop interfaces with the same `open`, `onClose`, `onSuccess`, `order`, and `orders` shape | More likely UI prop repetition than owner drift; useful false-positive pressure.       |
+| Repo            | Declarations                                                                                                 | Interpretation                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `sudocode-main` | `frontend/src/lib/api.ts:667` `BatchImportResponse`; `server/src/routes/import.ts:169` `BatchImportResponse` | Likely frontend/server contract duplication. Needs owner direction before enforcement. |
+| `sudocode-main` | `frontend/src/lib/api.ts:628` `ImportSearchRequest`; `server/src/routes/import.ts:105` `ImportSearchRequest` | Likely request contract duplication across boundary.                                   |
+| `sudocode-main` | `frontend/src/types/api.ts:27` `RepositoryInfo`; `server/src/services/repo-info.ts:8` `RepositoryInfo`       | Likely shared API model fork.                                                          |
+| a private app   | Five dialog prop interfaces with the same `open`, `onClose`, `onSuccess`, `order`, and `orders` shape        | More likely UI prop repetition than owner drift; useful false-positive pressure.       |
 
 Mixed generated/source examples:
 
-| Repo     | Declarations                                                                                                                                                                                                                                                                                                                    | Interpretation                         |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| `chaski` | Generated `ServiceWindow` at `src/frontend/bff/gen/ts/src/idls/protos/monolith/scenarios/v1/scenarios.ts:815`; source `RawSvcWindow` at `src/frontend/monolithui/src/components/CrowOps/ui/AccountServiceStopsModal.tsx:33`; source `SvcWindow` at `src/frontend/monolithui/src/components/CrowOps/ui/DeliveryEventModal.tsx:7` | Strong generated-owner fork candidate. |
-| `chaski` | Generated `RouteStop` at `src/frontend/bff/gen/ts/src/idls/protos/monolith/scenarios/v1/scenarios.ts:1845`; source `RouteStop` at `src/frontend/monolithui/src/components/CrowOps/types.ts:45`                                                                                                                                  | Strong generated-owner fork candidate. |
-| `chaski` | Generated `AccountCluster` at `src/frontend/bff/gen/ts/src/idls/protos/monolith/scenarios/v1/scenarios.ts:1828`; source `AccountCluster` at `src/frontend/monolithui/src/components/CrowOps/types.ts:30`                                                                                                                        | Strong generated-owner fork candidate. |
-| `chaski` | Generated `VisibleAgent` at `src/frontend/bff/gen/ts/src/idls/protos/monolith/scenarios/v1/scenarios.ts:1836`; source `VisibleAgent` at `src/frontend/monolithui/src/components/CrowOps/types.ts:37`                                                                                                                            | Strong generated-owner fork candidate. |
+| Repo          | Declarations                                                                                          | Interpretation                          |
+| ------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| a private app | Four generated protobuf types, each copied by hand-authored UI declarations (one type has two copies) | Strong generated-owner fork candidates. |
 
 Generated-only examples:
 
-- Chaski generated protobuf `MessageFns` appears 76 times with the same helper method surface.
-- Chaski generated QR action request/response shapes duplicate across `counts` and `qractions` protobuf outputs.
+- Generated protobuf `MessageFns` in the private app appears 76 times with the same helper method surface.
+- Generated request/response shapes in the private app duplicate across two protobuf outputs.
 
 Generated-only groups are useful for understanding source pressure but must not count as promotion drift by themselves.
 

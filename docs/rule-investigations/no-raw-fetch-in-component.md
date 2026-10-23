@@ -44,13 +44,13 @@ export async function loadOrders() {
 Why: transport is in a non-component API/client/resource module.
 
 ```tsx
-async function downloadQrCode(url: string) {
+async function downloadFile(url: string) {
   return fetch(url);
 }
 
-export function QrActionCard() {
+export function FileActionCard() {
   return (
-    <button onClick={() => void downloadQrCode("/qr.png")}>Download</button>
+    <button onClick={() => void downloadFile("/file.png")}>Download</button>
   );
 }
 ```
@@ -76,25 +76,25 @@ The broader problem space is not "fetch in X"; it is raw transport ownership. A 
 
 Drift:
 
-- `/Users/sushi/code/chaski/src/frontend/portal/components/ImpersonationWarning.tsx` line 85 exchanges an impersonation code with raw fetch inside a component effect.
-- Historical Codebase Atlas route drift in `src/routes/atlas.city.tsx` was removed upstream; it is no longer part of the live external corpus.
+- A component in a private app exchanges an impersonation code with raw fetch inside a component effect.
+- Historical route drift in a second private app was removed upstream; it is no longer part of the live external corpus.
 
 Clean:
 
-- `/Users/sushi/code/chaski/src/frontend/monolithui/src/components/QrActionsAdmin/QrActionCard.tsx` keeps a module-scope QR download helper clean; component-module co-location is not enough proof.
-- `/Users/sushi/code/chaski/src/frontend/monolithui/src/lib/crowdiesApi.ts` owns fetch in a client/helper module.
-- `/Users/sushi/code/chaski/src/frontend/portal/components/EmbeddedDashboard.tsx` renders without raw transport.
-- `/Users/sushi/code/sudocode-main/frontend/src/pages/ExecutionsPage.tsx` uses query/refetch state rather than raw component fetch.
-- `/Users/sushi/code/murderbox/apps/client/app/api/[...path]+api.ts` owns proxy transport in an API module and stays clean.
-- `/Users/sushi/code/murderbox/apps/client/app/(chat)/index.tsx` now uses `appFetch` / `appStreamFetch`, not raw `fetch`, and stays clean under this rule.
+- A component module in the private app keeps a module-scope QR download helper clean; component-module co-location is not enough proof.
+- A client/helper module in the private app owns fetch.
+- Another component in the private app renders without raw transport.
+- `sudocode-main/frontend/src/pages/ExecutionsPage.tsx` uses query/refetch state rather than raw component fetch.
+- An API route module in a third private app owns proxy transport and stays clean.
+- A screen in the third private app now uses the app's own fetch wrappers, not raw `fetch`, and stays clean under this rule.
 
 Pre-narrowing broad inventory on June 4, 2026:
 
-- Chaski frontend: 1,577 checked files, 2 findings before module-scope helper fetches were removed from the blocking proof.
-- Codebase Atlas `src`: historical route drift was removed upstream; keep the current checkout as clean pressure for this rule.
+- Private-app frontend: 1,577 checked files, 2 findings before module-scope helper fetches were removed from the blocking proof.
+- The second private app's `src`: historical route drift was removed upstream; keep the current checkout as clean pressure for this rule.
 - Sudocode frontend: 233 checked files, 0 findings.
-- Murderbox client after `globalThis.fetch` hardening: 184 checked files, 7 findings before the June 17 narrowing.
-- Taskme `src`: 8 checked files, 0 findings.
+- The third private app's client after `globalThis.fetch` hardening: 184 checked files, 7 findings before the June 17 narrowing.
+- A fourth private app's `src`: 8 checked files, 0 findings.
 
 ## Promotion State
 

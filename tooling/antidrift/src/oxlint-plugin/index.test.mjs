@@ -63,19 +63,6 @@ const schemaLibraryImportCases = [
   'import { ZodError } from "zod"; expect(() => submit(raw)).toThrow(ZodError);',
 ];
 
-const antiSlopRuleCases = [
-  {
-    ruleId: "no-unknown-type-aliases",
-    drift: "type Payload = unknown;",
-    correct: "type Payload = { id: string };",
-  },
-  {
-    ruleId: "no-unsafe-cast-chain",
-    drift: "const user = input as unknown as User;",
-    correct: "const user = input as User;",
-  },
-];
-
 function lint(
   source,
   rules = { "antidrift/require-effect-deps": "error" },
@@ -317,36 +304,4 @@ describe("Oxlint plugin", () => {
 
     expect(result.status).toBe(0);
   });
-
-  it.each(antiSlopRuleCases)(
-    "reports vendored $ruleId drift",
-    ({ ruleId, drift, filename = "sample.ts" }) => {
-      const result = lint(
-        drift,
-        { [`antidrift/${ruleId}`]: "error" },
-        filename
-      );
-
-      expect(result.status).toBe(1);
-      expect(`${result.stdout}${result.stderr}`).toContain(
-        `antidrift(${ruleId})`
-      );
-    }
-  );
-
-  it.each(antiSlopRuleCases)(
-    "accepts vendored $ruleId clean code",
-    ({ ruleId, correct, filename = "sample.ts" }) => {
-      const result = lint(
-        correct,
-        { [`antidrift/${ruleId}`]: "error" },
-        filename
-      );
-
-      expect(result.status).toBe(0);
-      expect(`${result.stdout}${result.stderr}`).not.toContain(
-        `antidrift(${ruleId})`
-      );
-    }
-  );
 });

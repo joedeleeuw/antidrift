@@ -4,7 +4,7 @@
 
 The task supplied three identity transforms: direct property reconstruction, shorthand reconstruction from a destructured parameter, and a single explicit return. Each transform returns every input key under the same name without changing any value.
 
-The task also supplied the Murderbox conversation-index decoder as the canonical clean control. The source was confirmed at `apps/client/src/lib/conversation-index.ts` in the local Murderbox corpus. That decoder derives an ID, trims and defaults strings, clamps a count, fills timestamps and status, and coerces a boolean.
+The task also supplied a private app's decoder as the canonical clean control. The source was confirmed in a local corpus of that app. That decoder derives an ID, trims and defaults strings, clamps a count, fills timestamps and status, and coerces a boolean.
 
 ## Smell
 
@@ -36,6 +36,6 @@ Generic syntax selectors provide only partial coverage because they cannot prove
 
 ## Evidence and status
 
-The regression fixtures preserve the three supplied identity cases and every supplied clean case. The Murderbox decoder is the strongest false-positive control. An indexed Zod input fixture confirms that unresolved shapes remain clean.
+The regression fixtures preserve the three supplied identity cases and every supplied clean case. The private app's decoder is the strongest false-positive control. An indexed Zod input fixture confirms that unresolved shapes remain clean.
 
 The rule is enabled at error; a 54-repository corpus with 384 `.transform` calls reports 0 findings. It is not stable because the current evidence has no independently replicated real identity-transform drift.

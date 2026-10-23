@@ -114,6 +114,6 @@ The rule is enabled in `createConfig()` with `{ max: 12 }` because consumers sho
 
 Real drift:
 
-- `/Users/sushi/code/chaski/src/frontend/monolithui/src/components/FlightTrackerMap/MobileFlightTrackerMap.tsx` line 415 reports 31 locally-owned accepted props. The component combines mobile-specific controls with the extended flight-tracker map API.
+- A component in a private app reports 31 locally-owned accepted props. The component combines mobile-specific controls with the API of the map component it extends.
 
 Stable promotion still needs broader real-corpus inventory for the chosen threshold, especially around design-system wrappers, generated components, form/schema components, and components that deliberately mirror another component's prop API.
