@@ -126,7 +126,6 @@ const additionalAntidriftRules = {
   "antidrift/no-ai-debt-comments": "error",
   "antidrift/no-as-never": "error",
   "antidrift/no-todo-without-issue": "error",
-  "antidrift/no-generic-module-names": "off",
   "antidrift/no-default-export-in-domain": "error",
   "antidrift/no-trivial-property-helpers": "error",
   "antidrift/no-tutorial-comments": "error",

@@ -75,7 +75,7 @@ Behavioral unit tests, real repository checks, and packed-consumer verification 
 
 Configured severity describes wiring, not a claim that every rule fires in every repository. Domain models, statuses, authorization functions, generated owners, and other consumer facts come from the registries that need them. Registry-driven rules act on those facts rather than manufacturing project ownership.
 
-`antidrift/no-generic-module-names` is deprecated and off by default; enable it explicitly only if your team wants its filename blocklist. `antidrift/no-hash-literal` is retired and its published ID remains in `retiredRules`. Invalid configuration fails loudly instead of falling back to weaker analysis.
+Invalid configuration fails loudly instead of falling back to weaker analysis. Published rule retirements remain in `policy/registries/rules.yaml`.
 
 ## Use the configs
 
@@ -449,7 +449,6 @@ The governance config enables 51 new agent guardrails at error severity. The [ru
 | `antidrift/no-disabled-tooltip-trigger`          | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-duplicate-context`                 | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-eager-singleton`                   | Portable agent guardrail; declared options and artifact proof                                                                |
-| `antidrift/no-generic-module-names`              | Deprecated filename blocklist; off by default, explicit opt-in with behavioral artifact proof                                |
 | `antidrift/no-inline-style-colors`               | Use declared palette/embedding scope; terminal black surface is a recorded platform boundary                                 |
 | `antidrift/no-omitted-prop-respread`             | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-partial-record-satisfies`          | Portable agent guardrail; declared options and artifact proof                                                                |

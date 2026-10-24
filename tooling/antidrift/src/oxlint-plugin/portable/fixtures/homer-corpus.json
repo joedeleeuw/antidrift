@@ -710,26 +710,6 @@
       ]
     },
     {
-      "filename": "apps/client/src/components/chat/model-selector-sections/shared.ts",
-      "blob": "bd466c1e40bb30813417d634dcf3e3f2eb8d73fe",
-      "sha256": "3e509d84218cb479a0f7a2839e0b837e2e4aa260676ed11ab904047c80c56498",
-      "source": "import type { ChatToolExecutionCapability } from \"@homer/shared/api-types\";\nimport type { ChatModelTarget, ModelTarget } from \"@/lib/model-directory\";\nimport type { ThemePalette } from \"@/lib/theme\";\nimport {\n  chatProfileFacts,\n  type ModelSelectorMenuData,\n} from \"../model-selector-menu-data\";\n\nexport type KindSectionSharedProps = {\n  target: ModelTarget | null;\n  switching: boolean;\n  selectedId: string | null;\n  menuData: ModelSelectorMenuData;\n  onSelect: (target: ModelTarget) => void;\n  onNavigate?: () => void;\n  compact: boolean;\n  dense?: boolean;\n  colors: ThemePalette;\n};\n\nexport function chatProfileSubtitle(\n  endpoint: ChatModelTarget,\n  executions: readonly ChatToolExecutionCapability[]\n): string | undefined {\n  return chatProfileFacts(endpoint, executions) || undefined;\n}\n",
-      "expected": [
-        {
-          "rule": "no-generic-module-names",
-          "options": {},
-          "messages": [
-            {
-              "ruleId": "antidrift/no-generic-module-names",
-              "line": 1,
-              "column": 1,
-              "message": "File name 'shared' is too generic. Use a domain-specific name."
-            }
-          ]
-        }
-      ]
-    },
-    {
       "filename": "apps/client/src/components/chat/screen/use-chat-composer-attachments.test.tsx",
       "blob": "117e19fa40e31aebcd764095da26d059746a2c0d",
       "sha256": "354a17935f3c32a98662a15e8be0a393c428f152830a5bec5b6bd3c93e34b241",

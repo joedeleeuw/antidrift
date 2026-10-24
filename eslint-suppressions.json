@@ -811,11 +811,6 @@
       "count": 1
     }
   },
-  "tooling/antidrift/test/consumer-monorepo.mjs": {
-    "antidrift/no-compat-names": {
-      "count": 1
-    }
-  },
   "tooling/antidrift/test/consumer-workspace.mjs": {
     "antidrift/no-vague-names": {
       "count": 1

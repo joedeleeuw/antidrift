@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Retire `antidrift/no-hash-literal` and its S1 policy directive. The implementation and default configuration are removed; the published ID remains in `retiredRules`.
-- Deprecate `antidrift/no-generic-module-names` and disable it in the default Oxlint config. Its implementation remains available for explicit opt-in users, with default-off and opt-in behavior verified in the packed consumer.
+- Retire `antidrift/no-generic-module-names` completely. The implementation, registration, default configuration, and explicit opt-in support are removed; the published ID remains in `retiredRules`.
 - Remove the maturity/status layer: per-rule promotion and research metadata, policy-review and family registries, the `rule-status` CLI, and all `ruleStatus*` exports and `RuleStatus*` types. `policy/registries/rules.yaml` now owns only semantic-fact contracts and published retirement records; there is no replacement status catalog.
 - Validation now depends on actual plugin/config membership, single-runtime ownership, functional registries and semantic facts, behavioral tests, and packed-artifact execution. Corpus history remains useful evidence but is not a runtime dependency or maturity score, and unit-test count is not a trust metric.
 

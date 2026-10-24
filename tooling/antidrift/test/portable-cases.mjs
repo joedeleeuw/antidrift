@@ -40,13 +40,6 @@ export const portableCases = [
     valid: "// TODO(APP-42): confirm remote audio track rendering\nstart();",
   },
   {
-    name: "no-generic-module-names",
-    filename: "shared.ts",
-    invalid: "export const token = 1;",
-    valid: "export const token = 1;",
-    validFilename: "tokens.ts",
-  },
-  {
     name: "no-default-export-in-domain",
     filename: "domain/entity.ts",
     invalid: "export default class Entity {}",

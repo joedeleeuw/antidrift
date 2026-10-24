@@ -86,7 +86,6 @@ rikalabs @rikalabs/no-duplicate-context 81a246bc1e61268afcf6933bd026e6aabe0869cd
 rikalabs @rikalabs/no-ai-debt-comments effaadf43d86dbe6e76a44e3822c8320e280d40d4af1dad916109a2a3130978f -> no-ai-debt-comments
 rikalabs @rikalabs/no-as-never 040d7738b8774e73ee0dc4ba1951b22f4835eb7c2d8d686d6e19eff9811dc5b0 -> no-as-never
 rikalabs @rikalabs/no-todo-without-issue 8811d9ccf406bb49bcf7010ceb4f4c4eee560b15e388b05d318f0591ca722e22 -> no-todo-without-issue
-rikalabs @rikalabs/no-generic-module-names a8ad8139688e602145311de198c43c53b2cc8930e7d9fe5c7e23e1de02828d99 -> no-generic-module-names
 rikalabs @rikalabs/no-default-export-in-domain e44668aeeb360849e780a42356cc06f7991d701aed3f11dc2f9f14cf42878803 -> no-default-export-in-domain
 rikalabs @rikalabs/no-anemic-errors 8f1e87ea4fda81f95af4b4f1bcfb6cbb55544a4dff6e70be82f5c121c699a005 -> no-anemic-errors
 rikalabs @rikalabs/no-relative-cross-package-imports c0e835d29e9c0b7fd2276b104865821a13d1830293a728f71f4549ae44889c23 -> no-relative-cross-package-imports

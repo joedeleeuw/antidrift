@@ -42,7 +42,6 @@ import noDuplicateContextRule from "./portable/no-duplicate-context.js";
 import noAiDebtCommentsRule from "./portable/no-ai-debt-comments.js";
 import noAsNeverRule from "./portable/no-as-never.js";
 import noTodoWithoutIssueRule from "./portable/no-todo-without-issue.js";
-import noGenericModuleNamesRule from "./portable/no-generic-module-names.js";
 import noDefaultExportInDomainRule from "./portable/no-default-export-in-domain.js";
 import noTrivialPropertyHelpersRule from "./portable/no-trivial-property-helpers.js";
 import noTutorialCommentsRule from "./portable/no-tutorial-comments.js";
@@ -102,7 +101,6 @@ const rules = {
   "no-ai-debt-comments": noAiDebtCommentsRule,
   "no-as-never": noAsNeverRule,
   "no-todo-without-issue": noTodoWithoutIssueRule,
-  "no-generic-module-names": noGenericModuleNamesRule,
   "no-default-export-in-domain": noDefaultExportInDomainRule,
   "no-trivial-property-helpers": noTrivialPropertyHelpersRule,
   "no-tutorial-comments": noTutorialCommentsRule,

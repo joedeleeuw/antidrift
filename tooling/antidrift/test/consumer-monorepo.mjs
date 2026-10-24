@@ -213,16 +213,6 @@ try {
   provePortableRules({ file, lintOxlint, packedFiles });
   proveAdoptionPresets({ file, runJson, lintOxlint, work });
 
-  const deprecatedFilenameRules = oxlintRuleIds(
-    lintOxlint(
-      "portable-proofs/no-generic-module-names/shared.ts",
-      "oxlint.config.mjs"
-    )
-  );
-  if (deprecatedFilenameRules.includes("antidrift/no-generic-module-names")) {
-    fail("Deprecated generic module naming must be off in the default config");
-  }
-
   const unconfiguredTouchableRules = oxlintRuleIds(
     lintOxlint("portable-proofs/raw-touchable.tsx", "oxlint.config.mjs")
   );

@@ -110,6 +110,9 @@ semanticFactKinds:
       - decision
 
 retiredRules:
+  antidrift/no-generic-module-names:
+    status: retired
+    reason: Removed by owner request. Generic filename blocklists are opinionated naming policy rather than Antidrift contract-drift enforcement; no explicit opt-in implementation is retained.
   antidrift/no-hash-literal:
     status: retired
     reason: Removed by owner request. Source provenance belongs to version control and release metadata, not a hash-literal lint policy.

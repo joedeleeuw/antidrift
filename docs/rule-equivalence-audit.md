@@ -16,7 +16,6 @@ This is the ownership policy, not a second rule catalog. Plugin configs own acti
 - Rika's `@rikalabs/no-property-default-fallbacks` is disabled by default. `enforceNoPropertyDefaultFallbacks: true` opts into that rule alone, not Rika's aggressive preset. `propertyDefaultAllowedFiles` declares repository-relative file patterns whose fully qualified suffixes match across checkout and config locations.
 - When Rika enforcement is enabled, Antidrift disables `no-sentinel-absence-fallback` in its ESLint config. It retains selectors for no-substitution template-literal sentinels, which Rika's implementation does not detect.
 - React Native restrictions remain opt-in. A consumer's `policy/registries/react-native.yaml` declares `replacementImport` and exact `allowedFiles`; without that policy, raw-touchable restrictions are inert.
-- `no-generic-module-names` is deprecated and disabled by default. Its implementation remains available for explicit opt-in users; `no-hash-literal` is retired and recorded in `retiredRules`.
 
 ## Decision procedure
 

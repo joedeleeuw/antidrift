@@ -318,38 +318,6 @@
       "tests": "Valid/invalid rule cases and exactly one packed consumer diagnostic; revision-authenticated full-source diagnostics"
     },
     {
-      "rule": "no-generic-module-names",
-      "count": 1,
-      "exitCode": 1,
-      "samples": [
-        {
-          "file": "apps/client/src/components/chat/model-selector-sections/shared.ts",
-          "line": 1,
-          "column": 1,
-          "message": "File name 'shared' is too generic. Use a domain-specific name.",
-          "anchor": "import type { ChatToolExecutionCapability } from \"@homer/shared/api-types\";",
-          "context": "import type { ChatToolExecutionCapability } from \"@homer/shared/api-types\";\nimport type { ChatModelTarget, ModelTarget } from \"@/lib/model-directory\";\nimport type { ThemePalette } from \"@/lib/theme\";\nimport {\n  chatProfileFacts,\n  type ModelSelectorMenuData,\n} from \"../model-selector-menu-data\";\n\nexport type KindSectionSharedProps = {\n  target: ModelTarget | null;\n  switching: boolean;",
-          "sha256": "3e509d84218cb479a0f7a2839e0b837e2e4aa260676ed11ab904047c80c56498",
-          "classification": "TP",
-          "reason": "shared.ts mixes section props and subtitle delegation; the feature contract can be named model-selector-section-contract.",
-          "reviewChange": "Fresh agent-intent judgement at pinned revision; no unverifiable attribution to an earlier individual sample.",
-          "blob": "bd466c1e40bb30813417d634dcf3e3f2eb8d73fe"
-        }
-      ],
-      "intent": "Interrupt an agent creating a generic dumping-ground module instead of a named feature contract.",
-      "decision": "fix",
-      "interpretation": "Agent-intent review: 1 signal, 0 genuine noise in the original detector sample. Repairs must remove the latter without silencing the former.",
-      "sampleCounts": {
-        "TP": 1,
-        "FP": 0
-      },
-      "before": 1,
-      "after": 1,
-      "afterExitCode": 1,
-      "repair": "Declared options, plugin registration, valid/invalid regression and packed artifact proof",
-      "tests": "Valid/invalid rule cases and exactly one packed consumer diagnostic; revision-authenticated full-source diagnostics"
-    },
-    {
       "rule": "no-default-export-in-domain",
       "count": 0,
       "exitCode": 0,
@@ -2926,7 +2894,6 @@
     "no-ai-debt-comments": {},
     "no-as-never": {},
     "no-todo-without-issue": {},
-    "no-generic-module-names": {},
     "no-default-export-in-domain": {},
     "no-anemic-errors": {},
     "no-relative-cross-package-imports": {},
