@@ -244,26 +244,6 @@ ruleTester.run("no-hash-literal", rule("no-hash-literal"), {
   ],
 });
 
-ruleTester.run("no-host-path-literal", rule("no-host-path-literal"), {
-  valid: [
-    {
-      code: 'const brew = "/home/linuxbrew/.linuxbrew/bin";',
-      filename: "scripts/path.ts",
-    },
-    {
-      code: 'const root = "/Users/alex/repos/project";',
-      filename: "src/paths.test.ts",
-    },
-  ],
-  invalid: [
-    {
-      code: "const root = `/Users/joe/code/${name}`;",
-      filename: "scripts/path.ts",
-      errors: 1,
-    },
-  ],
-});
-
 ruleTester.run("no-dated-comments", rule("no-dated-comments"), {
   valid: [
     'expect(cards[0]).toHaveTextContent("SPEC-002"); // 2024-01-21',
@@ -308,20 +288,6 @@ ruleTester.run("no-fallback-to-empty", rule("no-fallback-to-empty"), {
     {
       code: "const body = await response.json().catch(() => ({}));",
       errors: 1,
-    },
-  ],
-});
-
-ruleTester.run("no-else-if-chain", rule("no-else-if-chain"), {
-  valid: [
-    'if (mode === "a") run(1); else if (mode === "b") run(2); else if (mode === "c") run(3);',
-  ],
-  invalid: [
-    {
-      code: 'if (event.key === "Up" || event.key === "Left") up(); else if (event.key === "Down") down(); else if (event.key === "Enter") open(); else if (event.key === "Escape") close(); else idle();',
-      errors: [
-        { messageId: "chain", data: { count: 4, discriminant: "event.key" } },
-      ],
     },
   ],
 });

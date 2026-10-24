@@ -13,7 +13,10 @@ const packageRequire = createRequire(import.meta.url);
 const governance = createGovernanceOxlintConfig({
   repoRoot: import.meta.dirname,
 });
-const tooling = createToolingConfig({ repoRoot: import.meta.dirname });
+const tooling = createToolingConfig({
+  repoRoot: import.meta.dirname,
+  enforceNoDerivedStateEffects: true,
+});
 const nativePlugins = ["eslint", "import", "oxc", "react", "unicorn"] as const;
 // Preserve the repository's TypeScript-only scopes rather than widening JavaScript.
 const toolingBaseRules = Object.fromEntries(
@@ -103,7 +106,6 @@ export default defineConfig({
   rules: {
     ...toolingBaseRules,
     ...governance.rules,
-    "react/react-compiler": "error",
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
     "react/button-has-type": "error",
@@ -138,7 +140,6 @@ export default defineConfig({
       "error",
       { terms: ["@nocommit", "FIXME"], location: "anywhere" },
     ],
-    "no-nested-ternary": "error",
     "unicorn/no-abusive-eslint-disable": "error",
     "unicorn/no-await-in-promise-methods": "error",
     "unicorn/no-invalid-fetch-options": "error",

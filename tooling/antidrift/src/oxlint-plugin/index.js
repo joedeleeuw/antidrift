@@ -50,14 +50,11 @@ import noDebugResidueFilenamesRule from "./portable/no-debug-residue-filenames.j
 import noPlaceholderTestsRule from "./portable/no-placeholder-tests.js";
 import noUnlistedExternalImportsRule from "./portable/no-unlisted-external-imports.js";
 import noDatedCommentsRule from "./portable/no-dated-comments.js";
-import noElseIfChainRule from "./portable/no-else-if-chain.js";
 import noFallbackToEmptyRule from "./portable/no-fallback-to-empty.js";
 import noHashLiteralRule from "./portable/no-hash-literal.js";
-import noHostPathLiteralRule from "./portable/no-host-path-literal.js";
 import packageMetadata from "../../package.json" with { type: "json" };
 
 import { createSyntaxRules } from "../syntax-rules.mjs";
-import ruleNoRawReactNativeTouchables from "./rules/no-raw-react-native-touchables.js";
 import { noChainedTypeAssertionsRule } from "./anti-slop/rules/no-chained-type-assertions.js";
 import { noUnknownTypeAliasesRule } from "./anti-slop/rules/no-unknown-type-aliases.js";
 
@@ -114,12 +111,9 @@ const rules = {
   "no-placeholder-tests": noPlaceholderTestsRule,
   "no-unlisted-external-imports": noUnlistedExternalImportsRule,
   "no-dated-comments": noDatedCommentsRule,
-  "no-else-if-chain": noElseIfChainRule,
   "no-fallback-to-empty": noFallbackToEmptyRule,
   "no-hash-literal": noHashLiteralRule,
-  "no-host-path-literal": noHostPathLiteralRule,
   ...createSyntaxRules(),
-  "no-raw-react-native-touchables": ruleNoRawReactNativeTouchables(),
   "no-unknown-type-aliases": noUnknownTypeAliasesRule,
   "no-unsafe-cast-chain": noChainedTypeAssertionsRule,
 };

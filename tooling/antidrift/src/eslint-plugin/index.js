@@ -30,8 +30,6 @@ import ruleNoCallingComponentsAsFunctions from "../oxlint-plugin/rules/no-callin
 import ruleNoDuplicatedConditionalClassnames from "../oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoDuplicatedObjectFieldBlocks from "../oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
 import ruleNoNonindependentTestOracle from "../oxlint-plugin/rules/no-nonindependent-test-oracle.js";
-import ruleNoOpenDictionaryAtBoundary from "../oxlint-plugin/rules/no-open-dictionary-at-boundary.js";
-import ruleNoRawReactNativeTouchables from "../oxlint-plugin/rules/no-raw-react-native-touchables.js";
 import ruleNoRedeclaredOwnedUnion from "../oxlint-plugin/rules/no-redeclared-owned-union.js";
 import ruleNoSchemaLibraryInTest from "../oxlint-plugin/rules/no-schema-library-in-test.js";
 import ruleNoSentinelAbsenceFallback from "../oxlint-plugin/rules/no-sentinel-absence-fallback.js";
@@ -76,9 +74,7 @@ const rules = {
   "no-inline-structural-type-at-use-site":
     ruleNoInlineStructuralTypeAtUseSite(),
   "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
-  "no-open-dictionary-at-boundary": ruleNoOpenDictionaryAtBoundary(),
   "no-raw-fetch-in-component": ruleNoRawFetchInComponent,
-  "no-raw-react-native-touchables": ruleNoRawReactNativeTouchables(),
   "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
   "no-schema-library-in-test": ruleNoSchemaLibraryInTest(),
   "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),

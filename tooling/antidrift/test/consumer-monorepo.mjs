@@ -47,10 +47,10 @@ function runJson(cmd, args, cwd) {
   return JSON.parse(run(cmd, args, cwd));
 }
 
-function file(rel, contents) {
-  const path = join(work, rel);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, contents, "utf8");
+function file(rel, fileContents) {
+  const targetPath = join(work, rel);
+  mkdirSync(dirname(targetPath), { recursive: true });
+  writeFileSync(targetPath, fileContents, "utf8");
 }
 
 function fail(message) {
@@ -62,7 +62,7 @@ function fail(message) {
 try {
   console.log("1/7  packing @joedeleeuw/antidrift ...");
   run("pnpm", ["pack", "--pack-destination", work], pkgDir);
-  const tgz = readdirSync(work).find((f) => f.endsWith(".tgz"));
+  const tgz = readdirSync(work).find((filename) => filename.endsWith(".tgz"));
   if (!tgz) fail("pack produced no tarball");
   const tarball = join(work, tgz);
   const packedFiles = new Set(
@@ -124,11 +124,11 @@ try {
   const semanticFactFile = join(work, "semantic-facts.jsonl");
   rmSync(semanticFactFile, { force: true });
 
-  function lint(relFile) {
+  function lint(relFile, config = "eslint.config.mjs") {
     try {
       return runJson(
         pnpmBinary,
-        ["exec", "eslint", relFile, "--format", "json"],
+        ["exec", "eslint", relFile, "--format", "json", "--config", config],
         work
       );
     } catch (error) {
@@ -212,6 +212,112 @@ try {
 
   provePortableRules({ file, lintOxlint, packedFiles });
   proveAdoptionPresets({ file, runJson, lintOxlint, work });
+
+  const unconfiguredTouchableRules = oxlintRuleIds(
+    lintOxlint("portable-proofs/raw-touchable.tsx", "oxlint.config.mjs")
+  );
+  if (unconfiguredTouchableRules.includes("eslint/no-restricted-imports")) {
+    fail(
+      "React Native restrictions must be opt-in when no interaction owner is configured"
+    );
+  }
+  const configuredTouchableOutput = lintOxlint(
+    "portable-proofs/raw-touchable.tsx",
+    "oxlint.react-native.config.mjs"
+  );
+  const configuredTouchableRules = oxlintRuleIds(configuredTouchableOutput);
+  if (!configuredTouchableRules.includes("eslint/no-restricted-imports")) {
+    fail("Configured React Native policy must reject a raw Pressable import");
+  }
+  const restrictedMessages = (configuredTouchableOutput.diagnostics ?? []).map(
+    ({ message }) => message
+  );
+  for (const expected of [
+    "'default' import",
+    "* import is invalid",
+    "'TouchableOpacity' import",
+  ]) {
+    if (!restrictedMessages.some((message) => message.includes(expected))) {
+      fail(
+        `React Native restrictions must cover default, namespace and re-export forms; missing ${expected}: ${JSON.stringify(restrictedMessages)}`
+      );
+    }
+  }
+  for (const allowed of [
+    "portable-proofs/tw/index.tsx",
+    "portable-proofs/type-only-touchable.tsx",
+  ]) {
+    if (
+      oxlintRuleIds(
+        lintOxlint(allowed, "oxlint.react-native.config.mjs")
+      ).includes("eslint/no-restricted-imports")
+    ) {
+      fail(
+        `React Native owner and type-only imports must stay clean: ${allowed}`
+      );
+    }
+  }
+
+  const fallbackConfig = "nested/oxlint.fallback.config.mjs";
+  const fallbackOutput = lintOxlint(
+    "portable-proofs/fallback.ts",
+    fallbackConfig
+  );
+  const fallbackRules = oxlintRuleIds(fallbackOutput);
+  const hostPathDiagnostics = (fallbackOutput.diagnostics ?? []).filter(
+    ({ message }) => message.includes("Host-absolute path literal")
+  );
+  if (
+    !fallbackRules.includes("@rikalabs/no-property-default-fallbacks") ||
+    !fallbackRules.includes("governance-eslint/no-restricted-syntax") ||
+    hostPathDiagnostics.length !== 2
+  ) {
+    fail(
+      `Fallback opt-in must enforce Rika defaults and both host-path selector forms, got: ${JSON.stringify(fallbackOutput.diagnostics)}`
+    );
+  }
+  if (
+    !(fallbackOutput.diagnostics ?? []).some(({ message }) =>
+      message.includes("hides a missing member behind a sentinel")
+    )
+  ) {
+    fail("Template-literal sentinels must remain covered when Rika is enabled");
+  }
+  const allowedFallbackRules = oxlintRuleIds(
+    lintOxlint("portable-proofs/allowed-fallback.ts", fallbackConfig)
+  );
+  if (
+    allowedFallbackRules.includes("@rikalabs/no-property-default-fallbacks") ||
+    allowedFallbackRules.includes("governance-eslint/no-restricted-syntax")
+  ) {
+    fail(
+      `Nested config must honor repo-relative fallback exceptions, got: ${JSON.stringify(allowedFallbackRules)}`
+    );
+  }
+
+  const defaultFallbackRules = lint(
+    "packages/app/src/fallback-policy.ts"
+  ).flatMap((lintResult) => lintResult.messages.map(({ ruleId }) => ruleId));
+  if (
+    !defaultFallbackRules.includes("antidrift/no-sentinel-absence-fallback")
+  ) {
+    fail(
+      "The narrow sentinel rule must remain enabled without the Rika opt-in"
+    );
+  }
+  const delegatedFallbackRules = lint(
+    "packages/app/src/fallback-policy.ts",
+    "eslint.fallback.config.mjs"
+  ).flatMap((lintResult) => lintResult.messages.map(({ ruleId }) => ruleId));
+  if (
+    delegatedFallbackRules.includes("antidrift/no-sentinel-absence-fallback") ||
+    !delegatedFallbackRules.includes("no-restricted-syntax")
+  ) {
+    fail(
+      `Rika opt-in must disable the overlapping custom rule but retain template sentinels, got: ${JSON.stringify(delegatedFallbackRules)}`
+    );
+  }
+
   rmSync(join(work, "portable-proofs"), { recursive: true, force: true });
   rmSync(join(work, "portable.config.json"));
   rmSync(join(work, "adoption-proof.tsx"));
@@ -274,11 +380,11 @@ try {
   }
 
   const RULE = "antidrift/no-structural-type-fork";
-  const defaultCleanRules = lint("packages/app/src/clean.ts").flatMap((r) =>
-    r.messages.map((m) => m.ruleId)
+  const defaultCleanRules = lint("packages/app/src/clean.ts").flatMap(
+    (lintResult) => lintResult.messages.map((message) => message.ruleId)
   );
-  const defaultDriftRules = lint("packages/app/src/drift.ts").flatMap((r) =>
-    r.messages.map((m) => m.ruleId)
+  const defaultDriftRules = lint("packages/app/src/drift.ts").flatMap(
+    (lintResult) => lintResult.messages.map((message) => message.ruleId)
   );
   if (defaultCleanRules.includes(RULE)) {
     fail(
@@ -293,16 +399,16 @@ try {
 
   const restrictedSyntaxMessages = lint(
     "packages/app/src/restricted-syntax-drift.ts"
-  ).flatMap((r) =>
-    r.messages
-      .filter((m) => m.ruleId === "no-restricted-syntax")
-      .map((m) => m.message)
+  ).flatMap((lintResult) =>
+    lintResult.messages
+      .filter((message) => message.ruleId === "no-restricted-syntax")
+      .map((message) => message.message)
   );
-  const declaresEnum = restrictedSyntaxMessages.some((m) =>
-    m.includes("Do not declare enums")
+  const declaresEnum = restrictedSyntaxMessages.some((message) =>
+    message.includes("Do not declare enums")
   );
-  const usesForwardRef = restrictedSyntaxMessages.some((m) =>
-    m.includes("forwardRef is deprecated")
+  const usesForwardRef = restrictedSyntaxMessages.some((message) =>
+    message.includes("forwardRef is deprecated")
   );
   if (!declaresEnum || !usesForwardRef) {
     fail(
@@ -319,11 +425,13 @@ try {
   }
 
   const packageCopyRules = lint("packages/app/src/package-copy.ts").flatMap(
-    (r) => r.messages.map((m) => m.ruleId)
+    (lintResult) => lintResult.messages.map((message) => message.ruleId)
   );
   const undercheckedPredicateRules = lint(
     "packages/app/src/underchecked-predicate.ts"
-  ).flatMap((r) => r.messages.map((m) => m.ruleId));
+  ).flatMap((lintResult) =>
+    lintResult.messages.map((message) => message.ruleId)
+  );
 
   if (packageCopyRules.includes(RULE)) {
     fail(

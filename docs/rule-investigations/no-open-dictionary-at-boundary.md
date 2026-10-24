@@ -1,5 +1,7 @@
 # no-open-dictionary-at-boundary
 
+Retired. `@joedeleeuw/typescript-tooling` now owns explicit-`any` enforcement through the maintained TypeScript rules in both lint runtimes. The custom implementation is removed; its identifier and replacement remain in `policy/registries/rules.yaml`. The investigation below is historical evidence, not a description of an active Antidrift rule.
+
 An exported dictionary of `any` lets callers skip type checks. Use the owner type when one exists. Use `unknown` for input that still needs decoding.
 
 The rule reports `Record<string, any>` and `{ [key: string]: any }` in exported function parameters, returns, and variable annotations. It includes nested annotations and separately exported declarations. Private declarations and generic constraints stay allowed. The rule does not expand named aliases or inferred types.

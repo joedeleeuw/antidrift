@@ -26,5 +26,6 @@ export function loadRegistriesSync(policyDir = "policy") {
     boundaries: loadOne(policyDir, "boundaries"),
     generated: loadOne(policyDir, "generated"),
     ownership: loadOne(policyDir, "ownership"),
+    reactNative: loadOne(policyDir, "react-native"),
   };
 }

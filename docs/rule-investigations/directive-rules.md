@@ -2,17 +2,17 @@
 
 Status: implemented; default error in the shared presets. Each rule names the directive it enforces through `directive` in `policy/registries/rules.yaml`. The IDs come from the dotfiles enforcement map (`docs/enforcement-map.md` in the dotfiles repo): G directives from `ai-contexts/AGENT.md`, S directives from the cloud-rl-train process smells.
 
-| Rule                                   | Directive | Runtime | Default                                   |
-| -------------------------------------- | --------- | ------- | ----------------------------------------- |
-| `antidrift/no-pass-through-parameters` | G22       | ESLint  | error, ratcheted by suppressions          |
-| `antidrift/no-vague-names`             | G21       | ESLint  | error, ratcheted by suppressions          |
-| `antidrift/no-compat-names`            | G5        | ESLint  | error, ratcheted by suppressions          |
-| `antidrift/no-fallback-to-empty`       | G7        | Oxlint  | error                                     |
-| `no-nested-ternary` (native)           | G8        | Oxlint  | owned by `@joedeleeuw/typescript-tooling` |
-| `antidrift/no-else-if-chain`           | G9        | Oxlint  | error                                     |
-| `antidrift/no-hash-literal`            | S1        | Oxlint  | error                                     |
-| `antidrift/no-host-path-literal`       | S4        | Oxlint  | error                                     |
-| `antidrift/no-dated-comments`          | S5        | Oxlint  | error                                     |
+| Rule                                     | Directive | Runtime | Default                                   |
+| ---------------------------------------- | --------- | ------- | ----------------------------------------- |
+| `antidrift/no-pass-through-parameters`   | G22       | ESLint  | error, ratcheted by suppressions          |
+| `antidrift/no-vague-names`               | G21       | ESLint  | error, ratcheted by suppressions          |
+| `antidrift/no-compat-names`              | G5        | ESLint  | error, ratcheted by suppressions          |
+| `antidrift/no-fallback-to-empty`         | G7        | Oxlint  | error                                     |
+| `no-nested-ternary` (native)             | G8        | Oxlint  | owned by `@joedeleeuw/typescript-tooling` |
+| `unicorn-js/prefer-switch`               | G9        | Oxlint  | owned by `@joedeleeuw/typescript-tooling` |
+| `antidrift/no-hash-literal`              | S1        | Oxlint  | error                                     |
+| `governance-eslint/no-restricted-syntax` | S4        | Oxlint  | generated host-path selectors             |
+| `antidrift/no-dated-comments`            | S5        | Oxlint  | error                                     |
 
 ## Runtime choice
 

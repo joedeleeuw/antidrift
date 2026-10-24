@@ -94,10 +94,10 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
         devDependencies: {
           "@joedeleeuw/antidrift": `file:${tarball}`,
           "@joedeleeuw/typescript-tooling": `file:${toolingTarball}`,
-          eslint: "9.39.4",
-          "typescript-eslint": "8.60.1",
-          "@typescript-eslint/parser": "8.60.1",
-          oxlint: "1.78.0",
+          eslint: "10.13.0",
+          "typescript-eslint": "8.72.0",
+          "@typescript-eslint/parser": "8.72.0",
+          oxlint: "1.89.0",
           typescript: "6.0.3",
           vitest: "2.1.9",
           firebase: "workspace:*",
@@ -184,6 +184,71 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "  ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])],\n" +
       "  overrides: [...(tooling.overrides ?? []), ...governance.overrides],\n" +
       "};\n"
+  );
+  file(
+    "react-native-policy/registries/react-native.yaml",
+    'replacementImport: "@/tw"\n' +
+      "allowedFiles:\n" +
+      "  - portable-proofs/tw/index.tsx\n"
+  );
+  file(
+    "oxlint.react-native.config.mjs",
+    'import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
+      "const config = createGovernanceOxlintConfig({ repoRoot: import.meta.dirname, policyDir: 'react-native-policy' });\n" +
+      "export default { ...config, rules: { ...config.rules, 'antidrift/no-unlisted-external-imports': 'off' } };\n"
+  );
+  file(
+    "portable-proofs/raw-touchable.tsx",
+    'import ReactNative, { Pressable, View } from "react-native";\n' +
+      'import * as GestureHandler from "react-native-gesture-handler";\n' +
+      'export { TouchableOpacity } from "react-native";\n' +
+      'export { default as NativeDefault } from "react-native";\n' +
+      'export * as Native from "react-native";\n' +
+      "export const primitives = { ReactNative, Pressable, View, GestureHandler };\n"
+  );
+  file(
+    "portable-proofs/tw/index.tsx",
+    'import { Pressable } from "react-native";\nexport const Interaction = Pressable;\n'
+  );
+  file(
+    "portable-proofs/type-only-touchable.tsx",
+    'import type { PressableProps, TouchableOpacityProps } from "react-native";\n' +
+      "export type Props = PressableProps;\n" +
+      'export type { TouchableOpacityProps } from "react-native";\n'
+  );
+  file(
+    "nested/oxlint.fallback.config.mjs",
+    'import { resolve } from "node:path";\n' +
+      'import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
+      'import { createConfig } from "@joedeleeuw/typescript-tooling/oxlint";\n' +
+      "const repoRoot = resolve(import.meta.dirname, '..');\n" +
+      "const governance = createGovernanceOxlintConfig({ repoRoot, enforceNoPropertyDefaultFallbacks: true, propertyDefaultAllowedFiles: ['portable-proofs/allowed-fallback.ts'] });\n" +
+      "const tooling = createConfig({ repoRoot, typeAware: false, enforceNoPropertyDefaultFallbacks: true, propertyDefaultAllowedFiles: ['portable-proofs/allowed-fallback.ts'] });\n" +
+      "export default { ...tooling, ...governance, rules: { ...tooling.rules, ...governance.rules }, jsPlugins: [...governance.jsPlugins, ...tooling.jsPlugins], plugins: [...new Set([...governance.plugins, ...tooling.plugins])], options: { ...tooling.options, ...governance.options }, ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])], overrides: [...(tooling.overrides ?? []), ...governance.overrides] };\n"
+  );
+  file(
+    "portable-proofs/fallback.ts",
+    "export function labels(row: { state?: string; count?: number }) {\n" +
+      '  return { state: row?.state ?? "unknown", template: row?.state ?? `unknown`, count: row.count ?? 0 };\n' +
+      "}\n" +
+      'export const developerPath = "/home/example/project";\n' +
+      "export const templatePath = `/Users/example/project`;\n" +
+      "export function projectPath(project: string) { return `/home/example/${project}`; }\n"
+  );
+  file(
+    "portable-proofs/allowed-fallback.ts",
+    "export function count(row: { count?: number }) { return row.count ?? 0; }\n"
+  );
+  file(
+    "eslint.fallback.config.mjs",
+    'import { createConfig } from "@joedeleeuw/antidrift/eslint-config";\n' +
+      "export default createConfig({ tsconfigRootDir: import.meta.dirname, enforceNoPropertyDefaultFallbacks: true });\n"
+  );
+  file(
+    "packages/app/src/fallback-policy.ts",
+    "export function labels(row: { state?: string }) {\n" +
+      '  return { state: row?.state ?? "unknown", template: row?.state ?? `unknown` };\n' +
+      "}\n"
   );
   file(
     "oxlint.precedence.config.mjs",

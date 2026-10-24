@@ -17,20 +17,31 @@ function staticPropertyKey(property) {
   return null;
 }
 
-function returnedObject(callback) {
-  if (callback.body.type === "ObjectExpression") {
-    return { object: callback.body, returnStyle: "implicit" };
-  }
-  if (
-    callback.body.type !== "BlockStatement" ||
-    callback.body.body.length !== 1
-  ) {
+function identityCallbackParameter(callback) {
+  if (callback.async || callback.generator || callback.params.length !== 1) {
     return null;
   }
-  const statement = callback.body.body[0];
-  if (statement.type !== "ReturnStatement") return null;
-  if (statement.argument?.type !== "ObjectExpression") return null;
-  return { object: statement.argument, returnStyle: "block-return" };
+  const [parameter] = callback.params;
+  return parameter.type === "Identifier" || parameter.type === "ObjectPattern"
+    ? parameter
+    : null;
+}
+
+function returnedExpression(callback) {
+  if (callback.body.type !== "BlockStatement") {
+    return { expression: callback.body, returnStyle: "implicit" };
+  }
+  if (callback.body.body.length !== 1) return null;
+  const [statement] = callback.body.body;
+  return statement.type === "ReturnStatement"
+    ? { expression: statement.argument, returnStyle: "block-return" }
+    : null;
+}
+
+function returnedObject(callback) {
+  const returned = returnedExpression(callback);
+  if (returned?.expression?.type !== "ObjectExpression") return null;
+  return { object: returned.expression, returnStyle: returned.returnStyle };
 }
 
 function destructuredParameterKeys(parameter) {
@@ -112,18 +123,11 @@ function sameKeys(left, right) {
 }
 
 function identityTransformProof(callback, inputKeys) {
-  if (
-    callback.async ||
-    callback.generator ||
-    callback.params.length !== 1 ||
-    (callback.params[0].type !== "Identifier" &&
-      callback.params[0].type !== "ObjectPattern")
-  ) {
-    return null;
-  }
+  const parameter = identityCallbackParameter(callback);
+  if (!parameter) return null;
   const returned = returnedObject(callback);
   if (!returned) return null;
-  const outputKeys = identityOutputKeys(returned.object, callback.params[0]);
+  const outputKeys = identityOutputKeys(returned.object, parameter);
   if (!outputKeys || !sameKeys(inputKeys, outputKeys)) return null;
   return {
     inputKeys: [...inputKeys],
@@ -131,10 +135,28 @@ function identityTransformProof(callback, inputKeys) {
       left.localeCompare(right)
     ),
     parameterStyle:
-      callback.params[0].type === "Identifier"
-        ? "identifier"
-        : "object-pattern",
+      parameter.type === "Identifier" ? "identifier" : "object-pattern",
     returnStyle: returned.returnStyle,
+  };
+}
+
+function directIdentityProof(callback) {
+  const parameter = identityCallbackParameter(callback);
+  if (parameter?.type !== "Identifier") return null;
+  const returned = returnedExpression(callback);
+  if (
+    returned?.expression?.type !== "Identifier" ||
+    returned.expression.name !== parameter.name
+  ) {
+    return null;
+  }
+  return {
+    inputKeys: null,
+    outputKeys: null,
+    parameterStyle: "identifier",
+    returnStyle:
+      returned.returnStyle === "implicit" ? "direct" : returned.returnStyle,
+    relation: "identity-value",
   };
 }
 
@@ -150,11 +172,11 @@ function emitIdentityTransformFact(context, node, proof) {
         emitted: true,
         messageId: "identitySchemaTransform",
       },
-      inputShape: { keys: proof.inputKeys },
-      outputShape: { keys: proof.outputKeys },
+      inputShape: proof.inputKeys ? { keys: proof.inputKeys } : null,
+      outputShape: proof.outputKeys ? { keys: proof.outputKeys } : null,
       transform: {
         parameterStyle: proof.parameterStyle,
-        relation: "identity-object-reconstruction",
+        relation: proof.relation ?? "identity-object-reconstruction",
         returnStyle: proof.returnStyle,
       },
     },
@@ -169,12 +191,12 @@ export function ruleNoIdentitySchemaTransform() {
       type: "problem",
       docs: {
         description:
-          "Disallow Zod transforms that reconstruct the schema's input object without changing its shape or values.",
+          "Disallow Zod transforms that return their input unchanged or reconstruct the schema's input object without changing its shape or values.",
       },
       schema: [],
       messages: {
         identitySchemaTransform:
-          "This Zod transform only reconstructs the same object shape. Remove the identity transform and infer the schema output directly.",
+          "This Zod transform returns its input unchanged. Remove the identity transform and infer the schema output directly.",
       },
     },
     visitors({ context, checker, services }) {
@@ -182,13 +204,18 @@ export function ruleNoIdentitySchemaTransform() {
         CallExpression(node) {
           const parts = zodTransformCallParts(node, services, checker);
           if (!parts) return;
-          const inputKeys = closedZodTransformInputKeys(
-            parts.callee.object,
-            services,
-            checker
-          );
-          if (!inputKeys) return;
-          const proof = identityTransformProof(parts.callback, inputKeys);
+          const proof =
+            directIdentityProof(parts.callback) ??
+            (() => {
+              const inputKeys = closedZodTransformInputKeys(
+                parts.callee.object,
+                services,
+                checker
+              );
+              return inputKeys
+                ? identityTransformProof(parts.callback, inputKeys)
+                : null;
+            })();
           if (!proof) return;
           emitIdentityTransformFact(context, node, proof);
           context.report({

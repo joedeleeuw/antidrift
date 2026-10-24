@@ -6,6 +6,7 @@ import { defineConfig } from "eslint/config";
 
 import aiPolicy from "../eslint-plugin/index.js";
 import { loadRegistriesSync } from "../policy/lib/registries.mjs";
+import { templateSentinelSelectors } from "../policy/lib/property-default-fallbacks.mjs";
 
 const ratchetedRules = {
   "antidrift/no-calling-components-as-functions": "error",
@@ -13,10 +14,8 @@ const ratchetedRules = {
   "antidrift/no-duplicated-conditional-classnames": "error",
   "antidrift/no-duplicated-object-field-blocks": "error",
   "antidrift/no-nonindependent-test-oracle": "error",
-  "antidrift/no-open-dictionary-at-boundary": "error",
   "antidrift/no-pass-through-parameters": "error",
   "antidrift/no-raw-fetch-in-component": "error",
-  "antidrift/no-raw-react-native-touchables": "error",
   "antidrift/no-redeclared-owned-union": "error",
   "antidrift/no-schema-library-in-test": "error",
   "antidrift/no-sentinel-absence-fallback": "error",
@@ -29,6 +28,7 @@ export function createConfig({
   tsconfigRootDir = process.cwd(),
   policyDir = "policy",
   semanticFacts,
+  enforceNoPropertyDefaultFallbacks = false,
 } = {}) {
   const registries = loadRegistriesSync(resolve(tsconfigRootDir, policyDir));
   const generatedSources = registries.generated?.generatedSources ?? {};
@@ -101,6 +101,14 @@ export function createConfig({
         "antidrift/no-service-constructor-imports": "error",
         "antidrift/no-sql-string-concat": "error",
         ...ratchetedRules,
+        "antidrift/no-sentinel-absence-fallback":
+          enforceNoPropertyDefaultFallbacks ? "off" : "error",
+        "no-restricted-syntax": [
+          "error",
+          ...(enforceNoPropertyDefaultFallbacks
+            ? templateSentinelSelectors
+            : []),
+        ],
       },
     },
     {
@@ -111,7 +119,17 @@ export function createConfig({
         parserOptions: { ecmaFeatures: { jsx: true } },
       },
       plugins: { antidrift: aiPolicy },
-      rules: ratchetedRules,
+      rules: {
+        ...ratchetedRules,
+        "antidrift/no-sentinel-absence-fallback":
+          enforceNoPropertyDefaultFallbacks ? "off" : "error",
+        "no-restricted-syntax": [
+          "error",
+          ...(enforceNoPropertyDefaultFallbacks
+            ? templateSentinelSelectors
+            : []),
+        ],
+      },
     },
     {
       files: ["**/package.json"],

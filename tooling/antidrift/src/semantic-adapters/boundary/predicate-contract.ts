@@ -11,6 +11,7 @@ import {
   syntaxText,
 } from "../kernel/syntax-node.ts";
 import { isZodMethod } from "../projection/schema-provenance.ts";
+import { resolveAliasedSymbol } from "../provenance/symbol-provenance.ts";
 import { callExpressionName } from "./auth-boundary.ts";
 import { syntaxDescendants } from "./binding-syntax.ts";
 import {
@@ -184,6 +185,9 @@ class ContractEvidenceScan {
     const operator = syntaxField(binary, "operator");
     const left = syntaxField(binary, "left");
     const right = syntaxField(binary, "right");
+    if (operator === "in") {
+      return this.#nominalBrandProves(left, right);
+    }
     if (operator === "instanceof") {
       return this.#instanceofProves(this.#paths.pathOf(left), right);
     }
@@ -192,6 +196,39 @@ class ContractEvidenceScan {
       (this.#comparisonSideProves(left, right) ||
         this.#comparisonSideProves(right, left))
     );
+  }
+
+  #nominalBrandProves(left: unknown, right: unknown): boolean {
+    if (this.#targetType.isUnion() || this.#paths.pathOf(right)?.length !== 0) {
+      return false;
+    }
+    const tsLeft = this.#services.esTreeNodeToTSNodeMap.get(left);
+    if (!tsLeft) {
+      return false;
+    }
+    const brandSymbol = resolveAliasedSymbol(
+      this.#checker,
+      this.#checker.getSymbolAtLocation(tsLeft)
+    );
+    if (!brandSymbol) {
+      return false;
+    }
+    return this.#checker
+      .getPropertiesOfType(this.#targetType)
+      .some((property) =>
+        (property.declarations ?? []).some((declaration) => {
+          const name = ts.getNameOfDeclaration(declaration);
+          if (!name || !ts.isComputedPropertyName(name)) {
+            return false;
+          }
+          return (
+            resolveAliasedSymbol(
+              this.#checker,
+              this.#checker.getSymbolAtLocation(name.expression)
+            ) === brandSymbol
+          );
+        })
+      );
   }
 
   #instanceofProves(

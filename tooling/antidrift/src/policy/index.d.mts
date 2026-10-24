@@ -25,6 +25,7 @@ export interface AntidriftRegistries {
   boundaries: unknown;
   generated: unknown;
   ownership: unknown;
+  reactNative: unknown;
 }
 
 export type PolicyArtifacts = Map<string, string>;

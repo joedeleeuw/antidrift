@@ -31,17 +31,17 @@ catalogs:
     vite: ^6.0.7
 
   lint:
-    "@typescript-eslint/parser": ^8.60.1
-    eslint: ^9.17.0
+    "@typescript-eslint/parser": ^8.72.0
+    eslint: ^10.13.0
     eslint-plugin-boundaries: ^5.0.1
     "@eslint-community/eslint-plugin-eslint-comments": ^4.7.2
     dependency-cruiser: 18.5.0
     eslint-plugin-sonarjs: 4.2.2
     knip: 6.38.0
-    oxlint: ^1.78.0
-    oxlint-tsgolint: ^7.0.2001
+    oxlint: ^1.89.0
+    oxlint-tsgolint: ^7.0.2005
     prettier: ^3.4.2
-    typescript-eslint: ^8.60.1
+    typescript-eslint: ^8.72.0
 
   test:
     "@vitest/coverage-v8": ^2.1.8
@@ -50,3 +50,6 @@ catalogs:
   git:
     lint-staged: ^15.3.0
     simple-git-hooks: ^2.11.1
+
+minimumReleaseAgeExclude:
+  - eslint-plugin-unicorn@79.0.0

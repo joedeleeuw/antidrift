@@ -11,7 +11,7 @@ export const SEMANTIC_FACT_KINDS = Object.freeze({
     confidence: Object.freeze(["deterministic-enforcement"]),
     emission: Object.freeze(["blocking-diagnostic"]),
     association:
-      "Zod transform callbacks to closed schema input shapes and exact object pass-through reconstruction.",
+      "Zod transform callbacks to direct identity values or to closed schema input shapes with exact object pass-through reconstruction. Direct identity has null inputShape and outputShape because no key set is inspected.",
     noSinkBehavior:
       "The identity-transform diagnostic still reports; only the serialized semantic fact is skipped.",
     payloadFields: Object.freeze([

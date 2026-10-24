@@ -55,7 +55,7 @@
   },
   "devDependencies": {
     "@joedeleeuw/antidrift": "workspace:*",
-    "@joedeleeuw/typescript-tooling": "github:joedeleeuw/typescript-tooling#4388458794287c49242ca250ba27812d9553d78b",
+    "@joedeleeuw/typescript-tooling": "github:joedeleeuw/typescript-tooling#0f9ce5d52ca962471ae1774620f9f77389669bc1",
     "@types/node": "catalog:core",
     "dependency-cruiser": "catalog:lint",
     "eslint": "catalog:lint",

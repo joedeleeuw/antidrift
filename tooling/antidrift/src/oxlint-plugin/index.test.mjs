@@ -15,41 +15,6 @@ const oxlintBinary = resolve(
 );
 const plugin = fileURLToPath(new URL("./index.js", import.meta.url));
 const packageTopEntry = fileURLToPath(new URL("../index.mjs", import.meta.url));
-const rawTouchableImportCases = [
-  {
-    label: "aliased React Native Pressable import",
-    source: 'import { Pressable as NativePressable } from "react-native";',
-  },
-  {
-    label: "legacy RNGH touchable import",
-    source: 'import { TouchableOpacity } from "react-native-gesture-handler";',
-  },
-  {
-    label: "React Native namespace import",
-    source: 'import * as ReactNative from "react-native";',
-  },
-  {
-    label: "named re-export",
-    source: 'export { Pressable as Button } from "react-native";',
-  },
-  {
-    label: "RNGH namespace re-export",
-    source: 'export * from "react-native-gesture-handler";',
-  },
-  {
-    label: "React Native Button import",
-    source: 'import { Button } from "react-native";',
-  },
-  {
-    label: "RNGH RectButton import",
-    source: 'import { RectButton } from "react-native-gesture-handler";',
-  },
-  {
-    label: "React Native default re-export",
-    source: 'export { default as RN } from "react-native";',
-  },
-];
-
 const schemaLibraryImportCases = [
   'import { z } from "zod"; z.string();',
   'import * as z from "zod/v4"; z.string();',
@@ -125,92 +90,6 @@ describe("Oxlint plugin", () => {
     );
 
     expect(result.status).toBe(0);
-  });
-
-  it.each(rawTouchableImportCases)(
-    "rejects $label with owner advice when no owner is configured",
-    ({ source }) => {
-      const result = lint(source, {
-        "antidrift/no-raw-react-native-touchables": "error",
-      });
-      const output = `${result.stdout}${result.stderr}`;
-
-      expect(result.status).toBe(1);
-      expect(output).toContain("antidrift(no-raw-react-native-touchables)");
-      expect(output).toMatch(/create one shared Touchable module/iu);
-      expect(output).toContain(
-        "set that module as this rule's owner in allowedFiles"
-      );
-    }
-  );
-
-  it.each(rawTouchableImportCases)(
-    "rejects $label outside the configured owner",
-    ({ source }) => {
-      const ownedLint = lint(source, {
-        "antidrift/no-raw-react-native-touchables": [
-          "error",
-          { allowedFiles: ["apps/client/src/tw/index.tsx"] },
-        ],
-      });
-      const output = `${ownedLint.stdout}${ownedLint.stderr}`;
-
-      expect(ownedLint.status).toBe(1);
-      expect(output).toContain("antidrift(no-raw-react-native-touchables)");
-      expect(output).toMatch(/import the shared Touchable/iu);
-      expect(output).toContain("choose a named feedback preset");
-    }
-  );
-
-  it("allows non-touchable platform imports and the shared primitive", () => {
-    const result = lint(
-      [
-        'import { View } from "react-native";',
-        'import { Gesture } from "react-native-gesture-handler";',
-        'import { Touchable } from "@/tw";',
-        'import type { TouchableOpacityProps } from "react-native";',
-        'export type { TouchableOpacityProps as LegacyProps } from "react-native";',
-      ].join("\n"),
-      { "antidrift/no-raw-react-native-touchables": "error" }
-    );
-
-    expect(result.status).toBe(0);
-  });
-
-  it("allows raw touchable imports only in a registered owner file", () => {
-    const result = lint(
-      [
-        'import { Pressable } from "react-native";',
-        'import { Touchable } from "react-native-gesture-handler";',
-      ].join("\n"),
-      {
-        "antidrift/no-raw-react-native-touchables": [
-          "error",
-          { allowedFiles: ["apps/client/src/tw/index.tsx"] },
-        ],
-      },
-      "apps/client/src/tw/index.tsx"
-    );
-
-    expect(result.status).toBe(0);
-  });
-
-  it("rejects an underqualified owner filename", () => {
-    const result = lint(
-      'import { Pressable } from "react-native";',
-      {
-        "antidrift/no-raw-react-native-touchables": [
-          "error",
-          { allowedFiles: ["index.tsx"] },
-        ],
-      },
-      "index.tsx"
-    );
-
-    expect(result.status).toBe(1);
-    expect(`${result.stdout}${result.stderr}`).toContain(
-      "allowedFiles entries must be exact repository-relative owner paths"
-    );
   });
 
   it("runs an extracted syntax rule", () => {

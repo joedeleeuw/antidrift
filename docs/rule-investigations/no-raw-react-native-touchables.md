@@ -1,5 +1,9 @@
 # `no-raw-react-native-touchables`
 
+Retired as a custom implementation. `createGovernanceOxlintConfig` now emits `no-restricted-imports` patterns from its maintained React Native/RNGH primitive inventory. The policy stays inert unless the consumer supplies `policy/registries/react-native.yaml` with `replacementImport` and at least one exact `allowedFiles` owner path. Type-only imports and re-exports stay clean; namespace/default imports and named/namespace re-exports remain covered. The published identifier and replacement remain in `policy/registries/rules.yaml`.
+
+The investigation below records the original drift and the migration evidence.
+
 ## Original failure mode
 
 Murderbox had one intended interaction authority but 140 production `Pressable` call sites, raw React Native imports, a legacy `TouchableHighlight` wrapper, and feedback encoded independently through active class strings and functional pressed-state rendering. That made ordinary button behavior capable of drifting across iOS, Android, browser web, and Electron even though the product intended one shared renderer and one native-backed interaction policy.
@@ -17,7 +21,7 @@ The import or re-export syntax is the policy violation. The rule requires no typ
 
 `allowedFiles` contains exact repository-relative owner paths with at least one directory segment and no glob, parent, or absolute-path syntax. Each entry matches either the whole normalized filename or that fully qualified repository-relative suffix. The rule does not infer owners from component names and does not allow feature-level exceptions. A legitimate router-link or custom-gesture exception belongs behind a narrow app-owned adapter in a registered owner file.
 
-Every React Native repository routes presses through one shared Touchable. With no `allowedFiles` entry configured, the rule still reports every raw import, and the message tells the repository to create one shared Touchable module, import it everywhere instead, and register that module in `allowedFiles` so the owner file alone may import the raw primitives.
+Every React Native repository routes presses through one shared Touchable. With no `react-native.yaml`, the restriction is inert. Once that policy is present, `replacementImport` and at least one exact `allowedFiles` owner path are required; incomplete policy fails during config creation rather than silently permitting raw imports.
 
 ## Desired replacement
 
@@ -25,7 +29,7 @@ Import the shared `Touchable`, choose a named feedback preset, and preserve sema
 
 ## Ecosystem comparison
 
-Oxlint's core `no-restricted-imports` can express named import restrictions and file overrides. It remains the closest config replacement. This custom rule keeps ownership because the reusable policy spans two packages, a maintained forbidden primitive set, namespace/default bypasses, re-exports, exact owner-file registration, and one remediation message describing feedback presets and adapter ownership. If core configuration gains an equally maintainable shared policy surface, retire the custom implementation rather than running both.
+Oxlint's core `no-restricted-imports` now owns the import and re-export detector. Antidrift retains the maintained primitive inventory and translates the consumer's optional `react-native.yaml` into import patterns and owner-file overrides. Exact owner paths become fully qualified suffix globs because Oxlint's native override matcher accepts that form across config locations. Example and test exclusions, type-only allowances, and remediation through the declared app-owned module are preserved; no custom touchable rule remains.
 
 ## Real corpus evidence
 

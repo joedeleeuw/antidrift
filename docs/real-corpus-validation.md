@@ -39,6 +39,11 @@ This command is for non-Chaski research when the primary corpus has only clean c
 | `murderbox`         | `MURDERBOX_REPO` or `/Users/sushi/code/murderbox`                 | Redundant Zod parse evidence across API route and server boundary code.                    |
 | `cloudflare-agents` | `CLOUDFLARE_AGENTS_REPO` or `/Users/sushi/code/cloudflare-agents` | SQL/fetch/effect controls plus known-gap deserialize and sanitized SQL identifier cases.   |
 | `opencode`          | `OPENCODE_REPO` or `/Users/sushi/code/opencode`                   | Unsafe deserialize evidence plus Drizzle SQL-tag and local SQL escaper clean controls.     |
+| `xai-sdk-ts`        | `XAI_SDK_TS_REPO` or `/Users/sushi/code/xai-sdk-ts`               | Nominal-brand clean control, tag-only predicates, and broad-input cast drift.              |
+| `letraz`            | `LETRAZ_REPO` or `/Users/sushi/code/letraz`                       | Spread and direct-factory owned-registration type-argument drift.                          |
+| `neblir`            | `NEBLIR_REPO` or `/Users/sushi/code/neblir`                       | Direct Zod identity-transform drift.                                                       |
+| `lightdash`         | `LIGHTDASH_REPO` or `/Users/sushi/code/lightdash`                 | Independent nullable positional date-range tuple drift.                                    |
+| `reflet`            | `REFLET_REPO` or `/Users/sushi/code/reflet`                       | JSON Schema used in a prompt rather than transcoded into a Convex validator.               |
 
 For a promotion or slice-completion claim that needs broader evidence, run the relevant named corpora independently and retain their reports. Require a selected checkout explicitly when absence must fail:
 

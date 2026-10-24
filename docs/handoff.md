@@ -16,8 +16,9 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 
 - `policy/agent-guardrails.yaml` is the editable source of truth.
 - `tooling/antidrift` is the `@joedeleeuw/antidrift` package; `antidrift generate` (src/policy/) produces agent instruction files and hook configs.
-- `tooling/antidrift/src/oxlint-config` owns focused registry, suppression, module-size, and syntax-rule governance plus the immutable complexity fragment.
-- `oxlint.config.mts` owns this repository's generic native, type-aware, architecture, and scoped complexity policy.
+- `@joedeleeuw/typescript-tooling` owns generic native and third-party TypeScript, Oxlint, and ESLint defaults.
+- `tooling/antidrift/src/oxlint-config` owns focused registry, suppression, module-size, generated-selector, and custom-syntax governance.
+- `oxlint.config.mts` owns this repository's architecture and scoped complexity policy, composing the shared tooling and Antidrift factories.
 - `tooling/antidrift/src/oxlint-plugin` contains syntax-only custom rules supported by Oxlint.
 - `tooling/antidrift/src/eslint-plugin` retains custom rules requiring TypeScript `Program` or `TypeChecker` data.
 - The root ESLint config consumes the eight-rule `@joedeleeuw/antidrift/eslint-config` TypeChecker pass.
@@ -30,7 +31,7 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - `docs/rule-status-registry.md` defines the vocabulary the rule status registry uses.
 - `docs/source-ledger.md` records where pulled rules, custom rules, rulesets, tools, and borrowed repo references came from.
 - `docs/real-corpus-validation.md` tracks which implemented custom rules have real Chaski-backed or fallback real-corpus evidence, and which rules remain under-proven.
-- `docs/gap-inventory.md` is the synthesized current gap surface across active rule maturity, broad policy coverage, real-corpus blockers, and retired/research boundaries.
+- `policy/registries/rules.yaml` owns current rule maturity, ecosystem ownership, corpus evidence gaps, and retirement decisions; do not recreate a hand-maintained gap inventory.
 - `docs/self-hosting-risks.md` records the self-linting failure modes and which layer owns each control.
 - `docs/roadmap.md` is limited to the hardened rules and chosen next scope: branded casts, appeasement casts, structural selector wrappers, status-triplet handling, unsafe-deserialize type signals, defensive shape probing, brand utilities, and cycle detection.
 

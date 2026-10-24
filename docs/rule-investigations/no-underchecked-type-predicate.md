@@ -4,6 +4,8 @@
 
 Implemented as `antidrift/no-underchecked-type-predicate`, enabled at error in the ESLint config (directive G2). A literal tag proves a variant, and so its payload, only when the value it is read from is already a closed union; read from raw `any`/`unknown`/open-record input, or through a type assertion, the predicate must also check the asserted payload fields. On the 70 local roots of the October 2026 rules review it reports 9 findings in 4 repositories with resolved dependencies, 8 true positives, plus 1 true positive in mrp (89%, every repository at or above 80%). See [Tag checks on raw input](#tag-checks-on-raw-input).
 
+Current XAI default-branch evidence adds five tag-only predicate findings across `src/porcelain.ts` and `src/stream.ts`. `APIError.is` is a clean nominal-brand control: its `BRAND in err` check and the asserted class's `[BRAND]` property resolve to the same symbol. Arbitrary string `in` checks and capability probes are not nominal-brand proof.
+
 ## Scope
 
 Detect functions that claim `x is T` or `asserts x is T` while only performing weak runtime checks on broad input such as `unknown`, `any`, `object`, or `Record<string, unknown>`.
@@ -32,7 +34,7 @@ Changes:
 4. A helper called with the predicate value and a literal key (`hasString(value, "text")`) checks that key.
 5. A parameter whose declared type does not resolve (TypeScript's error type, e.g. a broken global re-export) is not raw input.
 
-The other proof exemptions are unchanged: `instanceof`, delegated type predicates (Effect `Schema.is`, `Predicate.isTagged`), schema validator delegation, `Reflect.get` reads, `in` checks and destructured field checks.
+The other proof exemptions are `instanceof`, delegated type predicates (Effect `Schema.is`, `Predicate.isTagged`), schema validator delegation, `Reflect.get` reads, destructured field checks, and nominal brands whose computed property symbol matches the symbol used in the `in` check. Arbitrary string `in` checks and capability probes are not brand proof.
 
 ### Measurement
 
@@ -59,7 +61,7 @@ Known adjacent rules:
 - `@typescript-eslint/no-unnecessary-condition` can flag impossible or redundant conditions.
 - `@typescript-eslint/no-redundant-type-constituents` catches useless union/intersection constituents.
 
-These do not prove that a custom type predicate actually validates the asserted target type. No ecosystem replacement has been found; keep the custom rule at warn until corpus evidence proves the required-field drift threshold.
+These do not prove that a custom type predicate actually validates the asserted target type. No ecosystem replacement has been found. Keep the custom rule enabled at error with `stable: false` while known false-positive classes and independent replication remain open.
 
 ## Custom Solve
 
@@ -149,6 +151,6 @@ Claude Opus 4.8 advisory review on June 15, 2026 (`reports/claude-rule-review-no
 
 ## Promotion Conditions
 
-- Another real repository contains an under-checked `x is T` or `asserts x is T` drift case that misses required asserted fields. Current status: unsatisfied.
+- Another real repository contains an under-checked `x is T` or `asserts x is T` drift case that misses required asserted fields. Current status: satisfied by XAI's five tag-only predicates. Stable promotion still needs review of the remaining false-positive classes and independent evidence.
 - Another real repository contains clean validator-backed and discriminant-only controls. Codebase Atlas now supplies additional clean controls for alias-backed field checks, primitive predicates, and third-party union predicates.
 - Claude Opus 4.8 review has read the narrowed rule code and corpus cases; rerun advisory review before promotion if new required-field drift appears.

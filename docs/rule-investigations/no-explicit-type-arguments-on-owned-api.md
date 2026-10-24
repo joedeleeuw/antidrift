@@ -34,8 +34,11 @@ TypeChecker symbol resolution, never name matching:
 2. Owner existence proof:
    - Convex: the first argument is a member chain rooted at an import whose
      source ends with `convex/_generated/api`.
-   - TanStack: the first argument resolves (identifier, or `.queryKey` member
-     access) to a `queryOptions(...)` / `mutationOptions(...)` call result.
+   - TanStack: the first argument resolves through identifiers, `.queryKey`
+     access, direct registration factories, or all-spread objects to a
+     `queryOptions(...)` / `mutationOptions(...)` registration. Every spread
+     must resolve to a registration, so an ordinary property or unproven spread
+     cannot replace the owner's query function or key and still claim its inference.
 3. Any explicit type argument on such a call reports.
 
 A locally declared function that merely shares the name `useQuery` is not
@@ -48,8 +51,10 @@ to the real package.
   registration exists to own the result.
 - Inline options objects (`useQuery<T>({ queryKey, queryFn })`) stay silent:
   the call site is the definition site, not a registered owner.
-- Wrapper hooks around `useQuery` are not followed; the registration chain
-  would be speculative.
+- Ordinary fields or unproven spreads beside a registration stay silent because
+  they can override its query function or key.
+- Arbitrary wrapper hooks around `useQuery` are not followed; only direct
+  factories returning a recognized registration are resolved.
 
 ## Ecosystem check (2026-08-10)
 
@@ -62,5 +67,8 @@ No other maintained rule models generated-API or registration ownership.
 
 - Murderbox (`apps/client`): clean-run control — zero explicit type arguments
   on Convex or TanStack owned calls across the app.
+- Letraz `lib/skill/queries.ts`: the first real drift. The current default-branch
+  run reports the spread registration at line 17 and direct factories at lines
+  34 and 51. This is one real drift repository, not independent replication.
 - Synthetic drift fixtures cover both owner sources and the name-collision
   guard.

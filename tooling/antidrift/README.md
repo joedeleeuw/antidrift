@@ -6,7 +6,7 @@ Regular linters check syntax and a handful of correctness rules. They don't noti
 
 antidrift writes those patterns down as deterministic rules so the machine catches them instead of you.
 
-Oxlint owns syntax-only custom rules and shared governance. ESLint owns the custom rules that need TypeScript's `Program` and `TypeChecker`. Portable rules may be exported by both plugins, but each rule runs through only one configured runtime. Generic TypeScript, React, Vitest, Unicorn, import-style, and repository-boundary policy belongs to each consumer.
+Oxlint owns syntax-only custom rules and shared governance. ESLint owns the custom rules that need TypeScript's `Program` and `TypeChecker`. Portable rules may be exported by both plugins, but each rule runs through only one configured runtime. Generic TypeScript and maintained third-party rules belong to `@joedeleeuw/typescript-tooling`; consumer-specific React, Vitest, import-style, and repository-boundary policy stays in each consumer's config.
 
 The positive pattern behind the rules is one owner per concept: domain owns business vocabulary, contracts own wire schemas, API boundaries validate and authorize, gateways own SDKs, and UI consumes resource/result unions instead of local duplicate shapes.
 
@@ -16,18 +16,16 @@ The positive pattern behind the rules is one owner per concept: domain owns busi
 
 For example, `const loadItems = (id) => owner.load(id)` reports; call `owner.load(id)` directly at its callers. `button.onClick(() => owner.load(id))` remains a callback with deferred execution. For a subscription API, `useSyncExternalStore(subscribeToConsent, getSnapshot)` is the valid direct substitution only when `subscribeToConsent` has the adapter's signature and receiver semantics; do not replace a required stable adapter with a new inline arrow or `.bind`. ESLint-only consumers can enable the same rule through the ESLint plugin; do not enable it in both lint runtimes.
 
-The presets also enforce one rule per shared AGENT.md directive, each recorded with its directive ID in `policy/registries/rules.yaml`: `antidrift/no-fallback-to-empty` (G7), `antidrift/no-else-if-chain` (G9), `antidrift/no-hash-literal` (S1), `antidrift/no-host-path-literal` (S4) and `antidrift/no-dated-comments` (S5) in Oxlint, and `antidrift/no-vague-names` (G21), `antidrift/no-pass-through-parameters` (G22) and `antidrift/no-compat-names` (G5) in the ESLint pass. G8 maps to native `no-nested-ternary`, which the generic tooling package owns.
+The presets also enforce one rule per shared AGENT.md directive, each recorded with its directive ID in `policy/registries/rules.yaml`: `antidrift/no-fallback-to-empty` (G7), `antidrift/no-hash-literal` (S1) and `antidrift/no-dated-comments` (S5) in Oxlint, and `antidrift/no-vague-names` (G21), `antidrift/no-pass-through-parameters` (G22) and `antidrift/no-compat-names` (G5) in the ESLint pass. G8 maps to native `no-nested-ternary`, owned by `@joedeleeuw/typescript-tooling`. G9 maps to `unicorn-js/prefer-switch` there. S4 maps to generated host-path selectors enforced by `governance-eslint/no-restricted-syntax`.
 
 The ESLint pass also enforces these syntax rules at error, exported by both plugins but configured only in ESLint:
 
 - G15 test independence: `antidrift/no-nonindependent-test-oracle`, `antidrift/no-validator-output-oracle`, `antidrift/no-schema-library-in-test`
 - W4 type reuse: `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-duplicated-object-field-blocks`, `antidrift/no-redeclared-owned-union`
-- G4 boundary decoding: `antidrift/no-open-dictionary-at-boundary`, `antidrift/unknown-input-must-be-decoded`
+- G4 boundary decoding: `antidrift/unknown-input-must-be-decoded`
 - G7 loud failure: `antidrift/no-sentinel-absence-fallback`, `antidrift/no-silent-empty-detection-fallback`
-- G11 one owner per concern: `antidrift/no-raw-fetch-in-component`, `antidrift/no-raw-react-native-touchables`
+- G11 one owner per concern: `antidrift/no-raw-fetch-in-component`
 - React and markup hygiene: `antidrift/no-calling-components-as-functions`, `antidrift/no-duplicated-conditional-classnames`
-
-`antidrift/no-raw-react-native-touchables` reports every raw React Native or gesture-handler touchable import until a repository creates one shared Touchable module and registers it as the rule's owner (`allowedFiles`); the owner file alone may then import the raw primitives.
 
 The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-bag-reshaper`, `antidrift/no-redundant-zod-parse`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-restated-dependency-type`, `antidrift/no-unresolved-dependency-types`, `antidrift/no-redundant-local-return-type`, `antidrift/no-service-constructor-imports` and `antidrift/no-sql-string-concat` at error.
 
@@ -45,12 +43,10 @@ eslint . \
   --suppress-rule antidrift/no-restated-dependency-type \
   --suppress-rule antidrift/no-duplicated-object-field-blocks \
   --suppress-rule antidrift/no-redeclared-owned-union \
-  --suppress-rule antidrift/no-open-dictionary-at-boundary \
   --suppress-rule antidrift/unknown-input-must-be-decoded \
   --suppress-rule antidrift/no-sentinel-absence-fallback \
   --suppress-rule antidrift/no-silent-empty-detection-fallback \
   --suppress-rule antidrift/no-raw-fetch-in-component \
-  --suppress-rule antidrift/no-raw-react-native-touchables \
   --suppress-rule antidrift/no-calling-components-as-functions \
   --suppress-rule antidrift/no-duplicated-conditional-classnames \
   --suppress-rule antidrift/no-bag-reshaper \
@@ -118,7 +114,9 @@ export default [
 
 The antidrift preset also parses every `package.json` with ESLint's JSON language (`@eslint/json`, a dependency of this package). `antidrift/no-unresolved-dependency-types` is enabled at error in that block and in the TypeScript block, independent of `antidrift/no-restated-dependency-type`: it reports a declared dependency that is not installed, or a workspace or linked dependency with a public entry that does not resolve to type declarations, on its manifest key, and each import of a declared package whose types do not resolve at the import. Spreading `createConfig()` supplies the language for `**/package.json`, so `eslint .` reports those gaps with no further setup. These reports stay out of the suppression ratchet above; a gap closes when the dependency is installed or built. ESLint 9.38 or later is required, as for the rest of the preset.
 
-`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, `antidrift/no-async-array-method`, `antidrift/no-handrolled-resource-lifecycle-cells`, `antidrift/no-status-literal-in-type`, `antidrift/no-repo-state-mirror-assertion`, and the imported rules for unknown aliases and chained assertions. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. `antidrift/require-authz-check` remains registered as default-off inventory. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services and the ratcheted syntax rules above, and keeps `no-sql-string-concat` as explicit default-off inventory. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
+`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, `antidrift/no-async-array-method`, `antidrift/no-handrolled-resource-lifecycle-cells`, `antidrift/no-status-literal-in-type`, `antidrift/no-repo-state-mirror-assertion`, and the imported rules for unknown aliases and chained assertions. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. `antidrift/require-authz-check` is enabled with registry-derived authorization functions and stays inert until they are configured. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services, the ratcheted syntax rules above, and `no-sql-string-concat` at error. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
+
+For the aggressive property-default policy, pass `enforceNoPropertyDefaultFallbacks: true` to both factories. `typescript-tooling` then owns Rika's rule, the ESLint config disables `no-sentinel-absence-fallback`, and both configs retain only no-substitution template-literal sentinel selectors. `propertyDefaultAllowedFiles` supplies repository-relative exceptions to the two Oxlint factories. No broad Rika preset is enabled.
 
 Oxlint excludes generated output only when its exact file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Generated-looking names are ordinary linted code unless the registry owns them.
 
@@ -319,7 +317,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 
 - `require-effect-deps` — a `useEffect` with no dependency array runs on every render, and `exhaustive-deps` won't say a word about it
 - `no-static-property-loop` — tests that loop over hardcoded keys only to restate one precomputed object's static values
-- `no-raw-react-native-touchables` — one shared Touchable per React Native app: raw React Native/RNGH interaction imports, namespace/default bypasses, and re-exports report outside the exact owner files in `allowedFiles`, and with no owner configured every raw import reports with advice to create and register one
+- React Native interaction ownership — an optional `react-native.yaml` drives `no-restricted-imports` for raw React Native/RNGH interaction imports, namespace/default bypasses, and re-exports. `replacementImport` names the shared module and exact `allowedFiles` exempt only its owners; without that registry the restriction is inert
 - `no-schema-library-in-test` — test-file guard against value imports from runtime-schema libraries; type-only imports remain valid
 - `no-validator-output-oracle` — local-flow guard against assertions whose subject is direct runtime-validator output
 - `no-nonindependent-test-oracle` — rejects test assertions that compare a binding to itself, to an arranged input literal/fixture, or to a `response.json()` shape that statically repeats a same-test mock arrangement

@@ -186,9 +186,55 @@ function isRegistrationFactoryCall(checker, tsNode) {
   return false;
 }
 
+function singleReturnExpression(body) {
+  if (!body || body.statements.length !== 1) return null;
+  const [statement] = body.statements;
+  return ts.isReturnStatement(statement)
+    ? (statement.expression ?? null)
+    : null;
+}
+
+function directFactoryResult(declaration) {
+  const callable = ts.isVariableDeclaration(declaration)
+    ? declaration.initializer
+    : declaration;
+  if (ts.isArrowFunction(callable) || ts.isFunctionExpression(callable)) {
+    return ts.isBlock(callable.body)
+      ? singleReturnExpression(callable.body)
+      : callable.body;
+  }
+  if (ts.isFunctionDeclaration(callable)) {
+    return singleReturnExpression(callable.body);
+  }
+  return null;
+}
+
 function resolvesToRegistration(checker, tsNode, depth = 6) {
   if (!tsNode || depth <= 0) return false;
-  if (isRegistrationFactoryCall(checker, tsNode)) return true;
+  if (ts.isCallExpression(tsNode)) {
+    if (isRegistrationFactoryCall(checker, tsNode)) return true;
+    const symbol = resolveAliasedSymbol(
+      checker,
+      checker.getSymbolAtLocation(tsNode.expression)
+    );
+    for (const declaration of symbol?.declarations ?? []) {
+      if (
+        isRegistrationFactoryCall(checker, directFactoryResult(declaration))
+      ) {
+        return true;
+      }
+    }
+  }
+  if (ts.isObjectLiteralExpression(tsNode)) {
+    return (
+      tsNode.properties.length > 0 &&
+      tsNode.properties.every(
+        (property) =>
+          ts.isSpreadAssignment(property) &&
+          resolvesToRegistration(checker, property.expression, depth - 1)
+      )
+    );
+  }
   if (
     ts.isPropertyAccessExpression(tsNode) &&
     tsNode.name.text === "queryKey"
@@ -203,7 +249,7 @@ function resolvesToRegistration(checker, tsNode, depth = 6) {
     for (const declaration of symbol?.declarations ?? []) {
       if (
         declaration.initializer &&
-        isRegistrationFactoryCall(checker, declaration.initializer)
+        resolvesToRegistration(checker, declaration.initializer, depth - 1)
       ) {
         return true;
       }

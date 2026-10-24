@@ -14,20 +14,16 @@ The rule needs type and provenance proof. Syntax alone cannot distinguish a Zod 
 
 ## Detection boundary
 
-The rule reports only when all of these facts hold:
+TypeScript must resolve the called `transform` method to Zod. The rule then has two proof branches:
 
-- TypeScript resolves the called `transform` method to Zod.
-- The callback has one identifier or simple object-pattern parameter.
-- TypeScript resolves that parameter to a closed object type without string or number index signatures.
-- The callback returns one object literal, either implicitly or through one return statement.
-- Every output property passes through the same input property under the same key.
-- The output and input key sets match exactly.
+- Direct identity: one identifier parameter is returned directly, either as `value => value` or as the only statement in `function (value) { return value; }`. This does not require an object input and emits null shapes rather than pretending the key set is empty.
+- Exact object reconstruction: the callback has one identifier or simple object-pattern parameter, TypeScript resolves a closed object type without string or number index signatures, and the callback returns one object literal. Every output property passes through the same input property under the same key, and the input and output key sets match exactly.
 
 The rule abstains on unresolved or indexed shapes, readonly schema receivers, async or aliased callbacks, spreads, computed keys, methods, getters, noncanonical destructuring, added or dropped keys, renamed keys, and any default, coercion, derivation, or other value expression. Readonly transforms can unfreeze an object, and async transforms change the schema's parse contract, so neither is removable identity work.
 
 ## Ecosystem
 
-Zod documents `.transform()` as the API for changing schema output and distinguishes schema input from output types. Zod 4 also documents `.overwrite()` for transforms that preserve an inferred type. The ecosystem search found no maintained ESLint rule that combines Zod method ownership, a TypeChecker-resolved closed input shape, and exact pass-through reconstruction.
+Zod documents `.transform()` as the API for changing schema output and distinguishes schema input from output types. Zod 4 also documents `.overwrite()` for transforms that preserve an inferred type. The ecosystem search found no maintained ESLint rule that combines Zod method ownership with either direct identity or a TypeChecker-resolved closed input shape and exact pass-through reconstruction.
 
 - [Zod basics: input and output types](https://zod.dev/basics)
 - [Zod 4: `.overwrite()` for type-preserving transforms](https://zod.dev/v4)
@@ -36,6 +32,6 @@ Generic syntax selectors provide only partial coverage because they cannot prove
 
 ## Evidence and status
 
-The regression fixtures preserve the three supplied identity cases and every supplied clean case. The Murderbox decoder is the strongest false-positive control. An indexed Zod input fixture confirms that unresolved shapes remain clean.
+Neblir's `submitInitiativeBodySchema` at `src/app/lib/types/initiative.ts:19` is the first real direct-identity drift anchor. The current default-branch corpus run reports that transform with installed dependencies. Murderbox's conversation-index decoder remains the clean control: it derives, trims, defaults, clamps, fills, and coerces values rather than returning its input unchanged.
 
-The rule is enabled at error; a 54-repository corpus with 384 `.transform` calls reports 0 findings. It is not stable because the current evidence has no independently replicated real identity-transform drift.
+The rule is enabled at error and remains unstable because independently replicated real identity-transform drift is still absent. The earlier 54-repository, 384-call sweep measured the closed-object branch before direct identity was implemented; it is not evidence that the new branch was exercised.

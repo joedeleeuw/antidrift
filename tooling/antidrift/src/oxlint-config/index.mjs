@@ -4,6 +4,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { defineConfig } from "oxlint";
 
 import { loadRegistriesSync } from "../policy/lib/registries.mjs";
+import { templateSentinelSelectors } from "../policy/lib/property-default-fallbacks.mjs";
 
 const javascriptPlugins = [
   {
@@ -12,6 +13,72 @@ const javascriptPlugins = [
       new URL("../oxlint-plugin/index.js", import.meta.url)
     ),
   },
+  {
+    name: "governance-eslint",
+    specifier: fileURLToPath(new URL("./eslint-builtins.mjs", import.meta.url)),
+  },
+];
+
+const touchableImports = new Map([
+  [
+    "react-native",
+    new Set([
+      "Button",
+      "Pressable",
+      "TouchableHighlight",
+      "TouchableNativeFeedback",
+      "TouchableOpacity",
+      "TouchableWithoutFeedback",
+    ]),
+  ],
+  [
+    "react-native-gesture-handler",
+    new Set([
+      "BaseButton",
+      "BorderlessButton",
+      "LegacyBaseButton",
+      "LegacyBorderlessButton",
+      "LegacyPressable",
+      "LegacyRawButton",
+      "LegacyRectButton",
+      "Pressable",
+      "RawButton",
+      "RectButton",
+      "Touchable",
+      "TouchableHighlight",
+      "TouchableNativeFeedback",
+      "TouchableOpacity",
+      "TouchableWithoutFeedback",
+    ]),
+  ],
+]);
+
+const hostPathSelectors = [
+  {
+    selector: "Literal[value=/^\\/(?:Users|home)\\/(?!linuxbrew\\/)[^/]+\\//]",
+    message:
+      "Host-absolute path literal. Resolve the path from the home directory, the repository root, or configuration.",
+  },
+  {
+    selector:
+      "TemplateLiteral[expressions.length=0] > TemplateElement[value.cooked=/^\\/(?:Users|home)\\/(?!linuxbrew\\/)[^/]+\\//]",
+    message:
+      "Host-absolute path literal. Resolve the path from the home directory, the repository root, or configuration.",
+  },
+];
+
+const applicationExclusionFiles = [
+  "**/examples/**",
+  "**/example/**",
+  "**/__tests__/**",
+  "**/*.{test,spec}.{js,jsx,ts,tsx,mts,cts,mjs,cjs}",
+];
+
+const hostPathExclusionFiles = [
+  ...applicationExclusionFiles,
+  "**/*.stories.{js,jsx,ts,tsx,mts,cts,mjs,cjs}",
+  "**/__mocks__/**",
+  "**/e2e/**",
 ];
 
 const additionalAntidriftRules = {
@@ -67,13 +134,11 @@ const additionalAntidriftRules = {
   "antidrift/no-placeholder-tests": "error",
   "antidrift/no-unlisted-external-imports": "error",
   "antidrift/no-dated-comments": "error",
-  "antidrift/no-else-if-chain": "error",
   "antidrift/no-fallback-to-empty": [
     "error",
     { excludeFiles: ["**/fixtures/**"] },
   ],
   "antidrift/no-hash-literal": "error",
-  "antidrift/no-host-path-literal": "error",
   "antidrift/no-async-array-method": "error",
   "antidrift/no-handrolled-resource-lifecycle-cells": "error",
   "antidrift/no-repo-state-mirror-assertion": "error",
@@ -169,9 +234,148 @@ function gatewayWrapperOverrides(registries, generatedPatterns) {
     }));
 }
 
+function normalizedOwnerPath(ownerPath) {
+  if (typeof ownerPath !== "string") {
+    throw new TypeError(
+      "policy/registries/react-native.yaml allowedFiles entries must be exact repository-relative owner paths."
+    );
+  }
+  const normalized = ownerPath.replaceAll("\\", "/").replace(/^\.\//u, "");
+  if (
+    !normalized.includes("/") ||
+    normalized.startsWith("../") ||
+    normalized.startsWith("/") ||
+    /^[A-Za-z]:\//u.test(normalized) ||
+    /[!*?{}()[\]]/u.test(normalized)
+  ) {
+    throw new TypeError(
+      "policy/registries/react-native.yaml allowedFiles entries must be exact repository-relative owner paths containing at least one directory and no glob, parent, or absolute-path syntax."
+    );
+  }
+  return normalized;
+}
+
+function reactNativePolicyFor(policy) {
+  if (!policy || Object.keys(policy).length === 0) return null;
+  if (
+    typeof policy.replacementImport !== "string" ||
+    policy.replacementImport.trim().length === 0
+  ) {
+    throw new TypeError(
+      "policy/registries/react-native.yaml replacementImport must name the app-owned interaction module."
+    );
+  }
+  if (!Array.isArray(policy.allowedFiles) || policy.allowedFiles.length === 0) {
+    throw new TypeError(
+      "policy/registries/react-native.yaml allowedFiles must name at least one exact owner file."
+    );
+  }
+  return {
+    replacementImport: policy.replacementImport,
+    allowedFiles: policy.allowedFiles.map(
+      (file) => `**/${normalizedOwnerPath(file)}`
+    ),
+  };
+}
+
+function touchableImportPatterns(reactNativePolicy) {
+  if (!reactNativePolicy) return [];
+  return [...touchableImports].map(([source, names]) => ({
+    group: [source],
+    importNames: ["default", ...names],
+    allowTypeImports: true,
+    message: `Raw interaction primitive access from "${source}" bypasses the app-owned interaction policy. Import the shared Touchable from ${reactNativePolicy.replacementImport} and choose a named feedback preset.`,
+  }));
+}
+
+function touchableOwnerOverrides(reactNativePolicy, otherPatterns) {
+  return (reactNativePolicy?.allowedFiles ?? []).map((file) => ({
+    files: [file],
+    rules: {
+      "no-restricted-imports":
+        otherPatterns.length > 0 ? restrictedImportsRule(otherPatterns) : "off",
+    },
+  }));
+}
+
+function applicationExclusionOverrides(otherPatterns) {
+  return [
+    {
+      files: applicationExclusionFiles,
+      rules: {
+        "no-restricted-imports":
+          otherPatterns.length > 0
+            ? restrictedImportsRule(otherPatterns)
+            : "off",
+      },
+    },
+    {
+      files: hostPathExclusionFiles,
+      rules: { "governance-eslint/no-restricted-syntax": "off" },
+    },
+  ];
+}
+
+const disabledCategories = {
+  correctness: "off",
+  nursery: "off",
+  pedantic: "off",
+  perf: "off",
+  restriction: "off",
+  style: "off",
+  suspicious: "off",
+};
+
+const governanceIgnorePatterns = [
+  "**/node_modules/**",
+  "**/dist/**",
+  "**/coverage/**",
+  "reports/**",
+  "tooling/antidrift/src/oxlint-plugin/anti-slop/**",
+];
+
+const declarationIgnorePatterns = [
+  "**/*.d.ts",
+  "**/*.d.mts",
+  "**/*.d.cts",
+  "**/*.tsbuildinfo",
+];
+
+const governanceOptions = {
+  denyWarnings: true,
+  reportUnusedDisableDirectives: "error",
+};
+
+function propertyDefaultOverride(file) {
+  if (typeof file !== "string" || file.length === 0) {
+    throw new TypeError(
+      "propertyDefaultAllowedFiles entries must be non-empty repository-relative file patterns."
+    );
+  }
+  const pattern = file.replaceAll("\\", "/").replace(/^\.\//u, "");
+  const invalid = [
+    pattern.startsWith("/"),
+    /^[A-Za-z]:\//u.test(pattern),
+    pattern.split("/").includes(".."),
+  ].some(Boolean);
+  if (invalid) {
+    throw new TypeError(
+      `propertyDefaultAllowedFiles entries must stay relative to the repository; received ${file}.`
+    );
+  }
+  return {
+    files: [pattern.startsWith("**/") ? pattern : `**/${pattern}`],
+    rules: {
+      "governance-eslint/no-restricted-syntax": ["error", ...hostPathSelectors],
+    },
+  };
+}
+
 export function createGovernanceOxlintConfig({
   repoRoot = process.cwd(),
   policyDir = "policy",
+  enforceNoPropertyDefaultFallbacks = false,
+  propertyDefaultAllowedFiles = [],
 } = {}) {
   const registries = loadRegistriesSync(resolve(repoRoot, policyDir));
   const statuses = registries.domain?.statuses ?? {};
@@ -179,15 +383,25 @@ export function createGovernanceOxlintConfig({
     registries.boundaries?.requiredCalls?.authorization ?? [];
   const generatedIgnores = generatedIgnorePatterns(registries, repoRoot);
   const generatedPatterns = generatedImportPatterns(registries);
-  const restrictedImportPatterns = [
+  const reactNativePolicy = reactNativePolicyFor(registries.reactNative);
+  const otherPatterns = [
     ...generatedPatterns,
     ...gatewayImportPatterns(registries),
+  ];
+  const restrictedImportPatterns = [
+    ...otherPatterns,
+    ...touchableImportPatterns(reactNativePolicy),
   ];
   const rules = {
     "antidrift/require-effect-deps": "error",
     "antidrift/no-static-property-loop": "error",
     "antidrift/no-unknown-type-aliases": "error",
     "antidrift/no-unsafe-cast-chain": "error",
+    "governance-eslint/no-restricted-syntax": [
+      "error",
+      ...hostPathSelectors,
+      ...(enforceNoPropertyDefaultFallbacks ? templateSentinelSelectors : []),
+    ],
     ...additionalAntidriftRules,
     "antidrift/no-status-literal-in-type": ["error", { statuses }],
     "antidrift/require-authz-check": ["error", { authzFunctions }],
@@ -199,35 +413,22 @@ export function createGovernanceOxlintConfig({
   }
 
   return defineConfig({
-    categories: {
-      correctness: "off",
-      nursery: "off",
-      pedantic: "off",
-      perf: "off",
-      restriction: "off",
-      style: "off",
-      suspicious: "off",
-    },
+    categories: disabledCategories,
     ignorePatterns: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/coverage/**",
-      "reports/**",
-      "tooling/antidrift/src/oxlint-plugin/anti-slop/**",
+      ...governanceIgnorePatterns,
       ...generatedIgnores,
-      "**/*.d.ts",
-      "**/*.d.mts",
-      "**/*.d.cts",
-      "**/*.tsbuildinfo",
+      ...declarationIgnorePatterns,
     ],
     jsPlugins: javascriptPlugins,
-    options: {
-      denyWarnings: true,
-      reportUnusedDisableDirectives: "error",
-    },
+    options: governanceOptions,
     plugins: ["eslint", "typescript"],
     rules,
-    overrides: gatewayWrapperOverrides(registries, generatedPatterns),
+    overrides: [
+      ...gatewayWrapperOverrides(registries, generatedPatterns),
+      ...touchableOwnerOverrides(reactNativePolicy, otherPatterns),
+      ...applicationExclusionOverrides(otherPatterns),
+      ...propertyDefaultAllowedFiles.map(propertyDefaultOverride),
+    ],
   });
 }
 

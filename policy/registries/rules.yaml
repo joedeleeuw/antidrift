@@ -74,7 +74,7 @@ semanticFactKinds:
       - deterministic-enforcement
     emission:
       - blocking-diagnostic
-    association: Zod transform callbacks to closed schema input shapes and exact object pass-through reconstruction.
+    association: Zod transform callbacks to direct identity values or to closed schema input shapes with exact object pass-through reconstruction. Direct identity has null inputShape and outputShape because no key set is inspected.
     noSinkBehavior: The identity-transform diagnostic still reports; only the serialized semantic fact is skipped.
     payloadFields:
       - diagnostic
@@ -316,10 +316,10 @@ policyRuleReviews:
     nextAction: Keep the locked retired custom decision in place; use no-handrolled-resource-lifecycle-cells for semantic AST lifecycle proof.
   react/no-derived-state-effect:
     status: ecosystem-covered
-    replacement: react/react-compiler
-    coverage: Covered by Oxlint's React Compiler rule through its EffectDerivationsOfState diagnostic.
-    reason: The native compiler analysis reports values derived from props or state inside effects; custom code would duplicate that proof.
-    nextAction: Keep the native React Compiler rule enabled and retain the behavioral probe in migration evidence.
+    replacement: react-hooks-js/no-deriving-state-in-effects
+    coverage: Covered by the official React Hooks compiler through its EffectDerivationsOfState category, enabled explicitly by enforceNoDerivedStateEffects.
+    reason: The maintained compiler analysis reports values derived from props or state inside effects; custom code would duplicate that proof. Oxlint 1.89 has no react/react-compiler rule, so the official JavaScript plugin runs under the react-hooks-js alias.
+    nextAction: Keep the rule opt-in through typescript-tooling and retain the real derived-state and clean-effect probes in packed-consumer evidence.
   react/no-effect-fetch-waterfall:
     status: research
     coverage: Partially pressured by antidrift/no-raw-fetch-in-component, but no separate waterfall rule exists.
@@ -519,16 +519,16 @@ policyRuleReviews:
     status: ecosystem-covered
     directive: G8
     replacement: no-nested-ternary
-    coverage: Native no-nested-ternary is generic enforcement owned by @joedeleeuw/typescript-tooling (its eslint adoption preset); this repository enables it in the root oxlint.config.mts.
+    coverage: Native no-nested-ternary is generic enforcement owned and enabled by @joedeleeuw/typescript-tooling.
     reason: The maintained rule matches the directive exactly, and Antidrift 0.15 leaves generic native rules to typescript-tooling.
-    nextAction: Make no-nested-ternary a typescript-tooling default so consumers get G8 without opting into an adoption preset.
+    nextAction: Keep no-nested-ternary as a typescript-tooling default; do not duplicate it in the Antidrift repository config.
   simplicity/no-else-if-chain:
-    status: active-custom
+    status: ecosystem-covered
     directive: G9
-    antidriftRule: antidrift/no-else-if-chain
-    coverage: Default error for if/else-if chains of four or more branches whose equality tests share one discriminant.
-    reason: A long chain over one value is an undeclared case space.
-    nextAction: Keep enabled by default.
+    replacement: unicorn-js/prefer-switch (Unicorn prefer-switch) with minimumCases 4
+    coverage: typescript-tooling loads eslint-plugin-unicorn as unicorn-js and owns prefer-switch for chains of four or more branches whose strict-equality tests share one discriminant.
+    reason: A long chain over one value is an undeclared case space; switch is an accepted declaration form and strict equality is now required. Oxlint 1.89 has no native prefer-switch rule, so the JavaScript plugin is intentional.
+    nextAction: Keep unicorn-js/prefer-switch enabled in typescript-tooling; do not recreate the custom chain detector.
   provenance/no-hash-literal:
     status: active-custom
     directive: S1
@@ -537,12 +537,12 @@ policyRuleReviews:
     reason: Hash pins of repo content go stale silently and duplicate what version control already proves.
     nextAction: Keep enabled by default.
   provenance/no-host-path-literal:
-    status: active-custom
+    status: generated-config
     directive: S4
-    antidriftRule: antidrift/no-host-path-literal
-    coverage: Default error for /home/<user>/ and /Users/<user>/ string literals outside test files.
-    reason: Host-absolute paths tie code to one machine.
-    nextAction: Keep enabled by default.
+    replacement: no-restricted-syntax with host-path selectors and file exclusions
+    coverage: Generated selectors for string literals and no-substitution template text, excluding Linuxbrew and test/story/mock/e2e paths.
+    reason: Host-absolute paths tie code to one machine; the policy is deterministic syntax and does not need a custom rule implementation.
+    nextAction: Keep generated selectors and exclusions aligned with the former rule's behavior.
   provenance/no-dated-comments:
     status: active-custom
     directive: S5
@@ -1031,21 +1031,23 @@ rules:
       association: Tuple element positions to direct optional/nullish syntax, or to TypeChecker-resolved nullable aliases when parser services are available.
       blockingThreshold: A tuple type reports only when two or more tuple slots are optional, directly nullish, or TypeChecker-resolved to include null or undefined.
       ecosystemComparison: No maintained TypeScript ESLint rule covers the narrow smell of multi-slot nullable positional tuples without banning ordinary tuple use.
-      corpusEvidence: Chaski supplies one real drift, `CustomRange = [Date | null, Date | null]`, plus one clean control for a non-null numeric coordinate pair.
-      realCorpusInventory: "docs/rule-investigations/no-nullable-positional-tuple.md records the documented broad Chaski frontend inventory count: one finding across 1,533 files. No saved report artifact is currently checked in for this count."
+      corpusEvidence: Chaski supplies `CustomRange = [Date | null, Date | null]` and Lightdash independently supplies `MetricExplorerPartialDateRange = [Date | null, Date | null]` at packages/common/src/types/metricsExplorer.ts:32. Chaski also supplies a clean non-null numeric coordinate pair.
+      realCorpusInventory: "docs/rule-investigations/no-nullable-positional-tuple.md records the documented broad Chaski frontend inventory count: one finding across 1,533 files. The current Lightdash default-branch checkout adds a second real drift anchor through the external-corpus runner. No saved report artifact is checked in for the Chaski count."
       realCorpusInventoryRefs:
         - docs/rule-investigations/no-nullable-positional-tuple.md
         - docs/rule-roadmap.md
         - docs/rule-status-registry.md
         - docs/real-corpus-validation.md
+        - docs/field-notes/2026-10-23.md
+        - tooling/antidrift/src/policy/external-corpus/cases.mjs
       replicationsNotIntroducedForTest: true
       knownFalsePositives: 0
       knownFalseNegatives: Alias and generic-chain nullability are missed without TypeScript parser services; imported owner range aliases are intentionally out of scope unless redeclared as local tuple syntax.
-      productionConcerns: Evidence is precise but low-yield and Chaski-only. Keep default-off until another real nullable or optional multi-slot tuple appears with real-corpus clean controls for ordinary tuples, hook tuples, imported owner aliases, arrays, whole-null tuple values, and intentionally positional protocol/API tuples.
+      productionConcerns: Two independent repositories now prove the narrow drift shape. Stable promotion still needs real clean pressure for hook tuples, imported owner aliases, arrays, whole-null tuple values, and intentionally positional protocol/API tuples.
       noSinkBehavior: This rule emits no semantic facts; diagnostics depend on local tuple syntax and optional TypeChecker alias resolution, not sink availability.
       noDeadWorkBehavior: The current corpus proves non-null coordinate pairs stay clean; hook-style tuples with only one nullable slot, imported owner tuple aliases, arrays, and whole-null tuple values are implementation/case-matrix boundaries that still need real-corpus clean pressure before promotion.
     referenceDoc: docs/rule-investigations/no-nullable-positional-tuple.md
-    corpusRepositories: [chaski]
+    corpusRepositories: [chaski, lightdash]
     concerns:
       - The rule intentionally requires at least two nullable or optional tuple slots; one nullable slot in a hook-style tuple stays clean.
       - Type alias and generic-chain nullability are resolved only when TypeScript parser services are available.
@@ -1062,7 +1064,7 @@ rules:
         - "type CustomRange = [Date | null, Date | null];"
       allows:
         - "type Point = [number, number];"
-    nextAction: Keep default-off inventory while seeking another real nullable positional tuple and clean tuple-control replication before blocking promotion.
+    nextAction: Keep enabled at error with two independent real drift anchors. Review clean hook, imported-alias, array, whole-null, and intentional protocol tuples before stable promotion; do not treat the second anchor as proof of broader coverage.
   antidrift/react-max-component-props:
     status: ready
     stable: false
@@ -1119,41 +1121,6 @@ rules:
         - 'type ButtonProps = ComponentProps<"button"> & { tone?: Tone; size?: Size };'
         - "function Wrapper(props: BaseProps) { return <Base {...props} />; }"
     nextAction: Run real-corpus inventory for threshold calibration and revisit stable promotion after class/PropTypes/HOC false-negative decisions are explicit.
-  antidrift/no-raw-react-native-touchables:
-    status: ready
-    stable: false
-    defaultOff: false
-    directive: G11
-    signal: deterministic AST import and re-export source plus configured exact owner-file paths
-    solveType: interaction-primitive-ownership
-    proofBuckets: [local-ast-source-shape]
-    referenceDoc: docs/rule-investigations/no-raw-react-native-touchables.md
-    corpusRepositories: [murderbox]
-    concerns:
-      - "Two-corpus precision check (October 2026; 84 deduplicated TypeScript roots, 40 local and 44 sushi, parser-only; vendored, build, generated, fixture, mock and snapshot trees and analyzer test inputs excluded before sampling; hand-checked round-robin samples with labels frozen before scoring): 780 hits in 16 repositories, 6/20 true. False positives were library example and repro apps, the libraries' own primitive wrappers, and owner modules no corpus run can configure. Example and test trees are now skipped: 513 hits in 13 repositories; a fresh sample drawn after the correction from hits no earlier lane had inspected measured 10/20, true only in application repositories (paseo, chaski, charging-monitor, ai-chat-demo, expo-ai). The remaining false positives are library example and repro apps outside example/ (FabricExample, apps/src/tests, common-app) and the libraries' own primitive wrappers. Below the 70% bar."
-      - Murderbox is the first real drift and clean corpus. Every React Native repository routes presses through one shared Touchable; with no allowedFiles owner configured, every raw import reports with advice to create that module and register it as the owner.
-      - Namespace and default imports from React Native or RNGH are intentionally rejected because they bypass named-import ownership even when their current member usage is clean; their diagnostic first directs clean code to named non-interaction imports.
-      - Type-only imports and re-exports remain clean because they cannot expose a runtime interaction primitive.
-      - Dynamic import, CommonJS require, and deep package subpath forms remain outside this rule; the first consumer already rejects require imports and unowned package internals and has no real dynamic or subpath bypass.
-      - allowedFiles rejects bare filenames, globs, parent paths, and absolute paths so one owner entry cannot accidentally exempt every same-named module.
-    external:
-      state: config-replacement
-      support: high
-      candidates: ["Oxlint no-restricted-imports"]
-      decision: own-antidrift
-      whyThisState: "Core restricted-import configuration can ban the same named imports and apply file overrides."
-      whyNotOtherState: "The custom rule remains the owner because the reusable policy maintains two package-specific primitive sets, blocks namespace/default and re-export bypasses, accepts exact owner files, and emits one feedback-preset and adapter-ownership remediation. Retire it if generated core config becomes equally maintainable."
-    examples:
-      flags:
-        - 'import { Pressable as NativePressable } from "react-native";'
-        - 'import * as RNGH from "react-native-gesture-handler";'
-        - 'export { TouchableOpacity } from "react-native";'
-      allows:
-        - 'import { Touchable } from "@/tw";'
-        - 'import { View } from "react-native";'
-        - 'import { Gesture } from "react-native-gesture-handler";'
-        - 'import type { TouchableOpacityProps } from "react-native";'
-    nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 222 raw touchable imports in 6 React Native repositories (paseo 123, chaski 82); each repository registers its shared Touchable as the exact owner. Retire in favor of generated no-restricted-imports if the custom ownership delta disappears."
   antidrift/no-raw-fetch-in-component:
     status: ready
     stable: false
@@ -1356,23 +1323,25 @@ rules:
     status: ready
     stable: false
     referenceDoc: docs/rule-investigations/no-identity-schema-transform.md
-    signal: TypeChecker-proven Zod transform ownership plus closed input shape and exact AST pass-through reconstruction
+    signal: TypeChecker-proven Zod transform ownership plus direct identity values or closed input shape and exact AST pass-through reconstruction
     solveType: type-contract-shape
     proofBuckets: [semantic-source-type-provenance]
-    corpusRepositories: [murderbox]
+    corpusRepositories: [murderbox, neblir]
     concerns:
-      - The first evidence set includes synthetic identity drift and a real Murderbox clean decoder, but no independently replicated real drift.
+      - Neblir's submitInitiativeBodySchema supplies the first real direct identity transform at src/app/lib/types/initiative.ts:19. Murderbox supplies a real clean decoder; independently replicated real drift is still absent.
       - Generic schemas, indexed input shapes, readonly receivers, async or aliased callbacks, computed properties, spreads, and noncanonical destructuring intentionally remain false negatives.
-      - "Wide corpus sweep (54 TypeScript repositories, 384 .transform calls in 9 repositories, led by opencode 177, paseo 132 and homer-production 44): 0 findings, 0 false positives. The closed-shape proof holds; real identity drift is still unreplicated."
+      - "Earlier wide corpus sweep (54 TypeScript repositories, 384 .transform calls in 9 repositories, led by opencode 177, paseo 132 and homer-production 44): 0 findings, 0 false positives. That sweep predates direct-identity support and measured the closed-shape reconstruction branch."
+      - Direct identity emits null inputShape and outputShape because it proves x => x or a single return x without inspecting an object key set; it does not represent unknown shape as an empty shape.
     external:
       state: net-antidrift
       support: none
       candidates: []
       decision: own-antidrift
-      whyThisState: "Zod documents transforms and input/output inference, but no maintained rule found in the ecosystem search detects exact object reconstruction against a checker-resolved schema input shape."
-      whyNotOtherState: "Syntax selectors cannot prove that transform belongs to Zod or that the output key set equals a closed schema input shape."
+      whyThisState: "Zod documents transforms and input/output inference, but no maintained rule found in the ecosystem search detects direct identity callbacks or exact object reconstruction against a checker-resolved schema input shape."
+      whyNotOtherState: "Syntax selectors cannot prove that a callback belongs to Zod and either returns its input unchanged or exactly reconstructs its closed input shape."
     examples:
       flags:
+        - "z.string().transform((value) => value)"
         - "z.object({ a: z.string(), b: z.number() }).transform((value) => ({ a: value.a, b: value.b }))"
         - "z.object({ a: z.string() }).transform(({ a }) => ({ a }))"
       allows:
@@ -1387,15 +1356,15 @@ rules:
       status: inline-pending
       reason: Convex hook and TanStack registration symbol resolution live inline with one consumer. Extract to a shared adapter when a second rule needs owned-API provenance.
     referenceDoc: docs/rule-investigations/no-explicit-type-arguments-on-owned-api.md
-    signal: TypeChecker symbol resolution of the callee to the convex or @tanstack packages plus owner existence proof (generated api reference or queryOptions/mutationOptions registration)
+    signal: TypeChecker symbol resolution of the callee to the convex or @tanstack packages plus owner existence proof (generated api reference, direct queryOptions/mutationOptions registration factory, or an all-spread object whose spreads preserve registered inference)
     solveType: type-contract-shape
     proofBuckets: [semantic-source-type-provenance]
-    corpusRepositories: [murderbox]
+    corpusRepositories: [murderbox, letraz]
     concerns:
-      - "The first evidence set is synthetic drift plus Murderbox clean-run controls; no independently replicated real drift yet."
-      - "Only registered owners are proven: Convex generated api references and queryOptions/mutationOptions results. Ad-hoc TanStack key arrays, inline options objects, and wrapper hooks around useQuery intentionally stay silent because no owner can be resolved."
+      - "Letraz lib/skill/queries.ts supplies the first real drift: one spread registration at line 17 and two direct registration factories at lines 34 and 51. Murderbox remains a clean control; independently replicated real drift is still absent."
+      - "Only registered owners are proven: Convex generated api references and queryOptions/mutationOptions results, including direct factories and all-spread objects whose spreads all resolve to registrations. Ad-hoc TanStack key arrays, inline options objects, registration fields overridden by ordinary properties, and arbitrary wrapper hooks intentionally stay silent."
       - "Aliased or re-exported hook names resolve through the checker; a locally declared function that merely shares the useQuery name is not flagged even when handed a generated api reference."
-      - "Wide corpus sweep (54 TypeScript repositories, 151 explicit type arguments on TanStack/Convex calls in 6 repositories, led by sentry 81 and paseo 48): 0 findings, 0 false positives. Every one of those calls passes inline options, an ad-hoc key, or a query-cache result, so none has a provable owner."
+      - "Earlier wide corpus sweep (54 TypeScript repositories, 151 explicit type arguments on TanStack/Convex calls in 6 repositories, led by sentry 81 and paseo 48): 0 findings, 0 false positives. Every one of those calls passed inline options, an ad-hoc key, or a query-cache result without a provable owner."
     external:
       state: net-antidrift
       support: none
@@ -1766,8 +1735,10 @@ rules:
     solveType: type-guard-laundering
     proofBuckets: [semantic-source-type-provenance]
     referenceDoc: docs/rule-investigations/no-underchecked-type-predicate.md
-    corpusRepositories: [chaski, codebase-atlas, sudocode-main, opencode]
+    corpusRepositories:
+      [chaski, codebase-atlas, sudocode-main, opencode, xai-sdk-ts]
     concerns:
+      - "XAI supplies five real tag-only predicate findings across src/porcelain.ts and src/stream.ts, plus a clean APIError.is nominal-brand control. A symbol used by an in check proves a non-union target only when that target has a computed property keyed by the same resolved symbol; arbitrary string in checks and capability probes are not exempt."
       - "October 12 2026 precision on the combined local and sushi corpus (typed pool of 49 resolved roots): 103 hits in 15 repositories (pool 61 in 12: cloudflare-agents 22, LibreChat 8, executor 8, reanimated 8, paseo 6). Hand-checked 20 across 12 repositories: 17/20. False positives: reanimated isSerializableRef and isWorkletFunction (brand and capability probes on in-process objects) and a typed paseo timeline entry narrowed by its own kind."
       - The rule is intentionally limited to broad-input predicates that assert nontrivial object contracts.
       - Codebase Atlas supplies clean controls for primitive predicates, alias-based field checks, and third-party union predicates.
@@ -2242,22 +2213,27 @@ rules:
       - Numeric fallbacks, other strings, calls, and plain identifiers stay outside the current match.
       - Earlier precision labels allow display fallbacks. The October 12 owner ruling supersedes those labels. The investigation document keeps that history.
     external:
-      state: net-antidrift
-      support: low
+      state: partial-overlap
+      support: high
       candidates:
-        ["ESLint no-null", "@typescript-eslint/prefer-nullish-coalescing"]
-      decision: own-antidrift
-      whyThisState: "no-null and prefer-nullish-coalescing police the operator a codebase uses, not the sentinel value the operator produces; no maintained rule models absence coerced to an in-band sentinel string on a member read."
-      whyNotOtherState: "Not ecosystem-covered because the signal requires a fixed sentinel vocabulary and the absence-as-absence doctrine, which generic nullish-discipline rules do not carry."
+        [
+          "@rikalabs/no-property-default-fallbacks",
+          "ESLint no-null",
+          "@typescript-eslint/prefer-nullish-coalescing",
+        ]
+      decision: use-both
+      whyThisState: "Rika's property-default rule covers literal member fallbacks, including this rule's fixed sentinels, when explicitly enabled. It does not cover no-substitution template-literal sentinels, so the configs retain a small selector for that gap instead of running both complete detectors."
+      whyNotOtherState: "Not net-antidrift because literal sentinel fallbacks overlap Rika. Not a wholesale replacement because Rika deliberately has much broader fallback semantics and misses template literals; XAI usage normalization and Arroxy diagnostic defaults prove that the aggressive rule needs an opt-in and declared exceptions."
     examples:
       flags:
         - 'activeState: props.ActiveState ?? "unknown"'
         - 'const state = row?.state ?? "unavailable";'
+        - "const state = row?.state ?? `unknown`;"
         - 'console.log(props.ActiveState ?? "unknown");'
       allows:
         - 'const title = doc.title ?? "Untitled";'
         - "const exit = Number(props.ExecMainStatus ?? 0);"
-    nextAction: "The fresh sample scores 16/20. Preserve missing reports in display text. Review declared domain modes and unreachable fallbacks."
+    nextAction: "Keep the narrow sentinel rule by default. With enforceNoPropertyDefaultFallbacks, typescript-tooling owns Rika's broad literal rule, Antidrift disables this custom rule in ESLint, and both configs retain only the template-literal gap. Declare intentional exceptions through propertyDefaultAllowedFiles."
 
   antidrift/no-repo-state-mirror-assertion:
     status: ready
@@ -2393,42 +2369,6 @@ rules:
       allows:
         - 'export const PHASES = ["queued", "done"] as const; type Phase = (typeof PHASES)[number];'
     nextAction: "Enabled at error in the ESLint pass and baselined in eslint-suppressions.json (antidrift has 0 findings). The sushi corpus reports 7 findings in 7 repositories."
-
-  antidrift/no-open-dictionary-at-boundary:
-    status: ready
-    stable: false
-    defaultOff: false
-    directive: G4
-    signal: String-keyed dictionaries of any in exported signatures and variable annotations.
-    solveType: open-dictionary-at-boundary
-    proofBuckets: [local-ast-source-shape]
-    referenceDoc: docs/rule-investigations/no-open-dictionary-at-boundary.md
-    corpusRepositories: [antidrift]
-    concerns:
-      - "Superseded October 12, 2026 study. Before excluding type parameters, 403 hits in 30 repositories scored 11/20. After that change, 356 hits in 29 repositories scored 10/20. Both samples fell below 70%. The current rule checks only dictionaries of any."
-      - Unknown values remain unchecked input and stay allowed.
-      - Generic constraints and defaults stay allowed.
-      - The rule does not expand named types or inferred signatures.
-    external:
-      state: net-antidrift
-      support: low
-      candidates:
-        [
-          "@typescript-eslint/no-restricted-types",
-          "@typescript-eslint/no-explicit-any",
-        ]
-      decision: own-antidrift
-      whyThisState: "Type bans do not distinguish open dictionaries at exported boundaries from private implementation types."
-      whyNotOtherState: "Not ecosystem-covered because type bans cannot scope an open dictionary to exported boundaries."
-    examples:
-      flags:
-        - "export function receive(input: Record<string, any>) {}"
-        - "export const headers: { [key: string]: any } = {};"
-      allows:
-        - "export function receive(input: Message) {}"
-        - "export function decode(input: Record<string, unknown>) {}"
-        - "function internal(input: Record<string, any>) {}"
-    nextAction: Keep the 18-of-20 measurement in the investigation document. Review hidden implementation annotations and nested generic constraints.
 
   antidrift/unknown-input-must-be-decoded:
     status: ready
@@ -3981,50 +3921,23 @@ rules:
       - The governance preset excludes `**/fixtures/**`, where failure behavior is modeled on purpose, matching the ESLint pass ignores.
     external:
       state: partial-overlap
-      support: medium
+      support: high
       candidates:
         [
+          "@rikalabs/no-silent-catch-fallback",
           eslint/no-empty,
           preserve-caught-error,
           unicorn/prefer-optional-catch-binding,
         ]
       decision: own-antidrift
-      whyThisState: Ecosystem rules catch empty blocks and lost causes, not a failure path that returns an empty collection.
-      whyNotOtherState: The empty-collection return is the construct the policy names.
+      whyThisState: Rika rejects a catch with a default fallback return or without a direct throw. Antidrift instead targets the narrower silent empty-array/object return and allows catches that read or rethrow their error; the broad Rika policy would reject those intentional handling paths too.
+      whyNotOtherState: The empty-collection return and caught-error-use proof are the policy this rule owns. Empty-block and lost-cause rules alone do not cover it, while Rika's broader catch policy is not an equivalent replacement.
     examples:
       flags:
         - "async function load() { try { return await read(); } catch { return []; } }"
         - "const body = await response.json().catch(() => ({}));"
       allows:
         - 'function readRegistry(path) { try { return parse(read(path)); } catch (error) { if (error.code === "ENOENT") return {}; throw error; } }'
-    nextAction: Keep at error severity in the governance preset.
-
-  antidrift/no-else-if-chain:
-    status: ready
-    stable: false
-    defaultOff: false
-    directive: G9
-    signal: Deterministic AST over equality tests that share one discriminant
-    solveType: no-else-if-chain
-    proofBuckets: [local-ast-source-shape]
-    referenceDoc: docs/rule-investigations/directive-rules.md
-    corpusRepositories:
-      [chatbiz-webapp, pierre, executor, opencode, sudocode-main, hunk, codiff]
-    concerns:
-      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 122 hits in 28 repositories, 19/20 true across 19 repositories; the false positive picks list positions in a demo screen."
-      - Four or more branches matches the dotfiles g9-elif-chain threshold of an if plus three elifs.
-    external:
-      state: partial-overlap
-      support: medium
-      candidates: [unicorn/prefer-switch, sonar/max-switch-cases]
-      decision: own-antidrift
-      whyThisState: unicorn/prefer-switch is not hosted by the governance preset and suggests a switch rather than a declared case table.
-      whyNotOtherState: The directive asks for the case space to be declared, which a table checked with satisfies satisfies.
-    examples:
-      flags:
-        - 'if (mode === "a") run(1); else if (mode === "b") run(2); else if (mode === "c") run(3); else if (mode === "e") run(4);'
-      allows:
-        - 'if (mode === "a") run(1); else if (kind === "b") run(2); else if (mode === "c") run(3); else if (mode === "e") run(4);'
     nextAction: Keep at error severity in the governance preset.
 
   antidrift/no-hash-literal:
@@ -4052,33 +3965,6 @@ rules:
         - 'const patchSha256 = "abababababababababababababababababababababababababababababababab";'
       allows:
         - 'const encryptionKey = "abababababababababababababababababababababababababababababababab";'
-    nextAction: Keep at error severity in the governance preset.
-
-  antidrift/no-host-path-literal:
-    status: ready
-    stable: false
-    defaultOff: false
-    directive: S4
-    signal: Deterministic AST for /home/<user>/ and /Users/<user>/ string prefixes outside test files
-    solveType: no-host-path-literal
-    proofBuckets: [local-ast-source-shape]
-    referenceDoc: docs/rule-investigations/directive-rules.md
-    corpusRepositories: [opencode, executor]
-    concerns:
-      - "Two-corpus precision check (October 2026; 84 TypeScript roots): 30 hits in 6 repositories, 2/20 true; only opencode's two developer-home paths couple to a host. Story files, __mocks__ and e2e trees are now skipped: 18 hits in 4 repositories, every one already inspected by an earlier lane, so no fresh sample exists; on those earlier frozen labels 2/18 (descriptive). The rest are container and guest image homes (/home/agent, /home/claude) and a device service user. Below the 70% bar."
-      - Test fixture paths and the /home/linuxbrew/ Homebrew prefix do not couple code to a developer host and stay out.
-    external:
-      state: net-antidrift
-      support: none
-      candidates: []
-      decision: own-antidrift
-      whyThisState: No maintained lint rule reports host-absolute path literals.
-      whyNotOtherState: The dotfiles s4-host-path rule covers Python, Bash, JSON, YAML and Markdown only.
-    examples:
-      flags:
-        - 'const root = "/home/joe/code/app";'
-      allows:
-        - 'const root = join(homedir(), "code/app");'
     nextAction: Keep at error severity in the governance preset.
 
   antidrift/no-dated-comments:
@@ -4111,6 +3997,22 @@ rules:
     nextAction: Keep at error severity in the governance preset.
 
 retiredRules:
+  antidrift/no-open-dictionary-at-boundary:
+    status: retired
+    reason: Replaced by typescript-tooling's maintained typescript/no-explicit-any and @typescript-eslint/no-explicit-any defaults, which own the explicit-any boundary signal without a second custom implementation.
+    referenceDoc: docs/rule-investigations/no-open-dictionary-at-boundary.md
+  antidrift/no-else-if-chain:
+    status: retired
+    reason: Replaced by typescript-tooling's unicorn-js/prefer-switch (Unicorn prefer-switch) with minimumCases 4 for strict-equality chains over one discriminant. The former loose-equality branch is intentionally not retained; switch declares the case space.
+    referenceDoc: docs/rule-investigations/directive-rules.md
+  antidrift/no-raw-react-native-touchables:
+    status: retired
+    reason: Replaced by generated no-restricted-imports patterns for the maintained React Native and gesture-handler primitive inventory. Namespace, default, named and re-export forms remain restricted; type-only imports are allowed and policy/registries/react-native.yaml owns exact owner-file exceptions.
+    referenceDoc: docs/rule-investigations/no-raw-react-native-touchables.md
+  antidrift/no-host-path-literal:
+    status: retired
+    reason: Replaced by generated governance-eslint/no-restricted-syntax selectors for /Users/<user>/ and /home/<user>/ literals and no-substitution template text, retaining the Homebrew and test/story/mock/e2e exclusions.
+    referenceDoc: docs/rule-investigations/directive-rules.md
   antidrift/no-query-data-type-parameters:
     status: retired
     reason: Superseded by antidrift/no-explicit-type-arguments-on-owned-api, which resolves the callee symbol and proves registration ownership instead of matching method names; the syntax rule's ad-hoc key coverage was doctrine-rejected (no resolvable owner means no fork).

@@ -141,7 +141,7 @@ Applies to:
 
 **11. Type-driven prevention is gated on consumer adoption and should not be over-invested**
 
-Making owner forks untypeable (branded/nominal owner types) is the most elegant posture but requires target repos to adopt nominal types — something antidrift cannot force from the lint side. The project's own history is the evidence: `no-cast-to-branded` was retired for "no real adoption or non-test forgery evidence" (gap-inventory.md:171). The brand-kit utility exists but sits unused.
+Making owner forks untypeable (branded/nominal owner types) is the most elegant posture but requires target repos to adopt nominal types — something antidrift cannot force from the lint side. The project's own history is the evidence: `no-cast-to-branded` was retired for "no real adoption or non-test forgery evidence" (`retiredRules.antidrift/no-cast-to-branded` in `policy/registries/rules.yaml`). The brand-kit utility exists but sits unused.
 
 Basis: `docs/whitepaper-agent-code-drift-proofs.md` §2.5 (type-driven prevention, "gated on consumer adoption"); `docs/solve-bucket-architecture-review.md` §3 bucket (4) ("your own history is a caution: no-cast-to-branded was retired for no real adoption"); `policy/registries/solve-buckets.yaml` categories.type-prevention ("GATED ON CONSUMER ADOPTION").
 

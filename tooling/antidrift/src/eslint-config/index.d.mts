@@ -13,6 +13,7 @@ export interface AntidriftConfigOptions {
   tsconfigRootDir?: string;
   policyDir?: string;
   semanticFacts?: SemanticFactSetting;
+  enforceNoPropertyDefaultFallbacks?: boolean;
 }
 
 export function createConfig(options?: AntidriftConfigOptions): Linter.Config[];

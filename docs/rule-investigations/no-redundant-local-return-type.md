@@ -2,7 +2,7 @@
 
 ## Decision
 
-Implement a new default-off rule for one narrow TypeChecker proof. Keep the retired `antidrift/no-explicit-return-type-private-helper` decision locked.
+Keep one narrow TypeChecker proof enabled at error, ready but not stable. Keep the retired `antidrift/no-explicit-return-type-private-helper` decision locked. "Local" means a nested implementation with an enclosing return contract, not every private helper's annotation; the name is not a license to remove annotations wholesale.
 
 The old rule treated nearly every non-exported explicit return annotation as suspicious. Real Chaski code disproved that premise: private error mappers, `never` helpers, optional results, URL builders, predicates, hooks, builders, and gateway APIs can own legitimate contracts.
 
@@ -37,8 +37,8 @@ These are false negatives by design. Widening the rule to them would reopen the 
 
 ## Ecosystem Boundary
 
-`@typescript-eslint/explicit-function-return-type` and `@typescript-eslint/explicit-module-boundary-types` require annotations on selected surfaces. They do not prove redundancy or preserve the distinction between public contracts and nested inference. No maintained equivalent owns this exact inverse, TypeChecker-backed proof.
+`@typescript-eslint/explicit-function-return-type` and `@typescript-eslint/explicit-module-boundary-types` require annotations on selected surfaces. They do not prove redundancy or preserve the distinction between public contracts and nested inference. `@typescript-eslint/no-inferrable-types` covers primitive/default literal annotations, not this nested object-shape plus enclosing-contract proof. TypeScript itself and the `no-unnecessary-*` family do not own that proof, so this is not a compiler delegation or a general private-helper annotation rule.
 
 ## Promotion Gate
 
-Keep the rule default-off. Promotion requires independent real drift, a clean inventory over repositories with nested builders and protocol/error helpers, and review of every finding against the retired rule's clean controls.
+Keep the rule enabled and `ready`, with `stable: false`. Murderbox supplies one real drift anchor; independent replication has not been established. Promotion requires independent real drift, a clean inventory over repositories with nested builders and protocol/error helpers, and review of every finding against the retired rule's clean controls.

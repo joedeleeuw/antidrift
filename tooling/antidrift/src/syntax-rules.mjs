@@ -13,7 +13,6 @@ import ruleNoSilentEmptyDetectionFallback from "./oxlint-plugin/rules/no-silent-
 import ruleNoStaticPropertyLoop from "./oxlint-plugin/rules/no-static-property-loop.js";
 import ruleNoValidatorOutputOracle from "./oxlint-plugin/rules/no-validator-output-oracle.js";
 import ruleRequireEffectDeps from "./oxlint-plugin/rules/require-effect-deps.js";
-import ruleNoOpenDictionaryAtBoundary from "./oxlint-plugin/rules/no-open-dictionary-at-boundary.js";
 import ruleNoRedeclaredOwnedUnion from "./oxlint-plugin/rules/no-redeclared-owned-union.js";
 import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-mirror-assertion.js";
 
@@ -30,7 +29,6 @@ export function createSyntaxRules() {
     "no-handrolled-resource-lifecycle-cells":
       ruleNoHandrolledResourceLifecycleCells,
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
-    "no-open-dictionary-at-boundary": ruleNoOpenDictionaryAtBoundary(),
     "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
     "no-repo-state-mirror-assertion": ruleNoRepoStateMirrorAssertion(),
     "no-schema-library-in-test": ruleNoSchemaLibraryInTest(),

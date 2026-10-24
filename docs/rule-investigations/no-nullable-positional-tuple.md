@@ -53,13 +53,17 @@ Chaski clean control:
 
 - `src/frontend/crow-v2/hooks/useCountingTasks.ts`: `convertUnitsToCases(): [number, number]`.
 
+Independent Lightdash drift:
+
+- `packages/common/src/types/metricsExplorer.ts` line 32: `MetricExplorerPartialDateRange = [Date | null, Date | null]`. The current default-branch external-corpus run reports this real declaration with installed package dependencies.
+
 The latest documented broad Chaski frontend inventory recorded one finding across 1,533 files: the `CustomRange` type above. No saved inventory artifact is currently checked in for this count, so it is supporting context, not promotion-grade evidence.
 
 ## Decision
 
 Keep `antidrift/no-nullable-positional-tuple` ready and default-on while `stable` remains false. The detector is real local AST/source-shape proof, with TypeChecker alias resolution when parser services exist, and it is not replaced by a maintained ecosystem rule.
 
-The evidence is precise but Chaski-only and low-yield: one real tuple across 1,533 frontend files. A second real tuple plus clean controls still gates stable promotion.
+Two independent repositories now prove the narrow drift shape. Broader real-corpus clean controls still gate stable promotion; the second anchor does not prove every intentional tuple should be rejected.
 
 ## Boundaries
 
@@ -71,4 +75,4 @@ Type alias and generic-chain nullability require TypeScript parser services. Wit
 
 - False negatives: nullable alias or generic-chain tuple slots when parser services are unavailable.
 - Intentional non-coverage: imported owner range aliases remain clean unless the tuple is redeclared locally.
-- Stable promotion still needs another real nullable or optional multi-slot tuple plus real-corpus clean controls for ordinary tuples, hook tuples, imported owner aliases, arrays, whole-null tuple values, and intentionally positional protocol/API tuples.
+- Lightdash supplies the second independent drift anchor; stable promotion still needs real-corpus clean controls for ordinary tuples, hook tuples, imported owner aliases, arrays, whole-null tuple values, and intentionally positional protocol/API tuples.

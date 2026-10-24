@@ -156,7 +156,7 @@ Because both systems enforce the same directive table (`G1`–`G26`, `S1`–`S9`
 - **Directive (`AGENT.md` § Code Design & `dotfiles/config/code-health/rules/g9-closed-string.yml`):**
   > _"Declare the case space first."_
   > In `dotfiles`, `g9-closed-string` scored **19/20 (95% precision)** across 19 repositories.
-- **Current gap:** Antidrift enforces `no-else-if-chain` (G9), but does not flag functions or class fields typed as widened `string` that immediately validate membership against a closed literal set at runtime and throw.
+- **Current gap:** `@joedeleeuw/typescript-tooling` enforces `unicorn-js/prefer-switch` (G9), but no rule flags functions or class fields typed as widened `string` that immediately validate membership against a closed literal set at runtime and throw.
 - **Required context:** `defineTypeScriptRule` (`ts-rule-kernel.mjs`) — `sourceFile` and `checker`.
 - **Implementation specification:**
   1. In non-test, non-generated files, inspect any function/method parameter `param` or class property `this.field` whose explicit type annotation is `ts.SyntaxKind.StringKeyword` (`string`).
