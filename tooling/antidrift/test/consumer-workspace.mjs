@@ -12,78 +12,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "  routeTree:\n" +
       "    generated: src/routeTree.gen.ts\n"
   );
-  file(
-    "policy/registries/rules.yaml",
-    "schemaVersion: 1\n" +
-      "promotionRequirements:\n" +
-      "  stable:\n" +
-      "    minIndependentRepositories: 2\n" +
-      "rules:\n" +
-      "  antidrift/no-structural-type-fork:\n" +
-      "    status: ready\n" +
-      "    stable: false\n" +
-      "    signal: TypeChecker plus authority index\n" +
-      "    solveType: generated-type-drift\n" +
-      "    corpusRepositories: [consumer]\n" +
-      "    external:\n" +
-      "      state: net-antidrift\n" +
-      "      support: none\n" +
-      "      candidates: []\n" +
-      "      decision: own-antidrift\n" +
-      "      whyThisState: Test package authority.\n" +
-      "      whyNotOtherState: Test package authority.\n" +
-      "    examples:\n" +
-      '      flags: ["type ReleaseRow = {}"]\n' +
-      '      allows: ["import type { GeneratedRelease } from ./generated/release"]\n' +
-      "    nextAction: Keep owner facts explicit.\n" +
-      "  antidrift/no-async-array-method:\n" +
-      "    status: ready\n" +
-      "    stable: false\n" +
-      "    signal: AST default branch plus opt-in local collection flow\n" +
-      "    solveType: promise-control-flow\n" +
-      "    proofBuckets: [local-ast-source-shape, semantic-source-type-provenance]\n" +
-      "    nextAction: Keep async collection proof explicit and opt-in.\n" +
-      "  antidrift/no-handrolled-resource-lifecycle-cells:\n" +
-      "    status: ready\n" +
-      "    stable: false\n" +
-      "    signal: source binding plus local transition/control-flow proof\n" +
-      "    solveType: react-state-shape\n" +
-      "    nextAction: Keep lifecycle proof explicit.\n" +
-      "  antidrift/no-nullable-positional-tuple:\n" +
-      "    status: ready\n" +
-      "    stable: false\n" +
-      "    signal: deterministic AST\n" +
-      "    solveType: type-contract-shape\n" +
-      "    proofBuckets: [local-ast-source-shape, semantic-source-type-provenance]\n" +
-      "    nextAction: Keep tuple shape proof explicit.\n" +
-      "  antidrift/no-raw-fetch-in-component:\n" +
-      "    status: ready\n" +
-      "    stable: true\n" +
-      "    signal: import-scope plus AST\n" +
-      "    solveType: side-effect-boundary\n" +
-      "    promotion:\n" +
-      "      proofBucket: local-ast-source-shape\n" +
-      "    nextAction: Keep local AST proof explicit.\n" +
-      "retiredRules:\n" +
-      "  antidrift/no-status-triplet-state:\n" +
-      "    status: retired\n" +
-      "    replacement: antidrift/no-handrolled-resource-lifecycle-cells\n" +
-      "    reason: Name groups are inventory only.\n" +
-      "researchCandidates:\n" +
-      "  ecosystem/import-cycle:\n" +
-      "    status: ecosystem-covered\n" +
-      "    signal: import-graph\n" +
-      "    solveType: semantic-architecture-drift\n" +
-      "    replacement: import/no-cycle\n" +
-      "    reason: Covered by shared Oxlint config.\n" +
-      "policyRuleReviews:\n" +
-      "  agent/require-checks-before-stop:\n" +
-      "    status: active-custom\n" +
-      "    antidriftRule: agent/require-checks-before-stop\n" +
-      "    coverage: Session fact.\n" +
-      "    reason: Requires command history.\n" +
-      "    nextAction: Keep in agent-ops.\n"
-  );
+  file("policy/registries/rules.yaml", "schemaVersion: 1\n");
   file(
     "package.json",
     JSON.stringify(
@@ -485,7 +414,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'import { createConfig as createConfigFromSubpath, type AntidriftConfigOptions as SubpathConfigOptions } from "@joedeleeuw/antidrift/eslint-config";\n' +
       'import { createGovernanceOxlintConfig as createGovernanceOxlintConfigFromSubpath, type AntidriftGovernanceOxlintConfigOptions as OxlintSubpathConfigOptions } from "@joedeleeuw/antidrift/oxlint-config";\n' +
       'import oxlintPluginFromSubpath from "@joedeleeuw/antidrift/oxlint-plugin";\n' +
-      'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, loadRuleStatusRegistrySync, parseOxlintArgs, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, ruleStatusEntriesForKind, ruleStatusEntriesForProofBucket, ruleStatusEntriesForSemanticAdapter, ruleStatusEntriesForStatus, ruleStatusEntryForId, ruleStatusManifest, ruleStatusSemanticSummaries, ruleStatusSemanticSummaryForId, runOxlint, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession, type AgentGuardrailsPolicy as PolicySubpathPolicy, type OxlintArgs, type RuleStatusManifest, type RuleStatusManifestEntry, type RuleStatusPromotion, type RuleStatusSemanticSummary, type SemanticFact, type SemanticFactKind, type SemanticFactKindContractEntry, type SqlParserServiceDeltaClassification } from "@joedeleeuw/antidrift/policy";\n' +
+      'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, parseOxlintArgs, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, runOxlint, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession, type AgentGuardrailsPolicy as PolicySubpathPolicy, type OxlintArgs, type SemanticFact, type SemanticFactKind, type SemanticFactKindContractEntry, type SqlParserServiceDeltaClassification } from "@joedeleeuw/antidrift/policy";\n' +
       'import { SEMANTIC_ADAPTERS, SEMANTIC_ADAPTER_CONTRACTS, SEMANTIC_ADAPTER_CONTRACT_LIST, SEMANTIC_ADAPTER_MANIFEST, type asyncControlFlow as adapterAsyncControlFlow, authBoundary as adapterAuthBoundary, broadInput as adapterBroadInput, type parseInput as adapterParseInput, reactState as adapterReactState, schemaProvenance as adapterSchemaProvenance, semanticAdapterContractsForFactAdapterId, semanticAdapterContractsForFactKind, semanticAdapterContractsForProofBucket, semanticAdapterContractsForRule, semanticAdapterManifestForAdapterId, semanticAdapterManifestForFactAdapterId, semanticAdapterManifestForFactKind, semanticAdapterManifestForProofBucket, semanticAdapterManifestForRule, sql as adapterSql, type tupleShape as adapterTupleShape, typeOwner as adapterTypeOwner, type SemanticAdapterContract, type SemanticAdapterContractKey, type SemanticAdapterManifestEntry } from "@joedeleeuw/antidrift/semantic-adapters";\n' +
       'import { REQUEST_PARAM_ROOTS, callExpressionName, createAuthBoundaryTracker, isAuthzCall, isRequestParamsAccess, type AuthBoundaryFrame, type AuthBoundaryTracker } from "@joedeleeuw/antidrift/semantic-adapters/auth-boundary";\n' +
       'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, isReturnedExpression, markAwaitedPendingMaps, markReturnedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap, type AsyncArrayCallbackClassification, type PendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
@@ -527,9 +456,6 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "const statusLiteralOwner = canonicalStatusLiteralOwner(statusLiteral, domainStatuses);\n" +
       'const nullableTuple = { type: "TSTupleType", elementTypes: [{ type: "TSUnionType", types: [{ type: "TSStringKeyword" }, { type: "TSNullKeyword" }] }, { type: "TSOptionalType", typeAnnotation: { type: "TSNumberKeyword" } }] };\n' +
       'const ownerCandidate = { label: "generated#Release", props: new Map<string, string>(), authority: "generated-source", authorityState: "accepted" } satisfies StructuralTypeCandidate;\n' +
-      'const ruleStatusRegistry = loadRuleStatusRegistrySync("policy");\n' +
-      "const ruleStatus = ruleStatusManifest(ruleStatusRegistry);\n" +
-      'const coupledStateSummary = ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", ruleStatus);\n' +
       'const asyncCallback = { type: "ArrowFunctionExpression", async: true };\n' +
       'const asyncMapCall = { type: "CallExpression", callee: { type: "MemberExpression", object: { type: "Identifier", name: "items" }, property: { type: "Identifier", name: "map" } }, arguments: [asyncCallback] };\n' +
       "const asyncClassification = asyncArrayCallbackClassification(asyncMapCall);\n" +
@@ -580,24 +506,12 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "SEMANTIC_FACT_KINDS.structuralMatch.association satisfies string;\n" +
       "SEMANTIC_FACT_KINDS.structuralMatch.noSinkBehavior satisfies string;\n" +
       "SEMANTIC_FACT_KIND_CONTRACT_LIST satisfies readonly SemanticFactKindContractEntry[];\n" +
-      "ruleStatus satisfies RuleStatusManifest;\n" +
-      "ruleStatus.entries satisfies readonly RuleStatusManifestEntry[];\n" +
-      'const rawFetchPromotion = ruleStatusEntryForId("antidrift/no-raw-fetch-in-component", ruleStatus)?.promotion;\n' +
-      "rawFetchPromotion satisfies RuleStatusPromotion | undefined;\n" +
-      "rawFetchPromotion?.proofBucket satisfies string | undefined;\n" +
       "statusLiteralOwner satisfies StatusLiteralOwner | null;\n" +
       "safeTemplateTags satisfies SafeTemplateTagSpecs;\n" +
       'normalizedContextName("User Status") satisfies string;\n' +
       'isStatusContextName("user_status", "UserStatus") satisfies boolean;\n' +
       'isStatusLiteralContext(statusLiteral, "UserStatus") satisfies boolean;\n' +
       'nodeKeyName({ type: "Identifier", name: "status" }) satisfies string;\n' +
-      'ruleStatusEntryForId("antidrift/no-structural-type-fork", ruleStatus) satisfies RuleStatusManifestEntry | null;\n' +
-      'ruleStatusEntriesForKind("research", ruleStatus) satisfies readonly RuleStatusManifestEntry[];\n' +
-      'ruleStatusEntriesForProofBucket("authority-index-ownership", ruleStatus) satisfies readonly RuleStatusManifestEntry[];\n' +
-      'ruleStatusEntriesForSemanticAdapter("type-owner", ruleStatus) satisfies readonly RuleStatusManifestEntry[];\n' +
-      'ruleStatusEntriesForStatus("retired", ruleStatus) satisfies readonly RuleStatusManifestEntry[];\n' +
-      "coupledStateSummary satisfies RuleStatusSemanticSummary | null;\n" +
-      "ruleStatusSemanticSummaries(ruleStatus) satisfies readonly RuleStatusSemanticSummary[];\n" +
       'semanticFactKindContractsForAdapterId("react-state") satisfies readonly SemanticFactKindContractEntry[];\n' +
       'semanticFactKindContractsForConfidence("deterministic-enforcement") satisfies readonly SemanticFactKindContractEntry[];\n' +
       'semanticFactKindContractsForEmission("blocking-diagnostic") satisfies readonly SemanticFactKindContractEntry[];\n' +
@@ -830,7 +744,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'import { createConfig as createConfigFromSubpath } from "@joedeleeuw/antidrift/eslint-config";\n' +
       'import { createGovernanceOxlintConfig as createGovernanceOxlintConfigFromSubpath } from "@joedeleeuw/antidrift/oxlint-config";\n' +
       'import oxlintPluginFromSubpath from "@joedeleeuw/antidrift/oxlint-plugin";\n' +
-      'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, loadRuleStatusRegistrySync, parseOxlintArgs, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, ruleStatusEntriesForKind, ruleStatusEntriesForProofBucket, ruleStatusEntriesForSemanticAdapter, ruleStatusEntriesForStatus, ruleStatusEntryForId, ruleStatusManifest, ruleStatusSemanticSummaries, ruleStatusSemanticSummaryForId, runOxlint, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession } from "@joedeleeuw/antidrift/policy";\n' +
+      'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkGenerated, checkRegistries, checkRuleSurface, classifyReactStateFact, classifySqlParserServiceDelta, createJsonlFactSink, createMemoryFactSink, declarationCloneInventory, defensiveShapeInventory, eslintJsonToSonar, externalCorpus, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, parseOxlintArgs, reactStateInventory, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, repoCorpus, runOxlint, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, undercheckedPredicateInventory, verifySession } from "@joedeleeuw/antidrift/policy";\n' +
       'import { SEMANTIC_ADAPTERS, SEMANTIC_ADAPTER_CONTRACTS, SEMANTIC_ADAPTER_CONTRACT_LIST, SEMANTIC_ADAPTER_MANIFEST, asyncControlFlow as adapterAsyncControlFlow, authBoundary as adapterAuthBoundary, broadInput as adapterBroadInput, parseInput as adapterParseInput, reactState as adapterReactState, schemaProvenance as adapterSchemaProvenance, semanticAdapterContractsForFactAdapterId, semanticAdapterContractsForFactKind, semanticAdapterContractsForProofBucket, semanticAdapterContractsForRule, semanticAdapterManifestForAdapterId, semanticAdapterManifestForFactAdapterId, semanticAdapterManifestForFactKind, semanticAdapterManifestForProofBucket, semanticAdapterManifestForRule, sql as adapterSql, tupleShape as adapterTupleShape, typeOwner as adapterTypeOwner } from "@joedeleeuw/antidrift/semantic-adapters";\n' +
       'import { REQUEST_PARAM_ROOTS, callExpressionName, createAuthBoundaryTracker, isAuthzCall, isRequestParamsAccess } from "@joedeleeuw/antidrift/semantic-adapters/auth-boundary";\n' +
       'import { ASYNC_ARRAY_METHODS_NEVER_AWAIT, ASYNC_ARRAY_METHODS_REQUIRE_COLLECTION, PROMISE_COMBINATOR_METHODS, asyncArrayCallbackClassification, asyncCallbackArgument, findVariable, getDeclaredVariable, isDirectlyWrappedInPromiseCombinator, isPromiseCombinator, isReturnedExpression, markAwaitedPendingMaps, markReturnedPendingMaps, promiseCombinatorVariables, queuePendingAsyncMap } from "@joedeleeuw/antidrift/semantic-adapters/async-control-flow";\n' +
@@ -975,19 +889,10 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "  typeProps,\n" +
       "  loadPolicyFromPolicy,\n" +
       "  loadRegistriesFromPolicy,\n" +
-      "  loadRuleStatusRegistrySync,\n" +
       "  parseOxlintArgs,\n" +
       "  renderPolicyArtifactsFromPolicy,\n" +
       "  reactStateInventory,\n" +
       "  repoCorpus,\n" +
-      "  ruleStatusEntriesForKind,\n" +
-      "  ruleStatusEntriesForProofBucket,\n" +
-      "  ruleStatusEntriesForSemanticAdapter,\n" +
-      "  ruleStatusEntriesForStatus,\n" +
-      "  ruleStatusEntryForId,\n" +
-      "  ruleStatusManifest,\n" +
-      "  ruleStatusSemanticSummaries,\n" +
-      "  ruleStatusSemanticSummaryForId,\n" +
       "  undercheckedPredicateInventory,\n" +
       "  declarationCloneInventory,\n" +
       "  SEMANTIC_FACT_KINDS,\n" +
@@ -1042,15 +947,6 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "\n" +
       'if (SEMANTIC_FACT_KIND_CONTRACT_LIST.find((entry) => entry.factKind === "resourceLifecycleProof")?.adapterId !== "react-state" || semanticFactKindContractsForAdapterId("react-state").filter((entry) => entry.rules.includes("antidrift/no-handrolled-resource-lifecycle-cells")).length !== 3 || semanticFactKindContractsForRule("antidrift/no-handrolled-resource-lifecycle-cells").length !== 3 || semanticFactKindContractsForAdapterId("not-real").length !== 0) {\n' +
       '  throw new Error("Missing semantic fact contract lookup behavior");\n' +
-      "}\n" +
-      "\n" +
-      "const runtimeRuleStatus = ruleStatusManifest(loadRuleStatusRegistrySync('policy'));\n" +
-      'if (ruleStatusEntryForId("antidrift/no-structural-type-fork", runtimeRuleStatus)?.kind !== "active" || ruleStatusEntriesForKind("research", runtimeRuleStatus)[0]?.id !== "ecosystem/import-cycle" || ruleStatusEntriesForProofBucket("authority-index-ownership", runtimeRuleStatus)[0]?.id !== "antidrift/no-structural-type-fork" || !ruleStatusEntriesForProofBucket("local-ast-source-shape", runtimeRuleStatus).some((entry) => entry.id === "antidrift/no-async-array-method") || !ruleStatusEntriesForProofBucket("local-ast-source-shape", runtimeRuleStatus).some((entry) => entry.id === "antidrift/no-nullable-positional-tuple") || !ruleStatusEntriesForProofBucket("local-ast-source-shape", runtimeRuleStatus).some((entry) => entry.id === "antidrift/no-raw-fetch-in-component") || ruleStatusEntriesForSemanticAdapter("async-control-flow", runtimeRuleStatus)[0]?.id !== "antidrift/no-async-array-method" || ruleStatusEntriesForSemanticAdapter("type-owner", runtimeRuleStatus)[0]?.id !== "antidrift/no-structural-type-fork" || ruleStatusEntriesForStatus("retired", runtimeRuleStatus)[0]?.id !== "antidrift/no-status-triplet-state") {\n' +
-      '  throw new Error("Missing rule status registry behavior");\n' +
-      "}\n" +
-      "\n" +
-      'if (ruleStatusSemanticSummaryForId("antidrift/no-async-array-method", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "async-control-flow" || ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "react-state" || ruleStatusSemanticSummaryForId("antidrift/no-handrolled-resource-lifecycle-cells", runtimeRuleStatus)?.semanticFactContracts.map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" || ruleStatusSemanticSummaryForId("antidrift/no-raw-fetch-in-component", runtimeRuleStatus)?.proofBuckets.join(",") !== "local-ast-source-shape" || ruleStatusSemanticSummaryForId("antidrift/no-nullable-positional-tuple", runtimeRuleStatus)?.semanticAdapters[0]?.id !== "tuple-shape") {\n' +
-      '  throw new Error("Missing joined rule semantic summary behavior");\n' +
       "}\n" +
       "\n" +
       'if (semanticFactKindContractsForEmission("inventory-only").map((entry) => entry.factKind).join(",") !== "broadSetterCoMutation,sourceMemberStateShardCandidate,changeContractConformance" || semanticFactKindContractsForEmission("blocking-diagnostic").length !== 3 || semanticFactKindContractsForConfidence("deterministic-enforcement").length !== 3 || semanticFactKindContractsForEmission("not-real").length !== 0) {\n' +

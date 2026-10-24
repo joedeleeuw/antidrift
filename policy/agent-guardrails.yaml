@@ -230,10 +230,6 @@ clusters:
         severity: error
         detector: antidrift:no-else-if-chain
         message: Declare the case space first with a typed table, a discriminated union or an exhaustive switch.
-      - id: provenance/no-hash-literal # S1 64-hex literals bound to hash, sha, digest, checksum or integrity names.
-        severity: error
-        detector: antidrift:no-hash-literal
-        message: Do not pin repo content by hash; third-party artifact pins belong in lockfiles.
       - id: provenance/no-host-path-literal # S4 /home/<user>/ and /Users/<user>/ literals outside tests.
         severity: error
         detector: antidrift:no-host-path-literal

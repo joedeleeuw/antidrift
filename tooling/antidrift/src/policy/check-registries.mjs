@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 
 import {
   checkDomainRegistries,
-  readPolicySource,
   readRegistry,
 } from "./registry-checks/domain.mjs";
 import { checkPackageSurface } from "./registry-checks/package-surface.mjs";
@@ -16,7 +15,6 @@ export function checkRegistries({
   report = console.error,
 } = {}) {
   const errors = [];
-  const policySource = readPolicySource(policyDir, errors);
   const registries = {
     architecture: readRegistry(policyDir, "architecture", errors),
     boundaries: readRegistry(policyDir, "boundaries", errors),
@@ -30,7 +28,7 @@ export function checkRegistries({
   };
 
   checkDomainRegistries(registries, repoRoot, errors);
-  checkRuleRegistry(registries.rules, repoRoot, policySource, errors);
+  checkRuleRegistry(registries.rules, repoRoot, errors);
   checkSemanticContracts(registries.rules, repoRoot, errors);
   checkPackageSurface(repoRoot, errors);
 

@@ -79,49 +79,6 @@ export type SemanticFactProvenance =
   | "ts-program"
   | "package-manifest";
 
-export type RuleStatusEntryKind =
-  | "active"
-  | "retired"
-  | "research"
-  | "policy-review";
-
-export type RuleStatusProofBucket =
-  | "local-ast-source-shape"
-  | "semantic-source-type-provenance"
-  | "authority-index-ownership"
-  | "graph-config-source"
-  | "repo-session-runtime"
-  | "diff-relative";
-
-export interface RuleStatusPromotion {
-  proofBucket: RuleStatusProofBucket;
-  association: string;
-  blockingThreshold: string;
-  ecosystemComparison: string;
-  corpusEvidence: string;
-  realCorpusInventory: string;
-  realCorpusInventoryRefs: readonly string[];
-  claudeAdvisoryReview: string;
-  claudeAdvisoryReviewRefs: readonly string[];
-  replicationsNotIntroducedForTest: boolean;
-  knownFalsePositives: number;
-  knownFalseNegatives: number;
-  productionConcerns: string;
-  noSinkBehavior: string;
-  noDeadWorkBehavior: string;
-}
-
-export interface RuleStatusSemanticAdapterStatus {
-  status: "inline-pending";
-  reason: string;
-}
-
-export interface RuleStatusExamples {
-  exhaustive: false;
-  flags: readonly string[];
-  allows: readonly string[];
-}
-
 export type SqlParserServiceDeltaClassification =
   | "not-applicable"
   | "equivalent-without-parser-services"
@@ -165,54 +122,6 @@ export interface SemanticFactSink {
 
 export interface MemorySemanticFactSink extends SemanticFactSink {
   facts: SemanticFact[];
-}
-
-export interface RuleStatusManifestEntry {
-  id: string;
-  kind: RuleStatusEntryKind;
-  status?: string;
-  stable?: boolean;
-  signal?: string;
-  solveType?: string;
-  proofBuckets?: readonly RuleStatusProofBucket[];
-  referenceDoc?: string;
-  replacement?: string;
-  mergedInto?: string;
-  reason?: string;
-  nextAction?: string;
-  antidriftRule?: string;
-  coverage?: string;
-  corpusRepositories?: readonly string[];
-  external?: unknown;
-  examples?: RuleStatusExamples;
-  promotion?: RuleStatusPromotion;
-  semanticAdapterStatus?: RuleStatusSemanticAdapterStatus;
-}
-
-export interface RuleStatusManifest {
-  schemaVersion: number;
-  promotionRequirements: unknown;
-  entries: readonly RuleStatusManifestEntry[];
-}
-
-export interface RuleStatusSemanticAdapterSummary {
-  id: string;
-  exportName: string;
-  subpath: string;
-  rules: readonly string[];
-  proofBuckets: readonly string[];
-  semanticFactAdapterIds: readonly string[];
-  semanticFactKinds: readonly string[];
-  associations: readonly string[];
-  carrier: string;
-  semanticFactContracts: readonly SemanticFactKindContractEntry[];
-}
-
-export interface RuleStatusSemanticSummary {
-  entry: RuleStatusManifestEntry;
-  proofBuckets: readonly string[];
-  semanticAdapters: readonly RuleStatusSemanticAdapterSummary[];
-  semanticFactContracts: readonly SemanticFactKindContractEntry[];
 }
 
 export interface SemanticFactKindContract {
@@ -271,42 +180,6 @@ export function semanticFactToJsonLine(fact: SemanticFact): string;
 export function createJsonlFactSink(
   writeLine: (line: string) => void
 ): SemanticFactSink;
-export function loadRuleStatusRegistrySync(
-  policyDir?: string
-): Record<string, unknown>;
-export function ruleStatusManifest(
-  registry?: Record<string, unknown>
-): RuleStatusManifest;
-export function ruleStatusEntriesFromRegistry(
-  registry?: Record<string, unknown>
-): readonly RuleStatusManifestEntry[];
-export function ruleStatusEntryForId(
-  id: string,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
-): RuleStatusManifestEntry | null;
-export function ruleStatusEntriesForKind(
-  kind: RuleStatusEntryKind,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
-): readonly RuleStatusManifestEntry[];
-export function ruleStatusEntriesForProofBucket(
-  proofBucket: string,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
-): readonly RuleStatusManifestEntry[];
-export function ruleStatusEntriesForSemanticAdapter(
-  adapterId: string,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
-): readonly RuleStatusManifestEntry[];
-export function ruleStatusEntriesForStatus(
-  status: string,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
-): readonly RuleStatusManifestEntry[];
-export function ruleStatusSemanticSummaryForId(
-  id: string,
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
-): RuleStatusSemanticSummary | null;
-export function ruleStatusSemanticSummaries(
-  manifestOrRegistry?: RuleStatusManifest | Record<string, unknown>
-): readonly RuleStatusSemanticSummary[];
 export function renderPolicyArtifacts(
   policy: AgentGuardrailsPolicy
 ): PolicyArtifacts;

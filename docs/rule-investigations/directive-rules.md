@@ -10,13 +10,12 @@ Status: implemented; default error in the shared presets. Each rule names the di
 | `antidrift/no-fallback-to-empty`         | G7        | Oxlint  | error                                     |
 | `no-nested-ternary` (native)             | G8        | Oxlint  | owned by `@joedeleeuw/typescript-tooling` |
 | `unicorn-js/prefer-switch`               | G9        | Oxlint  | owned by `@joedeleeuw/typescript-tooling` |
-| `antidrift/no-hash-literal`              | S1        | Oxlint  | error                                     |
 | `governance-eslint/no-restricted-syntax` | S4        | Oxlint  | generated host-path selectors             |
 | `antidrift/no-dated-comments`            | S5        | Oxlint  | error                                     |
 
 ## Runtime choice
 
-All nine rules need only AST and scope data, which by the engine decision in `docs/rule-authoring.md` makes them Oxlint rules. G21, G22 and G5 still run in the ESLint pass because they have large existing debt and Oxlint has no baseline. ESLint's bulk suppressions (`eslint-suppressions.json`) are the ratchet: existing violations are pinned per file and rule, a new violation fails, and fixed violations must be pruned. The ESLint pass covers TypeScript through the typed block and JavaScript through a parser-only block that enables just these three rules.
+All eight rules need only AST and scope data, which by the engine decision in `docs/rule-authoring.md` makes them Oxlint rules. G21, G22 and G5 still run in the ESLint pass because they have large existing debt and Oxlint has no baseline. ESLint's bulk suppressions (`eslint-suppressions.json`) are the ratchet: existing violations are pinned per file and rule, a new violation fails, and fixed violations must be pruned. The ESLint pass covers TypeScript through the typed block and JavaScript through a parser-only block that enables just these three rules.
 
 Consumer adoption is one step: run
 

@@ -530,12 +530,12 @@
       "count": 1
     },
     "antidrift/no-vague-names": {
-      "count": 10
+      "count": 7
     }
   },
   "tooling/antidrift/src/policy/check-rule-surface.test.mjs": {
     "antidrift/no-nonindependent-test-oracle": {
-      "count": 9
+      "count": 4
     }
   },
   "tooling/antidrift/src/policy/cli.mjs": {
@@ -596,14 +596,6 @@
   "tooling/antidrift/src/policy/lib/git.mjs": {
     "antidrift/no-vague-names": {
       "count": 1
-    }
-  },
-  "tooling/antidrift/src/policy/lib/rule-status.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 2
     }
   },
   "tooling/antidrift/src/policy/lib/semantic-facts.mjs": {
@@ -686,18 +678,15 @@
       "count": 2
     },
     "antidrift/no-pass-through-parameters": {
-      "count": 14
+      "count": 2
     },
     "antidrift/no-vague-names": {
-      "count": 17
+      "count": 2
     }
   },
   "tooling/antidrift/src/policy/registry-checks/rules.test.mjs": {
     "antidrift/no-nonindependent-test-oracle": {
-      "count": 39
-    },
-    "antidrift/no-vague-names": {
-      "count": 6
+      "count": 2
     }
   },
   "tooling/antidrift/src/policy/registry-checks/semantic-contracts.mjs": {
@@ -710,17 +699,12 @@
   },
   "tooling/antidrift/src/policy/registry-checks/semantic.test.mjs": {
     "antidrift/no-nonindependent-test-oracle": {
-      "count": 34
+      "count": 31
     }
   },
   "tooling/antidrift/src/policy/repo-corpus.mjs": {
     "antidrift/no-vague-names": {
       "count": 16
-    }
-  },
-  "tooling/antidrift/src/policy/repo-corpus.test.mjs": {
-    "antidrift/no-vague-names": {
-      "count": 2
     }
   },
   "tooling/antidrift/src/policy/schema-roundtrip-inventory.mjs": {
@@ -829,7 +813,7 @@
   },
   "tooling/antidrift/test/consumer-monorepo.mjs": {
     "antidrift/no-compat-names": {
-      "count": 2
+      "count": 1
     }
   },
   "tooling/antidrift/test/consumer-workspace.mjs": {
@@ -850,7 +834,7 @@
       "count": 2
     },
     "antidrift/no-vague-names": {
-      "count": 8
+      "count": 6
     }
   }
 }

@@ -19,7 +19,7 @@ Each rule has one enforcement owner. Runtime migration must remove the old owner
 
 Generated code is excluded only when its file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Names such as `generated`, `_generated`, `*.gen.ts`, and `*.generated.ts` do not bypass lint on their own.
 
-Per-rule runtime ownership, tier, severity, retirement, and promotion facts live in `policy/registries/rules.yaml`, and the runtime configs declare which rules each pass enables. `pnpm policy:check-rule-surface` fails when a custom rule is enabled by both runtimes, so this document does not restate the per-rule enablement and default-off inventory lists.
+Runtime configs declare enablement and severity, while `retiredRules` in `policy/registries/rules.yaml` preserves published IDs and their replacements. `pnpm policy:check-rule-surface` checks plugin export/config membership and rejects a custom rule enabled by both runtimes. Behavioral tests and packed-consumer execution own evidence; no per-rule maturity or promotion list is maintained.
 
 Intentional baseline removals:
 

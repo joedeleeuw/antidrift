@@ -25,7 +25,7 @@ Edited in the current pass:
 - `docs/rule-roadmap.md`
 - `docs/rule-equivalence-audit.md`
 - `docs/policy-coverage.md` (since deleted; its per-rule facts live in `policy/registries/rules.yaml`)
-- `docs/rule-status-registry.md`
+- `docs/rule-status-registry.md` (since deleted; only operational semantic-fact contracts and published retirements remain in `policy/registries/rules.yaml`)
 - `docs/stable-promotion-inventory.md` (since deleted; its per-rule facts live in `policy/registries/rules.yaml`)
 - `docs/roadmap.md`
 - `policy/registries/rules.yaml`

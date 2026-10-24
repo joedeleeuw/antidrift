@@ -87,12 +87,6 @@ const allowedActiveRuleProofBuckets = new Set([
   "graph-config-source",
 ]);
 const allowedSemanticAdapterProofBuckets = allowedActiveRuleProofBuckets;
-const stableProofBucketsRequiringSemanticAdapterClaim = new Set([
-  "semantic-source-type-provenance",
-  "authority-index-ownership",
-  "graph-config-source",
-]);
-const allowedSemanticAdapterStatuses = new Set(["inline-pending"]);
 function requireString(value, label, errors) {
   if (typeof value !== "string" || value.length === 0) {
     errors.push(`${label} must be a non-empty string.`);
@@ -400,161 +394,6 @@ function checkSemanticAdapterContractRules(
     }
   }
 }
-function checkSemanticAdapterStableRuleProofBuckets(
-  rules,
-  proofBuckets,
-  ruleEntries,
-  contractLabel,
-  errors
-) {
-  for (const rule of rules) {
-    const entry = ruleEntries?.[rule];
-    if (entry?.stable !== true || !isRecord(entry.promotion)) {
-      continue;
-    }
-    const proofBucket = entry.promotion.proofBucket;
-    if (typeof proofBucket !== "string" || proofBucket.length === 0) {
-      continue;
-    }
-    if (!proofBuckets.includes(proofBucket)) {
-      errors.push(
-        `${contractLabel}.proofBuckets must include stable rule ${rule} promotion proofBucket (${proofBucket}).`
-      );
-    }
-  }
-}
-function checkSemanticAdapterStableRuleAssociations(
-  rules,
-  associations,
-  ruleEntries,
-  contractLabel,
-  errors
-) {
-  for (const rule of rules) {
-    const entry = ruleEntries?.[rule];
-    if (entry?.stable !== true || !isRecord(entry.promotion)) {
-      continue;
-    }
-    const { association, proofBucket } = entry.promotion;
-    if (
-      !stableProofBucketsRequiringSemanticAdapterClaim.has(proofBucket) ||
-      typeof association !== "string" ||
-      association.length === 0
-    ) {
-      continue;
-    }
-    if (!associations.includes(association)) {
-      errors.push(
-        `${contractLabel}.associations must include stable rule ${rule} promotion association.`
-      );
-    }
-  }
-}
-function claimedSemanticAdapterRules(contracts) {
-  const rules = new Set();
-  for (const contract of Object.values(contracts)) {
-    if (!isRecord(contract) || !Array.isArray(contract.rules)) {
-      continue;
-    }
-    for (const rule of contract.rules) {
-      if (typeof rule === "string" && rule.length > 0) {
-        rules.add(rule);
-      }
-    }
-  }
-  return rules;
-}
-function checkStableSemanticAdapterRuleClaims(
-  contracts,
-  ruleEntries,
-  label,
-  errors
-) {
-  if (!isRecord(ruleEntries)) {
-    return;
-  }
-  const claimedRules = claimedSemanticAdapterRules(contracts);
-  for (const rule of sortedStrings(Object.keys(ruleEntries))) {
-    const entry = ruleEntries[rule];
-    if (entry?.stable !== true || !isRecord(entry.promotion)) {
-      continue;
-    }
-    const { proofBucket } = entry.promotion;
-    if (!stableProofBucketsRequiringSemanticAdapterClaim.has(proofBucket)) {
-      continue;
-    }
-    if (!claimedRules.has(rule)) {
-      errors.push(`${label} must claim stable ${proofBucket} rule ${rule}.`);
-    }
-  }
-}
-function ruleEntryProofBuckets(entry) {
-  const buckets = [];
-  if (Array.isArray(entry?.proofBuckets)) {
-    for (const bucket of entry.proofBuckets) {
-      if (typeof bucket === "string" && bucket.length > 0) {
-        buckets.push(bucket);
-      }
-    }
-  }
-  if (
-    isRecord(entry?.promotion) &&
-    typeof entry.promotion.proofBucket === "string" &&
-    entry.promotion.proofBucket.length > 0
-  ) {
-    buckets.push(entry.promotion.proofBucket);
-  }
-  return buckets;
-}
-function checkRuleSemanticAdapterStatus(status, label, errors, { required }) {
-  if (status === undefined) {
-    if (required) {
-      errors.push(
-        `${label}.semanticAdapterStatus is required when non-local proof buckets are not claimed by a shipped semantic adapter.`
-      );
-    }
-    return;
-  }
-  if (!isRecord(status)) {
-    errors.push(`${label}.semanticAdapterStatus must be a mapping.`);
-    return;
-  }
-  if (!allowedSemanticAdapterStatuses.has(status.status)) {
-    errors.push(
-      `${label}.semanticAdapterStatus.status must be one of: ${[...allowedSemanticAdapterStatuses].join(", ")}.`
-    );
-  }
-  requireString(status.reason, `${label}.semanticAdapterStatus.reason`, errors);
-}
-function checkUnclaimedNonStableSemanticAdapterStatuses(
-  ruleEntries,
-  contracts,
-  errors
-) {
-  if (!isRecord(ruleEntries)) {
-    return;
-  }
-  const claimedRules = claimedSemanticAdapterRules(contracts);
-  for (const rule of sortedStrings(Object.keys(ruleEntries))) {
-    const entry = ruleEntries[rule];
-    if (!isRecord(entry) || entry.stable !== false) {
-      continue;
-    }
-    const hasNonLocalBucket = ruleEntryProofBuckets(entry).some((bucket) =>
-      stableProofBucketsRequiringSemanticAdapterClaim.has(bucket)
-    );
-    const required = hasNonLocalBucket && !claimedRules.has(rule);
-    if (!required && entry.semanticAdapterStatus === undefined) {
-      continue;
-    }
-    checkRuleSemanticAdapterStatus(
-      entry.semanticAdapterStatus,
-      `policy/registries/rules.yaml rules.${rule}`,
-      errors,
-      { required }
-    );
-  }
-}
 function semanticFactRulesMatchAdapter(factContract, rules) {
   if (!isRecord(factContract)) {
     return false;
@@ -678,7 +517,6 @@ function checkSemanticAdapterClaimedFactKinds(
 function checkSemanticAdapterContractEntry(key, contract, context) {
   const {
     activeRules,
-    ruleEntries,
     semanticFactKinds,
     seenIds,
     seenSemanticFactAdapterIds,
@@ -714,25 +552,7 @@ function checkSemanticAdapterContractEntry(key, contract, context) {
     `${contractLabel}.proofBuckets`,
     errors
   );
-  const associations = stringArray(
-    contract.associations,
-    `${contractLabel}.associations`,
-    errors
-  );
-  checkSemanticAdapterStableRuleProofBuckets(
-    rules,
-    proofBuckets,
-    ruleEntries,
-    contractLabel,
-    errors
-  );
-  checkSemanticAdapterStableRuleAssociations(
-    rules,
-    associations,
-    ruleEntries,
-    contractLabel,
-    errors
-  );
+  stringArray(contract.associations, `${contractLabel}.associations`, errors);
   const semanticFactAdapterIds = stringArray(
     contract.semanticFactAdapterIds,
     `${contractLabel}.semanticFactAdapterIds`,
@@ -815,7 +635,6 @@ export function checkSemanticAdapterContracts(
   activeRules,
   errors,
   label = "shipped semantic adapter contracts",
-  ruleEntries = {},
   semanticFactKinds = {}
 ) {
   if (!isRecord(contracts)) {
@@ -841,7 +660,6 @@ export function checkSemanticAdapterContracts(
   const seenSubpaths = new Map();
   const context = {
     activeRules,
-    ruleEntries,
     semanticFactKinds,
     seenIds,
     seenSemanticFactAdapterIds,
@@ -853,7 +671,6 @@ export function checkSemanticAdapterContracts(
   for (const key of sortedStrings(contractKeys)) {
     checkSemanticAdapterContractEntry(key, contracts[key], context);
   }
-  checkStableSemanticAdapterRuleClaims(contracts, ruleEntries, label, errors);
 }
 function hasExportModifier(node) {
   return ts
@@ -1256,13 +1073,7 @@ export function checkSemanticContracts(registry, repoRoot, errors) {
     activeRules,
     errors,
     "shipped semantic adapter contracts",
-    registry.rules,
     SEMANTIC_FACT_KINDS
-  );
-  checkUnclaimedNonStableSemanticAdapterStatuses(
-    registry.rules,
-    SEMANTIC_ADAPTER_CONTRACTS,
-    errors
   );
   checkSemanticAdapterAggregateSources(
     SEMANTIC_ADAPTER_CONTRACTS,

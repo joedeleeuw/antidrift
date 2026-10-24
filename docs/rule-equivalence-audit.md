@@ -2,7 +2,7 @@
 
 A custom rule earns ownership only when a maintained tool cannot express the intended proof or policy. Compare implementations and options against real drift and clean controls, not rule names or descriptions alone.
 
-This is the ownership policy, not a second rule catalog. `policy/registries/rules.yaml` is the source for each rule's status, implementation intent, ecosystem comparison, corpus evidence, limitations, and retirement record. `docs/lint-rule-parity.md` records runtime ownership. `docs/real-corpus-validation.md` explains how to reproduce corpus evidence.
+This is the ownership policy, not a second rule catalog. Plugin configs own active enablement and severity, behavioral tests own executable evidence, and `policy/registries/rules.yaml` owns only semantic-fact contracts and published retirements. `docs/lint-rule-parity.md` records runtime ownership. `docs/real-corpus-validation.md` retains historical real-source evidence rather than a promotion gate.
 
 ## Owners
 
@@ -16,14 +16,15 @@ This is the ownership policy, not a second rule catalog. `policy/registries/rule
 - Rika's `@rikalabs/no-property-default-fallbacks` is disabled by default. `enforceNoPropertyDefaultFallbacks: true` opts into that rule alone, not Rika's aggressive preset. `propertyDefaultAllowedFiles` declares repository-relative file patterns whose fully qualified suffixes match across checkout and config locations.
 - When Rika enforcement is enabled, Antidrift disables `no-sentinel-absence-fallback` in its ESLint config. It retains selectors for no-substitution template-literal sentinels, which Rika's implementation does not detect.
 - React Native restrictions remain opt-in. A consumer's `policy/registries/react-native.yaml` declares `replacementImport` and exact `allowedFiles`; without that policy, raw-touchable restrictions are inert.
+- `no-generic-module-names` is deprecated and disabled by default. Its implementation remains available for explicit opt-in users; `no-hash-literal` is retired and recorded in `retiredRules`.
 
 ## Decision procedure
 
 1. Check the installed rule implementation, options, and actual runtime support. A catalog match is only a hypothesis.
-2. Run current source from independent repositories with dependencies installed. Preserve both drift and clean controls; do not manufacture anchors for an inert rule.
+2. Use behavioral unit tests and existing real-source evidence first. Add current corpus probes only when they answer a genuine detection uncertainty; there is no recurring promotion sweep or unit-test quota.
 3. If the maintained rule proves the intended behavior, remove the custom implementation and record the replacement in `retiredRules`. Do not delete the published identifier's retirement history.
 4. If overlap is partial, say which shapes and policies differ. Do not call a broader aggressive preset an equivalent replacement merely because it intersects the custom rule.
 5. Keep generated configuration when the policy is a set of facts or selectors. Keep a custom semantic rule when its checker, provenance, ownership, or local control-flow proof is the distinguishing behavior.
 6. Verify the actual packed consumer, including positive cases, rejected cases, default-off behavior, and configured exceptions.
 
-Published rule identifiers remain in `policy/registries/rules.yaml` after retirement. Active evidence documents remain evidence; stale duplicated inventories are not a substitute for that registry.
+Published rule identifiers remain in `policy/registries/rules.yaml` after retirement. Historical evidence documents remain evidence, not maturity metadata or a second active rule catalog.

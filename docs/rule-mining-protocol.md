@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-13.
 
-One protocol, two products. Mining work history recovers (1) lint/policy rule candidates for this package and (2) repeated manual workflows worth packaging as skills, subagents, or automations. Both share the same evidence order and candidate gates; they differ only in the form menu. This operationalizes investigation-flow step 2 in `docs/rule-status-registry.md` — recover the original complaint — at inventory scale, instead of designing rules from syntax.
+One protocol, two products. Mining work history recovers (1) lint/policy rule candidates for this package and (2) repeated manual workflows worth packaging as skills, subagents, or automations. Both share the same evidence order and candidate gates; they differ only in the form menu. Recover the original complaint at inventory scale instead of designing rules from syntax. Historical investigations provide examples, not a promotion gate.
 
 ## Evidence Order
 
@@ -28,7 +28,7 @@ One protocol, two products. Mining work history recovers (1) lint/policy rule ca
 3. **Chronicle, if enabled** — discovery only; confirm details in the source system.
 4. **Repo evidence**: `docs/handoff.md`, `reports/`, `docs/rule-investigations/`, the registries.
 5. **Real corpora** under `/Users/sushi/code` (Chaski, Codebase Atlas, Sudocode, ...) to confirm the complaint exists in real code, not just in conversation.
-6. **Existing surface, before creating anything**: active and retired rule-status rows in `policy/registries/rules.yaml`, the shared Oxlint config, the reduced TypeChecker ESLint pass, hooks, policy scripts, and existing skills/automations. Reuse or extend; retired decisions do not reopen via mining.
+6. **Existing surface, before creating anything**: plugin configs, `retiredRules` in `policy/registries/rules.yaml`, the reduced TypeChecker ESLint pass, hooks, policy scripts, and existing skills/automations. Reuse or extend; retired decisions do not reopen via mining.
 
 ## Search Probes
 

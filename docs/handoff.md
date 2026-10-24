@@ -27,11 +27,10 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - `.claude/settings.json` and `.codex/hooks.json` enforce policy during agent tool use.
 - `docs/build-patterns.md` is the positive construction guide. Use it before inventing a new domain, contract, API, UI resource, or gateway shape.
 - `docs/feature-slice-template.md` is the lightweight planning shape for new work.
-- `policy/registries/rules.yaml` is the canonical custom-rule status registry: active status, signal choice, corpus repositories, production concerns, and stable-promotion state.
-- `docs/rule-status-registry.md` defines the vocabulary the rule status registry uses.
+- `policy/registries/rules.yaml` owns operational semantic-fact contracts and published retirement records, not maturity metadata.
+- Plugin configs own active enablement, and behavioral tests at those interfaces own executable evidence.
 - `docs/source-ledger.md` records where pulled rules, custom rules, rulesets, tools, and borrowed repo references came from.
-- `docs/real-corpus-validation.md` tracks which implemented custom rules have real Chaski-backed or fallback real-corpus evidence, and which rules remain under-proven.
-- `policy/registries/rules.yaml` owns current rule maturity, ecosystem ownership, corpus evidence gaps, and retirement decisions; do not recreate a hand-maintained gap inventory.
+- `docs/real-corpus-validation.md` preserves historical real-source evidence without making it a promotion requirement.
 - `docs/self-hosting-risks.md` records the self-linting failure modes and which layer owns each control.
 - `docs/roadmap.md` is limited to the hardened rules and chosen next scope: branded casts, appeasement casts, structural selector wrappers, status-triplet handling, unsafe-deserialize type signals, defensive shape probing, brand utilities, and cycle detection.
 
@@ -42,13 +41,13 @@ Turn repeated agent review failures into deterministic repository feedback. Agen
 - Runtime ownership is tracked in `docs/lint-rule-parity.md`; do not move or remove coverage without recording the new owner or accepted gap.
 - Source provenance for rules, rulesets, tools, and borrowed references is tracked in `docs/source-ledger.md`; update it when adding or replacing enforcement.
 - Non-TypeScript language checks generally belong to native tools in consuming repos, optionally coordinated by a repo-local orchestrator such as Trunk. The narrow exception is the opt-in packaged shell ast-grep rule pack behind `antidrift shell`; do not widen Antidrift into a broader multi-engine lint runner without a future `[policy-change]`.
-- Rule readiness is tracked in `policy/registries/rules.yaml`; do not call a rule stable until it has multiple independent real-repo replications that were not created for the rule, zero known false positives, zero known false negatives, no production concerns, and a grounded Claude Opus 4.8 advisory review.
+- Rule trust comes from behavioral tests and packed-consumer execution. Historical corpus evidence and unit tests are complementary; there is no stable-promotion checklist.
 - One owner per concept is the primary anti-duplication rule: import or derive from the owner instead of retyping local copies.
-- `policy:check-registries` protects registry-backed rule facts; `policy:check-rule-surface` protects custom rule export, runtime ownership, and severity.
+- `policy:check-registries` protects functional registry and semantic-fact contracts; `policy:check-rule-surface` protects custom rule export/config membership and single-runtime ownership.
 - `policy:validate-chaski` is the optional local real-corpus gate. It asserts rule behavior against explicit Chaski frontend/BFF files when `CHASKI_REPO` or `/Users/sushi/code/chaski` exists and skips otherwise.
 - `policy:research-external-corpus` runs optional non-Chaski evidence one named checkout at a time. It is intentionally outside release and session gates because live external paths and TypeScript programs are neither hermetic nor package-owned. Use `--corpus <name> --require` when a research claim depends on one checkout, and retain the resulting report as evidence.
 - SonarQube should ingest custom ESLint/generic external issues instead of owning bespoke TypeScript rules directly.
-- Claude Code and Codex hooks are the deterministic lifecycle layer for PreToolUse, PostToolUse, and Stop checks.
+- Claude Code and Codex hooks enforce PreToolUse and PostToolUse policy, with the full session gate in git pre-push rather than a Stop hook.
 - Oxlint hosts `eslint-plugin-boundaries` as the architecture-boundary layer.
 
 ## First agent task after unzip

@@ -248,6 +248,6 @@ The exact-forward slice is also retired. The read-only audit found no real non-t
 - Do not turn research stubs or retired evidence into blocking rules without real drift and clean controls.
 - Do not use AST shape as a proxy for intent when TypeChecker, registry, or scope evidence is required.
 
-## Registry
+## Current ownership
 
-The machine-readable registration lives in `policy/registries/rules.yaml` under `ruleFamilies.type-contract-authority`. `pnpm policy:check-registries` validates that every subset references known active, research, or retired rules and includes both flag and allow examples.
+This document explains the design and evidence behind the type-contract rules; it is not a second rule registry. Plugin configs and behavioral tests own active behavior. `pnpm policy:check-registries` validates operational semantic-fact contracts and published retirement records, not rule families or maturity metadata.

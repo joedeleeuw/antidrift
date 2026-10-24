@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Retire `antidrift/no-hash-literal` and its S1 policy directive. The implementation and default configuration are removed; the published ID remains in `retiredRules`.
+- Deprecate `antidrift/no-generic-module-names` and disable it in the default Oxlint config. Its implementation remains available for explicit opt-in users, with default-off and opt-in behavior verified in the packed consumer.
+- Remove the maturity/status layer: per-rule promotion and research metadata, policy-review and family registries, the `rule-status` CLI, and all `ruleStatus*` exports and `RuleStatus*` types. `policy/registries/rules.yaml` now owns only semantic-fact contracts and published retirement records; there is no replacement status catalog.
+- Validation now depends on actual plugin/config membership, single-runtime ownership, functional registries and semantic facts, behavioral tests, and packed-artifact execution. Corpus history remains useful evidence but is not a runtime dependency or maturity score, and unit-test count is not a trust metric.
+
 - Move generic rule ownership to `@joedeleeuw/typescript-tooling`: maintained TypeScript `no-explicit-any` coverage replaces `no-open-dictionary-at-boundary`; `unicorn-js/prefer-switch` replaces `no-else-if-chain`. React Native touchable restrictions become opt-in `no-restricted-imports` policy from `react-native.yaml`, and host-path literals move to `governance-eslint/no-restricted-syntax`. The four custom implementations are removed and their published IDs retain retirement records in `policy/registries/rules.yaml`.
 - Add `enforceNoPropertyDefaultFallbacks` for Rika's property-default rule alone, defaulting off, with repository-relative `propertyDefaultAllowedFiles` exceptions. Enabling it disables Antidrift's overlapping sentinel rule in ESLint and retains template-literal sentinel coverage. React Native restrictions remain inert without a configured owner.
 - Detect direct Zod identity transforms, TanStack registrations returned by direct factories and preserved through all-spread objects, and nominal brands proved by the same computed-property symbol used in an `in` check. Current external anchors cover Neblir, Letraz, XAI, Lightdash, and a Reflet clean control; `no-redundant-local-return-type` remains narrow and is not claimed as a TypeScript builtin or independently replicated rule.

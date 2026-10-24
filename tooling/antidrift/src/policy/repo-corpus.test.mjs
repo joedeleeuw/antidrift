@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  allowedInactiveRulesFromRegistry,
-  eslintCorpusRuleIds,
-  repoCorpusDecision,
-} from "./repo-corpus.mjs";
+import { eslintCorpusRuleIds, repoCorpusDecision } from "./repo-corpus.mjs";
 
 describe("repoCorpusDecision", () => {
   it("uses the ESLint-owned custom rule surface", () => {
@@ -17,68 +13,22 @@ describe("repoCorpusDecision", () => {
     ).toEqual(["antidrift/typed-rule"]);
   });
 
-  it("allows inactive rules only when their registry maturity forbids blocking enforcement", () => {
-    const allowedInactiveRules = allowedInactiveRulesFromRegistry({
-      rules: {
-        "antidrift/under-proven": {
-          status: "under-proven",
-          signal: "TypeChecker",
-        },
-        "antidrift/heuristic": { status: "ready", signal: "token-overlap" },
-        "antidrift/retired": { status: "retired", signal: "no-op stub" },
-        "antidrift/default-off": {
-          status: "ready",
-          stable: false,
-          defaultOff: true,
-          signal: "TypeChecker",
-        },
-        "antidrift/stable": { status: "ready", signal: "TypeChecker" },
-      },
-    });
-
-    expect(
-      [...allowedInactiveRules].sort((a, b) => a.localeCompare(b))
-    ).toEqual([
-      "antidrift/default-off",
-      "antidrift/heuristic",
-      "antidrift/retired",
-      "antidrift/under-proven",
-    ]);
+  it("fails when selected rules do not activate", () => {
     expect(
       repoCorpusDecision({
         findings: [],
-        inactiveRules: ["antidrift/default-off"],
-        allowedInactiveRules,
-      })
-    ).toBe("pass");
-    expect(
-      repoCorpusDecision({
-        findings: [],
-        inactiveRules: ["antidrift/under-proven"],
-        allowedInactiveRules,
-      })
-    ).toBe("pass");
-    expect(
-      repoCorpusDecision({
-        findings: [],
-        inactiveRules: ["antidrift/retired"],
-        allowedInactiveRules,
-      })
-    ).toBe("pass");
-    expect(
-      repoCorpusDecision({
-        findings: [],
-        inactiveRules: ["antidrift/stable"],
-        allowedInactiveRules,
+        inactiveRules: ["antidrift/configured-rule"],
       })
     ).toBe("fail");
+    expect(repoCorpusDecision({ findings: [], inactiveRules: [] })).toBe(
+      "pass"
+    );
   });
 
-  it("keeps error findings blocking even when inactive rules are allowed", () => {
+  it("keeps error findings blocking when no rules are inactive", () => {
     const decision = repoCorpusDecision({
       findings: [{ severity: "error" }],
-      inactiveRules: ["antidrift/under-proven"],
-      allowedInactiveRules: new Set(["antidrift/under-proven"]),
+      inactiveRules: [],
     });
 
     expect(decision).toBe("fail");

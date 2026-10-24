@@ -213,6 +213,16 @@ try {
   provePortableRules({ file, lintOxlint, packedFiles });
   proveAdoptionPresets({ file, runJson, lintOxlint, work });
 
+  const deprecatedFilenameRules = oxlintRuleIds(
+    lintOxlint(
+      "portable-proofs/no-generic-module-names/shared.ts",
+      "oxlint.config.mjs"
+    )
+  );
+  if (deprecatedFilenameRules.includes("antidrift/no-generic-module-names")) {
+    fail("Deprecated generic module naming must be off in the default config");
+  }
+
   const unconfiguredTouchableRules = oxlintRuleIds(
     lintOxlint("portable-proofs/raw-touchable.tsx", "oxlint.config.mjs")
   );
@@ -624,181 +634,6 @@ try {
       `semantic-manifest filters should expose rule/proof/fact slices, got: ${JSON.stringify({ reactStateSemanticManifest, asyncControlSemanticManifest, tupleShapeSemanticManifest, authoritySemanticManifest, structuralFactSemanticManifest, typeOwnerFactSemanticManifest })}`
     );
   }
-  const ruleStatus = runJson(
-    pnpmBinary,
-    ["exec", "antidrift", "rule-status", "policy"],
-    work
-  );
-  const activeRule = ruleStatus.entries.find(
-    (entry) => entry.id === "antidrift/no-structural-type-fork"
-  );
-  const retiredRule = ruleStatus.entries.find(
-    (entry) => entry.id === "antidrift/no-status-triplet-state"
-  );
-
-  if (
-    activeRule?.kind !== "active" ||
-    activeRule?.external?.decision !== "own-antidrift" ||
-    retiredRule?.kind !== "retired"
-  ) {
-    fail(
-      `rule-status should expose normalized consumer rule metadata, got: ${JSON.stringify(ruleStatus)}`
-    );
-  }
-  const typeOwnerRuleStatus = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "rule-status",
-      "policy",
-      "--semantic-adapter",
-      "type-owner",
-    ],
-    work
-  );
-  const asyncControlRuleStatus = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "rule-status",
-      "policy",
-      "--semantic-adapter",
-      "async-control-flow",
-    ],
-    work
-  );
-  const tupleShapeRuleStatus = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "rule-status",
-      "policy",
-      "--semantic-adapter",
-      "tuple-shape",
-    ],
-    work
-  );
-  const authorityRuleStatus = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "rule-status",
-      "policy",
-      "--proof-bucket",
-      "authority-index-ownership",
-    ],
-    work
-  );
-  const localAstRuleStatus = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "rule-status",
-      "policy",
-      "--proof-bucket",
-      "local-ast-source-shape",
-    ],
-    work
-  );
-  const retiredRuleStatus = runJson(
-    pnpmBinary,
-    ["exec", "antidrift", "rule-status", "policy", "--kind", "retired"],
-    work
-  );
-  const ecosystemCoveredRuleStatus = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "rule-status",
-      "policy",
-      "--status",
-      "ecosystem-covered",
-    ],
-    work
-  );
-  const reactStateSemanticSummary = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "rule-status",
-      "policy",
-      "--semantic-summary",
-      "--semantic-adapter",
-      "react-state",
-    ],
-    work
-  );
-  const localAstSemanticSummary = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "rule-status",
-      "policy",
-      "--semantic-summary",
-      "--proof-bucket",
-      "local-ast-source-shape",
-    ],
-    work
-  );
-
-  if (
-    typeOwnerRuleStatus.entries.map((entry) => entry.id).join(",") !==
-      "antidrift/no-structural-type-fork" ||
-    asyncControlRuleStatus.entries.map((entry) => entry.id).join(",") !==
-      "antidrift/no-async-array-method" ||
-    tupleShapeRuleStatus.entries.map((entry) => entry.id).join(",") !==
-      "antidrift/no-nullable-positional-tuple" ||
-    authorityRuleStatus.entries.map((entry) => entry.id).join(",") !==
-      "antidrift/no-structural-type-fork" ||
-    !localAstRuleStatus.entries.some(
-      (entry) => entry.id === "antidrift/no-async-array-method"
-    ) ||
-    !localAstRuleStatus.entries.some(
-      (entry) => entry.id === "antidrift/no-nullable-positional-tuple"
-    ) ||
-    !localAstRuleStatus.entries.some(
-      (entry) => entry.id === "antidrift/no-raw-fetch-in-component"
-    ) ||
-    retiredRuleStatus.entries.map((entry) => entry.id).join(",") !==
-      "antidrift/no-status-triplet-state" ||
-    ecosystemCoveredRuleStatus.entries.map((entry) => entry.id).join(",") !==
-      "ecosystem/import-cycle" ||
-    reactStateSemanticSummary.summaries
-      ?.map((summary) => summary.semanticAdapters[0]?.id)
-      .join(",") !== "react-state" ||
-    reactStateSemanticSummary.summaries?.[0]?.semanticFactContracts
-      ?.map((entry) => entry.factKind)
-      .join(",") !==
-      "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" ||
-    !localAstSemanticSummary.summaries?.some(
-      (summary) =>
-        summary.entry.id === "antidrift/no-async-array-method" &&
-        summary.semanticAdapters[0]?.id === "async-control-flow"
-    ) ||
-    !localAstSemanticSummary.summaries?.some(
-      (summary) =>
-        summary.entry.id === "antidrift/no-nullable-positional-tuple" &&
-        summary.semanticAdapters[0]?.id === "tuple-shape"
-    ) ||
-    !localAstSemanticSummary.summaries?.some(
-      (summary) =>
-        summary.entry.id === "antidrift/no-raw-fetch-in-component" &&
-        summary.proofBuckets?.join(",") === "local-ast-source-shape"
-    )
-  ) {
-    fail(
-      `rule-status filters should expose adapter/proof-bucket/status/semantic-summary slices, got: ${JSON.stringify({ typeOwnerRuleStatus, asyncControlRuleStatus, tupleShapeRuleStatus, authorityRuleStatus, localAstRuleStatus, retiredRuleStatus, ecosystemCoveredRuleStatus, reactStateSemanticSummary, localAstSemanticSummary })}`
-    );
-  }
-
   console.log(
     "6/7  typechecking every public export under supported TS resolution modes ..."
   );

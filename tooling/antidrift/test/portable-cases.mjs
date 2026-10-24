@@ -1,10 +1,5 @@
 export const portableCases = [
   {
-    name: "no-hash-literal",
-    invalid: `const patchSha256 = "${"ab".repeat(32)}";`,
-    valid: `const encryptionKey = "${"ab".repeat(32)}";`,
-  },
-  {
     name: "no-dated-comments",
     invalid: "// Verified against the live API on 2026-06-10.\nstart();",
     valid:

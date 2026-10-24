@@ -98,8 +98,8 @@ Registry status:
 - `change-relative` is an allowed semantic fact carrier in registry validation and public policy types.
 - Change-contract provenance literals are part of the public policy type surface.
 - `changeContractConformance` is mirrored in `policy/registries/rules.yaml` under `semanticFactKinds` as a command-owned fact with `rules: []` and `commandIds: ["antidrift/change-contract"]`.
-- `diff-relative` is an accepted command-owned proof bucket in registry validation and public rule-status types; it is rejected for active plugin-rule rows and semantic adapter contracts.
-- `antidrift/change-contract-conformance` is tracked as a research candidate with `proofBuckets: [diff-relative]`; it is not an active ESLint rule, not stable, and not blocking.
+- `diff-relative` is accepted only as a command-owned proof bucket in semantic-fact validation; semantic adapter contracts use the four source/type proof buckets instead.
+- `antidrift/change-contract-conformance` is an inventory-only command fact, not an active ESLint rule or a maturity-registry entry.
 
 **5. Architecture Integration**
 Module layout:

@@ -51,7 +51,6 @@ import noPlaceholderTestsRule from "./portable/no-placeholder-tests.js";
 import noUnlistedExternalImportsRule from "./portable/no-unlisted-external-imports.js";
 import noDatedCommentsRule from "./portable/no-dated-comments.js";
 import noFallbackToEmptyRule from "./portable/no-fallback-to-empty.js";
-import noHashLiteralRule from "./portable/no-hash-literal.js";
 import packageMetadata from "../../package.json" with { type: "json" };
 
 import { createSyntaxRules } from "../syntax-rules.mjs";
@@ -112,7 +111,6 @@ const rules = {
   "no-unlisted-external-imports": noUnlistedExternalImportsRule,
   "no-dated-comments": noDatedCommentsRule,
   "no-fallback-to-empty": noFallbackToEmptyRule,
-  "no-hash-literal": noHashLiteralRule,
   ...createSyntaxRules(),
   "no-unknown-type-aliases": noUnknownTypeAliasesRule,
   "no-unsafe-cast-chain": noChainedTypeAssertionsRule,

@@ -22,15 +22,6 @@ import {
 } from "./external-corpus/runner.mjs";
 import { generate } from "./generate-policy-artifacts.mjs";
 import {
-  loadRuleStatusRegistrySync,
-  ruleStatusEntriesForKind,
-  ruleStatusEntriesForProofBucket,
-  ruleStatusEntriesForSemanticAdapter,
-  ruleStatusEntriesForStatus,
-  ruleStatusManifest,
-  ruleStatusSemanticSummaries,
-} from "./lib/rule-status.mjs";
-import {
   noAppeasementRemediationCorpus,
   parseArgs as parseNoAppeasementRemediationArgs,
 } from "./no-appeasement-remediation-corpus.mjs";
@@ -82,65 +73,6 @@ import {
 } from "../semantic-adapters/index.mjs";
 
 const [, , command, ...args] = process.argv;
-
-function parseRuleStatusArgs(argv) {
-  const parsed = {
-    policyDir: "policy",
-    filters: [],
-    semanticSummary: false,
-  };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    const next = argv[index + 1];
-    if (arg === "--kind" && next) {
-      parsed.filters.push((manifest) => ({
-        ...manifest,
-        entries: ruleStatusEntriesForKind(next, manifest),
-      }));
-      index += 1;
-    } else if (arg === "--status" && next) {
-      parsed.filters.push((manifest) => ({
-        ...manifest,
-        entries: ruleStatusEntriesForStatus(next, manifest),
-      }));
-      index += 1;
-    } else if ((arg === "--semantic-adapter" || arg === "--adapter") && next) {
-      parsed.filters.push((manifest) => ({
-        ...manifest,
-        entries: ruleStatusEntriesForSemanticAdapter(next, manifest),
-      }));
-      index += 1;
-    } else if (arg === "--proof-bucket" && next) {
-      parsed.filters.push((manifest) => ({
-        ...manifest,
-        entries: ruleStatusEntriesForProofBucket(next, manifest),
-      }));
-      index += 1;
-    } else if (arg === "--semantic-summary") {
-      parsed.semanticSummary = true;
-    } else if (!arg.startsWith("--")) {
-      parsed.policyDir = arg;
-    }
-  }
-  return parsed;
-}
-
-function ruleStatusCommand(argv) {
-  const parsed = parseRuleStatusArgs(argv);
-  const manifest = ruleStatusManifest(
-    loadRuleStatusRegistrySync(parsed.policyDir)
-  );
-  const filteredManifest = parsed.filters.reduce(
-    (current, filter) => Object.freeze(filter(current)),
-    manifest
-  );
-  if (!parsed.semanticSummary) return filteredManifest;
-  return Object.freeze({
-    schemaVersion: filteredManifest.schemaVersion,
-    promotionRequirements: filteredManifest.promotionRequirements,
-    summaries: ruleStatusSemanticSummaries(filteredManifest),
-  });
-}
 
 function parseSemanticManifestArgs(argv) {
   const parsed = { filters: [] };
@@ -253,11 +185,6 @@ const commands = {
   "semantic-manifest": () => {
     process.stdout.write(
       `${JSON.stringify(semanticManifestCommand(args), null, 2)}\n`
-    );
-  },
-  "rule-status": () => {
-    process.stdout.write(
-      `${JSON.stringify(ruleStatusCommand(args), null, 2)}\n`
     );
   },
   sonar: () => eslintJsonToSonar(args[0], args[1]),

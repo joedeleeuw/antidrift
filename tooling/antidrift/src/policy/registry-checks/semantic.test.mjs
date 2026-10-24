@@ -73,7 +73,7 @@ describe("semantic contracts", () => {
     writeFileSync(
       existing,
       text.replace(
-        "\nrules:\n",
+        "\nretiredRules:\n",
         `
   badFact:
     rules: [antidrift/not-real]
@@ -84,7 +84,7 @@ describe("semantic contracts", () => {
     association: Bad test association.
     noSinkBehavior: Bad test behavior.
     payloadFields: [thing]
-rules:
+retiredRules:
 `
       )
     );
@@ -120,7 +120,7 @@ rules:
     writeFileSync(
       existing,
       text.replace(
-        "\nrules:\n",
+        "\nretiredRules:\n",
         `
   modelSuggestion:
     rules: [antidrift/no-handrolled-resource-lifecycle-cells]
@@ -131,7 +131,7 @@ rules:
     association: Model cluster to candidate semantic drift.
     noSinkBehavior: No fact is emitted and no diagnostic is produced.
     payloadFields: [candidate]
-rules:
+retiredRules:
 `
       )
     );
@@ -319,109 +319,6 @@ rules:
       "test semantic adapter contracts.reactState exported adapter must expose at least one runtime primitive."
     );
   });
-  it("rejects stable semantic adapter rules whose promotion proof bucket is not declared by the adapter contract", () => {
-    const messages = [];
-    checkSemanticAdapterContracts(
-      {
-        schemaProvenance: {
-          id: "schema-provenance",
-          exportName: "schemaProvenance",
-          subpath: "@joedeleeuw/antidrift/semantic-adapters/schema-provenance",
-          rules: ["antidrift/no-redundant-zod-parse"],
-          proofBuckets: ["semantic-source-type-provenance"],
-          semanticFactAdapterIds: [],
-          semanticFactKinds: [],
-          associations: ["parsed value to schema provenance"],
-          carrier: "TypeChecker plus schema provenance",
-        },
-      },
-      { schemaProvenance: {} },
-      new Set(["antidrift/no-redundant-zod-parse"]),
-      messages,
-      "test semantic adapter contracts",
-      {
-        "antidrift/no-redundant-zod-parse": {
-          stable: true,
-          promotion: { proofBucket: "local-ast-source-shape" },
-        },
-      }
-    );
-    expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts.schemaProvenance.proofBuckets must include stable rule antidrift/no-redundant-zod-parse promotion proofBucket (local-ast-source-shape)."
-    );
-  });
-  it("rejects stable semantic adapter rules whose promotion association is not declared by the adapter contract", () => {
-    const messages = [];
-    checkSemanticAdapterContracts(
-      {
-        schemaProvenance: {
-          id: "schema-provenance",
-          exportName: "schemaProvenance",
-          subpath: "@joedeleeuw/antidrift/semantic-adapters/schema-provenance",
-          rules: ["antidrift/no-redundant-zod-parse"],
-          proofBuckets: ["semantic-source-type-provenance"],
-          semanticFactAdapterIds: [],
-          semanticFactKinds: [],
-          associations: ["parsed value to schema provenance"],
-          carrier: "TypeChecker plus schema provenance",
-        },
-      },
-      { schemaProvenance: {} },
-      new Set(["antidrift/no-redundant-zod-parse"]),
-      messages,
-      "test semantic adapter contracts",
-      {
-        "antidrift/no-redundant-zod-parse": {
-          stable: true,
-          promotion: {
-            proofBucket: "semantic-source-type-provenance",
-            association: "Stable same-schema parse association.",
-          },
-        },
-      }
-    );
-    expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts.schemaProvenance.associations must include stable rule antidrift/no-redundant-zod-parse promotion association."
-    );
-  });
-  it("rejects stable semantic source rules that are not claimed by a shipped adapter contract", () => {
-    const messages = [];
-    checkSemanticAdapterContracts(
-      {
-        schemaProvenance: {
-          id: "schema-provenance",
-          exportName: "schemaProvenance",
-          subpath: "@joedeleeuw/antidrift/semantic-adapters/schema-provenance",
-          rules: ["antidrift/no-redundant-zod-parse"],
-          proofBuckets: ["semantic-source-type-provenance"],
-          semanticFactAdapterIds: [],
-          semanticFactKinds: [],
-          associations: ["parsed value to schema provenance"],
-          carrier: "TypeChecker plus schema provenance",
-        },
-      },
-      { schemaProvenance: {} },
-      new Set([
-        "antidrift/no-redundant-zod-parse",
-        "antidrift/no-unsafe-deserialize",
-      ]),
-      messages,
-      "test semantic adapter contracts",
-      {
-        "antidrift/no-redundant-zod-parse": {
-          stable: true,
-          promotion: { proofBucket: "semantic-source-type-provenance" },
-        },
-        "antidrift/no-unsafe-deserialize": {
-          stable: true,
-          promotion: { proofBucket: "semantic-source-type-provenance" },
-        },
-      }
-    );
-    expect(messages.join("\n")).toContain(
-      "test semantic adapter contracts must claim stable semantic-source-type-provenance rule antidrift/no-unsafe-deserialize."
-    );
-  });
   it("rejects semantic adapter aggregate runtime surfaces missing contract adapters", () => {
     const root = workspace();
     writeValidRulesRegistry(root);
@@ -519,7 +416,6 @@ rules:
       new Set(["antidrift/no-handrolled-resource-lifecycle-cells"]),
       messages,
       "test semantic adapter contracts",
-      {},
       {
         resourceLifecycleProof: {
           rules: ["antidrift/no-handrolled-resource-lifecycle-cells"],
@@ -551,7 +447,6 @@ rules:
       new Set(["antidrift/no-handrolled-resource-lifecycle-cells"]),
       messages,
       "test semantic adapter contracts",
-      {},
       {
         resourceLifecycleProof: {
           rules: ["antidrift/no-handrolled-resource-lifecycle-cells"],

@@ -2,7 +2,7 @@
 
 This roadmap is limited to the lint stack, the custom rules already hardened, and the specific next rules/utilities that motivated this project. Do not use this file to add unrelated policy families.
 
-For policy coverage status and evidence gaps, see `policyRuleReviews` and the active rule entries in `policy/registries/rules.yaml`. For runtime ownership and parity, see `docs/lint-rule-parity.md`. For the per-rule classification and keep/delegate/retire decision layer, see `docs/rule-roadmap.md`.
+For runtime ownership and parity, see `docs/lint-rule-parity.md`. For historical keep/delegate/retire decisions, see `docs/rule-roadmap.md`. Current enablement lives in the plugin configs; `policy/registries/rules.yaml` retains only semantic-fact contracts and published retirements.
 
 ## Current Scope
 
@@ -10,9 +10,9 @@ For policy coverage status and evidence gaps, see `policyRuleReviews` and the ac
 - Generic native and third-party rules are owned by `@joedeleeuw/typescript-tooling`, not reimplemented by Antidrift.
 - Syntax-only custom rules run through the Oxlint JavaScript plugin API.
 - Custom rules that require TypeScript `Program` or `TypeChecker` data remain in the reduced ESLint pass until Oxlint exposes equivalent custom-rule primitives.
-- Custom rule surface: the implemented `antidrift/*` rules exported by the ESLint and Oxlint plugins; `policy:check-rule-surface` keeps exports, runtime ownership, configuration, and corpus evidence aligned.
+- Custom rule surface: the implemented `antidrift/*` rules exported by the ESLint and Oxlint plugins; `policy:check-rule-surface` keeps exports, runtime ownership, and configuration aligned.
 - Antidrift's config factories retain custom-rule enablement and policy-derived mappings; maintained ecosystem rules come from the shared tooling package.
-- Type-contract authority is the registered rule family for the type-system work. See `docs/rule-family-type-contract-authority.md` for subsets, examples, non-goals, and research boundaries.
+- Type-contract authority remains the design frame for the type-system work. See `docs/rule-family-type-contract-authority.md` for subsets, examples, non-goals, and research boundaries; it is not a separate rule registry.
 
 ## Built And Hardened Scope
 

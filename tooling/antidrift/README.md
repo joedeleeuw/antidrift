@@ -16,7 +16,7 @@ The positive pattern behind the rules is one owner per concept: domain owns busi
 
 For example, `const loadItems = (id) => owner.load(id)` reports; call `owner.load(id)` directly at its callers. `button.onClick(() => owner.load(id))` remains a callback with deferred execution. For a subscription API, `useSyncExternalStore(subscribeToConsent, getSnapshot)` is the valid direct substitution only when `subscribeToConsent` has the adapter's signature and receiver semantics; do not replace a required stable adapter with a new inline arrow or `.bind`. ESLint-only consumers can enable the same rule through the ESLint plugin; do not enable it in both lint runtimes.
 
-The presets also enforce one rule per shared AGENT.md directive, each recorded with its directive ID in `policy/registries/rules.yaml`: `antidrift/no-fallback-to-empty` (G7), `antidrift/no-hash-literal` (S1) and `antidrift/no-dated-comments` (S5) in Oxlint, and `antidrift/no-vague-names` (G21), `antidrift/no-pass-through-parameters` (G22) and `antidrift/no-compat-names` (G5) in the ESLint pass. G8 maps to native `no-nested-ternary`, owned by `@joedeleeuw/typescript-tooling`. G9 maps to `unicorn-js/prefer-switch` there. S4 maps to generated host-path selectors enforced by `governance-eslint/no-restricted-syntax`.
+The presets also enforce shared AGENT.md directives recorded in `policy/agent-guardrails.yaml`: `antidrift/no-fallback-to-empty` (G7) and `antidrift/no-dated-comments` (S5) in Oxlint, and `antidrift/no-vague-names` (G21), `antidrift/no-pass-through-parameters` (G22) and `antidrift/no-compat-names` (G5) in the ESLint pass. G8 maps to native `no-nested-ternary`, owned by `@joedeleeuw/typescript-tooling`. G9 maps to `unicorn-js/prefer-switch` there. S4 maps to generated host-path selectors enforced by `governance-eslint/no-restricted-syntax`.
 
 The ESLint pass also enforces these syntax rules at error, exported by both plugins but configured only in ESLint:
 
@@ -69,9 +69,13 @@ pnpm add -D @joedeleeuw/antidrift @joedeleeuw/typescript-tooling oxlint oxlint-t
 
 Oxlint 1.75+ and `oxlint-tsgolint` 7 are required for the stable type-aware pass. That pass uses TypeScript 7 semantics and requires a TypeScript 7-compatible `tsconfig`; it does not use the workspace's installed TypeScript package. ESLint 9.38+ or 10.x, TypeScript 5+ (TypeScript 6.0.x when composing tooling), typescript-eslint 8+, and `@typescript-eslint/parser` remain required for the custom TypeChecker-rule pass.
 
-## Stability
+## Behavior and configuration
 
-Experimental inventory commands, semantic fact payloads, registry metadata, and research rules are distributable evidence surfaces, not backward-compatible APIs. They may change between releases until promoted. Invalid configuration should fail loudly instead of falling back to weaker analysis.
+Behavioral unit tests, real repository checks, and packed-consumer verification are the trust signals. Historical corpus evidence is complementary, not a runtime dependency or maturity score; a rule is not untested merely because it lacks new unit tests or new corpus hits.
+
+Configured severity describes wiring, not a claim that every rule fires in every repository. Domain models, statuses, authorization functions, generated owners, and other consumer facts come from the registries that need them. Registry-driven rules act on those facts rather than manufacturing project ownership.
+
+`antidrift/no-generic-module-names` is deprecated and off by default; enable it explicitly only if your team wants its filename blocklist. `antidrift/no-hash-literal` is retired and its published ID remains in `retiredRules`. Invalid configuration fails loudly instead of falling back to weaker analysis.
 
 ## Use the configs
 
@@ -167,7 +171,6 @@ npx antidrift check-rule-surface
 npx antidrift shell
 npx antidrift shell test
 npx antidrift semantic-manifest
-npx antidrift rule-status
 pnpm package:verify
 pnpm policy:validate-corpus
 pnpm policy:validate-chaski
@@ -185,21 +188,20 @@ pnpm policy:inventory-underchecked-predicate
 npx antidrift repo-corpus --slice current-work --rules import/no-cycle
 ```
 
-The first two validate registry-backed rule facts and verify every custom rule is exported, configured, mature enough for its severity, and enabled by at most one runtime. Plugin tests own executable bad and clean behavior evidence; the surface check does not duplicate that evidence in a corpus manifest.
+The first two validate functional registry and semantic-fact contracts and verify every custom rule is exported, configured, and enabled by at most one runtime. Plugin and packed-consumer tests own executable bad and clean behavior evidence; there is no maturity check.
 `shell` runs the packaged ast-grep shell guardrails against the current project. It is opt-in source lint for shell scripts, not an ESLint rule and not an automatic hook installer. `antidrift shell test` validates the packaged ast-grep rule tests.
 `semantic-manifest` prints the composed semantic adapter/fact contract registry as JSON, so downstream tools can discover proof buckets, owned associations, and emitted fact kinds without importing source internals. Use `--adapter`, `--rule`, `--proof-bucket`, `--fact-adapter`, or `--fact-kind` to print a filtered adapter slice.
-`rule-status` prints a normalized view of `policy/registries/rules.yaml`, including active, retired, research, and policy-review rows, so experimental rules can ship with explicit maturity and delegation metadata. Use `--kind`, `--status`, `--semantic-adapter`, or `--proof-bucket` to print a filtered manifest. Add `--semantic-summary` to print joined summaries for the filtered rows. Proof-bucket filtering includes both semantic-adapter contracts and registry `promotion.proofBucket` rows. The policy subpath exposes the same helpers plus joined rule semantic summaries for downstream tooling.
 `oxlint` runs the repository's root Oxlint config through the packaged binary. The repository root composes governance with its own native and type-aware lint choices, local complexity scope, and boundary graph.
-`package:verify` packs the npm tarball, installs it in a throwaway consumer workspace, type-checks every public export under Bundler and NodeNext resolution, imports every runtime export, runs the shipped lint configs, proves `SEMANTIC_FACT_KINDS` and the public semantic adapters are available to consumer tooling, proves the CLI exposes the composed semantic manifest and normalized rule-status registry, and proves a configured semantic fact sink receives a generated-source `structuralMatch` fact.
+`package:verify` packs the npm tarball, installs it in a throwaway consumer workspace, type-checks every public export under Bundler and NodeNext resolution, imports every runtime export, runs the shipped lint configs, proves `SEMANTIC_FACT_KINDS` and the public semantic adapters are available to consumer tooling, proves the CLI exposes the composed semantic manifest, verifies the deprecated filename rule is off by default and reports on explicit opt-in, and proves a configured semantic fact sink receives a generated-source `structuralMatch` fact.
 `check-rule-surface` is only meaningful in this source repository layout; installed consumers can use `verify-session`, `check-generated`, and the normal Oxlint and reduced ESLint passes without carrying Antidrift's own rule tests.
 `policy:validate-corpus` exercises the remaining ESLint-owned rules against the maintained project inventory; the normal Oxlint pass covers Oxlint-owned rules. `repo-corpus` can narrow ESLint evidence to the rules changed in a slice, while the Chaski corpus executes native Oxlint cases directly where ownership moved.
 `policy:validate-chaski` is an optional local corpus gate: it runs explicit assertions against real Chaski frontend/BFF files when `CHASKI_REPO` or `~/code/chaski` is available, and skips otherwise so consumers do not need the private corpus.
-`policy:benchmark-sql-queries` runs `antidrift/no-sql-string-concat` on real SQL programs and emits `parserServiceDeltas`: extra-only non-type-aware identifier reports are inventory, while missing non-type-aware findings or parser errors block promotion.
+`policy:benchmark-sql-queries` runs `antidrift/no-sql-string-concat` on real SQL programs and emits `parserServiceDeltas`: extra-only non-type-aware identifier reports are inventory, while missing non-type-aware findings or parser errors remain release-blocking.
 `policy:inventory-change-contract` runs the inventory-only change-contract spine. Missing contracts exit 0, invalid contracts fail loudly, and present contracts compare merge-base change surfaces against declared paths, dependencies, exports, and optional module graph radius (`--tsconfig` is required when graph entrypoints are declared).
 `policy:validate-change-contract-evidence` replays the documented change-contract MVP gold true-positive and true-negative commits against local `sudocode-main` and `chaski` clones. It fails loudly when a required repo or SHA is unavailable, writes `reports/change-contract-evidence.json`, and is a source-repo evidence gate rather than a consumer requirement.
 `policy:inventory-diff-scoped-adapters` runs existing ESLint adapters against changed JS/TS files and filters diagnostics plus semantic facts to changed patch hunks. It is an inventory proof filter over the diff, not a blocking gate.
-`policy:inventory-defensive-shape` is a non-blocking sunset inventory for `no-defensive-shape-probing`. It compares the default-off custom rule with adjacent TypeScript ESLint unsafe rules under parser services and records syntax pressure separately from diagnostics.
-`policy:inventory-declaration-clone` is a non-blocking research inventory for duplicate object contract declarations. It uses the TypeScript checker to group interface declarations and literal object type aliases by exact declared-member name/type/optional/readonly fingerprints, and separates generated-only, mixed generated/source, and source-only clone groups. `policy:inventory-declaration-clone-source-fleet` runs the same inventory against configured local real-code corpora for promotion evidence mining.
+`policy:inventory-defensive-shape` is a non-blocking sunset inventory for `no-defensive-shape-probing`. It compares the custom rule with adjacent TypeScript ESLint unsafe rules under parser services and records syntax pressure separately from diagnostics.
+`policy:inventory-declaration-clone` is a non-blocking research inventory for duplicate object contract declarations. It uses the TypeScript checker to group interface declarations and literal object type aliases by exact declared-member name/type/optional/readonly fingerprints, and separates generated-only, mixed generated/source, and source-only clone groups. `policy:inventory-declaration-clone-source-fleet` runs the same inventory against configured local real-code corpora for research evidence mining.
 `policy:inventory-react-state` is a non-blocking semantic fact inventory for React state co-mutation. It classifies broad setter co-mutation separately from `no-handrolled-resource-lifecycle-cells` diagnostics so broad inventory cannot become accidental enforcement. Pass `--repo` and `--targets "src/**/*.{ts,tsx}"` to scan a specific checkout; target splitting preserves brace globs.
 `policy:inventory-schema-roundtrip` is a non-blocking research inventory for same-schema `.parse({ ...typedState })` shapes; it classifies real anchors instead of failing the build.
 `policy:inventory-type-owner` is a non-blocking proposal inventory for structural type ownership. It scans local type alias and interface declarations per repo plan, classifies them against installed-package, registry generated-source, and implicit Convex generated owner candidates with the structural relation engine, and emits owner-match rows (test files tagged) plus ready-to-accept `ownership.yaml` `packageTypeOwners` proposals for exact installed-package copies.
@@ -255,7 +257,7 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/eslint-plugin` — the TypeChecker plugin, if you'd rather wire those rules by hand
 - `@joedeleeuw/antidrift/oxlint-config` — custom drift governance and registry-aware import restrictions
 - `@joedeleeuw/antidrift/oxlint-plugin` — syntax-only custom rules supported by Oxlint's JavaScript plugin API
-- `@joedeleeuw/antidrift/policy` — policy check APIs, rule-status registry helpers, semantic fact sinks, and shipped `SEMANTIC_FACT_KINDS` contracts for advanced tooling
+- `@joedeleeuw/antidrift/policy` — functional policy checks, semantic fact sinks, and shipped `SEMANTIC_FACT_KINDS` contracts for advanced tooling
 - `@joedeleeuw/antidrift/semantic-adapters` — aggregate semantic adapter registry and contracts for tooling that wants the full shared proof surface
 - `@joedeleeuw/antidrift/semantic-adapters/async-control-flow` — async array callback and Promise collection-flow helpers shared by `no-async-array-method`
 - `@joedeleeuw/antidrift/semantic-adapters/auth-boundary` — route-param/authz frame tracking shared by `require-authz-check`
@@ -266,7 +268,7 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/semantic-adapters/sql` — SQL context, identifier-token, safe-member, and import/declaration-source safe-template-tag classifiers shared by `no-sql-string-concat`
 - `@joedeleeuw/antidrift/semantic-adapters/tuple-shape` — tuple nullish-slot classifiers shared by `no-nullable-positional-tuple`
 - `@joedeleeuw/antidrift/semantic-adapters/type-owner` — TypeChecker-backed owner candidate collectors for generated, domain, and installed-package structural authority
-- `antidrift` — the CLI binary for generate/check/report commands, opt-in `shell` guardrails, plus `semantic-manifest` and `rule-status` for machine-readable metadata
+- `antidrift` — the CLI binary for generate/check/report commands, opt-in `shell` guardrails, and `semantic-manifest` for machine-readable semantic-fact contracts
 
 The existing packed-consumer smoke installs both actual tarballs. Set `TYPESCRIPT_TOOLING_TARBALL` to a built artifact, or it packs the installed tooling dependency. No source checkout or symlink replaces that acceptance artifact.
 
@@ -447,7 +449,7 @@ The governance config enables 51 new agent guardrails at error severity. The [ru
 | `antidrift/no-disabled-tooltip-trigger`          | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-duplicate-context`                 | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-eager-singleton`                   | Portable agent guardrail; declared options and artifact proof                                                                |
-| `antidrift/no-generic-module-names`              | Portable agent guardrail; declared options and artifact proof                                                                |
+| `antidrift/no-generic-module-names`              | Deprecated filename blocklist; off by default, explicit opt-in with behavioral artifact proof                                |
 | `antidrift/no-inline-style-colors`               | Use declared palette/embedding scope; terminal black surface is a recorded platform boundary                                 |
 | `antidrift/no-omitted-prop-respread`             | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-partial-record-satisfies`          | Portable agent guardrail; declared options and artifact proof                                                                |

@@ -2,6 +2,8 @@
 
 Distilled, cited learnings from the 2026 antidrift research pass: the whitepaper market/literature survey, the opus-4-8 architecture review, three rule investigations, the solve-bucket taxonomy, and two independent lifecycle-proof external reviews (codex-out.md, opencode-out.md). Each learning is flagged to the antidrift rule(s) it changes. Rule IDs are drawn from `policy/registries/rules.yaml` and `policy/registries/solve-buckets.yaml`.
 
+This is a historical research record. References to maturity statuses and `promotionRequirements` describe the former process, not current configuration or release requirements. Current trust comes from behavioral tests and packed-artifact execution, not a promotion checklist.
+
 ---
 
 ## Learnings

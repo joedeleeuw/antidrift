@@ -29,7 +29,7 @@ export default createConfig({
 });
 ```
 
-The package should ship rules, loaders, validation, and starter templates. The consuming repo owns the registry contents. Experimental rules can still be distributed, but they should read consumer-owned authority facts and stay inert or inventory-only when the relevant registry is absent.
+The package ships rules, loaders, validation, and starter templates. The consuming repo owns the registry contents. Rules that need consumer-owned authority facts act only when those facts are supplied; missing optional facts do not manufacture findings, and malformed registries fail loudly.
 
 Treat the registry as a project authority index, not a dependency allowlist. Broad package scans may discover that a local type matches `@firebase/auth#User`; `ownership.yaml` records that this repo accepts that package export as an owner before future redeclarations block.
 
@@ -44,7 +44,7 @@ policy/registries/boundaries.yaml        route/action/job boundary functions
 policy/registries/dependencies.yaml      approved runtime dependency policy
 policy/registries/ownership.yaml         accepted package-type authority facts
 policy/registries/mcp.yaml               approved MCP servers and tool scopes
-policy/registries/rules.yaml             custom rule status, policy rule reviews, semantic fact kinds, signal, promotion, and next action
+policy/registries/rules.yaml             semantic fact contracts and published rule retirements
 ```
 
 ## Ownership Registry
@@ -73,12 +73,8 @@ Registry-backed rules should:
 
 Domain status and role entries should include `valuesExport` when the owner module exports a literal array. `pnpm policy:check-registries` compares registry values to that export so the registry cannot drift from the canonical domain module.
 
-Rule status entries should include every active `antidrift/*` rule exported by the plugin. Every active non-stable rule must declare one or more active-rule `proofBuckets` so package consumers can query the rule by proof carrier before it is stable; split rules may list multiple buckets when different branches have different proof floors. Semantic adapter buckets such as `semantic-source-type-provenance`, `authority-index-ownership`, and `graph-config-source` are claimed by shipped adapters or by `semanticAdapterStatus.status: inline-pending` while the proof still lives inside a rule. Command-owned buckets such as `diff-relative` are claimed by command/fact registry rows instead; they are invalid for active plugin-rule rows and semantic adapter contracts, do not imply a shipped semantic adapter, and must not be treated as an adapter fallback. Stable semantic-adapter proof still requires a shipped semantic adapter claim. Every active rule must name a repo-local `referenceDoc` that records the rule's current investigation state, ecosystem comparison, evidence, and blockers. Research candidates can use command-owned proof buckets only when the candidate ID is backed by a command-owned semantic fact such as `antidrift/change-contract-conformance`; candidates with sufficient online/ecosystem coverage should be marked `ecosystem-covered` instead of becoming custom rules.
-
-Stable active rules must include a `promotion` block and enough `corpusRepositories` entries to satisfy `promotionRequirements.stable.minIndependentRepositories`. The promotion block is the machine-checked promotion contract: proof bucket, semantic association or authority fact, blocking threshold, ecosystem comparison, corpus evidence, real-corpus inventory pointer, Claude advisory review pointer, non-test-created replication assertion, known false-positive and false-negative counts, production-concern state, no-sink behavior, and no-dead-work behavior. `realCorpusInventoryRefs` and `claudeAdvisoryReviewRefs` must be non-empty arrays of repo-relative paths that exist, so stable promotion cannot rely on stale prose. Ready or under-proven rules can omit the block until they meet the stable bar.
+`retiredRules` records published rule IDs that have been removed, why they were removed, and any replacement owner. It prevents identifier reuse without keeping compatibility implementations.
 
 Semantic fact kinds belong in `policy/registries/rules.yaml` under `semanticFactKinds`. Each emitted fact kind must name its owning active rule or command IDs, adapter ID, proof carrier, confidence level, emission mode, semantic association, no-sink behavior, and payload fields. Command-owned facts use `rules: []` plus non-empty `commandIds` so they stay out of the active lint-rule surface while remaining first-class policy facts. `pnpm policy:check-registries` compares this registry to the fact kinds emitted by the plugins and change-scope commands and to the shipped `SEMANTIC_FACT_KINDS` export from `@joedeleeuw/antidrift/policy`, so semantic adapters and command-owned facts become public package contracts instead of private internals. Behavioral plugin tests exercise emitted rule facts against the registered `payloadFields`, `adapterId`, rule IDs, and confidence values so payload drift breaks package verification.
 
-Policy rule reviews should include every rule ID named in `policy/agent-guardrails.yaml`, whether that ID is implemented as an active custom rule, covered by a maintained ecosystem rule, generated as Oxlint config, enforced by hooks or policy scripts, delegated to Sonar, merged into another rule, research-only, or spec-only. This keeps broad policy scope from being mistaken for active implementation scope. Changing runtime ownership is `[policy-change]` work.
-
-`pnpm policy:check-registries` fails when an active rule is missing from `policy/registries/rules.yaml`, when a retired rule is placed in the active table, when a locked retired/ecosystem-covered decision is removed or reactivated, when a policy-scoped rule lacks a review row, when a review row names a rule outside the policy source, or when investigation/stable-promotion gates are weakened.
+`pnpm policy:check-registries` validates functional consumer registries, semantic-fact contracts, and retirement records. `pnpm policy:check-rule-surface` independently checks plugin export/config membership and rejects duplicate runtime owners. Behavioral tests and packed-consumer execution provide evidence; there is no per-rule maturity, promotion, research, or policy-review registry.

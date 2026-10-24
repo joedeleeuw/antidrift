@@ -20,6 +20,7 @@ const BANNED_NAMES = new Set([
 ]);
 export const noGenericModuleNamesRule = {
   meta: {
+    deprecated: true,
     schema: [
       {
         type: "object",

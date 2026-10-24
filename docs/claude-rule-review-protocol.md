@@ -37,11 +37,11 @@ Project goal:
 - Use AST shape only when the syntax itself is the violation.
 - Do not suggest a second implementation of a rule already owned by Oxlint or the reduced ESLint pass.
 - Real source programs are the validation surface. Fixtures and reduced programs are regression aids only.
-- Stable promotion requires multiple independent repository replications that were not created to satisfy the rule, zero known false positives, zero known false negatives, and no unresolved production concerns.
+- Use behavioral tests and real artifact execution as evidence. Historical corpus results and unit tests are complementary, not a stable-promotion gate.
 
 Read at least:
 - policy/registries/rules.yaml
-- docs/rule-status-registry.md
+- docs/lint-rule-parity.md
 - docs/rule-investigations/<candidate>.md
 - docs/real-corpus-validation.md
 - docs/roadmap.md

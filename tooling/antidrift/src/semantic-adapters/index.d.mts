@@ -7,10 +7,7 @@ import * as schemaProvenance from "./projection/schema-provenance.ts";
 import * as sql from "./projection/sql.ts";
 import * as tupleShape from "./shape/tuple-shape.ts";
 import * as typeOwner from "./type-owner.mjs";
-import type {
-  RuleStatusProofBucket,
-  SemanticFactKindContractEntry,
-} from "../policy/index.mjs";
+import type { SemanticFactKindContractEntry } from "../policy/index.mjs";
 
 export {
   asyncControlFlow,
@@ -47,10 +44,11 @@ export type SemanticAdapterContractKey =
   | "tupleShape"
   | "typeOwner";
 
-export type SemanticAdapterProofBucket = Exclude<
-  RuleStatusProofBucket,
-  "repo-session-runtime" | "diff-relative"
->;
+export type SemanticAdapterProofBucket =
+  | "local-ast-source-shape"
+  | "semantic-source-type-provenance"
+  | "authority-index-ownership"
+  | "graph-config-source";
 
 export interface SemanticAdapterContract {
   id: string;

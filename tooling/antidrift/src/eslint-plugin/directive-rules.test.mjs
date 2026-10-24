@@ -229,21 +229,6 @@ typedRuleTester.run("no-vague-names", rule("no-vague-names"), {
   ],
 });
 
-const hash = "ab".repeat(32);
-
-ruleTester.run("no-hash-literal", rule("no-hash-literal"), {
-  valid: [
-    `const encryptionKey = "${hash}";`,
-    `expect(identityHash(input)).toBe(\`${hash}\`.slice(1));`,
-  ],
-  invalid: [
-    { code: `const patchSha256 = "${hash}";`, errors: 1 },
-    { code: `const source = { sha256: "${hash}" };`, errors: 1 },
-    { code: `if (digest !== "${hash}") fail();`, errors: 1 },
-    { code: `const patchSha256 = "${hash}" as const;`, errors: 1 },
-  ],
-});
-
 ruleTester.run("no-dated-comments", rule("no-dated-comments"), {
   valid: [
     'expect(cards[0]).toHaveTextContent("SPEC-002"); // 2024-01-21',

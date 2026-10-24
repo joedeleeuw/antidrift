@@ -1,10 +1,8 @@
 # Real Corpus Validation
 
-Reduced fixture programs are legacy regression aids only. They are not proof that antidrift catches real agent failure modes, and they are not completion gates. A rule becomes **ready** only after it has an explicit real-source assertion against a local corpus file.
+This is a historical evidence inventory, not a runtime dependency, maturity score, or promotion gate. Behavioral unit tests, historical real-source assertions, and packed-consumer execution all count as validation. A rule is not untested merely because it lacks new unit tests or new corpus hits.
 
-Clean-only corpus assertions are still useful: they protect against known real false positives, but the rule stays **under-proven** until a real drift file is also asserted.
-
-Deleting or reclassifying tracked drift evidence is `[policy-change]` work. Refresh moved paths and line anchors from live files; delete a case only when repository history proves the drift was remediated or removed.
+The investigations below used real-source assertions to challenge rules whose reduced fixtures hid false positives. Preserve that evidence when it remains useful, but do not turn it into a recurring promotion requirement. When updating the inventory, refresh moved paths and line anchors from live files and record removals in `[policy-change]` history.
 
 ## Local Chaski Gate
 

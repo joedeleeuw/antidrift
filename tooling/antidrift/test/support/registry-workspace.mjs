@@ -2,17 +2,9 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import eslintPlugin from "../../src/eslint-plugin/index.js";
-import oxlintPlugin from "../../src/oxlint-plugin/index.js";
 import { SEMANTIC_ADAPTER_CONTRACTS } from "../../src/semantic-adapters/index.mjs";
 import { SEMANTIC_FACT_KINDS } from "../../src/policy/lib/semantic-facts.mjs";
 
-export const plugin = {
-  rules: {
-    ...eslintPlugin.rules,
-    ...oxlintPlugin.rules,
-  },
-};
 export function workspace() {
   const root = mkdtempSync(join(tmpdir(), "antidrift-registries-"));
   mkdirSync(join(root, "policy", "registries"), { recursive: true });
@@ -24,27 +16,6 @@ export function writeRegistry(root, name, text) {
 export function touch(root, file) {
   mkdirSync(join(root, file, ".."), { recursive: true });
   writeFileSync(join(root, file), "");
-}
-export function writePolicySource(root, ruleIds) {
-  const rules = ruleIds
-    .map(
-      (id) => `      - id: ${id}
-        severity: error
-        detector: testDetector
-        message: Test message.
-`
-    )
-    .join("");
-  writeFileSync(
-    join(root, "policy", "agent-guardrails.yaml"),
-    `version: 1
-clusters:
-  - id: test-cluster
-    owner: test-owner
-    rules:
-${rules}
-`
-  );
 }
 export function writePackageJson(root, contents) {
   mkdirSync(join(root, "tooling", "antidrift"), { recursive: true });
@@ -191,7 +162,7 @@ ${commandIdsLine}    adapterId: ${contract.adapterId}
   return `semanticFactKinds:
 ${entries}`;
 }
-export const lockedRetiredRules = [
+const retiredRuleIds = [
   "antidrift/no-cycle",
   "antidrift/no-inline-disable-without-ticket",
   "antidrift/no-sdk-direct-use",
@@ -201,21 +172,11 @@ export const lockedRetiredRules = [
   "antidrift/no-obvious-comment",
   "antidrift/no-role-literal-in-type",
   "antidrift/no-cast-to-branded",
-  "antidrift/no-unsafe-cast-chain",
   "antidrift/no-status-triplet-state",
 ];
-export const lockedEcosystemCandidates = [
-  "ecosystem/discriminated-union-exhaustiveness",
-  "ecosystem/import-cycle",
-  "ecosystem/disable-comment-description",
-  "ecosystem/gateway-restricted-imports",
-  "ecosystem/vitest-test-integrity",
-  "ecosystem/react-hooks-compiler",
-  "ecosystem/sql-query-plugins",
-];
-export function lockedRuleSections(root) {
-  touch(root, "docs/locked-rule.md");
-  const retiredRules = lockedRetiredRules
+
+export function writeValidRulesRegistry(root) {
+  const retiredRules = retiredRuleIds
     .map(
       (rule) => `  ${rule}:
     status: retired
@@ -223,78 +184,12 @@ export function lockedRuleSections(root) {
 `
     )
     .join("");
-  const researchCandidates = lockedEcosystemCandidates
-    .map(
-      (rule) => `  ${rule}:
-    status: ecosystem-covered
-    signal: test-signal
-    solveType: test-solve
-    referenceDoc: docs/locked-rule.md
-    nextAction: Test action.
-`
-    )
-    .join("");
-  return `
-retiredRules:
-${retiredRules}
-researchCandidates:
-${researchCandidates}`;
-}
-export function writeValidRulesRegistry(root) {
-  touch(root, "docs/rule-roadmap.md");
-  const rules = Object.keys(plugin.rules)
-    .sort((a, b) => a.localeCompare(b))
-    .map(
-      (rule) => `  antidrift/${rule}:
-    status: ready
-    stable: false
-    signal: test-signal
-    solveType: test-solve
-    proofBuckets: [local-ast-source-shape]
-    referenceDoc: docs/rule-roadmap.md
-    corpusRepositories: []
-    concerns:
-      - Test non-stable blocker.
-    external:
-      state: net-antidrift
-      support: none
-      candidates: []
-      decision: own-antidrift
-      whyThisState: No supported equivalent is declared in this synthetic registry.
-      whyNotOtherState: Not ecosystem-covered because no upstream rule candidate is listed.
-    examples:
-      flags:
-        - bad()
-      allows:
-        - good()
-    nextAction: Test action.
-`
-    )
-    .join("");
   writeRegistry(
     root,
     "rules",
-    `
-schemaVersion: 1
-promotionRequirements:
-  investigation:
-    requireReferenceDoc: true
-    requireEcosystemCheck: true
-    requireClaudeAdvisoryKickoff: true
-  stable:
-    minIndependentRepositories: 2
-    requireReplicationsNotIntroducedForTest: true
-    maxKnownFalsePositives: 0
-    maxKnownFalseNegatives: 0
-    productionConcerns: none
-    requireClaudeAdvisoryReview: true
-    requireRealCorpusInventory: true
-statuses:
-  ready: Ready.
+    `schemaVersion: 1
 ${semanticFactKindSections()}
-rules:
-${rules}
-${lockedRuleSections(root)}
-`
+retiredRules:
+${retiredRules}`
   );
 }

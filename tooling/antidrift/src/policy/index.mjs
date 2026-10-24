@@ -13,18 +13,6 @@ export {
   semanticFactToJsonLine,
 } from "./lib/semantic-facts.mjs";
 export {
-  loadRuleStatusRegistrySync,
-  ruleStatusEntriesForKind,
-  ruleStatusEntriesForProofBucket,
-  ruleStatusEntriesForSemanticAdapter,
-  ruleStatusEntriesForStatus,
-  ruleStatusEntriesFromRegistry,
-  ruleStatusEntryForId,
-  ruleStatusSemanticSummaries,
-  ruleStatusSemanticSummaryForId,
-  ruleStatusManifest,
-} from "./lib/rule-status.mjs";
-export {
   generate,
   loadPolicy,
   renderPolicyArtifacts,

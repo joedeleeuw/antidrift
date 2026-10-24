@@ -10,7 +10,7 @@ Use Oxlint for baseline and type-aware ecosystem rules. Use its JavaScript plugi
 4. **Program Call-Graph & Evaluation Order (`callgraph/program-references.ts`, `callgraph/evaluation-order.ts`, `callgraph/hop-inline-verification.ts`):** `ts.LanguageService`-backed cross-file reference discovery and expression evaluation-order stepping.
 5. **Domain Provenance Graphs (`projection/schema-provenance.ts`, `projection/effect-schema.ts`, `projection/sql-provenance.ts`, `projection/sql-syntax.ts`, `projection/react-state.ts`):** Cross-library schema decode provenance (Zod, Effect Schema, Valibot, TypeBox), SQL fragment/identifier/escaper provenance, and React `useState` cell/transition provenance.
 
-Use the domain vocabulary in `GLOSSARY.md` and architectural decisions in `docs/adr/` throughout rule specs, investigations, and diagnostics. Use `docs/semantic-drift-goal.md` as the north-star requirement for new or migrated rules. A rule must recover a semantic association, authority fact, deterministic source construction, or repo/session proof surface (`docs/adr/0002-evidence-backed-provenance-over-name-heuristics.md`); every active rule in `policy/registries/rules.yaml` ships enabled by default at `"error"` (`defaultOff: false`). Use `docs/semantic-validation-matrix.md` to decide the rule's carrier, blocking threshold, and validation evidence before implementation or promotion.
+Use the domain vocabulary in `GLOSSARY.md` and architectural decisions in `docs/adr/` throughout rule specs, investigations, and diagnostics. Use `docs/semantic-drift-goal.md` as the north-star requirement for new or migrated rules. A rule must recover a semantic association, authority fact, deterministic source construction, or repo/session proof surface (`docs/adr/0002-evidence-backed-provenance-over-name-heuristics.md`). Plugin configs own active enablement and severity; deprecated rules are explicitly off. Use `docs/semantic-validation-matrix.md` to decide the rule's carrier, blocking threshold, and behavioral evidence before implementation.
 
 Keep baseline coverage in Oxlint and track ownership, replacement, or an accepted gap in `docs/lint-rule-parity.md`.
 
@@ -94,17 +94,14 @@ These should start as warnings:
 ## Rule implementation guidance
 
 - Keep each rule narrow and explain the desired replacement in the message.
-- Use syntax-only checks only when syntax is the violation.
-- Use the signal definitions in `docs/rule-status-registry.md` before choosing a rule approach. Syntax can be the violation for construction-pattern bans like `as unknown as T`, but it is not enough for ownership, trust, type authority, or domain meaning.
+- Use syntax-only checks only when syntax is the violation. Use the signal ladder above instead of a separate maturity registry.
 - Use `typescript-eslint` parser services for rules that need symbol identity, inferred types, assignability, imported declarations, or schema/type provenance.
-- Use real corpus assertions first when available. For this repo, `pnpm policy:validate-chaski` is the local Chaski-backed gate for real frontend/BFF behavior. If Chaski has only clean controls for a rule, run a named external corpus with `pnpm policy:research-external-corpus -- --corpus <name>` and document that research evidence in `docs/real-corpus-validation.md`.
-- Do not use reduced fixture programs as a completion gate. Real project files are the assertion surface for rule promotion.
-- Add or update the rule row in `policy/registries/rules.yaml` whenever a rule is added, retired, narrowed, reclassified, or considered for stable promotion.
+- Add behavioral tests at the plugin/config interface when they materially improve trust. Do not use reduced fixture programs as a completion gate or treat unit-test count as a trust metric.
+- Use historical real-source evidence and targeted corpus probes for genuine detection uncertainty. External research is optional, not a standing promotion sweep.
+- Update `policy/registries/rules.yaml` only for operational semantic-fact contracts or published retirements. There is no per-rule maturity map to maintain.
 - Add or update the corresponding provenance row in `docs/source-ledger.md` whenever a rule, ruleset, tool, or borrowed reference changes.
-- Do not mark `stable: true` in the rule registry until multiple independent real repositories replicate the behavior, with zero known false positives, zero known false negatives, no productionization concerns, and a grounded Claude Opus 4.8 advisory review.
 - Track any moved, deleted, or replaced lint rule in `docs/lint-rule-parity.md` with one enforcement owner, an explicit replacement, or an accepted gap.
-- Update `policyRuleReviews` in `policy/registries/rules.yaml` whenever a policy rule moves between spec-only, delegated, partial, and enforced.
-- Keep plugin exports, runtime ownership, severity, and corpus coverage aligned; `pnpm policy:check-rule-surface` fails when they drift.
+- Keep plugin exports, runtime ownership, and severity aligned; `pnpm policy:check-rule-surface` fails when they drift.
 - Keep registry-backed options valid; `pnpm policy:check-registries` fails when owner or wrapper paths are stale.
 - Emit machine-readable reports for Sonar import.
 - Do not rely on prompt instructions for a rule that can be enforced mechanically.
