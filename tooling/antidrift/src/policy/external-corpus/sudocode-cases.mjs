@@ -7,7 +7,7 @@ const sudocodeRepoCandidates = [
 ].filter(Boolean);
 
 const sudocodeCanonicalModelForkOptions = {
-  "antidrift/no-canonical-model-fork": [
+  "antidrift/no-structural-type-fork": [
     {
       canonicalEntities: {
         ProjectInfo: "server/src/types/project.ts",
@@ -504,7 +504,7 @@ const sudocodeCases = [
   },
   {
     id: "sudocode-project-info-frontend-model-fork",
-    ruleId: "antidrift/no-canonical-model-fork",
+    ruleId: "antidrift/no-structural-type-fork",
     kind: "drift",
     classification: "ready",
     subproject: "frontend",
@@ -529,7 +529,7 @@ const sudocodeCases = [
   },
   {
     id: "sudocode-project-info-owner-clean",
-    ruleId: "antidrift/no-canonical-model-fork",
+    ruleId: "antidrift/no-structural-type-fork",
     kind: "correct",
     classification: "ready",
     subproject: "server",

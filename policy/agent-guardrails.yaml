@@ -69,10 +69,10 @@ clusters:
         severity: off
         detector: mergedInto:ts/no-contract-appeasement-projection
         message: Do not use helper names as proof; use the type-aware contract projection rule.
-      - id: ts/no-inline-structural-type-at-use-site # Use-site structural contracts fork domain ownership.
+      - id: ts/no-structural-type-fork
         severity: error
-        detector: inlineObjectTypeInParameterOrVariable
-        message: Import or create the owned named type.
+        detector: antidrift:no-structural-type-fork
+        message: Import or derive the owned contract, hoist repeated field blocks, and remove provably redundant nested return annotations.
       - id: ts/no-nullable-positional-tuple # Multiple nullable tuple slots hide field meaning and partial-state combinations.
         severity: error
         detector: tupleTypeNullableOrOptionalSlotsGte:2
@@ -160,10 +160,6 @@ clusters:
         severity: error
         detector: tsLiteralTypeContainsCanonicalStatus # Registry-driven: options from policy/registries/domain.yaml statuses.
         message: Import the canonical status type instead of re-declaring the literal.
-      - id: domain/no-canonical-model-fork # Duplicate interfaces create semantic drift.
-        severity: warn
-        detector: newTypeSimilarToCanonicalModel
-        message: Extend or import the canonical model.
 
   - id: generated-type-drift # Agents hand-write types that already exist as generated output (Prisma, GraphQL codegen, OpenAPI, Protobuf). No supported ecosystem rule covers this project-owned authority check.
     owner: types-platform # Type platform owns codegen conventions and the generated registry.
@@ -173,10 +169,6 @@ clusters:
         severity: error
         detector: importSourceMatchesBannedGeneratedPattern # Registry-driven: options from policy/registries/generated.yaml; enforced via no-restricted-imports with message and pattern from each entry.
         message: Import from the approved generated-type wrapper, not the raw generated package.
-      - id: gen/no-structural-type-fork # Detects hand-written object types whose resolved properties are a subset of an installed package or configured generated-source exported type.
-        severity: error
-        detector: localObjectTypeSubsetOfInstalledPackageType # Type-aware (parserServices). Enumerates node_modules object types via the program checker, compares by property name + resolved type string. Unions/intersections excluded; min 4 properties.
-        message: Type matches an installed package's exported type — import it instead of redeclaring.
 
   - id: authorization-control-drift # Agents add executable boundaries without authz and tenancy.
     owner: security # Security owns route/action/job authorization templates.

@@ -237,7 +237,7 @@ export const murderboxCases = [
   },
   {
     id: "murderbox-model-selector-redundant-local-return-type",
-    ruleId: "antidrift/no-redundant-local-return-type",
+    ruleId: "antidrift/no-structural-type-fork",
     kind: "drift",
     classification: "ready",
     subproject: "client",
@@ -317,7 +317,7 @@ export const murderboxCases = [
   },
   {
     id: "murderbox-voice-session-object-field-blocks-clean",
-    ruleId: "antidrift/no-duplicated-object-field-blocks",
+    ruleId: "antidrift/no-structural-type-fork",
     kind: "correct",
     classification: "ready",
     subproject: "client",

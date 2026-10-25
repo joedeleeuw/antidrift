@@ -1,28 +1,33 @@
 import ts from "typescript";
 
+import { packageDirectory } from "../provenance/declared-dependencies.ts";
 import { resolveAliasedSymbol } from "../provenance/symbol-provenance.ts";
 import { boundedType, objectType } from "../shape/contract-types.ts";
 import type { StructuralTypeCandidate } from "../type-owner.mjs";
+import type {
+  OwnerAuthority,
+  OwnerProjection,
+  ProjectionRecord,
+} from "./owner-projection-view.ts";
+import { directOwnerReader } from "./owner-projection-view.ts";
 
-type OwnerSource = {
-  readonly authority: string;
-  readonly label: string;
-  readonly root: ts.Type;
+type OwnerCandidate = StructuralTypeCandidate & {
+  readonly reverses?: boolean;
 };
 
-export type OwnerProjection = {
-  readonly type: ts.Type;
-  readonly sources: ReadonlyMap<string, OwnerSource>;
-  readonly roots: ReadonlySet<ts.Type>;
-  readonly authority: string;
-  readonly label: string;
+export type OwnerProjectionIndex = {
+  readonly size: number;
+  readonly unresolved: ReadonlySet<ts.Type>;
+  getDirect(type: ts.Type): OwnerProjection | undefined;
+  get(type: ts.Type): OwnerProjection | undefined;
 };
 
-type ProjectionVisit = {
+type ProjectionVisit = OwnerAuthority & {
   readonly checker: ts.TypeChecker;
-  readonly owners: Map<ts.Type, OwnerProjection>;
-  readonly authority: string;
+  readonly owners: Map<ts.Type, ProjectionRecord>;
   readonly root: ts.Type;
+  readonly canVisit?: (type: ts.Type, depth: number) => boolean;
+  readonly target?: ts.Type;
 };
 
 type ProjectionPath = {
@@ -40,68 +45,307 @@ export function nonNullable(
   return type && checker.getNonNullableType(type);
 }
 
-function sortedJoin(names: Iterable<string>): string {
-  return [...new Set(names)].sort().join(" | ");
+function declaredInPackage(
+  type: ts.Type | undefined,
+  packageRoot: string
+): boolean {
+  if (!type) {
+    return false;
+  }
+  if (type.isUnionOrIntersection()) {
+    return type.types.some((part) => declaredInPackage(part, packageRoot));
+  }
+  const declarations = [
+    ...(type.aliasSymbol?.declarations ?? []),
+    ...(type.getSymbol()?.declarations ?? []),
+  ];
+  return declarations.some(
+    (declaration) =>
+      packageDirectory(declaration.getSourceFile().fileName) === packageRoot
+  );
+}
+
+function declaredInDefaultLibrary(type: ts.Type | undefined): boolean {
+  if (!type) {
+    return false;
+  }
+  if (type.isUnionOrIntersection()) {
+    return type.types.some((part) => declaredInDefaultLibrary(part));
+  }
+  const declarations = [
+    ...(type.aliasSymbol?.declarations ?? []),
+    ...(type.getSymbol()?.declarations ?? []),
+  ];
+  return declarations.some(
+    (declaration) =>
+      declaration.getSourceFile().isDeclarationFile &&
+      /(?:^|[/\\])lib\.[^/\\]*\.d\.ts$/u.test(
+        declaration.getSourceFile().fileName
+      )
+  );
 }
 
 function visitOwnerProjection(
   visit: ProjectionVisit,
   ownedType: ts.Type,
   path: ProjectionPath
-): void {
-  if (!objectType(ownedType) || path.depth === 0 || path.seen.has(ownedType)) {
-    return;
+): boolean {
+  if (
+    visit.canVisit?.(ownedType, path.depth) === false ||
+    !objectType(ownedType) ||
+    path.depth === 0 ||
+    path.seen.has(ownedType)
+  ) {
+    return false;
   }
   const sources = new Map(visit.owners.get(ownedType)?.sources ?? []);
   sources.set(`${visit.authority}:${path.label}`, {
     authority: visit.authority,
     label: path.label,
     root: visit.root,
+    reverses: visit.reverses === true,
   });
-  const sourceList = [...sources.values()];
-  visit.owners.set(ownedType, {
-    type: ownedType,
-    sources,
-    roots: new Set(sourceList.map((source) => source.root)),
-    authority: sortedJoin(sourceList.map((source) => source.authority)),
-    label: sortedJoin(sourceList.map((source) => source.label)),
-  });
+  visit.owners.set(ownedType, { type: ownedType, sources });
+  if (ownedType === visit.target) {
+    return true;
+  }
+  if (path.depth === 1) {
+    return false;
+  }
   const seen = new Set([...path.seen, ownedType]);
   for (const property of visit.checker.getPropertiesOfType(ownedType)) {
     const propertyType = visit.checker.getTypeOfSymbol(property);
-    visitOwnerProjection(
-      visit,
-      visit.checker.getNonNullableType(propertyType),
-      {
-        label: `${path.label}[${JSON.stringify(property.name)}]`,
-        depth: path.depth - 1,
-        seen,
-      }
-    );
+    if (
+      visitOwnerProjection(
+        visit,
+        visit.checker.getNonNullableType(propertyType),
+        {
+          label: `${path.label}[${JSON.stringify(property.name)}]`,
+          depth: path.depth - 1,
+          seen,
+        }
+      )
+    ) {
+      return true;
+    }
   }
+  return false;
+}
+
+type CandidateRoot = {
+  candidate: OwnerCandidate;
+  root: ts.Type;
+};
+
+function rootOwners(
+  checker: ts.TypeChecker,
+  candidates: readonly OwnerCandidate[]
+) {
+  const owners = new Map<ts.Type, ProjectionRecord>();
+  const roots = new Map<ts.Type, CandidateRoot[]>();
+  for (const candidate of candidates) {
+    if (candidate.authorityState !== "accepted" || !candidate.type) {
+      continue;
+    }
+    const root = candidate.type;
+    const ownedRoot = checker.getNonNullableType(root);
+    if (!objectType(ownedRoot)) {
+      continue;
+    }
+    visitOwnerProjection(
+      {
+        checker,
+        owners,
+        authority: candidate.authority,
+        root,
+        reverses: candidate.reverses === true,
+      },
+      ownedRoot,
+      { label: candidate.label, depth: 1, seen: new Set() }
+    );
+    roots.set(ownedRoot, [
+      ...(roots.get(ownedRoot) ?? []),
+      { candidate, root },
+    ]);
+  }
+  return { owners, roots };
+}
+
+function pendingRoots(
+  checker: ts.TypeChecker,
+  roots: ReadonlyMap<ts.Type, CandidateRoot[]>,
+  fields: ReadonlySet<string>,
+  target: ts.Type
+) {
+  return [...roots]
+    .map(([root, entries]) => {
+      const properties = checker.getPropertiesOfType(root);
+      return {
+        root,
+        entries,
+        targetsDirectly: properties.some(
+          (property) =>
+            checker.getNonNullableType(checker.getTypeOfSymbol(property)) ===
+            target
+        ),
+        score: properties.filter((property) => fields.has(property.name))
+          .length,
+      };
+    })
+    .sort(
+      (left, right) =>
+        Number(right.targetsDirectly) - Number(left.targetsDirectly) ||
+        right.score - left.score
+    );
+}
+
+type OwnerExpansion = Omit<
+  ProjectionVisit,
+  "authority" | "canVisit" | "reverses" | "target"
+> & {
+  readonly target: ts.Type;
+  entries: readonly CandidateRoot[];
+  search: { count: number; complete: boolean };
+};
+
+function expandOwnerRoot(expansion: OwnerExpansion) {
+  const { checker, owners, root, entries, search, target } = expansion;
+  let found = false;
+  for (const { candidate, root: sourceRoot } of entries) {
+    const visited = new Map<ts.Type, number>();
+    if (
+      visitOwnerProjection(
+        {
+          checker,
+          owners,
+          authority: candidate.authority,
+          root: sourceRoot,
+          reverses: candidate.reverses === true,
+          target,
+          canVisit(type, depth) {
+            if (!search.complete) {
+              return false;
+            }
+            const previousDepth = visited.get(type);
+            if (previousDepth !== undefined && previousDepth >= depth) {
+              return false;
+            }
+            visited.set(type, depth);
+            search.count += 1;
+            if (search.count > 4096) {
+              search.complete = false;
+              return false;
+            }
+            return true;
+          },
+        },
+        root,
+        { label: candidate.label, depth: maxOwnerDepth, seen: new Set() }
+      )
+    ) {
+      found = true;
+    }
+  }
+  return found;
+}
+
+function foreignRuntimeType(
+  type: ts.Type,
+  localPackageRoot: string | undefined,
+  hasLocalOwner: boolean,
+  localTypes: Map<ts.Type, boolean>
+): boolean {
+  if (localPackageRoot === undefined || hasLocalOwner) {
+    return false;
+  }
+  let local = localTypes.get(type);
+  if (local === undefined) {
+    local = declaredInPackage(type, localPackageRoot);
+    localTypes.set(type, local);
+  }
+  return local || declaredInDefaultLibrary(type);
 }
 
 export function ownerProjections(
   checker: ts.TypeChecker,
-  candidates: readonly StructuralTypeCandidate[]
-) {
-  const owners = new Map<ts.Type, OwnerProjection>();
-  for (const candidate of candidates) {
-    const root = candidate.type;
-    if (candidate.authorityState === "accepted" && root) {
-      visitOwnerProjection(
-        { checker, owners, authority: candidate.authority, root },
-        checker.getNonNullableType(root),
-        { label: candidate.label, depth: maxOwnerDepth, seen: new Set() }
+  candidates: readonly OwnerCandidate[],
+  localPackageRoot?: string
+): OwnerProjectionIndex {
+  const { owners, roots } = rootOwners(checker, candidates);
+  const resolved = new Map<ts.Type, OwnerProjection | null>();
+  const unresolved = new Set<ts.Type>();
+  const localTypes = new Map<ts.Type, boolean>();
+  const hasLocalOwner =
+    localPackageRoot !== undefined &&
+    candidates.some(
+      (candidate) =>
+        candidate.authorityState === "accepted" &&
+        declaredInPackage(candidate.type, localPackageRoot)
+    );
+  const directOwner = directOwnerReader(owners);
+  return {
+    unresolved,
+    get size() {
+      return owners.size;
+    },
+    getDirect: directOwner,
+    get(type) {
+      const direct = directOwner(type);
+      if (direct) {
+        unresolved.delete(type);
+        return direct;
+      }
+      if (!objectType(type)) {
+        return undefined;
+      }
+      if (resolved.has(type)) {
+        return resolved.get(type) ?? undefined;
+      }
+      if (
+        foreignRuntimeType(type, localPackageRoot, hasLocalOwner, localTypes)
+      ) {
+        resolved.set(type, null);
+        return undefined;
+      }
+      const fields = new Set(
+        checker.getPropertiesOfType(type).map((property) => property.name)
       );
-    }
-  }
-  return owners;
+      if (fields.size === 0) {
+        return undefined;
+      }
+      const search = { count: 0, complete: true };
+      const pending = pendingRoots(checker, roots, fields, type);
+      for (const { root, entries } of pending) {
+        expandOwnerRoot({
+          checker,
+          owners,
+          root,
+          entries,
+          search,
+          target: type,
+        });
+        const match = directOwner(type);
+        if (match) {
+          unresolved.delete(type);
+          resolved.set(type, match);
+          return match;
+        }
+        if (!search.complete) {
+          break;
+        }
+      }
+      if (!search.complete) {
+        unresolved.add(type);
+      }
+      resolved.set(type, null);
+      return undefined;
+    },
+  };
 }
 
 export function contextualOwner(
   checker: ts.TypeChecker,
-  owners: ReadonlyMap<ts.Type, OwnerProjection>,
+  owners: OwnerProjectionIndex,
   type: ts.Type | undefined
 ) {
   const contextualType = nonNullable(checker, type);

@@ -52,7 +52,8 @@ categories:
       Whole-repo module graph / architecture conformance (reflexion models, architectural fitness
       functions over history). Proves layering, cycles, feature-scatter, and — critically — owner
       DISCOVERY / uniqueness ("a second owner for concept X now exists"), which the per-file
-      authority-index cannot, because it only knows registry-DECLARED owners.
+      authority-index cannot prove outside the finding's dependency scope, even though it infers
+      candidate owners from registries, manifests, and public exports.
   dataflow-taint:
     status: not-yet-available
     summary: >-
@@ -96,19 +97,12 @@ rules:
       target: semantic-ast,
       note: "scoped parse-input rule: TypeChecker proves broad any/unknown JSON.parse input and local control flow proves string-boundary clean cases. Broader deserialization taint remains out of scope.",
     }
-  antidrift/no-canonical-model-fork:
-    {
-      current: semantic-ast,
-      fit: proven,
-      target: semantic-ast,
-      note: "authority-index whole-program type resolution; default-on only for DECLARED owners, with boundary DTO clean pressure and adversarial review still required for stable promotion. (Discovering NEW duplicate owners needs dependency-graph — see gaps.net-new-bias.)",
-    }
   antidrift/no-structural-type-fork:
     {
       current: semantic-ast,
       fit: proven,
       target: semantic-ast,
-      note: "authority-index; default-on for declared generated and accepted package owners, while stable promotion still requires independent generated-source and accepted package-owner evidence.",
+      note: "authority-index and package/public-export ownership inference; exact accepted owners, witnessed projections, unique workspace exported-name matches, repeated inline/field-block contracts, and proven local-return ownership share one rule.",
     }
   antidrift/no-status-literal-in-type:
     {
@@ -137,13 +131,6 @@ rules:
       fit: proven,
       target: semantic-ast,
       note: "contract-appeasement projection; TypeChecker plus structural return-flow proof. Ready; widened branch needs real corpus before stable.",
-    }
-  antidrift/no-inline-structural-type-at-use-site:
-    {
-      current: semantic-ast,
-      fit: proven,
-      target: semantic-ast,
-      note: "type-contract-shape; local AST proves the boundary shape, but evidence keeps it default-off until independent replication.",
     }
   antidrift/no-nullable-positional-tuple:
     {
@@ -242,7 +229,7 @@ gaps:
     {
       needs: dependency-graph,
       measured: 25,
-      note: "authority-index only enforces REGISTRY-DECLARED owners; it cannot catch the agent minting a NEW duplicate owner. Real fix: whole-repo owner-discovery/uniqueness (reflexion) pass.",
+      note: "authority-index infers owners from registries, manifests, and public exports, but a NEW duplicate owner outside the finding's dependency scope still needs whole-repo owner-discovery/uniqueness (reflexion).",
     }
   silent-fallback:
     {

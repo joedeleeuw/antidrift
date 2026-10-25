@@ -150,6 +150,10 @@ export function dependsBack(
   );
 }
 
+export function isInstalledPackageManifest(manifestPath: string): boolean {
+  return installedArtifact.test(realPath(dirname(manifestPath)));
+}
+
 function exportTargets(entry: unknown): string[] {
   if (typeof entry === "string") {
     return [entry];
@@ -321,7 +325,7 @@ export function unresolvedEntries(
   manifestPath: string,
   options: ts.CompilerOptions
 ): string[] {
-  if (installedArtifact.test(realPath(dirname(manifestPath)))) {
+  if (isInstalledPackageManifest(manifestPath)) {
     return [];
   }
   const { specifiers, undecided } = publicEntries(name, manifestPath);

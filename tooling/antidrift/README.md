@@ -21,13 +21,13 @@ The presets also enforce shared AGENT.md directives recorded in `policy/agent-gu
 The ESLint pass also enforces these syntax rules at error, exported by both plugins but configured only in ESLint:
 
 - G15 test independence: `antidrift/no-nonindependent-test-oracle`, `antidrift/no-validator-output-oracle`, `antidrift/no-schema-library-in-test`
-- W4 type reuse: `antidrift/no-inline-structural-type-at-use-site`, `antidrift/no-duplicated-object-field-blocks`, `antidrift/no-redeclared-owned-union`
+- W4 type reuse: `antidrift/no-redeclared-owned-union`
 - G4 boundary decoding: `antidrift/unknown-input-must-be-decoded`
 - G7 loud failure: `antidrift/no-sentinel-absence-fallback`, `antidrift/no-silent-empty-detection-fallback`
 - G11 one owner per concern: `antidrift/no-raw-fetch-in-component`
 - React and markup hygiene: `antidrift/no-calling-components-as-functions`, `antidrift/no-duplicated-conditional-classnames`
 
-The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-bag-reshaper`, `antidrift/no-redundant-zod-parse`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-restated-dependency-type`, `antidrift/no-unresolved-dependency-types`, `antidrift/no-redundant-local-return-type`, `antidrift/no-service-constructor-imports` and `antidrift/no-sql-string-concat` at error.
+The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-structural-type-fork`, `antidrift/no-bag-reshaper`, `antidrift/no-redundant-zod-parse`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-unresolved-dependency-types`, `antidrift/no-service-constructor-imports` and `antidrift/no-sql-string-concat` at error.
 
 Every ESLint-pass rule above, typed rules included, is ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
 
@@ -39,9 +39,6 @@ eslint . \
   --suppress-rule antidrift/no-nonindependent-test-oracle \
   --suppress-rule antidrift/no-validator-output-oracle \
   --suppress-rule antidrift/no-schema-library-in-test \
-  --suppress-rule antidrift/no-inline-structural-type-at-use-site \
-  --suppress-rule antidrift/no-restated-dependency-type \
-  --suppress-rule antidrift/no-duplicated-object-field-blocks \
   --suppress-rule antidrift/no-redeclared-owned-union \
   --suppress-rule antidrift/unknown-input-must-be-decoded \
   --suppress-rule antidrift/no-sentinel-absence-fallback \
@@ -56,7 +53,6 @@ eslint . \
   --suppress-rule antidrift/require-convex-return-validator \
   --suppress-rule antidrift/no-explicit-type-arguments-on-owned-api \
   --suppress-rule antidrift/no-schema-validator-transcoding \
-  --suppress-rule antidrift/no-redundant-local-return-type \
   --suppress-rule antidrift/no-service-constructor-imports \
   --suppress-rule antidrift/no-sql-string-concat
 ```
@@ -116,9 +112,9 @@ export default [
 ];
 ```
 
-The antidrift preset also parses every `package.json` with ESLint's JSON language (`@eslint/json`, a dependency of this package). `antidrift/no-unresolved-dependency-types` is enabled at error in that block and in the TypeScript block, independent of `antidrift/no-restated-dependency-type`: it reports a declared dependency that is not installed, or a workspace or linked dependency with a public entry that does not resolve to type declarations, on its manifest key, and each import of a declared package whose types do not resolve at the import. Spreading `createConfig()` supplies the language for `**/package.json`, so `eslint .` reports those gaps with no further setup. These reports stay out of the suppression ratchet above; a gap closes when the dependency is installed or built. ESLint 9.38 or later is required, as for the rest of the preset.
+The antidrift preset also parses every `package.json` with ESLint's JSON language (`@eslint/json`, a dependency of this package). `antidrift/no-unresolved-dependency-types` is enabled at error in that block and in the TypeScript block, independent of the structural owner: it reports a declared dependency that is not installed, or a workspace or linked dependency with a public entry that does not resolve to type declarations, on its manifest key, and each import of a declared package whose types do not resolve at the import. Spreading `createConfig()` supplies the language for `**/package.json`, so `eslint .` reports those gaps with no further setup. These reports stay out of the suppression ratchet above; a gap closes when the dependency is installed or built. ESLint 9.38 or later is required, as for the rest of the preset.
 
-`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, `antidrift/no-async-array-method`, `antidrift/no-handrolled-resource-lifecycle-cells`, `antidrift/no-status-literal-in-type`, `antidrift/no-repo-state-mirror-assertion`, and the imported rules for unknown aliases and chained assertions. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. `antidrift/require-authz-check` is enabled with registry-derived authorization functions and stays inert until they are configured. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services, the ratcheted syntax rules above, and `no-sql-string-concat` at error. The structural and canonical owner rules load `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
+`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, `antidrift/no-async-array-method`, `antidrift/no-handrolled-resource-lifecycle-cells`, `antidrift/no-status-literal-in-type`, `antidrift/no-repo-state-mirror-assertion`, and the imported rules for unknown aliases and chained assertions. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. `antidrift/require-authz-check` is enabled with registry-derived authorization functions and stays inert until they are configured. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services, the ratcheted syntax rules above, and `no-sql-string-concat` at error. The structural owner loads `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
 For the aggressive property-default policy, pass `enforceNoPropertyDefaultFallbacks: true` to both factories. `typescript-tooling` then owns Rika's rule, the ESLint config disables `no-sentinel-absence-fallback`, and both configs retain only no-substitution template-literal sentinel selectors. `propertyDefaultAllowedFiles` supplies repository-relative exceptions to the two Oxlint factories. No broad Rika preset is enabled.
 
@@ -274,7 +270,7 @@ The existing packed-consumer smoke installs both actual tarballs. Set `TYPESCRIP
 
 ## The rule worth installing this for
 
-`antidrift/no-structural-type-fork` asks the TypeScript type checker, not a list of names, whether the type you just hand-wrote is structurally a copy of a configured generated-source owner. Installed package matches are semantic inventory until a project accepts the package owner as authority. Convex generated owners are implicit: when the program contains `convex/_generated/dataModel` or `convex/_generated/api`, every `Doc<"table">`, `FunctionArgs<typeof api.*>`, and `FunctionReturnType<typeof api.*>` object contract is an accepted owner with no registry entry, and hand-written copies report only through a proven owner use. An unrelated matching shape is inventory, not a diagnostic; references, `Pick`/`Omit` projections, and near-miss shapes stay silent.
+`antidrift/no-structural-type-fork` uses the TypeScript checker plus package manifests, workspace and dependency public exports, generated declarations, exported names, exact shapes, and value flow to find duplicated owned contracts. Explicit generated, package, and domain owners remain supported, but are not required for ordinary inference. Convex generated owners are implicit: when the program contains `convex/_generated/dataModel` or `convex/_generated/api`, every `Doc<"table">`, `FunctionArgs<typeof api.*>`, and `FunctionReturnType<typeof api.*>` object contract is an accepted owner with no registry entry, and hand-written copies report only through a proven owner use. A unique workspace export with the same name and exact shape can report without value flow; other inferred package matches need that proof or explicit acceptance. Shape-only similarity and ambiguity stay inventory, never an automatic import recommendation. References, `Pick`/`Omit` projections, frozen independent formats, and near-miss shapes stay silent.
 
 ```ts
 // A configured generated owner already exports this exact shape.
@@ -288,11 +284,11 @@ type ReleaseRow = {
 };
 ```
 
-Generated-source and first-party domain owners come from policy registries. Convex generated owners need no registry entry: any `convex/_generated/dataModel` or `convex/_generated/api` module in the program supplies accepted `Doc<"table">`, `FunctionArgs<typeof api.*>`, and `FunctionReturnType<typeof api.*>` owners, but shape alone does not authorize their diagnostics; files under `convex/_generated/` are exempt. Installed packages are scanned only for proposal facts when a semantic fact sink is configured; they do not block by default. Alias an imported type (`type X = UserInfo`) and it stays quiet, because that's a reference and not a fork. All-optional projection DTOs stay quiet because they are usually boundary drafts or patches, not full model redeclarations.
+Configured generated-source and domain owners come from policy registries. Convex generated owners need no registry entry: any `convex/_generated/dataModel` or `convex/_generated/api` module in the program supplies accepted `Doc<"table">`, `FunctionArgs<typeof api.*>`, and `FunctionReturnType<typeof api.*>` owners, but shape alone does not authorize their diagnostics; files under `convex/_generated/` are exempt. Package and workspace public entries supply inferred owner candidates. A unique exact exported-name match can block for a workspace owner; other package matches require value-flow proof or explicit acceptance. Inventory facts are emitted only when a sink is configured. Alias an imported type (`type X = UserInfo`) and it stays quiet, because that's a reference and not a fork. All-optional projection DTOs stay quiet because they are usually boundary drafts or patches, not full model redeclarations.
 
 ### Proven owner projections, including component props
 
-Both `no-structural-type-fork` and `no-canonical-model-fork` share an owner-provenance adapter. In addition to existing whole-model checks, they inspect anonymous/nested annotations, named aliases, and interfaces at TypeScript contextual uses: props, function arguments, assignments, and returns. Either a trusted source value resolves to an accepted owner or its bounded nested object projection, or a local value is consumed in a checker-identical accepted-owner context. The latter catches named argument copies across files even when initialized with an ordinary object literal. A context such as `FunctionArgs<Query> | "skip"` retains the exact owner object; ambiguous object alternatives abstain. A lookalike shape or matching literal strings alone does not establish ownership. Property names, types, optionality, readonly, and method status must agree. Direct imports, indexed-access projections, `Pick`/`Omit`, and wrappers composed from owner references remain valid. Each configured rule owns its diagnostics: enabling both can produce one finding per rule for the same copied annotation. A warning or disable directive for one rule never suppresses the other rule's error. Within each rule, overlapping declaration/projection reports are coalesced.
+The structural rule uses one owner-provenance adapter for configured and inferred owners. It inspects anonymous/nested annotations, named aliases, and interfaces at TypeScript contextual uses: props, function arguments, assignments, and returns. Either a trusted source value resolves to an accepted owner or its bounded nested object projection, or a local value is consumed in a checker-identical accepted-owner context. The latter catches named argument copies across files even when initialized with an ordinary object literal. A context such as `FunctionArgs<Query> | "skip"` retains the exact owner object; ambiguous object alternatives abstain. A lookalike shape or matching literal strings alone does not establish ownership. Property names, types, optionality, readonly, and method status must agree. Direct imports, indexed-access projections, `Pick`/`Omit`, and wrappers composed from owner references remain valid. Overlapping declaration/projection reports are coalesced.
 
 Convex argument/return unions consisting entirely of objects are eligible owners, including unions with no common properties. They are not flattened into whole-model structural fingerprints. An exhaustive conditional constructor can certify a finite string discriminant when every strict equality guard and output tag preserves the same source value binding and accepted contextual owner. This certifies only that discriminant, not unrelated payload fields. For example, a local scope translated into generated API arguments and then passed to JSX can establish that a handwritten nested `kind` union repeats the owner.
 
@@ -306,14 +302,13 @@ Enable the typed rules using a parser configured with a TypeScript project (the 
 
 ```js
 rules: {
-  "antidrift/no-structural-type-fork": "error", // Convex owners are implicit
-  "antidrift/no-canonical-model-fork": ["error", {
+  "antidrift/no-structural-type-fork": ["error", {
     canonicalEntities: { Release: { owner: "src/domain/release.ts", exportName: "Release" } },
   }],
 }
 ```
 
-Generated-source and package acceptance continue to use `generatedSources` and `packageTypeOwners` on `no-structural-type-fork`. No new registry or blanket inline-type restriction is introduced. In particular, the JSX exemption in `no-inline-structural-type-at-use-site` is unchanged. A presentation-only consumer can remove domain coupling (for example, receive `showOrigin: boolean`) rather than import a contract it does not need. Real-repository acceptance and coverage limits are recorded in [the component-contract proof](../../docs/rule-investigations/component-contract-forks-proof.md).
+Generated-source, package, and domain acceptance use `generatedSources`, `packageTypeOwners`, and `canonicalEntities` on the unified rule; ordinary workspace and dependency inference needs no registry. The inline-boundary JSX exemption is preserved. A presentation-only consumer can remove domain coupling (for example, receive `showOrigin: boolean`) rather than import a contract it does not need. Real-repository acceptance and coverage limits are recorded in [the component-contract proof](../../docs/rule-investigations/component-contract-forks-proof.md).
 
 The scoped rules that motivated this package go after the usual agent tells:
 
@@ -329,7 +324,6 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-appeasement-cast` — `any` / `unknown` casts that paper over missing validation
 - `no-underchecked-type-predicate` — broad-input type predicates that assert object contracts, or unions of them, without checking the required asserted fields; `instanceof`, delegated type predicates, and literal tag checks on a value that is already a closed union count as proof
 - `no-redundant-type-predicate` — callbacks whose explicit `x is T` restates the predicate TypeScript 5.5+ infers from a single `instanceof`, `typeof`, literal-tag or null/undefined check; the autofix deletes the annotation and any import only it used
-- `no-canonical-model-fork` — configured first-party model redeclarations that should import or derive from the canonical owner
 - `no-handrolled-resource-lifecycle-cells` — behavior-based detection for hand-rolled async resource lifecycle state machines, with broad multi-setter co-mutation emitted as inventory only
 - `no-unsafe-deserialize` — broad `JSON.parse` inputs and unvalidated parsed results assigned into declared domain contracts
 - `no-defensive-shape-probing` — deterministic broad-value extractor cases backed by real corpus evidence, not ordinary boolean predicates
@@ -337,7 +331,6 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-explicit-type-arguments-on-owned-api` — symbol-resolved proof against caller-supplied type arguments on Convex generated references and TanStack registrations
 - `require-convex-return-validator` — symbol-resolved proof that every registered Convex function declares an explicit `returns` validator and does not widen its return contract with `v.any()`
 - `no-schema-validator-transcoding` — proof against an Effect `JSONSchema.make` or zod `toJSONSchema` result registered as a Convex validator instead of keeping one runtime owner
-- `no-redundant-local-return-type` — default-off TypeChecker identity proof for a nested implementation whose shorthand-object inference repeats a direct named type literal while every call remains constrained by the enclosing function's explicit return contract
 - `import/no-cycle` — import cycles caught by Oxlint's native import graph
 
 Other existing baseline rules may still ship in the config, but they are not the current roadmap.

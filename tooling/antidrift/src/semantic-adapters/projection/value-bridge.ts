@@ -1,7 +1,7 @@
 import ts from "typescript";
 
 import { dataProperty, objectType } from "../shape/contract-types.ts";
-import type { OwnerProjection } from "./owner-projection.ts";
+import type { OwnerProjection } from "./owner-projection-view.ts";
 
 export type ValuePath = {
   readonly symbol: ts.Symbol;

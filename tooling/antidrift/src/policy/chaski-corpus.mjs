@@ -41,7 +41,7 @@ const structuralTypeForkGeneratedOptions = {
   ],
 };
 const canonicalModelForkOptions = {
-  "antidrift/no-canonical-model-fork": [
+  "antidrift/no-structural-type-fork": [
     {
       canonicalEntities: {
         ActionItem: "src/frontend/portal/types/reports.ts",
@@ -345,7 +345,7 @@ export const defaultCases = [
   },
   {
     id: "portal-action-items-report-model-forks",
-    ruleId: "antidrift/no-canonical-model-fork",
+    ruleId: "antidrift/no-structural-type-fork",
     kind: "drift",
     classification: "ready",
     subproject: "frontend",
@@ -370,7 +370,7 @@ export const defaultCases = [
   },
   {
     id: "portal-weekly-digest-report-models-clean",
-    ruleId: "antidrift/no-canonical-model-fork",
+    ruleId: "antidrift/no-structural-type-fork",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
@@ -381,7 +381,7 @@ export const defaultCases = [
   },
   {
     id: "portal-report-model-owner-clean",
-    ruleId: "antidrift/no-canonical-model-fork",
+    ruleId: "antidrift/no-structural-type-fork",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
@@ -611,7 +611,7 @@ export const defaultCases = [
   },
   {
     id: "bff-scenarios-service-inline-request-contracts",
-    ruleId: "antidrift/no-inline-structural-type-at-use-site",
+    ruleId: "antidrift/no-structural-type-fork",
     kind: "drift",
     classification: "ready",
     subproject: "bff",
@@ -625,7 +625,7 @@ export const defaultCases = [
   },
   {
     id: "monolith-auth-provider-inline-react-props-clean",
-    ruleId: "antidrift/no-inline-structural-type-at-use-site",
+    ruleId: "antidrift/no-structural-type-fork",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
@@ -633,7 +633,7 @@ export const defaultCases = [
   },
   {
     id: "monolith-change-delivery-callback-shape-clean",
-    ruleId: "antidrift/no-inline-structural-type-at-use-site",
+    ruleId: "antidrift/no-structural-type-fork",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",

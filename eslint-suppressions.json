@@ -117,11 +117,6 @@
       "count": 3
     }
   },
-  "tooling/antidrift/src/eslint-plugin/rules/no-canonical-model-fork.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    }
-  },
   "tooling/antidrift/src/eslint-plugin/rules/no-contract-appeasement-projection.js": {
     "antidrift/no-pass-through-parameters": {
       "count": 21
@@ -146,19 +141,6 @@
   "tooling/antidrift/src/eslint-plugin/rules/no-pass-through-parameters.js": {
     "antidrift/no-vague-names": {
       "count": 2
-    }
-  },
-  "tooling/antidrift/src/eslint-plugin/rules/no-redundant-local-return-type.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 2
-    },
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/eslint-plugin/rules/no-structural-type-fork.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
     }
   },
   "tooling/antidrift/src/eslint-plugin/rules/no-underchecked-type-predicate.js": {
@@ -448,14 +430,6 @@
   "tooling/antidrift/src/oxlint-plugin/rules/no-duplicated-conditional-classnames.js": {
     "antidrift/no-vague-names": {
       "count": 11
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-duplicated-object-field-blocks.js": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
-    },
-    "antidrift/no-vague-names": {
-      "count": 6
     }
   },
   "tooling/antidrift/src/oxlint-plugin/rules/no-nonindependent-test-oracle.js": {

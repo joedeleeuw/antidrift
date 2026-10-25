@@ -76,10 +76,7 @@ export const SEMANTIC_FACT_KINDS = Object.freeze({
     ]),
   }),
   structuralMatch: Object.freeze({
-    rules: Object.freeze([
-      "antidrift/no-canonical-model-fork",
-      "antidrift/no-structural-type-fork",
-    ]),
+    rules: Object.freeze(["antidrift/no-structural-type-fork"]),
     adapterId: "typescript-eslint/type-owner",
     carrier: "authority-registry",
     confidence: Object.freeze([

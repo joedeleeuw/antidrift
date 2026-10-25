@@ -10,20 +10,25 @@ import type {
   StructuralProperty,
   StructuralTypeCandidate,
 } from "../type-owner.mjs";
-import { equivalentType } from "./contract-types.ts";
+import { equivalentType } from "./equivalent-types.ts";
+import { shapeComparison } from "./shape-identity.ts";
 
 type StructuralRelation =
   | "exact-owner-copy"
+  | "exported-name-exact-owner-copy"
+  | "reverse-dependency-owner-copy"
   | "loosened-owner-copy"
-  | "partial-owner-copy";
+  | "partial-owner-copy"
+  | "unresolved-owner-comparison";
 
 type StructuralDiagnostic =
   | { readonly emitted: true; readonly messageId: string }
   | { readonly emitted: false; readonly reason: string };
 
-type LocalStructuralType = {
+export type LocalStructuralType = {
   readonly type: ts.Type;
   readonly symbol: ts.Symbol;
+  readonly declaration?: ts.Node;
   readonly props: ReadonlyMap<string, string>;
   readonly detailedProps: ReadonlyMap<string, StructuralProperty>;
 };
@@ -41,12 +46,6 @@ export const structuralDerivationUtilities = new Set([
   "Readonly",
   "Required",
 ]);
-
-const relationRank = {
-  "exact-owner-copy": 0,
-  "loosened-owner-copy": 1,
-  "partial-owner-copy": 2,
-} satisfies Record<StructuralRelation, number>;
 
 function samePropertyType(
   checker: ts.TypeChecker,
@@ -204,6 +203,9 @@ function structuralDiagnosticFor(
   messageId: string,
   relation: StructuralRelation
 ): StructuralDiagnostic {
+  if (relation === "unresolved-owner-comparison") {
+    return { emitted: false, reason: relation };
+  }
   if (
     candidate.authorityState === "accepted" &&
     !candidate.requiresProvenance &&
@@ -225,45 +227,63 @@ function structuralDiagnosticFor(
   };
 }
 
-export function findStructuralProof(
+function samePropertyNames(
+  local: ReadonlyMap<string, StructuralProperty>,
+  owner: ReadonlyMap<string, StructuralProperty>
+) {
+  return (
+    local.size === owner.size &&
+    [...local.keys()].every((name) => owner.has(name))
+  );
+}
+
+export function findStructuralProofs(
   checker: ts.TypeChecker,
   local: LocalStructuralType,
   candidates: readonly StructuralTypeCandidate[],
-  messageId: string
+  messageId: string,
+  program?: ts.Program
 ) {
-  let best: {
-    candidate: StructuralTypeCandidate;
-    relation: StructuralRelation;
-  } | null = null;
+  const compare = program ? shapeComparison(program) : null;
+  const matches = [];
   for (const candidate of sortedStructuralCandidates(candidates)) {
-    const relation =
-      candidate.detailedProps &&
-      classifyStructuralRelation(
-        local.detailedProps,
-        candidate.detailedProps,
-        checker,
-        local.type,
-        candidate.type
-      );
+    let relation: StructuralRelation | null = candidate.detailedProps
+      ? classifyStructuralRelation(
+          local.detailedProps,
+          candidate.detailedProps,
+          checker,
+          local.type,
+          candidate.type
+        )
+      : null;
     if (
-      relation &&
-      (!best || relationRank[relation] < relationRank[best.relation])
+      !relation &&
+      compare &&
+      candidate.type !== undefined &&
+      candidate.detailedProps &&
+      samePropertyNames(local.detailedProps, candidate.detailedProps)
     ) {
-      best = { candidate, relation };
-      if (relation === "exact-owner-copy") {
-        break;
+      const verdict = compare(local.type, candidate.type);
+      if (verdict === true) {
+        relation = "exact-owner-copy";
+      } else if (typeof verdict !== "boolean") {
+        relation = "unresolved-owner-comparison";
       }
     }
+    if (relation) {
+      matches.push({
+        candidate,
+        relation,
+        proof: structuralMatchProof(
+          local,
+          candidate,
+          structuralDiagnosticFor(candidate, messageId, relation),
+          relation
+        ),
+      });
+    }
   }
-  if (!best) {
-    return null;
-  }
-  return structuralMatchProof(
-    local,
-    best.candidate,
-    structuralDiagnosticFor(best.candidate, messageId, best.relation),
-    best.relation
-  );
+  return matches;
 }
 
 function objectShapeMembers(node: unknown): readonly unknown[] {
@@ -321,12 +341,28 @@ function isDerivationSourceReference(typeNode: unknown): boolean {
   );
 }
 
+function isZodInference(typeNode: unknown): boolean {
+  if (!isSyntaxType(typeNode, "TSTypeReference")) {
+    return false;
+  }
+  const typeName = syntaxField(typeNode, "typeName");
+  return (
+    isSyntaxType(typeName, "TSQualifiedName") &&
+    syntaxText(syntaxField(typeName, "left"), "name") === "z" &&
+    syntaxText(syntaxField(typeName, "right"), "name") === "infer" &&
+    isSyntaxType(typeReferenceArguments(typeNode)[0], "TSTypeQuery")
+  );
+}
+
 export function isStructuralDerivationAlias(node: unknown): boolean {
   if (!isSyntaxType(node, "TSTypeAliasDeclaration")) {
     return false;
   }
   const annotation = syntaxField(node, "typeAnnotation");
   if (isSyntaxType(annotation, "TSTupleType")) {
+    return true;
+  }
+  if (isZodInference(annotation)) {
     return true;
   }
   return (

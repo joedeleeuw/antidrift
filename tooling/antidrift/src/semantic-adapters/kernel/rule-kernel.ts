@@ -36,7 +36,7 @@ type SyntaxKindListeners = SyntaxKindVisitors & {
   readonly exit?: SyntaxKindVisitors;
 };
 
-type TypeScriptRuleEnvironment = {
+export type TypeScriptRuleEnvironment = {
   readonly context: Rule.RuleContext;
   readonly checker: ts.TypeChecker;
   readonly program: ts.Program;

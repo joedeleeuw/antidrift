@@ -71,7 +71,6 @@ semanticFactKinds:
       - requestGuard
   structuralMatch:
     rules:
-      - antidrift/no-canonical-model-fork
       - antidrift/no-structural-type-fork
     adapterId: typescript-eslint/type-owner
     carrier: authority-registry
@@ -110,6 +109,26 @@ semanticFactKinds:
       - decision
 
 retiredRules:
+  antidrift/no-restated-dependency-type:
+    status: retired
+    reason: Merged into antidrift/no-structural-type-fork for graduated manifest and public-export ownership inference with exact structural comparison.
+    mergedInto: antidrift/no-structural-type-fork
+  antidrift/no-canonical-model-fork:
+    status: retired
+    reason: Merged into antidrift/no-structural-type-fork for accepted domain ownership and proven owner projections.
+    mergedInto: antidrift/no-structural-type-fork
+  antidrift/no-inline-structural-type-at-use-site:
+    status: retired
+    reason: Merged into antidrift/no-structural-type-fork for bounded inline boundary and local named-type reuse.
+    mergedInto: antidrift/no-structural-type-fork
+  antidrift/no-duplicated-object-field-blocks:
+    status: retired
+    reason: Merged into antidrift/no-structural-type-fork for bounded TypeScript and Zod field-block duplication analysis.
+    mergedInto: antidrift/no-structural-type-fork
+  antidrift/no-redundant-local-return-type:
+    status: retired
+    reason: Merged into antidrift/no-structural-type-fork for proven enclosing return-contract ownership.
+    mergedInto: antidrift/no-structural-type-fork
   antidrift/no-generic-module-names:
     status: retired
     reason: Removed by owner request. Generic filename blocklists are opinionated naming policy rather than Antidrift contract-drift enforcement; no explicit opt-in implementation is retained.

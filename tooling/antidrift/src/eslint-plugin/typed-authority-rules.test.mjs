@@ -12,13 +12,11 @@ const typeServiceMessage = /requires TypeScript parser services/u;
 const typeServiceGuardedRules = [
   "react-max-component-props",
   "no-appeasement-cast",
-  "no-canonical-model-fork",
   "no-contract-appeasement-projection",
   "no-defensive-shape-probing",
   "no-identity-schema-transform",
   "no-explicit-type-arguments-on-owned-api",
   "no-schema-validator-transcoding",
-  "no-redundant-local-return-type",
   "no-redundant-zod-parse",
   "no-appeasement-erasure",
   "no-structural-type-fork",
@@ -28,8 +26,8 @@ const typeServiceGuardedRules = [
 ];
 
 typedRuleTester.run(
-  "no-redundant-local-return-type",
-  rule("no-redundant-local-return-type"),
+  "no-structural-type-fork",
+  rule("no-structural-type-fork"),
   {
     valid: [
       `

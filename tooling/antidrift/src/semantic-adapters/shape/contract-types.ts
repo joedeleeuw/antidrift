@@ -48,138 +48,111 @@ function hasOpaqueSurface(checker: ts.TypeChecker, type: ts.Type): boolean {
   );
 }
 
+type BoundedVisit = {
+  readonly type: ts.Type;
+  readonly depth: number;
+};
+
+const boundedTypeCache = new WeakMap<
+  ts.TypeChecker,
+  Map<ts.Type, { depth: number; result: boolean }>
+>();
+
+function expandBoundedType(
+  checker: ts.TypeChecker,
+  current: BoundedVisit,
+  pending: BoundedVisit[],
+  work: number
+): number | "invalid" | "exhausted" {
+  if (current.depth === 0) {
+    return "invalid";
+  }
+  if (current.type.isUnionOrIntersection()) {
+    for (const part of current.type.types) {
+      if (work >= 4096) {
+        return "exhausted";
+      }
+      pending.push({ type: part, depth: current.depth - 1 });
+      work += 1;
+    }
+    return work;
+  }
+  if ((current.type.flags & OPAQUE_TYPE_FLAGS) !== 0) {
+    return "invalid";
+  }
+  if (!objectType(current.type)) {
+    return work;
+  }
+  if (hasOpaqueSurface(checker, current.type)) {
+    return "invalid";
+  }
+  for (const property of checker.getPropertiesOfType(current.type)) {
+    if (!dataProperty(property)) {
+      return "invalid";
+    }
+    if (work >= 4096) {
+      return "exhausted";
+    }
+    pending.push({
+      type: checker.getTypeOfSymbol(property),
+      depth: current.depth - 1,
+    });
+    work += 1;
+  }
+  return work;
+}
+
+function cacheBoundedResult(
+  checker: ts.TypeChecker,
+  type: ts.Type,
+  depth: number,
+  bounded: boolean
+): boolean {
+  const cache =
+    boundedTypeCache.get(checker) ??
+    new Map<ts.Type, { depth: number; result: boolean }>();
+  boundedTypeCache.set(checker, cache);
+  cache.set(type, { depth, result: bounded });
+  return bounded;
+}
+
 export function boundedType(
   checker: ts.TypeChecker,
   type: ts.Type | null | undefined,
-  depth = maxDepth,
-  seen = new Set<ts.Type>()
+  depth = maxDepth
 ): boolean {
-  if (!type || (type.flags & OPAQUE_TYPE_FLAGS) !== 0) {
+  if (!type) {
     return false;
   }
-  if (seen.has(type)) {
-    return true;
+  const cached = boundedTypeCache.get(checker)?.get(type);
+  if (cached && cached.depth >= depth) {
+    return cached.result;
   }
-  if (depth === 0) {
-    return false;
+  const pending: BoundedVisit[] = [{ type, depth }];
+  const visited = new Map<ts.Type, number>();
+  let work = 0;
+  for (let index = 0; index < pending.length; index += 1) {
+    const current = pending[index];
+    if (!current) {
+      break;
+    }
+    const previousDepth = visited.get(current.type);
+    if (previousDepth !== undefined && previousDepth >= current.depth) {
+      continue;
+    }
+    visited.set(current.type, current.depth);
+    const expandedWork = expandBoundedType(checker, current, pending, work);
+    if (expandedWork === "invalid" || expandedWork === "exhausted") {
+      return cacheBoundedResult(checker, type, depth, false);
+    }
+    work = expandedWork;
   }
-  const next = new Set([...seen, type]);
-  if (type.isUnionOrIntersection()) {
-    return type.types.every((part) =>
-      boundedType(checker, part, depth - 1, next)
-    );
-  }
-  if ((type.flags & ts.TypeFlags.Object) === 0) {
-    return true;
-  }
-  if (hasOpaqueSurface(checker, type)) {
-    return false;
-  }
-  return checker
-    .getPropertiesOfType(type)
-    .every(
-      (property) =>
-        dataProperty(property) &&
-        boundedType(checker, checker.getTypeOfSymbol(property), depth - 1, next)
-    );
+  return cacheBoundedResult(checker, type, depth, true);
 }
 
 export function sameModifiers(left: ts.Symbol, right: ts.Symbol): boolean {
   return (
     JSON.stringify(propertyModifiers(left)) ===
     JSON.stringify(propertyModifiers(right))
-  );
-}
-
-function equivalentMembers(
-  checker: ts.TypeChecker,
-  left: ts.Type,
-  right: ts.Type,
-  depth: number,
-  seen: Map<ts.Type, ts.Type>
-): boolean {
-  const leftParts = left.isUnion() ? left.types : [left];
-  const rightParts = right.isUnion() ? right.types : [right];
-  if (left.isUnion() || right.isUnion()) {
-    return (
-      leftParts.length === rightParts.length &&
-      leftParts.every((part) =>
-        rightParts.some((other) =>
-          equivalentType(checker, part, other, depth, seen)
-        )
-      )
-    );
-  }
-  if (!objectType(left) || !objectType(right)) {
-    return true;
-  }
-  const properties = checker.getPropertiesOfType(left);
-  return (
-    properties.length === checker.getPropertiesOfType(right).length &&
-    properties.every((property) => {
-      const other = checker.getPropertyOfType(right, property.name);
-      return (
-        other !== undefined &&
-        sameModifiers(property, other) &&
-        equivalentType(
-          checker,
-          checker.getTypeOfSymbol(property),
-          checker.getTypeOfSymbol(other),
-          depth,
-          seen
-        )
-      );
-    })
-  );
-}
-
-export function equivalentType(
-  checker: ts.TypeChecker,
-  left: ts.Type | null | undefined,
-  right: ts.Type | null | undefined,
-  depth = maxDepth,
-  seen = new Map<ts.Type, ts.Type>()
-): boolean {
-  if (!left || !right) {
-    return false;
-  }
-  if (((left.flags | right.flags) & OPAQUE_TYPE_FLAGS) !== 0) {
-    return left === right;
-  }
-  if (
-    !checker.isTypeAssignableTo(left, right) ||
-    !checker.isTypeAssignableTo(right, left)
-  ) {
-    return false;
-  }
-  if (left === right) {
-    return true;
-  }
-  if (left.isIntersection() || right.isIntersection()) {
-    return false;
-  }
-  if (
-    [left, right].some(
-      (type) =>
-        hasOpaqueSurface(checker, type) ||
-        checker
-          .getPropertiesOfType(type)
-          .some((property) => !dataProperty(property))
-    )
-  ) {
-    return false;
-  }
-  if (seen.get(left) === right) {
-    return true;
-  }
-  if (depth === 0) {
-    return false;
-  }
-  return equivalentMembers(
-    checker,
-    left,
-    right,
-    depth - 1,
-    new Map([...seen, [left, right]])
   );
 }

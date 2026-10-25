@@ -9,13 +9,17 @@ const optionKeys = new Set([
   "minRedundantDeclarations",
 ]);
 
-function isRecord(value) {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+function isRecord(candidate) {
+  return (
+    Boolean(candidate) &&
+    typeof candidate === "object" &&
+    !Array.isArray(candidate)
+  );
 }
 
 function invalidOptions(message) {
   throw new TypeError(
-    `antidrift/no-duplicated-object-field-blocks options: ${message}`
+    `antidrift/no-structural-type-fork fieldBlocks options: ${message}`
   );
 }
 
@@ -31,15 +35,15 @@ function requireOption(options, key) {
 }
 
 function boundedNumber(options, key, predicate, description) {
-  const value = requireOption(options, key);
+  const threshold = requireOption(options, key);
   if (
-    typeof value !== "number" ||
-    !Number.isFinite(value) ||
-    !predicate(value)
+    typeof threshold !== "number" ||
+    !Number.isFinite(threshold) ||
+    !predicate(threshold)
   ) {
     invalidOptions(`'${key}' must be ${description}.`);
   }
-  return value;
+  return threshold;
 }
 
 function normalizeOptionShape(options) {
@@ -48,19 +52,19 @@ function normalizeOptionShape(options) {
     minSharedFields: boundedNumber(
       options,
       "minSharedFields",
-      (value) => Number.isInteger(value) && value >= 1,
+      (threshold) => Number.isInteger(threshold) && threshold >= 1,
       "an integer greater than or equal to 1"
     ),
     minShapes: boundedNumber(
       options,
       "minShapes",
-      (value) => Number.isInteger(value) && value >= 2,
+      (threshold) => Number.isInteger(threshold) && threshold >= 2,
       "an integer greater than or equal to 2"
     ),
     minRedundantDeclarations: boundedNumber(
       options,
       "minRedundantDeclarations",
-      (value) => Number.isInteger(value) && value >= 1,
+      (threshold) => Number.isInteger(threshold) && threshold >= 1,
       "an integer greater than or equal to 1"
     ),
   };
@@ -215,22 +219,14 @@ function candidateScore(candidate) {
   return candidate.fieldKeys.length * (candidate.shapeIndices.length - 1);
 }
 
-function qualifies(candidate, options) {
-  return (
-    candidate.fieldKeys.length >= options.minSharedFields &&
-    candidate.shapeIndices.length >= options.minShapes &&
-    candidateScore(candidate) >= options.minRedundantDeclarations
-  );
-}
-
 // Both arrays hold ascending shape indices.
 function isSubset(left, right) {
   let rightIndex = 0;
-  for (const item of left) {
-    while (rightIndex < right.length && right[rightIndex] < item) {
+  for (const shapeIndex of left) {
+    while (rightIndex < right.length && right[rightIndex] < shapeIndex) {
       rightIndex += 1;
     }
-    if (right[rightIndex] !== item) return false;
+    if (right[rightIndex] !== shapeIndex) return false;
   }
   return true;
 }
@@ -243,8 +239,11 @@ function isStrictSubsetOf(candidate, reported) {
 }
 
 function reportedCandidates(groups, options) {
-  const candidates = groups.filter((candidate) =>
-    qualifies(candidate, options)
+  const candidates = groups.filter(
+    (candidate) =>
+      candidate.fieldKeys.length >= options.minSharedFields &&
+      candidate.shapeIndices.length >= options.minShapes &&
+      candidateScore(candidate) >= options.minRedundantDeclarations
   );
   return candidates
     .filter(
@@ -260,9 +259,17 @@ function reportedCandidates(groups, options) {
     );
 }
 
-function reportShapeKind(context, shapes, sourceCode, fieldsForShape, options) {
+function reportShapeKind(
+  context,
+  shapes,
+  sourceCode,
+  fieldsForShape,
+  options,
+  fieldBlocks
+) {
   const groups = sharedFieldGroups(shapes, sourceCode, fieldsForShape, options);
   for (const candidate of reportedCandidates(groups, options)) {
+    if (fieldBlocks.shouldSuppress(shapes[candidate.shapeIndices[0]])) continue;
     const fields = candidate.fieldNames.toSorted().slice(0, 6).join(", ");
     context.report({
       node: shapes[candidate.shapeIndices[0]],
@@ -305,65 +312,44 @@ function zodObjectShape(node) {
   return shape?.type === "ObjectExpression" ? shape : null;
 }
 
-export default function ruleNoDuplicatedObjectFieldBlocks() {
+export function createFieldBlockVisitors(
+  context,
+  rawOptions,
+  shouldSuppress = (_node) => false
+) {
+  const options = normalizedOptions(rawOptions);
+  const sourceCode = context.sourceCode;
+  const fieldBlocks = { shouldSuppress };
+  const typeShapes = [];
+  const zodShapes = [];
   return {
-    meta: {
-      type: "suggestion",
-      docs: {
-        description:
-          "Disallow repeated field blocks across sibling Zod object and TypeScript object shapes",
-      },
-      schema: [
-        {
-          type: "object",
-          additionalProperties: false,
-          required: [
-            "minSharedFields",
-            "minShapes",
-            "minRedundantDeclarations",
-          ],
-          properties: {
-            minSharedFields: {
-              type: "integer",
-              minimum: 1,
-            },
-            minShapes: {
-              type: "integer",
-              minimum: 2,
-            },
-            minRedundantDeclarations: {
-              type: "integer",
-              minimum: 1,
-            },
-          },
-        },
-      ],
-      messages: {
-        duplicatedObjectFieldBlocks:
-          "{{shapes}} object shapes repeat the same {{count}} fields ({{fields}}). Hoist the shared field block into one named shape and spread or extend it instead of repeating it.",
-      },
+    CallExpression(node) {
+      const shape = zodObjectShape(node);
+      if (shape) zodShapes.push(shape);
     },
-    create(context) {
-      const options = normalizedOptions(context.options?.[0]);
-      const sourceCode = context.sourceCode;
-      const typeShapes = [];
-      const zodShapes = [];
-      return {
-        CallExpression(node) {
-          const shape = zodObjectShape(node);
-          if (shape) zodShapes.push(shape);
-        },
-        TSTypeLiteral(node) {
-          typeShapes.push(node);
-        },
-        TSInterfaceBody(node) {
-          typeShapes.push(node);
-        },
-        "Program:exit"() {
-          reportShapeKind(context, zodShapes, sourceCode, zodFields, options);
-          reportShapeKind(context, typeShapes, sourceCode, typeFields, options);
-        },
-      };
+    TSTypeLiteral(node) {
+      typeShapes.push(node);
+    },
+    TSInterfaceBody(node) {
+      typeShapes.push(node);
+    },
+    "Program:exit"() {
+      reportShapeKind(
+        context,
+        zodShapes,
+        sourceCode,
+        zodFields,
+        options,
+        fieldBlocks
+      );
+      reportShapeKind(
+        context,
+        typeShapes,
+        sourceCode,
+        typeFields,
+        options,
+        fieldBlocks
+      );
     },
   };
 }

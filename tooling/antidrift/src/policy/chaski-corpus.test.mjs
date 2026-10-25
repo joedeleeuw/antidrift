@@ -168,7 +168,7 @@ export const normalized = Object.fromEntries(
   it("can run type-aware corpus cases against explicit program files", async () => {
     const root = tempRepo();
     const ruleOptions = {
-      "antidrift/no-canonical-model-fork": [
+      "antidrift/no-structural-type-fork": [
         {
           canonicalEntities: {
             ProjectInfo: "server/src/types/project.ts",
@@ -216,7 +216,7 @@ export interface OpenProjectInfo extends ProjectInfo {
       cases: [
         {
           id: "fork",
-          ruleId: "antidrift/no-canonical-model-fork",
+          ruleId: "antidrift/no-structural-type-fork",
           kind: "drift",
           classification: "ready",
           subproject: "frontend",
@@ -232,7 +232,7 @@ export interface OpenProjectInfo extends ProjectInfo {
         },
         {
           id: "owner",
-          ruleId: "antidrift/no-canonical-model-fork",
+          ruleId: "antidrift/no-structural-type-fork",
           kind: "correct",
           classification: "ready",
           subproject: "server",

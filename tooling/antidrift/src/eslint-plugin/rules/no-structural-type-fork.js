@@ -1,77 +1,38 @@
-import {
-  emitSemanticFact,
-  semanticFactSink,
-} from "../../policy/lib/semantic-facts.mjs";
-import { collectOwnedContractProvenance } from "../../semantic-adapters/projection/owned-contract-provenance.ts";
-import {
-  collectAcceptedPackageCanonicalTypes,
-  collectCanonicalTypes,
-  collectConvexGeneratedCanonicalTypes,
-  collectGeneratedCanonicalTypes,
-  isConvexGeneratedFile,
-  isObjectType,
-  resolvesToGeneratedType,
-  resolvesToInstalledType,
-  typeProps,
-  typePropsDetailed,
-} from "../../semantic-adapters/type-owner.mjs";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
-import { resolveAliasedSymbol } from "../../semantic-adapters/provenance/symbol-provenance.ts";
-import {
-  findStructuralProof,
-  isAllOptionalObjectShape,
-  isStructuralDerivationAlias,
-  structuralMatchFact,
-} from "../../semantic-adapters/shape/structural-fork-proof.ts";
-
-// Canonical candidate list is cached per TypeScript Program (stable per ESLint process),
-// so the node_modules enumeration runs once rather than per linted file.
-const canonicalCache = new WeakMap();
-// Same per-program caching for the implicit Convex generated owner sweep.
-const convexOwnerCache = new WeakMap();
-
-function declaresInConvexOwnedModule(sym) {
-  for (const declaration of sym?.getDeclarations?.() ??
-    sym?.declarations ??
-    []) {
-    const file = declaration.getSourceFile().fileName.replace(/\\/gu, "/");
-    if (
-      file.includes("/convex/_generated/") ||
-      file.includes("/node_modules/convex/")
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// `type Row = Doc<"machines">` / `type Result = FunctionReturnType<typeof api.machines.get>`
-// are references to the Convex owner, not hand-written forks. Alias-symbol preservation is
-// unreliable through convex's conditional/indexed-access owner types, so the exemption
-// resolves the referenced symbol's declarations instead of inspecting the resolved type.
-function isConvexOwnerReferenceAlias(services, checker, node) {
-  if (node.type !== "TSTypeAliasDeclaration") return false;
-  const annotation = node.typeAnnotation;
-  if (annotation?.type !== "TSTypeReference") return false;
-  const tsAnnotation = services.esTreeNodeToTSNodeMap.get(annotation);
-  const typeName = tsAnnotation?.typeName;
-  if (!typeName) return false;
-  const sym = resolveAliasedSymbol(
-    checker,
-    checker.getSymbolAtLocation(typeName)
-  );
-  return declaresInConvexOwnedModule(sym);
-}
+import { createFieldBlockVisitors } from "./structural-type-fork/field-block-analysis.js";
+import { StructuralRuleSession } from "./structural-type-fork/analysis-session.ts";
 
 export function ruleNoStructuralTypeFork() {
-  return defineTypeScriptRule({
+  const typedRule = defineTypeScriptRule({
     ruleName: "no-structural-type-fork",
     skipGenerated: false,
     meta: {
       type: "problem",
       docs: {
         description:
-          "Detect hand-written types that exactly redeclare an installed package, configured generated source, or Convex generated owner exported type.",
+          "Detect hand-written types and schema field blocks that duplicate an owned contract instead of importing or deriving it.",
+      },
+      messages: {
+        structuralTypeFork:
+          "Type matches {{owner}} — import or derive from the owner instead of redeclaring.",
+        ownedContractProjection:
+          "Contract copies {{owner}} through a proven owner use — import or derive the projection instead of redeclaring.",
+        sharedContractOwner:
+          "Type matches {{owner}}, but that package depends on this package. Move the shared contract to a package both can import.",
+        duplicatedObjectFieldBlocks:
+          "{{shapes}} object shapes repeat the same {{count}} fields ({{fields}}). Hoist the shared field block into one named shape and spread or extend it instead of repeating it.",
+        redundantLocalReturnType:
+          "This nested implementation's explicit return type repeats its inferred shorthand-object shape, and every call is constrained by the enclosing function's return contract. Remove the local annotation and keep the named type at that owner.",
+        overridden:
+          "This parameter repeats the parameter of {{name}} at {{location}}, which this method overrides. Use that parameter's type.",
+        named:
+          "This parameter repeats {{name}} at {{location}}. Use that named type.",
+        unscoped:
+          "This parameter repeats {{name}} at {{location}}, which is not usable here. Export or move that type and reuse it.",
+        repeated:
+          "This parameter repeats the inline type at {{location}}. Give the shared type one name and reuse it.",
+        undecided:
+          "Whether this parameter repeats the type at {{location}} is undecided because {{unresolved}} does not resolve.",
       },
       schema: [
         {
@@ -101,143 +62,47 @@ export function ruleNoStructuralTypeFork() {
                 },
               },
             },
+            canonicalEntities: {
+              type: "object",
+              additionalProperties: {
+                oneOf: [
+                  { type: "string" },
+                  {
+                    type: "object",
+                    additionalProperties: true,
+                    properties: {
+                      owner: { type: "string" },
+                      exportName: { type: "string" },
+                    },
+                  },
+                ],
+              },
+            },
+            fieldBlocks: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                minSharedFields: { type: "integer", minimum: 1 },
+                minShapes: { type: "integer", minimum: 2 },
+                minRedundantDeclarations: { type: "integer", minimum: 1 },
+              },
+            },
           },
         },
       ],
     },
-    visitors({ context, checker, program, services, options, filename }) {
-      const generatedSources = options[0]?.generatedSources ?? {};
-      const packageTypeOwners = options[0]?.packageTypeOwners ?? {};
-      const shouldCollectProposalFacts = Boolean(semanticFactSink(context));
-      let candidates = [];
-      if (Object.keys(generatedSources).length > 0) {
-        candidates = collectGeneratedCanonicalTypes(
-          program,
-          checker,
-          generatedSources
-        );
-      }
-      if (Object.keys(packageTypeOwners).length > 0) {
-        candidates = [
-          ...candidates,
-          ...collectAcceptedPackageCanonicalTypes(
-            program,
-            checker,
-            packageTypeOwners
-          ),
-        ];
-      }
-      if (shouldCollectProposalFacts) {
-        let installedCandidates = canonicalCache.get(program);
-        if (!installedCandidates) {
-          installedCandidates = collectCanonicalTypes(program, checker);
-          canonicalCache.set(program, installedCandidates);
-        }
-        candidates = [...candidates, ...installedCandidates];
-      }
-      let convexCandidates = convexOwnerCache.get(program);
-      if (!convexCandidates) {
-        convexCandidates = collectConvexGeneratedCanonicalTypes(
-          program,
-          checker
-        );
-        convexOwnerCache.set(program, convexCandidates);
-      }
-      candidates = [...candidates, ...convexCandidates];
-      if (!candidates.length) {
-        return {};
-      }
-      const provenance = collectOwnedContractProvenance(
-        program,
-        checker,
-        candidates
-      );
-      const reported = new Set();
-      function checkProjection(node) {
-        const tsNode = services.esTreeNodeToTSNodeMap.get(node);
-        const proof = provenance.get(tsNode);
-        if (!proof) return;
-        for (let parent = tsNode; parent; parent = parent.parent) {
-          if (reported.has(parent)) return;
-        }
-        reported.add(tsNode);
-        emitSemanticFact(
-          context,
-          node,
-          structuralMatchFact("antidrift/no-structural-type-fork", proof)
-        );
-        context.report({
-          node,
-          message: `Contract copies ${proof.ownerType.label} through a proven owner use — import or derive the projection instead of redeclaring.`,
-        });
-      }
-      function check(node) {
-        if (isAllOptionalObjectShape(node)) {
-          return;
-        }
-        if (isStructuralDerivationAlias(node)) {
-          return;
-        }
-        // Generated output is owner, never fork.
-        if (isConvexGeneratedFile(filename ?? context.getFilename?.())) {
-          return;
-        }
-        if (isConvexOwnerReferenceAlias(services, checker, node)) {
-          return;
-        }
-        const tsNode = services.esTreeNodeToTSNodeMap.get(node);
-        const sym = tsNode?.name && checker.getSymbolAtLocation(tsNode.name);
-        if (!sym) {
-          return;
-        }
-        const declared = checker.getDeclaredTypeOfSymbol(sym);
-        if (!isObjectType(declared)) {
-          return;
-        }
-        // `type AppUser = firebase.User` resolves to the package's own type — a reference, not a
-        // fork. Only hand-written shapes (resolved symbol declared in the user's code) are flagged.
-        if (resolvesToInstalledType(declared)) {
-          return;
-        }
-        if (resolvesToGeneratedType(declared, generatedSources)) {
-          return;
-        }
-        const proof = findStructuralProof(
-          checker,
-          {
-            type: declared,
-            symbol: sym,
-            props: typeProps(checker, declared),
-            detailedProps: typePropsDetailed(checker, declared),
-          },
-          candidates,
-          "structuralTypeFork"
-        );
-        if (!proof) {
-          return;
-        }
-        emitSemanticFact(
-          context,
-          node,
-          structuralMatchFact("antidrift/no-structural-type-fork", proof)
-        );
-        if (proof.diagnostic.emitted) {
-          reported.add(tsNode);
-          context.report({
-            node,
-            message: `Type matches ${proof.ownerType.label} — import or derive from the owner instead of redeclaring.`,
-          });
-        }
-      }
-      return {
-        TSTypeAliasDeclaration: check,
-        TSInterfaceDeclaration(node) {
-          check(node);
-          checkProjection(node);
-        },
-        TSTypeLiteral: checkProjection,
-        TSUnionType: checkProjection,
-      };
-    },
+    visitors: StructuralRuleSession.visitors,
   });
+  return {
+    meta: typedRule.meta,
+    create(context) {
+      if (/\.[cm]?jsx?$/u.test(context.filename)) {
+        return createFieldBlockVisitors(
+          context,
+          context.options[0]?.fieldBlocks
+        );
+      }
+      return typedRule.create(context);
+    },
+  };
 }

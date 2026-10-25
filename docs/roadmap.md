@@ -18,11 +18,10 @@ For runtime ownership and parity, see `docs/lint-rule-parity.md`. For historical
 
 These rules are already in the package and are part of the core project thesis:
 
-- `no-structural-type-fork`: type-aware fork detection, hardened through alias, optional-property, `z.infer`, and branded-type edge probing.
+- `no-structural-type-fork`: unified ownership inference and TypeChecker proof for duplicated dependency, workspace, generated, and domain contracts, plus repeated inline/field-block shapes and redundant nested return annotations.
 - `require-effect-deps`: closes the gap where `react-hooks/exhaustive-deps` does not flag a missing dependency-array argument.
 - `no-redundant-zod-parse`: provenance rule for repeated parsing of the same value by the same schema.
 - `no-contract-appeasement-projection`: subsumes the old selector-wrapper branch with TypeChecker-backed source/return ownership proof. The former `no-explicit-return-type-private-helper` rule is retired because real corpus evidence showed private return annotations are not a deterministic smell.
-- `no-redundant-local-return-type`: narrow TypeChecker proof for one post-retirement slice. It requires exact shorthand-object inference and same-type contextual ownership at every call in the immediate enclosing function's return expression; property equality alone does not report.
 - `no-schema-library-in-test`: deterministic test-file guard against runtime-schema value imports while preserving type-only imports.
 - `no-validator-output-oracle`: local-flow guard against direct validator-output assertions; application-call boundaries and document parsers stay clean.
 
@@ -37,8 +36,6 @@ These were the next project scope because they are the project, not because a br
 - `no-defensive-shape-probing`: provisional only where real corpus evidence shows deterministic broad-value mini-parsing; do not expand to general boolean predicates.
 - `no-nullable-positional-tuple`: block tuple types with multiple nullable or optional slots, such as `[Date | null, Date | null]`.
 - `no-underchecked-type-predicate`: TypeChecker proof for broad-input predicates that claim object contracts without checking required asserted fields or delegating to a validator.
-- `no-canonical-model-fork`: registry-backed structural detection for first-party canonical model redeclarations.
-- `no-redundant-local-return-type`: narrow TypeChecker proof for nested local object-return annotations that duplicate inference while an immediate enclosing return contract remains authoritative. It is not a TypeScript builtin or a general private-helper annotation ban.
 - Brand kit: `Brand<T, Name>` plus `brand() -> { make, safe, is }`. The separate `no-cast-to-branded` custom rule is retired until real non-test brand-forgery evidence appears.
 - `import/no-cycle`: circular-dependency detection through Oxlint's native import graph.
 
@@ -63,7 +60,6 @@ Completed in this batch:
 - `no-defensive-shape-probing`: limited to real-corpus-backed broad-value extractor patterns; predicate helpers remain review-first until the rule can prove a validation/type authority bypass.
 - `no-nullable-positional-tuple`: narrow deterministic syntax rule for multi-slot nullable tuples; ordinary non-null tuples and hook-style tuples with one nullable value slot stay clean.
 - `no-underchecked-type-predicate`: TypeChecker-backed broad-input object predicate checks; discriminant guards over typed unions and schema delegation stay clean. Real required-field drift keeps it enabled at error, while known false-positive classes keep stable promotion closed.
-- `no-canonical-model-fork`: TypeChecker-backed v1 for configured first-party model owners; real Chaski report-model forks flag while the owner and a different weekly digest report model stay clean.
 - `no-cycle`: retired custom relative graph traversal in favor of `import/no-cycle`.
 - Brand kit: branded values should cross the brand validation boundary. The custom brand-cast lint rule is retired until real adoption and forgery evidence justify reopening it.
 

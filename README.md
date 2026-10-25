@@ -8,7 +8,7 @@ This template intentionally excludes the later package-publication surface gap w
 
 - pnpm workspace catalogs for consistent dependency versions.
 - Oxlint for native and type-aware JavaScript/TypeScript feedback, plus a reduced ESLint pass for custom TypeChecker-backed policy rules.
-- A `no-duplicated-object-field-blocks` rule, enforced in the ESLint pass with a ratcheted baseline, for repeated Zod and TypeScript shape fields that should be hoisted into a shared shape.
+- A `no-structural-type-fork` rule for duplicated owned contracts, repeated TypeScript/Zod field blocks, and redundant nested return annotations, with ownership inferred from package exports and value flow.
 - Declarative source of truth in `policy/agent-guardrails.yaml`.
 - Positive build recipes in `docs/build-patterns.md` so agents import or derive concepts instead of duplicating them.
 - Feature planning template in `docs/feature-slice-template.md`.

@@ -1,11 +1,10 @@
 import ts from "typescript";
 
-import { shapeComparison } from "../../semantic-adapters/shape/shape-identity.ts";
-import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
+import { shapeComparison } from "../../../semantic-adapters/shape/shape-identity.ts";
 import {
   isSymbolPubliclyExported,
   symbolAtNode,
-} from "../../semantic-adapters/provenance/symbol-provenance.ts";
+} from "../../../semantic-adapters/provenance/symbol-provenance.ts";
 
 const unsafeTypeFlags =
   ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never;
@@ -89,7 +88,7 @@ function isExportedOwner(ownerNode) {
   return isExportedStatement(ownerNode);
 }
 
-function singleReturnedObject(functionNode) {
+function singleShorthandReturn(functionNode) {
   const body = functionNode.body;
   if (!body) {
     return null;
@@ -187,52 +186,54 @@ function directMutableTypeLiteral(checker, typeNode) {
   return properties.size > 0 ? properties : null;
 }
 
-function referencesSymbol(checker, rootNode, targetSymbol) {
-  let found = false;
-  function visit(currentNode) {
-    if (found) {
-      return;
-    }
-    if (
-      ts.isIdentifier(currentNode) &&
-      symbolAtNode(checker, currentNode) === targetSymbol
-    ) {
-      found = true;
-      return;
-    }
-    ts.forEachChild(currentNode, visit);
+function referencesSymbol(
+  checker,
+  rootNode,
+  targetSymbol,
+  search = { found: false }
+) {
+  if (search.found) return search.found;
+  if (
+    ts.isIdentifier(rootNode) &&
+    symbolAtNode(checker, rootNode) === targetSymbol
+  ) {
+    search.found = true;
+    return search.found;
   }
-  visit(rootNode);
-  return found;
+  ts.forEachChild(rootNode, (currentNode) =>
+    referencesSymbol(checker, currentNode, targetSymbol, search)
+  );
+  return search.found;
 }
 
-function referencesLocalFunction(checker, rootNode, ownSymbol) {
-  let found = false;
-  function visit(currentNode) {
-    if (found) {
-      return;
-    }
-    if (ts.isIdentifier(currentNode)) {
-      const symbol = checker.getSymbolAtLocation(currentNode);
-      if (symbol && symbol !== ownSymbol) {
-        for (const declaration of symbol.declarations ?? []) {
-          if (
-            ts.isFunctionDeclaration(declaration) ||
-            (ts.isVariableDeclaration(declaration) &&
-              declaration.initializer &&
-              (ts.isArrowFunction(declaration.initializer) ||
-                ts.isFunctionExpression(declaration.initializer)))
-          ) {
-            found = true;
-            return;
-          }
+function referencesLocalFunction(
+  checker,
+  rootNode,
+  ownSymbol,
+  search = { found: false }
+) {
+  if (search.found) return search.found;
+  if (ts.isIdentifier(rootNode)) {
+    const symbol = checker.getSymbolAtLocation(rootNode);
+    if (symbol && symbol !== ownSymbol) {
+      for (const declaration of symbol.declarations ?? []) {
+        if (
+          ts.isFunctionDeclaration(declaration) ||
+          (ts.isVariableDeclaration(declaration) &&
+            declaration.initializer &&
+            (ts.isArrowFunction(declaration.initializer) ||
+              ts.isFunctionExpression(declaration.initializer)))
+        ) {
+          search.found = true;
+          return search.found;
         }
       }
     }
-    ts.forEachChild(currentNode, visit);
   }
-  visit(rootNode);
-  return found;
+  ts.forEachChild(rootNode, (currentNode) =>
+    referencesLocalFunction(checker, currentNode, ownSymbol, search)
+  );
+  return search.found;
 }
 
 function escapesThroughBoundary(checker, candidate, candidateSymbol) {
@@ -369,90 +370,98 @@ function exactPropertyTypes({
   return true;
 }
 
-export function ruleNoRedundantLocalReturnType() {
-  return defineTypeScriptRule({
-    ruleName: "no-redundant-local-return-type",
-    skipGenerated: false,
-    meta: {
-      type: "suggestion",
-      docs: {
-        description:
-          "Disallow a redundant named object return type on a nested local implementation when an enclosing typed owner preserves the contract.",
+export function localReturnVisitors(environment) {
+  const { context, checker, program, services } = environment;
+  const reportNode = (target, report) => {
+    const mapped = services.tsNodeToESTreeNodeMap?.get(target);
+    if (mapped) {
+      context.report({ node: mapped, ...report });
+      return;
+    }
+    const sourceFile = program.getSourceFile(context.filename);
+    if (!sourceFile) {
+      throw new TypeError(
+        `Unable to locate ${context.filename} in the TypeScript program.`
+      );
+    }
+    const start = sourceFile.getLineAndCharacterOfPosition(
+      target.getStart(sourceFile)
+    );
+    const end = sourceFile.getLineAndCharacterOfPosition(target.getEnd());
+    context.report({
+      loc: {
+        start: { line: start.line + 1, column: start.character },
+        end: { line: end.line + 1, column: end.character },
       },
-      schema: [],
-      messages: {
-        redundantLocalReturnType:
-          "This nested implementation's explicit return type repeats its inferred shorthand-object shape, and every call is constrained by the enclosing function's return contract. Remove the local annotation and keep the named type at that owner.",
-      },
-    },
-    run({ checker, program, reportNode }) {
-      const sameShape = shapeComparison(program);
-      function checkDeclaration(declarationNode) {
-        const candidate = functionCandidate(declarationNode);
-        if (
-          !candidate ||
-          !candidate.functionNode.type ||
-          Boolean(
-            ts.getCombinedModifierFlags(candidate.functionNode) &
-            ts.ModifierFlags.Async
-          ) ||
-          Boolean(candidate.functionNode.asteriskToken) ||
-          !enclosingFunction(candidate.ownerNode) ||
-          isExportedOwner(candidate.ownerNode)
-        ) {
-          return;
-        }
-        const symbol = checker.getSymbolAtLocation(candidate.nameNode);
-        if (
-          !symbol ||
-          (symbol.declarations?.length ?? 0) > 1 ||
-          escapesThroughBoundary(checker, candidate, symbol)
-        ) {
-          return;
-        }
-        const returnedObject = singleReturnedObject(candidate.functionNode);
-        const objectProperties = returnedObject
-          ? shorthandProperties(returnedObject)
-          : null;
-        if (!objectProperties) {
-          return;
-        }
-        const returnTypeNode = candidate.functionNode.type;
-        const bodyNode = candidate.functionNode.body;
-        if (
-          referencesSymbol(checker, bodyNode, symbol) ||
-          referencesLocalFunction(checker, bodyNode, symbol)
-        ) {
-          return;
-        }
-        const typeProperties = directMutableTypeLiteral(
-          checker,
-          returnTypeNode
-        );
-        if (!typeProperties) {
-          return;
-        }
-        const declaredType = checker.getTypeFromTypeNode(returnTypeNode);
-        if (
-          !hasTypedOwnerProof(checker, candidate, symbol, declaredType) ||
-          !exactPropertyTypes({
-            checker,
-            sameShape,
-            declaredType,
-            objectProperties,
-            typeProperties,
-          })
-        ) {
-          return;
-        }
-        reportNode(returnTypeNode, {
-          messageId: "redundantLocalReturnType",
-        });
-      }
-      return {
-        [ts.SyntaxKind.FunctionDeclaration]: checkDeclaration,
-        [ts.SyntaxKind.VariableDeclaration]: checkDeclaration,
-      };
-    },
-  });
+      ...report,
+    });
+  };
+  const sameShape = shapeComparison(program);
+  function checkDeclaration(declarationNode) {
+    const candidate = functionCandidate(declarationNode);
+    if (
+      !candidate ||
+      !candidate.functionNode.type ||
+      Boolean(
+        ts.getCombinedModifierFlags(candidate.functionNode) &
+        ts.ModifierFlags.Async
+      ) ||
+      Boolean(candidate.functionNode.asteriskToken) ||
+      !enclosingFunction(candidate.ownerNode) ||
+      isExportedOwner(candidate.ownerNode)
+    ) {
+      return;
+    }
+    const symbol = checker.getSymbolAtLocation(candidate.nameNode);
+    if (
+      !symbol ||
+      (symbol.declarations?.length ?? 0) > 1 ||
+      escapesThroughBoundary(checker, candidate, symbol)
+    ) {
+      return;
+    }
+    const shorthandReturn = singleShorthandReturn(candidate.functionNode);
+    const objectProperties = shorthandReturn
+      ? shorthandProperties(shorthandReturn)
+      : null;
+    if (!objectProperties) {
+      return;
+    }
+    const returnTypeNode = candidate.functionNode.type;
+    const bodyNode = candidate.functionNode.body;
+    if (
+      referencesSymbol(checker, bodyNode, symbol) ||
+      referencesLocalFunction(checker, bodyNode, symbol)
+    ) {
+      return;
+    }
+    const typeProperties = directMutableTypeLiteral(checker, returnTypeNode);
+    if (!typeProperties) {
+      return;
+    }
+    const declaredType = checker.getTypeFromTypeNode(returnTypeNode);
+    if (
+      !hasTypedOwnerProof(checker, candidate, symbol, declaredType) ||
+      !exactPropertyTypes({
+        checker,
+        sameShape,
+        declaredType,
+        objectProperties,
+        typeProperties,
+      })
+    ) {
+      return;
+    }
+    reportNode(returnTypeNode, {
+      messageId: "redundantLocalReturnType",
+    });
+  }
+  function visitDeclaration(node) {
+    const mapped = services.esTreeNodeToTSNodeMap.get(node);
+    if (mapped) checkDeclaration(mapped);
+  }
+  return {
+    FunctionDeclaration: visitDeclaration,
+    VariableDeclarator: visitDeclaration,
+  };
 }

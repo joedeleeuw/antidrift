@@ -16,6 +16,10 @@ import { provePortableRules } from "./consumer-portable.mjs";
 import { proveAdoptionPresets } from "./consumer-adoption.mjs";
 
 import { scaffoldConsumerWorkspace } from "./consumer-workspace.mjs";
+import {
+  proveStructuralContracts,
+  scaffoldStructuralContracts,
+} from "./consumer-structural.mjs";
 
 const pnpmBinary = process.env.ANTIDRIFT_CONSUMER_PNPM ?? "pnpm";
 
@@ -103,6 +107,7 @@ try {
     toolingTarball = join(toolingPack, packed[0]);
   }
   scaffoldConsumerWorkspace({ file, tarball, toolingTarball });
+  scaffoldStructuralContracts({ file, work });
 
   console.log("3/7  installing the tarball into the consumer ...");
   runInherit(
@@ -396,6 +401,8 @@ try {
       `default config must load generated owner facts and report ${RULE}, got: ${JSON.stringify(defaultDriftRules)}`
     );
   }
+
+  proveStructuralContracts({ file, lint });
 
   const restrictedSyntaxMessages = lint(
     "packages/app/src/restricted-syntax-drift.ts"

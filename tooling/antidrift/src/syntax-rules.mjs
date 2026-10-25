@@ -5,7 +5,6 @@ import { ruleNoStatusLiteralInType } from "./semantic-adapters/syntax/status-lit
 import { ruleRequireAuthzCheck } from "./semantic-adapters/syntax/authz.ts";
 import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
-import ruleNoDuplicatedObjectFieldBlocks from "./oxlint-plugin/rules/no-duplicated-object-field-blocks.js";
 import ruleNoNonindependentTestOracle from "./oxlint-plugin/rules/no-nonindependent-test-oracle.js";
 import ruleNoSchemaLibraryInTest from "./oxlint-plugin/rules/no-schema-library-in-test.js";
 import ruleNoSentinelAbsenceFallback from "./oxlint-plugin/rules/no-sentinel-absence-fallback.js";
@@ -25,7 +24,6 @@ export function createSyntaxRules() {
     "no-calling-components-as-functions": ruleNoCallingComponentsAsFunctions(),
     "no-duplicated-conditional-classnames":
       ruleNoDuplicatedConditionalClassnames(),
-    "no-duplicated-object-field-blocks": ruleNoDuplicatedObjectFieldBlocks(),
     "no-handrolled-resource-lifecycle-cells":
       ruleNoHandrolledResourceLifecycleCells,
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),

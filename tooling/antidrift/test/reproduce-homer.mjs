@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   writeFileSync,
   rmSync,
   readdirSync,
@@ -45,7 +46,7 @@ const paths = [
   "scripts",
 ];
 const ignorePatterns = review.ignorePatterns;
-function archiveCheckout(revision) {
+function archiveCheckout(revision, installDependencies = false) {
   const destination = join(scratch, revision);
   mkdirSync(destination);
   const archive = execFileSync("git", ["-C", repository, "archive", revision], {
@@ -62,7 +63,7 @@ function archiveCheckout(revision) {
       relative(destination, directory),
       "node_modules"
     );
-    if (existsSync(installed)) {
+    if (!installDependencies && existsSync(installed)) {
       symlinkSync(installed, join(directory, "node_modules"), "dir");
     }
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -70,6 +71,17 @@ function archiveCheckout(revision) {
         directories.push(join(directory, entry.name));
       }
     }
+  }
+  if (installDependencies) {
+    const nodeVersion = JSON.parse(
+      readFileSync(join(destination, "package.json"), "utf8")
+    ).engines?.node;
+    const command = nodeVersion ? "fnm" : "pnpm";
+    const args = nodeVersion ? ["exec", `--using=${nodeVersion}`, "pnpm"] : [];
+    execFileSync(command, [...args, "install", "--frozen-lockfile"], {
+      cwd: destination,
+      stdio: "inherit",
+    });
   }
   return destination;
 }
@@ -86,7 +98,6 @@ try {
       file: "apps/client/src/screens/machine/conversation-feed-row.tsx",
       rules: {
         "antidrift/no-structural-type-fork": "error",
-        "antidrift/no-canonical-model-fork": "error",
       },
     });
     assert.equal(
@@ -112,7 +123,7 @@ try {
   }
   console.log(JSON.stringify({ ownedProjections }, null, 2));
   if (process.argv[3] !== "--owned-projections-only") {
-    const checkout = archiveCheckout(review.revision);
+    const checkout = archiveCheckout(review.revision, true);
     const rows = [];
     const unreviewedCustom = [];
     for (const entry of portableCases) {

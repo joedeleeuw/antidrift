@@ -1,9 +1,11 @@
+import { resolve } from "node:path";
 import tsParser from "@typescript-eslint/parser";
 import { ESLint } from "eslint";
 import { expect, it } from "vitest";
 
 import {
   fixture,
+  fixturesDir,
   plugin,
   rule,
   ruleTester,
@@ -346,9 +348,9 @@ it("fails loud on partial duplicated classname controls", async () => {
   ).rejects.toThrow(/attributes/u);
 });
 
-ruleTester.run(
-  "no-duplicated-object-field-blocks",
-  rule("no-duplicated-object-field-blocks"),
+typedRuleTester.run(
+  "no-structural-type-fork",
+  rule("no-structural-type-fork"),
   {
     valid: [
       {
@@ -552,12 +554,19 @@ it("fails loud on partial duplicated object field block controls", async () => {
           parser: tsParser,
           ecmaVersion: 2023,
           sourceType: "module",
+          parserOptions: {
+            projectService: {
+              allowDefaultProject: ["types.ts"],
+              defaultProject: resolve(fixturesDir, "tsconfig.json"),
+            },
+            tsconfigRootDir: fixturesDir,
+          },
         },
         plugins: { antidrift: plugin },
         rules: {
-          "antidrift/no-duplicated-object-field-blocks": [
+          "antidrift/no-structural-type-fork": [
             "error",
-            { minSharedFields: 2, minShapes: 2 },
+            { fieldBlocks: { minSharedFields: 2, minShapes: 2 } },
           ],
         },
       },
@@ -567,7 +576,7 @@ it("fails loud on partial duplicated object field block controls", async () => {
   await expect(
     eslint.lintText(
       `type A = { id: string; at: number }; type B = { id: string; at: number };`,
-      { filePath: "types.ts" }
+      { filePath: resolve(fixturesDir, "types.ts") }
     )
   ).rejects.toThrow(/minRedundantDeclarations/u);
 });
@@ -870,7 +879,7 @@ ruleTester.run("no-static-property-loop", rule("no-static-property-loop"), {
           const rules = collectRules(createConfig());
           for (const ruleId of [
             "antidrift/no-appeasement-cast",
-            "antidrift/no-canonical-model-fork",
+            "antidrift/no-structural-type-fork",
           ]) {
             expect(severity(rules[ruleId])).toBe("error");
           }

@@ -34,10 +34,7 @@ describe("semantic facts", () => {
         "Local handwritten object contracts to accepted or proposed generated, domain, or package owner types.",
       noSinkBehavior:
         "Accepted generated, domain, and package owner diagnostics still report; unaccepted installed-package owner proposals are not collected.",
-      rules: [
-        "antidrift/no-canonical-model-fork",
-        "antidrift/no-structural-type-fork",
-      ],
+      rules: ["antidrift/no-structural-type-fork"],
     });
     expect(SEMANTIC_FACT_KINDS.structuralMatch.payloadFields).toContain(
       "ownerType"

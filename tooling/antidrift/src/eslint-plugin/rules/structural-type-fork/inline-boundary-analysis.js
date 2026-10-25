@@ -1,13 +1,12 @@
-import { relative, resolve } from "node:path";
+import { basename, relative, resolve } from "node:path";
 import ts from "typescript";
-import { declaresGenerated } from "../../semantic-adapters/kernel/generated-source.ts";
-import { packageDirectory } from "../../semantic-adapters/provenance/declared-dependencies.ts";
+import { declaresGenerated } from "../../../semantic-adapters/kernel/generated-source.ts";
+import { packageDirectory } from "../../../semantic-adapters/provenance/declared-dependencies.ts";
 import {
   shapeComparison,
   unresolvedDescription,
-} from "../../semantic-adapters/shape/shape-identity.ts";
-import { inlineStructuralTypeAtBoundary } from "../../semantic-adapters/boundary/exported-syntax.ts";
-import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
+} from "../../../semantic-adapters/shape/shape-identity.ts";
+import { inlineStructuralTypeAtBoundary } from "../../../semantic-adapters/boundary/exported-syntax.ts";
 
 const declarationsByProgram = new WeakMap();
 const dependencySources = /(?:^|[/\\])node_modules(?:[/\\]|$)/u;
@@ -21,6 +20,16 @@ function propertyKey(type, checker) {
     return null;
   }
   return JSON.stringify(properties.map((property) => property.name).sort());
+}
+
+function hasOwnDeclarationMap(source) {
+  const directive = /^\/\/# sourceMappingURL=(\S+)\s*$/mu.exec(
+    source.getFullText()
+  );
+  return (
+    directive !== null &&
+    basename(directive[1]) === `${basename(source.fileName)}.map`
+  );
 }
 
 function compiledDeclarations(program) {
@@ -74,7 +83,11 @@ function compiledDeclarations(program) {
       .getSourceFiles()
       .filter(
         (source) =>
-          source.isDeclarationFile && outputs.has(resolve(source.fileName))
+          source.isDeclarationFile &&
+          (outputs.has(resolve(source.fileName)) ||
+            (!dependencySources.test(source.fileName) &&
+              !program.isSourceFileFromExternalLibrary(source) &&
+              hasOwnDeclarationMap(source)))
       )
   );
 }
@@ -255,133 +268,105 @@ function inScope(candidate, declaration) {
   );
 }
 
-export function ruleNoInlineStructuralTypeAtUseSite() {
-  return defineTypeScriptRule({
-    ruleName: "no-inline-structural-type-at-use-site",
-    meta: {
-      type: "problem",
-      docs: {
-        description:
-          "Require reuse when a boundary parameter repeats an existing object type.",
-      },
-      schema: [],
-      messages: {
-        overridden:
-          "This parameter repeats the parameter of {{name}} at {{location}}, which this method overrides. Use that parameter's type.",
-        named:
-          "This parameter repeats {{name}} at {{location}}. Use that named type.",
-        unscoped:
-          "This parameter repeats {{name}} at {{location}}, which is not usable here. Export or move that type and reuse it.",
-        repeated:
-          "This parameter repeats the inline type at {{location}}. Give the shared type one name and reuse it.",
-        undecided:
-          "Whether this parameter repeats the type at {{location}} is undecided because {{unresolved}} does not resolve.",
-      },
+export function inlineBoundaryVisitors(environment) {
+  const { context, checker, program, services, cwd } = environment;
+  const sameShape = shapeComparison(program);
+  return {
+    TSTypeLiteral(node) {
+      if (node.members.length < 3 || !inlineStructuralTypeAtBoundary(node)) {
+        return;
+      }
+      const declaration = services.esTreeNodeToTSNodeMap.get(node);
+      if (declaresGenerated(declaration.getSourceFile())) return;
+      const type = checker.getTypeAtLocation(declaration);
+      const key = propertyKey(type, checker);
+      if (!key) return;
+      const packageRoot = packageDirectory(
+        declaration.getSourceFile().fileName
+      );
+      const candidates = programDeclarations(program).get(key) ?? [];
+      const verdicts = candidates
+        .filter(
+          (candidate) =>
+            candidate.node !== declaration &&
+            (candidate.name ||
+              (packageRoot !== null && candidate.packageRoot === packageRoot))
+        )
+        .map((candidate) => ({
+          candidate,
+          verdict: sameShape(type, candidate.type),
+        }))
+        .filter(
+          ({ candidate, verdict }) =>
+            verdict !== false &&
+            !derivesFrom(candidate.node, declaration, checker)
+        );
+      const governing = overriddenParameter(declaration, checker);
+      if (
+        governing &&
+        sameShape(type, governing.type) === true &&
+        !derivesFrom(governing.node, declaration, checker)
+      ) {
+        context.report({
+          node,
+          messageId: "overridden",
+          data: {
+            name: governing.name,
+            location: lineLocation(governing.node, cwd),
+          },
+        });
+        return;
+      }
+      const matches = verdicts
+        .filter(({ verdict }) => verdict === true)
+        .map(({ candidate }) => candidate);
+      const named = matches.filter((candidate) => candidate.name);
+      const usable = named.filter(
+        (candidate) =>
+          inScope(candidate, declaration) ||
+          (candidate.node.getSourceFile() !== declaration.getSourceFile() &&
+            exported(candidate, checker))
+      );
+      const existingCandidates = [
+        ...usable.filter((candidate) => inScope(candidate, declaration)),
+        ...usable.filter((candidate) => candidate.packageRoot === packageRoot),
+        ...usable,
+        ...named,
+        ...matches,
+      ];
+      const existing = existingCandidates[0];
+      if (
+        existing &&
+        existingCandidates.every(
+          (candidate) => candidate.node === existing.node
+        )
+      ) {
+        let messageId = "repeated";
+        if (usable.includes(existing)) messageId = "named";
+        else if (existing.name) messageId = "unscoped";
+        context.report({
+          node,
+          messageId,
+          data: {
+            name: existing.name,
+            location: lineLocation(existing.node, cwd),
+          },
+        });
+        return;
+      }
+      const undecided = verdicts.find(
+        ({ verdict }) => typeof verdict === "object"
+      );
+      if (undecided) {
+        context.report({
+          node,
+          messageId: "undecided",
+          data: {
+            location: lineLocation(undecided.candidate.node, cwd),
+            unresolved: unresolvedDescription(undecided.verdict, checker, cwd),
+          },
+        });
+      }
     },
-    visitors({ context, checker, program, services, cwd }) {
-      const sameShape = shapeComparison(program);
-      return {
-        TSTypeLiteral(node) {
-          if (
-            node.members.length < 3 ||
-            !inlineStructuralTypeAtBoundary(node)
-          ) {
-            return;
-          }
-          const declaration = services.esTreeNodeToTSNodeMap.get(node);
-          if (declaresGenerated(declaration.getSourceFile())) return;
-          const type = checker.getTypeAtLocation(declaration);
-          const key = propertyKey(type, checker);
-          if (!key) return;
-          const packageRoot = packageDirectory(
-            declaration.getSourceFile().fileName
-          );
-          const candidates = programDeclarations(program).get(key) ?? [];
-          const verdicts = candidates
-            .filter(
-              (candidate) =>
-                candidate.node !== declaration &&
-                (candidate.name ||
-                  (packageRoot !== null &&
-                    candidate.packageRoot === packageRoot))
-            )
-            .map((candidate) => ({
-              candidate,
-              verdict: sameShape(type, candidate.type),
-            }))
-            .filter(
-              ({ candidate, verdict }) =>
-                verdict !== false &&
-                !derivesFrom(candidate.node, declaration, checker)
-            );
-          const governing = overriddenParameter(declaration, checker);
-          if (
-            governing &&
-            sameShape(type, governing.type) === true &&
-            !derivesFrom(governing.node, declaration, checker)
-          ) {
-            context.report({
-              node,
-              messageId: "overridden",
-              data: {
-                name: governing.name,
-                location: lineLocation(governing.node, cwd),
-              },
-            });
-            return;
-          }
-          const matches = verdicts
-            .filter(({ verdict }) => verdict === true)
-            .map(({ candidate }) => candidate);
-          const named = matches.filter((candidate) => candidate.name);
-          const usable = named.filter(
-            (candidate) =>
-              inScope(candidate, declaration) ||
-              (candidate.node.getSourceFile() !== declaration.getSourceFile() &&
-                exported(candidate, checker))
-          );
-          const existing = [
-            ...usable.filter((candidate) => inScope(candidate, declaration)),
-            ...usable.filter(
-              (candidate) => candidate.packageRoot === packageRoot
-            ),
-            ...usable,
-            ...named,
-            ...matches,
-          ][0];
-          if (existing) {
-            let messageId = "repeated";
-            if (usable.includes(existing)) messageId = "named";
-            else if (existing.name) messageId = "unscoped";
-            context.report({
-              node,
-              messageId,
-              data: {
-                name: existing.name,
-                location: lineLocation(existing.node, cwd),
-              },
-            });
-            return;
-          }
-          const undecided = verdicts.find(
-            ({ verdict }) => typeof verdict === "object"
-          );
-          if (undecided) {
-            context.report({
-              node,
-              messageId: "undecided",
-              data: {
-                location: lineLocation(undecided.candidate.node, cwd),
-                unresolved: unresolvedDescription(
-                  undecided.verdict,
-                  checker,
-                  cwd
-                ),
-              },
-            });
-          }
-        },
-      };
-    },
-  });
+  };
 }
