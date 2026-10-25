@@ -1,6 +1,7 @@
 import ts from "typescript";
 
 import { declaredDependencies } from "../provenance/declared-dependencies.ts";
+import { ownerTypeForProof } from "../projection/owner-projection-proof.ts";
 import type { ProjectionProof } from "../projection/owner-projection-proof.ts";
 import type { findStructuralProofs } from "../shape/structural-fork-proof.ts";
 import type { Coverage } from "./discovery-coverage.ts";
@@ -140,9 +141,7 @@ function inventory(
 
 export function arbitrateOwnership(input: ArbitrationInput): ArbitrationResult {
   const witnesses = input.witnesses ?? [];
-  const witnessOwners = new Set(
-    witnesses.map((witness) => witness.ownerType.label)
-  );
+  const witnessOwners = new Set(witnesses.map(ownerTypeForProof));
   if (witnesses.length > 0) {
     if (witnessOwners.size === 1 && witnesses[0]) {
       return { kind: "block", proof: witnesses[0] };

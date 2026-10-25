@@ -3,17 +3,15 @@ import ts from "typescript";
 import { packageDirectory } from "../provenance/declared-dependencies.ts";
 import { resolveAliasedSymbol } from "../provenance/symbol-provenance.ts";
 import { boundedType, objectType } from "../shape/contract-types.ts";
-import type { StructuralTypeCandidate } from "../type-owner.mjs";
 import type {
   OwnerAuthority,
+  OwnerCandidate,
   OwnerProjection,
   ProjectionRecord,
 } from "./owner-projection-view.ts";
-import { directOwnerReader } from "./owner-projection-view.ts";
-
-type OwnerCandidate = StructuralTypeCandidate & {
-  readonly reverses?: boolean;
-};
+import { directOwnerReader, maxOwnerDepth } from "./owner-projection-view.ts";
+import { pendingOwnerRoots } from "./owner-field-index.ts";
+import type { CandidateRoot, OwnerFieldIndex } from "./owner-field-index.ts";
 
 export type OwnerProjectionIndex = {
   readonly size: number;
@@ -35,8 +33,6 @@ type ProjectionPath = {
   readonly depth: number;
   readonly seen: ReadonlySet<ts.Type>;
 };
-
-export const maxOwnerDepth = 8;
 
 export function nonNullable(
   checker: ts.TypeChecker,
@@ -132,11 +128,6 @@ function visitOwnerProjection(
   return false;
 }
 
-type CandidateRoot = {
-  candidate: OwnerCandidate;
-  root: ts.Type;
-};
-
 function rootOwners(
   checker: ts.TypeChecker,
   candidates: readonly OwnerCandidate[]
@@ -169,34 +160,6 @@ function rootOwners(
     ]);
   }
   return { owners, roots };
-}
-
-function pendingRoots(
-  checker: ts.TypeChecker,
-  roots: ReadonlyMap<ts.Type, CandidateRoot[]>,
-  fields: ReadonlySet<string>,
-  target: ts.Type
-) {
-  return [...roots]
-    .map(([root, entries]) => {
-      const properties = checker.getPropertiesOfType(root);
-      return {
-        root,
-        entries,
-        targetsDirectly: properties.some(
-          (property) =>
-            checker.getNonNullableType(checker.getTypeOfSymbol(property)) ===
-            target
-        ),
-        score: properties.filter((property) => fields.has(property.name))
-          .length,
-      };
-    })
-    .sort(
-      (left, right) =>
-        Number(right.targetsDirectly) - Number(left.targetsDirectly) ||
-        right.score - left.score
-    );
 }
 
 type OwnerExpansion = Omit<
@@ -275,6 +238,7 @@ export function ownerProjections(
   const resolved = new Map<ts.Type, OwnerProjection | null>();
   const unresolved = new Set<ts.Type>();
   const localTypes = new Map<ts.Type, boolean>();
+  const fieldIndexes = new Map<ts.Type, OwnerFieldIndex>();
   const hasLocalOwner =
     localPackageRoot !== undefined &&
     candidates.some(
@@ -307,14 +271,8 @@ export function ownerProjections(
         resolved.set(type, null);
         return undefined;
       }
-      const fields = new Set(
-        checker.getPropertiesOfType(type).map((property) => property.name)
-      );
-      if (fields.size === 0) {
-        return undefined;
-      }
       const search = { count: 0, complete: true };
-      const pending = pendingRoots(checker, roots, fields, type);
+      const pending = pendingOwnerRoots(checker, roots, type, fieldIndexes);
       for (const { root, entries } of pending) {
         expandOwnerRoot({
           checker,
@@ -366,7 +324,13 @@ export function contextualOwner(
     : null;
 }
 
+const ownerTypeSets = new WeakMap<OwnerProjection, ReadonlySet<ts.Type>>();
+
 function ownerTypes(checker: ts.TypeChecker, owner: OwnerProjection) {
+  const cached = ownerTypeSets.get(owner);
+  if (cached) {
+    return cached;
+  }
   const visited = new Set<ts.Type>();
   const visit = (type: ts.Type, depth: number): void => {
     if (depth === 0 || visited.has(type)) {
@@ -386,6 +350,7 @@ function ownerTypes(checker: ts.TypeChecker, owner: OwnerProjection) {
   for (const root of owner.roots) {
     visit(root, maxOwnerDepth);
   }
+  ownerTypeSets.set(owner, visited);
   return visited;
 }
 

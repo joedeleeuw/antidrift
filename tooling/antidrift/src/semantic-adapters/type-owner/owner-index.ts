@@ -39,7 +39,8 @@ import type {
   PackageDiscovery,
   ResolvedPackageEntry,
 } from "./package-entry.ts";
-import { entryExportsName, exportedOwners } from "./public-export-owners.ts";
+import { entryExportsName } from "./public-export-owners.ts";
+import { sharedExportedOwners } from "./public-export-cache.ts";
 import type { CandidatesFor, OwnerScope } from "./owner-scope.ts";
 import { exactShapeCandidates } from "./shape-candidates.ts";
 
@@ -323,7 +324,9 @@ function discoverPackageScope(
     const sourceFile = expanded.getSourceFile(entry.fileName);
     if (sourceFile) {
       candidates.push(
-        ...exportedOwners(checker, sourceFile, entry, packageRoot, { coverage })
+        ...sharedExportedOwners(checker, sourceFile, entry, packageRoot, {
+          coverage,
+        })
       );
     }
   }

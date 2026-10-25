@@ -56,12 +56,17 @@ export function scaffoldStructuralContracts({ file, work }) {
   );
   file(
     "packages/first-owner/package.json",
-    `${JSON.stringify({ name: "first-owner", type: "module", types: "./index.ts" }, null, 2)}\n`
+    `${JSON.stringify({ name: "first-owner", type: "module", types: "./index.ts", exports: { ".": "./index.ts", "./a": "./a.ts", "./b": "./b.ts", "./c": "./c.ts" } }, null, 2)}\n`
   );
   file(
     "packages/first-owner/index.ts",
     "export interface OriginalChild { a: string; b: number; c: boolean }\nexport declare function makeChild(): OriginalChild;\n"
   );
+  const independentContract =
+    "export interface Contract { a: string; b: number; c: boolean }\nexport declare function make(): Contract;\n";
+  file("packages/first-owner/a.ts", independentContract);
+  file("packages/first-owner/b.ts", independentContract);
+  file("packages/first-owner/c.ts", independentContract);
   file(
     "packages/second-owner/package.json",
     `${JSON.stringify({ name: "second-owner", type: "module", types: "./index.ts" }, null, 2)}\n`
@@ -74,6 +79,14 @@ export function scaffoldStructuralContracts({ file, work }) {
   file(
     "packages/app/src/nested-envelope.ts",
     'import { make } from "second-owner";\nimport type { CopiedChild } from "./nested-contract.js";\nexport interface LocalEnvelope { payload: CopiedChild; meta: string }\nexport const copied: LocalEnvelope = make();\n'
+  );
+  file(
+    "packages/app/src/n-way-local.ts",
+    'import { makeChild } from "first-owner";\nexport interface FirstCopy { a: string; b: number; c: boolean }\nexport interface SecondCopy { a: string; b: number; c: boolean }\nexport interface ThirdCopy { a: string; b: number; c: boolean }\nexport const first: FirstCopy = makeChild();\nexport const second: SecondCopy = makeChild();\nexport const third: ThirdCopy = makeChild();\n'
+  );
+  file(
+    "packages/app/src/n-way-owners.ts",
+    'import { make as makeA } from "first-owner/a";\nimport { make as makeB } from "first-owner/b";\nimport { make as makeC } from "first-owner/c";\ndeclare const firstBranch: boolean;\ndeclare const secondBranch: boolean;\nexport interface Copied { a: string; b: number; c: boolean }\nlet copied: Copied;\nif (firstBranch) {\n  copied = makeA();\n} else if (secondBranch) {\n  copied = makeB();\n} else {\n  copied = makeC();\n}\nexport { copied };\n'
   );
   file(
     "packages/app/src/compiled-inline.ts",
@@ -131,6 +144,26 @@ export function proveStructuralContracts({ file, lint }) {
   if (bundled.length > 0) {
     throw new Error(
       `Generated declaration bundles must not duplicate their source contracts: ${JSON.stringify(bundled)}`
+    );
+  }
+  const localCopies = structuralMessages(["packages/app/src/n-way-local.ts"]);
+  if (
+    localCopies.length !== 3 ||
+    localCopies.some(
+      (message) => message.messageId !== "ownedContractProjection"
+    ) ||
+    localCopies.map((message) => message.line).join(",") !== "2,3,4"
+  ) {
+    throw new Error(
+      `Each of three local contract copies must report: ${JSON.stringify(localCopies)}`
+    );
+  }
+  const independentOwners = structuralMessages([
+    "packages/app/src/n-way-owners.ts",
+  ]);
+  if (independentOwners.length > 0) {
+    throw new Error(
+      `Three independent plausible owners must abstain: ${JSON.stringify(independentOwners)}`
     );
   }
 }

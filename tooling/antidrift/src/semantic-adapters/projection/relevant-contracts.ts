@@ -2,7 +2,7 @@ import type ts from "typescript";
 
 import { boundedType, objectType } from "../shape/contract-types.ts";
 import type { LocalContractScope } from "./contract-sites.ts";
-import { maxOwnerDepth } from "./owner-projection.ts";
+import { maxOwnerDepth } from "./owner-projection-view.ts";
 
 type RelevantVisit = {
   readonly type: ts.Type;

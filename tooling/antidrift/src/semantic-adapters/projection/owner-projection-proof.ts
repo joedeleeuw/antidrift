@@ -4,6 +4,18 @@ import type { OwnerProjection } from "./owner-projection-view.ts";
 
 export type ProjectionProof = ReturnType<typeof projectionProof>;
 
+const projectionOwnerTypes = new WeakMap<object, ts.Type>();
+
+export function ownerTypeForProof(proof: ProjectionProof): ts.Type {
+  const type = projectionOwnerTypes.get(proof);
+  if (!type) {
+    throw new TypeError(
+      "Owner projection proof is missing its TypeChecker type."
+    );
+  }
+  return type;
+}
+
 export function projectionProof(
   checker: ts.TypeChecker,
   localType: ts.Type,
@@ -15,7 +27,7 @@ export function projectionProof(
     field.name,
     checker.typeToString(checker.getTypeOfSymbol(field)),
   ]);
-  return {
+  const proof = {
     authorityState: "accepted",
     diagnostic: {
       emitted: true as const,
@@ -47,4 +59,6 @@ export function projectionProof(
       },
     },
   };
+  projectionOwnerTypes.set(proof, owner.type);
+  return proof;
 }

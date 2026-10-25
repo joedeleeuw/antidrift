@@ -78,14 +78,14 @@ function indexedExportOwner(
   }
   const merged = checker.getMergedSymbol(symbol);
   return {
-    label: `${entry.packageName}#${name}`,
+    label: `${entry.specifier}#${name}`,
     type,
     props: typeProps(checker, type),
     detailedProps: typePropsDetailed(checker, type),
     authority: "installed-package",
     authorityState: "proposal",
     requiresProvenance: true,
-    ownerKey: `${entry.packageName}#${name}`,
+    ownerKey: `${entry.specifier}#${name}`,
     symbol: merged,
     packageName: entry.packageName,
     exportName: name,

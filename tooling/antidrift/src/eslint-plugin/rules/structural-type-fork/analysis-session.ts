@@ -6,6 +6,7 @@ import {
   semanticFactSink,
 } from "../../../policy/lib/semantic-facts.mjs";
 import { collectOwnedContractProvenance } from "../../../semantic-adapters/projection/owned-contract-provenance.ts";
+import { ownerTypeForProof } from "../../../semantic-adapters/projection/owner-projection-proof.ts";
 import type { ProjectionProof } from "../../../semantic-adapters/projection/owner-projection-proof.ts";
 import { packageDirectory } from "../../../semantic-adapters/provenance/declared-dependencies.ts";
 import { isSymbolPubliclyExported } from "../../../semantic-adapters/provenance/symbol-provenance.ts";
@@ -42,9 +43,7 @@ import { isConvexOwnerReferenceAlias } from "./convex-owner.ts";
 import { relevantFilePaths } from "../../../semantic-adapters/provenance/module-imports.ts";
 import { contractFieldTypes } from "../../../semantic-adapters/projection/relevant-contracts.ts";
 
-type InlineReport = Parameters<
-  TypeScriptRuleEnvironment["context"]["report"]
->[0];
+type InlineReport = Rule.ReportDescriptor;
 type DeclarationCheck = {
   readonly node: Rule.Node;
   readonly tsNode: ts.Node;
@@ -64,6 +63,7 @@ type ProjectionNode = {
 type StructuralProof =
   | ReturnType<typeof findStructuralProofs>[number]["proof"]
   | ProjectionProof;
+type OwnerOptions = Parameters<typeof createPackageOwnerIndex>[0];
 
 export class StructuralRuleSession {
   private readonly context: TypeScriptRuleEnvironment["context"];
@@ -96,7 +96,7 @@ export class StructuralRuleSession {
       throw new TypeError(`${filename} is absent from the TypeScript program.`);
     }
     const options = (environment.options[0] ?? {}) as Omit<
-      Parameters<typeof createPackageOwnerIndex>[0],
+      OwnerOptions,
       "program"
     > & { fieldBlocks?: unknown };
     this.packageRoot = packageDirectory(filename) ?? cwd;
@@ -305,10 +305,10 @@ export class StructuralRuleSession {
   }
 
   private readonly generatedSources: NonNullable<
-    Parameters<typeof createPackageOwnerIndex>[0]["generatedSources"]
+    OwnerOptions["generatedSources"]
   >;
   private readonly canonicalEntities: NonNullable<
-    Parameters<typeof createPackageOwnerIndex>[0]["canonicalEntities"]
+    OwnerOptions["canonicalEntities"]
   >;
 
   private reportProof(
@@ -410,9 +410,7 @@ export class StructuralRuleSession {
       ) {
         continue;
       }
-      if (
-        new Set(proofs.map((witness) => witness.ownerType.label)).size !== 1
-      ) {
+      if (new Set(proofs.map(ownerTypeForProof)).size !== 1) {
         emitSemanticFact(
           this.context,
           node,

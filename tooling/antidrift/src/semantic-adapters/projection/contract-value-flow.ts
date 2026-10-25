@@ -6,9 +6,9 @@ import type { ContractSite, LocalContractScope } from "./contract-sites.ts";
 import type { ContractProvenanceSearch } from "./contract-provenance-state.ts";
 import { collectLocalCopies } from "./local-contract-copies.ts";
 import type { OwnerProjectionIndex } from "./owner-projection.ts";
+import { maxOwnerDepth } from "./owner-projection-view.ts";
 import {
   contextualOwner,
-  maxOwnerDepth,
   nonNullable,
   ownerProjections,
 } from "./owner-projection.ts";

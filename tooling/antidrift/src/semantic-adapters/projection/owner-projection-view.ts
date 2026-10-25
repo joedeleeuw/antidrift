@@ -1,4 +1,11 @@
 import type ts from "typescript";
+import type { StructuralTypeCandidate } from "../type-owner.mjs";
+
+export const maxOwnerDepth = 8;
+
+export type OwnerCandidate = StructuralTypeCandidate & {
+  readonly reverses?: boolean;
+};
 
 export type OwnerAuthority = {
   readonly authority: string;
