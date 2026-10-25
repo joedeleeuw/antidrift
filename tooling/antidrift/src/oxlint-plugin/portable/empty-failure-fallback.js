@@ -1,8 +1,3 @@
-import {
-  isRuleFile,
-  scopeProperties,
-} from "../../semantic-adapters/kernel/rule-scope.ts";
-
 const FUNCTION_TYPES = new Set([
   "ArrowFunctionExpression",
   "FunctionDeclaration",
@@ -69,51 +64,29 @@ function isSilent(handler, sourceCode) {
   return (
     sourceCode
       .getDeclaredVariables(handler)
-      .every((variable) => variable.references.length === 0) &&
+      .every((binding) => binding.references.length === 0) &&
     !rethrows(handler.body, sourceCode)
   );
 }
 
-export default {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow returning an empty array or object from a failure path that drops the error.",
+export function emptyFailureFallbackVisitors(context) {
+  const { sourceCode } = context;
+  return {
+    ReturnStatement(node) {
+      if (!isEmptyCollection(node.argument)) return;
+      const handler = enclosingFailurePath(node);
+      if (handler && isSilent(handler, sourceCode)) {
+        context.report({ node, messageId: "fallback" });
+      }
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
-    messages: {
-      fallback:
-        "Failure path drops the error and returns an empty collection, which makes bad data look valid. Let the error propagate or return a typed failure.",
+    ArrowFunctionExpression(node) {
+      if (
+        isEmptyCollection(node.body) &&
+        isPromiseCatchHandler(node) &&
+        isSilent(node, sourceCode)
+      ) {
+        context.report({ node, messageId: "fallback" });
+      }
     },
-  },
-  create(context) {
-    if (!isRuleFile(context)) return {};
-    const { sourceCode } = context;
-
-    return {
-      ReturnStatement(node) {
-        if (!isEmptyCollection(node.argument)) return;
-        const handler = enclosingFailurePath(node);
-        if (handler && isSilent(handler, sourceCode)) {
-          context.report({ node, messageId: "fallback" });
-        }
-      },
-      ArrowFunctionExpression(node) {
-        if (
-          isEmptyCollection(node.body) &&
-          isPromiseCatchHandler(node) &&
-          isSilent(node, sourceCode)
-        ) {
-          context.report({ node, messageId: "fallback" });
-        }
-      },
-    };
-  },
-};
+  };
+}

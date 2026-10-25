@@ -453,6 +453,38 @@ try {
     );
   }
 
+  const mergedProjectionMessages = lint(
+    "packages/app/src/merged-projections.ts"
+  ).flatMap((lintResult) => lintResult.messages);
+  const propertyHops = mergedProjectionMessages.filter(
+    (message) => message.ruleId === "antidrift/no-wrapping-functions"
+  );
+  const bagDiagnosticIds = new Set(
+    mergedProjectionMessages
+      .filter(
+        (message) =>
+          message.ruleId === "antidrift/no-contract-appeasement-projection"
+      )
+      .map((message) => message.messageId)
+  );
+  if (
+    propertyHops.length !== 2 ||
+    propertyHops.some((message) => message.messageId !== "hop")
+  ) {
+    fail(
+      `direct and fallback property helpers should each report a verified hop without name-only reports, got: ${JSON.stringify(mergedProjectionMessages)}`
+    );
+  }
+  const expectedBagIds = new Set(["bagToContract", "bagToBag"]);
+  if (
+    bagDiagnosticIds.size !== expectedBagIds.size ||
+    [...expectedBagIds].some((id) => !bagDiagnosticIds.has(id))
+  ) {
+    fail(
+      `merged projection rule should report both bag cases, got: ${JSON.stringify(mergedProjectionMessages)}`
+    );
+  }
+
   const ASYNC_RULE = "antidrift/no-async-array-method";
   const asyncDefaultConfig = "oxlint.async-array.config.mjs";
   const asyncCollectionConfig = "oxlint.async-array-collection.config.mjs";

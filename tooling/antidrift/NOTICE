@@ -82,14 +82,14 @@ Native rules are implemented by Oxlint. The adoption configuration selects
 existing native rule IDs; it copies no native rule implementation.
 
 Source module SHA-256 -> antidrift rule
-rikalabs @rikalabs/no-duplicate-context 81a246bc1e61268afcf6933bd026e6aabe0869cdce55ed6e2ab52aeeb16e482e -> no-duplicate-context
-rikalabs @rikalabs/no-ai-debt-comments effaadf43d86dbe6e76a44e3822c8320e280d40d4af1dad916109a2a3130978f -> no-ai-debt-comments
+rikalabs @rikalabs/no-duplicate-context 81a246bc1e61268afcf6933bd026e6aabe0869cdce55ed6e2ab52aeeb16e482e -> no-vague-names
+rikalabs @rikalabs/no-ai-debt-comments effaadf43d86dbe6e76a44e3822c8320e280d40d4af1dad916109a2a3130978f -> no-todo-without-issue
 rikalabs @rikalabs/no-as-never 040d7738b8774e73ee0dc4ba1951b22f4835eb7c2d8d686d6e19eff9811dc5b0 -> no-as-never
 rikalabs @rikalabs/no-todo-without-issue 8811d9ccf406bb49bcf7010ceb4f4c4eee560b15e388b05d318f0591ca722e22 -> no-todo-without-issue
 rikalabs @rikalabs/no-default-export-in-domain e44668aeeb360849e780a42356cc06f7991d701aed3f11dc2f9f14cf42878803 -> no-default-export-in-domain
 rikalabs @rikalabs/no-anemic-errors 8f1e87ea4fda81f95af4b4f1bcfb6cbb55544a4dff6e70be82f5c121c699a005 -> no-anemic-errors
 rikalabs @rikalabs/no-relative-cross-package-imports c0e835d29e9c0b7fd2276b104865821a13d1830293a728f71f4549ae44889c23 -> no-relative-cross-package-imports
-rikalabs @rikalabs/no-trivial-property-helpers c80672391908bd6f82bd73d9cef93e10387bc94719c385965168b554221aa302 -> no-trivial-property-helpers
+rikalabs @rikalabs/no-trivial-property-helpers c80672391908bd6f82bd73d9cef93e10387bc94719c385965168b554221aa302 -> no-wrapping-functions
 rikalabs @rikalabs/no-tutorial-comments 9ae376f94f737bf622919aee560de504be9713814a707f142ea14696837e2247 -> no-tutorial-comments
 rikalabs @rikalabs/no-debug-residue-filenames 0e0e4b7301b09c2bb3064bee81f2b4fb4072a778b5cafe32604c051588b76a61 -> no-debug-residue-filenames
 rikalabs @rikalabs/no-placeholder-tests 85b6ff1116efcae22403a4ef65269c3d2557a8c4723c7a7146286a5b7a76175a -> no-placeholder-tests

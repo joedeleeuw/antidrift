@@ -21,7 +21,7 @@ These rules are already in the package and are part of the core project thesis:
 - `no-structural-type-fork`: unified ownership inference and TypeChecker proof for duplicated dependency, workspace, generated, and domain contracts, plus repeated inline/field-block shapes and redundant nested return annotations.
 - `require-effect-deps`: closes the gap where `react-hooks/exhaustive-deps` does not flag a missing dependency-array argument.
 - `no-redundant-zod-parse`: provenance rule for repeated parsing of the same value by the same schema.
-- `no-contract-appeasement-projection`: subsumes the old selector-wrapper branch with TypeChecker-backed source/return ownership proof. The former `no-explicit-return-type-private-helper` rule is retired because real corpus evidence showed private return annotations are not a deterministic smell.
+- `no-contract-appeasement-projection`: TypeChecker-backed source/return ownership proof for selector wrappers and parameter-bag projections, with `bagToContract` and `bagToBag` cases under one owner. The former `no-explicit-return-type-private-helper` rule is retired because real corpus evidence showed private return annotations are not a deterministic smell.
 - `no-nonindependent-test-oracle`: local-flow proof against assertions that restate arranged inputs, validator output, static shapes, or mocked outputs; application-call boundaries and schemas used as application inputs stay clean.
 
 ## Chosen Next Scope
@@ -29,7 +29,7 @@ These rules are already in the package and are part of the core project thesis:
 These were the next project scope because they are the project, not because a broad policy table mentioned them. The active parts are implemented in the current batch:
 
 - `no-appeasement-cast`: block `any`/`unknown as NamedObject` source-boundary appeasement casts. Double-cast tunnels are delegated to `@typescript-eslint/no-unsafe-type-assertion`.
-- `no-contract-appeasement-projection`: no `getXFromY` name fingerprint; selector wrappers are now one branch of the broader contract-projection rule.
+- `no-contract-appeasement-projection`: no `getXFromY` name fingerprint; selector wrappers and bag reshaping are branches of the broader contract-projection rule.
 - `no-handrolled-resource-lifecycle-cells`: behavior-based React state graph rule for hand-rolled async resource lifecycle machines; broad multi-setter co-mutation is inventory only and classified with `pnpm policy:inventory-react-state`.
 - `no-unsafe-deserialize`: use an `any`/`unknown` type signal instead of a `req`/`ctx` name fingerprint.
 - `no-defensive-shape-probing`: provisional only where real corpus evidence shows deterministic broad-value mini-parsing; do not expand to general boolean predicates.

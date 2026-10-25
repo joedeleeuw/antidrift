@@ -337,6 +337,14 @@ class EvaluationStepper {
       !expression.questionDotToken
     ) {
       this.visitCall(expression);
+    } else if (
+      ts.isBinaryExpression(expression) &&
+      (expression.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+        expression.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+        expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
+    ) {
+      this.visit(expression.left);
+      this.visit(expression.right);
     } else if (ts.isTemplateExpression(expression)) {
       this.visitTemplate(expression);
     } else if (ts.isArrayLiteralExpression(expression)) {

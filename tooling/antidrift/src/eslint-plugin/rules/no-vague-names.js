@@ -2,6 +2,7 @@ import {
   isRuleFile,
   scopeProperties,
 } from "../../semantic-adapters/kernel/rule-scope.ts";
+import { splitIdentifierWords } from "../../semantic-adapters/kernel/identifier-words.ts";
 
 const VAGUE_NOUN =
   /^(?:data|info|value|values|val|vals|obj|objects|objs|thing|things|stuff|temp|tmp|foo|bar|baz|res|ret|retval|misc|result|results|item|items|var|vars|variable|content|contents|param|params|parameters|arr|spam|ham|toto|tutu|tata)\d*$/i;
@@ -56,6 +57,16 @@ function vagueReason(name) {
     return "a filler suffix";
   }
   if (FILLER_PREFIX.test(name)) return "a filler prefix";
+  return null;
+}
+
+function duplicateContextWord(name) {
+  const words = splitIdentifierWords(name);
+  for (let index = 1; index < words.length; index += 1) {
+    const previous = words[index - 1];
+    const current = words[index];
+    if (previous && current && previous === current) return current;
+  }
   return null;
 }
 
@@ -123,7 +134,7 @@ export default {
     type: "suggestion",
     docs: {
       description:
-        "Disallow declared names that are vague nouns, abbreviations, single letters, or filler affixes.",
+        "Disallow vague names, filler affixes, abbreviations, and repeated adjacent context words.",
     },
     schema: [
       {
@@ -135,6 +146,8 @@ export default {
     messages: {
       vague:
         "'{{name}}' is {{reason}}. Name the binding for what it holds in this domain.",
+      duplicate:
+        "Function '{{name}}' repeats '{{word}}'. Remove duplicate context from the identifier.",
     },
   },
   create(context) {
@@ -172,6 +185,22 @@ export default {
         });
       }
     }
+    function checkDuplicateContext(nameNode, reportNode) {
+      let name = null;
+      if (nameNode?.type === "Identifier") name = nameNode.name;
+      if (nameNode?.type === "Literal" && typeof nameNode.value === "string") {
+        name = nameNode.value;
+      }
+      if (!name) return;
+      const word = duplicateContextWord(name);
+      if (word) {
+        context.report({
+          node: reportNode,
+          messageId: "duplicate",
+          data: { name, word },
+        });
+      }
+    }
     function checkPattern(pattern) {
       for (const identifier of patternIdentifiers(pattern)) check(identifier);
     }
@@ -201,6 +230,9 @@ export default {
     }
     function checkFunction(node) {
       if (node.type !== "ArrowFunctionExpression") check(node.id);
+      if (node.type === "FunctionDeclaration") {
+        checkDuplicateContext(node.id, node);
+      }
       for (const [index, parameter] of node.params.entries()) {
         if (
           index === 0 &&
@@ -217,10 +249,19 @@ export default {
     return {
       VariableDeclarator(node) {
         checkPattern(node.id);
+        if (
+          node.init?.type === "ArrowFunctionExpression" ||
+          node.init?.type === "FunctionExpression"
+        ) {
+          checkDuplicateContext(node.id, node);
+        }
       },
       FunctionDeclaration: checkFunction,
       FunctionExpression: checkFunction,
       ArrowFunctionExpression: checkFunction,
+      MethodDefinition(node) {
+        checkDuplicateContext(node.key, node);
+      },
       CatchClause(node) {
         checkPattern(node.param);
       },

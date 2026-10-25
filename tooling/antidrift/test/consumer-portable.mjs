@@ -42,7 +42,9 @@ export function provePortableRules({ file, lintOxlint, packedFiles }) {
       },
     });
     if (
-      !packedFiles.has(`package/dist/oxlint-plugin/portable/${entry.name}.js`)
+      !packedFiles.has(
+        `package/dist/${entry.artifact ?? `oxlint-plugin/portable/${entry.name}.js`}`
+      )
     ) {
       throw new Error(`Portable rule missing from tarball: ${entry.name}`);
     }
@@ -79,14 +81,16 @@ export function provePortableRules({ file, lintOxlint, packedFiles }) {
     }
     counts.set(diagnostic.code, (counts.get(diagnostic.code) ?? 0) + 1);
   }
-  for (const rule of expected) {
-    if (counts.get(rule) !== 1) {
+  for (const entry of portableCases) {
+    const rule = `antidrift(${entry.name})`;
+    const expectedCount = entry.occurrences ?? 1;
+    if (counts.get(rule) !== expectedCount) {
       throw new Error(
-        `Packed portable rule ${rule}: expected one finding, got ${counts.get(rule) ?? 0}`
+        `Packed portable rule ${rule}: expected ${expectedCount} findings, got ${counts.get(rule) ?? 0}`
       );
     }
   }
   console.log(
-    `     portable rules: ${expected.size} packed rules each report one finding; licenses included`
+    `     portable rules: ${expected.size} packed rules report their expected findings; licenses included`
   );
 }

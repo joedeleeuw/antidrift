@@ -130,7 +130,7 @@ rules:
       current: semantic-ast,
       fit: proven,
       target: semantic-ast,
-      note: "contract-appeasement projection; TypeChecker plus structural return-flow proof. Ready; widened branch needs real corpus before stable.",
+      note: "contract-appeasement projection and parameter-bag repacking; TypeChecker plus structural return-flow proof preserves bagToContract and bagToBag. Ready; widened branch needs real corpus before stable.",
     }
   antidrift/no-nullable-positional-tuple:
     {
@@ -194,13 +194,6 @@ rules:
       fit: proven,
       target: semantic-ast,
       note: "TypeChecker symbol and module provenance proves a project-local module owns an Effect service tag or layer and reports direct constructor/factory imports outside Layer wiring.",
-    }
-  antidrift/no-bag-reshaper:
-    {
-      current: semantic-ast,
-      fit: proven,
-      target: semantic-ast,
-      note: "TypeChecker parameter-bag provenance plus pure object-literal return projection proof covers both bagToContract ('provide a bag, return a type I want') and bagToBag ('provide a bag, return a bag').",
     }
 
 # Behaviors the taxonomy reveals we do not have blocking coverage for yet. Some need a missing

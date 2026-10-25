@@ -56,7 +56,43 @@ function isForwardedArgument(node) {
   }
 }
 
-function delegatedCall(node, identifier) {
+function isParameterPropertyRead(node, parameterNames) {
+  if (node?.type !== "MemberExpression" || node.optional) return false;
+  let current = node;
+  while (current.type === "MemberExpression") {
+    if (current.optional) return false;
+    current = current.object;
+  }
+  return current.type === "Identifier" && parameterNames.has(current.name);
+}
+
+function isDefaultFallback(node) {
+  if (!node) return true;
+  if (node.type === "Literal") return true;
+  if (node.type === "ObjectExpression") {
+    return node.properties.every(
+      (property) =>
+        property.type === "Property" && isDefaultFallback(property.value)
+    );
+  }
+  if (node.type === "ArrayExpression") {
+    return node.elements.every(isDefaultFallback);
+  }
+  if (node.type === "Identifier") return node.name === "undefined";
+  return node.type === "UnaryExpression" && node.operator === "void";
+}
+
+function isPropertyHopBody(node, parameterNames) {
+  if (isParameterPropertyRead(node, parameterNames)) return true;
+  return (
+    node?.type === "LogicalExpression" &&
+    (node.operator === "??" || node.operator === "||") &&
+    isParameterPropertyRead(node.left, parameterNames) &&
+    isDefaultFallback(node.right)
+  );
+}
+
+function delegatedBody(node, identifier) {
   if (
     !identifier ||
     node.async ||
@@ -70,28 +106,37 @@ function delegatedCall(node, identifier) {
   ) {
     return null;
   }
-  let call = node.body;
-  if (call.type === "BlockStatement") {
-    if (call.body.length !== 1) {
+  const parameterNames = new Set(
+    node.params.map((parameter) =>
+      parameter.type === "Identifier" ? parameter.name : parameter.argument.name
+    )
+  );
+  let body = node.body;
+  let allowsPropertyRead = true;
+  if (body.type === "BlockStatement") {
+    if (body.body.length !== 1) {
       return null;
     }
-    const statement = call.body[0];
+    const statement = body.body[0];
     if (statement.type === "ReturnStatement") {
-      call = statement.argument;
+      body = statement.argument;
     } else if (statement.type === "ExpressionStatement") {
-      call = statement.expression;
+      body = statement.expression;
+      allowsPropertyRead = false;
     } else {
       return null;
     }
   }
   if (
-    !call ||
-    !isComposedCall(call) ||
-    (call.callee.type === "Identifier" && call.callee.name === identifier.name)
+    body &&
+    isComposedCall(body) &&
+    (body.callee.type !== "Identifier" || body.callee.name !== identifier.name)
   ) {
-    return null;
+    return body;
   }
-  return call;
+  return allowsPropertyRead && isPropertyHopBody(body, parameterNames)
+    ? body
+    : null;
 }
 
 function namedFunctionVisitors(visit) {
@@ -112,8 +157,8 @@ function namedFunctionVisitors(visit) {
 }
 
 function hopCandidate(services, node, identifier) {
-  const call = delegatedCall(node, identifier);
-  if (!call) {
+  const body = delegatedBody(node, identifier);
+  if (!body) {
     return null;
   }
   const nodes = services.esTreeNodeToTSNodeMap;
@@ -123,8 +168,8 @@ function hopCandidate(services, node, identifier) {
     ),
     functionNode: nodes.get(node),
     nameNode: nodes.get(identifier),
-    call: nodes.get(call),
-    callee: call.callee,
+    body: nodes.get(body),
+    operation: body.type === "CallExpression" ? body.callee : body,
   };
 }
 
@@ -167,7 +212,7 @@ export default defineTypeScriptRule({
       }
       const hopNames = {
         name: identifier.name,
-        callee: context.sourceCode.getText(candidate.callee),
+        callee: context.sourceCode.getText(candidate.operation),
       };
       if (verdict.incomplete) {
         context.report({

@@ -940,8 +940,8 @@ ruleTester.run(
 );
 
 ruleTester.run(
-  "no-silent-empty-detection-fallback",
-  rule("no-silent-empty-detection-fallback"),
+  "no-sentinel-absence-fallback",
+  rule("no-sentinel-absence-fallback"),
   {
     valid: [
       "function formatLabel() { try { return readLabel(); } catch { return ''; } }",

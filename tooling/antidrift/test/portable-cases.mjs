@@ -6,28 +6,16 @@ export const portableCases = [
       "/**\n * @example\n * formatDay(new Date('2026-06-10'))\n */\nstart();",
   },
   {
-    name: "no-fallback-to-empty",
-    invalid:
-      "async function load() { try { return await read(); } catch { return []; } }",
-    valid:
-      "async function load() { try { return await read(); } catch (error) { throw new LoadError({ cause: error }); } }",
-  },
-  {
     name: "no-bun-api-in-shared",
     filename: "packages/shared/portability.ts",
     invalid: 'import { file } from "bun";',
     valid: 'import { read } from "./runtime-adapter";',
   },
   {
-    name: "no-duplicate-context",
+    name: "no-vague-names",
+    artifact: "eslint-plugin/rules/no-vague-names.js",
     invalid: "function loadUserUser() {}",
     valid: "function loadUser() {}",
-  },
-  {
-    name: "no-ai-debt-comments",
-    invalid:
-      "// TODO clean up AI generated workaround\nexport const value = 1;",
-    valid: "// The generator owns this mapping.\nexport const value = 1;",
   },
   {
     name: "no-as-never",
@@ -36,8 +24,11 @@ export const portableCases = [
   },
   {
     name: "no-todo-without-issue",
-    invalid: "// TODO(verify): confirm remote audio track rendering\nstart();",
-    valid: "// TODO(APP-42): confirm remote audio track rendering\nstart();",
+    occurrences: 2,
+    invalid:
+      "// TODO clean up AI generated workaround\n// TODO(verify): confirm remote audio track rendering\nstart();",
+    valid:
+      "// TODO(APP-42): confirm remote audio track rendering\n// The generator owns this mapping.\nstart();",
   },
   {
     name: "no-default-export-in-domain",
@@ -47,19 +38,17 @@ export const portableCases = [
   },
   {
     name: "no-anemic-errors",
-    invalid: 'throw new Error("Something went wrong");',
-    valid: "throw new RequestError({ status, cause });",
+    occurrences: 2,
+    invalid:
+      'function fail() { throw new Error("Something went wrong"); }\nasync function load() { try { return await read(); } catch { return []; } }',
+    valid:
+      "function fail() { throw new RequestError({ status, cause }); }\nasync function load() { try { return await read(); } catch (error) { throw new LoadError({ cause: error }); } }",
   },
   {
     name: "no-relative-cross-package-imports",
     filename: "apps/client/src/main.ts",
     invalid: 'import { secret } from "../../other/src/internal";',
     valid: 'import { shared } from "@homer/shared";',
-  },
-  {
-    name: "no-trivial-property-helpers",
-    invalid: "function getStringValue(value) { return value.name ?? ''; }",
-    valid: "function userName(value) { return value.name; }",
   },
   {
     name: "no-tutorial-comments",

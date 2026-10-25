@@ -3,6 +3,16 @@ import { getFunctionNode } from "../../semantic-adapters/kernel/syntax-function.
 import { unwrapExpression } from "../../semantic-adapters/kernel/syntax-node.ts";
 import ts from "typescript";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
+import {
+  declaresGenerated,
+  isDeclaredGeneratedSource,
+} from "../../semantic-adapters/kernel/generated-source.ts";
+import {
+  isRuleFile,
+  scopeProperties,
+} from "../../semantic-adapters/kernel/rule-scope.ts";
+import { bagProjectionFinding } from "../../semantic-adapters/projection/bag-reshaping.js";
+import { isTestFilename } from "../../oxlint-plugin/portable/syntax.js";
 
 const collectionMetadataMemberNames = new Set(["length", "size"]);
 function hasExplicitReturnType(fn) {
@@ -723,6 +733,23 @@ function checkContractAppeasementProjection(node, context, services, checker) {
     });
   }
 }
+function checkProjection(node, context, services, checker) {
+  if (
+    !isTestFilename(context.filename) &&
+    isRuleFile(context) &&
+    !isDeclaredGeneratedSource(context.sourceCode.text)
+  ) {
+    const tsNode = services.esTreeNodeToTSNodeMap.get(node);
+    if (tsNode && !declaresGenerated(tsNode.getSourceFile())) {
+      const finding = bagProjectionFinding(tsNode, checker);
+      if (finding) {
+        context.report({ node, ...finding });
+        return;
+      }
+    }
+  }
+  checkContractAppeasementProjection(node, context, services, checker);
+}
 export function ruleNoContractAppeasementProjection() {
   return defineTypeScriptRule({
     ruleName: "no-contract-appeasement-projection",
@@ -731,13 +758,25 @@ export function ruleNoContractAppeasementProjection() {
       type: "problem",
       docs: {
         description:
-          "Disallow internal helpers that project source values into explicit return contracts without construction or validation.",
+          "Disallow helpers that project source values or repack parameter bags into other contracts without construction or validation.",
       },
-      schema: [],
+      schema: [
+        {
+          type: "object",
+          properties: scopeProperties,
+          additionalProperties: false,
+        },
+      ],
+      messages: {
+        bagToContract:
+          "Do not reshape parameter bag '{{parameterName}}' into target contract '{{targetContract}}' without boundary validation or domain construction; pass '{{targetContract}}' from its owner or decode at the boundary.",
+        bagToBag:
+          "Do not repack parameter bag '{{parameterName}}' into another ad-hoc object bag; read the owner's fields directly at the call site instead of threading a reshaped bag.",
+      },
     },
     visitors({ context, checker, services }) {
       return callableVisitors((node) =>
-        checkContractAppeasementProjection(node, context, services, checker)
+        checkProjection(node, context, services, checker)
       );
     },
   });

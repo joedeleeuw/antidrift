@@ -27,15 +27,12 @@ import ruleNoDuplicatedConditionalClassnames from "../oxlint-plugin/rules/no-dup
 import ruleNoNonindependentTestOracle from "../oxlint-plugin/rules/no-nonindependent-test-oracle.js";
 import ruleNoRedeclaredOwnedUnion from "../oxlint-plugin/rules/no-redeclared-owned-union.js";
 import ruleNoSentinelAbsenceFallback from "../oxlint-plugin/rules/no-sentinel-absence-fallback.js";
-import ruleNoSilentEmptyDetectionFallback from "../oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
 import { ruleNoServiceConstructorImports } from "./rules/no-service-constructor-imports.js";
-import { ruleNoBagReshaper } from "./rules/no-bag-reshaper.js";
 import ruleUnknownInputMustBeDecoded from "./rules/unknown-input-must-be-decoded.js";
 
 const rules = {
   "react-max-component-props": ruleReactMaxComponentProps(),
   "no-contract-appeasement-projection": ruleNoContractAppeasementProjection(),
-  "no-bag-reshaper": ruleNoBagReshaper(),
   "no-appeasement-cast": ruleNoAppeasementCast(),
   "no-nullable-positional-tuple": ruleNoNullablePositionalTuple(),
   "no-underchecked-type-predicate": ruleNoUndercheckedTypePredicate(),
@@ -64,7 +61,6 @@ const rules = {
   "no-raw-fetch-in-component": ruleNoRawFetchInComponent,
   "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
   "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
-  "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
   "unknown-input-must-be-decoded": ruleUnknownInputMustBeDecoded(),
 };
 

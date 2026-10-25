@@ -194,9 +194,9 @@ clusters:
         severity: error
         detector: catchThrowsNewErrorWithoutCause
         message: Preserve the caught error as cause.
-      - id: errors/no-fallback-to-empty # Returning [] or {} on failure makes bad data look valid.
+      - id: errors/no-anemic-errors # Returning [] or {} on failure makes bad data look valid.
         severity: error
-        detector: antidrift:no-fallback-to-empty
+        detector: antidrift:no-anemic-errors
         message: Return a typed failure unless empty is the explicit contract.
 
   - id: directive-smells # Shared AGENT.md directives that dotfiles enforces for Python, JSON and YAML.

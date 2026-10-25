@@ -674,7 +674,7 @@ export const opencodeCases = [
 export const dotfilesCases = [
   {
     id: "dotfiles-agent-trace-device-id-no-empty-sentinel",
-    ruleId: "antidrift/no-silent-empty-detection-fallback",
+    ruleId: "antidrift/no-sentinel-absence-fallback",
     kind: "correct",
     classification: "ready",
     subproject: "agent-trace",

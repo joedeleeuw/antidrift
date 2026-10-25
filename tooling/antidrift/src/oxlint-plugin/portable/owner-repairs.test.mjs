@@ -265,14 +265,3 @@ it("follows class bindings without mistaking quoted source for class values", ()
     )
   ).toEqual([]);
 });
-
-it("does not diagnose a helper call from its spelling alone", () => {
-  expect(
-    harness.lint(
-      "no-trivial-property-helpers",
-      'import { getString } from "parser"; getString(value);',
-      undefined,
-      undefined
-    )
-  ).toEqual([]);
-});

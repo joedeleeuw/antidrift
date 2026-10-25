@@ -8,28 +8,10 @@ import {
   isPopulatedObjectExpression,
 } from "../../oxlint-plugin/anti-slop/shared/dictionary-types.js";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
+import { mergeVisitors } from "../../semantic-adapters/kernel/merge-visitors.mjs";
 
 const TS_TYPE_FLAG_ANY = 1;
 const TS_TYPE_FLAG_UNKNOWN = 2;
-
-function mergeVisitors(...visitors) {
-  const handlers = new Map();
-  for (const visitor of visitors) {
-    for (const [selector, handler] of Object.entries(visitor)) {
-      const selectorHandlers = handlers.get(selector) ?? [];
-      selectorHandlers.push(handler);
-      handlers.set(selector, selectorHandlers);
-    }
-  }
-  return Object.fromEntries(
-    [...handlers].map(([selector, selectorHandlers]) => [
-      selector,
-      (node) => {
-        for (const handler of selectorHandlers) handler(node);
-      },
-    ])
-  );
-}
 
 function isUnknownTypeNode(typeNode) {
   return typeNode?.type === "TSUnknownKeyword";

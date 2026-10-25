@@ -1,3 +1,6 @@
+import { mergeVisitors } from "../../semantic-adapters/kernel/merge-visitors.mjs";
+import { silentEmptyDetectionVisitors } from "./absence-fallback/silent-empty-detection.js";
+
 const sentinelValues = new Set([
   "unknown",
   "n/a",
@@ -48,28 +51,45 @@ export default function ruleNoSentinelAbsenceFallback() {
     meta: {
       type: "problem",
       docs: {
-        description: "Keep missing member values distinct from real values.",
+        description:
+          "Keep missing member values and detection failures distinct from real values.",
       },
-      schema: [],
+      schema: [
+        {
+          type: "object",
+          properties: { memberSentinels: { type: "boolean" } },
+          additionalProperties: false,
+        },
+      ],
       messages: {
         sentinelAbsenceFallback:
           'This fallback hides a missing member behind "{{sentinel}}". Keep the missing value distinct from a reported value.',
+        noSilentEmptyFallback:
+          "Do not return an empty string from {{name}} (source: {{source}}). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
       },
     },
     create(context) {
-      return {
-        LogicalExpression(node) {
-          if (node.operator !== "??") return;
-          if (unwrapExpression(node.left)?.type !== "MemberExpression") return;
-          const sentinel = sentinelValue(node.right);
-          if (!sentinel) return;
-          context.report({
-            node,
-            messageId: "sentinelAbsenceFallback",
-            data: { sentinel },
-          });
-        },
-      };
+      const memberSentinels = context.options[0]?.memberSentinels !== false;
+      return mergeVisitors(
+        memberSentinels
+          ? {
+              LogicalExpression(node) {
+                if (node.operator !== "??") return;
+                if (unwrapExpression(node.left)?.type !== "MemberExpression") {
+                  return;
+                }
+                const sentinel = sentinelValue(node.right);
+                if (!sentinel) return;
+                context.report({
+                  node,
+                  messageId: "sentinelAbsenceFallback",
+                  data: { sentinel },
+                });
+              },
+            }
+          : {},
+        silentEmptyDetectionVisitors(context)
+      );
     },
   };
 }

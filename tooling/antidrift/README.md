@@ -12,22 +12,22 @@ The positive pattern behind the rules is one owner per concept: domain owns busi
 
 ## Install
 
-`antidrift/no-wrapping-functions` runs as a typed ESLint rule that inlines each candidate in memory and reports only verified hops; the typed preset enables it at error and the Oxlint preset does not run the syntax stage. Named functions and named arrows that only delegate to another call must earn their extra layer through a concrete boundary or callback requirement. Exports are included. Anonymous inline callbacks, calculations, argument transformations and functions that own additional behavior stay outside the rule. It provides no automatic fix. When removing a callback adapter, preserve its exact signature, receiver behavior, hook position and stable identity; pass the existing owner directly only when it already satisfies that callback contract.
+`antidrift/no-wrapping-functions` runs as a typed ESLint rule that inlines each candidate in memory and reports only verified hops; the typed preset enables it at error and the Oxlint preset does not run the syntax stage. Named functions and named arrows that only delegate to another call, read a parameter property, or apply a literal property fallback must earn their extra layer through a concrete boundary or callback requirement. Exports are included. Anonymous inline callbacks, calculations, argument transformations and functions that own additional behavior stay outside the rule. It provides no automatic fix. When removing a callback adapter, preserve its exact signature, receiver behavior, hook position and stable identity; pass the existing owner directly only when it already satisfies that callback contract.
 
 For example, `const loadItems = (id) => owner.load(id)` reports; call `owner.load(id)` directly at its callers. `button.onClick(() => owner.load(id))` remains a callback with deferred execution. For a subscription API, `useSyncExternalStore(subscribeToConsent, getSnapshot)` is the valid direct substitution only when `subscribeToConsent` has the adapter's signature and receiver semantics; do not replace a required stable adapter with a new inline arrow or `.bind`. ESLint-only consumers can enable the same rule through the ESLint plugin; do not enable it in both lint runtimes.
 
-The presets also enforce shared AGENT.md directives recorded in `policy/agent-guardrails.yaml`: `antidrift/no-fallback-to-empty` (G7) and `antidrift/no-dated-comments` (S5) in Oxlint, and `antidrift/no-vague-names` (G21), `antidrift/no-pass-through-parameters` (G22) and `antidrift/no-compat-names` (G5) in the ESLint pass. G8 maps to native `no-nested-ternary`, owned by `@joedeleeuw/typescript-tooling`. G9 maps to `unicorn-js/prefer-switch` there. S4 maps to generated host-path selectors enforced by `governance-eslint/no-restricted-syntax`.
+The presets also enforce shared AGENT.md directives recorded in `policy/agent-guardrails.yaml`: `antidrift/no-anemic-errors` (G7) and `antidrift/no-dated-comments` (S5) in Oxlint, and `antidrift/no-vague-names` (G21), `antidrift/no-pass-through-parameters` (G22) and `antidrift/no-compat-names` (G5) in the ESLint pass. G8 maps to native `no-nested-ternary`, owned by `@joedeleeuw/typescript-tooling`. G9 maps to `unicorn-js/prefer-switch` there. S4 maps to generated host-path selectors enforced by `governance-eslint/no-restricted-syntax`.
 
 The ESLint pass also enforces these syntax rules at error, exported by both plugins but configured only in ESLint:
 
 - G15 test independence: `antidrift/no-nonindependent-test-oracle`
 - W4 type reuse: `antidrift/no-redeclared-owned-union`
 - G4 boundary decoding: `antidrift/unknown-input-must-be-decoded`
-- G7 loud failure: `antidrift/no-sentinel-absence-fallback`, `antidrift/no-silent-empty-detection-fallback`
+- G7 loud failure: `antidrift/no-sentinel-absence-fallback`
 - G11 one owner per concern: `antidrift/no-raw-fetch-in-component`
 - React and markup hygiene: `antidrift/no-calling-components-as-functions`, `antidrift/no-duplicated-conditional-classnames`
 
-The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-structural-type-fork`, `antidrift/no-bag-reshaper`, `antidrift/no-redundant-zod-parse`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-unresolved-dependency-types`, `antidrift/no-service-constructor-imports` and `antidrift/no-sql-string-concat` at error.
+The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-structural-type-fork`, `antidrift/no-contract-appeasement-projection`, `antidrift/no-redundant-zod-parse`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-unresolved-dependency-types`, `antidrift/no-service-constructor-imports` and `antidrift/no-sql-string-concat` at error.
 
 Every ESLint-pass rule above, typed rules included, is ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
 
@@ -40,11 +40,10 @@ eslint . \
   --suppress-rule antidrift/no-redeclared-owned-union \
   --suppress-rule antidrift/unknown-input-must-be-decoded \
   --suppress-rule antidrift/no-sentinel-absence-fallback \
-  --suppress-rule antidrift/no-silent-empty-detection-fallback \
   --suppress-rule antidrift/no-raw-fetch-in-component \
   --suppress-rule antidrift/no-calling-components-as-functions \
   --suppress-rule antidrift/no-duplicated-conditional-classnames \
-  --suppress-rule antidrift/no-bag-reshaper \
+  --suppress-rule antidrift/no-contract-appeasement-projection \
   --suppress-rule antidrift/no-redundant-zod-parse \
   --suppress-rule antidrift/no-defensive-shape-probing \
   --suppress-rule antidrift/no-identity-schema-transform \
@@ -114,7 +113,7 @@ The antidrift preset also parses every `package.json` with ESLint's JSON languag
 
 `createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-async-array-method`, `antidrift/no-handrolled-resource-lifecycle-cells`, `antidrift/no-repo-state-mirror-assertion`, and the imported rules for unknown aliases and chained assertions. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. `antidrift/require-authz-check` is enabled with registry-derived authorization functions and stays inert until they are configured. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services, the ratcheted syntax rules above, and `no-sql-string-concat` at error. The structural owner loads `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
-For the aggressive property-default policy, pass `enforceNoPropertyDefaultFallbacks: true` to both factories. `typescript-tooling` then owns Rika's rule, the ESLint config disables `no-sentinel-absence-fallback`, and both configs retain only no-substitution template-literal sentinel selectors. `propertyDefaultAllowedFiles` supplies repository-relative exceptions to the two Oxlint factories. No broad Rika preset is enabled.
+For the aggressive property-default policy, pass `enforceNoPropertyDefaultFallbacks: true` to both factories. `typescript-tooling` then owns Rika's rule, and the ESLint config sets `memberSentinels: false` on `no-sentinel-absence-fallback` so member defaults have one owner. Silent empty-detection fallbacks remain enforced, and both configs retain no-substitution template-literal sentinel selectors. `propertyDefaultAllowedFiles` supplies repository-relative exceptions to the two Oxlint factories. No broad Rika preset is enabled.
 
 Oxlint excludes generated output only when its exact file or directory is declared by `policy/registries/generated.yaml` under `generatedSources[*].generated`. Generated-looking names are ordinary linted code unless the registry owns them.
 
@@ -314,7 +313,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 - React Native interaction ownership — an optional `react-native.yaml` drives `no-restricted-imports` for raw React Native/RNGH interaction imports, namespace/default bypasses, and re-exports. `replacementImport` names the shared module and exact `allowedFiles` exempt only its owners; without that registry the restriction is inert
 - `no-nonindependent-test-oracle` — rejects test assertions that restate arranged inputs, direct validator output, hardcoded static properties, or a `response.json()` shape supplied by a same-test mock; assertions about substantive application behavior remain valid
 - `react-max-component-props` — JSX-returning React components with too many locally-owned accepted props
-- `no-contract-appeasement-projection` — internal helpers that project one owned value contract into another explicit return contract without construction or validation
+- `no-contract-appeasement-projection` — internal helpers that project owned values or repack parameter bags into other contracts without construction or validation
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning
 - `no-appeasement-cast` — `any` / `unknown` casts that paper over missing validation
 - `no-underchecked-type-predicate` — broad-input type predicates that assert object contracts, or unions of them, without checking the required asserted fields; `instanceof`, delegated type predicates, and literal tag checks on a value that is already a closed union count as proof
@@ -422,9 +421,8 @@ The governance config enables 51 new agent guardrails at error severity. The [ru
 | `antidrift/docs-source-policy`                   | Validate only the single configured policyFile; default docs-sources.mjs; derive dependencies from the real package manifest |
 | `antidrift/icon-button-requires-tooltip`         | Configurable iconComponents; remove product branding                                                                         |
 | `antidrift/no-adhoc-loader`                      | Configurable loaderIcons, owner and skeleton; portable HTML progress default                                                 |
-| `antidrift/no-ai-debt-comments`                  | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-ambient-hotkey-format`             | Portable agent guardrail; declared options and artifact proof                                                                |
-| `antidrift/no-anemic-errors`                     | Accept contextual errors; detect Error calls with or without new; do not prescribe a fictional error class                   |
+| `antidrift/no-anemic-errors`                     | Contextual errors, lossy rewrapping, catch-log-rethrow duplication, and empty success-shaped failure returns                 |
 | `antidrift/no-as-never`                          | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-async-context-enter-with`          | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-auth-token-in-web-storage`         | Portable agent guardrail; declared options and artifact proof                                                                |
@@ -435,7 +433,6 @@ The governance config enables 51 new agent guardrails at error severity. The [ru
 | `antidrift/no-default-export-in-domain`          | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-dialog-trigger-menu-item`          | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-disabled-tooltip-trigger`          | Portable agent guardrail; declared options and artifact proof                                                                |
-| `antidrift/no-duplicate-context`                 | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-eager-singleton`                   | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-inline-style-colors`               | Use declared palette/embedding scope; terminal black surface is a recorded platform boundary                                 |
 | `antidrift/no-omitted-prop-respread`             | Portable agent guardrail; declared options and artifact proof                                                                |
@@ -450,8 +447,7 @@ The governance config enables 51 new agent guardrails at error severity. The [ru
 | `antidrift/no-relative-cross-package-imports`    | Resolve actual package boundaries and preserve ancestor configuration owners                                                 |
 | `antidrift/no-spread-input-in-query-key`         | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-static-devtools-import`            | Portable agent guardrail; declared options and artifact proof                                                                |
-| `antidrift/no-todo-without-issue`                | Portable agent guardrail; declared options and artifact proof                                                                |
-| `antidrift/no-trivial-property-helpers`          | Require the helper declaration and property/fallback body; names at unrelated call sites are not proof                       |
+| `antidrift/no-todo-without-issue`                | Tracked issues for debt comments, including acknowledged AI-generated debt                                                   |
 | `antidrift/no-tutorial-comments`                 | Portable agent guardrail; declared options and artifact proof                                                                |
 | `antidrift/no-unformatted-number`                | Configurable formatter; Intl.NumberFormat default; raw state in test output is not display text                              |
 | `antidrift/no-unlisted-external-imports`         | Skip marker manifests; honor ancestor devDependencies; sibling packages do not grant dependencies                            |

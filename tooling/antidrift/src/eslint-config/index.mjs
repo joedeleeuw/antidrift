@@ -17,7 +17,6 @@ const ratchetedRules = {
   "antidrift/no-raw-fetch-in-component": "error",
   "antidrift/no-redeclared-owned-union": "error",
   "antidrift/no-sentinel-absence-fallback": "error",
-  "antidrift/no-silent-empty-detection-fallback": "error",
   "antidrift/no-vague-names": "error",
 };
 
@@ -71,7 +70,6 @@ export function createConfig({
         : {},
       rules: {
         "antidrift/no-contract-appeasement-projection": "error",
-        "antidrift/no-bag-reshaper": "error",
         "antidrift/no-redundant-zod-parse": "error",
         "antidrift/react-max-component-props": ["error", { max: 12 }],
         "antidrift/no-unsafe-deserialize": "error",
@@ -96,8 +94,10 @@ export function createConfig({
         "antidrift/no-sql-string-concat": "error",
         ...ratchetedRules,
         "antidrift/no-redeclared-owned-union": ["error", { statuses }],
-        "antidrift/no-sentinel-absence-fallback":
-          enforceNoPropertyDefaultFallbacks ? "off" : "error",
+        "antidrift/no-sentinel-absence-fallback": [
+          "error",
+          { memberSentinels: !enforceNoPropertyDefaultFallbacks },
+        ],
         "no-restricted-syntax": [
           "error",
           ...(enforceNoPropertyDefaultFallbacks
@@ -117,8 +117,10 @@ export function createConfig({
       rules: {
         ...ratchetedRules,
         "antidrift/no-redeclared-owned-union": ["error", { statuses }],
-        "antidrift/no-sentinel-absence-fallback":
-          enforceNoPropertyDefaultFallbacks ? "off" : "error",
+        "antidrift/no-sentinel-absence-fallback": [
+          "error",
+          { memberSentinels: !enforceNoPropertyDefaultFallbacks },
+        ],
         "no-restricted-syntax": [
           "error",
           ...(enforceNoPropertyDefaultFallbacks

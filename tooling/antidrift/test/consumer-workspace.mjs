@@ -351,6 +351,22 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "}\n"
   );
   file(
+    "packages/app/src/merged-projections.ts",
+    "type SourceRow = { name?: string; score: number };\n" +
+      "type TargetRow = { label?: string };\n" +
+      "declare const source: SourceRow;\n" +
+      "function getStringValue(row: SourceRow) { return row.name ?? ''; }\n" +
+      "export const nameLength = getStringValue(source).length;\n" +
+      "function userName(row: SourceRow) { return row.name; }\n" +
+      "export const directNameLength = userName(source)?.length;\n" +
+      "function projectRow(row: SourceRow): TargetRow { return { label: row.name }; }\n" +
+      "export const projected = projectRow(source);\n" +
+      "function repackRow(row: SourceRow) { return { label: row.name }; }\n" +
+      "export const repacked = repackRow(source);\n" +
+      "declare function getString(row: SourceRow): string;\n" +
+      "export const indirect = getString(source);\n"
+  );
+  file(
     "packages/app/src/package-copy.ts",
     "export type AuthUser = {\n" +
       "  uid: string;\n  email: string | null;\n  displayName: string | null;\n" +

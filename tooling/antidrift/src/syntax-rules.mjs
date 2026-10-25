@@ -6,7 +6,7 @@ import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoNonindependentTestOracle from "./oxlint-plugin/rules/no-nonindependent-test-oracle.js";
 import ruleNoSentinelAbsenceFallback from "./oxlint-plugin/rules/no-sentinel-absence-fallback.js";
-import ruleNoSilentEmptyDetectionFallback from "./oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
+import ruleNoVagueNames from "./eslint-plugin/rules/no-vague-names.js";
 import ruleRequireEffectDeps from "./oxlint-plugin/rules/require-effect-deps.js";
 import ruleNoRedeclaredOwnedUnion from "./oxlint-plugin/rules/no-redeclared-owned-union.js";
 import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-mirror-assertion.js";
@@ -27,7 +27,7 @@ export function createSyntaxRules() {
     "no-repo-state-mirror-assertion": ruleNoRepoStateMirrorAssertion(),
     "no-raw-fetch-in-component": ruleNoRawFetchInComponent,
     "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
-    "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
+    "no-vague-names": ruleNoVagueNames,
     "require-authz-check": ruleRequireAuthzCheck,
     "require-effect-deps": ruleRequireEffectDeps,
   };

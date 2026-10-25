@@ -241,11 +241,6 @@
       "count": 1
     }
   },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-ai-debt-comments.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
   "tooling/antidrift/src/oxlint-plugin/portable/no-auth-token-in-web-storage.js": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
@@ -265,11 +260,6 @@
     }
   },
   "tooling/antidrift/src/oxlint-plugin/portable/no-disabled-tooltip-trigger.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-fallback-to-empty.js": {
     "antidrift/no-vague-names": {
       "count": 1
     }
@@ -316,11 +306,6 @@
   },
   "tooling/antidrift/src/oxlint-plugin/portable/no-todo-without-issue.js": {
     "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/portable/no-trivial-property-helpers.js": {
-    "antidrift/no-pass-through-parameters": {
       "count": 2
     }
   },
@@ -413,7 +398,7 @@
       "count": 2
     },
     "antidrift/no-vague-names": {
-      "count": 24
+      "count": 21
     }
   },
   "tooling/antidrift/src/oxlint-plugin/rules/no-calling-components-as-functions.js": {

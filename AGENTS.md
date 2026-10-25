@@ -24,7 +24,7 @@ Run `pnpm policy:verify-session` before pushing.
 - **domain-model-drift** (domain-platform): domain/no-inline-domain-status
 - **generated-type-drift** (types-platform): gen/require-import-from-generated
 - **authorization-control-drift** (security): auth/no-boundaryless-route, auth/no-client-only-authorization, auth/require-authz-check
-- **error-handling** (reliability): errors/preserve-caught-error, errors/no-fallback-to-empty
+- **error-handling** (reliability): errors/preserve-caught-error, errors/no-anemic-errors
 - **directive-smells** (engineering-productivity): naming/no-vague-names, arch/no-pass-through-parameters, compat/no-compat-names, simplicity/no-nested-ternary, simplicity/no-else-if-chain, provenance/no-host-path-literal, provenance/no-dated-comments
 - **test-integrity** (quality): test/no-only-or-skip, test/no-conditional-expect, test/no-test-without-assertion
 - **design-system** (design-system): ui/no-raw-tailwind-color, ui/no-hover-translate-card, ui/no-generic-ai-copy

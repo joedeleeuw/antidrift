@@ -38,18 +38,14 @@ import noRawFilenameWriteRule from "./portable/no-raw-filename-write.js";
 import noUnsanitizedHrefRule from "./portable/no-unsanitized-href.js";
 import requireSecureDocumentResponseRule from "./portable/require-secure-document-response.js";
 import noBunApiInSharedRule from "./portable/no-bun-api-in-shared.js";
-import noDuplicateContextRule from "./portable/no-duplicate-context.js";
-import noAiDebtCommentsRule from "./portable/no-ai-debt-comments.js";
 import noAsNeverRule from "./portable/no-as-never.js";
 import noTodoWithoutIssueRule from "./portable/no-todo-without-issue.js";
 import noDefaultExportInDomainRule from "./portable/no-default-export-in-domain.js";
-import noTrivialPropertyHelpersRule from "./portable/no-trivial-property-helpers.js";
 import noTutorialCommentsRule from "./portable/no-tutorial-comments.js";
 import noDebugResidueFilenamesRule from "./portable/no-debug-residue-filenames.js";
 import noPlaceholderTestsRule from "./portable/no-placeholder-tests.js";
 import noUnlistedExternalImportsRule from "./portable/no-unlisted-external-imports.js";
 import noDatedCommentsRule from "./portable/no-dated-comments.js";
-import noFallbackToEmptyRule from "./portable/no-fallback-to-empty.js";
 import packageMetadata from "../../package.json" with { type: "json" };
 
 import { createSyntaxRules } from "../syntax-rules.mjs";
@@ -97,18 +93,14 @@ const rules = {
   "no-unsanitized-href": noUnsanitizedHrefRule,
   "require-secure-document-response": requireSecureDocumentResponseRule,
   "no-bun-api-in-shared": noBunApiInSharedRule,
-  "no-duplicate-context": noDuplicateContextRule,
-  "no-ai-debt-comments": noAiDebtCommentsRule,
   "no-as-never": noAsNeverRule,
   "no-todo-without-issue": noTodoWithoutIssueRule,
   "no-default-export-in-domain": noDefaultExportInDomainRule,
-  "no-trivial-property-helpers": noTrivialPropertyHelpersRule,
   "no-tutorial-comments": noTutorialCommentsRule,
   "no-debug-residue-filenames": noDebugResidueFilenamesRule,
   "no-placeholder-tests": noPlaceholderTestsRule,
   "no-unlisted-external-imports": noUnlistedExternalImportsRule,
   "no-dated-comments": noDatedCommentsRule,
-  "no-fallback-to-empty": noFallbackToEmptyRule,
   ...createSyntaxRules(),
   "no-unknown-type-aliases": noUnknownTypeAliasesRule,
   "no-unsafe-cast-chain": noChainedTypeAssertionsRule,

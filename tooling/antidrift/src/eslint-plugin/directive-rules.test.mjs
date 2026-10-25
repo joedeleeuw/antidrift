@@ -242,7 +242,7 @@ ruleTester.run("no-dated-comments", rule("no-dated-comments"), {
   ],
 });
 
-ruleTester.run("no-fallback-to-empty", rule("no-fallback-to-empty"), {
+ruleTester.run("no-anemic-errors", rule("no-anemic-errors"), {
   valid: [
     'function readRegistry(path) { try { return parse(read(path)); } catch (error) { if (error.code === "ENOENT") return {}; throw error; } }',
     "function readRegistry(path) { try { return parse(read(path)); } catch (error) { errors.push(error.message); return {}; } }",

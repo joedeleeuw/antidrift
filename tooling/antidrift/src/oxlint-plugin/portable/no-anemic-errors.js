@@ -15,6 +15,8 @@ import {
   isTestFilename,
   unwrapChainExpression,
 } from "./syntax.js";
+import { emptyFailureFallbackVisitors } from "./empty-failure-fallback.js";
+import { mergeVisitors } from "../../semantic-adapters/kernel/merge-visitors.mjs";
 
 const VAGUE_ERROR_PATTERN =
   /^(failed|error|something went wrong|an error occurred|unknown error|unexpected error|oops|failure|internal error|server error)$/i;
@@ -201,7 +203,7 @@ export const noAnemicErrorsRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow vague error messages in throw statements, generic error return objects, lossy error re-wrapping without cause, and catch-log-rethrow duplication.",
+        "Disallow vague errors, lossy rewrapping, catch-log-rethrow duplication, and empty success-shaped failure returns.",
     },
     messages: {
       anemicThrow:
@@ -212,14 +214,13 @@ export const noAnemicErrorsRule = {
         "Re-throwing caught error '{{name}}' as a bare `new Error({{name}}.message)` discards its stack trace, cause chain, and error class with no added context. Rethrow `{{name}}` directly, wrap with `{ cause: {{name}} }` and domain context, or throw a typed domain error.",
       catchLogRethrow:
         "Logging caught error '{{name}}' and immediately re-throwing it unmodified duplicates error logging across every frame on the call stack. Either handle the error here, wrap it with domain context and `{ cause: {{name}} }`, or let it propagate and log once at the boundary.",
+      fallback:
+        "Failure path drops the error and returns an empty collection, which makes bad data look valid. Let the error propagate or return a typed failure.",
     },
   },
   create(context) {
     if (!isRuleFile(context)) return {};
 
-    if (isTestFilename(context.filename)) {
-      return {};
-    }
     const catchParamStack = [];
 
     function enterPromiseCatchCallback(node) {
@@ -237,7 +238,10 @@ export const noAnemicErrorsRule = {
       }
     }
 
-    return {
+    if (isTestFilename(context.filename)) {
+      return emptyFailureFallbackVisitors(context);
+    }
+    const anemicVisitors = {
       CatchClause(node) {
         const errorName = getIdentifierName(node.param);
         if (!errorName) {
@@ -345,6 +349,7 @@ export const noAnemicErrorsRule = {
         }
       },
     };
+    return mergeVisitors(emptyFailureFallbackVisitors(context), anemicVisitors);
   },
 };
 export default noAnemicErrorsRule;

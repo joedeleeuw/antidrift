@@ -149,6 +149,35 @@ retiredRules:
     reason: Removed the blanket runtime-schema import ban. Schema values remain valid application inputs and boundary decoders; self-validating oracles are handled by antidrift/no-nonindependent-test-oracle.
     mergedInto: antidrift/no-nonindependent-test-oracle
     referenceDoc: docs/rule-investigations/test-validator-oracles.md
+  antidrift/no-bag-reshaper:
+    status: retired
+    reason: Merged into antidrift/no-contract-appeasement-projection, sharing bag-projection analysis and preserving bagToContract and bagToBag diagnostics.
+    mergedInto: antidrift/no-contract-appeasement-projection
+  antidrift/no-trivial-property-helpers:
+    status: retired
+    reason: Merged into antidrift/no-wrapping-functions. Property reads and literal fallbacks now require verified inlining rather than banned helper names.
+    mergedInto: antidrift/no-wrapping-functions
+    referenceDoc: docs/rule-investigations/no-wrapping-functions.md
+  antidrift/no-duplicate-context:
+    status: retired
+    reason: Merged into antidrift/no-vague-names, preserving the duplicate diagnostic for repeated adjacent context words in function names.
+    mergedInto: antidrift/no-vague-names
+    referenceDoc: docs/rule-investigations/portable-rules.md
+  antidrift/no-ai-debt-comments:
+    status: retired
+    reason: Merged into antidrift/no-todo-without-issue, preserving AI-plus-debt detection, ticket exemptions, and one prioritized diagnostic per comment.
+    mergedInto: antidrift/no-todo-without-issue
+    referenceDoc: docs/rule-investigations/portable-rules.md
+  antidrift/no-silent-empty-detection-fallback:
+    status: retired
+    reason: Merged into antidrift/no-sentinel-absence-fallback, preserving noSilentEmptyFallback and its recovery-source details independently of member-sentinel configuration.
+    mergedInto: antidrift/no-sentinel-absence-fallback
+    referenceDoc: docs/rule-investigations/directive-rules.md
+  antidrift/no-fallback-to-empty:
+    status: retired
+    reason: Merged into antidrift/no-anemic-errors, preserving the fallback diagnostic and silent catch or promise-catch proof.
+    mergedInto: antidrift/no-anemic-errors
+    referenceDoc: docs/rule-investigations/directive-rules.md
   antidrift/no-generic-module-names:
     status: retired
     reason: Removed by owner request. Generic filename blocklists are opinionated naming policy rather than Antidrift contract-drift enforcement; no explicit opt-in implementation is retained.

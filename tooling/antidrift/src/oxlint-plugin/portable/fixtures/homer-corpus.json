@@ -2368,11 +2368,8 @@
   },
   "zeroPositiveRules": [
     "no-bun-api-in-shared",
-    "no-duplicate-context",
-    "no-ai-debt-comments",
     "no-default-export-in-domain",
     "no-anemic-errors",
-    "no-trivial-property-helpers",
     "no-tutorial-comments",
     "no-debug-residue-filenames",
     "no-placeholder-tests",

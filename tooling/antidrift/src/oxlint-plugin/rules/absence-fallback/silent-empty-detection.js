@@ -219,41 +219,25 @@ function isDetectionHelper(name) {
   );
 }
 
-export default function ruleNoSilentEmptyDetectionFallback() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description:
-          "Disallow empty-string fallbacks from identity, host, probe, and detection helpers",
-      },
-      schema: [],
-      messages: {
-        noSilentEmptyFallback:
-          "Do not return an empty string from {{name}} (source: {{source}}). Throw or return an explicit nullable/result value so callers cannot confuse detection failure with a real value.",
-      },
-    },
-    create(context) {
-      function reportIfSilentFallback(node, expression, name) {
-        if (!isDetectionHelper(name)) return;
-        const source = astRecoverySource(node, expression);
-        if (!source) return;
-        context.report({
-          node: expression,
-          messageId: "noSilentEmptyFallback",
-          data: { name, source },
-        });
-      }
+export function silentEmptyDetectionVisitors(context) {
+  function reportIfSilentFallback(node, expression, name) {
+    if (!isDetectionHelper(name)) return;
+    const source = astRecoverySource(node, expression);
+    if (!source) return;
+    context.report({
+      node: expression,
+      messageId: "noSilentEmptyFallback",
+      data: { name, source },
+    });
+  }
 
-      return {
-        ArrowFunctionExpression(node) {
-          if (node.body.type === "BlockStatement") return;
-          reportIfSilentFallback(node, node.body, functionName(node.parent));
-        },
-        ReturnStatement(node) {
-          reportIfSilentFallback(node, node.argument, owningFunctionName(node));
-        },
-      };
+  return {
+    ArrowFunctionExpression(node) {
+      if (node.body.type === "BlockStatement") return;
+      reportIfSilentFallback(node, node.body, functionName(node.parent));
+    },
+    ReturnStatement(node) {
+      reportIfSilentFallback(node, node.argument, owningFunctionName(node));
     },
   };
 }

@@ -2,6 +2,7 @@ import { posix } from "node:path";
 import ts from "typescript";
 import { publicSurface } from "../provenance/package-entry-points.ts";
 import { bindingAtSite, bodyBindings, importOfFile } from "./body-bindings.ts";
+import { argumentTexts, requireArgumentText } from "./inline-arguments.ts";
 import type {
   BodyBindings,
   FreeBinding,
@@ -39,7 +40,7 @@ type HopCandidate = {
     | ts.FunctionExpression
     | ts.ArrowFunction;
   readonly nameNode: ts.Identifier;
-  readonly call: ts.CallExpression;
+  readonly body: ts.Expression;
 };
 type HopContext = Omit<HopCandidate, "nameNode"> & {
   readonly program: ts.Program;
@@ -61,29 +62,6 @@ function requireParameter(
   }
   return parameter;
 }
-function requireArgumentText(texts: readonly string[], index: number) {
-  const text = texts[index];
-  if (text === undefined) {
-    throw new TypeError(`No inlined argument text for parameter ${index}`);
-  }
-  return text;
-}
-const BARE_ARGUMENT_KINDS = new Set([
-  ts.SyntaxKind.Identifier,
-  ts.SyntaxKind.PropertyAccessExpression,
-  ts.SyntaxKind.ElementAccessExpression,
-  ts.SyntaxKind.CallExpression,
-  ts.SyntaxKind.StringLiteral,
-  ts.SyntaxKind.NumericLiteral,
-  ts.SyntaxKind.NoSubstitutionTemplateLiteral,
-  ts.SyntaxKind.TemplateExpression,
-  ts.SyntaxKind.ArrayLiteralExpression,
-  ts.SyntaxKind.ParenthesizedExpression,
-  ts.SyntaxKind.ThisKeyword,
-  ts.SyntaxKind.TrueKeyword,
-  ts.SyntaxKind.FalseKeyword,
-  ts.SyntaxKind.NullKeyword,
-]);
 function rejected(reason: string) {
   return { hop: false, reason };
 }
@@ -168,26 +146,6 @@ function orderHazard(
   }
   return null;
 }
-function argumentTexts(
-  functionNode: HopCandidate["functionNode"],
-  call: ts.CallExpression
-) {
-  const sourceFile = call.getSourceFile();
-  return functionNode.parameters.map((parameter, index) => {
-    if (parameter.dotDotDotToken) {
-      return `[${call.arguments
-        .slice(index)
-        .map((argument) => argument.getText(sourceFile))
-        .join(", ")}]`;
-    }
-    const argument = call.arguments[index];
-    if (!argument) {
-      return "undefined";
-    }
-    const text = argument.getText(sourceFile);
-    return BARE_ARGUMENT_KINDS.has(argument.kind) ? text : `(${text})`;
-  });
-}
 function siteHazard(
   functionNode: HopCandidate["functionNode"],
   call: ts.CallExpression
@@ -226,7 +184,7 @@ function calleeArgument(
     : argumentText;
 }
 function inlinedText(
-  body: ts.CallExpression,
+  body: ts.Expression,
   bindings: BodyBindings,
   call: ts.CallExpression,
   functionNode: HopCandidate["functionNode"]
@@ -237,7 +195,16 @@ function inlinedText(
     ...bindings.uses.map((use) => ({ ...use, parameter: true as const })),
     ...bindings.free.map((free) => ({ ...free, parameter: false as const })),
   ].sort((left, right) => left.node.getStart() - right.node.getStart());
+  const use = outermostWrapper(call);
+  const detachedMemberCall =
+    (ts.isPropertyAccessExpression(body) ||
+      ts.isElementAccessExpression(body)) &&
+    ((ts.isCallExpression(use.parent) && use.parent.expression === use) ||
+      (ts.isTaggedTemplateExpression(use.parent) && use.parent.tag === use));
   let text = "";
+  if (!ts.isCallExpression(body)) {
+    text = detachedMemberCall ? "(0, " : "(";
+  }
   let cursor = body.getStart(sourceFile);
   const offsets: InlineSite["offsets"][number][] = [];
   for (const slot of slots) {
@@ -258,7 +225,11 @@ function inlinedText(
     }
     cursor = slot.node.end;
   }
-  return { text: text + sourceFile.text.slice(cursor, body.end), offsets };
+  const suffix = ts.isCallExpression(body) ? "" : ")";
+  return {
+    text: text + sourceFile.text.slice(cursor, body.end) + suffix,
+    offsets,
+  };
 }
 function relocatedSpecifier(
   specifier: string,
@@ -388,7 +359,7 @@ function siteImports(context: HopContext, site: ts.CallExpression) {
   return null;
 }
 function planSites(context: HopContext) {
-  const { functionNode, call, bindings, references, edits } = context;
+  const { functionNode, body, bindings, references, edits } = context;
   for (const { node: siteCall } of references.call) {
     const hazard =
       siteHazard(functionNode, siteCall) ??
@@ -397,7 +368,7 @@ function planSites(context: HopContext) {
     if (hazard) {
       return hazard;
     }
-    const inlined = inlinedText(call, bindings, siteCall, functionNode);
+    const inlined = inlinedText(body, bindings, siteCall, functionNode);
     const edit = edits.add(
       siteCall.getSourceFile(),
       siteCall.getStart(),
@@ -442,13 +413,13 @@ function verifyEdits(context: HopContext) {
   };
 }
 export function verifyHop(program: ts.Program, candidate: HopCandidate) {
-  const { declaration, functionNode, nameNode, call } = candidate;
+  const { declaration, functionNode, nameNode, body } = candidate;
   const contract = declaredContract(program, declaration, nameNode);
   if (contract) {
     return rejected(contract);
   }
   const references = programReferences(program, nameNode);
-  const bindings = bodyBindings(program, functionNode, call);
+  const bindings = bodyBindings(program, functionNode, body);
   const exported = isExported(declaration, references);
   const surface = exported ? publicSurface(program, nameNode) : {};
   const owner = ownerReason(references, bindings, surface);
@@ -471,7 +442,7 @@ export function verifyHop(program: ts.Program, candidate: HopCandidate) {
     program,
     declaration,
     functionNode,
-    call,
+    body,
     bindings,
     references,
     functionFile: nameNode.getSourceFile(),

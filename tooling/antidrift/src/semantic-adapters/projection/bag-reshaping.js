@@ -1,15 +1,12 @@
 import ts from "typescript";
 
-import { scopeProperties } from "../../semantic-adapters/kernel/rule-scope.ts";
-import { isTestFilename } from "../../oxlint-plugin/portable/syntax.js";
 import {
   collectReturnExpressionsFromExpression,
   collectStatementReturnExpressions,
   inspectObjectLiteralBagProjection,
   resolveBagParameter,
-} from "../../semantic-adapters/projection/bag-projection.ts";
-import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
-import { unwrapTransparent } from "../../semantic-adapters/kernel/transparent-expression.ts";
+} from "./bag-projection.ts";
+import { unwrapTransparent } from "../kernel/transparent-expression.ts";
 
 const ANONYMOUS_UTILITY_TYPE_NAMES = new Set([
   "Omit",
@@ -277,7 +274,14 @@ function tagsUnionMemberWithParameterFields(
   });
 }
 
-function classifyBagReshaper(functionNode, containerNode, checker, sourceFile) {
+export function bagProjectionFinding(candidateNode, checker) {
+  const sourceFile = candidateNode.getSourceFile();
+  const functionNode =
+    ts.isFunctionDeclaration(candidateNode) ||
+    ts.isMethodDeclaration(candidateNode)
+      ? candidateNode
+      : callableInitializer(candidateNode.initializer);
+  const containerNode = functionNode === candidateNode ? null : candidateNode;
   if (
     !functionNode?.body ||
     functionNode.asteriskToken ||
@@ -375,66 +379,3 @@ function callableInitializer(initializer) {
   }
   return null;
 }
-
-export function ruleNoBagReshaper() {
-  return defineTypeScriptRule({
-    ruleName: "no-bag-reshaper",
-    skipNonRuleFile: true,
-    meta: {
-      type: "problem",
-      docs: {
-        description:
-          "Disallow helper functions that reshape a parameter bag into a named target contract without validation ('bagToContract') or repack a parameter bag into another ad-hoc object bag ('bagToBag').",
-      },
-      schema: [
-        {
-          type: "object",
-          properties: scopeProperties,
-          additionalProperties: false,
-        },
-      ],
-      messages: {
-        bagToContract:
-          "Do not reshape parameter bag '{{parameterName}}' into target contract '{{targetContract}}' without boundary validation or domain construction; pass '{{targetContract}}' from its owner or decode at the boundary.",
-        bagToBag:
-          "Do not repack parameter bag '{{parameterName}}' into another ad-hoc object bag; read the owner's fields directly at the call site instead of threading a reshaped bag.",
-      },
-    },
-    run({ sourceFile, checker, filename, reportNode }) {
-      if (isTestFilename(filename)) {
-        return {};
-      }
-      function inspectCandidateNode(candidateNode) {
-        const functionNode =
-          ts.isFunctionDeclaration(candidateNode) ||
-          ts.isMethodDeclaration(candidateNode)
-            ? candidateNode
-            : callableInitializer(candidateNode.initializer);
-        if (!functionNode) {
-          return;
-        }
-        const containerNode =
-          functionNode === candidateNode ? null : candidateNode;
-        const classification = classifyBagReshaper(
-          functionNode,
-          containerNode,
-          checker,
-          sourceFile
-        );
-        if (!classification) {
-          return;
-        }
-        reportNode(candidateNode, classification);
-      }
-      return {
-        [ts.SyntaxKind.FunctionDeclaration]: inspectCandidateNode,
-        [ts.SyntaxKind.MethodDeclaration]: inspectCandidateNode,
-        [ts.SyntaxKind.VariableDeclaration]: inspectCandidateNode,
-        [ts.SyntaxKind.PropertyDeclaration]: inspectCandidateNode,
-        [ts.SyntaxKind.PropertyAssignment]: inspectCandidateNode,
-      };
-    },
-  });
-}
-
-export default ruleNoBagReshaper();

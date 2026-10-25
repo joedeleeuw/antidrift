@@ -99,10 +99,10 @@ function originOf(symbol: ts.Symbol, sourceFile: ts.SourceFile): BindingOrigin {
 export function bodyBindings(
   program: ts.Program,
   functionNode: ts.SignatureDeclaration,
-  call: ts.CallExpression
+  body: ts.Expression
 ) {
   const checker = program.getTypeChecker();
-  const sourceFile = call.getSourceFile();
+  const sourceFile = body.getSourceFile();
   const parameterSymbols = functionNode.parameters.map((parameter) =>
     checker.getSymbolAtLocation(parameter.name)
   );
@@ -152,7 +152,7 @@ export function bodyBindings(
       ts.forEachChild(node, visit);
     }
   }
-  visit(call);
+  visit(body);
   return bindings;
 }
 export function bindingAtSite(

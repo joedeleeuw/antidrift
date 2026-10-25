@@ -112,18 +112,6 @@ export const isEffectCallExpression = (value) => {
   }
   return callChain.rootIdentifier === "Effect";
 };
-export const extractFunctionName = (node) => {
-  if (node.type === "FunctionDeclaration") {
-    return getIdentifierName(node.id);
-  }
-  if (node.type === "MethodDefinition") {
-    return getIdentifierName(node.key) ?? getLiteralString(node.key);
-  }
-  if (node.type === "VariableDeclarator") {
-    return getIdentifierName(node.id);
-  }
-  return null;
-};
 export const getFunctionStatements = (node) => {
   const body = getNode(node, "body");
   if (!body || body.type !== "BlockStatement") {
@@ -132,54 +120,12 @@ export const getFunctionStatements = (node) => {
   return getNodeArray(body, "body");
 };
 
-export const splitWords = (value) => {
-  if (value.length === 0) {
-    return [];
-  }
-  const normalized = value
-    .replace(/[-_]/g, " ")
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .trim();
-  if (normalized.length === 0) {
-    return [];
-  }
-  return normalized
-    .split(/\s+/)
-    .map((segment) => segment.toLowerCase())
-    .filter((segment) => segment.length > 0);
-};
 export const firstLowercaseToken = (name) => {
   const match = /^([a-z]+)/.exec(name);
   return match?.[1] ?? null;
 };
 export const isFunctionValue = (node) =>
   node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression";
-export const isDefaultFallbackNode = (value) => {
-  const node = toNode(value);
-  if (!node) {
-    return true;
-  }
-  if (node.type === "Literal") {
-    return true;
-  }
-  if (node.type === "ObjectExpression") {
-    return node.properties.every(
-      (property) =>
-        property.type === "Property" && isDefaultFallbackNode(property.value)
-    );
-  }
-  if (node.type === "ArrayExpression") {
-    return node.elements.every(isDefaultFallbackNode);
-  }
-  if (node.type === "Identifier") {
-    const name = getString(node.name);
-    return name === "undefined";
-  }
-  if (node.type === "UnaryExpression") {
-    return node.operator === "void";
-  }
-  return false;
-};
 export const unwrapChainExpression = (value) => {
   const node = toNode(value);
   if (!node) {
@@ -189,10 +135,6 @@ export const unwrapChainExpression = (value) => {
     return node;
   }
   return toNode(node.expression);
-};
-export const isPropertyAccessLike = (value) => {
-  const node = unwrapChainExpression(value);
-  return node?.type === "MemberExpression";
 };
 export const isPrimitiveLiteralNode = (value) => {
   const node = toNode(value);
