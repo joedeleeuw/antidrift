@@ -17,7 +17,6 @@ meta:
   generatedTargets: # These files are regenerated from this source to prevent tool-specific drift.
     - AGENTS.md # Codex and other agents consume this as repo-local guidance.
     - CLAUDE.md # Claude consumes this as persistent project context.
-    - .cursor/rules/*.mdc # Cursor consumes scoped IDE-native rules.
     - .github/copilot-instructions.md # Copilot consumes repository instructions.
     - .codex/hooks.json # Codex uses this for deterministic lifecycle enforcement.
     - .claude/settings.json # Claude uses this for deterministic lifecycle enforcement.
@@ -375,7 +374,7 @@ clusters:
   - id: agent-instructions # Natural-language guidance should be generated and linted.
     owner: developer-experience # DX owns multi-agent instruction consistency.
     rules:
-      - id: rules/one-source-generates-agent-files # Prevent Claude/Codex/Cursor/Copilot drift.
+      - id: rules/one-source-generates-agent-files # Prevent Claude/Codex/Copilot drift.
         severity: error
         detector: generatedPolicyFilesOutOfDate
         message: Regenerate agent instruction files from policy/agent-guardrails.yaml.

@@ -14,7 +14,7 @@ This template intentionally excludes the later package-publication surface gap w
 - Feature planning template in `docs/feature-slice-template.md`.
 - Per-rule coverage, status, and promotion tracking in `policy/registries/rules.yaml`.
 - Self-hosting risk controls in `docs/self-hosting-risks.md`.
-- Generated agent instruction targets: `AGENTS.md`, `CLAUDE.md`, Cursor rules, Claude hooks, Codex hooks, and Copilot instructions.
+- Generated agent instruction targets: `AGENTS.md`, `CLAUDE.md`, Claude hooks, Codex hooks, and Copilot instructions.
 - Sample packages that exercise the agreed rule families.
 - SonarQube configuration and generic external issue import plumbing.
 
@@ -47,7 +47,7 @@ pnpm check
 pnpm lint              # Oxlint baseline, custom syntax policy, then custom typed ESLint rules
 pnpm typecheck         # TypeScript project references
 pnpm test              # Vitest
-pnpm policy:generate   # regenerate AGENTS/CLAUDE/Cursor/Codex/Copilot policy artifacts
+pnpm policy:generate   # regenerate AGENTS/CLAUDE/Codex/Copilot policy artifacts
 pnpm policy:check-registries
 pnpm policy:check-rule-surface
 pnpm policy:validate-corpus

@@ -46,26 +46,6 @@ export function renderPolicyArtifacts(policy) {
     `# Copilot Instructions\n\n${header}\n\nFollow repository architecture boundaries, avoid type escape hatches, and use public package APIs.\n`
   );
 
-  artifacts.set(
-    ".cursor/rules/architecture.mdc",
-    `---\ndescription: Enforce architecture boundaries and prevent semantic drift.\nglobs: ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx"]\nalwaysApply: true\n---\n\n${header}\n\nUse public package entrypoints and preserve architecture direction.\n`
-  );
-
-  artifacts.set(
-    ".cursor/rules/react-state.mdc",
-    `---\ndescription: Prevent brittle React state shape in agent-generated UI.\nglobs: ["apps/**/*.tsx", "packages/ui/**/*.tsx"]\nalwaysApply: true\n---\n\n${header}\n\nAvoid coupled useState waterfalls, status triplets, derived-state effects, and hand-rolled async resource lifecycles.\n`
-  );
-
-  artifacts.set(
-    ".cursor/rules/type-contracts.mdc",
-    `---\ndescription: Prevent local TypeScript appeasement patterns.\nglobs: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"]\nalwaysApply: true\n---\n\n${header}\n\nDo not create typed selector wrappers, one-use aliases, inline structural contracts, or unsafe cast chains.\n`
-  );
-
-  artifacts.set(
-    ".cursor/rules/policy-files.mdc",
-    `---\ndescription: Protect generated policy artifacts from direct edits.\nglobs: ["AGENTS.md", "CLAUDE.md", ".cursor/rules/*.mdc", ".claude/settings.json", ".codex/hooks.json", ".github/copilot-instructions.md"]\nalwaysApply: true\n---\n\n${header}\n\nEdit the source policy and run \`pnpm policy:generate\`.\n`
-  );
-
   const hooks = {
     PreToolUse: [
       {

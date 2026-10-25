@@ -2,10 +2,6 @@ export const generatedTargets = [
   "AGENTS.md",
   "CLAUDE.md",
   ".github/copilot-instructions.md",
-  ".cursor/rules/architecture.mdc",
-  ".cursor/rules/react-state.mdc",
-  ".cursor/rules/type-contracts.mdc",
-  ".cursor/rules/policy-files.mdc",
   ".claude/settings.json",
   ".codex/hooks.json",
 ];
