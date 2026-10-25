@@ -22,8 +22,7 @@ These rules are already in the package and are part of the core project thesis:
 - `require-effect-deps`: closes the gap where `react-hooks/exhaustive-deps` does not flag a missing dependency-array argument.
 - `no-redundant-zod-parse`: provenance rule for repeated parsing of the same value by the same schema.
 - `no-contract-appeasement-projection`: subsumes the old selector-wrapper branch with TypeChecker-backed source/return ownership proof. The former `no-explicit-return-type-private-helper` rule is retired because real corpus evidence showed private return annotations are not a deterministic smell.
-- `no-schema-library-in-test`: deterministic test-file guard against runtime-schema value imports while preserving type-only imports.
-- `no-validator-output-oracle`: local-flow guard against direct validator-output assertions; application-call boundaries and document parsers stay clean.
+- `no-nonindependent-test-oracle`: local-flow proof against assertions that restate arranged inputs, validator output, static shapes, or mocked outputs; application-call boundaries and schemas used as application inputs stay clean.
 
 ## Chosen Next Scope
 

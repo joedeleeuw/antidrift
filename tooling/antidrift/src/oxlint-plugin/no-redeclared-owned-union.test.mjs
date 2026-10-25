@@ -110,3 +110,58 @@ ruleTester.run("no-redeclared-owned-union", rule("no-redeclared-owned-union"), {
     },
   ],
 });
+
+const statusOptions = {
+  statuses: {
+    UserStatus: {
+      owner: "packages/domain/src/user.ts",
+      values: ["active", "disabled", "invited"],
+    },
+  },
+};
+
+ruleTester.run(
+  "no-redeclared-owned-union statuses",
+  rule("no-redeclared-owned-union"),
+  {
+    valid: [
+      {
+        ...fixture("programs/correct/packages/domain/src/user.ts"),
+        options: [statusOptions],
+      },
+      {
+        code: "const x = user.status === 'active';",
+        filename: "/repo/apps/web/src/App.ts",
+        options: [statusOptions],
+      },
+      {
+        code: "type BadgeProps = { variant: 'active' | 'disabled' };",
+        filename: "/repo/apps/web/src/Badge.ts",
+        options: [statusOptions],
+      },
+      {
+        code: "type FeatureStatus = 'active' | 'disabled';",
+        filename: "/repo/apps/web/src/feature.ts",
+        options: [statusOptions],
+      },
+      {
+        code: "let status: 'active' | 'disabled'; void status;",
+        filename: "/repo/apps/web/src/status.ts",
+        options: [statusOptions],
+      },
+    ],
+    invalid: [
+      {
+        ...fixture("programs/drift/status-literal-type-fork.ts"),
+        options: [statusOptions],
+        errors: 2,
+      },
+      {
+        code: "type User = { status: 'active' | 'disabled' };",
+        filename: "/repo/apps/web/src/user-copy.ts",
+        options: [statusOptions],
+        errors: 2,
+      },
+    ],
+  }
+);

@@ -183,7 +183,7 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     subpath: "@joedeleeuw/antidrift/semantic-adapters/type-owner",
     rules: Object.freeze([
       "antidrift/no-structural-type-fork",
-      "antidrift/no-status-literal-in-type",
+      "antidrift/no-redeclared-owned-union",
     ]),
     proofBuckets: Object.freeze(["authority-index-ownership"]),
     semanticFactAdapterIds: Object.freeze(["typescript-eslint/type-owner"]),

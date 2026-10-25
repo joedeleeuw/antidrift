@@ -191,11 +191,8 @@
     }
   },
   "tooling/antidrift/src/oxlint-plugin/index.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 7
-    },
     "antidrift/no-vague-names": {
-      "count": 12
+      "count": 11
     }
   },
   "tooling/antidrift/src/oxlint-plugin/owned-union-source.js": {
@@ -432,11 +429,6 @@
       "count": 11
     }
   },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-nonindependent-test-oracle.js": {
-    "antidrift/no-vague-names": {
-      "count": 12
-    }
-  },
   "tooling/antidrift/src/oxlint-plugin/rules/no-redeclared-owned-union.js": {
     "antidrift/no-pass-through-parameters": {
       "count": 1
@@ -445,24 +437,9 @@
       "count": 3
     }
   },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-schema-library-in-test.js": {
-    "antidrift/no-vague-names": {
-      "count": 2
-    }
-  },
   "tooling/antidrift/src/oxlint-plugin/rules/no-sentinel-absence-fallback.js": {
     "antidrift/no-vague-names": {
       "count": 1
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-static-property-loop.js": {
-    "antidrift/no-vague-names": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/oxlint-plugin/rules/no-validator-output-oracle.js": {
-    "antidrift/no-vague-names": {
-      "count": 3
     }
   },
   "tooling/antidrift/src/oxlint-plugin/shared/runtime-schema-libraries.js": {

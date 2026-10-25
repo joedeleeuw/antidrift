@@ -845,20 +845,23 @@ ruleTester.run(
   }
 );
 
-ruleTester.run("no-static-property-loop", rule("no-static-property-loop"), {
-  valid: [
-    {
-      code: `
+ruleTester.run(
+  "no-nonindependent-test-oracle",
+  rule("no-nonindependent-test-oracle"),
+  {
+    valid: [
+      {
+        code: `
         it("checks table-driven behavior", () => {
           for (const { input, expected } of cases) {
             expect(parse(input)).toEqual(expected);
           }
         });
       `,
-      filename: "parser.test.ts",
-    },
-    {
-      code: `
+        filename: "parser.test.ts",
+      },
+      {
+        code: `
         it("checks a runtime-derived invariant", () => {
           const permissions = permissionsFor(role);
           for (const action of requiredActions) {
@@ -866,12 +869,12 @@ ruleTester.run("no-static-property-loop", rule("no-static-property-loop"), {
           }
         });
       `,
-      filename: "permissions.test.ts",
-    },
-  ],
-  invalid: [
-    {
-      code: `
+        filename: "permissions.test.ts",
+      },
+    ],
+    invalid: [
+      {
+        code: `
         function severity(ruleValue) {
           return Array.isArray(ruleValue) ? ruleValue[0] : ruleValue;
         }
@@ -885,11 +888,12 @@ ruleTester.run("no-static-property-loop", rule("no-static-property-loop"), {
           }
         });
       `,
-      filename: "eslint-config/index.test.mjs",
-      errors: [{ messageId: "staticPropertyEcho" }],
-    },
-  ],
-});
+        filename: "eslint-config/index.test.mjs",
+        errors: [{ messageId: "staticPropertyEcho" }],
+      },
+    ],
+  }
+);
 
 ruleTester.run(
   "no-sentinel-absence-fallback",
@@ -1269,57 +1273,6 @@ ruleTester.run("no-raw-fetch-in-component", rule("no-raw-fetch-in-component"), {
         }
       `,
       errors: 1,
-    },
-  ],
-});
-
-const statusOptions = {
-  statuses: {
-    UserStatus: {
-      owner: "packages/domain/src/user.ts",
-      values: ["active", "disabled", "invited"],
-    },
-  },
-};
-
-ruleTester.run("no-status-literal-in-type", rule("no-status-literal-in-type"), {
-  valid: [
-    {
-      ...fixture("programs/correct/packages/domain/src/user.ts"),
-      options: [statusOptions],
-    },
-    {
-      code: "const x = user.status === 'active';",
-      filename: "/repo/apps/web/src/App.ts",
-      options: [statusOptions],
-    },
-    {
-      code: "type BadgeProps = { variant: 'active' | 'disabled' };",
-      filename: "/repo/apps/web/src/Badge.ts",
-      options: [statusOptions],
-    },
-    {
-      code: "type FeatureStatus = 'active' | 'disabled';",
-      filename: "/repo/apps/web/src/feature.ts",
-      options: [statusOptions],
-    },
-    {
-      code: "let status: 'active' | 'disabled'; void status;",
-      filename: "/repo/apps/web/src/status.ts",
-      options: [statusOptions],
-    },
-  ],
-  invalid: [
-    {
-      ...fixture("programs/drift/status-literal-type-fork.ts"),
-      options: [statusOptions],
-      errors: 2,
-    },
-    {
-      code: "type User = { status: 'active' | 'disabled' };",
-      filename: "/repo/apps/web/src/user-copy.ts",
-      options: [statusOptions],
-      errors: 2,
     },
   ],
 });

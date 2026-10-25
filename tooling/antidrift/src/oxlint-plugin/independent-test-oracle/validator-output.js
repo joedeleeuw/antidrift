@@ -5,12 +5,7 @@ import {
   isRuntimeSchemaLibraryFile,
   isRuntimeSchemaLibrarySource,
 } from "../shared/runtime-schema-libraries.js";
-import {
-  contextFilename,
-  isTestFilename,
-  staticPropertyName,
-  unwrapExpression,
-} from "../shared/test-files.js";
+import { staticPropertyName, unwrapExpression } from "../shared/test-files.js";
 
 // Only runtime-schema libraries define these names, so the call proves a validator.
 const distinctiveValidatorMethods = new Set([
@@ -66,8 +61,8 @@ const resolutionDepthLimit = 12;
 
 function importSourceForIdentifier(identifier, sourceCode) {
   if (identifier?.type !== "Identifier") return null;
-  const variable = findVariable(sourceCode, identifier);
-  const definition = variable?.defs?.[0];
+  const binding = findVariable(sourceCode, identifier);
+  const definition = binding?.defs?.[0];
   if (
     definition?.type !== "ImportBinding" ||
     definition.parent?.type !== "ImportDeclaration"
@@ -80,8 +75,8 @@ function importSourceForIdentifier(identifier, sourceCode) {
 
 function importedNameForIdentifier(identifier, sourceCode) {
   if (identifier?.type !== "Identifier") return null;
-  const variable = findVariable(sourceCode, identifier);
-  const definition = variable?.defs?.[0];
+  const binding = findVariable(sourceCode, identifier);
+  const definition = binding?.defs?.[0];
   if (definition?.type !== "ImportBinding") return null;
   const specifier = definition.node;
   if (specifier?.type !== "ImportSpecifier") return null;
@@ -92,8 +87,8 @@ function importedNameForIdentifier(identifier, sourceCode) {
 
 function constInitializer(identifier, sourceCode) {
   if (identifier?.type !== "Identifier") return null;
-  const variable = findVariable(sourceCode, identifier);
-  const definition = variable?.defs?.[0];
+  const binding = findVariable(sourceCode, identifier);
+  const definition = binding?.defs?.[0];
   if (
     definition?.type !== "Variable" ||
     definition.node?.type !== "VariableDeclarator" ||
@@ -453,34 +448,7 @@ function assertionFinding(record, sourceCode) {
   return "validatorOutputOracle";
 }
 
-export default function ruleNoValidatorOutputOracle() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description:
-          "Require expected values that do not come from the validated input or application output.",
-      },
-      schema: [],
-      messages: {
-        validatorOutputOracle:
-          "This assertion checks validator output without an independent expected value. Assert application behavior against a value that does not come from the input or output.",
-        validatorThrowOracle:
-          "This assertion only checks whether a validator accepts input. Assert application behavior or remove the test.",
-      },
-    },
-    create(context) {
-      if (!isTestFilename(contextFilename(context))) return {};
-      const sourceCode = context.sourceCode ?? context.getSourceCode();
-      return {
-        CallExpression(node) {
-          const record =
-            parseExpectAssertion(node) ?? parseAssertAssertion(node);
-          if (!record) return;
-          const messageId = assertionFinding(record, sourceCode);
-          if (messageId) context.report({ node, messageId });
-        },
-      };
-    },
-  };
+export function validatorOutputOracleFinding(node, sourceCode) {
+  const record = parseExpectAssertion(node) ?? parseAssertAssertion(node);
+  return record ? assertionFinding(record, sourceCode) : null;
 }

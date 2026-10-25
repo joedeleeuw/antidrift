@@ -26,10 +26,8 @@ import ruleNoCallingComponentsAsFunctions from "../oxlint-plugin/rules/no-callin
 import ruleNoDuplicatedConditionalClassnames from "../oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoNonindependentTestOracle from "../oxlint-plugin/rules/no-nonindependent-test-oracle.js";
 import ruleNoRedeclaredOwnedUnion from "../oxlint-plugin/rules/no-redeclared-owned-union.js";
-import ruleNoSchemaLibraryInTest from "../oxlint-plugin/rules/no-schema-library-in-test.js";
 import ruleNoSentinelAbsenceFallback from "../oxlint-plugin/rules/no-sentinel-absence-fallback.js";
 import ruleNoSilentEmptyDetectionFallback from "../oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
-import ruleNoValidatorOutputOracle from "../oxlint-plugin/rules/no-validator-output-oracle.js";
 import { ruleNoServiceConstructorImports } from "./rules/no-service-constructor-imports.js";
 import { ruleNoBagReshaper } from "./rules/no-bag-reshaper.js";
 import ruleUnknownInputMustBeDecoded from "./rules/unknown-input-must-be-decoded.js";
@@ -65,10 +63,8 @@ const rules = {
   "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
   "no-raw-fetch-in-component": ruleNoRawFetchInComponent,
   "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
-  "no-schema-library-in-test": ruleNoSchemaLibraryInTest(),
   "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
   "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
-  "no-validator-output-oracle": ruleNoValidatorOutputOracle(),
   "unknown-input-must-be-decoded": ruleUnknownInputMustBeDecoded(),
 };
 

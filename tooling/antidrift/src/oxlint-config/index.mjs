@@ -140,7 +140,6 @@ const additionalAntidriftRules = {
   "antidrift/no-async-array-method": "error",
   "antidrift/no-handrolled-resource-lifecycle-cells": "error",
   "antidrift/no-repo-state-mirror-assertion": "error",
-  "antidrift/no-status-literal-in-type": "error",
   "antidrift/require-authz-check": "error",
 };
 
@@ -376,7 +375,6 @@ export function createGovernanceOxlintConfig({
   propertyDefaultAllowedFiles = [],
 } = {}) {
   const registries = loadRegistriesSync(resolve(repoRoot, policyDir));
-  const statuses = registries.domain?.statuses ?? {};
   const authzFunctions =
     registries.boundaries?.requiredCalls?.authorization ?? [];
   const generatedIgnores = generatedIgnorePatterns(registries, repoRoot);
@@ -392,7 +390,6 @@ export function createGovernanceOxlintConfig({
   ];
   const rules = {
     "antidrift/require-effect-deps": "error",
-    "antidrift/no-static-property-loop": "error",
     "antidrift/no-unknown-type-aliases": "error",
     "antidrift/no-unsafe-cast-chain": "error",
     "governance-eslint/no-restricted-syntax": [
@@ -401,7 +398,6 @@ export function createGovernanceOxlintConfig({
       ...(enforceNoPropertyDefaultFallbacks ? templateSentinelSelectors : []),
     ],
     ...additionalAntidriftRules,
-    "antidrift/no-status-literal-in-type": ["error", { statuses }],
     "antidrift/require-authz-check": ["error", { authzFunctions }],
   };
   if (restrictedImportPatterns.length > 0) {

@@ -1,5 +1,9 @@
 # Test Validator Oracle Guardrails
 
+## Current ownership
+
+`antidrift/no-nonindependent-test-oracle` now owns arranged-input, validator-output, mocked-output, and static-shape oracles. The blanket schema-library import ban is removed: schema values passed into application calls and boundary decoders are valid, while assertions that merely validate their own arrangement still report. `no-schema-library-in-test`, `no-validator-output-oracle`, and `no-static-property-loop` are retired into that owner. The rule split and measurements below are historical evidence, not the current registration.
+
 ## Complaint and failure mode
 
 A test can look precise while proving only that a runtime-schema library implements the schema declared in the same test or production module. Two deterministic source patterns create this failure:

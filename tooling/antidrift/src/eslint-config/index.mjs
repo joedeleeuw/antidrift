@@ -16,11 +16,9 @@ const ratchetedRules = {
   "antidrift/no-pass-through-parameters": "error",
   "antidrift/no-raw-fetch-in-component": "error",
   "antidrift/no-redeclared-owned-union": "error",
-  "antidrift/no-schema-library-in-test": "error",
   "antidrift/no-sentinel-absence-fallback": "error",
   "antidrift/no-silent-empty-detection-fallback": "error",
   "antidrift/no-vague-names": "error",
-  "antidrift/no-validator-output-oracle": "error",
 };
 
 export function createConfig({
@@ -33,6 +31,7 @@ export function createConfig({
   const generatedSources = registries.generated?.generatedSources ?? {};
   const packageTypeOwners = registries.ownership?.packageTypeOwners ?? {};
   const canonicalEntities = registries.domain?.canonicalEntities ?? {};
+  const statuses = registries.domain?.statuses ?? {};
 
   return defineConfig(
     {
@@ -96,6 +95,7 @@ export function createConfig({
         "antidrift/no-service-constructor-imports": "error",
         "antidrift/no-sql-string-concat": "error",
         ...ratchetedRules,
+        "antidrift/no-redeclared-owned-union": ["error", { statuses }],
         "antidrift/no-sentinel-absence-fallback":
           enforceNoPropertyDefaultFallbacks ? "off" : "error",
         "no-restricted-syntax": [
@@ -116,6 +116,7 @@ export function createConfig({
       plugins: { antidrift: aiPolicy },
       rules: {
         ...ratchetedRules,
+        "antidrift/no-redeclared-owned-union": ["error", { statuses }],
         "antidrift/no-sentinel-absence-fallback":
           enforceNoPropertyDefaultFallbacks ? "off" : "error",
         "no-restricted-syntax": [

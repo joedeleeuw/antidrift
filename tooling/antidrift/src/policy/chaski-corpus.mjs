@@ -52,7 +52,7 @@ const canonicalModelForkOptions = {
   ],
 };
 const planStatusLiteralOptions = {
-  "antidrift/no-status-literal-in-type": [
+  "antidrift/no-redeclared-owned-union": [
     {
       statuses: {
         PlanStatus: {
@@ -479,13 +479,13 @@ export const defaultCases = [
   },
   {
     id: "bff-rep-progress-status-inline-union",
-    ruleId: "antidrift/no-status-literal-in-type",
+    ruleId: "antidrift/no-redeclared-owned-union",
     kind: "drift",
     classification: "ready",
     subproject: "bff",
     paths: ["src/frontend/bff/api/routers/orders-ops-router.ts"],
     ruleOptions: {
-      "antidrift/no-status-literal-in-type": [
+      "antidrift/no-redeclared-owned-union": [
         {
           statuses: {
             RepProgressStatus: {
@@ -512,13 +512,13 @@ export const defaultCases = [
   },
   {
     id: "bff-rep-progress-status-owner-clean",
-    ruleId: "antidrift/no-status-literal-in-type",
+    ruleId: "antidrift/no-redeclared-owned-union",
     kind: "correct",
     classification: "ready",
     subproject: "bff",
     paths: ["src/frontend/bff/api/routers/orders-ops-validation.ts"],
     ruleOptions: {
-      "antidrift/no-status-literal-in-type": [
+      "antidrift/no-redeclared-owned-union": [
         {
           statuses: {
             RepProgressStatus: {
@@ -539,7 +539,7 @@ export const defaultCases = [
   },
   {
     id: "portal-tag-variant-literals-not-status-clean",
-    ruleId: "antidrift/no-status-literal-in-type",
+    ruleId: "antidrift/no-redeclared-owned-union",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
@@ -548,7 +548,7 @@ export const defaultCases = [
   },
   {
     id: "monolith-line-item-status-prop-not-plan-status-clean",
-    ruleId: "antidrift/no-status-literal-in-type",
+    ruleId: "antidrift/no-redeclared-owned-union",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",

@@ -39,7 +39,7 @@ describe("semantic adapter manifest", () => {
       )?.semanticFactContracts.map((entry) => entry.factKind)
     ).toEqual(["identitySchemaTransform"]);
     expect(semanticAdapterManifestForAdapterId("type-owner")?.rules).toContain(
-      "antidrift/no-status-literal-in-type"
+      "antidrift/no-redeclared-owned-union"
     );
     expect(semanticAdapterManifestForAdapterId("tuple-shape")?.rules).toContain(
       "antidrift/no-nullable-positional-tuple"

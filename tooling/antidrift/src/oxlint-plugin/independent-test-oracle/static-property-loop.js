@@ -138,11 +138,13 @@ function transparentArgument(node, sourceCode) {
   if (node?.type !== "CallExpression" || node.arguments.length !== 1) {
     return null;
   }
-  const fn = localFunction(node, sourceCode);
-  const parameter = fn?.params?.[0];
-  const returned = fn ? functionReturnExpression(fn) : null;
+  const projectionFunction = localFunction(node, sourceCode);
+  const parameter = projectionFunction?.params?.[0];
+  const returned = projectionFunction
+    ? functionReturnExpression(projectionFunction)
+    : null;
   return parameter?.type === "Identifier" &&
-    fn.params.length === 1 &&
+    projectionFunction.params.length === 1 &&
     returned &&
     isProjection(returned, parameter.name)
     ? node.arguments[0]
@@ -203,11 +205,11 @@ function assertionSubject(node) {
     : null;
 }
 
-function isNode(value) {
+function isNode(field) {
   return (
-    Boolean(value) &&
-    typeof value === "object" &&
-    typeof value.type === "string"
+    Boolean(field) &&
+    typeof field === "object" &&
+    typeof field.type === "string"
   );
 }
 
@@ -221,9 +223,9 @@ function containsStaticAssertion(root, bindingName, sourceCode) {
       ? indexedPropertyRoot(subject, bindingName, sourceCode)
       : null;
     if (object && isConstBinding(object, sourceCode)) return true;
-    for (const [key, value] of Object.entries(node)) {
+    for (const [key, field] of Object.entries(node)) {
       if (key === "parent") continue;
-      for (const child of Array.isArray(value) ? value : [value]) {
+      for (const child of Array.isArray(field) ? field : [field]) {
         if (isNode(child)) stack.push(child);
       }
     }
@@ -231,42 +233,13 @@ function containsStaticAssertion(root, bindingName, sourceCode) {
   return false;
 }
 
-function contextFilename(context) {
-  return typeof context.getFilename === "function"
-    ? context.getFilename()
-    : (context.filename ?? "");
-}
-
-export default function ruleNoStaticPropertyLoop() {
-  return {
-    meta: {
-      type: "problem",
-      docs: {
-        description:
-          "Disallow tests that loop over hardcoded keys to restate one precomputed object's static shape",
-      },
-      schema: [],
-      messages: {
-        staticPropertyEcho:
-          "This loop restates hardcoded properties of one precomputed object. Exercise behavior for each case or assert a generated/public artifact instead.",
-      },
-    },
-    create(context) {
-      if (!testFilenamePattern.test(contextFilename(context))) return {};
-      const sourceCode = context.sourceCode ?? context.getSourceCode();
-      return {
-        ForOfStatement(node) {
-          const bindingName = loopBinding(node);
-          if (
-            bindingName &&
-            isInsideTestBlock(node) &&
-            hasLiteralKeys(node) &&
-            containsStaticAssertion(node.body, bindingName, sourceCode)
-          ) {
-            context.report({ node, messageId: "staticPropertyEcho" });
-          }
-        },
-      };
-    },
-  };
+export function isStaticPropertyEcho(node, sourceCode, filename) {
+  if (!testFilenamePattern.test(filename)) return false;
+  const bindingName = loopBinding(node);
+  return Boolean(
+    bindingName &&
+    isInsideTestBlock(node) &&
+    hasLiteralKeys(node) &&
+    containsStaticAssertion(node.body, bindingName, sourceCode)
+  );
 }

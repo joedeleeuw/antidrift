@@ -15,19 +15,6 @@ const oxlintBinary = resolve(
 );
 const plugin = fileURLToPath(new URL("./index.js", import.meta.url));
 const packageTopEntry = fileURLToPath(new URL("../index.mjs", import.meta.url));
-const schemaLibraryImportCases = [
-  'import { z } from "zod"; z.string();',
-  'import * as z from "zod/v4"; z.string();',
-  'const { object } = require("valibot"); object({});',
-  'async function load() { return import("@effect/schema/Schema"); }',
-  'import Superstruct = require("superstruct"); Superstruct.string();',
-  'import { z } from "zod"; const LocalSchema = z.object({ id: z.string() });',
-  'import { z } from "zod"; const UserSchema = z.object({ id: z.string() }); expect(renderUser(UserSchema.parse(raw))).toBe("User u1");',
-  'import { z } from "zod"; expect(Object.keys(z.object({ id: z.string() }).shape)).toEqual(["id"]);',
-  'import { object, parse } from "valibot"; expect(renderUser(parse(object({}), raw))).toBe("User u1");',
-  'import { ZodError } from "zod"; expect(() => submit(raw)).toThrow(ZodError);',
-];
-
 const antiSlopRuleCases = [
   {
     ruleId: "no-unknown-type-aliases",
@@ -79,7 +66,7 @@ describe("Oxlint plugin", () => {
     );
 
     expect(result.status).toBe(1);
-    expect(`${result.stdout}${result.stderr}`).toContain(
+    expect(`${result.stdout}${result.stderr}`).toMatch(
       "antidrift(require-effect-deps)"
     );
   });
@@ -99,7 +86,7 @@ describe("Oxlint plugin", () => {
     );
 
     expect(result.status).toBe(1);
-    expect(`${result.stdout}${result.stderr}`).toContain(
+    expect(`${result.stdout}${result.stderr}`).toMatch(
       "antidrift(no-raw-fetch-in-component)"
     );
   });
@@ -114,13 +101,13 @@ describe("Oxlint plugin", () => {
           }
         });
       `,
-      { "antidrift/no-static-property-loop": "error" },
+      { "antidrift/no-nonindependent-test-oracle": "error" },
       "config.test.ts"
     );
 
     expect(result.status).toBe(1);
-    expect(`${result.stdout}${result.stderr}`).toContain(
-      "antidrift(no-static-property-loop)"
+    expect(`${result.stdout}${result.stderr}`).toMatch(
+      "antidrift(no-nonindependent-test-oracle)"
     );
   });
 
@@ -131,7 +118,7 @@ describe("Oxlint plugin", () => {
       "component.tsx",
       packageTopEntry
     );
-    expect(result.stdout).toContain("antidrift(require-effect-deps)");
+    expect(result.stdout).toMatch("antidrift(require-effect-deps)");
   });
 
   it("accepts a behavior assertion without a static property loop", () => {
@@ -142,56 +129,34 @@ describe("Oxlint plugin", () => {
           expect(Object.keys(rules)).toStrictEqual(["first", "second"]);
         });
       `,
-      { "antidrift/no-static-property-loop": "error" },
+      { "antidrift/no-nonindependent-test-oracle": "error" },
       "config.test.ts"
     );
 
     expect(result.status).toBe(0);
   });
 
-  it.each(schemaLibraryImportCases)(
-    "rejects runtime-schema value imports in tests",
-    (source) => {
-      const result = lint(
-        source,
-        { "antidrift/no-schema-library-in-test": "error" },
-        "schema.test.ts"
-      );
-
-      expect(result.status).toBe(1);
-      expect(`${result.stdout}${result.stderr}`).toContain(
-        "antidrift(no-schema-library-in-test)"
-      );
-    }
-  );
-
-  it.each([
-    'import type { ZodType } from "zod"; declare const schema: ZodType;',
-    'import { type ZodType } from "zod"; declare const schema: ZodType;',
-    'import { UserSchema } from "./contracts"; UserSchema.parse(raw);',
-    'function require(name) { return fixtures[name]; } const z = require("zod");',
-    'import { z } from "zod"; it("renders schema fields", () => expect(generateForm(z.object({ name: z.string() })).fields).toEqual(["name"]));',
-    'import { z } from "zod"; const tool = defineTool({ name: "lookup", inputSchema: z.object({ id: z.string() }) }); it("runs", async () => expect(await tool.run({ id: "u1" })).toEqual({ found: true }));',
-    'import { ZodError } from "zod"; it("formats", () => expect(new FormError(new ZodError([])).message).toBe("Invalid form"));',
-    'import { z } from "zod"; const schema = z.object({ id: z.string() }); it("renders", () => expect(render(<Form schema={schema} />).getByRole("form")).toBeVisible());',
-  ])(
-    "allows type-only, project, shadowed, or application-input schema imports in tests",
-    (source) => {
-      const result = lint(
-        source,
-        { "antidrift/no-schema-library-in-test": "error" },
-        "schema.test.tsx"
-      );
-
-      expect(result.status).toBe(0);
-    }
-  );
-
-  it("allows runtime-schema libraries in production files", () => {
+  it("rejects assertions that only validate their own input", () => {
     const result = lint(
-      'import { z } from "zod"; export const UserSchema = z.object({ id: z.string() });',
-      { "antidrift/no-schema-library-in-test": "error" },
-      "schema.ts"
+      'import { z } from "zod"; const User = z.object({ name: z.string() }); const input = { name: "Ada" }; expect(User.safeParse(input).success).toBe(true);',
+      { "antidrift/no-nonindependent-test-oracle": "error" },
+      "schema.test.ts"
+    );
+
+    expect(result.status).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toMatch(
+      "antidrift(no-nonindependent-test-oracle)"
+    );
+    expect(`${result.stdout}${result.stderr}`).toMatch(
+      "without an independent expected value"
+    );
+  });
+
+  it("accepts schema output checked against independent expectations", () => {
+    const result = lint(
+      'import { z } from "zod"; const User = z.object({ name: z.string() }); it("parses a response", async () => { const output = await loadUser(); expect(User.parse(output)).toEqual({ name: "Ada" }); });',
+      { "antidrift/no-nonindependent-test-oracle": "error" },
+      "schema.test.ts"
     );
 
     expect(result.status).toBe(0);
@@ -207,7 +172,7 @@ describe("Oxlint plugin", () => {
       );
 
       expect(result.status).toBe(1);
-      expect(`${result.stdout}${result.stderr}`).toContain(
+      expect(`${result.stdout}${result.stderr}`).toMatch(
         `antidrift(${ruleId})`
       );
     }
@@ -223,7 +188,7 @@ describe("Oxlint plugin", () => {
       );
 
       expect(result.status).toBe(0);
-      expect(`${result.stdout}${result.stderr}`).not.toContain(
+      expect(`${result.stdout}${result.stderr}`).not.toMatch(
         `antidrift(${ruleId})`
       );
     }

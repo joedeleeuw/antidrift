@@ -4,6 +4,11 @@ import {
   importedArrays,
   memberSet,
 } from "../owned-union-source.js";
+import { canonicalStatusLiteralOwner } from "../../semantic-adapters/shape/status-literal.ts";
+
+function fileMatchesPath(filename, filePath) {
+  return filename.replace(/\\/gu, "/").endsWith(filePath.replace(/\\/gu, "/"));
+}
 
 function literalValue(node) {
   if (node?.type === "TSLiteralType") return literalValue(node.literal);
@@ -158,7 +163,7 @@ export default function ruleNoRedeclaredOwnedUnion() {
       type: "problem",
       docs: {
         description:
-          "Require literal unions to derive from an in-scope owning runtime array.",
+          "Require literal unions and canonical status literals to derive from their owners.",
       },
       schema: [
         {
@@ -169,6 +174,7 @@ export default function ruleNoRedeclaredOwnedUnion() {
               items: { type: "string" },
               uniqueItems: true,
             },
+            statuses: { type: "object" },
           },
           additionalProperties: false,
         },
@@ -181,6 +187,7 @@ export default function ruleNoRedeclaredOwnedUnion() {
     create(context) {
       const sourceCode = context.sourceCode;
       const allows = new Set(context.options[0]?.allows ?? []);
+      const statuses = context.options[0]?.statuses ?? {};
       let owners = [];
       function report(node, members, name) {
         if (!members || allows.has(name)) return;
@@ -223,6 +230,14 @@ export default function ruleNoRedeclaredOwnedUnion() {
             memberSet(node.typeAnnotation.types.map(literalValue)),
             node.id.name
           );
+        },
+        TSLiteralType(node) {
+          const owner = canonicalStatusLiteralOwner(node, statuses);
+          if (!owner || fileMatchesPath(context.filename, owner.owner)) return;
+          context.report({
+            node,
+            message: `String literal '${owner.value}' duplicates a canonical status from ${owner.owner}. Import the type instead.`,
+          });
         },
         CallExpression(node) {
           report(node, validatorMembers(node, sourceCode), callSite(node));

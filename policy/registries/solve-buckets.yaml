@@ -104,12 +104,12 @@ rules:
       target: semantic-ast,
       note: "authority-index and package/public-export ownership inference; exact accepted owners, witnessed projections, unique workspace exported-name matches, repeated inline/field-block contracts, and proven local-return ownership share one rule.",
     }
-  antidrift/no-status-literal-in-type:
+  antidrift/no-redeclared-owned-union:
     {
       current: semantic-ast,
       fit: proven,
       target: semantic-ast,
-      note: "authority-index domain-vocabulary with exact/composed owner context; default-off until independent configured status drift replicates.",
+      note: "owned literal unions and canonical status literals; exact runtime-array membership and configured status-owner context.",
     }
   antidrift/no-appeasement-cast:
     {

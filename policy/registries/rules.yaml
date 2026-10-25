@@ -129,6 +129,26 @@ retiredRules:
     status: retired
     reason: Merged into antidrift/no-structural-type-fork for proven enclosing return-contract ownership.
     mergedInto: antidrift/no-structural-type-fork
+  antidrift/no-status-literal-in-type:
+    status: retired
+    reason: Merged into antidrift/no-redeclared-owned-union, which now owns canonical status literal and runtime-array union derivation with owner-file exemptions.
+    mergedInto: antidrift/no-redeclared-owned-union
+    referenceDoc: docs/rule-investigations/no-redeclared-owned-union.md
+  antidrift/no-validator-output-oracle:
+    status: retired
+    reason: Merged into antidrift/no-nonindependent-test-oracle, preserving validatorOutputOracle and validatorThrowOracle diagnostics for assertions that lack an independent expectation.
+    mergedInto: antidrift/no-nonindependent-test-oracle
+    referenceDoc: docs/rule-investigations/test-validator-oracles.md
+  antidrift/no-static-property-loop:
+    status: retired
+    reason: Merged into antidrift/no-nonindependent-test-oracle, preserving staticPropertyEcho for hardcoded loops that restate a precomputed object's static shape.
+    mergedInto: antidrift/no-nonindependent-test-oracle
+    referenceDoc: docs/test-quality-taxonomy.md
+  antidrift/no-schema-library-in-test:
+    status: retired
+    reason: Removed the blanket runtime-schema import ban. Schema values remain valid application inputs and boundary decoders; self-validating oracles are handled by antidrift/no-nonindependent-test-oracle.
+    mergedInto: antidrift/no-nonindependent-test-oracle
+    referenceDoc: docs/rule-investigations/test-validator-oracles.md
   antidrift/no-generic-module-names:
     status: retired
     reason: Removed by owner request. Generic filename blocklists are opinionated naming policy rather than Antidrift contract-drift enforcement; no explicit opt-in implementation is retained.

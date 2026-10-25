@@ -20,7 +20,7 @@ The presets also enforce shared AGENT.md directives recorded in `policy/agent-gu
 
 The ESLint pass also enforces these syntax rules at error, exported by both plugins but configured only in ESLint:
 
-- G15 test independence: `antidrift/no-nonindependent-test-oracle`, `antidrift/no-validator-output-oracle`, `antidrift/no-schema-library-in-test`
+- G15 test independence: `antidrift/no-nonindependent-test-oracle`
 - W4 type reuse: `antidrift/no-redeclared-owned-union`
 - G4 boundary decoding: `antidrift/unknown-input-must-be-decoded`
 - G7 loud failure: `antidrift/no-sentinel-absence-fallback`, `antidrift/no-silent-empty-detection-fallback`
@@ -37,8 +37,6 @@ eslint . \
   --suppress-rule antidrift/no-pass-through-parameters \
   --suppress-rule antidrift/no-compat-names \
   --suppress-rule antidrift/no-nonindependent-test-oracle \
-  --suppress-rule antidrift/no-validator-output-oracle \
-  --suppress-rule antidrift/no-schema-library-in-test \
   --suppress-rule antidrift/no-redeclared-owned-union \
   --suppress-rule antidrift/unknown-input-must-be-decoded \
   --suppress-rule antidrift/no-sentinel-absence-fallback \
@@ -114,7 +112,7 @@ export default [
 
 The antidrift preset also parses every `package.json` with ESLint's JSON language (`@eslint/json`, a dependency of this package). `antidrift/no-unresolved-dependency-types` is enabled at error in that block and in the TypeScript block, independent of the structural owner: it reports a declared dependency that is not installed, or a workspace or linked dependency with a public entry that does not resolve to type declarations, on its manifest key, and each import of a declared package whose types do not resolve at the import. Spreading `createConfig()` supplies the language for `**/package.json`, so `eslint .` reports those gaps with no further setup. These reports stay out of the suppression ratchet above; a gap closes when the dependency is installed or built. ESLint 9.38 or later is required, as for the rest of the preset.
 
-`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-static-property-loop`, `antidrift/no-async-array-method`, `antidrift/no-handrolled-resource-lifecycle-cells`, `antidrift/no-status-literal-in-type`, `antidrift/no-repo-state-mirror-assertion`, and the imported rules for unknown aliases and chained assertions. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. `antidrift/require-authz-check` is enabled with registry-derived authorization functions and stays inert until they are configured. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services, the ratcheted syntax rules above, and `no-sql-string-concat` at error. The structural owner loads `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
+`createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-async-array-method`, `antidrift/no-handrolled-resource-lifecycle-cells`, `antidrift/no-repo-state-mirror-assertion`, and the imported rules for unknown aliases and chained assertions. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. `antidrift/require-authz-check` is enabled with registry-derived authorization functions and stays inert until they are configured. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services, the ratcheted syntax rules above, and `no-sql-string-concat` at error. The structural owner loads `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
 
 For the aggressive property-default policy, pass `enforceNoPropertyDefaultFallbacks: true` to both factories. `typescript-tooling` then owns Rika's rule, the ESLint config disables `no-sentinel-absence-fallback`, and both configs retain only no-substitution template-literal sentinel selectors. `propertyDefaultAllowedFiles` supplies repository-relative exceptions to the two Oxlint factories. No broad Rika preset is enabled.
 
@@ -313,11 +311,8 @@ Generated-source, package, and domain acceptance use `generatedSources`, `packag
 The scoped rules that motivated this package go after the usual agent tells:
 
 - `require-effect-deps` — a `useEffect` with no dependency array runs on every render, and `exhaustive-deps` won't say a word about it
-- `no-static-property-loop` — tests that loop over hardcoded keys only to restate one precomputed object's static values
 - React Native interaction ownership — an optional `react-native.yaml` drives `no-restricted-imports` for raw React Native/RNGH interaction imports, namespace/default bypasses, and re-exports. `replacementImport` names the shared module and exact `allowedFiles` exempt only its owners; without that registry the restriction is inert
-- `no-schema-library-in-test` — test-file guard against value imports from runtime-schema libraries; type-only imports remain valid
-- `no-validator-output-oracle` — local-flow guard against assertions whose subject is direct runtime-validator output
-- `no-nonindependent-test-oracle` — rejects test assertions that compare a binding to itself, to an arranged input literal/fixture, or to a `response.json()` shape that statically repeats a same-test mock arrangement
+- `no-nonindependent-test-oracle` — rejects test assertions that restate arranged inputs, direct validator output, hardcoded static properties, or a `response.json()` shape supplied by a same-test mock; assertions about substantive application behavior remain valid
 - `react-max-component-props` — JSX-returning React components with too many locally-owned accepted props
 - `no-contract-appeasement-projection` — internal helpers that project one owned value contract into another explicit return contract without construction or validation
 - `no-nullable-positional-tuple` — tuple types with multiple nullable or optional slots where a named object or state union should carry meaning

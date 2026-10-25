@@ -1,16 +1,12 @@
 import { ruleNoAsyncArrayMethod } from "./semantic-adapters/syntax/async-array.ts";
 import { ruleNoHandrolledResourceLifecycleCells } from "./semantic-adapters/syntax/resource-lifecycle.ts";
 import { ruleNoRawFetchInComponent } from "./semantic-adapters/syntax/raw-fetch.ts";
-import { ruleNoStatusLiteralInType } from "./semantic-adapters/syntax/status-literal.ts";
 import { ruleRequireAuthzCheck } from "./semantic-adapters/syntax/authz.ts";
 import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
 import ruleNoNonindependentTestOracle from "./oxlint-plugin/rules/no-nonindependent-test-oracle.js";
-import ruleNoSchemaLibraryInTest from "./oxlint-plugin/rules/no-schema-library-in-test.js";
 import ruleNoSentinelAbsenceFallback from "./oxlint-plugin/rules/no-sentinel-absence-fallback.js";
 import ruleNoSilentEmptyDetectionFallback from "./oxlint-plugin/rules/no-silent-empty-detection-fallback.js";
-import ruleNoStaticPropertyLoop from "./oxlint-plugin/rules/no-static-property-loop.js";
-import ruleNoValidatorOutputOracle from "./oxlint-plugin/rules/no-validator-output-oracle.js";
 import ruleRequireEffectDeps from "./oxlint-plugin/rules/require-effect-deps.js";
 import ruleNoRedeclaredOwnedUnion from "./oxlint-plugin/rules/no-redeclared-owned-union.js";
 import ruleNoRepoStateMirrorAssertion from "./oxlint-plugin/rules/no-repo-state-mirror-assertion.js";
@@ -29,13 +25,9 @@ export function createSyntaxRules() {
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
     "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
     "no-repo-state-mirror-assertion": ruleNoRepoStateMirrorAssertion(),
-    "no-schema-library-in-test": ruleNoSchemaLibraryInTest(),
     "no-raw-fetch-in-component": ruleNoRawFetchInComponent,
     "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
     "no-silent-empty-detection-fallback": ruleNoSilentEmptyDetectionFallback(),
-    "no-static-property-loop": ruleNoStaticPropertyLoop(),
-    "no-status-literal-in-type": ruleNoStatusLiteralInType,
-    "no-validator-output-oracle": ruleNoValidatorOutputOracle(),
     "require-authz-check": ruleRequireAuthzCheck,
     "require-effect-deps": ruleRequireEffectDeps,
   };
