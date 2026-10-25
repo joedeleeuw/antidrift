@@ -1,5 +1,7 @@
 # no-defensive-shape-probing Investigation
 
+Current ownership: retired and merged into `antidrift/unknown-input-must-be-decoded`. The surviving `defensiveShapeProbe` case retains the four-probe threshold, broad-value proof, and type-predicate exemption. The rest of this document records the standalone rule's investigation and corpus history.
+
 ## Current Rule
 
 `antidrift/no-defensive-shape-probing` is enabled at error in the ESLint config. It is `ready`, not `stable`. A 54-repository corpus (725 `Object.entries` iteration callbacks) reports 0 findings.

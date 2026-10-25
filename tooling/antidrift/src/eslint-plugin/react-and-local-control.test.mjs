@@ -1084,8 +1084,8 @@ typedRuleTester.run(
 );
 
 typedRuleTester.run(
-  "no-defensive-shape-probing",
-  rule("no-defensive-shape-probing"),
+  "unknown-input-must-be-decoded",
+  rule("unknown-input-must-be-decoded"),
   {
     valid: [
       fixture("programs/correct/owned-type-guard-or-schema.ts"),
@@ -1094,7 +1094,7 @@ typedRuleTester.run(
     invalid: [
       {
         ...fixture("programs/drift/object-entries-shape-probing.ts"),
-        errors: 1,
+        errors: [{ messageId: "defensiveShapeProbe" }],
       },
     ],
   }
@@ -1152,6 +1152,44 @@ ruleTester.run(
       fixture("programs/correct/owned-resource-hook.ts"),
       // Request guard constructed at component scope (useRef) still exempts the transition.
       fixture("programs/correct/abort-guarded-component-scope.ts"),
+      fixture("programs/correct/raw-fetch-in-helper.ts"),
+      fixture("programs/drift/raw-fetch-in-component-module-helper.tsx"),
+      {
+        filename: "component-imported-fetch.tsx",
+        code: `
+          import { fetch } from "./api-client";
+
+          export function UsersView() {
+            fetch("/api/users");
+            return <div>Users</div>;
+          }
+        `,
+      },
+      {
+        filename: "component-shadowed-fetch-lookalikes.tsx",
+        code: `
+          export function UsersView() {
+            const fetch = (url: string) => apiClient(url);
+            const window = { fetch };
+            const self = { fetch };
+            const globalThis = { fetch };
+            fetch("/api/users");
+            window.fetch("/api/users");
+            self.fetch("/api/users");
+            globalThis.fetch("/api/users");
+            return <div>Users</div>;
+          }
+        `,
+      },
+      {
+        filename: "component-raw-fetch-only.tsx",
+        code: `
+          export function UsersView() {
+            fetch("/api/users");
+            return <div>Users</div>;
+          }
+        `,
+      },
     ],
     invalid: [
       {
@@ -1161,121 +1199,6 @@ ruleTester.run(
     ],
   }
 );
-
-ruleTester.run("no-raw-fetch-in-component", rule("no-raw-fetch-in-component"), {
-  valid: [
-    fixture("programs/correct/raw-fetch-in-helper.ts"),
-    fixture("programs/drift/raw-fetch-in-component-module-helper.tsx"),
-    {
-      filename: "lowercase-utility.tsx",
-      code: `
-        async function loadUsers() {
-          return fetch("/api/users");
-        }
-
-        export function UsersView() {
-          return <div>Users</div>;
-        }
-
-        void loadUsers;
-      `,
-    },
-    {
-      filename: "pascalcase-non-component.ts",
-      code: `
-        async function UserLoader() {
-          return fetch("/api/users");
-        }
-
-        void UserLoader;
-      `,
-    },
-    {
-      filename: "component-imported-fetch.tsx",
-      code: `
-        import { fetch } from "./api-client";
-
-        export function UsersView() {
-          fetch("/api/users");
-          return <div>Users</div>;
-        }
-      `,
-    },
-    {
-      filename: "component-local-fetch.tsx",
-      code: `
-        export function UsersView() {
-          const fetch = (url: string) => apiClient(url);
-          fetch("/api/users");
-          return <div>Users</div>;
-        }
-      `,
-    },
-    {
-      filename: "component-local-window.tsx",
-      code: `
-        export function UsersView() {
-          const window = { fetch: (url: string) => apiClient(url) };
-          window.fetch("/api/users");
-          return <div>Users</div>;
-        }
-      `,
-    },
-    {
-      filename: "component-local-self.tsx",
-      code: `
-        export function UsersView() {
-          const self = { fetch: (url: string) => apiClient(url) };
-          self.fetch("/api/users");
-          return <div>Users</div>;
-        }
-      `,
-    },
-    {
-      filename: "component-local-global-this.tsx",
-      code: `
-        export function UsersView() {
-          const globalThis = { fetch: (url: string) => apiClient(url) };
-          globalThis.fetch("/api/users");
-          return <div>Users</div>;
-        }
-      `,
-    },
-  ],
-  invalid: [
-    { ...fixture("programs/drift/raw-fetch-in-component.tsx"), errors: 1 },
-    {
-      filename: "effect-fetch.tsx",
-      code: `
-        import { useEffect } from "react";
-
-        export function ImpersonationWarning() {
-          useEffect(() => {
-            async function exchangeCode() {
-              return fetch("/impersonation/exchange");
-            }
-
-            void exchangeCode();
-          }, []);
-
-          return <div>Impersonation</div>;
-        }
-      `,
-      errors: 1,
-    },
-    {
-      filename: "jsx-local-return-fetch.tsx",
-      code: `
-        export function UsersView() {
-          const view = <div>Users</div>;
-          fetch("/api/users");
-          return view;
-        }
-      `,
-      errors: 1,
-    },
-  ],
-});
 
 ruleTester.run(
   "no-nullable-positional-tuple",

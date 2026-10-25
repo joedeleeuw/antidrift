@@ -49,7 +49,7 @@ const sudocodeCases = [
   },
   {
     id: "sudocode-executions-page-query-clean",
-    ruleId: "antidrift/no-raw-fetch-in-component",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
@@ -464,7 +464,7 @@ const sudocodeCases = [
   },
   {
     id: "sudocode-first-party-plugin-entries-clean",
-    ruleId: "antidrift/no-defensive-shape-probing",
+    ruleId: "antidrift/unknown-input-must-be-decoded",
     kind: "correct",
     classification: "ready",
     subproject: "cli",

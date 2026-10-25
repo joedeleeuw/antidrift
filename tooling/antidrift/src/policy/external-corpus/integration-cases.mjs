@@ -172,7 +172,7 @@ export const codebaseAtlasCases = [
   },
   {
     id: "atlas-language-counts-entries-clean",
-    ruleId: "antidrift/no-defensive-shape-probing",
+    ruleId: "antidrift/unknown-input-must-be-decoded",
     kind: "correct",
     classification: "ready",
     subproject: "app",
@@ -185,7 +185,7 @@ export const codebaseAtlasCases = [
 export const murderboxCases = [
   {
     id: "murderbox-chat-module-app-fetch-clean",
-    ruleId: "antidrift/no-raw-fetch-in-component",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
     classification: "ready",
     subproject: "client",
@@ -193,7 +193,7 @@ export const murderboxCases = [
   },
   {
     id: "murderbox-client-api-proxy-fetch-clean",
-    ruleId: "antidrift/no-raw-fetch-in-component",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
     classification: "ready",
     subproject: "client",
@@ -649,7 +649,8 @@ export const opencodeCases = [
   },
   {
     id: "opencode-zen-provider-payload-replacer-clean",
-    ruleId: "antidrift/no-defensive-shape-probing",
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    messageId: "defensiveShapeProbe",
     kind: "correct",
     classification: "ready",
     subproject: "console-app",

@@ -97,7 +97,7 @@ export const labels = Object.entries(users).map(([id, user]) => [
     expect(result.parserErrors).toBe(0);
     expect(result.driftRepositories).toBe(1);
     expect(result.findingsByRule).toMatchObject({
-      "antidrift/no-defensive-shape-probing": 1,
+      "antidrift/unknown-input-must-be-decoded": 1,
     });
   });
 

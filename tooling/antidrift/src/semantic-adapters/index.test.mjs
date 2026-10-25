@@ -16,9 +16,12 @@ describe("semantic adapter manifest", () => {
     expect(semanticAdapterManifestForAdapterId("parse-input")?.rules).toEqual([
       "antidrift/no-unsafe-deserialize",
     ]);
-    expect(semanticAdapterManifestForAdapterId("broad-input")?.rules).toContain(
-      "antidrift/no-appeasement-cast"
-    );
+    expect(semanticAdapterManifestForAdapterId("broad-input")?.rules).toEqual([
+      "antidrift/no-appeasement-cast",
+      "antidrift/unknown-input-must-be-decoded",
+      "antidrift/no-redundant-type-predicate",
+      "antidrift/no-underchecked-type-predicate",
+    ]);
     expect(
       semanticAdapterManifestForAdapterId(
         "react-state"

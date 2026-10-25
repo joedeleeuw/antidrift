@@ -432,6 +432,49 @@ it("keeps sibling payload setters inventory-only under an aggressive threshold",
   );
 });
 
+it("tracks only scope-bound fetch as transition evidence, not as a setter", async () => {
+  const stateProgram = (fetchDeclaration = "") => `
+    import { useState } from "react";
+    ${fetchDeclaration}
+    export function Panel() {
+      const [rows, setRows] = useState([]);
+      const [selection, setSelection] = useState(null);
+      function update() {
+        fetch("/api/rows");
+        setRows([]);
+        setSelection(null);
+      }
+      return update;
+    }
+  `;
+  const global = await lintCoupledStateCodeWithFacts(stateProgram(), {
+    threshold: 2,
+  });
+  const shadowed = await lintCoupledStateCodeWithFacts(
+    stateProgram("const fetch = (url: string) => Promise.resolve(url);"),
+    { threshold: 2 }
+  );
+
+  expect(global.result.messages).toHaveLength(0);
+  expect(shadowed.result.messages).toHaveLength(0);
+  expect(global.facts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        factKind: "broadSetterCoMutation",
+        payload: expect.objectContaining({ transition: true, setterCount: 2 }),
+      }),
+    ])
+  );
+  expect(shadowed.facts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        factKind: "broadSetterCoMutation",
+        payload: expect.objectContaining({ transition: false, setterCount: 2 }),
+      }),
+    ])
+  );
+});
+
 it("proves lifecycle from derived catch writes and awaited source-member payloads", async () => {
   const { facts, result } = await lintCoupledStateCodeWithFacts(`
     import { useState } from "react";

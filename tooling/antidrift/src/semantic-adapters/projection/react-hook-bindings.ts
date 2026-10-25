@@ -7,7 +7,11 @@ import {
   syntaxChildren,
   syntaxField,
 } from "../kernel/syntax-node.ts";
-import { declaredVariables, variableName } from "../kernel/syntax-scope.ts";
+import {
+  bindingDefinitions,
+  declaredVariables,
+  variableName,
+} from "../kernel/syntax-scope.ts";
 import { importedName, memberName, unwrapCasts } from "./react-state-syntax.ts";
 
 export type ReactHookName = "useRef" | "useState";
@@ -70,6 +74,34 @@ export class ReactHookBindings {
       memberName(unwrapped) === hookName &&
       binding !== null &&
       this.#objectBindings.has(binding)
+    );
+  }
+
+  isGlobalFetchCall(callee: unknown): boolean {
+    const isUnshadowedGlobal = (identifier: unknown, name: string) => {
+      if (
+        !isSyntaxType(identifier, "Identifier") ||
+        identifierName(identifier) !== name
+      ) {
+        return false;
+      }
+      const binding = findVariable(this.#sourceCode, identifier);
+      return !binding || bindingDefinitions(binding).length === 0;
+    };
+    if (isSyntaxType(callee, "Identifier")) {
+      return isUnshadowedGlobal(callee, "fetch");
+    }
+    if (
+      !isSyntaxType(callee, "MemberExpression") ||
+      syntaxField(callee, "computed")
+    ) {
+      return false;
+    }
+    return (
+      identifierName(syntaxField(callee, "property")) === "fetch" &&
+      ["globalThis", "window", "self"].some((name) =>
+        isUnshadowedGlobal(syntaxField(callee, "object"), name)
+      )
     );
   }
 }

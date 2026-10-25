@@ -25,7 +25,7 @@ This map is the working answer to the goal: unclear rules must move toward ecosy
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Ecosystem-covered or retired       | `no-cycle`, `no-inline-disable-without-ticket`, `no-sdk-direct-use`, `no-silent-catch`, `no-explicit-return-type-private-helper`, `no-thin-typed-factory-wrapper`, `no-obvious-comment`, `no-role-literal-in-type`, `no-cast-to-branded`, `no-status-triplet-state` | Locked in `retiredRules` in `policy/registries/rules.yaml`; do not reopen without new real-code evidence and checker changes.                                                                                                                                                                                            |
 | Rewrite with sharper detector      | `no-appeasement-cast`, `no-sql-string-concat`, `no-underchecked-type-predicate`, `no-handrolled-resource-lifecycle-cells`, `no-async-array-method`, `no-nullable-positional-tuple`, `no-structural-type-fork`, `no-canonical-model-fork`, `require-authz-check`     | Keep custom only where the sharper signal is explicit: broad-input authority casts, type-aware SQL identifier proof, degenerate authority claims, redundant constant state cells, branch-specific async array control flow, nullable/optional tuple slots, owner-backed structural contracts, and typed policy wrappers. |
-| Inventory-only/off unless proven   | `no-defensive-shape-probing`                                                                                                                                                                                                                                        | `no-defensive-shape-probing` is default-off unless a second drift proves value beyond upstream unsafe-member rules.                                                                                                                                                                                                      |
+| Consolidated into stronger owners  | `no-defensive-shape-probing`, `no-raw-fetch-in-component`                                                                                                                                                                                                           | Broad `Object.entries` mini-parsers belong to `unknown-input-must-be-decoded`; fetch is evidence for `no-handrolled-resource-lifecycle-cells`, not a standalone violation. The published IDs remain retired.                                                                                                             |
 | Config/theme replacement candidate | `no-raw-tailwind-color`, `no-hover-translate-card`, `no-inline-structural-type-at-use-site`, `no-status-literal-in-type`                                                                                                                                            | Prefer generated config or construction constraints when readable; keep custom code only when extraction context and exceptions are materially clearer than config.                                                                                                                                                      |
 
 ## Current Grill Targets
@@ -53,7 +53,7 @@ Better split:
 - The retired `no-status-triplet-state` rule was really about derivable resource lifecycle facts.
 - `no-handrolled-resource-lifecycle-cells` is about local state cells behaving like one implicit resource lifecycle machine.
 - The semantic AST subset collapsed into `no-handrolled-resource-lifecycle-cells` plus a redundant-constant-cell proof: one setter writes a constant such as `false` or `null` whenever another setter receives the resource value.
-- Fetch/effect waterfall is a separate data-loading architecture problem, mostly pressured by `no-raw-fetch-in-component` and React Hooks rules.
+- Fetch/effect waterfall is a separate data-loading architecture problem. Fetch contributes evidence to `no-handrolled-resource-lifecycle-cells`, but raw fetch alone is not a violation; React Hooks rules remain separate.
 
 Recommended default:
 
@@ -80,7 +80,7 @@ Human answer (2026-06-10): yes. Any-co-mutation as a blocking signal is false-po
 Rules:
 
 - `antidrift/no-appeasement-cast`
-- `antidrift/no-defensive-shape-probing`
+- `antidrift/unknown-input-must-be-decoded`
 - `antidrift/no-underchecked-type-predicate`
 
 Human problem:

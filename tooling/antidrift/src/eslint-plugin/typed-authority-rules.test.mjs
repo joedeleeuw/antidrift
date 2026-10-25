@@ -13,7 +13,7 @@ const typeServiceGuardedRules = [
   "react-max-component-props",
   "no-appeasement-cast",
   "no-contract-appeasement-projection",
-  "no-defensive-shape-probing",
+  "unknown-input-must-be-decoded",
   "no-identity-schema-transform",
   "no-explicit-type-arguments-on-owned-api",
   "no-schema-validator-transcoding",

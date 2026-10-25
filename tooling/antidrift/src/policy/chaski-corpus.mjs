@@ -115,7 +115,7 @@ export const defaultCases = [
   },
   {
     id: "monolith-qr-action-card-raw-fetch-helper",
-    ruleId: "antidrift/no-raw-fetch-in-component",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
@@ -125,7 +125,7 @@ export const defaultCases = [
   },
   {
     id: "monolith-crowdies-api-raw-fetch-helper",
-    ruleId: "antidrift/no-raw-fetch-in-component",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
@@ -150,26 +150,20 @@ export const defaultCases = [
     ],
   },
   {
-    id: "portal-impersonation-warning-raw-fetch-effect",
-    ruleId: "antidrift/no-raw-fetch-in-component",
-    kind: "drift",
-    classification: "ready",
-    subproject: "frontend",
-    paths: ["src/frontend/portal/components/ImpersonationWarning.tsx"],
-    expectedFindings: [
-      {
-        path: "src/frontend/portal/components/ImpersonationWarning.tsx",
-        line: 85,
-      },
-    ],
-  },
-  {
     id: "portal-embedded-dashboard-clean-component",
-    ruleId: "antidrift/no-raw-fetch-in-component",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
     paths: ["src/frontend/portal/components/EmbeddedDashboard.tsx"],
+  },
+  {
+    id: "portal-impersonation-warning-raw-fetch-only-clean",
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    kind: "correct",
+    classification: "ready",
+    subproject: "frontend",
+    paths: ["src/frontend/portal/components/ImpersonationWarning.tsx"],
   },
   {
     id: "bff-scenario-planner-navigation-cycle",
@@ -840,7 +834,7 @@ export const defaultCases = [
   },
   {
     id: "bff-scenarios-global-params-shape-probing",
-    ruleId: "antidrift/no-defensive-shape-probing",
+    ruleId: "antidrift/unknown-input-must-be-decoded",
     kind: "drift",
     classification: "ready",
     subproject: "bff",
@@ -849,13 +843,13 @@ export const defaultCases = [
     expectedFindings: [
       {
         path: "src/frontend/bff/api/services/scenarios-service.ts",
-        line: 706,
+        line: 757,
       },
     ],
   },
   {
     id: "portal-agent-config-typed-patches-shape-probing-clean",
-    ruleId: "antidrift/no-defensive-shape-probing",
+    ruleId: "antidrift/unknown-input-must-be-decoded",
     kind: "correct",
     classification: "ready",
     subproject: "frontend",
@@ -867,7 +861,7 @@ export const defaultCases = [
   },
   {
     id: "bff-date-message-type-predicate-clean",
-    ruleId: "antidrift/no-defensive-shape-probing",
+    ruleId: "antidrift/unknown-input-must-be-decoded",
     kind: "correct",
     classification: "ready",
     subproject: "bff",
@@ -876,7 +870,7 @@ export const defaultCases = [
   },
   {
     id: "bff-bigquery-zod-normalization-clean",
-    ruleId: "antidrift/no-defensive-shape-probing",
+    ruleId: "antidrift/unknown-input-must-be-decoded",
     kind: "correct",
     classification: "ready",
     subproject: "bff",
@@ -885,7 +879,7 @@ export const defaultCases = [
   },
   {
     id: "bff-optimizer-config-value-type-clean",
-    ruleId: "antidrift/no-defensive-shape-probing",
+    ruleId: "antidrift/unknown-input-must-be-decoded",
     kind: "correct",
     classification: "ready",
     subproject: "bff",
@@ -1327,7 +1321,7 @@ async function lintCase(repoRoot, testCase, corpusLabel) {
   });
 
   const results = await eslint.lintFiles(absolutePaths);
-  const findings = results.flatMap((result) =>
+  const allFindings = results.flatMap((result) =>
     result.messages
       .filter(
         (message) =>
@@ -1336,10 +1330,25 @@ async function lintCase(repoRoot, testCase, corpusLabel) {
       .map((message) => ({
         path: relativeFile(repoRoot, result.filePath),
         ruleId: message.ruleId,
+        messageId: message.messageId,
         line: message.line,
         column: message.column,
         message: message.message,
       }))
+  );
+  const findings = allFindings.filter(
+    (finding) =>
+      !testCase.messageId ||
+      finding.ruleId == null ||
+      finding.messageId == null ||
+      finding.messageId === testCase.messageId
+  );
+  const outOfScopeFindings = allFindings.filter(
+    (finding) =>
+      testCase.messageId &&
+      finding.ruleId === testCase.ruleId &&
+      finding.messageId != null &&
+      finding.messageId !== testCase.messageId
   );
   const evaluation = evaluateCase(
     testCase,
@@ -1356,6 +1365,7 @@ async function lintCase(repoRoot, testCase, corpusLabel) {
     subproject: testCase.subproject,
     paths: testCase.paths,
     findings,
+    ...(testCase.messageId ? { outOfScopeFindings } : {}),
     missingFiles,
     ...evaluation,
   };

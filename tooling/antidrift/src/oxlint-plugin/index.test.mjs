@@ -79,18 +79,6 @@ describe("Oxlint plugin", () => {
     expect(result.status).toBe(0);
   });
 
-  it("runs an extracted syntax rule", () => {
-    const result = lint(
-      "function Panel() { fetch('/api/panel'); return <section />; }\n",
-      { "antidrift/no-raw-fetch-in-component": "error" }
-    );
-
-    expect(result.status).toBe(1);
-    expect(`${result.stdout}${result.stderr}`).toMatch(
-      "antidrift(no-raw-fetch-in-component)"
-    );
-  });
-
   it("rejects a static property-loop test", () => {
     const result = lint(
       `

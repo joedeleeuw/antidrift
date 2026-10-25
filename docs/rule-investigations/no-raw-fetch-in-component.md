@@ -1,5 +1,7 @@
 # `antidrift/no-raw-fetch-in-component`
 
+Current ownership: retired and merged into `antidrift/no-handrolled-resource-lifecycle-cells`. Scope-bound global fetch is transition evidence only; raw fetch alone no longer reports. The rest of this document is the historical investigation of the standalone rule.
+
 ## Definition
 
 Disallow raw global `fetch` calls inside a JSX-returning React component's lexical function frame.

@@ -178,6 +178,16 @@ retiredRules:
     reason: Merged into antidrift/no-anemic-errors, preserving the fallback diagnostic and silent catch or promise-catch proof.
     mergedInto: antidrift/no-anemic-errors
     referenceDoc: docs/rule-investigations/directive-rules.md
+  antidrift/no-raw-fetch-in-component:
+    status: retired
+    reason: Merged into antidrift/no-handrolled-resource-lifecycle-cells. Raw fetch alone is not a violation; scope-bound fetch is evidence only for a proven hand-rolled lifecycle.
+    mergedInto: antidrift/no-handrolled-resource-lifecycle-cells
+    referenceDoc: docs/semantic-validation-matrix.md
+  antidrift/no-defensive-shape-probing:
+    status: retired
+    reason: Merged into antidrift/unknown-input-must-be-decoded, preserving threshold 4, broad Object.entries proof, type-predicate exemption, and the defensiveShapeProbe message.
+    mergedInto: antidrift/unknown-input-must-be-decoded
+    referenceDoc: docs/semantic-validation-matrix.md
   antidrift/no-generic-module-names:
     status: retired
     reason: Removed by owner request. Generic filename blocklists are opinionated naming policy rather than Antidrift contract-drift enforcement; no explicit opt-in implementation is retained.
@@ -269,7 +279,7 @@ retiredRules:
     referenceDoc: docs/rule-investigations/anti-slop-import.md
   antidrift/no-object-parameters:
     status: retired
-    reason: Retired default-off false-positive-prone anti-slop import; broad input boundary contracts are enforced by antidrift/unknown-input-must-be-decoded and antidrift/no-open-dictionary-at-boundary.
+    reason: Retired default-off false-positive-prone anti-slop import; broad input boundary contracts are enforced by antidrift/unknown-input-must-be-decoded and maintained explicit-any rules.
     referenceDoc: docs/rule-investigations/anti-slop-import.md
   antidrift/no-reflect-apply:
     status: retired
@@ -277,11 +287,11 @@ retiredRules:
     referenceDoc: docs/rule-investigations/anti-slop-import.md
   antidrift/no-reflect-get:
     status: retired
-    reason: Retired default-off false-positive-prone anti-slop import; dynamic property probing and untrusted boundary access are enforced by antidrift/no-defensive-shape-probing and antidrift/unknown-input-must-be-decoded.
+    reason: Retired default-off false-positive-prone anti-slop import; broad Object.entries mini-parsers and untrusted boundary access are enforced by antidrift/unknown-input-must-be-decoded.
     referenceDoc: docs/rule-investigations/anti-slop-import.md
   antidrift/no-runtime-typeof:
     status: retired
-    reason: Retired default-off false-positive-prone anti-slop import; syntax-only typeof bans reject ordinary primitive narrowing while antidrift/no-defensive-shape-probing and antidrift/no-underchecked-type-predicate own the contract-laundering subsets.
+    reason: Retired default-off false-positive-prone anti-slop import; syntax-only typeof bans reject ordinary primitive narrowing while antidrift/unknown-input-must-be-decoded and antidrift/no-underchecked-type-predicate own the contract-laundering subsets.
     referenceDoc: docs/rule-investigations/anti-slop-import.md
   antidrift/no-shattered-ingested-entity-state:
     status: retired

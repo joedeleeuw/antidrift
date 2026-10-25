@@ -26,7 +26,8 @@ const opencodeRepoCandidates = [
   resolve(homedir(), "code", "opencode"),
 ].filter(Boolean);
 
-const customRuleId = "antidrift/no-defensive-shape-probing";
+const customRuleId = "antidrift/unknown-input-must-be-decoded";
+const customMessageId = "defensiveShapeProbe";
 const upstreamRuleIds = [
   "@typescript-eslint/no-unsafe-member-access",
   "@typescript-eslint/no-unsafe-return",
@@ -166,6 +167,7 @@ function toFinding(repoRoot, result, message) {
   return {
     path: relative(repoRoot, result.filePath).replace(/\\/gu, "/"),
     ruleId: message.ruleId,
+    messageId: message.messageId,
     line: message.line,
     column: message.column,
     message: message.message,
@@ -195,7 +197,10 @@ function countByRepo(results) {
 }
 
 function compare(findings) {
-  const custom = findings.filter((finding) => finding.ruleId === customRuleId);
+  const custom = findings.filter(
+    (finding) =>
+      finding.ruleId === customRuleId && finding.messageId === customMessageId
+  );
   const upstream = findings.filter((finding) =>
     upstreamRuleIds.includes(finding.ruleId)
   );
@@ -271,7 +276,12 @@ async function runPlan(plan) {
   );
   const findings = results.flatMap((result) =>
     result.messages
-      .filter((message) => benchmarkRuleIds.includes(message.ruleId))
+      .filter(
+        (message) =>
+          benchmarkRuleIds.includes(message.ruleId) &&
+          (message.ruleId !== customRuleId ||
+            message.messageId === customMessageId)
+      )
       .map((message) => toFinding(repoRoot, result, message))
   );
   const syntaxCandidates = results

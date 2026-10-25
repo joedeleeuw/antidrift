@@ -1,6 +1,5 @@
 import { ruleNoAsyncArrayMethod } from "./semantic-adapters/syntax/async-array.ts";
 import { ruleNoHandrolledResourceLifecycleCells } from "./semantic-adapters/syntax/resource-lifecycle.ts";
-import { ruleNoRawFetchInComponent } from "./semantic-adapters/syntax/raw-fetch.ts";
 import { ruleRequireAuthzCheck } from "./semantic-adapters/syntax/authz.ts";
 import ruleNoCallingComponentsAsFunctions from "./oxlint-plugin/rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "./oxlint-plugin/rules/no-duplicated-conditional-classnames.js";
@@ -25,7 +24,6 @@ export function createSyntaxRules() {
     "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
     "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
     "no-repo-state-mirror-assertion": ruleNoRepoStateMirrorAssertion(),
-    "no-raw-fetch-in-component": ruleNoRawFetchInComponent,
     "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
     "no-vague-names": ruleNoVagueNames,
     "require-authz-check": ruleRequireAuthzCheck,

@@ -14,7 +14,6 @@ const ratchetedRules = {
   "antidrift/no-duplicated-conditional-classnames": "error",
   "antidrift/no-nonindependent-test-oracle": "error",
   "antidrift/no-pass-through-parameters": "error",
-  "antidrift/no-raw-fetch-in-component": "error",
   "antidrift/no-redeclared-owned-union": "error",
   "antidrift/no-sentinel-absence-fallback": "error",
   "antidrift/no-vague-names": "error",
@@ -78,7 +77,6 @@ export function createConfig({
         "antidrift/no-nullable-positional-tuple": "error",
         "antidrift/no-underchecked-type-predicate": "error",
         "antidrift/no-redundant-type-predicate": "error",
-        "antidrift/no-defensive-shape-probing": "error",
         "antidrift/no-appeasement-erasure": "error",
         "antidrift/no-structural-type-fork": [
           "error",

@@ -147,7 +147,7 @@ export const normalized = Object.fromEntries(
       cases: [
         {
           id: "typed-drift",
-          ruleId: "antidrift/no-defensive-shape-probing",
+          ruleId: "antidrift/unknown-input-must-be-decoded",
           kind: "drift",
           classification: "ready",
           subproject: "bff",
@@ -163,6 +163,31 @@ export const normalized = Object.fromEntries(
 
     expect(result.decision).toBe("pass");
     expect(result.cases[0]?.findings).toHaveLength(1);
+  });
+
+  it("fails messageId-scoped cases when parser services are unavailable", async () => {
+    const untypedCorpusReport = await chaskiCorpus({
+      repo: join(import.meta.dirname, "../eslint-plugin/fixtures"),
+      cases: [
+        {
+          id: "untyped-probe-configuration",
+          ruleId: "antidrift/unknown-input-must-be-decoded",
+          messageId: "defensiveShapeProbe",
+          kind: "correct",
+          classification: "ready",
+          subproject: "untyped",
+          paths: ["programs/drift/object-entries-shape-probing.ts"],
+        },
+      ],
+      report: () => {},
+    });
+
+    expect(untypedCorpusReport.decision).toBe("fail");
+    expect(untypedCorpusReport.cases[0]?.findings).toHaveLength(1);
+    expect(
+      untypedCorpusReport.cases[0]?.findings[0]?.messageId
+    ).toBeUndefined();
+    expect(untypedCorpusReport.cases[0]?.outOfScopeFindings).toHaveLength(0);
   });
 
   it("can run type-aware corpus cases against explicit program files", async () => {

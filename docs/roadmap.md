@@ -30,9 +30,9 @@ These were the next project scope because they are the project, not because a br
 
 - `no-appeasement-cast`: block `any`/`unknown as NamedObject` source-boundary appeasement casts. Double-cast tunnels are delegated to `@typescript-eslint/no-unsafe-type-assertion`.
 - `no-contract-appeasement-projection`: no `getXFromY` name fingerprint; selector wrappers and bag reshaping are branches of the broader contract-projection rule.
-- `no-handrolled-resource-lifecycle-cells`: behavior-based React state graph rule for hand-rolled async resource lifecycle machines; broad multi-setter co-mutation is inventory only and classified with `pnpm policy:inventory-react-state`.
+- `no-handrolled-resource-lifecycle-cells`: behavior-based React state graph rule for hand-rolled async resource lifecycle machines; scope-bound global fetch is transition evidence, raw fetch alone is clean, and broad multi-setter co-mutation is inventory only and classified with `pnpm policy:inventory-react-state`.
 - `no-unsafe-deserialize`: use an `any`/`unknown` type signal instead of a `req`/`ctx` name fingerprint.
-- `no-defensive-shape-probing`: provisional only where real corpus evidence shows deterministic broad-value mini-parsing; do not expand to general boolean predicates.
+- `unknown-input-must-be-decoded`: owns broad-input decoding and repeated `Object.entries` shape probing, retaining the four-probe threshold and type-predicate exemption without expanding to general boolean predicates.
 - `no-nullable-positional-tuple`: block tuple types with multiple nullable or optional slots, such as `[Date | null, Date | null]`.
 - `no-underchecked-type-predicate`: TypeChecker proof for broad-input predicates that claim object contracts without checking required asserted fields or delegating to a validator.
 - Brand kit: `Brand<T, Name>` plus `brand() -> { make, safe, is }`. The separate `no-cast-to-branded` custom rule is retired until real non-test brand-forgery evidence appears.
@@ -56,7 +56,7 @@ Completed in this batch:
 - `no-status-triplet-state`: retired after the behavior-based lifecycle proof moved into `no-handrolled-resource-lifecycle-cells`.
 - `no-unsafe-cast-chain`: revived as the owner for vendored `anti-slop/no-chained-type-assertions`, which blocks every non-const nested assertion chain; `no-appeasement-cast` continues to own plain `any`/`unknown as NamedObject`.
 - `no-unsafe-deserialize`: type-aware `any`/`unknown` argument signal, not request-root names.
-- `no-defensive-shape-probing`: limited to real-corpus-backed broad-value extractor patterns; predicate helpers remain review-first until the rule can prove a validation/type authority bypass.
+- `unknown-input-must-be-decoded`: the former defensive shape-probing subset is limited to real-corpus-backed broad-value extractor patterns; predicate helpers remain with `no-underchecked-type-predicate`.
 - `no-nullable-positional-tuple`: narrow deterministic syntax rule for multi-slot nullable tuples; ordinary non-null tuples and hook-style tuples with one nullable value slot stay clean.
 - `no-underchecked-type-predicate`: TypeChecker-backed broad-input object predicate checks; discriminant guards over typed unions and schema delegation stay clean. Real required-field drift keeps it enabled at error, while known false-positive classes keep stable promotion closed.
 - `no-cycle`: retired custom relative graph traversal in favor of `import/no-cycle`.

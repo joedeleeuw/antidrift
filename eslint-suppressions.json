@@ -125,11 +125,6 @@
       "count": 15
     }
   },
-  "tooling/antidrift/src/eslint-plugin/rules/no-defensive-shape-probing.js": {
-    "antidrift/no-vague-names": {
-      "count": 1
-    }
-  },
   "tooling/antidrift/src/eslint-plugin/rules/no-identity-schema-transform.js": {
     "antidrift/no-pass-through-parameters": {
       "count": 2
@@ -192,7 +187,7 @@
   },
   "tooling/antidrift/src/oxlint-plugin/index.test.mjs": {
     "antidrift/no-vague-names": {
-      "count": 11
+      "count": 10
     }
   },
   "tooling/antidrift/src/oxlint-plugin/owned-union-source.js": {
@@ -734,7 +729,7 @@
   },
   "tooling/antidrift/src/semantic-adapters/index.test.mjs": {
     "antidrift/no-nonindependent-test-oracle": {
-      "count": 4
+      "count": 3
     }
   },
   "tooling/antidrift/src/semantic-adapters/schema-parse-shape.mjs": {

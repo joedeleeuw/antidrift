@@ -87,7 +87,7 @@ export function functionReturnsJsx(
   }
   return statementsReturnJsx(functionNode.body.body, new Set());
 }
-export function containsJsxNode(node: unknown): boolean {
+function containsJsxNode(node: unknown): boolean {
   if (!isSyntaxNode(node)) {
     return false;
   }

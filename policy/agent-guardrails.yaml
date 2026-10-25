@@ -139,10 +139,6 @@ clusters:
     owner: platform # Platform owns approved side-effect gateways.
     registry: policy/registries/gateways.yaml # Approved external SDK wrappers are repo-specific.
     rules:
-      - id: boundary/no-raw-fetch-in-component # Raw fetch in UI creates local lifecycle soup.
-        severity: error
-        detector: reactComponentContainsGlobalFetch
-        message: Use a route loader, query resource, or API client.
       - id: boundary/no-sdk-direct-use-outside-gateway # SDK usage must centralize auth, retry, logging, and policy. Enforced via registry-driven rule (gateways.yaml bannedDirectImports).
         severity: error
         detector: importSourceMatchesBannedPattern # Registry-driven: options loaded from policy/registries/gateways.yaml at config time.

@@ -160,20 +160,6 @@ rules:
       target: semantic-ast,
       note: "react-component-api-shape; TypeChecker counts locally-owned accepted props for JSX-returning components while external DOM/React props and whole-props pass-through wrappers stay clean. Enabled with max 12 pending corpus calibration.",
     }
-  antidrift/no-raw-fetch-in-component:
-    {
-      current: semantic-ast,
-      fit: proven,
-      target: semantic-ast,
-      note: "scope-bound global fetch in a JSX-returning lexical component frame is local AST/source-shape proof; default-off until narrowed re-inventory after removing file/PascalCase/module-helper heuristics.",
-    }
-  antidrift/no-defensive-shape-probing:
-    {
-      current: semantic-ast,
-      fit: under-proven,
-      target: semantic-ast,
-      note: "broad-value-shape-probing; type-provenance is the right bucket, just not yet proven.",
-    }
   antidrift/no-underchecked-type-predicate:
     {
       current: semantic-ast,

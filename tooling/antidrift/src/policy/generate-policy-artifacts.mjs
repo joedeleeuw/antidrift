@@ -24,7 +24,7 @@ export function renderPolicyArtifacts(policy) {
   const neverLines = [
     "Do not edit generated policy artifacts directly.",
     "Do not weaken lint/type/test/CI/Sonar/hook configuration unless the task includes `[policy-change]`.",
-    "Do not add type escape hatches, silent catches, focused tests, raw component fetches, or cross-layer imports.",
+    "Do not add type escape hatches, silent catches, focused tests, or cross-layer imports.",
     ...(Array.isArray(policy.meta?.never) ? policy.meta.never : []),
   ]
     .map((rule) => `- ${rule}`)
@@ -53,7 +53,7 @@ export function renderPolicyArtifacts(policy) {
 
   artifacts.set(
     ".cursor/rules/react-state.mdc",
-    `---\ndescription: Prevent brittle React state shape in agent-generated UI.\nglobs: ["apps/**/*.tsx", "packages/ui/**/*.tsx"]\nalwaysApply: true\n---\n\n${header}\n\nAvoid coupled useState waterfalls, status triplets, derived-state effects, and raw fetch calls in components.\n`
+    `---\ndescription: Prevent brittle React state shape in agent-generated UI.\nglobs: ["apps/**/*.tsx", "packages/ui/**/*.tsx"]\nalwaysApply: true\n---\n\n${header}\n\nAvoid coupled useState waterfalls, status triplets, derived-state effects, and hand-rolled async resource lifecycles.\n`
   );
 
   artifacts.set(

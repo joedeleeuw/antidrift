@@ -429,6 +429,9 @@ class ReactStateTraversal implements AbortControllerScope {
 
   callExpression(call: unknown): void {
     const frame = this.#functionStack.at(-1);
+    if (frame && this.#hooks.isGlobalFetchCall(syntaxField(call, "callee"))) {
+      frame.isTransition = true;
+    }
     const setter = identifierName(syntaxField(call, "callee"));
     if (
       !frame ||

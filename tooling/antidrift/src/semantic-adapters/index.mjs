@@ -74,7 +74,7 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
     subpath: "@joedeleeuw/antidrift/semantic-adapters/broad-input",
     rules: Object.freeze([
       "antidrift/no-appeasement-cast",
-      "antidrift/no-defensive-shape-probing",
+      "antidrift/unknown-input-must-be-decoded",
       "antidrift/no-redundant-type-predicate",
       "antidrift/no-underchecked-type-predicate",
     ]),
@@ -119,6 +119,7 @@ export const SEMANTIC_ADAPTER_CONTRACTS = Object.freeze({
       "React state setter to cell",
       "state cell to resource lifecycle role",
       "source object member to state cell",
+      "scope-bound global fetch to async transition evidence",
     ]),
     carrier: "React state graph semantic adapter",
   }),

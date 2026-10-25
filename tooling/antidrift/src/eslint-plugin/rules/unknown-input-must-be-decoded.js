@@ -3,6 +3,7 @@ import ts from "typescript";
 import { boundaryModel } from "../../semantic-adapters/boundary/boundary-model.ts";
 import { boundaryObservations } from "../../semantic-adapters/boundary/boundary-observations.ts";
 import { defineTypeScriptRule } from "../../semantic-adapters/kernel/rule-kernel.ts";
+import { defensiveShapeProbe } from "../../semantic-adapters/boundary/shape-probe.js";
 
 export default function ruleUnknownInputMustBeDecoded() {
   return defineTypeScriptRule({
@@ -12,7 +13,7 @@ export default function ruleUnknownInputMustBeDecoded() {
       type: "problem",
       docs: {
         description:
-          "Require decoding before untrusted input reaches a cast or typed use.",
+          "Require decoding before untrusted input reaches a cast, typed use, or repeated Object.entries shape probing.",
       },
       schema: [],
       messages: {
@@ -20,9 +21,11 @@ export default function ruleUnknownInputMustBeDecoded() {
           "Untrusted input reaches a typed use without a dominating decode. Decode it at the receiving boundary.",
         incompleteAnalysis:
           "Untrusted input provenance could not be resolved ({{cause}}). Decode the value before typed use.",
+        defensiveShapeProbe:
+          "Do not unpack broad object shapes by probing property names inside Object.entries(...). Move the normalization to an owned schema or converter.",
       },
     },
-    run({ program, cwd, reportNode }) {
+    run({ program, cwd, reportNode, services, checker, sourceFile }) {
       const observationPath = process.env[boundaryObservations.envVar];
       const observe = observationPath
         ? (observation) => {
@@ -34,6 +37,17 @@ export default function ruleUnknownInputMustBeDecoded() {
         observe ? { observe, rootDirectory: cwd } : undefined
       );
       const reported = new Set();
+      function reportIncompleteMapping(node) {
+        reportNode(node, {
+          messageId: "incompleteAnalysis",
+          data: {
+            cause: "Object.entries shape probing requires ESTree mapping",
+          },
+        });
+      }
+      if (!services.tsNodeToESTreeNodeMap) {
+        reportIncompleteMapping(sourceFile);
+      }
       function reportRoots(node, roots) {
         if (reported.has(node) || !roots.length) return;
         reported.add(node);
@@ -61,6 +75,26 @@ export default function ruleUnknownInputMustBeDecoded() {
         [ts.SyntaxKind.BinaryExpression]: sink,
         [ts.SyntaxKind.ReturnStatement]: sink,
         [ts.SyntaxKind.CallExpression](node) {
+          const forwardMap = services.tsNodeToESTreeNodeMap;
+          const syntaxNode = forwardMap?.get(node);
+          if (forwardMap && !syntaxNode) {
+            reportIncompleteMapping(node);
+          }
+          const shapeProbe =
+            syntaxNode && defensiveShapeProbe(syntaxNode, services, checker);
+          if (shapeProbe?.status === "incomplete") {
+            reportIncompleteMapping(node);
+          }
+          if (shapeProbe?.status === "report") {
+            const tsCallback = services.esTreeNodeToTSNodeMap.get(
+              shapeProbe.callback
+            );
+            if (tsCallback) {
+              reportNode(tsCallback, { messageId: "defensiveShapeProbe" });
+            } else {
+              reportIncompleteMapping(node);
+            }
+          }
           reportRoots(node, model.uncheckedAt(node));
           callArguments(node);
         },

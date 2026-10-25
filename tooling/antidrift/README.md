@@ -24,10 +24,9 @@ The ESLint pass also enforces these syntax rules at error, exported by both plug
 - W4 type reuse: `antidrift/no-redeclared-owned-union`
 - G4 boundary decoding: `antidrift/unknown-input-must-be-decoded`
 - G7 loud failure: `antidrift/no-sentinel-absence-fallback`
-- G11 one owner per concern: `antidrift/no-raw-fetch-in-component`
 - React and markup hygiene: `antidrift/no-calling-components-as-functions`, `antidrift/no-duplicated-conditional-classnames`
 
-The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-structural-type-fork`, `antidrift/no-contract-appeasement-projection`, `antidrift/no-redundant-zod-parse`, `antidrift/no-defensive-shape-probing`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-unresolved-dependency-types`, `antidrift/no-service-constructor-imports` and `antidrift/no-sql-string-concat` at error.
+The typed (TypeChecker-backed) half of the ESLint pass also blocks `antidrift/no-structural-type-fork`, `antidrift/no-contract-appeasement-projection`, `antidrift/no-redundant-zod-parse`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-unresolved-dependency-types`, `antidrift/no-service-constructor-imports` and `antidrift/no-sql-string-concat` at error.
 
 Every ESLint-pass rule above, typed rules included, is ratcheted with ESLint bulk suppressions. When adopting, run this once and commit `eslint-suppressions.json`; afterwards new violations fail and `eslint . --prune-suppressions` lowers the baseline as debt is fixed:
 
@@ -40,12 +39,10 @@ eslint . \
   --suppress-rule antidrift/no-redeclared-owned-union \
   --suppress-rule antidrift/unknown-input-must-be-decoded \
   --suppress-rule antidrift/no-sentinel-absence-fallback \
-  --suppress-rule antidrift/no-raw-fetch-in-component \
   --suppress-rule antidrift/no-calling-components-as-functions \
   --suppress-rule antidrift/no-duplicated-conditional-classnames \
   --suppress-rule antidrift/no-contract-appeasement-projection \
   --suppress-rule antidrift/no-redundant-zod-parse \
-  --suppress-rule antidrift/no-defensive-shape-probing \
   --suppress-rule antidrift/no-identity-schema-transform \
   --suppress-rule antidrift/require-convex-return-validator \
   --suppress-rule antidrift/no-explicit-type-arguments-on-owned-api \
@@ -112,6 +109,8 @@ export default [
 The antidrift preset also parses every `package.json` with ESLint's JSON language (`@eslint/json`, a dependency of this package). `antidrift/no-unresolved-dependency-types` is enabled at error in that block and in the TypeScript block, independent of the structural owner: it reports a declared dependency that is not installed, or a workspace or linked dependency with a public entry that does not resolve to type declarations, on its manifest key, and each import of a declared package whose types do not resolve at the import. Spreading `createConfig()` supplies the language for `**/package.json`, so `eslint .` reports those gaps with no further setup. These reports stay out of the suppression ratchet above; a gap closes when the dependency is installed or built. ESLint 9.38 or later is required, as for the rest of the preset.
 
 `createGovernanceOxlintConfig` enables registry-derived generated-code exclusions and restricted imports, gateway exemptions, `antidrift/require-effect-deps`, `antidrift/no-async-array-method`, `antidrift/no-handrolled-resource-lifecycle-cells`, `antidrift/no-repo-state-mirror-assertion`, and the imported rules for unknown aliases and chained assertions. The Oxlint plugin still exports the ratcheted syntax rules listed above, but leaves them unconfigured because the ESLint pass owns them and its bulk suppressions ratchet existing debt. `antidrift/require-authz-check` is enabled with registry-derived authorization functions and stays inert until they are configured. The config deliberately does not choose a generic correctness, React, Vitest, Unicorn, import-style, or repository-boundary baseline. Tooling owns the complexity/TypeScript baseline, anti-suppression rules, and global 1,500-line module ceiling; compose it explicitly to keep those protections. Consumers may use its `complexityRules` fragment for deliberate scopes instead of its full factory. `createConfig` enables the custom rules that need TypeScript parser services, the ratcheted syntax rules above, and `no-sql-string-concat` at error. The structural owner loads `generated.yaml`, optional `ownership.yaml`, and `domain.yaml` from the consumer's policy directory.
+
+`no-handrolled-resource-lifecycle-cells` treats scope-bound global fetch as async-transition evidence only. Raw fetch alone does not report, does not increment setter counts, and cannot replace the required lifecycle proof. `unknown-input-must-be-decoded` also owns broad `Object.entries` mini-parsers with at least four shape probes; type-predicate callbacks stay exempt, and missing ESTree mappings produce an incomplete-analysis diagnostic instead of silently skipping the check.
 
 For the aggressive property-default policy, pass `enforceNoPropertyDefaultFallbacks: true` to both factories. `typescript-tooling` then owns Rika's rule, and the ESLint config sets `memberSentinels: false` on `no-sentinel-absence-fallback` so member defaults have one owner. Silent empty-detection fallbacks remain enforced, and both configs retain no-substitution template-literal sentinel selectors. `propertyDefaultAllowedFiles` supplies repository-relative exceptions to the two Oxlint factories. No broad Rika preset is enabled.
 
@@ -193,7 +192,7 @@ The first two validate functional registry and semantic-fact contracts and verif
 `policy:inventory-change-contract` runs the inventory-only change-contract spine. Missing contracts exit 0, invalid contracts fail loudly, and present contracts compare merge-base change surfaces against declared paths, dependencies, exports, and optional module graph radius (`--tsconfig` is required when graph entrypoints are declared).
 `policy:validate-change-contract-evidence` replays the documented change-contract MVP gold true-positive and true-negative commits against local `sudocode-main` and `chaski` clones. It fails loudly when a required repo or SHA is unavailable, writes `reports/change-contract-evidence.json`, and is a source-repo evidence gate rather than a consumer requirement.
 `policy:inventory-diff-scoped-adapters` runs existing ESLint adapters against changed JS/TS files and filters diagnostics plus semantic facts to changed patch hunks. It is an inventory proof filter over the diff, not a blocking gate.
-`policy:inventory-defensive-shape` is a non-blocking sunset inventory for `no-defensive-shape-probing`. It compares the custom rule with adjacent TypeScript ESLint unsafe rules under parser services and records syntax pressure separately from diagnostics.
+`policy:inventory-defensive-shape` is a non-blocking inventory for the broad `Object.entries` subset of `unknown-input-must-be-decoded`. It compares only the `defensiveShapeProbe` diagnostic with adjacent TypeScript ESLint unsafe rules under parser services and records syntax pressure separately from other decoder diagnostics.
 `policy:inventory-declaration-clone` is a non-blocking research inventory for duplicate object contract declarations. It uses the TypeScript checker to group interface declarations and literal object type aliases by exact declared-member name/type/optional/readonly fingerprints, and separates generated-only, mixed generated/source, and source-only clone groups. `policy:inventory-declaration-clone-source-fleet` runs the same inventory against configured local real-code corpora for research evidence mining.
 `policy:inventory-react-state` is a non-blocking semantic fact inventory for React state co-mutation. It classifies broad setter co-mutation separately from `no-handrolled-resource-lifecycle-cells` diagnostics so broad inventory cannot become accidental enforcement. Pass `--repo` and `--targets "src/**/*.{ts,tsx}"` to scan a specific checkout; target splitting preserves brace globs.
 `policy:inventory-schema-roundtrip` is a non-blocking research inventory for same-schema `.parse({ ...typedState })` shapes; it classifies real anchors instead of failing the build.
@@ -254,7 +253,7 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/semantic-adapters` — aggregate semantic adapter registry and contracts for tooling that wants the full shared proof surface
 - `@joedeleeuw/antidrift/semantic-adapters/async-control-flow` — async array callback and Promise collection-flow helpers shared by `no-async-array-method`
 - `@joedeleeuw/antidrift/semantic-adapters/auth-boundary` — route-param/authz frame tracking shared by `require-authz-check`
-- `@joedeleeuw/antidrift/semantic-adapters/broad-input` — broad `Object.entries` mini-parser classifiers shared by `no-defensive-shape-probing`
+- `@joedeleeuw/antidrift/semantic-adapters/broad-input` — broad `Object.entries` mini-parser classifiers shared by `unknown-input-must-be-decoded`
 - `@joedeleeuw/antidrift/semantic-adapters/parse-input` — JSON.parse input provenance and local string-boundary proof shared by `no-unsafe-deserialize`
 - `@joedeleeuw/antidrift/semantic-adapters/react-state` — React state graph adapter primitives for tooling that needs the same lifecycle proof used by `no-handrolled-resource-lifecycle-cells`
 - `@joedeleeuw/antidrift/semantic-adapters/schema-provenance` — Zod transform and parse/provenance helpers shared by `no-identity-schema-transform` and `no-redundant-zod-parse`
@@ -320,7 +319,7 @@ The scoped rules that motivated this package go after the usual agent tells:
 - `no-redundant-type-predicate` — callbacks whose explicit `x is T` restates the predicate TypeScript 5.5+ infers from a single `instanceof`, `typeof`, literal-tag or null/undefined check; the autofix deletes the annotation and any import only it used
 - `no-handrolled-resource-lifecycle-cells` — behavior-based detection for hand-rolled async resource lifecycle state machines, with broad multi-setter co-mutation emitted as inventory only
 - `no-unsafe-deserialize` — broad `JSON.parse` inputs and unvalidated parsed results assigned into declared domain contracts
-- `no-defensive-shape-probing` — deterministic broad-value extractor cases backed by real corpus evidence, not ordinary boolean predicates
+- `unknown-input-must-be-decoded` — broad inputs must be decoded before typed use; repeated `Object.entries` shape probes are mini-parsers that belong in an owned schema or converter, not ordinary boolean predicates
 - `no-identity-schema-transform` — TypeChecker proof for Zod transforms that reconstruct every input field unchanged
 - `no-explicit-type-arguments-on-owned-api` — symbol-resolved proof against caller-supplied type arguments on Convex generated references and TanStack registrations
 - `require-convex-return-validator` — symbol-resolved proof that every registered Convex function declares an explicit `returns` validator and does not widen its return contract with `v.any()`

@@ -117,5 +117,5 @@ Examples:
 ```txt
 antidrift/no-contract-appeasement-projection
 antidrift/no-handrolled-resource-lifecycle-cells
-antidrift/no-raw-fetch-in-component
+antidrift/unknown-input-must-be-decoded
 ```
