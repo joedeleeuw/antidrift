@@ -1,11 +1,9 @@
 use antidrift_kernel::diagnostic::{RuleDiagnostic, Severity, apply_fixes};
 use antidrift_kernel::registries::PolicyRegistries;
-use antidrift_kernel::rule::{EmitFactRequest, LintFileRequest, RuleActivation, lint_file};
-use antidrift_kernel::semantic_facts::{SemanticFact, SemanticFactInput, build_semantic_fact};
-use antidrift_kernel::span_index::LineIndex;
+use antidrift_kernel::rule::{LintFileRequest, RuleActivation, lint_file};
+use antidrift_kernel::semantic_facts::SemanticFact;
 use antidrift_kernel::ts_resolver::TsDeclarationResolver;
 use antidrift_rules::all_rules;
-use oxc::span::Span;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -13,19 +11,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct BatchFactProbe {
-    pub(crate) start: u32,
-    pub(crate) end: u32,
-    pub(crate) fact_kind: String,
-    pub(crate) rule_id: String,
-    pub(crate) adapter_id: String,
-    pub(crate) confidence: String,
-    pub(crate) provenance: Vec<String>,
-    pub(crate) payload: Value,
-}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,8 +30,6 @@ pub(crate) struct BatchCaseInput {
     pub(crate) cwd: Option<String>,
     #[serde(default)]
     pub(crate) report_unused_directives: bool,
-    #[serde(default)]
-    pub(crate) fact_probe: Option<BatchFactProbe>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -106,30 +89,7 @@ fn evaluate_single_case(
         resolver: resolver.as_ref(),
         report_unused_directives: case.report_unused_directives,
     };
-    let mut result = lint_file(&request, rules);
-    if let Some(probe) = &case.fact_probe {
-        let line_index = LineIndex::new(&case.source_text);
-        let req = EmitFactRequest {
-            span: Span::new(probe.start, probe.end),
-            fact_kind: probe.fact_kind.clone(),
-            adapter_id: probe.adapter_id.clone(),
-            confidence: probe.confidence.clone(),
-            provenance: probe.provenance.clone(),
-            payload: probe.payload.clone(),
-        };
-        let location = Some(line_index.fact_location(&case.source_text, req.span));
-        result.facts.push(build_semantic_fact(SemanticFactInput {
-            fact_kind: req.fact_kind,
-            rule_id: probe.rule_id.clone(),
-            adapter_id: req.adapter_id,
-            confidence: req.confidence,
-            provenance: req.provenance,
-            file_path: case.filename.clone(),
-            location,
-            source_text: Some(case.source_text.clone()),
-            payload: req.payload,
-        }));
-    }
+    let result = lint_file(&request, rules);
     let fixed_text = apply_fixes(&case.source_text, &result.diagnostics);
     BatchCaseOutput {
         id: case.id.clone(),

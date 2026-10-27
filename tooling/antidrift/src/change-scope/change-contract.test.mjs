@@ -97,7 +97,6 @@ describe("runChangeContract", () => {
   it("flags an out-of-scope path, undeclared runtime dependency, and undeclared added export", () => {
     writeContract([
       "schemaVersion: 1",
-      "contractId: ORDERS-1",
       "scope:",
       "  checkedSurfaces:",
       "    - paths",
@@ -126,7 +125,6 @@ describe("runChangeContract", () => {
   it("stays clean when the contract authorizes the full surface", () => {
     writeContract([
       "schemaVersion: 1",
-      "contractId: ORDERS-2",
       "scope:",
       "  checkedSurfaces:",
       "    - paths",
@@ -154,7 +152,6 @@ describe("runChangeContract", () => {
   it("records module graph radius inventory when the contract declares an entrypoint", () => {
     writeContract([
       "schemaVersion: 1",
-      "contractId: ORDERS-3",
       "scope:",
       "  checkedSurfaces:",
       "    - paths",
@@ -223,7 +220,6 @@ describe("change-contract CLI", () => {
   it("requires a base ref when a contract is present", () => {
     writeContract([
       "schemaVersion: 1",
-      "contractId: B-1",
       "scope:",
       "  checkedSurfaces:",
       "    - paths",

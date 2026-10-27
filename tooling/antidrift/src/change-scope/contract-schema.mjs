@@ -1,13 +1,6 @@
 import { parse as parseYaml } from "yaml";
 
-const TOP_LEVEL_KEYS = new Set([
-  "schemaVersion",
-  "contractId",
-  "task",
-  "authorship",
-  "scope",
-  "refactor",
-]);
+const TOP_LEVEL_KEYS = new Set(["schemaVersion", "scope"]);
 const SCOPE_KEYS = new Set([
   "checkedSurfaces",
   "allowedPaths",
@@ -83,7 +76,7 @@ function checkPath(path, field, problems) {
   }
 }
 
-function validateAllowedPaths(scope, refactorApproved, problems) {
+function validateAllowedPaths(scope, problems) {
   if (!isStringArray(scope.allowedPaths) || scope.allowedPaths.length === 0) {
     problems.push(
       "scope.allowedPaths must be a non-empty array of repo-relative globs"
@@ -92,10 +85,8 @@ function validateAllowedPaths(scope, refactorApproved, problems) {
   }
   for (const path of scope.allowedPaths) {
     checkPath(path, "scope.allowedPaths", problems);
-    if (BROAD_GLOBS.has(path) && !refactorApproved) {
-      problems.push(
-        `scope.allowedPaths uses broad glob "${path}" without refactor.approved: true`
-      );
+    if (BROAD_GLOBS.has(path)) {
+      problems.push(`scope.allowedPaths disallows broad glob "${path}"`);
     }
   }
 }
@@ -217,10 +208,10 @@ function validateModuleRadius(scope, problems) {
   }
 }
 
-function validateScope(scope, refactorApproved, problems) {
+function validateScope(scope, problems) {
   validateUnknownScopeKeys(scope, problems);
   validateCheckedSurfaces(scope, problems);
-  validateAllowedPaths(scope, refactorApproved, problems);
+  validateAllowedPaths(scope, problems);
   validateForbiddenPaths(scope, problems);
   validateChangeTypes(scope, problems);
   validateDependencyFields(scope, problems);
@@ -228,37 +219,6 @@ function validateScope(scope, refactorApproved, problems) {
   validateEntrypoints(scope, problems);
   validateOwnerSymbols(scope, problems);
   validateModuleRadius(scope, problems);
-}
-
-function validateRefactor(raw, problems) {
-  const refactor = isObject(raw.refactor) ? raw.refactor : {};
-  if (
-    refactor.approved !== undefined &&
-    typeof refactor.approved !== "boolean"
-  ) {
-    problems.push("refactor.approved must be a boolean");
-  }
-  if (
-    refactor.justification !== undefined &&
-    typeof refactor.justification !== "string"
-  ) {
-    problems.push("refactor.justification must be a string");
-  }
-  const approved = refactor.approved === true;
-  if (
-    approved &&
-    (typeof refactor.justification !== "string" ||
-      refactor.justification.trim().length === 0)
-  ) {
-    problems.push(
-      "refactor.approved: true requires a non-empty refactor.justification"
-    );
-  }
-  return {
-    approved,
-    justification:
-      typeof refactor.justification === "string" ? refactor.justification : "",
-  };
 }
 
 /**
@@ -278,20 +238,9 @@ export function validateContract(raw) {
     }
   }
   if (raw.schemaVersion !== 1) problems.push("schemaVersion must be 1");
-  if (
-    typeof raw.contractId !== "string" ||
-    raw.contractId.trim().length === 0
-  ) {
-    problems.push("contractId must be a non-empty string");
-  }
-
-  const { approved: refactorApproved, justification } = validateRefactor(
-    raw,
-    problems
-  );
 
   if (isObject(raw.scope)) {
-    validateScope(raw.scope, refactorApproved, problems);
+    validateScope(raw.scope, problems);
   } else {
     problems.push("scope is required and must be a mapping");
   }
@@ -301,9 +250,6 @@ export function validateContract(raw) {
   const scope = raw.scope;
   return Object.freeze({
     schemaVersion: 1,
-    contractId: raw.contractId.trim(),
-    task: raw.task ?? null,
-    authorship: raw.authorship ?? null,
     scope: Object.freeze({
       ...scope,
       checkedSurfaces: frozenStringArray(scope.checkedSurfaces),
@@ -319,7 +265,6 @@ export function validateContract(raw) {
       allowedOwnerSymbols: frozenStringArray(scope.allowedOwnerSymbols),
       maxTouchedModuleRadius: scope.maxTouchedModuleRadius ?? null,
     }),
-    refactor: Object.freeze({ approved: refactorApproved, justification }),
   });
 }
 

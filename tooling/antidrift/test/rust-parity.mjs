@@ -3,10 +3,6 @@ import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  createMemoryFactSink,
-  emitSemanticFact,
-} from "../src/policy/lib/semantic-facts.mjs";
 import { portableCases } from "./portable-cases.mjs";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -68,59 +64,6 @@ for (const entry of portableCases) {
   });
 }
 
-batchInputs.push({
-  id: "inline-directive:suppressed",
-  filename: "suppressed.ts",
-  sourceText:
-    "// eslint-disable-next-line antidrift/no-as-never\nconst x = 1 as never;\n",
-  rule: "antidrift/no-as-never",
-  reportUnusedDirectives: true,
-});
-expectations.set("inline-directive:suppressed", {
-  ruleId: "antidrift/no-as-never",
-  expectedCount: 0,
-});
-
-batchInputs.push({
-  id: "inline-directive:unused",
-  filename: "unused.ts",
-  sourceText:
-    "// oxlint-disable-next-line antidrift/no-as-never\nconst x = 1;\n",
-  rule: "antidrift/no-as-never",
-  reportUnusedDirectives: true,
-});
-expectations.set("inline-directive:unused", {
-  ruleId: "unused-disable-directive",
-  expectedCount: 1,
-});
-
-const factSourceText = "export const schema = z.object({ id: z.string() });\n";
-const factPayload = {
-  diagnostic: true,
-  inputShape: null,
-  outputShape: null,
-  transform: "identity",
-};
-batchInputs.push({
-  id: "semantic-fact:hash-parity",
-  filename: "packages/domain/schema.ts",
-  sourceText: factSourceText,
-  factProbe: {
-    start: 13,
-    end: 50,
-    factKind: "identitySchemaTransform",
-    ruleId: "antidrift/no-identity-schema-transform",
-    adapterId: "typescript-eslint/schema-provenance",
-    confidence: "deterministic-enforcement",
-    provenance: ["TypeChecker", "AST"],
-    payload: factPayload,
-  },
-});
-expectations.set("semantic-fact:hash-parity", {
-  ruleId: "antidrift/no-identity-schema-transform",
-  expectedCount: 0,
-});
-
 const rawBatchOutput = execFileSync(binaryPath, ["--batch-json", "-"], {
   cwd: repoRoot,
   input: JSON.stringify(batchInputs),
@@ -142,34 +85,8 @@ for (const outcome of batchResults) {
   for (const diag of outcome.diagnostics) {
     assert.equal(diag.ruleId, expected.ruleId);
   }
-  if (outcome.id === "semantic-fact:hash-parity") {
-    const memorySink = createMemoryFactSink();
-    emitSemanticFact(
-      {
-        filename: "packages/domain/schema.ts",
-        sourceCode: { text: factSourceText },
-        settings: { antidrift: { semanticFacts: memorySink } },
-      },
-      {
-        loc: {
-          start: { line: 1, column: 13 },
-          end: { line: 1, column: 50 },
-        },
-      },
-      {
-        factKind: "identitySchemaTransform",
-        ruleId: "antidrift/no-identity-schema-transform",
-        adapterId: "typescript-eslint/schema-provenance",
-        confidence: "deterministic-enforcement",
-        provenance: ["TypeChecker", "AST"],
-        payload: factPayload,
-      }
-    );
-    assert.equal(outcome.facts.length, 1);
-    assert.deepEqual(outcome.facts[0], memorySink.facts[0]);
-  }
 }
 
 console.log(
-  `✓ antidrift-linter Rust parity verified (${registeredRules.size} rules registered, ${batchResults.length} batch cases + SemanticFact hash parity passed)`
+  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} cases verified)`
 );

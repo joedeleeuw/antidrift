@@ -100,7 +100,6 @@ export function runChangeContract({
     return {
       contractState: "missing",
       claim: CHANGE_CONTRACT_CLAIM,
-      contractId: null,
       changeContext: null,
       declaredScope: null,
       actualChangeSurface: null,
@@ -138,7 +137,6 @@ export function runChangeContract({
   return {
     contractState,
     claim: CHANGE_CONTRACT_CLAIM,
-    contractId: contract.contractId,
     changeContext: { base, head, mergeBase: surface.mergeBase },
     declaredScope: contract.scope,
     actualChangeSurface: {
@@ -238,7 +236,7 @@ export function changeContractCommand(argv) {
     );
   } else {
     process.stdout.write(
-      `change-contract [${result.contractId}] ${result.contractState}: ${result.violations.length} violation(s), inventory-only.\n`
+      `change-contract ${result.contractState}: ${result.violations.length} violation(s), inventory-only.\n`
     );
   }
   return result;

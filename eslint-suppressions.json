@@ -4,11 +4,6 @@
       "count": 2
     }
   },
-  "tooling/antidrift/src/change-scope/analyze.test.mjs": {
-    "antidrift/no-nonindependent-test-oracle": {
-      "count": 9
-    }
-  },
   "tooling/antidrift/src/change-scope/change-context.test.mjs": {
     "antidrift/no-nonindependent-test-oracle": {
       "count": 4
@@ -31,12 +26,7 @@
   },
   "tooling/antidrift/src/change-scope/contract-schema.mjs": {
     "antidrift/no-pass-through-parameters": {
-      "count": 3
-    }
-  },
-  "tooling/antidrift/src/change-scope/contract-schema.test.mjs": {
-    "antidrift/no-pass-through-parameters": {
-      "count": 1
+      "count": 2
     }
   },
   "tooling/antidrift/src/change-scope/diff-scoped-adapters.mjs": {
