@@ -1,0 +1,57 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/antidrift-kernel",
+  "crates/antidrift-rules",
+  "crates/antidrift-linter",
+]
+
+[workspace.package]
+version = "0.20.0"
+edition = "2024"
+rust-version = "1.95.0"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+antidrift-kernel = { path = "crates/antidrift-kernel" }
+antidrift-rules = { path = "crates/antidrift-rules" }
+globset = "0.4.18"
+ignore = "0.4.25"
+oxc = { version = "0.146.0", features = ["semantic", "cfg", "ast_visit", "isolated_declarations"] }
+oxc_resolver = "11.24.3"
+rayon = "1.11.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sha2 = "0.10.9"
+yaml_serde = "0.10.7"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+dead_code = "deny"
+unused_imports = "deny"
+unused_must_use = "deny"
+unused_variables = "deny"
+unreachable_pub = "deny"
+
+[workspace.lints.clippy]
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+cognitive_complexity = "deny"
+collapsible_if = "deny"
+dbg_macro = "deny"
+excessive_nesting = "deny"
+expect_used = "deny"
+manual_let_else = "deny"
+match_same_arms = "deny"
+needless_pass_by_value = "deny"
+panic = "deny"
+redundant_clone = "deny"
+semicolon_if_nothing_returned = "deny"
+todo = "deny"
+too_many_arguments = "deny"
+too_many_lines = "deny"
+unimplemented = "deny"
+unnested_or_patterns = "deny"
+unwrap_used = "deny"
+wildcard_imports = "deny"

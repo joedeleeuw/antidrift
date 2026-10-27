@@ -1,0 +1,23 @@
+[package]
+name = "antidrift-linter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "antidrift-linter"
+path = "src/main.rs"
+
+[dependencies]
+antidrift-kernel.workspace = true
+antidrift-rules.workspace = true
+ignore.workspace = true
+oxc.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

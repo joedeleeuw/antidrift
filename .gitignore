@@ -13,3 +13,4 @@ data/fullshards/
 *.tsbuildinfo
 *.tgz
 tooling/antidrift/bin
+target

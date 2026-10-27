@@ -11,7 +11,9 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "typecheck": "tsc -b --pretty false && tsc -p tooling/antidrift --pretty false",
-    "lint": "pnpm lint:oxlint && pnpm lint:custom-typed && pnpm lint:boundaries && pnpm lint:exports",
+    "lint": "pnpm lint:rust && pnpm lint:oxlint && pnpm lint:custom-typed && pnpm lint:boundaries && pnpm lint:exports",
+    "lint:rust": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings",
+    "parity:rust": "node tooling/antidrift/test/rust-parity.mjs",
     "lint:oxlint": "antidrift oxlint",
     "lint:custom-typed": "eslint . --max-warnings 0",
     "lint:boundaries": "depcruise --config .dependency-cruiser.mjs --output-type err tooling/antidrift/src apps packages",
