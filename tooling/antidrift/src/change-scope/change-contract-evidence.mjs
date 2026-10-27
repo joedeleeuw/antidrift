@@ -342,7 +342,7 @@ const argumentOptions = {
   "--case": { field: "caseIds", read: parseCsv },
 };
 
-export function parseArgs(argv) {
+function parseArgs(argv) {
   const parsed = {
     output: null,
     slice: "change-contract-mvp-evidence",
@@ -481,7 +481,7 @@ function writeReport(output, report) {
   writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`);
 }
 
-export function changeContractEvidence(parsed) {
+function changeContractEvidence(parsed) {
   const selected = selectedCases(parsed);
   if (selected.length === 0) {
     throw new Error("change-contract-evidence: no cases selected");

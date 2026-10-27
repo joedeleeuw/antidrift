@@ -163,5 +163,3 @@ export function ruleNoServiceConstructorImports() {
     },
   });
 }
-
-export default ruleNoServiceConstructorImports();

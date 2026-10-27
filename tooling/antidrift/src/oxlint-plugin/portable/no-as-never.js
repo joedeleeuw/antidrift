@@ -4,7 +4,7 @@ import {
 } from "../../semantic-adapters/kernel/rule-scope.ts";
 import { getIdentifierName, getNode } from "./syntax.js";
 
-export const noAsNeverRule = {
+const noAsNeverRule = {
   meta: {
     schema: [
       {

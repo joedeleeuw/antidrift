@@ -25,25 +25,6 @@ export function readRegistry(policyDir, name, errors) {
     return {};
   }
 }
-export function readPolicySource(policyDir, errors) {
-  const file = join(policyDir, "agent-guardrails.yaml");
-  if (!existsSync(file)) {
-    return null;
-  }
-  try {
-    const parsed = YAML.parse(readFileSync(file, "utf8")) ?? {};
-    if (!isRecord(parsed)) {
-      errors.push("policy/agent-guardrails.yaml must contain a mapping.");
-      return null;
-    }
-    return parsed;
-  } catch (error) {
-    errors.push(
-      `policy/agent-guardrails.yaml could not be parsed: ${error.message}`
-    );
-    return null;
-  }
-}
 function stringArray(value, label, errors, { allowEmpty = false } = {}) {
   if (
     !Array.isArray(value) ||

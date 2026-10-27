@@ -18,7 +18,7 @@ export const CHANGE_CONTRACT_CLAIM =
  * @param {ReturnType<typeof runChangeContract>} result
  * @param {string} contractPath
  */
-export function changeContractFact(result, contractPath) {
+function changeContractFact(result, contractPath) {
   return semanticFact({
     factKind: "changeContractConformance",
     ruleId: "antidrift/change-contract-conformance",

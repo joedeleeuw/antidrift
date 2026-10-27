@@ -69,12 +69,12 @@ export class StructuralRuleSession {
   private readonly context: TypeScriptRuleEnvironment["context"];
   private readonly services: TypeScriptRuleEnvironment["services"];
   private readonly filename: string;
-  private readonly scope: OwnerScope;
-  private readonly sourceFile: ts.SourceFile;
+  private resolvedScope?: OwnerScope;
+  private sourceFile: ts.SourceFile;
   private readonly packageRoot: string;
   private readonly mode: ts.ResolutionMode | undefined;
-  private readonly packageEntries: readonly IndexedCandidate[];
-  private readonly filePaths: readonly string[];
+  private packageEntries: readonly IndexedCandidate[] = [];
+  private filePaths: readonly string[] = [];
   private readonly declarationChecks: DeclarationCheck[] = [];
   private readonly projectionNodes: ProjectionNode[] = [];
   private readonly inlineNodes: Rule.Node[] = [];
@@ -110,20 +110,7 @@ export class StructuralRuleSession {
       canonicalEntities: options.canonicalEntities ?? {},
       includeInstalledProposals: Boolean(semanticFactSink(context)),
     });
-    this.scope = index.candidatesFor({
-      packageRoot: this.packageRoot,
-      mode: this.mode,
-      sourceFile: parserSourceFile,
-    });
-    const sourceFile = this.scope.program.getSourceFile(
-      parserSourceFile.fileName
-    );
-    if (!sourceFile) {
-      throw new TypeError(`${filename} is absent from the ownership program.`);
-    }
-    this.sourceFile = sourceFile;
-    this.filePaths = relevantFilePaths(this.scope.program, sourceFile);
-    this.packageEntries = [...this.scope.candidates];
+    this.sourceFile = parserSourceFile;
     this.fieldBlockVisitors = createFieldBlockVisitors(
       context,
       options.fieldBlocks,
@@ -150,6 +137,28 @@ export class StructuralRuleSession {
   }
 
   private readonly index: ReturnType<typeof createPackageOwnerIndex>;
+
+  private get scope(): OwnerScope {
+    if (this.resolvedScope) {
+      return this.resolvedScope;
+    }
+    const scope = this.index.candidatesFor({
+      packageRoot: this.packageRoot,
+      mode: this.mode,
+      sourceFile: this.sourceFile,
+    });
+    const sourceFile = scope.program.getSourceFile(this.sourceFile.fileName);
+    if (!sourceFile) {
+      throw new TypeError(
+        `${this.filename} is absent from the ownership program.`
+      );
+    }
+    this.resolvedScope = scope;
+    this.sourceFile = sourceFile;
+    this.filePaths = relevantFilePaths(scope.program, sourceFile);
+    this.packageEntries = [...scope.candidates];
+    return scope;
+  }
 
   static visitors(environment: TypeScriptRuleEnvironment): Rule.RuleListener {
     const session = new StructuralRuleSession(environment);
@@ -337,52 +346,55 @@ export class StructuralRuleSession {
   }
 
   private collectProvenance() {
+    if (
+      this.declarationChecks.length === 0 &&
+      this.projectionNodes.length === 0
+    ) {
+      return {
+        provenance: new Map<ts.Node, ProjectionProof[]>(),
+        incomplete: new Set<ts.Node>(),
+        coverage: { complete: true, exhausted: [] },
+      };
+    }
+    const scope = this.scope;
     const filePaths = this.filePaths.slice(0, 32);
     const localDeclarations = new Map<ts.Node, ReadonlyMap<string, ts.Type>>();
     for (const check of this.declarationChecks) {
       localDeclarations.set(
         check.sourceNode,
-        contractFieldTypes(this.scope.checker, check.sourceNode)
+        contractFieldTypes(scope.checker, check.sourceNode)
       );
     }
     for (const { tsNode } of this.projectionNodes) {
       const analyzed = this.analysisNode(tsNode);
       localDeclarations.set(
         analyzed,
-        contractFieldTypes(this.scope.checker, analyzed)
+        contractFieldTypes(scope.checker, analyzed)
       );
     }
     const candidates = scopedProvenanceCandidates(
-      this.scope.program,
+      scope.program,
       filePaths,
       this.packageEntries
     );
-    const hasContractSites = localDeclarations.size > 0;
-    const owners = hasContractSites
-      ? this.index.ownerProjectionsForUse({
-          packageRoot: this.packageRoot,
-          mode: this.mode,
-          sourceFile: this.sourceFile,
-          candidates,
-        })
-      : undefined;
-    const { findings: provenance, incomplete } = hasContractSites
-      ? collectOwnedContractProvenance(
-          this.scope.program,
-          this.scope.checker,
-          candidates,
-          filePaths,
-          { declarations: localDeclarations },
-          owners
-        )
-      : {
-          findings: new Map<ts.Node, ProjectionProof[]>(),
-          incomplete: new Set<ts.Node>(),
-        };
+    const owners = this.index.ownerProjectionsForUse({
+      packageRoot: this.packageRoot,
+      mode: this.mode,
+      sourceFile: this.sourceFile,
+      candidates,
+    });
+    const { findings: provenance, incomplete } = collectOwnedContractProvenance(
+      scope.program,
+      scope.checker,
+      candidates,
+      filePaths,
+      { declarations: localDeclarations },
+      owners
+    );
     const coverage: Coverage = {
-      complete: this.scope.coverage.complete && this.filePaths.length <= 32,
+      complete: scope.coverage.complete && this.filePaths.length <= 32,
       exhausted: [
-        ...this.scope.coverage.exhausted,
+        ...scope.coverage.exhausted,
         ...(this.filePaths.length <= 32
           ? []
           : [

@@ -5,7 +5,7 @@ import {
   powersyncSqlRuleOptions,
 } from "./integration-options.mjs";
 
-export const codebaseAtlasCases = [
+const codebaseAtlasCases = [
   {
     id: "atlas-debug-bundle-promise-all-map-clean",
     ruleId: "antidrift/no-async-array-method",
@@ -182,7 +182,7 @@ export const codebaseAtlasCases = [
   },
 ];
 
-export const murderboxCases = [
+const murderboxCases = [
   {
     id: "murderbox-chat-module-app-fetch-clean",
     ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
@@ -347,7 +347,7 @@ export const murderboxCases = [
   },
 ];
 
-export const cloudflareAgentsCases = [
+const cloudflareAgentsCases = [
   {
     id: "cloudflare-voice-parameterized-sql-tag-clean",
     ruleId: "antidrift/no-sql-string-concat",
@@ -535,7 +535,7 @@ export const cloudflareAgentsCases = [
   },
 ];
 
-export const claudeCodeSourceCases = [
+const claudeCodeSourceCases = [
   {
     id: "claude-assistant-history-every-render-effects",
     ruleId: "antidrift/require-effect-deps",
@@ -574,7 +574,7 @@ export const claudeCodeSourceCases = [
   },
 ];
 
-export const opencodeCases = [
+const opencodeCases = [
   {
     id: "opencode-drizzle-sql-template-identifiers-clean",
     ruleId: "antidrift/no-sql-string-concat",
@@ -672,7 +672,7 @@ export const opencodeCases = [
   },
 ];
 
-export const dotfilesCases = [
+const dotfilesCases = [
   {
     id: "dotfiles-agent-trace-device-id-no-empty-sentinel",
     ruleId: "antidrift/no-sentinel-absence-fallback",
@@ -691,7 +691,7 @@ export const dotfilesCases = [
   },
 ];
 
-export const powersyncServiceCases = [
+const powersyncServiceCases = [
   {
     id: "powersync-mysql-raw-source-table-name",
     ruleId: "antidrift/no-sql-string-concat",

@@ -92,10 +92,8 @@ Broad inventory on 2026-06-04:
 - Codebase Atlas `src`: 152 checked files, 0 findings.
 - Sudocode app and test source: 561 checked files, 1 finding.
 
-## Promotion State
+## Current applicability
 
-Status: `ready`, `stable: false`, default-off inventory.
-
-The rule is clean across the broad inventory and has clear deterministic syntax, but stable promotion still needs either a second independent drift instance or an explicit exception to the usual multi-repository drift-replication gate.
+The never-await method branch is enabled in the shipped governance config. Zero findings in the historical inventory are preventive evidence, not proof of inertness or a maturity score. The optional `.map` / `.flatMap` collection-flow branch retains its separate evidence and configuration boundary.
 
 Known false negatives are intentionally local-scope boundaries for the opt-in collection branch: interprocedural promise collection handoff through helper functions, custom Promise combinators, promise collections not produced by a direct local `.map` / `.flatMap` call, and floated Promise combinator results are outside the current proof. Floated combinator results belong to `@typescript-eslint/no-floating-promises` or a separate config gate. The default branch is the never-await method set only; the `.map` / `.flatMap` collection-flow branch keeps its own evidence gate.

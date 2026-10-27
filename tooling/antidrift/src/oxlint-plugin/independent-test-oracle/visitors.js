@@ -16,16 +16,16 @@ import { validatorOutputOracleFinding } from "./validator-output.js";
 
 export function createIndependentTestOracleListeners(context) {
   const filename = contextFilename(context);
+  const sourceCode = context.sourceCode ?? context.getSourceCode();
   if (!isTestFilename(filename)) {
     return {
       ForOfStatement(node) {
-        if (isStaticPropertyEcho(node, context.sourceCode, filename)) {
+        if (isStaticPropertyEcho(node, sourceCode, filename)) {
           context.report({ node, messageId: "staticPropertyEcho" });
         }
       },
     };
   }
-  const sourceCode = context.sourceCode ?? context.getSourceCode();
   const factsByCallback = new WeakMap();
   const blockFacts = (callback) => {
     let facts = factsByCallback.get(callback);

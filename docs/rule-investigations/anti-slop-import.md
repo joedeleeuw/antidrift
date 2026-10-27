@@ -6,14 +6,14 @@ The imported rules track `dmmulroy/anti-slop` commit `6d538555cb151d4121ed51a27d
 
 ## Ownership
 
-The upstream chained-assertion rule is exposed through the existing `antidrift/no-unsafe-cast-chain` owner. The upstream known-value-widening and widen-then-assert detectors extend the existing TypeChecker-backed `antidrift/no-appeasement-erasure` owner. All other imported behaviors retain their upstream rule names under the `antidrift` namespace.
+The upstream chained-assertion rule is exposed through the existing `antidrift/no-unsafe-cast-chain` owner. The upstream known-value-widening and widen-then-assert detectors extend the existing TypeChecker-backed `antidrift/no-appeasement-erasure` owner. Retained imported behaviors keep their upstream rule names under the `antidrift` namespace.
 
 ## Enforcement
 
 Two imported rules are blocking in the shared Oxlint configuration: unknown aliases and chained assertions. `antidrift/no-appeasement-erasure` is blocking in the reduced TypeChecker ESLint pass.
 
-Twelve imported rules remain registered but default-off because their syntax does not prove drift at a general boundary: conditional empty-object spread, module mocking, broad object parameters, `Reflect.apply`, `Reflect.get`, runtime `typeof`, `makeX` relative imports, `shape` in identifiers, `unknown` parameters, unknown returns, unsafe dictionary values, and safety comments on assertions. They are available for explicit consumer experiments, not general enforcement.
+Twelve other imported rules were retired after utility review: conditional empty-object spread, module mocking, broad object parameters, `Reflect.apply`, `Reflect.get`, runtime `typeof`, `makeX` relative imports, `shape` in identifiers, `unknown` parameters, unknown returns, unsafe dictionary values, and safety comments on assertions. They are not registered for explicit opt-in; their published IDs remain in `retiredRules` with the reasons.
 
 ## Verification
 
-Oxlint plugin tests execute a bad and clean program for every imported rule through the real plugin entrypoint. Registry checks own export and configuration consistency. The shared default is validated against a packed consumer and a real consumer migration before publication. Live external repositories are an explicit sequential research command and are not a release or session prerequisite.
+Oxlint plugin tests execute a bad and clean program for each retained imported rule through the real plugin entrypoint. Registry checks own export and configuration consistency. The shared default is validated against a packed consumer and a real consumer migration before publication. Live external repositories are an explicit sequential research command and are not a release or session prerequisite.

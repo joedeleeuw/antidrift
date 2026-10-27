@@ -16,7 +16,7 @@ const ratchetedRules = {
   "antidrift/no-pass-through-parameters": "error",
   "antidrift/no-redeclared-owned-union": "error",
   "antidrift/no-sentinel-absence-fallback": "error",
-  "antidrift/no-vague-names": "error",
+  "antidrift/no-vague-names": "off",
 };
 
 export function createConfig({
@@ -89,7 +89,7 @@ export function createConfig({
         "antidrift/no-unresolved-dependency-types": "error",
         "antidrift/no-wrapping-functions": "error",
         "antidrift/no-service-constructor-imports": "error",
-        "antidrift/no-sql-string-concat": "error",
+        "antidrift/no-sql-string-concat": "off",
         ...ratchetedRules,
         "antidrift/no-redeclared-owned-union": ["error", { statuses }],
         "antidrift/no-sentinel-absence-fallback": [

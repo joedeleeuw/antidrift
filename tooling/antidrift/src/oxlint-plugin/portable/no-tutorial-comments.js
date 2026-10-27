@@ -11,7 +11,7 @@ import {
 
 const TUTORIAL_COMMENT_PATTERN =
   /^\s*(this|here|we)\b.*\b(checks?|ensures?|handles?|returns?|gets?|sets?|does|validates?)\b/i;
-export const noTutorialCommentsRule = {
+const noTutorialCommentsRule = {
   meta: {
     schema: [
       {

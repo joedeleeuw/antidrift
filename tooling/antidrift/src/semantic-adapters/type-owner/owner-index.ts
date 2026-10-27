@@ -1,15 +1,6 @@
-import { join } from "node:path";
 import ts from "typescript";
 
-import {
-  declaredDependencies,
-  dependencyManifest,
-  dependsBack,
-  isInstalledPackageManifest,
-  importedName,
-  publicEntries,
-  specifierPackage,
-} from "../provenance/declared-dependencies.ts";
+import { discoverPackageEntries } from "./dependency-discovery.ts";
 import { ownerProjections } from "../projection/owner-projection.ts";
 import { sharedOwnerProjections } from "./projection-cache.ts";
 import {
@@ -46,8 +37,6 @@ import { exactShapeCandidates } from "./shape-candidates.ts";
 
 const limits = {
   packageScopes: 8,
-  dependencyManifests: 64,
-  publicEntries: 256,
   files: 256,
   symbolVisits: 4096,
 } as const;
@@ -85,148 +74,6 @@ function scopeWithCandidates(
       exhausted: coverage.exhausted,
     },
   };
-}
-
-function resolvePublicEntry(
-  entry: Omit<ResolvedPackageEntry, "fileName">,
-  packageRoot: string,
-  options: ts.CompilerOptions,
-  discovery: PackageDiscovery
-): ResolvedPackageEntry | null {
-  const resolved = ts.resolveModuleName(
-    entry.specifier,
-    join(packageRoot, "package.json"),
-    options,
-    ts.sys,
-    undefined,
-    undefined,
-    entry.mode
-  ).resolvedModule;
-  if (!resolved) {
-    exhaust(discovery.coverage, {
-      budget: "public-entry",
-      scope: entry.specifier,
-      workspace: entry.workspace,
-    });
-    return null;
-  }
-  return { ...entry, fileName: resolved.resolvedFileName };
-}
-
-function discoverDependencyEntries(
-  packageRoot: string,
-  dependency: string,
-  mode: ts.ResolutionMode | undefined,
-  options: ts.CompilerOptions,
-  discovery: PackageDiscovery,
-  usedSpecifiers?: ReadonlySet<string>
-) {
-  const requiredByScope =
-    usedSpecifiers === undefined ||
-    [...usedSpecifiers].some((specifier) => {
-      const packageName = specifierPackage(specifier);
-      return (
-        packageName === dependency || packageName === importedName(dependency)
-      );
-    });
-  const manifestPath = dependencyManifest(packageRoot, dependency, options);
-  if (!manifestPath) {
-    if (requiredByScope) {
-      exhaust(discovery.coverage, {
-        budget: "package",
-        scope: `${dependency} manifest`,
-        workspace: true,
-      });
-    }
-    return [];
-  }
-  const workspace = !isInstalledPackageManifest(manifestPath);
-  if (!workspace && !requiredByScope) {
-    return [];
-  }
-  const reverses = dependsBack(packageRoot, manifestPath);
-  const publicEntry = publicEntries(dependency, manifestPath);
-  for (const unresolved of publicEntry.undecided) {
-    exhaust(discovery.coverage, {
-      budget: "public-entry",
-      scope: unresolved,
-      workspace,
-    });
-  }
-  const entries: ResolvedPackageEntry[] = [];
-  for (const specifier of publicEntry.specifiers.slice(0, 256)) {
-    const entry = resolvePublicEntry(
-      { packageName: dependency, specifier, mode, reverses, workspace },
-      packageRoot,
-      options,
-      discovery
-    );
-    if (
-      entry &&
-      (entry.workspace ||
-        usedSpecifiers === undefined ||
-        usedSpecifiers.has(specifier) ||
-        usedSpecifiers.has(importedName(specifier)))
-    ) {
-      entries.push(entry);
-    }
-  }
-  if (publicEntry.specifiers.length > 256) {
-    exhaust(discovery.coverage, {
-      budget: "public-entry",
-      scope: `${dependency} public entries`,
-      workspace,
-    });
-  }
-  return entries;
-}
-
-function packageEntries(
-  packageRoot: string,
-  mode: ts.ResolutionMode | undefined,
-  options: ts.CompilerOptions,
-  discovery: PackageDiscovery,
-  usedSpecifiers?: ReadonlySet<string>
-) {
-  const coverage = discovery.coverage;
-  if (!ts.sys.fileExists(join(packageRoot, "package.json"))) {
-    return [];
-  }
-  const entries: ResolvedPackageEntry[] = [];
-  const dependencies = declaredDependencies(packageRoot);
-  if (dependencies.length > 64) {
-    exhaust(coverage, {
-      budget: "package",
-      scope: `${packageRoot} dependency manifests`,
-      workspace: true,
-    });
-  }
-  for (const dependency of dependencies.slice(0, 64)) {
-    entries.push(
-      ...discoverDependencyEntries(
-        packageRoot,
-        dependency,
-        mode,
-        options,
-        discovery,
-        usedSpecifiers
-      )
-    );
-  }
-  const ordered = entries.toSorted(
-    (left, right) => Number(right.workspace) - Number(left.workspace)
-  );
-  if (ordered.length > 256) {
-    exhaust(coverage, {
-      budget: "public-entry",
-      scope: `${packageRoot} resolved public entries`,
-      workspace: ordered.slice(256).some((entry) => entry.workspace),
-      entries: ordered
-        .slice(256)
-        .map(({ fileName, workspace }) => ({ fileName, workspace })),
-    });
-  }
-  return ordered.slice(0, 256);
 }
 
 function programWithEntries(
@@ -291,15 +138,16 @@ function discoverPackageScope(
   expand?: string
 ): OwnerScope {
   const coverage = completeCoverage();
-  const entries = packageEntries(
+  const entries = discoverPackageEntries({
+    program,
     packageRoot,
     mode,
-    program.getCompilerOptions(),
-    { coverage },
-    sourceFile
+    options: program.getCompilerOptions(),
+    discovery: { coverage },
+    usedSpecifiers: sourceFile
       ? scopedSpecifiers(program, relevantFilePaths(program, sourceFile))
-      : undefined
-  );
+      : undefined,
+  });
   const missingEntries = entries.filter(
     (entry) => !program.getSourceFile(entry.fileName)
   );

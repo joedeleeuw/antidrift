@@ -5,7 +5,6 @@ import {
   resolveAliasedSymbol,
   symbolAtNode,
 } from "../provenance/symbol-provenance.ts";
-import { shapeComparison } from "../shape/shape-identity.ts";
 
 type ServiceTagScan = {
   readonly checker: ts.TypeChecker;
@@ -17,10 +16,6 @@ type ServiceTagScan = {
 type ServiceContractProvenance = {
   readonly hasServiceContract: boolean;
   readonly constructorSymbols: ReadonlySet<ts.Symbol>;
-};
-
-type ServiceConstructorSearch = ServiceTagScan & {
-  readonly sameShape: ReturnType<typeof shapeComparison>;
 };
 
 const serviceContractsByProgram = new WeakMap<
@@ -185,21 +180,47 @@ function serviceTagShapeCalls(currentNode: ts.Node): ts.CallExpression[] {
   return [];
 }
 
-function serviceWiringRoots(currentNode: ts.Node): readonly ts.Node[] {
+function serviceWiring(
+  currentNode: ts.Node
+): {
+  roots: readonly ts.Node[];
+  serviceTag?: ts.Expression | undefined;
+} | null {
   if (ts.isClassDeclaration(currentNode)) {
-    return heritageServiceTagCalls(currentNode).flatMap((heritageCall) =>
-      heritageCall.arguments.filter(ts.isObjectLiteralExpression)
-    );
+    return {
+      roots: heritageServiceTagCalls(currentNode).flatMap((heritageCall) =>
+        heritageCall.arguments.filter(ts.isObjectLiteralExpression)
+      ),
+    };
   }
   if (
     ts.isCallExpression(currentNode) &&
     isLayerConstructionCall(currentNode)
   ) {
-    return currentNode.arguments.length >= 2
-      ? currentNode.arguments.slice(1)
-      : currentNode.arguments;
+    return {
+      roots:
+        currentNode.arguments.length >= 2
+          ? currentNode.arguments.slice(1)
+          : currentNode.arguments,
+      serviceTag:
+        currentNode.arguments.length >= 2
+          ? currentNode.arguments[0]
+          : undefined,
+    };
   }
-  return [];
+  return null;
+}
+
+function serviceShapeFromWiringTag(
+  checker: ts.TypeChecker,
+  serviceTag: ts.Expression
+): ts.Type | null {
+  const serviceProperty = checker
+    .getTypeAtLocation(serviceTag)
+    .getProperty("Service");
+  return serviceProperty
+    ? checker.getTypeOfSymbolAtLocation(serviceProperty, serviceTag)
+    : null;
 }
 
 function inspectServiceTagDeclarations(
@@ -220,8 +241,17 @@ function inspectServiceTagDeclarations(
         scan.serviceShapes.push(shapeType);
       }
     }
-    for (const wiringRoot of serviceWiringRoots(currentNode)) {
-      collectReferencedLocalSymbols(scan, wiringRoot);
+    const wiring = serviceWiring(currentNode);
+    if (wiring) {
+      for (const wiringRoot of wiring.roots) {
+        collectReferencedLocalSymbols(scan, wiringRoot);
+      }
+      if (wiring.serviceTag) {
+        const shapeType = serviceShapeFromWiringTag(checker, wiring.serviceTag);
+        if (shapeType) {
+          scan.serviceShapes.push(shapeType);
+        }
+      }
     }
     ts.forEachChild(currentNode, (childNode) => {
       stack.push(childNode);
@@ -242,15 +272,15 @@ function isWiringDeclaration(declaration: ts.Declaration): boolean {
 }
 
 function isServiceConstructor(
-  search: ServiceConstructorSearch,
+  scan: ServiceTagScan,
   candidateSymbol: ts.Symbol
 ): boolean {
-  const { checker } = search;
+  const { checker } = scan;
   const declaration =
     candidateSymbol.valueDeclaration ?? candidateSymbol.declarations?.[0];
   if (
     !declaration ||
-    declaration.getSourceFile() !== search.sourceFile ||
+    declaration.getSourceFile() !== scan.sourceFile ||
     isWiringDeclaration(declaration)
   ) {
     return false;
@@ -262,18 +292,16 @@ function isServiceConstructor(
   if (callSignatures.length === 0) {
     return false;
   }
-  if (search.wiredSymbols.has(candidateSymbol)) {
-    return true;
-  }
   return callSignatures.some((signature) => {
     const returnType = checker.getReturnTypeOfSignature(signature);
     const unwrappedReturn =
       extractEffectSuccessType(checker, returnType) ?? returnType;
     return (
       checker.getPropertiesOfType(unwrappedReturn).length > 0 &&
-      search.serviceShapes.some(
+      scan.serviceShapes.some(
         (serviceShape) =>
-          search.sameShape(unwrappedReturn, serviceShape) === true
+          checker.getPropertiesOfType(serviceShape).length > 0 &&
+          checker.isTypeAssignableTo(unwrappedReturn, serviceShape)
       )
     );
   });
@@ -290,7 +318,6 @@ function inspectServiceContract(
   if (!hasServiceContract) {
     return { hasServiceContract, constructorSymbols: new Set() };
   }
-  const search = { ...scan, sameShape: shapeComparison(program) };
   const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
   const candidates = new Set(scan.wiredSymbols);
   for (const exported of moduleSymbol
@@ -305,7 +332,7 @@ function inspectServiceContract(
     hasServiceContract,
     constructorSymbols: new Set(
       [...candidates].filter((candidateSymbol) =>
-        isServiceConstructor(search, candidateSymbol)
+        isServiceConstructor(scan, candidateSymbol)
       )
     ),
   };

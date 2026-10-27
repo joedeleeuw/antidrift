@@ -5,7 +5,7 @@ Status: implemented; default error in the shared presets. Each rule names the di
 | Rule                                     | Directive | Runtime | Default                                   |
 | ---------------------------------------- | --------- | ------- | ----------------------------------------- |
 | `antidrift/no-pass-through-parameters`   | G22       | ESLint  | error, ratcheted by suppressions          |
-| `antidrift/no-vague-names`               | G21       | ESLint  | error, ratcheted by suppressions          |
+| `antidrift/no-vague-names`               | G21       | ESLint  | off (exported for explicit opt-in)        |
 | `antidrift/no-compat-names`              | G5        | ESLint  | error, ratcheted by suppressions          |
 | `antidrift/no-fallback-to-empty`         | G7        | Oxlint  | error                                     |
 | `no-nested-ternary` (native)             | G8        | Oxlint  | owned by `@joedeleeuw/typescript-tooling` |

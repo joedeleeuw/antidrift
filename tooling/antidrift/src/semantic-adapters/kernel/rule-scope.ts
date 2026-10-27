@@ -25,7 +25,10 @@ function scopePatterns(
   return patterns.filter((pattern) => typeof pattern === "string");
 }
 
-export function isRuleFile(context: RuleFileContext): boolean {
+export function isRuleFile(
+  context: RuleFileContext,
+  inferredScope?: (filename: string) => boolean
+): boolean {
   const [options] = context.options;
   const filename = context.filename.replaceAll("\\", "/");
   const local = isAbsolute(filename)
@@ -36,6 +39,8 @@ export function isRuleFile(context: RuleFileContext): boolean {
   const files = scopePatterns(options, "files");
   const excludeFiles = scopePatterns(options, "excludeFiles") ?? [];
   return (
-    (files === undefined || files.some(matches)) && !excludeFiles.some(matches)
+    (files === undefined || files.some(matches)) &&
+    (files !== undefined || inferredScope?.(filename) !== false) &&
+    !excludeFiles.some(matches)
   );
 }

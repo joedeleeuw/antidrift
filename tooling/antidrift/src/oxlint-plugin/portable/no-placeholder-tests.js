@@ -49,7 +49,7 @@ const hasOnlyPlaceholderText = (node) => {
     PLACEHOLDER_PATTERN.test(getCommentText(comment))
   );
 };
-export const noPlaceholderTestsRule = {
+const noPlaceholderTestsRule = {
   meta: {
     schema: [
       {

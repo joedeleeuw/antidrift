@@ -190,7 +190,7 @@ function promiseCatchCallbackParamName(node) {
     : null;
 }
 
-export const noAnemicErrorsRule = {
+const noAnemicErrorsRule = {
   meta: {
     schema: [
       {

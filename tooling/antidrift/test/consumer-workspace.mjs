@@ -26,6 +26,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
           eslint: "10.13.0",
           "typescript-eslint": "8.72.0",
           "@typescript-eslint/parser": "8.72.0",
+          "@types/node": "22.19.19",
           oxlint: "1.89.0",
           typescript: "6.0.3",
           vitest: "2.1.9",

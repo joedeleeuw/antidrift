@@ -24,7 +24,7 @@ const getCommentText = (value) => {
   }
   return "";
 };
-export const noTodoWithoutIssueRule = {
+const noTodoWithoutIssueRule = {
   meta: {
     schema: [
       {

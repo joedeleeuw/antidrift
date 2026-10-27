@@ -1,6 +1,6 @@
 # `antidrift/no-sql-string-concat`
 
-Status: `ecosystem-covered` / delegated on 2026-08-03. Replacement: `sql-template/no-unsafe-query` for untagged SQL interpolation, CodeQL/Semgrep for cross-function taint (Learning 9). The measurement that settled it: 71 findings in one Cloudflare Agents file, every one a `this.sql` tagged template that binds interpolations as `?` placeholders. The provenance machinery below is retained as history and as the design basis for a tag-body-proof upgrade if real tag-name evasion ever appears.
+Status: default-off in the shipped ESLint preset, with explicit consumer opt-in retained. Disabled by owner decision on 2026-10-26 because the implemented declaration-source coverage does not recognize enough parameterized builder APIs automatically for default enforcement. This is not a claim that `sql-template/no-unsafe-query`, CodeQL, or Semgrep is equivalent to the rule's raw-query and local identifier-proof surface. The packed consumer proves both default silence and an opted-in raw-query diagnostic.
 
 ## Definition
 
@@ -157,7 +157,9 @@ External references checked during the June 9, 2026 review:
 - [OWASP SQL Injection Prevention](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html) recommends prepared statements for values and allow-list validation for table names, column names, and sort indicators when bind variables cannot represent those SQL fragments.
 - [Prisma raw queries](https://docs.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries) and [Drizzle `sql` templates](https://orm.drizzle.team/docs/sql) both document tagged SQL templates as value-parameterizing APIs while treating raw SQL / identifier interpolation as a separate higher-risk surface.
 
-## Real-Corpus Evidence
+## Historical real-corpus evidence
+
+These pinned investigations explain the implementation and the decision to disable default enforcement. They are not current-release measurements or a claim that every candidate is an accepted defect.
 
 Drift:
 
@@ -211,9 +213,13 @@ Current source-fleet finding classification:
 | Lower-strength demo/test drift            |    27 | Cloudflare demo `SqlDemo.tsx:133`, Sudocode dynamic test update helpers, PowerSync integration-test SQL interpolation | Keep as pressure evidence, not stable-production evidence.                                                                                            |
 | Known false positives after this slice    |     2 | Cloudflare Voice and AI Chat Agent.sql tags blocked by unresolved external package tsconfigs                          | Keep the rule off in the shipped config until those member proofs can run type-aware without local shims, then rerun source-fleet/adversarial review. |
 
-## Promotion State
+## Adoption boundary
 
-Status: `false-positive-prone`, `stable: false`, default-off inventory.
+The shipped preset leaves this rule off. Consumers that accept its current safe-builder configuration burden can enable `antidrift/no-sql-string-concat` explicitly; the implementation and public SQL semantic adapter remain available. There is no retirement alias and no new automatic builder allowlist.
+
+Current acceptance is behavioral: the packed consumer gets no SQL diagnostic from the default preset and gets the expected raw-query diagnostic after explicit opt-in. The remaining promotion analysis below is historical evidence, not a runtime dependency, maturity score, or current acceptance requirement.
+
+### Historical promotion analysis
 
 The observed SQL interpolation and identifier-proof surface remains useful inventory, but it is not ready for blocking severity while two real SQL-builder clean controls remain parked behind external type-service availability. Production drift exists in Chaski HogQL/template interpolation and PowerSync raw `sourceTable.table` interpolation. The second independent sanitized identifier clean-control gap is resolved: Cloudflare Workspace covers anchored-regex/early-exit identifier derivation, and Opencode stats covers quote-doubling identifier and string escapers plus bounded local SQL-fragment builders. PowerSync service supplies the lower-edge pressure case: raw table access reports next to escaped table-name APIs, imported `escapeMysqlTableName(table)` stays clean through TypeScript symbol-to-declaration proof, Postgres `SourceTable.escapedIdentifier` stays clean only through an explicit type/member contract that requires parser services, numbered placeholder fragments stay clean through local structure, and `AbstractPostgresConnection.sql` stays clean through configured member declaration-source provenance.
 

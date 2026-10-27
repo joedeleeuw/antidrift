@@ -2,238 +2,26 @@ import {
   isRuleFile,
   scopeProperties,
 } from "../../semantic-adapters/kernel/rule-scope.ts";
+import { getPropertyName, isAstNode, isIdentifier } from "./ast.js";
 import {
-  getPropertyName,
-  isAstNode,
-  isIdentifier,
-  isStringLiteral,
-  unwrapExpression,
-} from "./ast.js";
+  breakExitsLoop,
+  callWithinExpressionStatement,
+  FUNCTION_TYPES,
+  isDescendantOf,
+  isInfiniteLoop,
+  memberCall,
+  nearestFunctionOrProgram,
+  nearestLoopWithin,
+  statementSite,
+  staticMemberName,
+  unwrapReaderExpression,
+  visitNodes,
+} from "./stream-reader-ast.js";
+import {
+  canPrecedeReaderCleanup,
+  canWriteBinding,
+} from "./stream-reader-cleanup.js";
 
-const FUNCTION_TYPES = new Set([
-  "ArrowFunctionExpression",
-  "FunctionDeclaration",
-  "FunctionExpression",
-]);
-const LOOP_TYPES = new Set([
-  "DoWhileStatement",
-  "ForInStatement",
-  "ForOfStatement",
-  "ForStatement",
-  "WhileStatement",
-]);
-const unwrapValue = (node) => {
-  let current = unwrapExpression(node);
-  while (
-    current !== null &&
-    (current.type === "TSNonNullExpression" ||
-      current.type === "TSTypeAssertion")
-  ) {
-    current = unwrapExpression(current.expression);
-  }
-  return current;
-};
-const nearestFunctionOrProgram = (node) => {
-  let current = isAstNode(node) ? node : null;
-  while (current !== null) {
-    if (FUNCTION_TYPES.has(current.type) || current.type === "Program") {
-      return current;
-    }
-    current = isAstNode(current.parent) ? current.parent : null;
-  }
-  return null;
-};
-const isDescendantOf = (node, ancestor) => {
-  let current = isAstNode(node) ? node : null;
-  while (current !== null) {
-    if (current === ancestor) {
-      return true;
-    }
-    current = isAstNode(current.parent) ? current.parent : null;
-  }
-  return false;
-};
-const statementSite = (node) => {
-  let current = isAstNode(node) ? node : null;
-  while (current !== null) {
-    const parent = isAstNode(current.parent) ? current.parent : null;
-    if (
-      parent !== null &&
-      (parent.type === "BlockStatement" || parent.type === "Program") &&
-      Array.isArray(parent.body) &&
-      parent.body.includes(current)
-    ) {
-      return { block: parent, statement: current };
-    }
-    current = parent;
-  }
-  return null;
-};
-const visitNodes = (node, root, visitor, seen = new Set()) => {
-  if (!isAstNode(node) || seen.has(node)) {
-    return;
-  }
-  seen.add(node);
-  if (node !== root && FUNCTION_TYPES.has(node.type)) {
-    return;
-  }
-  visitor(node);
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "parent") {
-      continue;
-    }
-    if (Array.isArray(value)) {
-      for (const child of value) {
-        visitNodes(child, root, visitor, seen);
-      }
-      continue;
-    }
-    visitNodes(value, root, visitor, seen);
-  }
-};
-const staticMemberName = (node) => {
-  if (node.type !== "MemberExpression") {
-    return null;
-  }
-  if (node.computed === true) {
-    return isStringLiteral(node.property) ? node.property.value : null;
-  }
-  return getPropertyName(node.property);
-};
-const memberCall = (node, method) => {
-  const call = unwrapValue(node);
-  if (call === null || call.type !== "CallExpression") {
-    return null;
-  }
-  const callee = unwrapValue(call.callee);
-  if (
-    callee === null ||
-    callee.type !== "MemberExpression" ||
-    staticMemberName(callee) !== method
-  ) {
-    return null;
-  }
-  return { call, object: callee.object };
-};
-const callWithinExpressionStatement = (statement, predicate) => {
-  if (!isAstNode(statement) || statement.type !== "ExpressionStatement") {
-    return false;
-  }
-  const containsUnconditionalCall = (node) => {
-    const expression = unwrapValue(node);
-    if (expression === null) {
-      return false;
-    }
-    if (expression.type === "AwaitExpression") {
-      return containsUnconditionalCall(expression.argument);
-    }
-    if (
-      expression.type === "CallExpression" &&
-      (expression.optional !== true ||
-        (expression.callee.type === "MemberExpression" &&
-          expression.callee.optional !== true &&
-          staticMemberName(expression.callee) === "releaseLock"))
-    ) {
-      if (predicate(expression)) {
-        return true;
-      }
-      const callee = unwrapValue(expression.callee);
-      if (
-        callee?.type === "MemberExpression" &&
-        callee.optional !== true &&
-        containsUnconditionalCall(callee.object)
-      ) {
-        return true;
-      }
-      return Array.isArray(expression.arguments)
-        ? expression.arguments.some(containsUnconditionalCall)
-        : false;
-    }
-    if (
-      expression.type === "SequenceExpression" &&
-      Array.isArray(expression.expressions)
-    ) {
-      for (const item of expression.expressions) {
-        if (containsUnconditionalCall(item)) {
-          return true;
-        }
-        const preceding = unwrapValue(item);
-        if (
-          preceding === null ||
-          (preceding.type !== "Identifier" &&
-            preceding.type !== "Literal" &&
-            preceding.type !== "ThisExpression")
-        ) {
-          return false;
-        }
-      }
-    }
-    return false;
-  };
-  return containsUnconditionalCall(statement.expression);
-};
-const abruptCompletionTarget = (node) => {
-  if (node.type !== "BreakStatement" && node.type !== "ContinueStatement") {
-    return null;
-  }
-  const labelName = isIdentifier(node.label) ? node.label.name : null;
-  let current = isAstNode(node.parent) ? node.parent : null;
-  while (current !== null) {
-    if (
-      labelName !== null &&
-      current.type === "LabeledStatement" &&
-      isIdentifier(current.label, labelName)
-    ) {
-      return current;
-    }
-    if (
-      labelName === null &&
-      (LOOP_TYPES.has(current.type) ||
-        (node.type === "BreakStatement" && current.type === "SwitchStatement"))
-    ) {
-      return current;
-    }
-    if (FUNCTION_TYPES.has(current.type)) {
-      return null;
-    }
-    current = isAstNode(current.parent) ? current.parent : null;
-  }
-  return null;
-};
-const nearestLoopWithin = (node, boundary) => {
-  let current = isAstNode(node) ? node.parent : null;
-  while (isAstNode(current) && current !== boundary) {
-    if (LOOP_TYPES.has(current.type)) {
-      return current;
-    }
-    if (FUNCTION_TYPES.has(current.type)) {
-      return null;
-    }
-    current = current.parent;
-  }
-  return null;
-};
-const isLiteralTrue = (node) => {
-  const expression = unwrapValue(node);
-  return (
-    expression !== null &&
-    expression.type === "Literal" &&
-    expression.value === true
-  );
-};
-const isInfiniteLoop = (node) => {
-  if (node.type === "ForStatement") {
-    return node.test === null;
-  }
-  return (
-    (node.type === "WhileStatement" || node.type === "DoWhileStatement") &&
-    isLiteralTrue(node.test)
-  );
-};
-const breakExitsLoop = (node, loop) => {
-  const target = abruptCompletionTarget(node);
-  return target !== null && isDescendantOf(loop, target);
-};
 export default {
   meta: {
     schema: [
@@ -269,6 +57,7 @@ export default {
       }
       return null;
     };
+    const canAssign = canWriteBinding.bind(null, resolveVariable);
     const isGlobalReference = (node, name) => {
       if (!isEstreeIdentifier(node) || node.name !== name) {
         return false;
@@ -367,9 +156,9 @@ export default {
           ) {
             continue;
           }
-          let target = unwrapValue(property.value);
+          let target = unwrapReaderExpression(property.value);
           if (target?.type === "AssignmentPattern") {
-            target = unwrapValue(target.left);
+            target = unwrapReaderExpression(target.left);
           }
           if (
             isEstreeIdentifier(target) &&
@@ -382,14 +171,14 @@ export default {
       return null;
     };
     const isGlobalConstructor = (node, name) => {
-      const expression = unwrapValue(node);
+      const expression = unwrapReaderExpression(node);
       if (expression?.type !== "NewExpression") {
         return false;
       }
       if (isGlobalReference(expression.callee, name)) {
         return true;
       }
-      const callee = unwrapValue(expression.callee);
+      const callee = unwrapReaderExpression(expression.callee);
       if (
         callee?.type !== "MemberExpression" ||
         staticMemberName(callee) !== name
@@ -401,14 +190,14 @@ export default {
       );
     };
     const isGlobalFetch = (node) => {
-      const expression = unwrapValue(node);
+      const expression = unwrapReaderExpression(node);
       if (expression?.type !== "CallExpression") {
         return false;
       }
       if (isGlobalReference(expression.callee, "fetch")) {
         return true;
       }
-      const callee = unwrapValue(expression.callee);
+      const callee = unwrapReaderExpression(expression.callee);
       if (
         callee?.type !== "MemberExpression" ||
         staticMemberName(callee) !== "fetch"
@@ -421,7 +210,8 @@ export default {
     };
     const isBunStdinStream = (node) => {
       const matched = memberCall(node, "stream");
-      const stdin = matched === null ? null : unwrapValue(matched.object);
+      const stdin =
+        matched === null ? null : unwrapReaderExpression(matched.object);
       return (
         matched !== null &&
         Array.isArray(matched.call.arguments) &&
@@ -432,7 +222,7 @@ export default {
       );
     };
     const isResponseExpression = (node, visited = new Set()) => {
-      const expression = unwrapValue(node);
+      const expression = unwrapReaderExpression(node);
       if (expression === null) {
         return false;
       }
@@ -457,7 +247,7 @@ export default {
       return initializer !== null && isResponseExpression(initializer, visited);
     };
     const isReadableStreamExpression = (node, visited = new Set()) => {
-      const expression = unwrapValue(node);
+      const expression = unwrapReaderExpression(node);
       if (expression === null) {
         return false;
       }
@@ -497,7 +287,7 @@ export default {
       );
     };
     const canonicalBinding = (node, visited = new Set()) => {
-      const expression = unwrapValue(node);
+      const expression = unwrapReaderExpression(node);
       if (!isEstreeIdentifier(expression)) {
         return null;
       }
@@ -515,7 +305,7 @@ export default {
       return matched !== null && canonicalBinding(matched.object) === binding;
     };
     const containsReaderMethod = (node, method, binding) => {
-      const root = unwrapValue(node);
+      const root = unwrapReaderExpression(node);
       if (root === null) {
         return false;
       }
@@ -563,7 +353,7 @@ export default {
       return { binding: null, stable: false };
     };
     const directlyReturned = (node) => {
-      const expression = unwrapValue(node);
+      const expression = unwrapReaderExpression(node);
       if (expression === null) {
         return false;
       }
@@ -596,8 +386,10 @@ export default {
       const indexes = [];
       for (const [index, statement] of block.body.entries()) {
         if (
-          callWithinExpressionStatement(statement, (candidate) =>
-            readerMethodCall(candidate, method, binding)
+          callWithinExpressionStatement(
+            statement,
+            (candidate) => readerMethodCall(candidate, method, binding),
+            canAssign
           )
         ) {
           indexes.push(index);
@@ -609,14 +401,24 @@ export default {
       if (!isAstNode(statement) || statement.type !== "ExpressionStatement") {
         return false;
       }
-      let expression = unwrapValue(statement.expression);
-      if (expression?.type === "AwaitExpression") {
-        expression = unwrapValue(expression.argument);
+      let expression = unwrapReaderExpression(statement.expression);
+      while (
+        expression?.type === "AwaitExpression" ||
+        (expression?.type === "AssignmentExpression" &&
+          expression.operator === "=" &&
+          isIdentifier(expression.left) &&
+          canAssign(expression.left))
+      ) {
+        const innerExpression =
+          expression.type === "AwaitExpression"
+            ? expression.argument
+            : expression.right;
+        expression = unwrapReaderExpression(innerExpression);
       }
       if (expression?.type !== "CallExpression") {
         return false;
       }
-      const callee = unwrapValue(expression.callee);
+      const callee = unwrapReaderExpression(expression.callee);
       return (
         callee?.type === "MemberExpression" &&
         staticMemberName(callee) === "catch" &&
@@ -634,8 +436,10 @@ export default {
       let handledCancel = false;
       for (const statement of block.body) {
         if (
-          callWithinExpressionStatement(statement, (candidate) =>
-            readerMethodCall(candidate, "releaseLock", binding)
+          callWithinExpressionStatement(
+            statement,
+            (candidate) => readerMethodCall(candidate, "releaseLock", binding),
+            canAssign
           )
         ) {
           return {
@@ -644,8 +448,10 @@ export default {
           };
         }
         if (
-          callWithinExpressionStatement(statement, (candidate) =>
-            readerMethodCall(candidate, "cancel", binding)
+          callWithinExpressionStatement(
+            statement,
+            (candidate) => readerMethodCall(candidate, "cancel", binding),
+            canAssign
           )
         ) {
           if (!handledCancelStatement(statement, binding)) {
@@ -675,7 +481,7 @@ export default {
       }
       return { cancelBeforeRelease: false, releases: false };
     };
-    const tryCoversAcquisition = (tryNode, acquisition, binding) => {
+    const tryCoversAcquisition = (tryNode, acquisition) => {
       if (isDescendantOf(acquisition.node, tryNode.block)) {
         return true;
       }
@@ -696,21 +502,12 @@ export default {
       return (
         acquisitionIndex !== -1 &&
         tryIndex > acquisitionIndex &&
-        acquisitionSite.block.body
-          .slice(acquisitionIndex + 1, tryIndex)
-          .every(
-            (statement) =>
-              isAstNode(statement) &&
-              statement.type === "VariableDeclaration" &&
-              statement.kind === "const" &&
-              Array.isArray(statement.declarations) &&
-              statement.declarations.every(
-                (declaration) =>
-                  isAstNode(declaration) &&
-                  declaration.type === "VariableDeclarator" &&
-                  canonicalBinding(declaration.init) === binding
-              )
-          )
+        canPrecedeReaderCleanup(
+          acquisitionSite.block.body.slice(acquisitionIndex + 1, tryIndex),
+          {
+            resolveVariable,
+          }
+        )
       );
     };
     const protectingTry = (acquisition, binding) => {
@@ -720,7 +517,7 @@ export default {
           result !== null ||
           node.type !== "TryStatement" ||
           !isAstNode(node.finalizer) ||
-          !tryCoversAcquisition(node, acquisition, binding) ||
+          !tryCoversAcquisition(node, acquisition) ||
           !finalizerCleanup(node.finalizer, binding).releases
         ) {
           return;
@@ -759,21 +556,12 @@ export default {
       if (
         acquisitionIndex === -1 ||
         returnIndex === -1 ||
-        !body.body
-          .slice(acquisitionIndex + 1, returnIndex)
-          .every(
-            (statement) =>
-              isAstNode(statement) &&
-              statement.type === "VariableDeclaration" &&
-              statement.kind === "const" &&
-              Array.isArray(statement.declarations) &&
-              statement.declarations.every(
-                (declaration) =>
-                  isAstNode(declaration) &&
-                  declaration.type === "VariableDeclarator" &&
-                  canonicalBinding(declaration.init) === binding
-              )
-          )
+        !canPrecedeReaderCleanup(
+          body.body.slice(acquisitionIndex + 1, returnIndex),
+          {
+            resolveVariable,
+          }
+        )
       ) {
         return false;
       }
@@ -821,9 +609,9 @@ export default {
         ) {
           continue;
         }
-        let initializer = unwrapValue(definition.node.init);
+        let initializer = unwrapReaderExpression(definition.node.init);
         if (initializer?.type === "AwaitExpression") {
-          initializer = unwrapValue(initializer.argument);
+          initializer = unwrapReaderExpression(initializer.argument);
         }
         if (!readerMethodCall(initializer, "read", binding)) {
           continue;
@@ -849,16 +637,16 @@ export default {
       return null;
     };
     const isDoneGuard = (node, binding) => {
-      const expression = unwrapValue(node);
+      const expression = unwrapReaderExpression(node);
       if (isEstreeIdentifier(expression)) {
         return readResultKind(expression, binding) === "done";
       }
       if (
         expression?.type === "MemberExpression" &&
         staticMemberName(expression) === "done" &&
-        isEstreeIdentifier(unwrapValue(expression.object))
+        isEstreeIdentifier(unwrapReaderExpression(expression.object))
       ) {
-        const object = unwrapValue(expression.object);
+        const object = unwrapReaderExpression(expression.object);
         return (
           isEstreeIdentifier(object) &&
           readResultKind(object, binding) === "result"
@@ -902,8 +690,10 @@ export default {
       return site.block.body
         .slice(0, index)
         .some((statement) =>
-          callWithinExpressionStatement(statement, (candidate) =>
-            readerMethodCall(candidate, "cancel", binding)
+          callWithinExpressionStatement(
+            statement,
+            (candidate) => readerMethodCall(candidate, "cancel", binding),
+            canAssign
           )
         );
     };
@@ -911,11 +701,21 @@ export default {
       if (!isAstNode(tryNode.handler) || !isAstNode(tryNode.handler.body)) {
         return false;
       }
-      return (
-        methodStatementIndexes(tryNode.handler.body, "cancel", binding).at(
-          0
-        ) === 0
-      );
+      const cancelIndex = methodStatementIndexes(
+        tryNode.handler.body,
+        "cancel",
+        binding
+      ).at(0);
+      const safePrefix =
+        cancelIndex !== undefined &&
+        canPrecedeReaderCleanup(
+          tryNode.handler.body.body.slice(0, cancelIndex),
+          {
+            resolveVariable,
+            allowAssignments: true,
+          }
+        );
+      return safePrefix;
     };
     const trailingCancelCoversTopLevelReads = (tryNode, binding) => {
       if (
@@ -995,7 +795,7 @@ export default {
             return;
           }
           if (node.type === "AwaitExpression") {
-            const awaited = unwrapValue(node.argument);
+            const awaited = unwrapReaderExpression(node.argument);
             if (
               !dominatedByDoneGuard(node, binding) &&
               !containsReaderMethod(awaited, "read", binding) &&

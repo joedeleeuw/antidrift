@@ -143,7 +143,7 @@ export function patchHunksBetween({ base, head, cwd }) {
  * Read a file at a git ref. Returns null when the file is absent at that ref.
  * @param {{ ref: string, path: string, cwd: string }} params
  */
-export function fileAt({ ref, path, cwd }) {
+function fileAt({ ref, path, cwd }) {
   const result = spawnSync("git", ["show", `${ref}:${path}`], {
     cwd,
     encoding: "utf8",

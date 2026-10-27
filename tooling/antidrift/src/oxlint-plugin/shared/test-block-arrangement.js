@@ -1,7 +1,7 @@
 import { findVariable } from "../../semantic-adapters/kernel/async-control-flow.ts";
 import { staticPropertyName } from "./test-files.js";
 
-export const booleanValues = new Set([true, false]);
+const booleanValues = new Set([true, false]);
 export const equalityMethods = new Set([
   "deepEqual",
   "deepStrictEqual",
@@ -82,7 +82,7 @@ function isFunctionNode(node) {
   );
 }
 
-export function nearestFunction(node) {
+function nearestFunction(node) {
   let current = node?.parent;
   while (current) {
     if (isFunctionNode(current)) {
@@ -391,7 +391,7 @@ function mockArrangementExpression(node) {
     : arranged;
 }
 
-export function constInitializer(sourceCode, identifier, callback = null) {
+function constInitializer(sourceCode, identifier, callback = null) {
   if (identifier?.type !== "Identifier") {
     return null;
   }
@@ -417,7 +417,7 @@ export function templateText(template) {
   return template.quasis.map((quasi) => quasi.value.cooked).join("");
 }
 
-export function propertyKeyName(property) {
+function propertyKeyName(property) {
   if (property.type !== "Property") {
     return null;
   }

@@ -412,8 +412,8 @@ export function resolvesToDomainCanonicalType(type, canonicalEntities = {}) {
 // Neither needs registry plumbing: the fixed toolchain paths establish accepted
 // owner authority. Retained checker types preserve nested and union contracts.
 
-export const CONVEX_DATA_MODEL_MODULE = "convex/_generated/dataModel";
-export const CONVEX_API_MODULE = "convex/_generated/api";
+const CONVEX_DATA_MODEL_MODULE = "convex/_generated/dataModel";
+const CONVEX_API_MODULE = "convex/_generated/api";
 
 export function isConvexGeneratedFile(fileName) {
   const p = fileName.replace(/\\/gu, "/");

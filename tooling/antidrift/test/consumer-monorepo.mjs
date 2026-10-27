@@ -20,6 +20,10 @@ import {
   proveStructuralContracts,
   scaffoldStructuralContracts,
 } from "./consumer-structural.mjs";
+import {
+  provePrecisionRules,
+  scaffoldPrecisionProofs,
+} from "./consumer-precision.mjs";
 
 const pnpmBinary = process.env.ANTIDRIFT_CONSUMER_PNPM ?? "pnpm";
 
@@ -108,6 +112,7 @@ try {
   }
   scaffoldConsumerWorkspace({ file, tarball, toolingTarball });
   scaffoldStructuralContracts({ file, work });
+  scaffoldPrecisionProofs({ file, work });
 
   console.log("3/7  installing the tarball into the consumer ...");
   runInherit(
@@ -217,6 +222,7 @@ try {
 
   provePortableRules({ file, lintOxlint, packedFiles });
   proveAdoptionPresets({ file, runJson, lintOxlint, work });
+  provePrecisionRules({ lint, lintOxlint });
 
   const unconfiguredTouchableRules = oxlintRuleIds(
     lintOxlint("portable-proofs/raw-touchable.tsx", "oxlint.config.mjs")
@@ -327,6 +333,8 @@ try {
   rmSync(join(work, "portable.config.json"));
   rmSync(join(work, "adoption-proof.tsx"));
   rmSync(join(work, "adoption.config.json"));
+  rmSync(join(work, "precision-proofs"), { recursive: true, force: true });
+  rmSync(join(work, "precision.config.json"));
 
   const repositoryDiagnostics = lintOxlintRepository().diagnostics ?? [];
   const moduleSizeDiagnostics = repositoryDiagnostics.filter(

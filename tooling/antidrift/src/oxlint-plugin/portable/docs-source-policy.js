@@ -22,7 +22,7 @@ const addClassification = (classifications, dependency, disposition) => {
   }
   current.push(disposition);
 };
-export const checkDocumentationSourcePolicy = ({
+const checkDocumentationSourcePolicy = ({
   dependencies,
   exclusions,
   now,

@@ -6,7 +6,7 @@ import { getPropertyName, isAstNode, isIdentifier } from "./ast.js";
 
 const LOGGER_IDENTIFIER = "logger";
 const LOGGER_METHODS = new Set(["debug", "error", "info", "warn"]);
-export const SENSITIVE_LOG_ATTRIBUTE_KEY_PATTERN =
+const SENSITIVE_LOG_ATTRIBUTE_KEY_PATTERN =
   /(?:body|content|email|fileName|message|name|title|password|secret|credential|authorization|cookie|bearer|api[_-]?key|prompt(?!_?token)|snippet|subject|phone)/iu;
 const isLoggerCall = (node) => {
   const callee = node.callee;

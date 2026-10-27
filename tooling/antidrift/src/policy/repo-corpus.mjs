@@ -80,13 +80,23 @@ function emptyRows(rules) {
   return new Map(
     rules.map((ruleId) => [
       ruleId,
-      { ruleId, severity: "off", activeFiles: 0, errors: 0, warnings: 0 },
+      {
+        ruleId,
+        severity: "off",
+        activeFiles: 0,
+        offFiles: 0,
+        errors: 0,
+        warnings: 0,
+      },
     ])
   );
 }
 
 function markActive(row, severity) {
-  if (severity === "off") return;
+  if (severity === "off") {
+    row.offFiles += 1;
+    return;
+  }
   row.activeFiles += 1;
   if (row.severity === "off" || row.severity === "warn") {
     row.severity = severity;
@@ -119,7 +129,8 @@ async function ruleRows(eslint, results, rules) {
 
   for (const { result, config } of configuredResults) {
     for (const ruleId of rules) {
-      markActive(rows.get(ruleId), severityOf(config?.rules?.[ruleId]));
+      if (!Object.hasOwn(config?.rules ?? {}, ruleId)) continue;
+      markActive(rows.get(ruleId), severityOf(config.rules[ruleId]));
     }
     for (const message of result.messages) {
       markFinding(rows.get(message.ruleId), message);
@@ -189,8 +200,13 @@ export async function repoCorpus({
   const inactiveRules = ruleReports
     .filter((rule) => rule.activeFiles === 0)
     .map((rule) => rule.ruleId);
-  const unexpectedInactiveRules = inactiveRules;
-  const decision = repoCorpusDecision({ findings, inactiveRules });
+  const unexpectedInactiveRules = ruleReports
+    .filter((rule) => rule.activeFiles === 0 && rule.offFiles === 0)
+    .map((rule) => rule.ruleId);
+  const decision = repoCorpusDecision({
+    findings,
+    inactiveRules: unexpectedInactiveRules,
+  });
   const command = `antidrift repo-corpus --targets ${targets.join(",")} --rules ${rules.join(",")}`;
   const summary = {
     schemaVersion: 1,

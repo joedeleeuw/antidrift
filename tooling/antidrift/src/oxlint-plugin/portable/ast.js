@@ -36,23 +36,6 @@ export const isCallTo = (node, name) =>
   isAstNode(node) &&
   node.type === "CallExpression" &&
   isIdentifier(node.callee, name);
-export const getCalleeName = (callee) => {
-  if (isIdentifier(callee)) {
-    return callee.name;
-  }
-  if (!isAstNode(callee) || callee.type !== "MemberExpression") {
-    return null;
-  }
-  if (callee.computed !== false) {
-    return null;
-  }
-  const objectName = getCalleeName(callee.object);
-  const propertyName = getPropertyName(callee.property);
-  if (propertyName === null) {
-    return null;
-  }
-  return objectName === null ? propertyName : `${objectName}.${propertyName}`;
-};
 export const unwrapExpression = (node) => {
   if (!isAstNode(node)) {
     return null;
@@ -78,72 +61,4 @@ export const getImportedName = (specifier) => {
     return imported.value;
   }
   return null;
-};
-export const getImportLocalName = (specifier) => {
-  if (!isAstNode(specifier) || specifier.type !== "ImportSpecifier") {
-    return null;
-  }
-  return isIdentifier(specifier.local) ? specifier.local.name : null;
-};
-const PER_ITERATION_LOOP_FIELDS = {
-  ForStatement: ["body", "test", "update"],
-  ForOfStatement: ["body"],
-  ForInStatement: ["body"],
-  WhileStatement: ["body", "test"],
-  DoWhileStatement: ["body", "test"],
-};
-export const LOOP_NODE_TYPES = new Set(Object.keys(PER_ITERATION_LOOP_FIELDS));
-export const isPerIterationLoopPosition = (loop, child) => {
-  if (!isAstNode(loop)) {
-    return false;
-  }
-  const fields = PER_ITERATION_LOOP_FIELDS[loop.type];
-  return fields?.some((field) => loop[field] === child) ?? false;
-};
-const isResultTryPromiseArgument = (node) => {
-  if (!isAstNode(node)) {
-    return false;
-  }
-  const call = node.parent;
-  if (
-    !isAstNode(call) ||
-    call.type !== "CallExpression" ||
-    !isMemberAccess(call.callee, "Result", "tryPromise")
-  ) {
-    return false;
-  }
-  return Array.isArray(call.arguments) && call.arguments.includes(node);
-};
-export const isResultTryPromiseCallback = (fnNode) => {
-  if (!isAstNode(fnNode)) {
-    return false;
-  }
-  const parent = fnNode.parent;
-  if (
-    isAstNode(parent) &&
-    parent.type === "Property" &&
-    parent.value === fnNode &&
-    getPropertyName(parent.key) === "try"
-  ) {
-    const objectExpression = parent.parent;
-    return (
-      isAstNode(objectExpression) &&
-      objectExpression.type === "ObjectExpression" &&
-      isResultTryPromiseArgument(objectExpression)
-    );
-  }
-  return isResultTryPromiseArgument(fnNode);
-};
-export const resolveChainRootName = (node) => {
-  const current = unwrapExpression(node);
-  if (!isAstNode(current)) {
-    return null;
-  }
-  if (current.type === "CallExpression") {
-    return resolveChainRootName(current.callee);
-  }
-  if (current.type === "MemberExpression") {
-    return resolveChainRootName(current.object);
-  }
-  return isIdentifier(current) ? current.name : null;
 };

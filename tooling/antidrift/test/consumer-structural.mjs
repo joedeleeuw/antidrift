@@ -81,6 +81,10 @@ export function scaffoldStructuralContracts({ file, work }) {
     'import { make } from "second-owner";\nimport type { CopiedChild } from "./nested-contract.js";\nexport interface LocalEnvelope { payload: CopiedChild; meta: string }\nexport const copied: LocalEnvelope = make();\n'
   );
   file(
+    "packages/app/src/inline-owner-projection.ts",
+    'import { makeChild } from "first-owner";\nexport function readInput(input: { a: string; b: number; c: boolean }) { return input; }\nexport const copied = readInput(makeChild());\n'
+  );
+  file(
     "packages/app/src/n-way-local.ts",
     'import { makeChild } from "first-owner";\nexport interface FirstCopy { a: string; b: number; c: boolean }\nexport interface SecondCopy { a: string; b: number; c: boolean }\nexport interface ThirdCopy { a: string; b: number; c: boolean }\nexport const first: FirstCopy = makeChild();\nexport const second: SecondCopy = makeChild();\nexport const third: ThirdCopy = makeChild();\n'
   );
@@ -122,6 +126,17 @@ export function proveStructuralContracts({ file, lint }) {
   ) {
     throw new Error(
       `Nested workspace ownership must report one copied child: ${JSON.stringify(before)}`
+    );
+  }
+  const inlineOnly = structuralMessages([
+    "packages/app/src/inline-owner-projection.ts",
+  ]);
+  if (
+    inlineOnly.length !== 1 ||
+    inlineOnly[0]?.messageId !== "ownedContractProjection"
+  ) {
+    throw new Error(
+      `Inline-only ownership must initialize provenance scope: ${JSON.stringify(inlineOnly)}`
     );
   }
   file(

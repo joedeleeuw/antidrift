@@ -1,4 +1,4 @@
-export const generatedTargets = [
+const generatedTargets = [
   "AGENTS.md",
   "CLAUDE.md",
   ".github/copilot-instructions.md",

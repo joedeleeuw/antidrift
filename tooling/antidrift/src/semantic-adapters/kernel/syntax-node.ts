@@ -56,6 +56,20 @@ export function syntaxChildren(
   return children;
 }
 
+export function isTypeOnlyModule(node: unknown): boolean {
+  const specifiers = syntaxChildren(node, "specifiers");
+  return (
+    syntaxText(node, "importKind") === "type" ||
+    syntaxText(node, "exportKind") === "type" ||
+    (specifiers.length > 0 &&
+      specifiers.every(
+        (specifier) =>
+          syntaxText(specifier, "importKind") === "type" ||
+          syntaxText(specifier, "exportKind") === "type"
+      ))
+  );
+}
+
 export function syntaxText(node: unknown, field: string): string | null {
   const text = syntaxField(node, field);
   return typeof text === "string" ? text : null;

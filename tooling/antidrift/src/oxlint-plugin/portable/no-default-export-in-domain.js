@@ -2,9 +2,12 @@ import {
   isRuleFile,
   scopeProperties,
 } from "../../semantic-adapters/kernel/rule-scope.ts";
-import { isDomainFile, isTestFilename } from "./syntax.js";
+import { isDomainFile, isMigrationFile, isTestFilename } from "./syntax.js";
 
-export const noDefaultExportInDomainRule = {
+const GENERATED_MODULE_PATTERN = /\.(?:gen|generated)\.[cm]?[jt]sx?$/;
+const DECLARATION_MODULE_PATTERN = /\.d\.[cm]?ts$/;
+
+const noDefaultExportInDomainRule = {
   meta: {
     schema: [
       {
@@ -25,12 +28,13 @@ export const noDefaultExportInDomainRule = {
     },
   },
   create(context) {
-    if (!isRuleFile(context)) return {};
-
-    if (isTestFilename(context.filename)) {
-      return {};
-    }
-    if (!isDomainFile(context.filename)) {
+    if (
+      !isRuleFile(context, isDomainFile) ||
+      isTestFilename(context.filename) ||
+      isMigrationFile(context.filename) ||
+      GENERATED_MODULE_PATTERN.test(context.filename) ||
+      DECLARATION_MODULE_PATTERN.test(context.filename)
+    ) {
       return {};
     }
     return {

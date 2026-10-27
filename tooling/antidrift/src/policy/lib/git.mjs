@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 
 /** @param {string[]} args */
-export function git(args) {
+function git(args) {
   const result = spawnSync("git", args, { encoding: "utf8" });
   if (result.status !== 0) return "";
   return result.stdout.trim();

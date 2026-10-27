@@ -12,7 +12,7 @@ Member sets must match exactly. Order and duplicates are ignored; string case, w
 
 ## Controls
 
-Default-off. `allows` contains type alias names or validator binding/property paths such as `phase` or `validators.phase`.
+Enabled at error. `allows` contains type alias names or validator binding/property paths such as `phase` or `validators.phase`.
 
 ```js
 "antidrift/no-redeclared-owned-union": ["error", { allows: ["WirePhase"] }]
@@ -22,8 +22,8 @@ Derive types with `(typeof PHASES)[number]` and validators with `v.union(...PHAS
 
 ## Ecosystem
 
-Duplicate union-member checks concern repetition within a union. This rule instead compares the union to an in-scope runtime owner. Ecosystem ownership remains provisional pending external inventory.
+Duplicate union-member checks concern repetition within a union. This rule instead compares the union to an in-scope runtime owner. That runtime-owner comparison remains Antidrift-owned behavior rather than a duplicate of maintained union-literal checks.
 
 ## Corpus
 
-The local Antidrift corpus checks the actual `fixtures/owned-union/allows.ts` source through the corpus runner; its companion flags fixture proves imported-owner detection. Unit fixtures also cover normalized numeric sets, import aliases, shadowing, exemptions, and Convex binding provenance. No independently pinned external checkout was examined. Keep default-off until external false-positive evidence is available.
+The local Antidrift corpus checks the actual `fixtures/owned-union/allows.ts` source through the corpus runner; its companion flags fixture proves imported-owner detection. Packed and public behavioral controls cover normalized numeric sets, import aliases, shadowing, exemptions, and Convex binding provenance. Selected external programs provide performance and zero-candidate evidence, not a claim of inertness or a reason to restore the historical default-off recommendation.

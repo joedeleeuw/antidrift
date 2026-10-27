@@ -62,7 +62,17 @@ function loopBinding(node) {
     return null;
   }
   const binding = node.left.declarations[0]?.id;
-  return binding?.type === "Identifier" ? binding.name : null;
+  return binding?.type === "Identifier" ? binding : null;
+}
+
+function matchesLoopBinding(identifier, binding, loopVariable, sourceCode) {
+  if (identifier?.type !== "Identifier" || identifier.name !== binding.name) {
+    return false;
+  }
+  return (
+    loopVariable === null ||
+    findVariable(sourceCode, identifier) === loopVariable
+  );
 }
 
 function hasLiteralKeys(node) {
@@ -169,17 +179,21 @@ function isConstBinding(identifier, sourceCode) {
   );
 }
 
-function indexedPropertyRoot(node, bindingName, sourceCode) {
+function indexedPropertyRoot(node, binding, loopVariable, sourceCode) {
   const expression = unwrapExpression(node);
   const projected = transparentArgument(expression, sourceCode);
   if (projected) {
-    return indexedPropertyRoot(projected, bindingName, sourceCode);
+    return indexedPropertyRoot(projected, binding, loopVariable, sourceCode);
   }
   if (
     expression?.type !== "MemberExpression" ||
     !expression.computed ||
-    unwrapExpression(expression.property)?.type !== "Identifier" ||
-    unwrapExpression(expression.property).name !== bindingName
+    !matchesLoopBinding(
+      unwrapExpression(expression.property),
+      binding,
+      loopVariable,
+      sourceCode
+    )
   ) {
     return null;
   }
@@ -213,14 +227,14 @@ function isNode(field) {
   );
 }
 
-function containsStaticAssertion(root, bindingName, sourceCode) {
+function containsStaticAssertion(root, binding, loopVariable, sourceCode) {
   const stack = [root];
   while (stack.length > 0) {
     const node = stack.pop();
     const subject =
       node.type === "CallExpression" ? assertionSubject(node) : null;
     const object = subject
-      ? indexedPropertyRoot(subject, bindingName, sourceCode)
+      ? indexedPropertyRoot(subject, binding, loopVariable, sourceCode)
       : null;
     if (object && isConstBinding(object, sourceCode)) return true;
     for (const [key, field] of Object.entries(node)) {
@@ -235,11 +249,16 @@ function containsStaticAssertion(root, bindingName, sourceCode) {
 
 export function isStaticPropertyEcho(node, sourceCode, filename) {
   if (!testFilenamePattern.test(filename)) return false;
-  const bindingName = loopBinding(node);
+  const binding = loopBinding(node);
   return Boolean(
-    bindingName &&
+    binding &&
     isInsideTestBlock(node) &&
     hasLiteralKeys(node) &&
-    containsStaticAssertion(node.body, bindingName, sourceCode)
+    containsStaticAssertion(
+      node.body,
+      binding,
+      findVariable(sourceCode, binding),
+      sourceCode
+    )
   );
 }

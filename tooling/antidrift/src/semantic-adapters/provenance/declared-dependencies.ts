@@ -203,6 +203,18 @@ function wildcardMatches(
     }));
 }
 
+export function matchesSpecifierPattern(
+  candidate: string,
+  pattern: string
+): boolean {
+  const [prefix = "", suffix] = pattern.split("*");
+  return suffix === undefined
+    ? candidate === pattern
+    : candidate.length >= prefix.length + suffix.length &&
+        candidate.startsWith(prefix) &&
+        candidate.endsWith(suffix);
+}
+
 function governingEntry(
   entries: readonly string[],
   entryKey: string
@@ -211,15 +223,10 @@ function governingEntry(
     return entryKey;
   }
   return entries
-    .filter((candidate) => {
-      const [prefix = "", suffix] = candidate.split("*");
-      return (
-        suffix !== undefined &&
-        entryKey.length >= prefix.length + suffix.length &&
-        entryKey.startsWith(prefix) &&
-        entryKey.endsWith(suffix)
-      );
-    })
+    .filter(
+      (candidate) =>
+        candidate.includes("*") && matchesSpecifierPattern(entryKey, candidate)
+    )
     .sort(
       (left, right) =>
         right.indexOf("*") - left.indexOf("*") || right.length - left.length
@@ -307,6 +314,57 @@ export function resolvedModule(
     undefined,
     mode
   ).resolvedModule;
+}
+
+export function createUsageResolver(
+  filename: string,
+  sourceText: string,
+  options: ts.CompilerOptions
+) {
+  let sourceFile: ts.SourceFile | undefined;
+  return (specifier: string, position: number) => {
+    const parsedFile = (sourceFile ??= ts.createSourceFile(
+      filename,
+      sourceText,
+      {
+        languageVersion: ts.ScriptTarget.Latest,
+        impliedNodeFormat: ts.getImpliedNodeFormatForFile(
+          filename,
+          undefined,
+          ts.sys,
+          options
+        ),
+      },
+      true
+    ));
+    let usage: ts.StringLiteralLike | undefined;
+    const visit = (node: ts.Node) => {
+      if (usage) {
+        return;
+      }
+      if (
+        ts.isStringLiteralLike(node) &&
+        node.getStart(parsedFile) === position &&
+        node.text === specifier
+      ) {
+        usage = node;
+        return;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(parsedFile);
+    if (!usage) {
+      throw new Error(
+        `Cannot locate module specifier '${specifier}' at ${filename}:${position} for resolution-mode analysis.`
+      );
+    }
+    return resolvedModule(
+      specifier,
+      filename,
+      options,
+      ts.getModeForUsageLocation(parsedFile, usage, options)
+    );
+  };
 }
 
 export function resolvesToTypes(

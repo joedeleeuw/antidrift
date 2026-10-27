@@ -78,7 +78,7 @@ const planStatusLiteralOptions = {
   ],
 };
 
-export const defaultCases = [
+const defaultCases = [
   {
     id: "portal-types-reports-no-calling-components-clean",
     ruleId: "antidrift/no-calling-components-as-functions",

@@ -47,7 +47,7 @@ export default {
         if (hookName && node.arguments.length < 2) {
           context.report({
             node,
-            message: `${hookName} must be called with a dependency array. Without it the effect runs on every render — pass [] or the real dependencies.`,
+            message: `${hookName} must declare its dependency array. Pass the dependencies the effect reads. If every-render execution is intentional, keep it and suppress antidrift/require-effect-deps with a reason rather than adding [].`,
           });
         }
       },

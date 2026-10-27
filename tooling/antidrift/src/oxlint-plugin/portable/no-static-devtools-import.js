@@ -2,6 +2,7 @@ import {
   isRuleFile,
   scopeProperties,
 } from "../../semantic-adapters/kernel/rule-scope.ts";
+import { isTypeOnlyModule } from "../../semantic-adapters/kernel/syntax-node.ts";
 
 const DEVTOOLS_PACKAGES = new Set([
   "@tanstack/react-devtools",
@@ -9,15 +10,6 @@ const DEVTOOLS_PACKAGES = new Set([
   "@tanstack/react-router-devtools",
   "@tanstack/react-table-devtools",
 ]);
-const isTypeOnlyImport = (node) => {
-  if (node.importKind === "type") {
-    return true;
-  }
-  if (!Array.isArray(node.specifiers) || node.specifiers.length === 0) {
-    return false;
-  }
-  return node.specifiers.every((specifier) => specifier.importKind === "type");
-};
 export default {
   meta: {
     schema: [
@@ -45,7 +37,7 @@ export default {
     return {
       ImportDeclaration(node) {
         const source = node.source?.value;
-        if (typeof source !== "string" || isTypeOnlyImport(node)) {
+        if (typeof source !== "string" || isTypeOnlyModule(node)) {
           return;
         }
         if (DEVTOOLS_PACKAGES.has(source)) {
