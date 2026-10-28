@@ -1,4 +1,4 @@
-use super::syntax::{in_scope, is_function};
+use super::syntax::is_function;
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
@@ -83,7 +83,7 @@ impl Rule for NoEagerSingleton {
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
             rule: self,
-            enabled: in_scope(ctx, &self.scope),
+            enabled: self.scope.in_scope(ctx),
         })
     }
 }

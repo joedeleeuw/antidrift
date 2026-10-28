@@ -1,6 +1,5 @@
 use super::syntax::{
-    declaration, global, identifier_member, in_scope, is_var_decl, member, symbol, unwrap,
-    without_parens,
+    declaration, global, identifier_member, is_var_decl, member, symbol, unwrap, without_parens,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
@@ -34,7 +33,7 @@ impl Rule for RequireFunctionReplacer {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
-            enabled: in_scope(ctx, &self.scope),
+            enabled: self.scope.in_scope(ctx),
         })
     }
 }

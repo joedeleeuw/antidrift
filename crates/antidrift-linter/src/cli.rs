@@ -18,7 +18,6 @@ pub(crate) struct CliArgs {
     pub(crate) prune_suppressions: bool,
     pub(crate) suppress_rules: Vec<String>,
     pub(crate) suppressions_path: PathBuf,
-    pub(crate) semantic_facts_out: Option<PathBuf>,
     pub(crate) batch_json: Option<String>,
     pub(crate) report_unused_directives: bool,
     pub(crate) list_rules: bool,
@@ -33,7 +32,6 @@ impl Default for CliArgs {
             prune_suppressions: false,
             suppress_rules: Vec::new(),
             suppressions_path: PathBuf::from("eslint-suppressions.json"),
-            semantic_facts_out: None,
             batch_json: None,
             report_unused_directives: false,
             list_rules: false,
@@ -79,12 +77,6 @@ where
                 .next()
                 .ok_or("missing value for --suppressions-location")?;
             parsed.suppressions_path = PathBuf::from(val);
-        }
-        "--semantic-facts-out" => {
-            let val = iter
-                .next()
-                .ok_or("missing value for --semantic-facts-out")?;
-            parsed.semantic_facts_out = Some(PathBuf::from(val));
         }
         "--batch-json" => {
             let val = iter.next().ok_or("missing value for --batch-json")?;

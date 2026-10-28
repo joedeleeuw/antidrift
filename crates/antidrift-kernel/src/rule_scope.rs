@@ -39,13 +39,12 @@ pub fn require_non_empty(
 #[must_use]
 pub fn in_scope(scope: &RuleScope, ctx: &Ctx, inferred_scope: Option<fn(&str) -> bool>) -> bool {
     let filename = tspath::normalize_slashes(ctx.file.file_name());
-    let cwd = ctx.program.host().get_current_directory();
     let matches_inferred = if scope.has_explicit_files() {
         true
     } else {
         inferred_scope.is_none_or(|predicate| predicate(&filename))
     };
-    scope.matches(&filename, cwd) && matches_inferred
+    scope.in_scope(ctx) && matches_inferred
 }
 
 pub fn decode_rule_options<T: DeserializeOwned + Default>(
@@ -121,6 +120,13 @@ impl RuleScope {
     #[must_use]
     pub const fn has_explicit_files(&self) -> bool {
         self.files.is_some()
+    }
+
+    #[must_use]
+    pub fn in_scope(&self, ctx: &Ctx) -> bool {
+        let filename = tspath::normalize_slashes(ctx.file.file_name());
+        let cwd = ctx.program.host().get_current_directory();
+        self.matches(&filename, cwd)
     }
 
     #[must_use]

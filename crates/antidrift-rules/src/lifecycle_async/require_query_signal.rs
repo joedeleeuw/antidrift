@@ -1,6 +1,6 @@
 use super::syntax::{
-    Binding, binding_property, const_initializer, global, in_scope, object_property, owner,
-    property, property_name, root_identifier, symbol, symbol_is_mutated, unwrap,
+    Binding, binding_property, const_initializer, global, object_property, owner, property,
+    property_name, root_identifier, symbol, symbol_is_mutated, unwrap,
 };
 use antidrift_kernel::local_binding::is_identifier_reference_position;
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
@@ -55,7 +55,7 @@ impl Rule for RequireQuerySignal {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(ctx, &self.scope);
+        let enabled = self.scope.in_scope(ctx);
         let functions = if enabled {
             query_functions(ctx.file.as_node())
         } else {

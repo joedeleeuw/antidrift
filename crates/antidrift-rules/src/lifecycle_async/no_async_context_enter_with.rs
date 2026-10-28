@@ -1,4 +1,3 @@
-use super::syntax::in_scope;
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -31,7 +30,7 @@ impl Rule for NoAsyncContextEnterWith {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
-            enabled: in_scope(ctx, &self.scope),
+            enabled: self.scope.in_scope(ctx),
         })
     }
 }

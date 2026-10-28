@@ -10,7 +10,6 @@ pub mod projection;
 pub mod provenance;
 pub mod registries;
 pub mod rule_scope;
-pub mod semantic_facts;
 pub mod shape;
 pub mod span_index;
 pub mod suppressions;

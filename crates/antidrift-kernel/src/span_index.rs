@@ -9,17 +9,6 @@ pub struct DiagnosticLocation {
     pub end_column: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FactLocation {
-    pub column: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub end_column: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub end_line: Option<u32>,
-    pub line: u32,
-}
-
 #[derive(Debug, Clone)]
 pub struct LineIndex {
     line_starts: Vec<u32>,

@@ -172,7 +172,6 @@ try {
           "antidrift",
           "oxlint",
           "--",
-          "--type-aware",
           "--format",
           "json",
           "--config",

@@ -5,9 +5,8 @@ use std::sync::Arc;
 
 use antidrift_kernel::diagnostic::{RuleDiagnostic, RuleFix, Severity, TextEdit, apply_fixes};
 use antidrift_kernel::directives::{DirectiveSet, effective_token_start};
-use antidrift_kernel::semantic_facts::SemanticFact;
 use antidrift_kernel::span_index::LineIndex;
-use antidrift_rules::create_rule;
+use antidrift_rules::{create_rule, lookup_default_rule};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -19,7 +18,7 @@ use tsrs_core::{P, Tristate};
 use tsrs_vfs::{FS, bundled, cachedvfs, osvfs};
 use tsrslint::linter::{Options, lint_files};
 use tsrslint::overlayfs::OverlayFS;
-use tsrslint::rule::Rule;
+use tsrslint::rule::{ReportedDiagnostic, Rule};
 
 use crate::tsgolint_host::inferred_compiler_options;
 
@@ -54,7 +53,6 @@ pub(crate) struct BatchCaseInput {
 pub(crate) struct BatchCaseOutput {
     pub(crate) id: String,
     pub(crate) diagnostics: Vec<RuleDiagnostic>,
-    pub(crate) facts: Vec<SemanticFact>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) fixed_text: Option<String>,
 }
@@ -105,12 +103,47 @@ fn evaluate_single_case(case: &BatchCaseInput) -> Result<BatchCaseOutput, String
     Ok(BatchCaseOutput {
         id: case.id.clone(),
         diagnostics,
-        facts: Vec::new(),
         fixed_text,
     })
 }
 
-pub(crate) fn lint_source_file(
+pub(crate) fn reported_to_rule_diagnostic(
+    item: &ReportedDiagnostic,
+    source_text: &str,
+    line_index: &LineIndex,
+    severities: &FxHashMap<String, Severity>,
+) -> RuleDiagnostic {
+    let start = effective_token_start(source_text, item.pos, item.end);
+    let end = u32::try_from(item.end.max(0)).unwrap_or(start);
+    let severity = severities
+        .get(item.rule_name)
+        .copied()
+        .unwrap_or(Severity::Error);
+    let fix = item
+        .fixes
+        .as_ref()
+        .filter(|fixes| !fixes.is_empty())
+        .map(|fixes| RuleFix {
+            edits: fixes
+                .iter()
+                .map(|f| TextEdit {
+                    start: u32::try_from(f.pos.max(0)).unwrap_or(0),
+                    end: u32::try_from(f.end.max(0)).unwrap_or(0),
+                    text: f.text.clone(),
+                })
+                .collect(),
+        });
+    RuleDiagnostic {
+        rule_id: item.rule_name.to_string(),
+        message_id: Some(item.message.id.to_string()),
+        message: item.message.description.clone(),
+        severity,
+        location: line_index.diagnostic_location(source_text, start, end),
+        fix,
+    }
+}
+
+fn lint_source_file(
     normalized_file: &str,
     source_text: &str,
     dir: &str,
@@ -158,37 +191,11 @@ pub(crate) fn lint_source_file(
         .copied()
         .filter(|sf| sf.path() == &target_path)
         .collect();
-    let mut raw_diagnostics = Vec::new();
-    for item in lint_files(program, &source_files, active_rules, &Options::default()) {
-        let start = effective_token_start(source_text, item.pos, item.end);
-        let end = u32::try_from(item.end.max(0)).unwrap_or(start);
-        let severity = severities
-            .get(item.rule_name)
-            .copied()
-            .unwrap_or(Severity::Error);
-        let fix = item
-            .fixes
-            .as_ref()
-            .filter(|fixes| !fixes.is_empty())
-            .map(|fixes| RuleFix {
-                edits: fixes
-                    .iter()
-                    .map(|f| TextEdit {
-                        start: u32::try_from(f.pos.max(0)).unwrap_or(0),
-                        end: u32::try_from(f.end.max(0)).unwrap_or(0),
-                        text: f.text.clone(),
-                    })
-                    .collect(),
-            });
-        raw_diagnostics.push(RuleDiagnostic {
-            rule_id: item.rule_name.to_string(),
-            message_id: Some(item.message.id.to_string()),
-            message: item.message.description.clone(),
-            severity,
-            location: line_index.diagnostic_location(source_text, start, end),
-            fix,
-        });
-    }
+    let raw_diagnostics: Vec<RuleDiagnostic> =
+        lint_files(program, &source_files, active_rules, &Options::default())
+            .iter()
+            .map(|item| reported_to_rule_diagnostic(item, source_text, &line_index, severities))
+            .collect();
     directives.filter_diagnostics(
         raw_diagnostics,
         report_unused_directives,
@@ -202,6 +209,34 @@ struct CaseRuleSet {
     severities: FxHashMap<String, Severity>,
 }
 
+fn has_non_empty_options(options: Option<&Value>) -> bool {
+    match options {
+        None | Some(Value::Null) => false,
+        Some(Value::Array(items)) => items.first().is_some_and(|first| !first.is_null()),
+        Some(_) => true,
+    }
+}
+
+fn resolve_case_rule(
+    rule_name: &str,
+    options: Option<&Value>,
+    filename: &str,
+    case_id: &str,
+) -> Result<&'static dyn Rule, String> {
+    if !has_non_empty_options(options)
+        && let Some(default_rule) = lookup_default_rule(rule_name)
+    {
+        return Ok(default_rule);
+    }
+    let Some(rule) = create_rule(rule_name, options).map_err(|err| format!("{filename}: {err}"))?
+    else {
+        return Err(format!(
+            "unknown rule '{rule_name}' in batch case '{case_id}'"
+        ));
+    };
+    Ok(Box::leak(rule))
+}
+
 fn build_case_rules(case: &BatchCaseInput) -> Result<CaseRuleSet, String> {
     let mut rules: Vec<&'static dyn Rule> = Vec::new();
     let mut severities: FxHashMap<String, Severity> = FxHashMap::default();
@@ -211,33 +246,18 @@ fn build_case_rules(case: &BatchCaseInput) -> Result<CaseRuleSet, String> {
             Some(Value::Null) | None => None,
             Some(single) => Some(Value::Array(vec![single.clone()])),
         };
-        let Some(rule) = create_rule(rule_name, options.as_ref())
-            .map_err(|err| format!("{}: {err}", case.filename))?
-        else {
-            return Err(format!(
-                "unknown rule '{rule_name}' in batch case '{}'",
-                case.id
-            ));
-        };
-        let leaked: &'static dyn Rule = Box::leak(rule);
-        severities.insert(leaked.name().to_string(), Severity::Error);
-        rules.push(leaked);
+        let resolved = resolve_case_rule(rule_name, options.as_ref(), &case.filename, &case.id)?;
+        severities.insert(resolved.name().to_string(), Severity::Error);
+        rules.push(resolved);
     }
     if let Some(rules_map) = &case.rules {
         for (rule_id, config) in rules_map {
             let act = parse_rule_config_entry(rule_id, config)?;
-            let Some(rule) = create_rule(rule_id, Some(&act.options))
-                .map_err(|err| format!("{}: {err}", case.filename))?
-            else {
-                return Err(format!(
-                    "unknown rule '{rule_id}' in batch case '{}'",
-                    case.id
-                ));
-            };
+            let resolved =
+                resolve_case_rule(rule_id, Some(&act.options), &case.filename, &case.id)?;
             if act.severity != Severity::Off {
-                let leaked: &'static dyn Rule = Box::leak(rule);
-                severities.insert(leaked.name().to_string(), act.severity);
-                rules.push(leaked);
+                severities.insert(resolved.name().to_string(), act.severity);
+                rules.push(resolved);
             }
         }
     }

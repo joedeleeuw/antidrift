@@ -1,6 +1,6 @@
 use super::syntax::{
-    Span, binding_for_declarator, call_expression, const_initializer, identifier, in_scope,
-    object_property, parent_expression, property_name, root_identifier, symbol, unwrap,
+    Span, binding_for_declarator, call_expression, const_initializer, identifier, object_property,
+    parent_expression, property_name, root_identifier, symbol, unwrap,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
@@ -39,7 +39,7 @@ impl Rule for NoSpreadInputInQueryKey {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
-            enabled: in_scope(ctx, &self.scope),
+            enabled: self.scope.in_scope(ctx),
         })
     }
 }

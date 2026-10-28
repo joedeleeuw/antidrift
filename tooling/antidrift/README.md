@@ -28,12 +28,28 @@ The default ruleset also enforces these rules at error:
 - Type-checked authority & boundary rules: `antidrift/no-structural-type-fork`, `antidrift/no-contract-appeasement-projection`, `antidrift/no-redundant-zod-parse`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-unresolved-dependency-types`, and `antidrift/no-service-constructor-imports`. `antidrift/no-sql-string-concat` remains registered for explicit opt-in.
 
 ```sh
-pnpm add -D @joedeleeuw/antidrift @joedeleeuw/typescript-tooling oxlint oxlint-tsgolint typescript
+pnpm add -D @joedeleeuw/antidrift typescript
 ```
 
-## Use the configs
+## Quickstart (Standalone)
 
-Create the root Oxlint config:
+Create `oxlint.config.mjs`:
+
+```js
+import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";
+
+export default createGovernanceOxlintConfig({
+  repoRoot: import.meta.dirname,
+});
+```
+
+Run the unified Oxlint + native Rust `antidrift-linter` gate:
+
+```sh
+npx antidrift oxlint
+```
+
+## Composing with `@joedeleeuw/typescript-tooling` or Custom Oxlint Configs
 
 ```ts
 import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";

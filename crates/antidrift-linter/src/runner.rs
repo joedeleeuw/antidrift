@@ -1,19 +1,27 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use antidrift_kernel::diagnostic::{RuleDiagnostic, apply_fixes};
+use antidrift_kernel::directives::DirectiveSet;
+use antidrift_kernel::provenance::relative_to_cwd;
 use antidrift_kernel::registries::PolicyRegistries;
-use antidrift_kernel::semantic_facts::{SemanticFact, semantic_fact_to_json_line};
+use antidrift_kernel::span_index::LineIndex;
 use antidrift_kernel::suppressions::SuppressionsTable;
 use ignore::WalkBuilder;
-use rayon::prelude::*;
 use rustc_hash::FxHashMap;
+use tsrs_ast::SourceFile;
+use tsrs_core::P;
 use tsrs_core::tspath;
+use tsrs_vfs::{FS, bundled, cachedvfs, osvfs};
+use tsrslint::linter::{Options, lint_files};
+use tsrslint::rule::{ReportedDiagnostic, Rule};
 
-use crate::batch::lint_source_file;
+use crate::batch::reported_to_rule_diagnostic;
 use crate::cli::CliArgs;
 use crate::format::format_diagnostics;
+use crate::tsgolint_host::{BoundProgram, ProgramBuilderEnv, collect_missing_bound_files};
 use crate::tsgolint_runner::default_workspace_rules;
 
 pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
@@ -22,63 +30,118 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
         .map_err(|err| format!("failed to read current directory: {err}"))?;
     let registries = PolicyRegistries::load_from_repo(&cwd)?;
     let files = collect_lintable_files(&args.paths, &cwd)?;
+    if files.is_empty() {
+        return handle_suppressions_and_format(args, &BTreeMap::new());
+    }
     let active_rules = default_workspace_rules(&registries)?;
-    let script_rules: Vec<&'static dyn tsrslint::rule::Rule> = active_rules
+    let script_rules: Vec<&'static dyn Rule> = active_rules
         .iter()
         .copied()
         .filter(|rule| !antidrift_rules::is_typescript_only_rule(rule.name()))
         .collect();
-    let severities = FxHashMap::default();
     let cwd_norm = tspath::normalize_slashes(&cwd.to_string_lossy());
-
-    let per_file_results: Vec<(String, Vec<RuleDiagnostic>, Vec<SemanticFact>)> = files
-        .par_iter()
-        .map(|path| {
-            let source_text = fs::read_to_string(path)
-                .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
-            let rel_path = path
-                .strip_prefix(&cwd)
-                .unwrap_or(path)
-                .to_string_lossy()
-                .replace('\\', "/");
-            let full_norm = tspath::normalize_slashes(&path.to_string_lossy());
-            let rules_for_file = if tspath::has_ts_file_extension(&full_norm) {
-                &active_rules
-            } else {
-                &script_rules
-            };
-            let diagnostics = lint_source_file(
-                &full_norm,
-                &source_text,
-                &cwd_norm,
-                rules_for_file,
-                &severities,
-                args.report_unused_directives,
-            );
-            if args.fix
-                && let Some(fixed) = apply_fixes(&source_text, &diagnostics)
-            {
-                fs::write(path, fixed)
-                    .map_err(|err| format!("failed to write {}: {err}", path.display()))?;
-            }
-            Ok((rel_path, diagnostics, Vec::new()))
-        })
-        .collect::<Result<Vec<_>, String>>()?;
-
+    let fs: Arc<dyn FS> = Arc::new(bundled::wrap_fs(cachedvfs::from(Arc::new(osvfs::fs()))));
+    let env = ProgramBuilderEnv::new(fs, &cwd_norm);
+    let normalized_files: Vec<String> = files
+        .iter()
+        .map(|path| tspath::normalize_slashes(&path.to_string_lossy()))
+        .collect();
+    let (programs, mut unmatched) = env.group_files_by_tsconfig(&normalized_files);
     let mut diagnostics_by_file: BTreeMap<String, Vec<RuleDiagnostic>> = BTreeMap::new();
-    let mut all_facts: Vec<SemanticFact> = Vec::new();
-    for (file_path, diags, facts) in per_file_results {
-        if !diags.is_empty() {
-            diagnostics_by_file.insert(file_path, diags);
+    for (config_file_name, config_files) in &programs {
+        match env.run_configured_program(config_file_name, config_files, true) {
+            Ok(bound) => {
+                collect_missing_bound_files(&bound.source_files, config_files, &mut unmatched);
+                lint_bound_program(
+                    &bound,
+                    &active_rules,
+                    &script_rules,
+                    &cwd_norm,
+                    args,
+                    &mut diagnostics_by_file,
+                )?;
+            }
+            Err(_) => unmatched.extend(config_files.iter().cloned()),
         }
-        all_facts.extend(facts);
     }
-
-    if let Some(facts_out) = &args.semantic_facts_out {
-        write_semantic_facts(facts_out, &all_facts)?;
+    if !unmatched.is_empty() {
+        let bound = env.build_inferred_program(&unmatched);
+        lint_bound_program(
+            &bound,
+            &active_rules,
+            &script_rules,
+            &cwd_norm,
+            args,
+            &mut diagnostics_by_file,
+        )?;
     }
 
     handle_suppressions_and_format(args, &diagnostics_by_file)
+}
+
+fn lint_bound_program(
+    bound: &BoundProgram,
+    active_rules: &[&'static dyn Rule],
+    script_rules: &[&'static dyn Rule],
+    cwd_norm: &str,
+    args: &CliArgs,
+    diagnostics_by_file: &mut BTreeMap<String, Vec<RuleDiagnostic>>,
+) -> Result<(), String> {
+    let mut ts_files: Vec<P<SourceFile>> = Vec::new();
+    let mut js_files: Vec<P<SourceFile>> = Vec::new();
+    for &sf in &bound.source_files {
+        if tspath::has_ts_file_extension(sf.file_name()) {
+            ts_files.push(sf);
+        } else {
+            js_files.push(sf);
+        }
+    }
+    let mut reported_by_file: FxHashMap<String, Vec<ReportedDiagnostic>> = FxHashMap::default();
+    if !ts_files.is_empty() && !active_rules.is_empty() {
+        for item in lint_files(bound.program, &ts_files, active_rules, &Options::default()) {
+            reported_by_file
+                .entry(tspath::normalize_slashes(item.file.file_name()))
+                .or_default()
+                .push(item);
+        }
+    }
+    if !js_files.is_empty() && !script_rules.is_empty() {
+        for item in lint_files(bound.program, &js_files, script_rules, &Options::default()) {
+            reported_by_file
+                .entry(tspath::normalize_slashes(item.file.file_name()))
+                .or_default()
+                .push(item);
+        }
+    }
+    let severities = FxHashMap::default();
+    for &sf in &bound.source_files {
+        let full_norm = tspath::normalize_slashes(sf.file_name());
+        let source_text = sf.text();
+        let line_index = LineIndex::new(source_text);
+        let mut directives = DirectiveSet::from_source(source_text, &line_index);
+        let raw_diags: Vec<RuleDiagnostic> = reported_by_file
+            .remove(&full_norm)
+            .unwrap_or_default()
+            .iter()
+            .map(|item| reported_to_rule_diagnostic(item, source_text, &line_index, &severities))
+            .collect();
+        let filtered = directives.filter_diagnostics(
+            raw_diags,
+            args.report_unused_directives,
+            source_text,
+            &line_index,
+        );
+        if args.fix
+            && let Some(fixed) = apply_fixes(source_text, &filtered)
+        {
+            fs::write(&full_norm, fixed)
+                .map_err(|err| format!("failed to write {full_norm}: {err}"))?;
+        }
+        if !filtered.is_empty() {
+            diagnostics_by_file.insert(relative_to_cwd(cwd_norm, &full_norm), filtered);
+        }
+    }
+    Ok(())
 }
 
 fn handle_suppressions_and_format(
@@ -106,20 +169,6 @@ fn handle_suppressions_and_format(
         return Ok(1);
     }
     Ok(0)
-}
-
-fn write_semantic_facts(path: &Path, facts: &[SemanticFact]) -> Result<(), String> {
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        fs::create_dir_all(parent)
-            .map_err(|err| format!("failed to create {}: {err}", parent.display()))?;
-    }
-    let mut buf = String::new();
-    for fact in facts {
-        buf.push_str(&semantic_fact_to_json_line(fact)?);
-    }
-    fs::write(path, buf).map_err(|err| format!("failed to write {}: {err}", path.display()))
 }
 
 fn collect_lintable_files(paths: &[PathBuf], cwd: &Path) -> Result<Vec<PathBuf>, String> {
@@ -157,7 +206,5 @@ fn is_supported_file(path: &Path) -> bool {
     let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
         return false;
     };
-    name == "package.json"
-        || tspath::has_implementation_ts_file_extension(name)
-        || tspath::has_js_file_extension(name)
+    tspath::has_implementation_ts_file_extension(name) || tspath::has_js_file_extension(name)
 }

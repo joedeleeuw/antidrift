@@ -1,34 +1,10 @@
-pub(super) use antidrift_kernel::tsrs_kernel::unwrap_expression as unwrap;
-use tsrs_ast::{self as ast, Kind, Node, SourceFile};
+pub(super) use antidrift_kernel::tsrs_kernel::{
+    Span, call_expression_of as call, identifier_of as identifier,
+    numeric_literal_value as numeric_value, unwrap_awaited_expression as awaited,
+    unwrap_expression as unwrap,
+};
+use tsrs_ast::{Kind, Node, SourceFile};
 use tsrs_core::P;
-use tsrslint::utils::trim_node_text_range;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) struct Span {
-    pub(super) start: i32,
-    pub(super) end: i32,
-}
-
-impl Span {
-    pub(super) fn of(sf: P<SourceFile>, node: P<Node>) -> Self {
-        let (start, end) = trim_node_text_range(sf, node);
-        Self { start, end }
-    }
-}
-
-pub(super) fn awaited(expression: P<Node>) -> P<Node> {
-    let inner = unwrap(expression);
-    if inner.kind() == Kind::AwaitExpression {
-        awaited(inner.as_await_expression().expression())
-    } else {
-        inner
-    }
-}
-
-pub(super) fn identifier(expression: P<Node>) -> Option<P<Node>> {
-    let inner = unwrap(expression);
-    ast::is_identifier(inner).then_some(inner)
-}
 
 pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, String)> {
     let inner = unwrap(expression);
@@ -81,16 +57,6 @@ pub(super) fn segment(expression: P<Node>) -> Option<String> {
     }
 }
 
-pub(super) fn numeric_value(expression: P<Node>) -> Option<f64> {
-    if expression.kind() != Kind::NumericLiteral {
-        return None;
-    }
-    let Ok(value) = expression.text().replace('_', "").parse::<f64>() else {
-        return None;
-    };
-    Some(value)
-}
-
 pub(super) fn object_property(prop: P<Node>) -> Option<(String, P<Node>, bool)> {
     match prop.kind() {
         Kind::PropertyAssignment => {
@@ -125,11 +91,6 @@ pub(super) fn property_name(key: P<Node>, computed: bool) -> Option<String> {
         }
         _ => None,
     }
-}
-
-pub(super) fn call(expression: P<Node>) -> Option<P<Node>> {
-    let inner = unwrap(expression);
-    (inner.kind() == Kind::CallExpression).then_some(inner)
 }
 
 pub(super) fn argument(call_node: P<Node>, index: usize) -> Option<P<Node>> {
@@ -184,10 +145,6 @@ pub(super) fn literal(expression: P<Node>) -> bool {
                 | Kind::NoSubstitutionTemplateLiteral
                 | Kind::TemplateExpression
         )
-}
-
-pub(super) fn contains(outer: Span, inner: Span) -> bool {
-    outer.start <= inner.start && inner.end <= outer.end
 }
 
 pub(super) fn expression_key(sf: P<SourceFile>, expression: P<Node>) -> (i32, i32) {

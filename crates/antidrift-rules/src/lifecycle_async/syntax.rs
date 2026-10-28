@@ -5,43 +5,13 @@ pub(super) use antidrift_kernel::local_binding::{
     is_let_variable_declaration as is_let_decl, is_var_variable_declaration as is_var_decl,
     is_write_reference, resolve_lexical_binding as symbol,
 };
-use antidrift_kernel::rule_scope::RuleScope;
 pub(super) use antidrift_kernel::tsrs_kernel::{
+    Span, call_expression_of as call_expression, identifier_of as identifier,
     is_function_like as is_function, unwrap_expression as unwrap,
     unwrap_parentheses as without_parens,
 };
-use tsrs_ast::{self as ast, Kind, Node, SourceFile};
+use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::Ctx;
-use tsrslint::utils::trim_node_text_range;
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) struct Span {
-    pub(super) start: i32,
-    pub(super) end: i32,
-}
-
-impl Span {
-    pub(super) fn of(sf: P<SourceFile>, node: P<Node>) -> Self {
-        let (start, end) = trim_node_text_range(sf, node);
-        Self { start, end }
-    }
-
-    pub(super) fn contains_inclusive(self, other: Self) -> bool {
-        self.start <= other.start && other.end <= self.end
-    }
-}
-
-pub(super) fn in_scope(ctx: &Ctx<'_>, scope: &RuleScope) -> bool {
-    let cwd = ctx.program.host().get_current_directory();
-    let filename = ctx.file.file_name().replace('\\', "/");
-    scope.matches(&filename, cwd)
-}
-
-pub(super) fn identifier(expression: P<Node>) -> Option<P<Node>> {
-    let inner = unwrap(expression);
-    ast::is_identifier(inner).then_some(inner)
-}
 
 pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, &'static str)> {
     let inner = unwrap(expression);
@@ -137,11 +107,6 @@ pub(super) fn binding_property(elem: P<Node>) -> Option<(&'static str, P<Node>)>
     let key_node = binding.property_name().unwrap_or(value);
     let key = property_name(key_node)?;
     Some((key, value))
-}
-
-pub(super) fn call_expression(expression: P<Node>) -> Option<P<Node>> {
-    let inner = unwrap(expression);
-    (inner.kind() == Kind::CallExpression).then_some(inner)
 }
 
 pub(super) fn property(expression: P<Node>, name: &str) -> Option<P<Node>> {

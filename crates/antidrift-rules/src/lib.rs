@@ -81,6 +81,15 @@ pub fn is_typescript_only_rule(name: &str) -> bool {
         .any(|entry| entry.typescript_only && entry.rule.name() == name)
 }
 
+#[must_use]
+pub fn lookup_default_rule(name: &str) -> Option<&'static dyn Rule> {
+    rule_catalog().into_iter().find_map(|entry| {
+        let rule_name = entry.rule.name();
+        (rule_name == name || rule_name.strip_prefix("antidrift/") == Some(name))
+            .then_some(entry.rule)
+    })
+}
+
 pub fn create_rule(
     name: &str,
     options: Option<&serde_json::Value>,

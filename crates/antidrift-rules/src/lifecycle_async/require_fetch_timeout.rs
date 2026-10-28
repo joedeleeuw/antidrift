@@ -1,5 +1,5 @@
 use super::syntax::{
-    Binding, binding_for_declarator, const_initializer, declaration, identifier, in_scope,
+    Binding, binding_for_declarator, const_initializer, declaration, identifier,
     is_write_reference, member, object_property, property_name, symbol, symbol_is_mutated, unwrap,
     without_parens,
 };
@@ -47,7 +47,7 @@ impl Rule for RequireFetchTimeout {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
-            enabled: in_scope(ctx, &self.scope),
+            enabled: self.scope.in_scope(ctx),
             signals: FxHashMap::default(),
         })
     }

@@ -446,6 +446,48 @@ pub fn node_range(sf: P<SourceFile>, node: P<Node>) -> (usize, usize) {
     (start_idx, end_idx)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Span {
+    pub start: i32,
+    pub end: i32,
+}
+
+impl Span {
+    #[must_use]
+    pub fn of(sf: P<SourceFile>, node: P<Node>) -> Self {
+        let (start, end) = trim_node_text_range(sf, node);
+        Self { start, end }
+    }
+
+    #[must_use]
+    pub const fn contains_inclusive(self, other: Self) -> bool {
+        self.start <= other.start && other.end <= self.end
+    }
+}
+
+#[must_use]
+pub fn identifier_of(expression: P<Node>) -> Option<P<Node>> {
+    let inner = unwrap_expression(expression);
+    ast::is_identifier(inner).then_some(inner)
+}
+
+#[must_use]
+pub fn call_expression_of(expression: P<Node>) -> Option<P<Node>> {
+    let inner = unwrap_expression(expression);
+    (inner.kind() == Kind::CallExpression).then_some(inner)
+}
+
+#[must_use]
+pub fn numeric_literal_value(expression: P<Node>) -> Option<f64> {
+    if expression.kind() != Kind::NumericLiteral {
+        return None;
+    }
+    let Ok(value) = expression.text().replace('_', "").parse::<f64>() else {
+        return None;
+    };
+    Some(value)
+}
+
 #[must_use]
 pub fn node_text(sf: P<SourceFile>, node: P<Node>) -> &'static str {
     let (start_idx, end_idx) = node_range(sf, node);

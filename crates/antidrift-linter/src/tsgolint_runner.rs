@@ -1,28 +1,24 @@
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
-use std::sync::Arc;
 
 use antidrift_kernel::directives::is_inline_disabled;
 use antidrift_kernel::registries::PolicyRegistries;
-use antidrift_rules::{create_rule, default_rules, is_typescript_only_rule};
-use rustc_hash::{FxHashMap, FxHashSet};
+use antidrift_rules::{create_rule, default_rules, is_typescript_only_rule, lookup_default_rule};
+use rustc_hash::FxHashMap;
 use serde_json::json;
 use tsrs_ast::SourceFile;
-use tsrs_compiler::{Program, ProgramOptions, new_program};
-use tsrs_core::tspath::{self, Path};
-use tsrs_core::{P, Tristate};
-use tsrs_vfs::FS;
+use tsrs_compiler::Program;
+use tsrs_core::P;
+use tsrs_core::tspath;
 use tsrslint::linter::{Options, lint_files};
 use tsrslint::protocol::{
     self, Diagnostic, MessageType, Payload, deserialize_payload, write_error_message, write_message,
 };
 use tsrslint::rule::{ReportedDiagnostic, Rule};
 use tsrslint::rules;
-use tsrslint::tsconfig::{ExtendedConfigCache, ParseHost, TsConfigResolver};
 
 use crate::tsgolint_host::{
-    DeclarationCache, base_fs, build_shared_host, filter_suppressed_diagnostics,
-    inferred_compiler_options, tsconfig_error_diagnostic,
+    ProgramBuilderEnv, base_fs, collect_missing_bound_files, filter_suppressed_diagnostics,
 };
 
 fn apply_debug_flag(raw: &str, opts: &mut Options) -> Result<(), String> {
@@ -71,10 +67,25 @@ fn parse_headless_flags(args: &[String]) -> Result<Options, String> {
     Ok(opts)
 }
 
+fn has_non_empty_options(options: Option<&serde_json::Value>) -> bool {
+    match options {
+        None | Some(serde_json::Value::Null) => false,
+        Some(serde_json::Value::Array(items)) => {
+            items.first().is_some_and(|first| !first.is_null())
+        }
+        Some(_) => true,
+    }
+}
+
 pub(crate) fn instantiate_rule(
     name: &str,
     options: Option<&serde_json::Value>,
 ) -> Result<Option<&'static dyn Rule>, String> {
+    if !has_non_empty_options(options)
+        && let Some(default_rule) = lookup_default_rule(name)
+    {
+        return Ok(Some(default_rule));
+    }
     if let Some(custom) = create_rule(name, options)? {
         return Ok(Some(Box::leak(custom)));
     }
@@ -200,34 +211,6 @@ fn to_protocol_diagnostic(reported: &ReportedDiagnostic) -> Diagnostic {
     proto
 }
 
-fn group_files_by_tsconfig(
-    payload: &Payload,
-    resolver: &TsConfigResolver,
-) -> (Vec<(String, Vec<String>)>, Vec<String>) {
-    let mut files: Vec<String> = Vec::new();
-    for config in &payload.configs {
-        for file_path in &config.file_paths {
-            files.push(tspath::normalize_slashes(file_path));
-        }
-    }
-    let assignment = resolver.resolve_all(&files);
-    let mut programs: Vec<(String, Vec<String>)> = Vec::new();
-    let mut program_index: FxHashMap<String, usize> = FxHashMap::default();
-    let mut unmatched: Vec<String> = Vec::new();
-    for (file, config) in files.iter().zip(assignment) {
-        if config.is_empty() {
-            unmatched.push(file.clone());
-        } else {
-            let idx = *program_index.entry(config.clone()).or_insert_with(|| {
-                programs.push((config.clone(), Vec::new()));
-                programs.len() - 1
-            });
-            programs[idx].1.push(file.clone());
-        }
-    }
-    (programs, unmatched)
-}
-
 fn lint_program_files(
     program: &'static Program,
     source_files: &[P<SourceFile>],
@@ -275,115 +258,30 @@ fn lint_program_files(
     }
 }
 
-struct BoundProgram {
-    program: &'static Program,
-    source_files: Vec<P<SourceFile>>,
-}
-
-fn run_configured_program(
-    config_file_name: &str,
-    config_files: &[String],
-    resolver: &TsConfigResolver,
-    fs: &Arc<dyn FS>,
-    ext_cache: &'static ExtendedConfigCache,
-    declarations: &'static DeclarationCache,
-) -> Result<BoundProgram, Vec<Diagnostic>> {
-    let parsed = resolver.load(config_file_name);
-    let Some(config) = parsed.config else {
-        return Err(parsed
-            .errors
-            .iter()
-            .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
-            .collect());
-    };
-    if !parsed.errors.is_empty() {
-        return Err(parsed
-            .errors
-            .iter()
-            .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
-            .collect());
-    }
-    let suppress = std::env::var("OXLINT_TSGOLINT_DANGEROUSLY_SUPPRESS_PROGRAM_DIAGNOSTICS")
-        .is_ok_and(|val| val == "true");
-    if !config.errors.is_empty() && !suppress {
-        return Err(config
-            .errors
-            .iter()
-            .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
-            .collect());
-    }
-    let dir = tspath::get_directory_path(config_file_name);
-    let compiler_host = build_shared_host(&dir, fs, ext_cache, declarations);
-    let mut popts = ProgramOptions::new(config, compiler_host);
-    popts.use_source_of_project_reference = true;
-    popts.single_threaded = Tristate::False;
-    let program = new_program(popts);
-    let program_diags = program.get_program_diagnostics();
-    if !program_diags.is_empty() && !suppress {
-        return Err(program_diags
-            .iter()
-            .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
-            .collect());
-    }
-    program.bind_source_files();
-    let use_case = fs.use_case_sensitive_file_names();
-    let wanted: FxHashSet<Path> = config_files
-        .iter()
-        .map(|file| tspath::to_path(file, &dir, use_case))
-        .collect();
-    let source_files: Vec<P<SourceFile>> = program
-        .source_files()
-        .iter()
-        .copied()
-        .filter(|sf| wanted.contains(sf.path()))
-        .collect();
-    Ok(BoundProgram {
-        program,
-        source_files,
-    })
-}
-
-fn collect_missing_bound_files(
-    source_files: &[P<SourceFile>],
-    config_files: &[String],
-    unmatched: &mut Vec<String>,
-) {
-    let bound_names: FxHashSet<String> = source_files
-        .iter()
-        .map(|sf| tspath::normalize_slashes(sf.file_name()))
-        .collect();
-    for requested in config_files {
-        if !bound_names.contains(&tspath::normalize_slashes(requested)) {
-            unmatched.push(requested.clone());
-        }
-    }
-}
-
 pub(crate) fn execute_payload(
     payload: &Payload,
     cwd: &str,
     opts: &Options,
 ) -> Result<Vec<Diagnostic>, String> {
     tsrs_checker::links::set_sparse_id_pages(true);
-    let fs = base_fs(payload);
-    let host: &'static ParseHost = Box::leak(Box::new(ParseHost {
-        fs: Arc::clone(&fs),
-        cwd: cwd.to_string(),
-    }));
-    let ext_cache: &'static ExtendedConfigCache = Box::leak(Box::default());
-    let declarations: &'static DeclarationCache = Box::leak(Box::default());
+    let env = ProgramBuilderEnv::new(base_fs(payload), cwd);
     let plan = build_config_rule_plan(payload, cwd)?;
-    let resolver = TsConfigResolver::new(host, ext_cache);
-    let (programs, mut unmatched) = group_files_by_tsconfig(payload, &resolver);
+    let mut requested_files: Vec<String> = Vec::new();
+    for config in &payload.configs {
+        for file_path in &config.file_paths {
+            requested_files.push(tspath::normalize_slashes(file_path));
+        }
+    }
+    let (programs, mut unmatched) = env.group_files_by_tsconfig(&requested_files);
+    let suppress_program_diagnostics =
+        std::env::var("OXLINT_TSGOLINT_DANGEROUSLY_SUPPRESS_PROGRAM_DIAGNOSTICS")
+            .is_ok_and(|val| val == "true");
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
     for (config_file_name, config_files) in &programs {
-        match run_configured_program(
+        match env.run_configured_program(
             config_file_name,
             config_files,
-            &resolver,
-            &fs,
-            ext_cache,
-            declarations,
+            suppress_program_diagnostics,
         ) {
             Ok(bound) => {
                 collect_missing_bound_files(&bound.source_files, config_files, &mut unmatched);
@@ -399,32 +297,14 @@ pub(crate) fn execute_payload(
         }
     }
     if !unmatched.is_empty() {
-        let compiler_host = build_shared_host(cwd, &fs, ext_cache, declarations);
-        let use_case = fs.use_case_sensitive_file_names();
-        let config = P::new(tsrs_tsoptions::new_parsed_command_line(
-            P::new(inferred_compiler_options()),
-            unmatched.clone(),
-            Vec::new(),
-            tspath::ComparePathsOptions {
-                use_case_sensitive_file_names: use_case,
-                current_directory: cwd.to_string(),
-            },
-        ));
-        let mut popts = ProgramOptions::new(config, compiler_host);
-        popts.single_threaded = Tristate::False;
-        let program = new_program(popts);
-        program.bind_source_files();
-        let wanted: FxHashSet<Path> = unmatched
-            .iter()
-            .map(|file| tspath::to_path(file, cwd, use_case))
-            .collect();
-        let source_files: Vec<P<SourceFile>> = program
-            .source_files()
-            .iter()
-            .copied()
-            .filter(|sf| wanted.contains(sf.path()))
-            .collect();
-        lint_program_files(program, &source_files, &plan, opts, &mut diagnostics);
+        let bound = env.build_inferred_program(&unmatched);
+        lint_program_files(
+            bound.program,
+            &bound.source_files,
+            &plan,
+            opts,
+            &mut diagnostics,
+        );
     }
     filter_suppressed_diagnostics(cwd, diagnostics)
 }

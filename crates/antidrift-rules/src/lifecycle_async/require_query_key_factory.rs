@@ -1,5 +1,5 @@
 use super::syntax::{
-    const_initializer, identifier, in_scope, member, object_property, property_name, symbol, unwrap,
+    const_initializer, identifier, member, object_property, property_name, symbol, unwrap,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -36,7 +36,7 @@ impl Rule for RequireQueryKeyFactory {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
-            enabled: in_scope(ctx, &self.scope),
+            enabled: self.scope.in_scope(ctx),
         })
     }
 }

@@ -1,4 +1,4 @@
-use super::syntax::{Span, contains, identifier, unwrap};
+use super::syntax::{Span, identifier, unwrap};
 use antidrift_kernel::local_binding::{
     Binding, enclosing_variable_declaration, is_const_variable_declaration, resolve_lexical_binding,
 };
@@ -177,7 +177,10 @@ impl Oracle {
     }
 
     pub(super) fn in_block(&self, node: P<Node>, callback: Callback) -> bool {
-        if !contains(callback.span(self.sf), Span::of(self.sf, node)) {
+        if !callback
+            .span(self.sf)
+            .contains_inclusive(Span::of(self.sf, node))
+        {
             return false;
         }
         let mut cursor = node.parent();

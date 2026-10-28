@@ -96,7 +96,7 @@ export function runOxlint({
       [
         "Usage: antidrift oxlint [paths...] [-- oxlint-options...]",
         "",
-        "Runs the repository Oxlint gate, including native type-aware rules and Antidrift JS rules.",
+        "Runs the unified Oxlint + native Rust antidrift-linter (tsrs) gate.",
       ].join("\n") + "\n"
     );
     return exit(0);
@@ -108,9 +108,13 @@ export function runOxlint({
     );
     return exit(1);
   }
+  const typeAwareFlags = parsed.passthrough.includes("--type-aware")
+    ? []
+    : ["--type-aware"];
   const args = [
     resolveOxlintBinary(),
     "--disable-nested-config",
+    ...typeAwareFlags,
     ...parsed.passthrough,
     ...parsed.targets,
   ];

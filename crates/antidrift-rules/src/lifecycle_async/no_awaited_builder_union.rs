@@ -1,4 +1,4 @@
-use super::syntax::{Span, in_scope, member, unwrap, without_parens};
+use super::syntax::{Span, member, unwrap, without_parens};
 use antidrift_kernel::directives::scan_source_comments;
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
@@ -44,7 +44,7 @@ impl Rule for NoAwaitedBuilderUnion {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
-            enabled: in_scope(ctx, &self.scope),
+            enabled: self.scope.in_scope(ctx),
         })
     }
 }

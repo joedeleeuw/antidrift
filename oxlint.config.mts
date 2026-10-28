@@ -44,7 +44,6 @@ export default defineConfig({
       ...(governance.ignorePatterns ?? []),
       ...(tooling.ignorePatterns ?? []),
     ]),
-    "tooling/antidrift/src/brand/fixtures/programs/**",
   ],
   jsPlugins: [
     ...(governance.jsPlugins ?? []),

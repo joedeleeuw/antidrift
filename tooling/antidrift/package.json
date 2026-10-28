@@ -93,12 +93,10 @@
     "zod": "^3.24.1"
   },
   "peerDependencies": {
-    "eslint": ">=9.38.0 <11",
     "typescript": ">=5 <6.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "eslint": "catalog:lint",
     "typescript": "6.0.3"
   }
 }

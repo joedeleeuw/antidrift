@@ -1,7 +1,7 @@
 use super::stream_origin::{canonical, is_stream};
 use super::syntax::{
-    Binding, Span, binding_for_declarator, call_expression, identifier, in_scope, is_const_decl,
-    is_function, is_write_reference, member, owner, parent_expression, references_to, symbol,
+    Binding, Span, binding_for_declarator, call_expression, identifier, is_const_decl, is_function,
+    is_write_reference, member, owner, parent_expression, references_to, symbol,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -41,7 +41,7 @@ impl Rule for RequireStreamReaderDisposal {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
-            enabled: in_scope(ctx, &self.scope),
+            enabled: self.scope.in_scope(ctx),
         })
     }
 }

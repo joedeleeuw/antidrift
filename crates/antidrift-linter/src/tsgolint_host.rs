@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{SourceFile, SourceFileParseOptions};
-use tsrs_compiler::{CompilerHost, new_compiler_host};
+use tsrs_compiler::{CompilerHost, Program, ProgramOptions, new_compiler_host, new_program};
 use tsrs_core::tspath::{self, Path};
 use tsrs_core::{
     CompilerOptions, JsxEmit, ModuleKind, ModuleResolutionKind, P, ScriptTarget, Tristate,
@@ -10,7 +10,7 @@ use tsrs_core::{
 use tsrs_vfs::{FS, bundled, cachedvfs, osvfs};
 use tsrslint::overlayfs::OverlayFS;
 use tsrslint::protocol::{Diagnostic, Message, Payload, Range};
-use tsrslint::tsconfig::ExtendedConfigCache;
+use tsrslint::tsconfig::{ExtendedConfigCache, ParseHost, TsConfigResolver};
 
 pub(crate) type DeclarationCache = Mutex<FxHashMap<SourceFileParseOptions, P<SourceFile>>>;
 
@@ -189,5 +189,167 @@ pub(crate) fn inferred_compiler_options() -> CompilerOptions {
         allow_non_ts_extensions: Tristate::True,
         resolve_json_module: Tristate::True,
         ..Default::default()
+    }
+}
+
+pub(crate) struct BoundProgram {
+    pub(crate) program: &'static Program,
+    pub(crate) source_files: Vec<P<SourceFile>>,
+}
+
+pub(crate) struct ProgramBuilderEnv {
+    cwd: String,
+    fs: Arc<dyn FS>,
+    ext_cache: &'static ExtendedConfigCache,
+    declarations: &'static DeclarationCache,
+    resolver: TsConfigResolver,
+}
+
+impl ProgramBuilderEnv {
+    pub(crate) fn new(fs: Arc<dyn FS>, cwd: &str) -> Self {
+        let host: &'static ParseHost = Box::leak(Box::new(ParseHost {
+            fs: Arc::clone(&fs),
+            cwd: cwd.to_string(),
+        }));
+        let ext_cache: &'static ExtendedConfigCache = Box::leak(Box::default());
+        let declarations: &'static DeclarationCache = Box::leak(Box::default());
+        let resolver = TsConfigResolver::new(host, ext_cache);
+        Self {
+            cwd: cwd.to_string(),
+            fs,
+            ext_cache,
+            declarations,
+            resolver,
+        }
+    }
+
+    pub(crate) fn group_files_by_tsconfig(
+        &self,
+        files: &[String],
+    ) -> (Vec<(String, Vec<String>)>, Vec<String>) {
+        let assignment = self.resolver.resolve_all(files);
+        let mut programs: Vec<(String, Vec<String>)> = Vec::new();
+        let mut program_index: FxHashMap<String, usize> = FxHashMap::default();
+        let mut unmatched: Vec<String> = Vec::new();
+        for (file, config) in files.iter().zip(assignment) {
+            if config.is_empty() {
+                unmatched.push(file.clone());
+                continue;
+            }
+            let idx = *program_index.entry(config.clone()).or_insert_with(|| {
+                programs.push((config.clone(), Vec::new()));
+                programs.len() - 1
+            });
+            programs[idx].1.push(file.clone());
+        }
+        (programs, unmatched)
+    }
+
+    pub(crate) fn run_configured_program(
+        &self,
+        config_file_name: &str,
+        config_files: &[String],
+        suppress_program_diagnostics: bool,
+    ) -> Result<BoundProgram, Vec<Diagnostic>> {
+        let parsed = self.resolver.load(config_file_name);
+        let Some(config) = parsed.config else {
+            return Err(parsed
+                .errors
+                .iter()
+                .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
+                .collect());
+        };
+        if !parsed.errors.is_empty() {
+            return Err(parsed
+                .errors
+                .iter()
+                .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
+                .collect());
+        }
+        if !config.errors.is_empty() && !suppress_program_diagnostics {
+            return Err(config
+                .errors
+                .iter()
+                .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
+                .collect());
+        }
+        let dir = tspath::get_directory_path(config_file_name);
+        let compiler_host = build_shared_host(&dir, &self.fs, self.ext_cache, self.declarations);
+        let mut popts = ProgramOptions::new(config, compiler_host);
+        popts.use_source_of_project_reference = true;
+        popts.single_threaded = Tristate::False;
+        let program = new_program(popts);
+        let program_diags = program.get_program_diagnostics();
+        if !program_diags.is_empty() && !suppress_program_diagnostics {
+            return Err(program_diags
+                .iter()
+                .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
+                .collect());
+        }
+        program.bind_source_files();
+        let use_case = self.fs.use_case_sensitive_file_names();
+        let wanted: FxHashSet<Path> = config_files
+            .iter()
+            .map(|file| tspath::to_path(file, &dir, use_case))
+            .collect();
+        let source_files: Vec<P<SourceFile>> = program
+            .source_files()
+            .iter()
+            .copied()
+            .filter(|sf| wanted.contains(sf.path()))
+            .collect();
+        Ok(BoundProgram {
+            program,
+            source_files,
+        })
+    }
+
+    pub(crate) fn build_inferred_program(&self, unmatched: &[String]) -> BoundProgram {
+        let compiler_host =
+            build_shared_host(&self.cwd, &self.fs, self.ext_cache, self.declarations);
+        let use_case = self.fs.use_case_sensitive_file_names();
+        let config = P::new(tsrs_tsoptions::new_parsed_command_line(
+            P::new(inferred_compiler_options()),
+            unmatched.to_vec(),
+            Vec::new(),
+            tspath::ComparePathsOptions {
+                use_case_sensitive_file_names: use_case,
+                current_directory: self.cwd.clone(),
+            },
+        ));
+        let mut popts = ProgramOptions::new(config, compiler_host);
+        popts.single_threaded = Tristate::False;
+        let program = new_program(popts);
+        program.bind_source_files();
+        let wanted: FxHashSet<Path> = unmatched
+            .iter()
+            .map(|file| tspath::to_path(file, &self.cwd, use_case))
+            .collect();
+        let source_files: Vec<P<SourceFile>> = program
+            .source_files()
+            .iter()
+            .copied()
+            .filter(|sf| wanted.contains(sf.path()))
+            .collect();
+        BoundProgram {
+            program,
+            source_files,
+        }
+    }
+}
+
+pub(crate) fn collect_missing_bound_files(
+    source_files: &[P<SourceFile>],
+    config_files: &[String],
+    unmatched: &mut Vec<String>,
+) {
+    let bound_names: FxHashSet<String> = source_files
+        .iter()
+        .map(|sf| tspath::normalize_slashes(sf.file_name()))
+        .collect();
+    for requested in config_files {
+        if !bound_names.contains(&tspath::normalize_slashes(requested)) {
+            unmatched.push(requested.clone());
+        }
     }
 }
