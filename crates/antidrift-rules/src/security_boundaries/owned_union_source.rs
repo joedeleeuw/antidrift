@@ -1,5 +1,5 @@
 use antidrift_kernel::local_binding::{
-    Binding, binding_for_declarator, is_const_variable_declaration, resolve_lexical_binding,
+    Binding, is_const_variable_declaration, lookup_scope_binding, resolve_lexical_binding,
 };
 use antidrift_kernel::tsrs_kernel::is_const_assertion;
 use rustc_hash::FxHashSet;
@@ -229,7 +229,7 @@ pub(super) fn is_shadowed_at(node: P<Node>, name: &str, root_binding: Binding) -
         if current.kind() == Kind::SourceFile {
             break;
         }
-        if let Some(found) = find_local_in_container(current, name) {
+        if let Some(found) = lookup_scope_binding(current, name) {
             return found != root_binding;
         }
         cursor = current.parent();
@@ -237,52 +237,8 @@ pub(super) fn is_shadowed_at(node: P<Node>, name: &str, root_binding: Binding) -
     false
 }
 
-fn find_local_in_container(container: P<Node>, target_name: &str) -> Option<Binding> {
-    if container.function_like_data().is_some() {
-        for &param in container.parameters() {
-            if let Some(name_node) = param.name()
-                && ast::is_identifier(name_node)
-                && name_node.as_identifier().text() == target_name
-            {
-                return Some(Binding {
-                    decl: param,
-                    ident: name_node,
-                });
-            }
-        }
-    }
-    let stmts = match container.kind() {
-        Kind::Block => container.as_block().statements().nodes(),
-        Kind::ModuleBlock => container.as_module_block().statements().nodes(),
-        _ => return None,
-    };
-    find_binding_in_statements(stmts, target_name)
-}
-
 pub(super) fn find_top_level_binding(sf: P<SourceFile>, target_name: &str) -> Option<Binding> {
-    find_binding_in_statements(sf.statements().nodes(), target_name)
-}
-
-fn find_binding_in_statements(stmts: &[P<Node>], target_name: &str) -> Option<Binding> {
-    for &stmt in stmts {
-        if stmt.kind() != Kind::VariableStatement {
-            continue;
-        }
-        let decls = stmt
-            .as_variable_statement()
-            .declaration_list()
-            .as_variable_declaration_list()
-            .declarations()
-            .nodes();
-        for &decl in decls {
-            if let Some(binding) = binding_for_declarator(decl)
-                && binding.name() == target_name
-            {
-                return Some(binding);
-            }
-        }
-    }
-    None
+    lookup_scope_binding(sf.as_node(), target_name)
 }
 
 pub(super) fn convex_bindings(sf: P<SourceFile>) -> FxHashSet<Binding> {

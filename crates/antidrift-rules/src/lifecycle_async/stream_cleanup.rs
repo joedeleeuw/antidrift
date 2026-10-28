@@ -1,7 +1,7 @@
 use super::require_stream_reader_disposal::ReaderAnalysis;
 use super::syntax::{
-    Span, assignment_identifier, binding_for_declarator, call_expression, declaration, identifier,
-    is_let_decl, is_var_decl, member, object_property, symbol, unwrap,
+    Span, binding_for_declarator, call_expression, declaration, identifier, is_let_decl,
+    is_var_decl, member, object_property, symbol, unwrap,
 };
 use tsrs_ast::{Kind, Node, NodeFlags};
 use tsrs_core::P;
@@ -87,8 +87,7 @@ impl ReaderAnalysis {
                 let bin = inner.as_binary_expression();
                 match bin.operator_token().kind() {
                     Kind::EqualsToken
-                        if assignment_identifier(bin.left())
-                            .is_some_and(|ident| self.can_write(ident)) =>
+                        if identifier(bin.left()).is_some_and(|ident| self.can_write(ident)) =>
                     {
                         self.unconditional_call(bin.right(), method)
                     }
@@ -161,7 +160,7 @@ impl ReaderAnalysis {
             Kind::BinaryExpression => {
                 let bin = expression.as_binary_expression();
                 (bin.operator_token().kind() == Kind::EqualsToken
-                    && assignment_identifier(bin.left()).is_some_and(|ident| self.can_write(ident)))
+                    && identifier(bin.left()).is_some_and(|ident| self.can_write(ident)))
                 .then(|| unwrap(bin.right()))
             }
             _ => None,
@@ -216,7 +215,7 @@ impl ReaderAnalysis {
                 }
                 let bin = expr.as_binary_expression();
                 bin.operator_token().kind() == Kind::EqualsToken
-                    && assignment_identifier(bin.left()).is_some_and(|ident| self.can_write(ident))
+                    && identifier(bin.left()).is_some_and(|ident| self.can_write(ident))
                     && self.cannot_throw(bin.right())
             }
             _ => false,

@@ -1,7 +1,7 @@
 use super::syntax::{
-    Binding, assignment_identifier, binding_for_declarator, const_initializer, declaration,
-    identifier, in_scope, is_write_reference, member, object_property, property_name, symbol,
-    symbol_is_mutated, unwrap, without_parens,
+    Binding, binding_for_declarator, const_initializer, declaration, identifier, in_scope,
+    is_write_reference, member, object_property, property_name, symbol, symbol_is_mutated, unwrap,
+    without_parens,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -111,7 +111,7 @@ impl Visitor {
         if !ast::is_assignment_operator(bin.operator_token().kind()) {
             return;
         }
-        let Some(ident) = assignment_identifier(bin.left()) else {
+        let Some(ident) = identifier(bin.left()) else {
             self.clear_assigned(bin.left());
             return;
         };

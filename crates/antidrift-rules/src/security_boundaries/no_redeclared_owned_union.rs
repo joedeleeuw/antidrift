@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use tsrs_ast::{
     self as ast, ExternalModuleIndicatorOptions, Kind, Node, SourceFile, SourceFileParseOptions,
 };
-use tsrs_compiler::CompilerHost;
+use tsrs_compiler::Program;
 use tsrs_core::P;
 use tsrs_core::tspath;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -76,8 +76,7 @@ impl Rule for NoRedeclaredOwnedUnion {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let host = ctx.program.host();
-        let owners = match union_owners(ctx.file, host.as_ref()) {
+        let owners = match union_owners(ctx.program, ctx.file) {
             Ok(owners) => owners,
             Err(error) => {
                 ctx.report_range(0, 0, RuleMessage::new("ownerResolution", error));
@@ -196,7 +195,7 @@ fn owner_report(
     ))
 }
 
-fn union_owners(sf: P<SourceFile>, host: &dyn CompilerHost) -> Result<Vec<UnionOwner>, String> {
+fn union_owners(program: &Program, sf: P<SourceFile>) -> Result<Vec<UnionOwner>, String> {
     let filename = sf.file_name();
     let mut owners = Vec::new();
     for array in exported_arrays(sf) {
@@ -238,7 +237,7 @@ fn union_owners(sf: P<SourceFile>, host: &dyn CompilerHost) -> Result<Vec<UnionO
                 filename,
                 spec.as_string_literal().text(),
                 resolver,
-                host,
+                program,
                 &mut cache,
             )?;
             add_import_owners(clause_node, arrays, &mut owners);
@@ -353,7 +352,7 @@ fn imported_arrays<'c>(
     filename: &str,
     specifier: &str,
     resolver: &Resolver,
-    host: &dyn CompilerHost,
+    program: &Program,
     cache: &'c mut BTreeMap<PathBuf, Vec<ExportedArray>>,
 ) -> Result<&'c [ExportedArray], String> {
     let abs_filename = absolute_filename(Path::new(filename))?;
@@ -374,40 +373,42 @@ fn imported_arrays<'c>(
             ));
         }
     };
-    if resolved.to_string_lossy().ends_with(".d.ts")
-        || !resolved
-            .extension()
-            .and_then(|extension| extension.to_str())
-            .is_some_and(|extension| {
-                matches!(
-                    extension,
-                    "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "mts" | "cts"
-                )
-            })
+    let file_name_str = tspath::normalize_slashes(&resolved.to_string_lossy());
+    if tspath::is_declaration_file_name(&file_name_str)
+        || !(tspath::has_implementation_ts_file_extension(&file_name_str)
+            || tspath::has_js_file_extension(&file_name_str))
     {
         return Ok(&[]);
     }
     if !cache.contains_key(&resolved) {
-        if let Err(error) = std::fs::metadata(&resolved) {
-            return Err(format!(
-                "{}: cannot read runtime array owner: {error}",
-                resolved.display()
-            ));
+        if let Some(&loaded_sf) = program
+            .get_source_files()
+            .iter()
+            .find(|sf| tspath::normalize_slashes(sf.file_name()) == file_name_str)
+        {
+            cache.insert(resolved.clone(), exported_arrays(loaded_sf));
+        } else {
+            if let Err(error) = std::fs::metadata(&resolved) {
+                return Err(format!(
+                    "{}: cannot read runtime array owner: {error}",
+                    resolved.display()
+                ));
+            }
+            let host = program.host();
+            let path_obj = tspath::to_path(&file_name_str, host.get_current_directory(), true);
+            let opts = SourceFileParseOptions {
+                file_name: file_name_str,
+                path: path_obj,
+                external_module_indicator_options: ExternalModuleIndicatorOptions::default(),
+            };
+            let Some(parsed_sf) = host.get_source_file(opts) else {
+                return Err(format!(
+                    "{}: cannot parse runtime array owner",
+                    resolved.display()
+                ));
+            };
+            cache.insert(resolved.clone(), exported_arrays(parsed_sf));
         }
-        let file_name_str = tspath::normalize_slashes(&resolved.to_string_lossy());
-        let path_obj = tspath::to_path(&file_name_str, host.get_current_directory(), true);
-        let opts = SourceFileParseOptions {
-            file_name: file_name_str,
-            path: path_obj,
-            external_module_indicator_options: ExternalModuleIndicatorOptions::default(),
-        };
-        let Some(parsed_sf) = host.get_source_file(opts) else {
-            return Err(format!(
-                "{}: cannot parse runtime array owner",
-                resolved.display()
-            ));
-        };
-        cache.insert(resolved.clone(), exported_arrays(parsed_sf));
     }
     cache
         .get(&resolved)

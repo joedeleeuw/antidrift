@@ -6,7 +6,10 @@ pub(super) use antidrift_kernel::local_binding::{
     is_write_reference, resolve_lexical_binding as symbol,
 };
 use antidrift_kernel::rule_scope::RuleScope;
-use antidrift_kernel::tsrs_kernel;
+pub(super) use antidrift_kernel::tsrs_kernel::{
+    is_function_like as is_function, unwrap_expression as unwrap,
+    unwrap_parentheses as without_parens,
+};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 use tsrslint::rule::Ctx;
@@ -35,21 +38,9 @@ pub(super) fn in_scope(ctx: &Ctx<'_>, scope: &RuleScope) -> bool {
     scope.matches(&filename, cwd)
 }
 
-pub(super) fn unwrap(expression: P<Node>) -> P<Node> {
-    tsrs_kernel::unwrap_expression(expression)
-}
-
-pub(super) fn without_parens(expression: P<Node>) -> P<Node> {
-    tsrs_kernel::unwrap_parentheses(expression)
-}
-
 pub(super) fn identifier(expression: P<Node>) -> Option<P<Node>> {
     let inner = unwrap(expression);
     ast::is_identifier(inner).then_some(inner)
-}
-
-pub(super) fn assignment_identifier(target: P<Node>) -> Option<P<Node>> {
-    identifier(target)
 }
 
 pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, &'static str)> {
@@ -171,10 +162,6 @@ pub(super) fn property(expression: P<Node>, name: &str) -> Option<P<Node>> {
 pub(super) fn global(expression: P<Node>, name: &str) -> bool {
     identifier(expression)
         .is_some_and(|ident| ident.as_identifier().text() == name && symbol(ident).is_none())
-}
-
-pub(super) fn is_function(node: P<Node>) -> bool {
-    tsrs_kernel::is_function_like(node)
 }
 
 pub(super) fn owner(node: P<Node>) -> P<Node> {

@@ -1,4 +1,5 @@
 use super::RustDiagnostic;
+use super::smells::check_smells;
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -41,6 +42,7 @@ pub(super) fn check_syn_ast(
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
     check_hollow_module(rel_path, path, ast, diagnostics);
+    check_smells(rel_path, path, ast, diagnostics);
     let file_name = path
         .file_name()
         .and_then(|name| name.to_str())

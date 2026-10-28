@@ -15,24 +15,28 @@ use antidrift_kernel::rule_scope::decode_rule_options;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn Rule> {
+pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
     vec![
         &no_appeasement_cast::NoAppeasementCast,
         &no_appeasement_erasure::NoAppeasementErasure,
         &no_redundant_type_predicate::NoRedundantTypePredicate,
         &no_underchecked_type_predicate::NoUndercheckedTypePredicate,
         &no_wrapping_functions::DEFAULT_INSTANCE,
-        &no_pass_through_parameters::DEFAULT_INSTANCE,
         &no_unresolved_dependency_types::NoUnresolvedDependencyTypes,
+    ]
+}
+
+#[must_use]
+pub fn script_default_rules() -> Vec<&'static dyn Rule> {
+    vec![
+        &no_pass_through_parameters::DEFAULT_INSTANCE,
         &no_compat_names::DEFAULT_INSTANCE,
     ]
 }
 
 #[must_use]
-pub fn all_rules() -> Vec<&'static dyn Rule> {
-    let mut list = rules();
-    list.push(&no_vague_names::DEFAULT_INSTANCE);
-    list
+pub fn default_off_rules() -> Vec<&'static dyn Rule> {
+    vec![&no_vague_names::DEFAULT_INSTANCE]
 }
 
 pub fn create_rule(

@@ -1,34 +1,21 @@
+pub use tsrs_ast::skip_parentheses as unwrap_parentheses;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 use tsrs_core::tspath;
+pub use tsrs_core::tspath::normalize_slashes as normalize_path;
 use tsrslint::utils::trim_node_text_range;
 
 #[must_use]
-pub fn normalize_path(file_path: &str) -> String {
-    tspath::normalize_slashes(file_path)
-}
-
-#[must_use]
 pub fn is_declaration_file(file_path: &str) -> bool {
-    let normalized = normalize_path(file_path);
-    normalized.ends_with(".d.ts")
-        || normalized.ends_with(".d.mts")
-        || normalized.ends_with(".d.cts")
+    tspath::is_declaration_file_name(&normalize_path(file_path))
 }
 
 fn has_script_ext(file_path: &str) -> bool {
-    const EXTS: &[&str] = &[".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"];
-    EXTS.iter().any(|ext| file_path.ends_with(ext))
+    tspath::has_ts_file_extension(file_path) || tspath::has_js_file_extension(file_path)
 }
 
 fn strip_script_ext(file_path: &str) -> Option<&str> {
-    const EXTS: &[&str] = &[".tsx", ".jsx", ".mts", ".cts", ".mjs", ".cjs", ".ts", ".js"];
-    for ext in EXTS {
-        if let Some(stem) = file_path.strip_suffix(ext) {
-            return Some(stem);
-        }
-    }
-    None
+    has_script_ext(file_path).then(|| tspath::remove_file_extension(file_path))
 }
 
 fn path_has_dir_segment(normalized: &str, segments: &[&str]) -> bool {
@@ -49,9 +36,6 @@ fn path_matches_dir_or_stem(normalized: &str, segments: &[&str]) -> bool {
 #[must_use]
 pub fn is_generated_file(file_path: &str, source_text: &str) -> bool {
     let normalized = normalize_path(file_path);
-    if is_declaration_file(&normalized) {
-        return true;
-    }
     if path_has_dir_segment(
         &normalized,
         &[
@@ -67,10 +51,7 @@ pub fn is_generated_file(file_path: &str, source_text: &str) -> bool {
         return true;
     }
     if let Some(stem) = strip_script_ext(&normalized)
-        && (stem.ends_with(".gen")
-            || stem.ends_with(".generated")
-            || stem.ends_with(".pb")
-            || stem.ends_with(".d"))
+        && (stem.ends_with(".gen") || stem.ends_with(".generated") || stem.ends_with(".pb"))
     {
         return true;
     }
@@ -164,11 +145,6 @@ pub fn is_domain_file(file_path: &str) -> bool {
                 "schemas",
             ],
         )
-}
-
-#[must_use]
-pub fn unwrap_parentheses(node: P<Node>) -> P<Node> {
-    ast::skip_parentheses(node)
 }
 
 #[must_use]

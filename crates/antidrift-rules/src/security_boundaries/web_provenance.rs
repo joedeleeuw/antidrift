@@ -1,7 +1,7 @@
-use antidrift_kernel::local_binding::{
-    Binding, const_binding_initializer, is_binding_mutated, resolve_lexical_binding,
+pub(super) use antidrift_kernel::local_binding::{
+    Binding, const_binding_initializer, is_binding_mutated, resolve_lexical_binding as symbol_for,
 };
-use antidrift_kernel::tsrs_kernel;
+pub(super) use antidrift_kernel::tsrs_kernel::unwrap_expression;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -28,10 +28,6 @@ pub(super) fn property_name(key: P<Node>) -> Option<&'static str> {
     }
 }
 
-pub(super) fn symbol_for(identifier: P<Node>) -> Option<Binding> {
-    resolve_lexical_binding(identifier)
-}
-
 pub(super) fn const_initializer(
     sf: P<SourceFile>,
     symbol: Binding,
@@ -41,10 +37,6 @@ pub(super) fn const_initializer(
         return None;
     }
     const_binding_initializer(symbol)
-}
-
-pub(super) fn unwrap_expression(expression: P<Node>) -> P<Node> {
-    tsrs_kernel::unwrap_expression(expression)
 }
 
 pub(super) fn member_expression(expression: P<Node>) -> Option<P<Node>> {

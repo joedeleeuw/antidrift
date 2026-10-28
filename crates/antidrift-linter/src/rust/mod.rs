@@ -1,4 +1,5 @@
 mod rules;
+mod smells;
 mod syntax;
 mod workspace;
 

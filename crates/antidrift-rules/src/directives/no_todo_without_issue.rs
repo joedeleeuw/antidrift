@@ -1,5 +1,4 @@
-use super::no_tutorial_comments::split_identifier_words;
-use antidrift_kernel::directives::scan_source_comments;
+use antidrift_kernel::directives::{scan_source_comments, split_identifier_words};
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;

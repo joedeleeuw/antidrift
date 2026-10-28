@@ -1,3 +1,4 @@
+use antidrift_kernel::directives::split_identifier_words;
 use antidrift_kernel::rule_scope::RuleScope;
 use antidrift_kernel::tsrs_kernel;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -153,27 +154,6 @@ fn vague_reason(name: &str) -> Option<String> {
         return Some("a filler suffix".to_string());
     }
     has_filler_prefix(name).then(|| "a filler prefix".to_string())
-}
-
-fn split_identifier_words(identifier: &str) -> Vec<String> {
-    let mut normalized = String::with_capacity(identifier.len() + 8);
-    let mut prev: Option<char> = None;
-    for ch in identifier.chars() {
-        if ch == '-' || ch == '_' {
-            normalized.push(' ');
-            prev = Some(ch);
-            continue;
-        }
-        if let Some(prev_ch) = prev
-            && (prev_ch.is_ascii_lowercase() || prev_ch.is_ascii_digit())
-            && ch.is_ascii_uppercase()
-        {
-            normalized.push(' ');
-        }
-        normalized.push(ch.to_ascii_lowercase());
-        prev = Some(ch);
-    }
-    normalized.split_whitespace().map(str::to_owned).collect()
 }
 
 fn duplicate_context_word(name: &str) -> Option<String> {

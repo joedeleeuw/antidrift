@@ -70,6 +70,30 @@ pub fn binding_for_declarator(decl: P<Node>) -> Option<Binding> {
 }
 
 #[must_use]
+pub fn lookup_scope_binding(scope: P<Node>, target_name: &str) -> Option<Binding> {
+    if let Some(locals) = scope.locals()
+        && let Some(sym) = locals.get().get(target_name)
+        && let Some(decl) = sym
+            .value_declaration()
+            .or_else(|| sym.declarations().first().copied())
+        && let Some(binding) = binding_for_declarator(decl)
+    {
+        return Some(binding);
+    }
+    if is_function_like(scope)
+        && let Some(name) = scope.name()
+        && ast::is_identifier(name)
+        && name.as_identifier().text() == target_name
+    {
+        return Some(Binding {
+            decl: scope,
+            ident: name,
+        });
+    }
+    None
+}
+
+#[must_use]
 pub fn resolve_lexical_binding(ident: P<Node>) -> Option<Binding> {
     if !ast::is_identifier(ident) {
         return None;
@@ -77,13 +101,8 @@ pub fn resolve_lexical_binding(ident: P<Node>) -> Option<Binding> {
     let target_name = ident.as_identifier().text();
     let mut current = ident.parent();
     while let Some(scope) = current {
-        if let Some(found) = find_binding_in_scope_node(scope, target_name) {
-            return Some(found);
-        }
-        if (is_function_like(scope) || scope.kind() == Kind::SourceFile)
-            && let Some(found) = find_hoisted_var(scope, scope, target_name)
-        {
-            return Some(found);
+        if let Some(binding) = lookup_scope_binding(scope, target_name) {
+            return Some(binding);
         }
         current = scope.parent();
     }
@@ -107,174 +126,6 @@ pub fn resolve_local_declaration(checker: &mut Checker, node: P<Node>) -> Option
         .into_iter()
         .find(|&decl| ast::get_source_file_of_node(decl) == Some(target_sf))
         .or_else(|| resolve_lexical_binding(expr).map(|binding| binding.decl))
-}
-
-fn find_binding_in_scope_node(scope: P<Node>, target_name: &str) -> Option<Binding> {
-    match scope.kind() {
-        Kind::Block | Kind::SourceFile | Kind::ModuleBlock | Kind::CaseBlock => {
-            let stmts: &[P<Node>] = match scope.kind() {
-                Kind::Block => scope.as_block().statements().nodes(),
-                Kind::SourceFile => scope.as_source_file().statements().nodes(),
-                Kind::ModuleBlock => scope.as_module_block().statements().nodes(),
-                _ => &[],
-            };
-            stmts
-                .iter()
-                .copied()
-                .find_map(|stmt| match_statement_declaration(stmt, target_name))
-        }
-        Kind::ForStatement => scope
-            .as_for_statement()
-            .initializer()
-            .and_then(|init| match_var_decl_list(init, target_name)),
-        Kind::ForOfStatement | Kind::ForInStatement => {
-            match_var_decl_list(scope.as_for_in_or_of_statement().initializer(), target_name)
-        }
-        Kind::CatchClause => scope
-            .as_catch_clause()
-            .variable_declaration()
-            .and_then(|decl| match_binding_declaration(decl, target_name)),
-        _ if is_function_like(scope) => scope
-            .parameters()
-            .iter()
-            .copied()
-            .find_map(|param| match_binding_declaration(param, target_name))
-            .or_else(|| {
-                let name = scope.name()?;
-                (ast::is_identifier(name) && name.as_identifier().text() == target_name).then_some(
-                    Binding {
-                        decl: scope,
-                        ident: name,
-                    },
-                )
-            }),
-        _ => None,
-    }
-}
-
-fn find_hoisted_var(node: P<Node>, root: P<Node>, target_name: &str) -> Option<Binding> {
-    if node != root && is_function_like(node) {
-        return None;
-    }
-    if node.kind() == Kind::VariableDeclarationList
-        && !node.flags().intersects(NodeFlags::BlockScoped)
-        && let Some(found) = match_var_decl_list(node, target_name)
-    {
-        return Some(found);
-    }
-    let mut result = None;
-    node.for_each_child(&mut |child| {
-        if let Some(found) = find_hoisted_var(child, root, target_name) {
-            result = Some(found);
-            return true;
-        }
-        false
-    });
-    result
-}
-
-fn match_statement_declaration(stmt: P<Node>, target_name: &str) -> Option<Binding> {
-    match stmt.kind() {
-        Kind::VariableStatement => {
-            match_var_decl_list(stmt.as_variable_statement().declaration_list(), target_name)
-        }
-        Kind::FunctionDeclaration
-        | Kind::ClassDeclaration
-        | Kind::InterfaceDeclaration
-        | Kind::TypeAliasDeclaration
-        | Kind::EnumDeclaration => {
-            let name = stmt.name()?;
-            (ast::is_identifier(name) && name.as_identifier().text() == target_name).then_some(
-                Binding {
-                    decl: stmt,
-                    ident: name,
-                },
-            )
-        }
-        Kind::ImportDeclaration => match_import_declaration(stmt, target_name),
-        _ => None,
-    }
-}
-
-fn match_import_declaration(stmt: P<Node>, target_name: &str) -> Option<Binding> {
-    let clause_node = stmt.as_import_declaration().import_clause()?;
-    let clause = clause_node.as_import_clause();
-    if let Some(name) = clause.name()
-        && ast::is_identifier(name)
-        && name.as_identifier().text() == target_name
-    {
-        return Some(Binding {
-            decl: clause_node,
-            ident: name,
-        });
-    }
-    let bindings = clause.named_bindings()?;
-    match bindings.kind() {
-        Kind::NamespaceImport => {
-            let name = bindings.name()?;
-            (ast::is_identifier(name) && name.as_identifier().text() == target_name).then_some(
-                Binding {
-                    decl: bindings,
-                    ident: name,
-                },
-            )
-        }
-        Kind::NamedImports => bindings
-            .as_named_imports()
-            .elements()
-            .nodes()
-            .iter()
-            .copied()
-            .find_map(|spec| {
-                let name = (spec.kind() == Kind::ImportSpecifier)
-                    .then(|| spec.name())
-                    .flatten()?;
-                (ast::is_identifier(name) && name.as_identifier().text() == target_name).then_some(
-                    Binding {
-                        decl: spec,
-                        ident: name,
-                    },
-                )
-            }),
-        _ => None,
-    }
-}
-
-fn match_var_decl_list(decl_list: P<Node>, target_name: &str) -> Option<Binding> {
-    if decl_list.kind() != Kind::VariableDeclarationList {
-        return None;
-    }
-    decl_list
-        .as_variable_declaration_list()
-        .declarations()
-        .nodes()
-        .iter()
-        .copied()
-        .find_map(|decl| match_binding_declaration(decl, target_name))
-}
-
-fn match_binding_declaration(decl: P<Node>, target_name: &str) -> Option<Binding> {
-    let name_node = decl.name()?;
-    if ast::is_identifier(name_node) {
-        return (name_node.as_identifier().text() == target_name).then_some(Binding {
-            decl,
-            ident: name_node,
-        });
-    }
-    if matches!(
-        name_node.kind(),
-        Kind::ObjectBindingPattern | Kind::ArrayBindingPattern
-    ) {
-        return name_node
-            .as_binding_pattern()
-            .elements()
-            .nodes()
-            .iter()
-            .copied()
-            .filter(|elem| elem.kind() == Kind::BindingElement)
-            .find_map(|elem| match_binding_declaration(elem, target_name));
-    }
-    None
 }
 
 #[must_use]

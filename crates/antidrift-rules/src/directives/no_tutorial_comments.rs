@@ -1,5 +1,5 @@
 use super::no_default_export_in_domain::{is_fixture_or_docs_file, is_test_filename};
-use antidrift_kernel::directives::scan_source_comments;
+use antidrift_kernel::directives::{scan_source_comments, split_identifier_words};
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -100,25 +100,4 @@ fn is_tutorial_comment(text: &str) -> bool {
         .iter()
         .skip(1)
         .any(|word| VERB_WORDS.contains(&word.as_str()))
-}
-
-pub(super) fn split_identifier_words(text: &str) -> Vec<String> {
-    let mut normalized = String::with_capacity(text.len() + 8);
-    let mut prev: Option<char> = None;
-    for ch in text.chars() {
-        if !ch.is_ascii_alphanumeric() {
-            normalized.push(' ');
-            prev = Some(ch);
-            continue;
-        }
-        if let Some(prev_ch) = prev
-            && (prev_ch.is_ascii_lowercase() || prev_ch.is_ascii_digit())
-            && ch.is_ascii_uppercase()
-        {
-            normalized.push(' ');
-        }
-        normalized.push(ch.to_ascii_lowercase());
-        prev = Some(ch);
-    }
-    normalized.split_whitespace().map(str::to_owned).collect()
 }

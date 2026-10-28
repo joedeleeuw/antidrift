@@ -9,58 +9,76 @@ pub mod type_narrowing;
 
 use tsrslint::rule::Rule;
 
+struct RuleCatalogEntry {
+    rule: &'static dyn Rule,
+    default_enabled: bool,
+    typescript_only: bool,
+}
+
+fn push_entries(
+    out: &mut Vec<RuleCatalogEntry>,
+    rules: Vec<&'static dyn Rule>,
+    default_enabled: bool,
+    typescript_only: bool,
+) {
+    for rule in rules {
+        out.push(RuleCatalogEntry {
+            rule,
+            default_enabled,
+            typescript_only,
+        });
+    }
+}
+
+fn rule_catalog() -> Vec<RuleCatalogEntry> {
+    let mut entries = Vec::with_capacity(82);
+    push_entries(&mut entries, boundary_schema::rules(), true, true);
+    push_entries(&mut entries, contracts_shape::rules(), true, true);
+    push_entries(
+        &mut entries,
+        type_narrowing::typescript_only_rules(),
+        true,
+        true,
+    );
+    push_entries(
+        &mut entries,
+        type_narrowing::script_default_rules(),
+        true,
+        false,
+    );
+    push_entries(
+        &mut entries,
+        type_narrowing::default_off_rules(),
+        false,
+        false,
+    );
+    push_entries(&mut entries, directives::rules(), true, false);
+    push_entries(&mut entries, lifecycle_async::rules(), true, false);
+    push_entries(&mut entries, react_ui::rules(), true, false);
+    push_entries(&mut entries, security_boundaries::rules(), true, false);
+    push_entries(&mut entries, test_oracle::rules(), true, false);
+    entries
+}
+
 #[must_use]
 pub fn default_rules() -> Vec<&'static dyn Rule> {
-    let mut rules = Vec::new();
-    rules.extend(boundary_schema::rules());
-    rules.extend(contracts_shape::rules());
-    rules.extend(type_narrowing::rules());
-    rules.extend(directives::rules());
-    rules.extend(lifecycle_async::rules());
-    rules.extend(react_ui::rules());
-    rules.extend(security_boundaries::rules());
-    rules.extend(test_oracle::rules());
-    rules
+    rule_catalog()
+        .into_iter()
+        .filter(|entry| entry.default_enabled)
+        .map(|entry| entry.rule)
+        .collect()
 }
 
 #[must_use]
 pub fn all_rules() -> Vec<&'static dyn Rule> {
-    let mut rules = Vec::new();
-    rules.extend(boundary_schema::rules());
-    rules.extend(contracts_shape::rules());
-    rules.extend(type_narrowing::all_rules());
-    rules.extend(directives::rules());
-    rules.extend(lifecycle_async::rules());
-    rules.extend(react_ui::rules());
-    rules.extend(security_boundaries::rules());
-    rules.extend(test_oracle::rules());
-    rules
+    rule_catalog().into_iter().map(|entry| entry.rule).collect()
 }
 
 #[must_use]
 pub fn is_typescript_only_rule(name: &str) -> bool {
-    matches!(
-        name,
-        "antidrift/unknown-input-must-be-decoded"
-            | "antidrift/no-unsafe-deserialize"
-            | "antidrift/no-redundant-zod-parse"
-            | "antidrift/no-identity-schema-transform"
-            | "antidrift/no-schema-validator-transcoding"
-            | "antidrift/require-convex-return-validator"
-            | "antidrift/no-sql-string-concat"
-            | "antidrift/no-contract-appeasement-projection"
-            | "antidrift/no-structural-type-fork"
-            | "antidrift/no-nullable-positional-tuple"
-            | "antidrift/react-max-component-props"
-            | "antidrift/no-explicit-type-arguments-on-owned-api"
-            | "antidrift/no-service-constructor-imports"
-            | "antidrift/no-appeasement-cast"
-            | "antidrift/no-appeasement-erasure"
-            | "antidrift/no-redundant-type-predicate"
-            | "antidrift/no-underchecked-type-predicate"
-            | "antidrift/no-wrapping-functions"
-            | "antidrift/no-unresolved-dependency-types"
-    )
+    rule_catalog()
+        .into_iter()
+        .any(|entry| entry.typescript_only && entry.rule.name() == name)
 }
 
 pub fn create_rule(

@@ -1,8 +1,7 @@
 use super::stream_origin::{canonical, is_stream};
 use super::syntax::{
-    Binding, Span, assignment_identifier, binding_for_declarator, call_expression, in_scope,
-    is_const_decl, is_function, is_write_reference, member, owner, parent_expression,
-    references_to, symbol,
+    Binding, Span, binding_for_declarator, call_expression, identifier, in_scope, is_const_decl,
+    is_function, is_write_reference, member, owner, parent_expression, references_to, symbol,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -134,7 +133,7 @@ fn acquisition_owner(node: P<Node>) -> Option<(Binding, bool)> {
             {
                 return None;
             }
-            Some((symbol(assignment_identifier(bin.left())?)?, false))
+            Some((symbol(identifier(bin.left())?)?, false))
         }
         _ => None,
     }

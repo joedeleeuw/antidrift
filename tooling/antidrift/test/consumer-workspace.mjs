@@ -247,6 +247,12 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       '  status: "draft" | "submitted" | "released";\n  createdAt: number;\n};\n'
   );
   file(
+    "packages/app/src/drift.ts",
+    "export type ReleaseRow = {\n" +
+      "  id: string;\n  appId: string;\n  version: string;\n" +
+      '  status: "draft" | "submitted" | "released";\n  createdAt: number;\n};\n'
+  );
+  file(
     "packages/app/src/underchecked-predicate.ts",
     "type User = { id: string; email: string };\n" +
       "export function isUser(value: unknown): value is User {\n" +

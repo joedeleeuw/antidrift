@@ -596,6 +596,12 @@ try {
       "    pub seen: HashMap<String, bool>,",
       "    pub item: Option<BoundaryItem>,",
       "}",
+      "pub fn legacy_adapter(input: &str) -> Result<usize, String> {",
+      '    input.parse::<usize>().map_err(|_| "parse failed".to_string())',
+      "}",
+      "pub fn hop_wrapper(input: &str) -> Result<usize, String> {",
+      "    legacy_adapter(input)",
+      "}",
       "",
     ].join("\n")
   );
@@ -622,6 +628,9 @@ try {
     "rust/no-boolean-map",
     "rust/no-orphan-module",
     "rust/no-grab-bag-module",
+    "rust/no-anemic-errors",
+    "rust/no-compat-names",
+    "rust/no-wrapping-functions",
   ]) {
     assert.ok(
       reportedRuleIds.has(expectedRuleId),

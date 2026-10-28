@@ -20,7 +20,14 @@ pub(super) fn check_workspace_root(
 }
 
 fn discover_crate_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
-    let crates_parent = root.join("crates");
+    if root.join("Cargo.toml").is_file() && root.join("src").is_dir() {
+        return Ok(vec![root.to_path_buf()]);
+    }
+    let crates_parent = if root.join("crates").is_dir() {
+        root.join("crates")
+    } else {
+        root.to_path_buf()
+    };
     let mut dirs = Vec::new();
     if crates_parent.is_dir() {
         let entries = fs::read_dir(&crates_parent)
@@ -33,10 +40,6 @@ fn discover_crate_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
             }
         }
         dirs.sort();
-        return Ok(dirs);
-    }
-    if root.join("Cargo.toml").is_file() && root.join("src").is_dir() {
-        dirs.push(root.to_path_buf());
     }
     Ok(dirs)
 }

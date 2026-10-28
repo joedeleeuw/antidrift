@@ -343,21 +343,22 @@ try {
   if (
     JSON.stringify(
       structuralForkDiagnostics.map(({ filename }) => filename)
-    ) !== JSON.stringify(["packages/app/src/package-copy.ts"])
+    ) !== JSON.stringify(["packages/app/src/drift.ts"])
   ) {
     fail(
-      `default packed Oxlint config should report antidrift/no-structural-type-fork via native antidrift-linter, got: ${JSON.stringify(repositoryDiagnostics)}`
+      `default packed Oxlint config should report antidrift/no-structural-type-fork on drift.ts (and NOT on unaccepted package-copy.ts), got: ${JSON.stringify(repositoryDiagnostics)}`
     );
   }
   const cleanDiagnostics = repositoryDiagnostics.filter(
     ({ filename }) =>
       filename === "packages/app/src/clean.ts" ||
+      filename === "packages/app/src/package-copy.ts" ||
       filename === "packages/app/src/brand.ts" ||
       filename === "packages/app/src/exports.ts"
   );
   if (cleanDiagnostics.length > 0) {
     fail(
-      `clean.ts, brand.ts, and exports.ts must remain clean, got: ${JSON.stringify(cleanDiagnostics)}`
+      `clean.ts, package-copy.ts, brand.ts, and exports.ts must remain clean, got: ${JSON.stringify(cleanDiagnostics)}`
     );
   }
 

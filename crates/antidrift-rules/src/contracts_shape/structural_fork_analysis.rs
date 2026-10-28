@@ -1,9 +1,9 @@
+use antidrift_kernel::provenance::{DeclarationOrigin, classify_source_file_origin};
 use antidrift_kernel::tsrs_kernel;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, NodeFlags, SourceFile};
 use tsrs_checker::Checker;
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, RuleMessage};
-use tsrslint::utils::is_source_file_default_library;
 
 #[must_use]
 pub fn has_modifier(node: P<Node>, flags: ModifierFlags) -> bool {
@@ -365,26 +365,14 @@ fn has_exact_same_property_types(
     true
 }
 
-fn is_candidate_exempt_file(file_name: &str) -> bool {
-    let normalized = tsrs_kernel::normalize_path(file_name);
-    tsrs_kernel::is_test_file(&normalized)
-        || normalized.contains("/_generated/")
-        || normalized.ends_with(".generated.ts")
-        || normalized.contains("/node_modules/")
-}
-
 fn find_owner_in_source_file(
     checker: &mut Checker,
     sf: P<SourceFile>,
+    is_accepted_authority: bool,
     cand_node: P<Node>,
     cand_name: &str,
     cand_props: &[String],
 ) -> Option<String> {
-    let sf_name = tsrs_kernel::normalize_path(sf.file_name());
-    let is_generated_or_pkg = sf_name.contains("/_generated/")
-        || sf_name.ends_with(".generated.ts")
-        || sf_name.contains("/node_modules/")
-        || sf_name.contains("/packages/");
     for &stmt in sf.statements().nodes() {
         if !has_modifier(stmt, ModifierFlags::Export) {
             continue;
@@ -393,7 +381,7 @@ fn find_owner_in_source_file(
             continue;
         };
         if owner_props == cand_props
-            && (is_generated_or_pkg || owner_name == cand_name)
+            && (is_accepted_authority || owner_name == cand_name)
             && has_exact_same_property_types(checker, cand_node, stmt, cand_props)
         {
             return Some(owner_name);
@@ -409,15 +397,30 @@ fn find_matching_exported_owner(
     cand_props: &[String],
 ) -> Option<String> {
     for &sf in ctx.program.get_source_files() {
-        if sf == ctx.file
-            || is_source_file_default_library(ctx.program, sf)
-            || tsrs_kernel::is_test_file(sf.file_name())
-        {
+        if sf == ctx.file || tsrs_kernel::is_test_file(sf.file_name()) {
             continue;
         }
-        if let Some(owner_name) =
-            find_owner_in_source_file(ctx.checker, sf, cand_node, cand_name, cand_props)
-        {
+        let origin = classify_source_file_origin(ctx.program, sf, Some(ctx.file));
+        if matches!(
+            origin,
+            DeclarationOrigin::DefaultLib
+                | DeclarationOrigin::SameFile
+                | DeclarationOrigin::Unknown
+        ) {
+            continue;
+        }
+        let is_accepted_authority = matches!(
+            origin,
+            DeclarationOrigin::Generated | DeclarationOrigin::LocalDomain
+        );
+        if let Some(owner_name) = find_owner_in_source_file(
+            ctx.checker,
+            sf,
+            is_accepted_authority,
+            cand_node,
+            cand_name,
+            cand_props,
+        ) {
             return Some(owner_name);
         }
     }
@@ -426,7 +429,16 @@ fn find_matching_exported_owner(
 
 pub fn check_structural_fork_declaration(ctx: &mut Ctx, node: P<Node>) {
     let file_name = ctx.file.file_name();
-    if tsrs_kernel::is_declaration_file(file_name) || is_candidate_exempt_file(file_name) {
+    let file_origin = classify_source_file_origin(ctx.program, ctx.file, None);
+    if tsrs_kernel::is_declaration_file(file_name)
+        || tsrs_kernel::is_test_file(file_name)
+        || matches!(
+            file_origin,
+            DeclarationOrigin::DefaultLib
+                | DeclarationOrigin::NodeModules
+                | DeclarationOrigin::Generated
+        )
+    {
         return;
     }
     let Some((cand_name, cand_props)) = plain_declaration_member_names(node) else {

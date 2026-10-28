@@ -1,4 +1,4 @@
-use antidrift_kernel::tsrs_kernel;
+pub(super) use antidrift_kernel::tsrs_kernel::unwrap_expression as unwrap;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 use tsrslint::utils::trim_node_text_range;
@@ -14,10 +14,6 @@ impl Span {
         let (start, end) = trim_node_text_range(sf, node);
         Self { start, end }
     }
-}
-
-pub(super) fn unwrap(expression: P<Node>) -> P<Node> {
-    tsrs_kernel::unwrap_expression(expression)
 }
 
 pub(super) fn awaited(expression: P<Node>) -> P<Node> {
