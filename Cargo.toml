@@ -18,7 +18,6 @@ antidrift-kernel = { path = "crates/antidrift-kernel" }
 antidrift-rules = { path = "crates/antidrift-rules" }
 globset = "0.4.18"
 ignore = "0.4.25"
-oxc = { version = "0.146.0", features = ["semantic", "cfg", "ast_visit", "isolated_declarations"] }
 oxc_resolver = "11.24.3"
 proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
 rayon = "1.12.0"

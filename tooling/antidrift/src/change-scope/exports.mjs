@@ -261,26 +261,10 @@ function exportModuleSpecifiers(sourceFile) {
     }
     ts.forEachChild(node, visit);
   }
-  visit(sourceFile);
+  for (const statement of sourceFile.statements) {
+    visit(statement);
+  }
   return moduleNames;
-}
-
-function relativeExportTargets({ ref, cwd, fileName, fileNameSet }) {
-  const sourceText = gitFileAt({ ref, path: fileName.slice(1), cwd });
-  if (sourceText === null) return [];
-  const sourceFile = ts.createSourceFile(
-    fileName,
-    sourceText,
-    ts.ScriptTarget.ESNext,
-    true
-  );
-  return exportModuleSpecifiers(sourceFile)
-    .filter((moduleName) => moduleName.startsWith("."))
-    .map((moduleName) =>
-      resolveRelativeSourceModule(moduleName, fileName, fileNameSet)
-    )
-    .filter((resolvedModule) => resolvedModule !== undefined)
-    .map((resolvedModule) => resolvedModule.resolvedFileName);
 }
 
 function affectedExportFileNames({ ref, cwd, fileNames, seedFileNames }) {
@@ -293,12 +277,21 @@ function affectedExportFileNames({ ref, cwd, fileNames, seedFileNames }) {
     addedAffectedFile = false;
     for (const fileName of fileNames) {
       if (affected.has(fileName)) continue;
-      const targets = relativeExportTargets({
-        ref,
-        cwd,
+      const sourceText = gitFileAt({ ref, path: fileName.slice(1), cwd });
+      if (sourceText === null) continue;
+      const sourceFile = ts.createSourceFile(
         fileName,
-        fileNameSet,
-      });
+        sourceText,
+        ts.ScriptTarget.ESNext,
+        true
+      );
+      const targets = exportModuleSpecifiers(sourceFile)
+        .filter((moduleName) => moduleName.startsWith("."))
+        .map((moduleName) =>
+          resolveRelativeSourceModule(moduleName, fileName, fileNameSet)
+        )
+        .filter((resolvedModule) => resolvedModule !== undefined)
+        .map((resolvedModule) => resolvedModule.resolvedFileName);
       if (targets.some((target) => affected.has(target))) {
         affected.add(fileName);
         addedAffectedFile = true;

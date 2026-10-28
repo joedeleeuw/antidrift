@@ -52,23 +52,6 @@ function runOrThrow(command, args, cwd) {
   }
 }
 
-function withMaterializedGitTree({ cwd, head }, callback) {
-  const temp = mkdtempSync(resolve(tmpdir(), "module-graph-head-"));
-  const treeRoot = resolve(temp, "tree");
-  const archivePath = resolve(temp, "head.tar");
-  mkdirSync(treeRoot);
-  try {
-    gitOrThrow(
-      ["archive", "--format=tar", `--output=${archivePath}`, head],
-      cwd
-    );
-    runOrThrow("tar", ["-xf", archivePath, "-C", treeRoot], cwd);
-    return callback(treeRoot);
-  } finally {
-    rmSync(temp, { recursive: true, force: true });
-  }
-}
-
 function readTsconfig(cwd, tsconfig) {
   const configPath = resolve(cwd, tsconfig);
   const loaded = ts.readConfigFile(configPath, (fileName) =>
@@ -267,75 +250,69 @@ export function collectTouchedModuleGraph({
       "module-graph-radius: --tsconfig is required when scope.allowedEntrypoints is configured"
     );
   }
-  return withMaterializedGitTree({ cwd, head }, (headRoot) =>
-    collectTouchedModuleGraphFromDirectory({
-      cwd: headRoot,
-      head,
-      tsconfig,
-      changedFiles,
-      allowedEntrypoints,
-      maxTouchedModuleRadius,
-    })
-  );
-}
-
-function collectTouchedModuleGraphFromDirectory({
-  cwd,
-  head,
-  tsconfig,
-  changedFiles,
-  allowedEntrypoints,
-  maxTouchedModuleRadius = null,
-}) {
-  const parsed = readTsconfig(cwd, tsconfig);
-  const program = ts.createProgram({
-    rootNames: parsed.fileNames,
-    options: { ...parsed.options, noEmit: true },
-  });
-  const sourceFiles = sourceFilesInRepo(program, cwd);
-  const graph = new Map();
-  const sourcePaths = new Set(
-    sourceFiles.map((sourceFile) => repoPath(cwd, sourceFile.fileName))
-  );
-  for (const sourcePath of sourcePaths) addNode(graph, sourcePath);
-  for (const sourceFile of sourceFiles) {
-    const from = repoPath(cwd, sourceFile.fileName);
-    for (const to of importTargets({
-      cwd,
-      sourceFile,
-      options: parsed.options,
-      sourcePaths,
-    })) {
-      addEdge(graph, from, to);
-    }
-  }
-  const entrypoints = allowedEntrypoints
-    .map((path) => path.replace(/\\/gu, "/"))
-    .sort(compareStrings);
-  const missingEntrypoints = entrypoints.filter(
-    (entrypoint) => !graph.has(entrypoint)
-  );
-  if (missingEntrypoints.length > 0) {
-    throw new Error(
-      `module-graph-radius: scope.allowedEntrypoints missing from selected tsconfig: ${missingEntrypoints.join(", ")}`
+  const repoRoot = resolve(cwd);
+  const temp = mkdtempSync(resolve(tmpdir(), "module-graph-head-"));
+  const treeRoot = resolve(temp, "tree");
+  const archivePath = resolve(temp, "head.tar");
+  mkdirSync(treeRoot);
+  try {
+    gitOrThrow(
+      ["archive", "--format=tar", `--output=${archivePath}`, head],
+      repoRoot
     );
+    runOrThrow("tar", ["-xf", archivePath, "-C", treeRoot], repoRoot);
+    const parsed = readTsconfig(treeRoot, tsconfig);
+    const program = ts.createProgram({
+      rootNames: parsed.fileNames,
+      options: { ...parsed.options, noEmit: true },
+    });
+    const sourceFiles = sourceFilesInRepo(program, treeRoot);
+    const graph = new Map();
+    const sourcePaths = new Set(
+      sourceFiles.map((sourceFile) => repoPath(treeRoot, sourceFile.fileName))
+    );
+    for (const sourcePath of sourcePaths) addNode(graph, sourcePath);
+    for (const sourceFile of sourceFiles) {
+      const from = repoPath(treeRoot, sourceFile.fileName);
+      for (const to of importTargets({
+        cwd: treeRoot,
+        sourceFile,
+        options: parsed.options,
+        sourcePaths,
+      })) {
+        addEdge(graph, from, to);
+      }
+    }
+    const entrypoints = allowedEntrypoints
+      .map((path) => path.replace(/\\/gu, "/"))
+      .sort(compareStrings);
+    const missingEntrypoints = entrypoints.filter(
+      (entrypoint) => !graph.has(entrypoint)
+    );
+    if (missingEntrypoints.length > 0) {
+      throw new Error(
+        `module-graph-radius: scope.allowedEntrypoints missing from selected tsconfig: ${missingEntrypoints.join(", ")}`
+      );
+    }
+    const distances = shortestDistances(graph, entrypoints);
+    const touchedFiles = touchedTsFiles(changedFiles).map((file) =>
+      touchedEntry({ file, graph, distances, maxTouchedModuleRadius })
+    );
+    const outOfRadius =
+      typeof maxTouchedModuleRadius === "number"
+        ? touchedFiles.filter((file) => file.withinRadius === false)
+        : [];
+    return {
+      tsconfig,
+      head,
+      entrypoints,
+      maxTouchedModuleRadius,
+      nodes: graph.size,
+      edges: edgeCount(graph),
+      touchedFiles,
+      outOfRadius,
+    };
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
   }
-  const distances = shortestDistances(graph, entrypoints);
-  const touchedFiles = touchedTsFiles(changedFiles).map((file) =>
-    touchedEntry({ file, graph, distances, maxTouchedModuleRadius })
-  );
-  const outOfRadius =
-    typeof maxTouchedModuleRadius === "number"
-      ? touchedFiles.filter((file) => file.withinRadius === false)
-      : [];
-  return {
-    tsconfig,
-    head,
-    entrypoints,
-    maxTouchedModuleRadius,
-    nodes: graph.size,
-    edges: edgeCount(graph),
-    touchedFiles,
-    outOfRadius,
-  };
 }

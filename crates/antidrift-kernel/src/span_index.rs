@@ -1,4 +1,3 @@
-use oxc::span::Span;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -57,9 +56,14 @@ impl LineIndex {
     }
 
     #[must_use]
-    pub fn diagnostic_location(&self, source_text: &str, span: Span) -> DiagnosticLocation {
-        let (line, col0) = self.line_col_zero_based(source_text, span.start);
-        let (end_line, end_col0) = self.line_col_zero_based(source_text, span.end);
+    pub fn diagnostic_location(
+        &self,
+        source_text: &str,
+        start: u32,
+        end: u32,
+    ) -> DiagnosticLocation {
+        let (line, col0) = self.line_col_zero_based(source_text, start);
+        let (end_line, end_col0) = self.line_col_zero_based(source_text, end);
         DiagnosticLocation {
             line,
             column: col0.saturating_add(1),

@@ -1,58 +1,73 @@
-use antidrift_kernel::rule::{ReportDiagnostic, Rule, RuleContext};
-use antidrift_kernel::rule_scope::is_rule_file;
-use oxc::ast::ast::{TSAsExpression, TSType, TSTypeName};
-use oxc::ast_visit::Visit;
-use oxc::span::Span;
+use antidrift_kernel::rule_scope::RuleScope;
+use tsrs_ast::{self as ast, Kind, Node};
+use tsrs_core::P;
+use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
-pub(super) struct NoAsNeverRule;
+pub const RULE_NAME: &str = "antidrift/no-as-never";
 
-impl Rule for NoAsNeverRule {
-    fn id(&self) -> &'static str {
-        "antidrift/no-as-never"
+pub struct NoAsNever {
+    scope: RuleScope,
+}
+
+pub static DEFAULT_RULE: NoAsNever = NoAsNever {
+    scope: RuleScope::DEFAULT,
+};
+
+impl NoAsNever {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: RuleScope::from_options(RULE_NAME, options)?,
+        })
+    }
+}
+
+const LISTENERS: &[Listener] = &[Listener::Enter(Kind::AsExpression)];
+
+impl Rule for NoAsNever {
+    fn name(&self) -> &'static str {
+        RULE_NAME
     }
 
-    fn run(&self, ctx: &mut RuleContext<'_, '_>) {
-        if !is_rule_file(ctx, None) {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        let cwd = ctx.program.host().get_current_directory();
+        let enabled = self.scope.matches(ctx.file.file_name(), cwd);
+        Box::new(Visitor { enabled })
+    }
+}
+
+struct Visitor {
+    enabled: bool,
+}
+
+impl RuleVisitor for Visitor {
+    fn listeners(&self) -> &[Listener] {
+        if self.enabled { LISTENERS } else { &[] }
+    }
+
+    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+        if node.kind() != Kind::AsExpression {
             return;
         }
-        let Some(program) = ctx.program else {
-            return;
-        };
-        let mut finder = AsNeverVisitor {
-            offending_spans: Vec::new(),
-        };
-        finder.visit_program(program);
-        for span in finder.offending_spans {
-            ctx.report(ReportDiagnostic {
-                span,
-                message_id: Some("forbidden".to_string()),
-                message: "Do not cast to 'never'. Fix the type boundary instead.".to_string(),
-                fix: None,
-            });
+        let type_node = node.as_as_expression().type_();
+        if is_never_type_annotation(type_node) {
+            ctx.report_node(
+                node,
+                RuleMessage::new(
+                    "forbidden",
+                    "Do not cast to 'never'. Fix the type boundary instead.",
+                ),
+            );
         }
     }
 }
 
-struct AsNeverVisitor {
-    offending_spans: Vec<Span>,
-}
-
-impl<'a> Visit<'a> for AsNeverVisitor {
-    fn visit_ts_as_expression(&mut self, it: &TSAsExpression<'a>) {
-        if is_never_type_annotation(&it.type_annotation) {
-            self.offending_spans.push(it.span);
+fn is_never_type_annotation(type_node: P<Node>) -> bool {
+    match type_node.kind() {
+        Kind::NeverKeyword => true,
+        Kind::TypeReference => {
+            let name = type_node.as_type_reference_node().type_name();
+            ast::is_identifier(name) && name.as_identifier().text() == "never"
         }
-        oxc::ast_visit::walk::walk_ts_as_expression(self, it);
-    }
-}
-
-fn is_never_type_annotation(annotation: &TSType<'_>) -> bool {
-    match annotation {
-        TSType::TSNeverKeyword(_) => true,
-        TSType::TSTypeReference(type_ref) => match &type_ref.type_name {
-            TSTypeName::IdentifierReference(ident) => ident.name == "never",
-            _ => false,
-        },
         _ => false,
     }
 }

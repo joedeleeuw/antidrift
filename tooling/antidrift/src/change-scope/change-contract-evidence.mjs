@@ -359,10 +359,6 @@ function repoRootFor(repo) {
   return root;
 }
 
-function assertCommit(repoRoot, sha) {
-  gitOrThrow(["rev-parse", "--verify", `${sha}^{commit}`], repoRoot);
-}
-
 function caseDecision(item, result) {
   const violations = result.violations;
   const expectedTypes = new Set(item.expected.violationTypes);
@@ -408,7 +404,7 @@ function caseDecision(item, result) {
 }
 
 function replayCase(item, repoRoot, tempRoot) {
-  assertCommit(repoRoot, item.sha);
+  gitOrThrow(["rev-parse", "--verify", `${item.sha}^{commit}`], repoRoot);
   const contractPath = resolve(tempRoot, `${item.id}.json`);
   writeFileSync(contractPath, `${JSON.stringify(item.contract, null, 2)}\n`);
   const result = runChangeContract({

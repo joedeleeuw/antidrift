@@ -463,16 +463,17 @@ pub fn contains_call_or_new(root: Option<P<Node>>) -> bool {
 }
 
 #[must_use]
-pub fn node_text(sf: P<SourceFile>, node: P<Node>) -> &'static str {
+pub fn node_range(sf: P<SourceFile>, node: P<Node>) -> (usize, usize) {
     let (pos, end) = trim_node_text_range(sf, node);
-    let text = sf.text();
-    let Ok(start_idx) = usize::try_from(pos) else {
-        return "";
-    };
-    let Ok(end_idx) = usize::try_from(end) else {
-        return "";
-    };
-    text.get(start_idx..end_idx).unwrap_or("")
+    let start_idx = usize::try_from(pos).unwrap_or(0);
+    let end_idx = usize::try_from(end).unwrap_or(start_idx);
+    (start_idx, end_idx)
+}
+
+#[must_use]
+pub fn node_text(sf: P<SourceFile>, node: P<Node>) -> &'static str {
+    let (start_idx, end_idx) = node_range(sf, node);
+    sf.text().get(start_idx..end_idx).unwrap_or("")
 }
 
 #[must_use]

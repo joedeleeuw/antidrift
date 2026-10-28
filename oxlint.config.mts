@@ -18,7 +18,6 @@ const tooling = createToolingConfig({
   enforceNoDerivedStateEffects: true,
 });
 const nativePlugins = ["eslint", "import", "oxc", "react", "unicorn"] as const;
-// Preserve the repository's TypeScript-only scopes rather than widening JavaScript.
 const toolingBaseRules = Object.fromEntries(
   Object.entries(tooling.rules ?? {}).filter(
     ([rule]) => !rule.startsWith("typescript/")
@@ -27,35 +26,6 @@ const toolingBaseRules = Object.fromEntries(
 const typescriptRules = {
   ...typescriptSyntaxRules,
   ...typescriptTypeAwareRules,
-} satisfies DummyRuleMap;
-const shippedRuleCodeQualityRules = {
-  complexity: ["error", { max: 20, variant: "classic" }],
-  curly: ["error", "all"],
-  "max-depth": ["error", 4],
-  "max-lines": [
-    "error",
-    { max: 500, skipBlankLines: true, skipComments: true },
-  ],
-  "max-lines-per-function": ["error", { max: 80, skipComments: true }],
-  "max-params": ["error", 6],
-  "max-statements": ["error", 50],
-  "no-dupe-else-if": "error",
-  "no-else-return": ["error", { allowElseIf: false }],
-  "no-lonely-if": "error",
-  "no-unused-vars": [
-    "error",
-    { args: "all", argsIgnorePattern: "^_$", caughtErrors: "all" },
-  ],
-  "unicorn/no-lonely-if": "error",
-} satisfies DummyRuleMap;
-const vitestRules = {
-  "vitest/expect-expect": "error",
-  "vitest/no-conditional-expect": "error",
-  "vitest/no-focused-tests": "error",
-  "vitest/no-disabled-tests": "error",
-  "vitest/no-standalone-expect": "error",
-  "vitest/no-test-prefixes": "error",
-  "vitest/require-to-throw-message": "error",
 } satisfies DummyRuleMap;
 
 export default defineConfig({
@@ -74,9 +44,7 @@ export default defineConfig({
       ...(governance.ignorePatterns ?? []),
       ...(tooling.ignorePatterns ?? []),
     ]),
-    "tooling/antidrift/src/eslint-plugin/fixtures/programs/**",
     "tooling/antidrift/src/brand/fixtures/programs/**",
-    "tooling/antidrift/src/oxlint-plugin/fixtures/programs/**",
   ],
   jsPlugins: [
     ...(governance.jsPlugins ?? []),
@@ -187,19 +155,6 @@ export default defineConfig({
       rules: typescriptRules,
     },
     {
-      files: ["**/*.{test,spec}.{js,jsx,mjs,cjs}"],
-      plugins: [...nativePlugins, "vitest"],
-      rules: vitestRules,
-    },
-    {
-      files: ["**/*.{test,spec}.{ts,tsx,mts,cts}"],
-      plugins: [...nativePlugins, "typescript", "vitest"],
-      rules: {
-        ...vitestRules,
-        "typescript/no-non-null-assertion": "off",
-      },
-    },
-    {
       files: ["tooling/**/*.{ts,tsx,mts,cts}"],
       rules: {
         "typescript/no-unsafe-assignment": "off",
@@ -215,10 +170,6 @@ export default defineConfig({
       rules: {
         "no-console": "off",
       },
-    },
-    {
-      files: ["tooling/antidrift/src/**/*.ts"],
-      rules: shippedRuleCodeQualityRules,
     },
   ],
 });

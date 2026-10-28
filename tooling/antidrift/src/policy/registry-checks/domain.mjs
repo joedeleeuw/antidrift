@@ -6,6 +6,7 @@ import ts from "typescript";
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
+
 export function readRegistry(policyDir, name, errors) {
   const file = join(policyDir, "registries", `${name}.yaml`);
   if (!existsSync(file)) {
@@ -25,6 +26,7 @@ export function readRegistry(policyDir, name, errors) {
     return {};
   }
 }
+
 function stringArray(value, label, errors, { allowEmpty = false } = {}) {
   if (
     !Array.isArray(value) ||
@@ -38,7 +40,8 @@ function stringArray(value, label, errors, { allowEmpty = false } = {}) {
   }
   return value;
 }
-function safeRepoPath(repoRoot, relativePath) {
+
+function safeRepoPath(root, relativePath) {
   if (
     typeof relativePath !== "string" ||
     relativePath.length === 0 ||
@@ -47,12 +50,12 @@ function safeRepoPath(repoRoot, relativePath) {
   ) {
     return null;
   }
-  const root = resolve(repoRoot);
   const target = resolve(root, relativePath);
   return target.startsWith(root + sep) ? target : null;
 }
-function requireExistingPath(repoRoot, relativePath, label, errors) {
-  const target = safeRepoPath(repoRoot, relativePath);
+
+function requireExistingPath(root, relativePath, label, errors) {
+  const target = safeRepoPath(root, relativePath);
   if (!target) {
     errors.push(`${label} must be a relative repo path.`);
     return;
@@ -61,6 +64,7 @@ function requireExistingPath(repoRoot, relativePath, label, errors) {
     errors.push(`${label} path does not exist: ${relativePath}`);
   }
 }
+
 function unwrapExpression(node) {
   let current = node;
   while (ts.isAsExpression(current) || ts.isSatisfiesExpression(current)) {
@@ -68,6 +72,7 @@ function unwrapExpression(node) {
   }
   return current;
 }
+
 function findExportedConst(sourceFile, exportName) {
   for (const statement of sourceFile.statements) {
     const isExported = statement.modifiers?.some(
@@ -89,6 +94,7 @@ function findExportedConst(sourceFile, exportName) {
   }
   return null;
 }
+
 function arrayLiteralStrings(initializer, exportName, label, errors) {
   const expression = unwrapExpression(initializer);
   if (!ts.isArrayLiteralExpression(expression)) {
@@ -112,41 +118,9 @@ function arrayLiteralStrings(initializer, exportName, label, errors) {
   }
   return values;
 }
-function exportedStringArray(
-  repoRoot,
-  relativePath,
-  exportName,
-  label,
-  errors
-) {
-  const target = safeRepoPath(repoRoot, relativePath);
-  if (!target || !existsSync(target)) {
-    return null;
-  }
-  const source = readFileSync(target, "utf8");
-  const sourceFile = ts.createSourceFile(
-    target,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-  const declaration = findExportedConst(sourceFile, exportName);
-  if (declaration?.initializer) {
-    return arrayLiteralStrings(
-      declaration.initializer,
-      exportName,
-      label,
-      errors
-    );
-  }
-  errors.push(
-    `${label} valuesExport '${exportName}' was not found in ${relativePath}.`
-  );
-  return null;
-}
+
 function requireMatchingValueExport(
-  repoRoot,
+  root,
   owner,
   exportName,
   values,
@@ -160,9 +134,27 @@ function requireMatchingValueExport(
     errors.push(`${label}.valuesExport must be a string.`);
     return;
   }
-  const exported = exportedStringArray(
-    repoRoot,
-    owner,
+  const target = safeRepoPath(root, owner);
+  if (!target || !existsSync(target)) {
+    return;
+  }
+  const source = readFileSync(target, "utf8");
+  const sourceFile = ts.createSourceFile(
+    target,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  );
+  const declaration = findExportedConst(sourceFile, exportName);
+  if (!declaration?.initializer) {
+    errors.push(
+      `${label} valuesExport '${exportName}' was not found in ${owner}.`
+    );
+    return;
+  }
+  const exported = arrayLiteralStrings(
+    declaration.initializer,
     exportName,
     label,
     errors
@@ -179,171 +171,174 @@ function requireMatchingValueExport(
     );
   }
 }
-function checkCanonicalEntities(entities, repoRoot, errors) {
+
+function checkCanonicalEntities(entities, state) {
   if (entities === undefined) {
     return;
   }
   if (!isRecord(entities)) {
-    errors.push(
+    state.errors.push(
       "policy/registries/domain.yaml canonicalEntities must be a mapping."
     );
     return;
   }
   for (const [name, owner] of Object.entries(entities)) {
     requireExistingPath(
-      repoRoot,
+      state.root,
       owner,
       `policy/registries/domain.yaml canonicalEntities.${name}`,
-      errors
+      state.errors
     );
   }
 }
-function checkStatuses(statuses, repoRoot, errors) {
+
+function checkStatuses(statuses, state) {
   if (statuses === undefined) {
     return;
   }
   if (!isRecord(statuses)) {
-    errors.push("policy/registries/domain.yaml statuses must be a mapping.");
+    state.errors.push(
+      "policy/registries/domain.yaml statuses must be a mapping."
+    );
     return;
   }
   for (const [name, entry] of Object.entries(statuses)) {
     if (!isRecord(entry)) {
-      errors.push(
+      state.errors.push(
         `policy/registries/domain.yaml statuses.${name} must be a mapping.`
       );
       continue;
     }
     requireExistingPath(
-      repoRoot,
+      state.root,
       entry.owner,
       `policy/registries/domain.yaml statuses.${name}.owner`,
-      errors
+      state.errors
     );
     const values = stringArray(
       entry.values,
       `policy/registries/domain.yaml statuses.${name}.values`,
-      errors
+      state.errors
     );
     requireMatchingValueExport(
-      repoRoot,
+      state.root,
       entry.owner,
       entry.valuesExport,
       values,
       `policy/registries/domain.yaml statuses.${name}`,
-      errors
+      state.errors
     );
   }
 }
-function checkRoles(roles, repoRoot, errors) {
+
+function checkRoles(roles, state) {
   if (roles === undefined) {
     return;
   }
   if (!isRecord(roles)) {
-    errors.push("policy/registries/domain.yaml roles must be a mapping.");
+    state.errors.push("policy/registries/domain.yaml roles must be a mapping.");
     return;
   }
   requireExistingPath(
-    repoRoot,
+    state.root,
     roles.owner,
     "policy/registries/domain.yaml roles.owner",
-    errors
+    state.errors
   );
   const values = stringArray(
     roles.values,
     "policy/registries/domain.yaml roles.values",
-    errors
+    state.errors
   );
   requireMatchingValueExport(
-    repoRoot,
+    state.root,
     roles.owner,
     roles.valuesExport,
     values,
     "policy/registries/domain.yaml roles",
-    errors
+    state.errors
   );
 }
-function checkDomain(registry, repoRoot, errors) {
-  checkCanonicalEntities(registry.canonicalEntities, repoRoot, errors);
-  checkStatuses(registry.statuses, repoRoot, errors);
-  checkRoles(registry.roles, repoRoot, errors);
-}
-function checkGateways(registry, repoRoot, errors) {
+
+function checkGateways(registry, state) {
   if (registry.approvedGateways === undefined) {
     return;
   }
   if (!isRecord(registry.approvedGateways)) {
-    errors.push(
+    state.errors.push(
       "policy/registries/gateways.yaml approvedGateways must be a mapping."
     );
     return;
   }
   for (const [name, entry] of Object.entries(registry.approvedGateways)) {
     if (!isRecord(entry)) {
-      errors.push(
+      state.errors.push(
         `policy/registries/gateways.yaml approvedGateways.${name} must be a mapping.`
       );
       continue;
     }
     requireExistingPath(
-      repoRoot,
+      state.root,
       entry.wrapper,
       `policy/registries/gateways.yaml approvedGateways.${name}.wrapper`,
-      errors
+      state.errors
     );
     stringArray(
       entry.bannedDirectImports,
       `policy/registries/gateways.yaml approvedGateways.${name}.bannedDirectImports`,
-      errors
+      state.errors
     );
   }
 }
-function checkGenerated(registry, repoRoot, errors) {
+
+function checkGenerated(registry, state) {
   if (registry.generatedSources === undefined) {
     return;
   }
   if (!isRecord(registry.generatedSources)) {
-    errors.push(
+    state.errors.push(
       "policy/registries/generated.yaml generatedSources must be a mapping."
     );
     return;
   }
   for (const [name, entry] of Object.entries(registry.generatedSources)) {
     if (!isRecord(entry)) {
-      errors.push(
+      state.errors.push(
         `policy/registries/generated.yaml generatedSources.${name} must be a mapping.`
       );
       continue;
     }
     if (typeof entry.generated !== "string" || entry.generated.length === 0) {
-      errors.push(
+      state.errors.push(
         `policy/registries/generated.yaml generatedSources.${name}.generated must be a non-empty string.`
       );
     } else {
       requireExistingPath(
-        repoRoot,
+        state.root,
         entry.generated,
         `policy/registries/generated.yaml generatedSources.${name}.generated`,
-        errors
+        state.errors
       );
     }
     if (entry.wrapper !== undefined) {
       requireExistingPath(
-        repoRoot,
+        state.root,
         entry.wrapper,
         `policy/registries/generated.yaml generatedSources.${name}.wrapper`,
-        errors
+        state.errors
       );
     }
     if (entry.bannedDirectImports !== undefined) {
       stringArray(
         entry.bannedDirectImports,
         `policy/registries/generated.yaml generatedSources.${name}.bannedDirectImports`,
-        errors,
+        state.errors,
         { allowEmpty: true }
       );
     }
   }
 }
+
 function checkOwnership(registry, errors) {
   if (registry.packageTypeOwners === undefined) {
     return;
@@ -370,6 +365,7 @@ function checkOwnership(registry, errors) {
     }
   }
 }
+
 function checkArchitectureLayers(layers, errors) {
   if (layers === undefined) {
     return;
@@ -407,6 +403,7 @@ function checkArchitectureLayers(layers, errors) {
     }
   }
 }
+
 function checkForbiddenImports(forbiddenImports, errors) {
   if (forbiddenImports === undefined) {
     return;
@@ -429,18 +426,7 @@ function checkForbiddenImports(forbiddenImports, errors) {
     }
   }
 }
-function checkArchitecture(registry, errors) {
-  checkArchitectureLayers(registry.layers, errors);
-  if (registry.publicEntrypoints !== undefined) {
-    stringArray(
-      registry.publicEntrypoints,
-      "policy/registries/architecture.yaml publicEntrypoints",
-      errors,
-      { allowEmpty: true }
-    );
-  }
-  checkForbiddenImports(registry.forbiddenImports, errors);
-}
+
 function checkBoundaries(registry, errors) {
   if (registry.serverBoundaryGlobs !== undefined) {
     stringArray(
@@ -466,31 +452,33 @@ function checkBoundaries(registry, errors) {
     );
   }
 }
-function checkDependencies(registry, repoRoot, errors) {
+
+function checkDependencies(registry, state) {
   const policy = registry.runtimeDependencyPolicy;
   if (policy === undefined) {
     return;
   }
   if (!isRecord(policy)) {
-    errors.push(
+    state.errors.push(
       "policy/registries/dependencies.yaml runtimeDependencyPolicy must be a mapping."
     );
     return;
   }
   if (policy.requireApproval === true) {
     requireExistingPath(
-      repoRoot,
+      state.root,
       policy.approvalFile,
       "policy/registries/dependencies.yaml runtimeDependencyPolicy.approvalFile",
-      errors
+      state.errors
     );
   }
   stringArray(
     policy.bannedVersionSpecifiers,
     "policy/registries/dependencies.yaml runtimeDependencyPolicy.bannedVersionSpecifiers",
-    errors
+    state.errors
   );
 }
+
 function checkDesignSystem(registry, errors) {
   if (registry.semanticClassPrefixes !== undefined) {
     stringArray(
@@ -529,13 +517,27 @@ function checkDesignSystem(registry, errors) {
     );
   }
 }
+
 export function checkDomainRegistries(registries, repoRoot, errors) {
-  checkArchitecture(registries.architecture, errors);
-  checkBoundaries(registries.boundaries, errors);
-  checkDependencies(registries.dependencies, repoRoot, errors);
-  checkDesignSystem(registries.designSystem, errors);
-  checkDomain(registries.domain, repoRoot, errors);
-  checkGateways(registries.gateways, repoRoot, errors);
-  checkGenerated(registries.generated, repoRoot, errors);
-  checkOwnership(registries.ownership, errors);
+  const state = { root: resolve(repoRoot), errors: [] };
+  checkArchitectureLayers(registries.architecture.layers, state.errors);
+  if (registries.architecture.publicEntrypoints !== undefined) {
+    stringArray(
+      registries.architecture.publicEntrypoints,
+      "policy/registries/architecture.yaml publicEntrypoints",
+      state.errors,
+      { allowEmpty: true }
+    );
+  }
+  checkForbiddenImports(registries.architecture.forbiddenImports, state.errors);
+  checkBoundaries(registries.boundaries, state.errors);
+  checkDependencies(registries.dependencies, state);
+  checkDesignSystem(registries.designSystem, state.errors);
+  checkCanonicalEntities(registries.domain.canonicalEntities, state);
+  checkStatuses(registries.domain.statuses, state);
+  checkRoles(registries.domain.roles, state);
+  checkGateways(registries.gateways, state);
+  checkGenerated(registries.generated, state);
+  checkOwnership(registries.ownership, state.errors);
+  errors.push(...state.errors);
 }

@@ -2,19 +2,19 @@ use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use antidrift_rules::tsrslint_rules::{create_typed_rule, default_typed_rules};
+use antidrift_kernel::directives::is_inline_disabled;
+use antidrift_kernel::registries::PolicyRegistries;
+use antidrift_rules::{create_rule, default_rules, is_typescript_only_rule};
 use rustc_hash::{FxHashMap, FxHashSet};
+use serde_json::json;
 use tsrs_ast::SourceFile;
 use tsrs_compiler::{Program, ProgramOptions, new_program};
 use tsrs_core::tspath::{self, Path};
-use tsrs_core::{
-    CompilerOptions, JsxEmit, ModuleKind, ModuleResolutionKind, P, ScriptTarget, Tristate,
-};
+use tsrs_core::{P, Tristate};
 use tsrs_vfs::FS;
 use tsrslint::linter::{Options, lint_files};
 use tsrslint::protocol::{
-    self, Diagnostic, Message, MessageType, Payload, Range, deserialize_payload,
-    write_error_message, write_message,
+    self, Diagnostic, MessageType, Payload, deserialize_payload, write_error_message, write_message,
 };
 use tsrslint::rule::{ReportedDiagnostic, Rule};
 use tsrslint::rules;
@@ -22,8 +22,8 @@ use tsrslint::tsconfig::{ExtendedConfigCache, ParseHost, TsConfigResolver};
 
 use crate::tsgolint_host::{
     DeclarationCache, base_fs, build_shared_host, filter_suppressed_diagnostics,
+    inferred_compiler_options, tsconfig_error_diagnostic,
 };
-use antidrift_kernel::directives::is_inline_disabled;
 
 fn apply_debug_flag(raw: &str, opts: &mut Options) -> Result<(), String> {
     for part in raw.split(',') {
@@ -71,16 +71,15 @@ fn parse_headless_flags(args: &[String]) -> Result<Options, String> {
     Ok(opts)
 }
 
-fn instantiate_rule(
+pub(crate) fn instantiate_rule(
     name: &str,
     options: Option<&serde_json::Value>,
-) -> Result<&'static dyn Rule, String> {
-    let created = if let Some(custom) = create_typed_rule(name, options)? {
-        custom
-    } else {
-        rules::create_rule(name, options)?
-    };
-    Ok(Box::leak(created))
+) -> Result<Option<&'static dyn Rule>, String> {
+    if let Some(custom) = create_rule(name, options)? {
+        return Ok(Some(Box::leak(custom)));
+    }
+    let created = rules::create_rule(name, options)?;
+    Ok(Some(Box::leak(created)))
 }
 
 struct ConfigRulePlan {
@@ -89,20 +88,80 @@ struct ConfigRulePlan {
     inject_defaults: bool,
 }
 
-fn append_default_typed_rules(config_rules: &mut Vec<&'static dyn Rule>) {
-    for custom_rule in default_typed_rules() {
-        if !config_rules
-            .iter()
-            .any(|existing| existing.name() == custom_rule.name())
-        {
-            config_rules.push(custom_rule);
-        }
+fn push_unique_rule(config_rules: &mut Vec<&'static dyn Rule>, candidate: &'static dyn Rule) {
+    if !config_rules
+        .iter()
+        .any(|existing| existing.name() == candidate.name())
+    {
+        config_rules.push(candidate);
     }
 }
 
-fn build_config_rule_plan(payload: &Payload) -> Result<ConfigRulePlan, String> {
+fn append_default_rules(
+    config_rules: &mut Vec<&'static dyn Rule>,
+    rule_cache: &mut FxHashMap<String, &'static dyn Rule>,
+    registries: &PolicyRegistries,
+) -> Result<(), String> {
+    if let Some(authz_calls) = registries.boundaries.required_calls.get("authorization") {
+        let opts = json!([{ "authzFunctions": authz_calls }]);
+        if let Some(rule) =
+            resolve_cached_rule(rule_cache, "antidrift/require-authz-check", Some(&opts))?
+        {
+            push_unique_rule(config_rules, rule);
+        }
+    }
+    if !registries.domain.statuses.is_empty() {
+        let opts = json!([{ "statuses": registries.domain.statuses }]);
+        if let Some(rule) = resolve_cached_rule(
+            rule_cache,
+            "antidrift/no-redeclared-owned-union",
+            Some(&opts),
+        )? {
+            push_unique_rule(config_rules, rule);
+        }
+    }
+    for custom_rule in default_rules() {
+        push_unique_rule(config_rules, custom_rule);
+    }
+    Ok(())
+}
+
+pub(crate) fn default_workspace_rules(
+    registries: &PolicyRegistries,
+) -> Result<Vec<&'static dyn Rule>, String> {
+    let mut config_rules = Vec::new();
+    let mut rule_cache = FxHashMap::default();
+    append_default_rules(&mut config_rules, &mut rule_cache, registries)?;
+    Ok(config_rules)
+}
+
+pub(crate) fn resolve_cached_rule(
+    rule_cache: &mut FxHashMap<String, &'static dyn Rule>,
+    name: &str,
+    options: Option<&serde_json::Value>,
+) -> Result<Option<&'static dyn Rule>, String> {
+    let key = format!(
+        "{name}\u{0}{}",
+        options.map(ToString::to_string).unwrap_or_default()
+    );
+    if let Some(&cached) = rule_cache.get(&key) {
+        return Ok(Some(cached));
+    }
+    let Some(created) = instantiate_rule(name, options)? else {
+        return Ok(None);
+    };
+    rule_cache.insert(key, created);
+    Ok(Some(created))
+}
+
+fn build_config_rule_plan(payload: &Payload, cwd: &str) -> Result<ConfigRulePlan, String> {
     let inject_defaults = std::env::var("ANTIDRIFT_TSGOLINT_DEFAULTS").is_ok_and(|val| val == "1")
         && !std::env::var("ANTIDRIFT_DISABLE_TYPED_RULES").is_ok_and(|val| val == "1");
+    let registries = if inject_defaults {
+        PolicyRegistries::load_from_repo(std::path::Path::new(cwd))?
+    } else {
+        PolicyRegistries::default()
+    };
     let mut rule_cache: FxHashMap<String, &'static dyn Rule> = FxHashMap::default();
     let mut rules_by_config: Vec<Vec<&'static dyn Rule>> =
         Vec::with_capacity(payload.configs.len());
@@ -110,31 +169,14 @@ fn build_config_rule_plan(payload: &Payload) -> Result<ConfigRulePlan, String> {
     for (config_idx, config) in payload.configs.iter().enumerate() {
         let mut config_rules: Vec<&'static dyn Rule> = Vec::new();
         for rule_spec in &config.rules {
-            let key = format!(
-                "{}\u{0}{}",
-                rule_spec.name,
-                rule_spec
-                    .options
-                    .as_ref()
-                    .map(ToString::to_string)
-                    .unwrap_or_default()
-            );
-            let leaked = if let Some(&cached) = rule_cache.get(&key) {
-                cached
-            } else {
-                let created = instantiate_rule(&rule_spec.name, rule_spec.options.as_ref())?;
-                rule_cache.insert(key, created);
-                created
-            };
-            if !config_rules
-                .iter()
-                .any(|existing| existing.name() == leaked.name())
+            if let Some(leaked) =
+                resolve_cached_rule(&mut rule_cache, &rule_spec.name, rule_spec.options.as_ref())?
             {
-                config_rules.push(leaked);
+                push_unique_rule(&mut config_rules, leaked);
             }
         }
-        if inject_defaults && !config_rules.is_empty() {
-            append_default_typed_rules(&mut config_rules);
+        if inject_defaults {
+            append_default_rules(&mut config_rules, &mut rule_cache, &registries)?;
         }
         for file_path in &config.file_paths {
             file_to_config.insert(tspath::normalize_slashes(file_path), config_idx);
@@ -156,47 +198,6 @@ fn to_protocol_diagnostic(reported: &ReportedDiagnostic) -> Diagnostic {
         proto.message.id = reported.rule_name.to_string();
     }
     proto
-}
-
-fn tsconfig_error_diagnostic(diag: P<tsrs_ast::Diagnostic>, config_file_name: &str) -> Diagnostic {
-    let file_path = diag
-        .file()
-        .map(|file| file.file_name().to_string())
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| config_file_name.to_string());
-    let help = tsrs_compiler::diagnosticwriter::flatten_diagnostic_message(diag, "\n");
-    Diagnostic {
-        kind: 1,
-        range: diag.loc().map(Range::from),
-        message: Message {
-            id: "tsconfig-error".to_string(),
-            description: "Invalid tsconfig".to_string(),
-            help: Some(help),
-        },
-        file_path: Some(file_path),
-        labeled_ranges: Vec::new(),
-        rule: None,
-        fixes: Vec::new(),
-        suggestions: Vec::new(),
-    }
-}
-
-fn inferred_compiler_options() -> CompilerOptions {
-    CompilerOptions {
-        allow_js: Tristate::True,
-        module: ModuleKind::ESNext,
-        module_resolution: ModuleResolutionKind::Bundler,
-        target: ScriptTarget::ES2022,
-        jsx: JsxEmit::ReactJSX,
-        allow_importing_ts_extensions: Tristate::True,
-        strict_null_checks: Tristate::True,
-        strict_function_types: Tristate::True,
-        source_map: Tristate::True,
-        es_module_interop: Tristate::True,
-        allow_non_ts_extensions: Tristate::True,
-        resolve_json_module: Tristate::True,
-        ..Default::default()
-    }
 }
 
 fn group_files_by_tsconfig(
@@ -227,13 +228,6 @@ fn group_files_by_tsconfig(
     (programs, unmatched)
 }
 
-fn is_js_script_file(file_name: &str) -> bool {
-    file_name.ends_with(".js")
-        || file_name.ends_with(".jsx")
-        || file_name.ends_with(".mjs")
-        || file_name.ends_with(".cjs")
-}
-
 fn lint_program_files(
     program: &'static Program,
     source_files: &[P<SourceFile>],
@@ -251,7 +245,7 @@ fn lint_program_files(
         let Some(&config_idx) = plan.file_to_config.get(&normalized) else {
             continue;
         };
-        let bucket = u8::from(plan.inject_defaults && is_js_script_file(name));
+        let bucket = u8::from(plan.inject_defaults && tspath::has_js_file_extension(name));
         groups.entry((config_idx, bucket)).or_default().push(sf);
     }
     for ((config_idx, bucket), files) in groups {
@@ -262,13 +256,7 @@ fn lint_program_files(
             base_rules
                 .iter()
                 .copied()
-                .filter(|rule| {
-                    !rule.name().starts_with("antidrift/")
-                        || matches!(
-                            rule.name(),
-                            "antidrift/no-pass-through-parameters" | "antidrift/no-compat-names"
-                        )
-                })
+                .filter(|rule| !is_typescript_only_rule(rule.name()))
                 .collect()
         } else {
             base_rules.clone()
@@ -371,7 +359,7 @@ fn collect_missing_bound_files(
     }
 }
 
-fn execute_payload(
+pub(crate) fn execute_payload(
     payload: &Payload,
     cwd: &str,
     opts: &Options,
@@ -384,7 +372,7 @@ fn execute_payload(
     }));
     let ext_cache: &'static ExtendedConfigCache = Box::leak(Box::default());
     let declarations: &'static DeclarationCache = Box::leak(Box::default());
-    let plan = build_config_rule_plan(payload)?;
+    let plan = build_config_rule_plan(payload, cwd)?;
     let resolver = TsConfigResolver::new(host, ext_cache);
     let (programs, mut unmatched) = group_files_by_tsconfig(payload, &resolver);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();

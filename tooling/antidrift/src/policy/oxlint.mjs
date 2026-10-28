@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { chmodSync, existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +16,7 @@ export function resolveOxlintBinary() {
   return resolve(dirname(packageJsonPath), packageJson.bin.oxlint);
 }
 
-function resolveTsgolintBinary(cwd = process.cwd()) {
+export function resolveNativeLinterBinary(cwd = process.cwd()) {
   if (process.env.OXLINT_TSGOLINT_PATH) {
     return process.env.OXLINT_TSGOLINT_PATH;
   }
@@ -28,7 +28,11 @@ function resolveTsgolintBinary(cwd = process.cwd()) {
     resolve(cwd, "target/debug/antidrift-linter"),
     resolve(repoRoot, "target/debug/antidrift-linter"),
   ];
-  return candidates.find((candidate) => existsSync(candidate));
+  const found = candidates.find((candidate) => existsSync(candidate));
+  if (found && (statSync(found).mode & 0o111) === 0) {
+    chmodSync(found, 0o755);
+  }
+  return found;
 }
 
 function defaultTargets() {
@@ -97,7 +101,7 @@ export function runOxlint({
     );
     return exit(0);
   }
-  const tsgolintBinary = resolveTsgolintBinary(cwd);
+  const tsgolintBinary = resolveNativeLinterBinary(cwd);
   if (!tsgolintBinary) {
     stderr.write(
       "Missing antidrift-linter native binary; build crates/antidrift-linter or run pnpm --filter @joedeleeuw/antidrift build.\n"

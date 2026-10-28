@@ -1,29 +1,35 @@
-use crate::cli::CliArgs;
-use crate::format::format_diagnostics;
-use antidrift_kernel::diagnostic::{RuleDiagnostic, apply_fixes};
-use antidrift_kernel::registries::PolicyRegistries;
-use antidrift_kernel::rule::{LintFileRequest, lint_file};
-use antidrift_kernel::semantic_facts::{SemanticFact, semantic_fact_to_json_line};
-use antidrift_kernel::suppressions::SuppressionsTable;
-use antidrift_kernel::ts_resolver::TsDeclarationResolver;
-use antidrift_rules::all_rules;
-use ignore::WalkBuilder;
-use rayon::prelude::*;
-use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use antidrift_kernel::diagnostic::{RuleDiagnostic, apply_fixes};
+use antidrift_kernel::registries::PolicyRegistries;
+use antidrift_kernel::semantic_facts::{SemanticFact, semantic_fact_to_json_line};
+use antidrift_kernel::suppressions::SuppressionsTable;
+use ignore::WalkBuilder;
+use rayon::prelude::*;
+use rustc_hash::FxHashMap;
+use tsrs_core::tspath;
+
+use crate::batch::lint_source_file;
+use crate::cli::CliArgs;
+use crate::format::format_diagnostics;
+use crate::tsgolint_runner::default_workspace_rules;
+
 pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
+    tsrs_checker::links::set_sparse_id_pages(true);
     let cwd = std::env::current_dir()
         .map_err(|err| format!("failed to read current directory: {err}"))?;
     let registries = PolicyRegistries::load_from_repo(&cwd)?;
     let files = collect_lintable_files(&args.paths, &cwd)?;
-    let rules = all_rules();
-    let active_rules = BTreeMap::new();
-    let settings = Value::Null;
-    let tsconfig = TsDeclarationResolver::discover_governing_tsconfig(&cwd);
-    let resolver = TsDeclarationResolver::new(tsconfig);
+    let active_rules = default_workspace_rules(&registries)?;
+    let script_rules: Vec<&'static dyn tsrslint::rule::Rule> = active_rules
+        .iter()
+        .copied()
+        .filter(|rule| !antidrift_rules::is_typescript_only_rule(rule.name()))
+        .collect();
+    let severities = FxHashMap::default();
+    let cwd_norm = tspath::normalize_slashes(&cwd.to_string_lossy());
 
     let per_file_results: Vec<(String, Vec<RuleDiagnostic>, Vec<SemanticFact>)> = files
         .par_iter()
@@ -35,23 +41,27 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
                 .unwrap_or(path)
                 .to_string_lossy()
                 .replace('\\', "/");
-            let request = LintFileRequest {
-                file_path: &rel_path,
-                source_text: &source_text,
-                active_rules: &active_rules,
-                settings: &settings,
-                registries: &registries,
-                resolver: Some(&resolver),
-                report_unused_directives: args.report_unused_directives,
+            let full_norm = tspath::normalize_slashes(&path.to_string_lossy());
+            let rules_for_file = if tspath::has_ts_file_extension(&full_norm) {
+                &active_rules
+            } else {
+                &script_rules
             };
-            let output = lint_file(&request, &rules);
+            let diagnostics = lint_source_file(
+                &full_norm,
+                &source_text,
+                &cwd_norm,
+                rules_for_file,
+                &severities,
+                args.report_unused_directives,
+            );
             if args.fix
-                && let Some(fixed) = apply_fixes(&source_text, &output.diagnostics)
+                && let Some(fixed) = apply_fixes(&source_text, &diagnostics)
             {
                 fs::write(path, fixed)
                     .map_err(|err| format!("failed to write {}: {err}", path.display()))?;
             }
-            Ok((rel_path, output.diagnostics, output.facts))
+            Ok((rel_path, diagnostics, Vec::new()))
         })
         .collect::<Result<Vec<_>, String>>()?;
 
@@ -147,15 +157,7 @@ fn is_supported_file(path: &Path) -> bool {
     let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
         return false;
     };
-    if name == "package.json" {
-        return true;
-    }
-    name.ends_with(".ts")
-        || name.ends_with(".tsx")
-        || name.ends_with(".mts")
-        || name.ends_with(".cts")
-        || name.ends_with(".js")
-        || name.ends_with(".jsx")
-        || name.ends_with(".mjs")
-        || name.ends_with(".cjs")
+    name == "package.json"
+        || tspath::has_implementation_ts_file_extension(name)
+        || tspath::has_js_file_extension(name)
 }

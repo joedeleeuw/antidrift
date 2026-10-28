@@ -1,9 +1,52 @@
-use crate::rule::RuleContext;
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tsrs_core::tspath;
+use tsrslint::rule::Ctx;
+
+pub trait ScopedOptions: DeserializeOwned + Default {
+    fn scope(&self) -> ScopeOptions;
+
+    fn validate(&self, _rule_name: &str) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+pub fn decode_scoped<T: ScopedOptions>(
+    rule_name: &str,
+    raw: Option<&Value>,
+) -> Result<(T, RuleScope), String> {
+    let options = decode_rule_options::<T>(rule_name, raw)?;
+    options.validate(rule_name)?;
+    let scope = RuleScope::from_scope_options(rule_name, &options.scope())?;
+    Ok((options, scope))
+}
+
+pub fn require_non_empty(
+    rule_name: &str,
+    field: &str,
+    text: Option<&String>,
+) -> Result<(), String> {
+    if text.is_some_and(String::is_empty) {
+        return Err(format!(
+            "invalid options for {rule_name}: '{field}' must be a non-empty string"
+        ));
+    }
+    Ok(())
+}
+
+#[must_use]
+pub fn in_scope(scope: &RuleScope, ctx: &Ctx, inferred_scope: Option<fn(&str) -> bool>) -> bool {
+    let filename = tspath::normalize_slashes(ctx.file.file_name());
+    let cwd = ctx.program.host().get_current_directory();
+    let matches_inferred = if scope.has_explicit_files() {
+        true
+    } else {
+        inferred_scope.is_none_or(|predicate| predicate(&filename))
+    };
+    scope.matches(&filename, cwd) && matches_inferred
+}
 
 pub fn decode_rule_options<T: DeserializeOwned + Default>(
     rule_name: &str,
@@ -108,18 +151,4 @@ fn compile_glob_set(rule_name: &str, field: &str, patterns: &[String]) -> Result
     builder
         .build()
         .map_err(|err| format!("failed to compile {field} globs for {rule_name}: {err}"))
-}
-
-#[must_use]
-pub fn is_rule_file(ctx: &RuleContext<'_, '_>, inferred_scope: Option<fn(&str) -> bool>) -> bool {
-    let Ok(scope) = RuleScope::from_options("antidrift", Some(ctx.options)) else {
-        return false;
-    };
-    let filename = ctx.file_path.replace('\\', "/");
-    let matches_inferred = if scope.has_explicit_files() {
-        true
-    } else {
-        inferred_scope.is_none_or(|predicate| predicate(&filename))
-    };
-    scope.matches(&filename, "") && matches_inferred
 }

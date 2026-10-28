@@ -1,5 +1,4 @@
 use crate::span_index::DiagnosticLocation;
-use oxc::span::Span;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -29,33 +28,10 @@ pub struct TextEdit {
     pub text: String,
 }
 
-impl TextEdit {
-    #[must_use]
-    pub fn replace(span: Span, text: impl Into<String>) -> Self {
-        Self {
-            start: span.start,
-            end: span.end,
-            text: text.into(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuleFix {
     pub edits: Vec<TextEdit>,
-}
-
-impl RuleFix {
-    #[must_use]
-    pub fn single(edit: TextEdit) -> Self {
-        Self { edits: vec![edit] }
-    }
-
-    #[must_use]
-    pub fn multi(edits: Vec<TextEdit>) -> Self {
-        Self { edits }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,8 +42,6 @@ pub struct RuleDiagnostic {
     pub message_id: Option<String>,
     pub message: String,
     pub severity: Severity,
-    #[serde(skip)]
-    pub span: Span,
     pub location: DiagnosticLocation,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fix: Option<RuleFix>,

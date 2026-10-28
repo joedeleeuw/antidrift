@@ -1,14 +1,73 @@
-mod no_as_never;
-mod no_debug_residue_filenames;
+mod anemic_error_fallback;
+pub mod docs_source_policy;
+pub mod no_anemic_errors;
+pub mod no_as_never;
+pub mod no_dated_comments;
+pub mod no_debug_residue_filenames;
+pub mod no_default_export_in_domain;
+pub mod no_partial_record_satisfies;
+pub mod no_todo_without_issue;
+pub mod no_tutorial_comments;
+pub mod no_unknown_type_aliases;
+pub mod no_unsafe_cast_chain;
 
-use antidrift_kernel::rule::Rule;
-use no_as_never::NoAsNeverRule;
-use no_debug_residue_filenames::NoDebugResidueFilenamesRule;
+use tsrslint::rule::Rule;
 
 #[must_use]
-pub(crate) fn rules() -> Vec<Box<dyn Rule>> {
+pub fn rules() -> Vec<&'static dyn Rule> {
     vec![
-        Box::new(NoAsNeverRule),
-        Box::new(NoDebugResidueFilenamesRule),
+        &docs_source_policy::DEFAULT_RULE,
+        &no_anemic_errors::DEFAULT_RULE,
+        &no_as_never::DEFAULT_RULE,
+        &no_dated_comments::DEFAULT_RULE,
+        &no_debug_residue_filenames::DEFAULT_RULE,
+        &no_default_export_in_domain::DEFAULT_RULE,
+        &no_partial_record_satisfies::DEFAULT_RULE,
+        &no_todo_without_issue::DEFAULT_RULE,
+        &no_tutorial_comments::DEFAULT_RULE,
+        &no_unknown_type_aliases::DEFAULT_RULE,
+        &no_unsafe_cast_chain::DEFAULT_RULE,
     ]
+}
+
+pub fn create_rule(
+    name: &str,
+    options: Option<&serde_json::Value>,
+) -> Result<Option<Box<dyn Rule>>, String> {
+    match name {
+        docs_source_policy::RULE_NAME | "docs-source-policy" => Ok(Some(Box::new(
+            docs_source_policy::DocsSourcePolicy::from_options(options)?,
+        ))),
+        no_anemic_errors::RULE_NAME | "no-anemic-errors" => Ok(Some(Box::new(
+            no_anemic_errors::NoAnemicErrors::from_options(options)?,
+        ))),
+        no_as_never::RULE_NAME | "no-as-never" => Ok(Some(Box::new(
+            no_as_never::NoAsNever::from_options(options)?,
+        ))),
+        no_dated_comments::RULE_NAME | "no-dated-comments" => Ok(Some(Box::new(
+            no_dated_comments::NoDatedComments::from_options(options)?,
+        ))),
+        no_debug_residue_filenames::RULE_NAME | "no-debug-residue-filenames" => Ok(Some(Box::new(
+            no_debug_residue_filenames::NoDebugResidueFilenames::from_options(options)?,
+        ))),
+        no_default_export_in_domain::RULE_NAME | "no-default-export-in-domain" => Ok(Some(
+            Box::new(no_default_export_in_domain::NoDefaultExportInDomain::from_options(options)?),
+        )),
+        no_partial_record_satisfies::RULE_NAME | "no-partial-record-satisfies" => Ok(Some(
+            Box::new(no_partial_record_satisfies::NoPartialRecordSatisfies::from_options(options)?),
+        )),
+        no_todo_without_issue::RULE_NAME | "no-todo-without-issue" => Ok(Some(Box::new(
+            no_todo_without_issue::NoTodoWithoutIssue::from_options(options)?,
+        ))),
+        no_tutorial_comments::RULE_NAME | "no-tutorial-comments" => Ok(Some(Box::new(
+            no_tutorial_comments::NoTutorialComments::from_options(options)?,
+        ))),
+        no_unknown_type_aliases::RULE_NAME | "no-unknown-type-aliases" => Ok(Some(Box::new(
+            no_unknown_type_aliases::NoUnknownTypeAliases::from_options(options)?,
+        ))),
+        no_unsafe_cast_chain::RULE_NAME | "no-unsafe-cast-chain" => Ok(Some(Box::new(
+            no_unsafe_cast_chain::NoUnsafeCastChain::from_options(options)?,
+        ))),
+        _ => Ok(None),
+    }
 }

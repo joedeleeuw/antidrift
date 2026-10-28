@@ -1,7 +1,5 @@
 use crate::diagnostic::{RuleDiagnostic, Severity};
 use crate::span_index::LineIndex;
-use oxc::ast::Comment;
-use oxc::span::Span;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DirectiveKind {
@@ -15,7 +13,8 @@ enum DirectiveKind {
 struct ParsedDirective {
     kind: DirectiveKind,
     line: u32,
-    span: Span,
+    start: u32,
+    end: u32,
     rules: Vec<String>,
     matched: bool,
 }
@@ -27,19 +26,18 @@ pub struct DirectiveSet {
 
 impl DirectiveSet {
     #[must_use]
-    pub fn from_comments(comments: &[Comment], source_text: &str, line_index: &LineIndex) -> Self {
+    pub fn from_source(source_text: &str, line_index: &LineIndex) -> Self {
         let mut directives = Vec::new();
-        for comment in comments {
-            let text = source_text
-                .get(comment.content_span().start as usize..comment.content_span().end as usize)
-                .unwrap_or("")
-                .trim();
-            if let Some((kind, rules)) = parse_directive_text(text) {
-                let (line, _) = line_index.line_col_zero_based(source_text, comment.span.start);
+        for comment in scan_source_comments(source_text) {
+            if let Some((kind, rules)) = parse_directive_text(comment.text) {
+                let start = u32::try_from(comment.pos.max(0)).unwrap_or(0);
+                let end = u32::try_from(comment.end.max(0)).unwrap_or(start);
+                let (line, _) = line_index.line_col_zero_based(source_text, start);
                 directives.push(ParsedDirective {
                     kind,
                     line,
-                    span: comment.span,
+                    start,
+                    end,
                     rules,
                     matched: false,
                 });
@@ -57,7 +55,9 @@ impl DirectiveSet {
     ) -> Vec<RuleDiagnostic> {
         let mut retained = Vec::with_capacity(diagnostics.len());
         for diag in diagnostics {
-            if self.suppresses(&diag.rule_id, diag.location.line) {
+            if diag.message_id.as_deref() != Some("invalidOptions")
+                && self.suppresses(&diag.rule_id, diag.location.line)
+            {
                 continue;
             }
             retained.push(diag);
@@ -83,8 +83,11 @@ impl DirectiveSet {
                 message_id: Some("unusedDisableDirective".to_string()),
                 message: "Unused inline disable directive.".to_string(),
                 severity: Severity::Error,
-                span: directive.span,
-                location: line_index.diagnostic_location(source_text, directive.span),
+                location: line_index.diagnostic_location(
+                    source_text,
+                    directive.start,
+                    directive.end,
+                ),
                 fix: None,
             });
         }
@@ -227,11 +230,30 @@ fn read_block_comment<'a>(
         }
         idx += 1;
     }
-    let text = source_text.get(content_start..idx).map(str::trim);
-    ((idx + 2).min(bytes.len()), text)
+    let raw = source_text.get(content_start..idx);
+    ((idx + 2).min(bytes.len()), raw)
 }
 
-fn scan_comments_until_line(source_text: &str, max_line: usize) -> Vec<(usize, &str)> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScannedComment<'a> {
+    pub pos: i32,
+    pub end: i32,
+    pub line: usize,
+    pub is_block: bool,
+    pub raw_content: &'a str,
+    pub text: &'a str,
+}
+
+#[must_use]
+pub fn scan_source_comments(source_text: &str) -> Vec<ScannedComment<'_>> {
+    scan_comments_until_line(source_text, usize::MAX)
+}
+
+fn to_pos_i32(offset: usize) -> i32 {
+    i32::try_from(offset).unwrap_or(i32::MAX)
+}
+
+fn scan_comments_until_line(source_text: &str, max_line: usize) -> Vec<ScannedComment<'_>> {
     let bytes = source_text.as_bytes();
     let mut idx = 0_usize;
     let mut line = 0_usize;
@@ -242,26 +264,48 @@ fn scan_comments_until_line(source_text: &str, max_line: usize) -> Vec<(usize, &
                 line += 1;
                 idx += 1;
             }
-            b'\'' | b'"' => {
+            b'\'' | b'"' if idx == 0 || bytes[idx - 1] != b'\\' => {
                 idx = skip_quoted_literal(bytes, idx, bytes[idx]);
             }
-            b'`' => {
+            b'`' if idx == 0 || bytes[idx - 1] != b'\\' => {
                 idx = skip_template_literal(bytes, idx, &mut line);
             }
-            b'/' if idx + 1 < bytes.len() && bytes[idx + 1] == b'/' => {
+            b'/' if (idx == 0 || bytes[idx - 1] != b'\\')
+                && idx + 1 < bytes.len()
+                && bytes[idx + 1] == b'/' =>
+            {
+                let comment_pos = idx;
                 let start = idx + 2;
                 idx += 2;
                 while idx < bytes.len() && bytes[idx] != b'\n' {
                     idx += 1;
                 }
-                if let Some(text) = source_text.get(start..idx) {
-                    comments.push((line, text.trim()));
+                if let Some(raw_content) = source_text.get(start..idx) {
+                    comments.push(ScannedComment {
+                        pos: to_pos_i32(comment_pos),
+                        end: to_pos_i32(idx),
+                        line,
+                        is_block: false,
+                        raw_content,
+                        text: raw_content.trim(),
+                    });
                 }
             }
-            b'/' if idx + 1 < bytes.len() && bytes[idx + 1] == b'*' => {
-                let (next_idx, text) = read_block_comment(source_text, idx, &mut line);
-                if let Some(trimmed) = text {
-                    comments.push((line, trimmed));
+            b'/' if (idx == 0 || bytes[idx - 1] != b'\\')
+                && idx + 1 < bytes.len()
+                && bytes[idx + 1] == b'*' =>
+            {
+                let comment_pos = idx;
+                let (next_idx, raw) = read_block_comment(source_text, idx, &mut line);
+                if let Some(raw_content) = raw {
+                    comments.push(ScannedComment {
+                        pos: to_pos_i32(comment_pos),
+                        end: to_pos_i32(next_idx),
+                        line,
+                        is_block: true,
+                        raw_content,
+                        text: raw_content.trim(),
+                    });
                 }
                 idx = next_idx;
             }
@@ -274,6 +318,19 @@ fn scan_comments_until_line(source_text: &str, max_line: usize) -> Vec<(usize, &
 }
 
 #[must_use]
+pub fn effective_token_start(source_text: &str, pos: i32, end: i32) -> u32 {
+    let start_offset = usize::try_from(pos.max(0)).unwrap_or(0);
+    let end_offset = usize::try_from(end.max(0)).unwrap_or(0);
+    let token_pos = skip_leading_trivia(source_text, start_offset, end_offset);
+    let chosen = if token_pos < end_offset {
+        token_pos
+    } else {
+        start_offset
+    };
+    u32::try_from(chosen).unwrap_or(0)
+}
+
+#[must_use]
 pub fn is_inline_disabled(source_text: &str, pos: i32, end: i32, rule_id: &str) -> bool {
     let start_offset = usize::try_from(pos.max(0)).unwrap_or(0);
     let end_offset = usize::try_from(end.max(0)).unwrap_or(0);
@@ -281,18 +338,18 @@ pub fn is_inline_disabled(source_text: &str, pos: i32, end: i32, rule_id: &str) 
     let prefix = source_text.get(..token_pos).unwrap_or(source_text);
     let target_line = prefix.bytes().filter(|&ch| ch == b'\n').count();
     let mut block_disabled = false;
-    for (comment_line, comment_text) in scan_comments_until_line(source_text, target_line) {
-        let Some((kind, rules)) = parse_directive_text(comment_text) else {
+    for comment in scan_comments_until_line(source_text, target_line) {
+        let Some((kind, rules)) = parse_directive_text(comment.text) else {
             continue;
         };
         if !directive_applies_to_rule(&rules, rule_id) {
             continue;
         }
         match kind {
-            DirectiveKind::DisableNextLine if comment_line + 1 == target_line => return true,
-            DirectiveKind::DisableLine if comment_line == target_line => return true,
-            DirectiveKind::DisableBlock if comment_line <= target_line => block_disabled = true,
-            DirectiveKind::EnableBlock if comment_line <= target_line => block_disabled = false,
+            DirectiveKind::DisableNextLine if comment.line + 1 == target_line => return true,
+            DirectiveKind::DisableLine if comment.line == target_line => return true,
+            DirectiveKind::DisableBlock if comment.line <= target_line => block_disabled = true,
+            DirectiveKind::EnableBlock if comment.line <= target_line => block_disabled = false,
             _ => {}
         }
     }

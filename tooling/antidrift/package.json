@@ -5,9 +5,6 @@
   "license": "MIT",
   "description": "Deterministic Oxlint and TypeScript-aware policy guardrails against code and AI-agent drift.",
   "keywords": [
-    "eslint",
-    "eslint-plugin",
-    "eslint-config",
     "oxlint",
     "lint",
     "guardrails",
@@ -41,65 +38,13 @@
         "types": "./dist/brand/index.d.mts",
         "import": "./dist/brand/index.mjs"
       },
-      "./eslint-plugin": {
-        "types": "./dist/eslint-plugin/index.d.ts",
-        "import": "./dist/eslint-plugin/index.js"
-      },
-      "./eslint-config": {
-        "types": "./dist/eslint-config/index.d.mts",
-        "import": "./dist/eslint-config/index.mjs"
-      },
       "./oxlint-config": {
         "types": "./dist/oxlint-config/index.d.mts",
         "import": "./dist/oxlint-config/index.mjs"
       },
-      "./oxlint-plugin": {
-        "types": "./dist/oxlint-plugin/index.d.ts",
-        "import": "./dist/oxlint-plugin/index.js"
-      },
       "./policy": {
         "types": "./dist/policy/index.d.mts",
         "import": "./dist/policy/index.mjs"
-      },
-      "./semantic-adapters": {
-        "types": "./dist/semantic-adapters/index.d.mts",
-        "import": "./dist/semantic-adapters/index.mjs"
-      },
-      "./semantic-adapters/async-control-flow": {
-        "types": "./dist/semantic-adapters/kernel/async-control-flow.d.ts",
-        "import": "./dist/semantic-adapters/kernel/async-control-flow.js"
-      },
-      "./semantic-adapters/auth-boundary": {
-        "types": "./dist/semantic-adapters/boundary/auth-boundary.d.ts",
-        "import": "./dist/semantic-adapters/boundary/auth-boundary.js"
-      },
-      "./semantic-adapters/broad-input": {
-        "types": "./dist/semantic-adapters/boundary/broad-input.d.ts",
-        "import": "./dist/semantic-adapters/boundary/broad-input.js"
-      },
-      "./semantic-adapters/parse-input": {
-        "types": "./dist/semantic-adapters/boundary/parse-input.d.ts",
-        "import": "./dist/semantic-adapters/boundary/parse-input.js"
-      },
-      "./semantic-adapters/react-state": {
-        "types": "./dist/semantic-adapters/projection/react-state.d.ts",
-        "import": "./dist/semantic-adapters/projection/react-state.js"
-      },
-      "./semantic-adapters/schema-provenance": {
-        "types": "./dist/semantic-adapters/projection/schema-provenance.d.ts",
-        "import": "./dist/semantic-adapters/projection/schema-provenance.js"
-      },
-      "./semantic-adapters/sql": {
-        "types": "./dist/semantic-adapters/projection/sql.d.ts",
-        "import": "./dist/semantic-adapters/projection/sql.js"
-      },
-      "./semantic-adapters/tuple-shape": {
-        "types": "./dist/semantic-adapters/shape/tuple-shape.d.ts",
-        "import": "./dist/semantic-adapters/shape/tuple-shape.js"
-      },
-      "./semantic-adapters/type-owner": {
-        "types": "./dist/semantic-adapters/type-owner.d.mts",
-        "import": "./dist/semantic-adapters/type-owner.mjs"
       }
     }
   },
@@ -117,65 +62,13 @@
       "types": "./src/brand/index.d.mts",
       "import": "./src/brand/index.mjs"
     },
-    "./eslint-plugin": {
-      "types": "./src/eslint-plugin/index.d.ts",
-      "import": "./src/eslint-plugin/index.js"
-    },
-    "./eslint-config": {
-      "types": "./src/eslint-config/index.d.mts",
-      "import": "./src/eslint-config/index.mjs"
-    },
     "./oxlint-config": {
       "types": "./src/oxlint-config/index.d.mts",
       "import": "./src/oxlint-config/index.mjs"
     },
-    "./oxlint-plugin": {
-      "types": "./src/oxlint-plugin/index.d.ts",
-      "import": "./src/oxlint-plugin/index.js"
-    },
     "./policy": {
       "types": "./src/policy/index.d.mts",
       "import": "./src/policy/index.mjs"
-    },
-    "./semantic-adapters": {
-      "types": "./src/semantic-adapters/index.d.mts",
-      "import": "./src/semantic-adapters/index.mjs"
-    },
-    "./semantic-adapters/async-control-flow": {
-      "types": "./src/semantic-adapters/kernel/async-control-flow.ts",
-      "import": "./src/semantic-adapters/kernel/async-control-flow.ts"
-    },
-    "./semantic-adapters/auth-boundary": {
-      "types": "./src/semantic-adapters/boundary/auth-boundary.ts",
-      "import": "./src/semantic-adapters/boundary/auth-boundary.ts"
-    },
-    "./semantic-adapters/broad-input": {
-      "types": "./src/semantic-adapters/boundary/broad-input.ts",
-      "import": "./src/semantic-adapters/boundary/broad-input.ts"
-    },
-    "./semantic-adapters/parse-input": {
-      "types": "./src/semantic-adapters/boundary/parse-input.ts",
-      "import": "./src/semantic-adapters/boundary/parse-input.ts"
-    },
-    "./semantic-adapters/react-state": {
-      "types": "./src/semantic-adapters/projection/react-state.ts",
-      "import": "./src/semantic-adapters/projection/react-state.ts"
-    },
-    "./semantic-adapters/schema-provenance": {
-      "types": "./src/semantic-adapters/projection/schema-provenance.ts",
-      "import": "./src/semantic-adapters/projection/schema-provenance.ts"
-    },
-    "./semantic-adapters/sql": {
-      "types": "./src/semantic-adapters/projection/sql.ts",
-      "import": "./src/semantic-adapters/projection/sql.ts"
-    },
-    "./semantic-adapters/tuple-shape": {
-      "types": "./src/semantic-adapters/shape/tuple-shape.ts",
-      "import": "./src/semantic-adapters/shape/tuple-shape.ts"
-    },
-    "./semantic-adapters/type-owner": {
-      "types": "./src/semantic-adapters/type-owner.d.mts",
-      "import": "./src/semantic-adapters/type-owner.mjs"
     }
   },
   "bin": {
@@ -195,30 +88,17 @@
     "dist"
   ],
   "dependencies": {
-    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
-    "@eslint/json": "0.14.0",
-    "@oxlint/plugins": "1.89.0",
-    "@typescript-eslint/types": "8.72.0",
     "oxlint": "1.89.0",
     "yaml": "^2.6.1",
     "zod": "^3.24.1"
   },
   "peerDependencies": {
-    "@typescript-eslint/parser": ">=8",
     "eslint": ">=9.38.0 <11",
-    "typescript": ">=5 <6.1",
-    "typescript-eslint": ">=8"
+    "typescript": ">=5 <6.1"
   },
   "devDependencies": {
-    "@tanstack/react-query": "^5.101.4",
     "@types/node": "^22.10.2",
-    "@typescript-eslint/parser": "^8.72.0",
-    "@typescript-eslint/rule-tester": "^8.72.0",
-    "convex": "^1.43.0",
-    "effect": "^3.22.1",
-    "firebase": "^11.0.0",
-    "typescript": "6.0.3",
-    "typescript-eslint": "^8.72.0",
-    "vitest": "^2.1.8"
+    "eslint": "catalog:lint",
+    "typescript": "6.0.3"
   }
 }

@@ -27,12 +27,29 @@ const registeredRules = new Set(
     .filter(Boolean)
 );
 
-const batchRuleIds = new Set([
-  "antidrift/no-as-never",
-  "antidrift/no-debug-residue-filenames",
-]);
+const batchRuleIds = new Set(
+  portableCases.map((entry) => `antidrift/${entry.name}`)
+);
 const batchInputs = [];
 const expectations = new Map();
+const sourceWorkspace = mkdtempSync(join(tmpdir(), "antidrift-rust-source-"));
+process.on("exit", () =>
+  rmSync(sourceWorkspace, { recursive: true, force: true })
+);
+for (const [directory, manifest] of [
+  [
+    "apps/client",
+    { name: "@homer/client", dependencies: { "@homer/shared": "workspace:*" } },
+  ],
+  ["apps/other", { name: "@homer/other" }],
+  ["packages/shared", { name: "@homer/shared" }],
+]) {
+  mkdirSync(join(sourceWorkspace, directory, "src"), { recursive: true });
+  writeFileSync(
+    join(sourceWorkspace, directory, "package.json"),
+    JSON.stringify(manifest)
+  );
+}
 
 for (const entry of portableCases) {
   const fullRuleId = `antidrift/${entry.name}`;
@@ -41,9 +58,14 @@ for (const entry of portableCases) {
   }
   const invalidId = `${entry.name}:invalid`;
   const validId = `${entry.name}:valid`;
-  const invalidFilename = entry.filename ?? "component.tsx";
-  const validFilename =
-    entry.validFilename ?? entry.filename ?? "component.tsx";
+  const invalidFilename = join(
+    sourceWorkspace,
+    entry.filename ?? "component.tsx"
+  );
+  const validFilename = join(
+    sourceWorkspace,
+    entry.validFilename ?? entry.filename ?? "component.tsx"
+  );
 
   batchInputs.push({
     id: invalidId,
@@ -68,6 +90,161 @@ for (const entry of portableCases) {
     ruleId: fullRuleId,
     expectedCount: 0,
   });
+}
+
+writeFileSync(
+  join(sourceWorkspace, "states.ts"),
+  'export const states = ["ready", "done"] as const;\n'
+);
+
+const boundaryProbes = [
+  {
+    id: "authz:missing",
+    rule: "antidrift/require-authz-check",
+    sourceText: "function handle(req) { return req.params.id; }",
+    options: { authzFunctions: ["authorize"] },
+    expectedCount: 1,
+  },
+  {
+    id: "authz:checked",
+    rule: "antidrift/require-authz-check",
+    sourceText:
+      "function handle(req) { authorize(req); return req.params.id; }",
+    options: { authzFunctions: ["authorize"] },
+    expectedCount: 0,
+  },
+  {
+    id: "authz:nested-frame",
+    rule: "antidrift/require-authz-check",
+    sourceText:
+      "function handle(req) { const check = () => authorize(req); return req.params.id; }",
+    options: { authzFunctions: ["authorize"] },
+    expectedCount: 1,
+  },
+  {
+    id: "owned-union:local",
+    rule: "antidrift/no-redeclared-owned-union",
+    sourceText:
+      'export const states = ["ready", "done"] as const; type State = "done" | "ready";',
+    expectedCount: 1,
+  },
+  {
+    id: "owned-union:derived",
+    rule: "antidrift/no-redeclared-owned-union",
+    sourceText:
+      'export const states = ["ready", "done"] as const; type State = typeof states[number];',
+    expectedCount: 0,
+  },
+  {
+    id: "owned-union:imported",
+    rule: "antidrift/no-redeclared-owned-union",
+    sourceText:
+      'import { states } from "./states.js"; type State = "ready" | "done";',
+    expectedCount: 1,
+  },
+  {
+    id: "owned-union:shadowed",
+    rule: "antidrift/no-redeclared-owned-union",
+    sourceText:
+      'import { states } from "./states.js"; function scope(states: unknown) { type State = "ready" | "done"; }',
+    expectedCount: 0,
+  },
+  {
+    id: "owned-union:convex",
+    rule: "antidrift/no-redeclared-owned-union",
+    sourceText:
+      'import { v } from "convex/values"; import { states } from "./states.js"; const validator = v.union(v.literal("ready"), v.literal("done"));',
+    expectedCount: 1,
+  },
+  {
+    id: "owned-union:status-context",
+    rule: "antidrift/no-redeclared-owned-union",
+    sourceText: 'type Job = { status: "ready" }; type Other = "ready";',
+    options: {
+      statuses: {
+        JobStatus: { owner: "states.ts", values: ["ready", "done"] },
+      },
+    },
+    expectedCount: 1,
+  },
+  {
+    id: "unknown-type-aliases:invalid",
+    rule: "antidrift/no-unknown-type-aliases",
+    sourceText: "type MysteryPayload = unknown;\n",
+    expectedCount: 1,
+  },
+  {
+    id: "unsafe-cast-chain:invalid",
+    rule: "antidrift/no-unsafe-cast-chain",
+    sourceText: "const out = raw as unknown as string;\n",
+    expectedCount: 1,
+  },
+  {
+    id: "calling-components:invalid",
+    rule: "antidrift/no-calling-components-as-functions",
+    sourceText:
+      "function Row() { return <div />; }\nexport function Table() { return <div>{Row()}</div>; }\n",
+    filename: join(sourceWorkspace, "Table.tsx"),
+    expectedCount: 1,
+  },
+  {
+    id: "duplicated-classnames:invalid",
+    rule: "antidrift/no-duplicated-conditional-classnames",
+    sourceText:
+      'export function Badge({ active }: { active: boolean }) { return <div className={active ? "flex items-center gap-2 px-2 text-red-500" : "flex items-center gap-2 px-2 text-blue-500"} />; }\n',
+    filename: join(sourceWorkspace, "Badge.tsx"),
+    expectedCount: 1,
+  },
+  {
+    id: "resource-lifecycle:invalid",
+    rule: "antidrift/no-handrolled-resource-lifecycle-cells",
+    sourceText:
+      'import { useState } from "react";\nexport function UsersView() {\n  const [users, setUsers] = useState([]);\n  const [loading, setLoading] = useState(false);\n  const [error, setError] = useState(null);\n  async function load() {\n    setLoading(true);\n    try {\n      const result = await fetch("/api/users");\n      setUsers(result);\n    } catch (err) {\n      setError(err);\n    } finally {\n      setLoading(false);\n    }\n  }\n  return <button onClick={load}>{loading ? "Loading" : error ? "Error" : users.length}</button>;\n}\n',
+    filename: join(sourceWorkspace, "UsersView.tsx"),
+    expectedCount: 1,
+  },
+  {
+    id: "effect-deps:invalid",
+    rule: "antidrift/require-effect-deps",
+    sourceText:
+      'import { useEffect } from "react";\nexport function View() { useEffect(() => { console.log("hi"); }); return null; }\n',
+    filename: join(sourceWorkspace, "View.tsx"),
+    expectedCount: 1,
+  },
+  {
+    id: "async-array-method:invalid",
+    rule: "antidrift/no-async-array-method",
+    sourceText: "items.forEach(async (item) => { await save(item); });\n",
+    expectedCount: 1,
+  },
+  {
+    id: "sentinel-fallback:invalid",
+    rule: "antidrift/no-sentinel-absence-fallback",
+    sourceText: 'export const label = user.name ?? "Unknown";\n',
+    expectedCount: 1,
+  },
+  {
+    id: "repo-state-mirror:invalid",
+    rule: "antidrift/no-repo-state-mirror-assertion",
+    sourceText:
+      'import { readFileSync } from "node:fs";\nexpect(readFileSync("src/index.ts", "utf8")).toContain("export");\n',
+    filename: join(sourceWorkspace, "mirror.test.ts"),
+    expectedCount: 1,
+  },
+  {
+    id: "nonindependent-oracle:invalid",
+    rule: "antidrift/no-nonindependent-test-oracle",
+    sourceText: 'expect(names.includes("needle")).toBe(true);\n',
+    filename: join(sourceWorkspace, "oracle.test.ts"),
+    expectedCount: 1,
+  },
+];
+for (const { expectedCount, filename, ...probe } of boundaryProbes) {
+  batchInputs.push({
+    ...probe,
+    filename: filename ?? join(sourceWorkspace, "boundary.ts"),
+  });
+  expectations.set(probe.id, { ruleId: probe.rule, expectedCount });
 }
 
 const rawBatchOutput = execFileSync(binaryPath, ["--batch-json", "-"], {
@@ -267,10 +444,11 @@ const sqlDefaultDiags = runHeadlessProbe(
   },
   { ANTIDRIFT_TSGOLINT_DEFAULTS: "1" }
 );
-assert.ok(
-  sqlDefaultDiags.some(
+assert.equal(
+  sqlDefaultDiags.filter(
     (diag) => diag.message?.id === "antidrift/no-sql-string-concat"
-  ),
+  ).length,
+  1,
   `Expected default native rules to report antidrift/no-sql-string-concat, got ${JSON.stringify(sqlDefaultDiags)}`
 );
 

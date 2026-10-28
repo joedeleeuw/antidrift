@@ -8,12 +8,6 @@ import { templateSentinelSelectors } from "../policy/lib/property-default-fallba
 
 const javascriptPlugins = [
   {
-    name: "antidrift",
-    specifier: fileURLToPath(
-      new URL("../oxlint-plugin/index.js", import.meta.url)
-    ),
-  },
-  {
     name: "governance-eslint",
     specifier: fileURLToPath(new URL("./eslint-builtins.mjs", import.meta.url)),
   },
@@ -80,61 +74,6 @@ const hostPathExclusionFiles = [
   "**/__mocks__/**",
   "**/e2e/**",
 ];
-
-const additionalAntidriftRules = {
-  "antidrift/no-anemic-errors": "error",
-  "antidrift/no-relative-cross-package-imports": "error",
-  "antidrift/confine-owner": "error",
-  "antidrift/docs-source-policy": "error",
-  "antidrift/icon-button-requires-tooltip": "error",
-  "antidrift/no-adhoc-loader": "error",
-  "antidrift/no-ambient-hotkey-format": "error",
-  "antidrift/no-async-context-enter-with": "error",
-  "antidrift/no-auth-token-in-web-storage": "error",
-  "antidrift/no-awaited-builder-union": "error",
-  "antidrift/no-centered-scroll-column": "error",
-  "antidrift/no-dialog-trigger-menu-item": "error",
-  "antidrift/no-disabled-tooltip-trigger": "error",
-  "antidrift/no-eager-singleton": "error",
-  "antidrift/no-inline-style-colors": "error",
-  "antidrift/no-omitted-prop-respread": "error",
-  "antidrift/no-partial-record-satisfies": "error",
-  "antidrift/no-path-prefix-containment": "error",
-  "antidrift/no-physical-properties": "error",
-  "antidrift/no-raw-foreground-opacity": "error",
-  "antidrift/no-redacted-log-attribute-key": "error",
-  "antidrift/no-spread-input-in-query-key": "error",
-  "antidrift/no-static-devtools-import": "error",
-  "antidrift/no-unformatted-number": "error",
-  "antidrift/no-unsafe-inner-html": "error",
-  "antidrift/no-portal-under-interactive-ancestor": "error",
-  "antidrift/require-detached-label-shape": "error",
-  "antidrift/require-dir-on-rendered-name": "error",
-  "antidrift/require-exhaustive-panic": "error",
-  "antidrift/require-fetch-timeout": "error",
-  "antidrift/require-function-replacer": "error",
-  "antidrift/require-query-key-factory": "error",
-  "antidrift/require-query-signal": "error",
-  "antidrift/require-safe-window-open": "error",
-  "antidrift/require-stable-snapshot": "error",
-  "antidrift/require-stream-reader-disposal": "error",
-  "antidrift/no-raw-filename-write": "error",
-  "antidrift/no-unsanitized-href": "error",
-  "antidrift/require-secure-document-response": "error",
-  "antidrift/no-bun-api-in-shared": "error",
-  "antidrift/no-as-never": "error",
-  "antidrift/no-todo-without-issue": "error",
-  "antidrift/no-default-export-in-domain": "error",
-  "antidrift/no-tutorial-comments": "error",
-  "antidrift/no-debug-residue-filenames": "error",
-  "antidrift/no-placeholder-tests": "error",
-  "antidrift/no-unlisted-external-imports": "error",
-  "antidrift/no-dated-comments": "error",
-  "antidrift/no-async-array-method": "error",
-  "antidrift/no-handrolled-resource-lifecycle-cells": "error",
-  "antidrift/no-repo-state-mirror-assertion": "error",
-  "antidrift/require-authz-check": "error",
-};
 
 function generatedImportPatterns(registries) {
   return Object.values(registries.generated?.generatedSources ?? {}).flatMap(
@@ -321,7 +260,6 @@ const governanceIgnorePatterns = [
   "**/dist/**",
   "**/coverage/**",
   "reports/**",
-  "tooling/antidrift/src/oxlint-plugin/anti-slop/**",
 ];
 
 const declarationIgnorePatterns = [
@@ -368,8 +306,6 @@ export function createGovernanceOxlintConfig({
   propertyDefaultAllowedFiles = [],
 } = {}) {
   const registries = loadRegistriesSync(resolve(repoRoot, policyDir));
-  const authzFunctions =
-    registries.boundaries?.requiredCalls?.authorization ?? [];
   const generatedIgnores = generatedIgnorePatterns(registries, repoRoot);
   const generatedPatterns = generatedImportPatterns(registries);
   const reactNativePolicy = reactNativePolicyFor(registries.reactNative);
@@ -382,16 +318,11 @@ export function createGovernanceOxlintConfig({
     ...touchableImportPatterns(reactNativePolicy),
   ];
   const rules = {
-    "antidrift/require-effect-deps": "error",
-    "antidrift/no-unknown-type-aliases": "error",
-    "antidrift/no-unsafe-cast-chain": "error",
     "governance-eslint/no-restricted-syntax": [
       "error",
       ...hostPathSelectors,
       ...(enforceNoPropertyDefaultFallbacks ? templateSentinelSelectors : []),
     ],
-    ...additionalAntidriftRules,
-    "antidrift/require-authz-check": ["error", { authzFunctions }],
   };
   if (restrictedImportPatterns.length > 0) {
     rules["no-restricted-imports"] = restrictedImportsRule(

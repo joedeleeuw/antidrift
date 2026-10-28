@@ -1,14 +1,13 @@
-import { isAbsolute, join, posix, resolve, sep } from "node:path";
+import { isAbsolute, join, resolve, sep } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { SEMANTIC_ADAPTER_CONTRACTS } from "../../semantic-adapters/index.mjs";
 
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
-function readPackageJson(repoRoot, errors) {
-  const file = join(repoRoot, "tooling", "antidrift", "package.json");
+
+function readPackageJson(root, errors) {
+  const file = join(root, "tooling", "antidrift", "package.json");
   if (!existsSync(file)) {
     return null;
   }
@@ -26,88 +25,61 @@ function readPackageJson(repoRoot, errors) {
     return null;
   }
 }
-function safeRepoPath(repoRoot, relativePath) {
+
+function safeRepoPath(root, relativePath) {
   if (typeof relativePath !== "string" || relativePath.length === 0) {
     return null;
   }
-  const root = resolve(repoRoot);
   const target = resolve(root, relativePath);
   return target === root || target.startsWith(root + sep) ? target : null;
 }
+
 function sortedStrings(values) {
   return [...values].sort((a, b) => a.localeCompare(b));
 }
-function checkSemanticAdapterPackageExportEntry(
-  exportsMap,
-  exportKey,
-  expectedTypes,
-  expectedImport,
-  errors
-) {
-  const label = "tooling/antidrift/package.json exports";
-  const exportLabel = `${label}${exportKey}`;
-  const entry = exportsMap[exportKey];
-  if (!isRecord(entry)) {
-    errors.push(`${label} missing semantic adapter subpath: ${exportKey}`);
-    return;
-  }
-  if (entry.types !== expectedTypes) {
-    errors.push(`${exportLabel}.types must be ${expectedTypes}.`);
-  }
-  if (entry.import !== expectedImport) {
-    errors.push(`${exportLabel}.import must be ${expectedImport}.`);
-  }
-}
-function requireExistingPackageExportPath(
-  repoRoot,
-  packagePath,
-  label,
-  errors
-) {
+
+function validatePackageExportPath(root, packagePath, label) {
   if (
     typeof packagePath !== "string" ||
     packagePath.length === 0 ||
     !packagePath.startsWith("./")
   ) {
-    errors.push(`${label} must be a package-relative ./ path.`);
-    return;
+    return {
+      target: null,
+      errors: [`${label} must be a package-relative ./ path.`],
+    };
   }
   const target = safeRepoPath(
-    repoRoot,
+    root,
     join("tooling", "antidrift", packagePath.slice(2))
   );
   if (!target) {
-    errors.push(`${label} must stay inside tooling/antidrift.`);
-    return;
+    return {
+      target: null,
+      errors: [`${label} must stay inside tooling/antidrift.`],
+    };
   }
   if (!existsSync(target)) {
-    errors.push(`${label} path does not exist: ${packagePath}`);
+    return {
+      target: null,
+      errors: [`${label} path does not exist: ${packagePath}`],
+    };
   }
+  return { target, errors: [] };
 }
-function packageExportTarget(repoRoot, packagePath) {
-  if (
-    typeof packagePath !== "string" ||
-    packagePath.length === 0 ||
-    !packagePath.startsWith("./")
-  ) {
-    return null;
-  }
-  const target = safeRepoPath(
-    repoRoot,
-    join("tooling", "antidrift", packagePath.slice(2))
-  );
-  return target && existsSync(target) ? target : null;
-}
+
 function hasExportModifier(node) {
   return ts
     .getModifiers(node)
     ?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
 }
+
 function hasDefaultModifier(node) {
   return ts
     .getModifiers(node)
     ?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword);
 }
+
 function addBindingNames(name, names) {
   if (ts.isIdentifier(name)) {
     names.add(name.text);
@@ -121,6 +93,7 @@ function addBindingNames(name, names) {
     }
   }
 }
+
 function addNamedExportNames(statement, names) {
   if (
     !ts.isExportDeclaration(statement) ||
@@ -136,6 +109,7 @@ function addNamedExportNames(statement, names) {
     }
   }
 }
+
 function addExportedDeclarationName(statement, names) {
   if (!hasExportModifier(statement)) {
     return;
@@ -159,6 +133,7 @@ function addExportedDeclarationName(statement, names) {
     names.add(statement.name.text);
   }
 }
+
 function packageExportedValueNames(sourceText, fileName, scriptKind) {
   const source = ts.createSourceFile(
     fileName,
@@ -178,131 +153,64 @@ function packageExportedValueNames(sourceText, fileName, scriptKind) {
   }
   return names;
 }
+
 function sourceScriptKind(packagePath) {
   return packagePath.endsWith(".ts") ? ts.ScriptKind.TS : ts.ScriptKind.JS;
 }
-function semanticAdapterModules() {
-  const indexPath = fileURLToPath(
-    new URL("../../semantic-adapters/index.mjs", import.meta.url)
-  );
-  const source = ts.createSourceFile(
-    indexPath,
-    readFileSync(indexPath, "utf8"),
-    ts.ScriptTarget.Latest,
-    false,
-    ts.ScriptKind.JS
-  );
-  const modules = new Map();
-  for (const statement of source.statements) {
-    const bindings = ts.isImportDeclaration(statement)
-      ? statement.importClause?.namedBindings
-      : undefined;
-    if (
-      bindings &&
-      ts.isNamespaceImport(bindings) &&
-      ts.isStringLiteral(statement.moduleSpecifier)
-    ) {
-      modules.set(
-        bindings.name.text,
-        `./${posix.join("src/semantic-adapters", statement.moduleSpecifier.text)}`
-      );
-    }
+
+function validateExportEntry(root, exportKey, entry) {
+  if (!isRecord(entry)) {
+    return [];
   }
-  return modules;
-}
-function semanticAdapterTypesPath(importPath) {
-  return importPath.endsWith(".mjs")
-    ? importPath.replace(/\.mjs$/u, ".d.mts")
-    : importPath;
-}
-function checkPackageExportRuntimeDeclarations(
-  exportLabel,
-  typesPath,
-  importPath,
-  repoRoot,
-  errors
-) {
-  const runtimeTarget = packageExportTarget(repoRoot, importPath);
-  const typeTarget = packageExportTarget(repoRoot, typesPath);
-  if (!runtimeTarget || !typeTarget) {
-    return;
+  if (typeof entry.types !== "string" || typeof entry.import !== "string") {
+    return [];
+  }
+  const label = `tooling/antidrift/package.json exports${exportKey}`;
+  const typesResult = validatePackageExportPath(
+    root,
+    entry.types,
+    `${label}.types`
+  );
+  const importResult = validatePackageExportPath(
+    root,
+    entry.import,
+    `${label}.import`
+  );
+  const errors = [...typesResult.errors, ...importResult.errors];
+  if (!typesResult.target || !importResult.target) {
+    return errors;
   }
   const runtimeNames = packageExportedValueNames(
-    readFileSync(runtimeTarget, "utf8"),
-    importPath,
-    sourceScriptKind(importPath)
+    readFileSync(importResult.target, "utf8"),
+    entry.import,
+    sourceScriptKind(entry.import)
   );
   const typeNames = packageExportedValueNames(
-    readFileSync(typeTarget, "utf8"),
-    typesPath,
+    readFileSync(typesResult.target, "utf8"),
+    entry.types,
     ts.ScriptKind.TS
   );
   for (const name of sortedStrings(runtimeNames)) {
     if (!typeNames.has(name)) {
       errors.push(
-        `${exportLabel}.import runtime export ${name} is missing from types path ${typesPath}`
+        `${label}.import runtime export ${name} is missing from types path ${entry.types}`
       );
     }
   }
   for (const name of sortedStrings(typeNames)) {
     if (!runtimeNames.has(name)) {
       errors.push(
-        `${exportLabel}.types declaration ${name} is missing from runtime import path ${importPath}`
+        `${label}.types declaration ${name} is missing from runtime import path ${entry.import}`
       );
     }
   }
+  return errors;
 }
-function checkPackageExportEntryFilesAndDeclarations(
-  exportKey,
-  entry,
-  repoRoot,
-  errors
-) {
-  if (!isRecord(entry)) {
-    return;
-  }
-  if (typeof entry.types !== "string" || typeof entry.import !== "string") {
-    return;
-  }
-  const label = `tooling/antidrift/package.json exports${exportKey}`;
-  requireExistingPackageExportPath(
-    repoRoot,
-    entry.types,
-    `${label}.types`,
-    errors
-  );
-  requireExistingPackageExportPath(
-    repoRoot,
-    entry.import,
-    `${label}.import`,
-    errors
-  );
-  checkPackageExportRuntimeDeclarations(
-    label,
-    entry.types,
-    entry.import,
-    repoRoot,
-    errors
-  );
-}
-function checkPackageExportFilesAndDeclarations(packageJson, repoRoot, errors) {
-  const exportsMap = packageJson.exports;
-  if (!isRecord(exportsMap)) {
-    return;
-  }
-  for (const exportKey of sortedStrings(Object.keys(exportsMap))) {
-    checkPackageExportEntryFilesAndDeclarations(
-      exportKey,
-      exportsMap[exportKey],
-      repoRoot,
-      errors
-    );
-  }
-}
-function packageRelativeTarget(repoRoot, packagePath, label, errors) {
+
+function validateBinTarget(root, binary, packagePath) {
+  const label = `tooling/antidrift/package.json bin.${binary}`;
   if (typeof packagePath !== "string" || packagePath.length === 0) {
-    errors.push(`${label} must be a package-relative path.`);
-    return null;
+    return [`${label} must be a package-relative path.`];
   }
   const relativePackagePath = packagePath.startsWith("./")
     ? packagePath.slice(2)
@@ -313,68 +221,25 @@ function packageRelativeTarget(repoRoot, packagePath, label, errors) {
     relativePackagePath.startsWith("../") ||
     relativePackagePath.includes("/../")
   ) {
-    errors.push(`${label} must stay inside tooling/antidrift.`);
-    return null;
+    return [`${label} must stay inside tooling/antidrift.`];
   }
   const target = safeRepoPath(
-    repoRoot,
+    root,
     join("tooling", "antidrift", relativePackagePath)
   );
   if (!target) {
-    errors.push(`${label} must stay inside tooling/antidrift.`);
-    return null;
-  }
-  return target;
-}
-function requireExistingPackageBinPath(repoRoot, packagePath, label, errors) {
-  const target = packageRelativeTarget(repoRoot, packagePath, label, errors);
-  if (!target) {
-    return null;
+    return [`${label} must stay inside tooling/antidrift.`];
   }
   if (!existsSync(target)) {
-    errors.push(`${label} path does not exist: ${packagePath}`);
-    return null;
-  }
-  return target;
-}
-function checkPackageBinTarget(binary, packagePath, repoRoot, errors) {
-  const label = `tooling/antidrift/package.json bin.${binary}`;
-  const target = requireExistingPackageBinPath(
-    repoRoot,
-    packagePath,
-    label,
-    errors
-  );
-  if (!target) {
-    return;
+    return [`${label} path does not exist: ${packagePath}`];
   }
   const firstLine = readFileSync(target, "utf8").split(/\r?\n/u, 1)[0];
   if (firstLine !== "#!/usr/bin/env node") {
-    errors.push(`${label} must start with #!/usr/bin/env node.`);
+    return [`${label} must start with #!/usr/bin/env node.`];
   }
+  return [];
 }
-function checkPackageBinTargets(packageJson, repoRoot, errors) {
-  if (packageJson.bin === undefined) {
-    return;
-  }
-  if (typeof packageJson.bin === "string") {
-    const binary =
-      typeof packageJson.name === "string" && packageJson.name.length > 0
-        ? packageJson.name
-        : "default";
-    checkPackageBinTarget(binary, packageJson.bin, repoRoot, errors);
-    return;
-  }
-  if (!isRecord(packageJson.bin)) {
-    errors.push(
-      "tooling/antidrift/package.json bin must be a string or mapping."
-    );
-    return;
-  }
-  for (const binary of sortedStrings(Object.keys(packageJson.bin))) {
-    checkPackageBinTarget(binary, packageJson.bin[binary], repoRoot, errors);
-  }
-}
+
 function packageExportPublicSpecifier(packageName, exportKey) {
   if (exportKey === ".") {
     return packageName;
@@ -384,53 +249,33 @@ function packageExportPublicSpecifier(packageName, exportKey) {
   }
   return null;
 }
-function checkPackageReadmePublicEntry(readme, specifier, errors) {
-  if (!readme.includes(`\`${specifier}\``)) {
-    errors.push(
-      `tooling/antidrift/README.md public entry points missing package export: ${specifier}`
-    );
-  }
-}
-function checkPackageReadmeBinaryEntry(readme, binary, errors) {
-  if (!readme.includes(`\`${binary}\``)) {
-    errors.push(
-      `tooling/antidrift/README.md public entry points missing CLI binary: ${binary}`
-    );
-  }
-}
+
 function readmeCodeSpans(readme) {
   return [...readme.matchAll(/`([^`\n]+)`/gu)].map((match) => match[1]);
 }
-function packageReadmeSpecifiers(readme, packageName) {
-  return readmeCodeSpans(readme).filter(
-    (span) => span === packageName || span.startsWith(`${packageName}/`)
-  );
-}
-function checkPackageReadmeNoStalePublicEntries(
-  readme,
-  packageName,
-  expectedSpecifiers,
-  errors
-) {
-  for (const specifier of packageReadmeSpecifiers(readme, packageName)) {
-    if (!expectedSpecifiers.has(specifier)) {
-      errors.push(
-        `tooling/antidrift/README.md public entry points lists non-exported package specifier: ${specifier}`
-      );
-    }
+
+function packageBinNames(packageJson) {
+  if (typeof packageJson.bin === "string") {
+    return [packageJson.name];
   }
+  if (isRecord(packageJson.bin)) {
+    return sortedStrings(Object.keys(packageJson.bin));
+  }
+  return [];
 }
-function checkPackageReadmePublicEntryPoints(packageJson, repoRoot, errors) {
+
+function validateReadmeEntries(root, packageJson) {
   if (typeof packageJson.name !== "string" || packageJson.name.length === 0) {
-    return;
+    return [];
   }
-  const target = safeRepoPath(repoRoot, "tooling/antidrift/README.md");
+  const target = safeRepoPath(root, "tooling/antidrift/README.md");
   if (!target || !existsSync(target)) {
-    return;
+    return [];
   }
   const readme = readFileSync(target, "utf8");
   const exportsMap = packageJson.exports;
   const expectedSpecifiers = new Set();
+  const errors = [];
   if (isRecord(exportsMap)) {
     for (const exportKey of sortedStrings(Object.keys(exportsMap))) {
       const specifier = packageExportPublicSpecifier(
@@ -439,26 +284,38 @@ function checkPackageReadmePublicEntryPoints(packageJson, repoRoot, errors) {
       );
       if (specifier) {
         expectedSpecifiers.add(specifier);
-        checkPackageReadmePublicEntry(readme, specifier, errors);
+        if (!readme.includes(`\`${specifier}\``)) {
+          errors.push(
+            `tooling/antidrift/README.md public entry points missing package export: ${specifier}`
+          );
+        }
       }
     }
-    checkPackageReadmeNoStalePublicEntries(
-      readme,
-      packageJson.name,
-      expectedSpecifiers,
-      errors
+    const foundSpecifiers = readmeCodeSpans(readme).filter(
+      (span) =>
+        span === packageJson.name || span.startsWith(`${packageJson.name}/`)
     );
-  }
-  if (typeof packageJson.bin === "string") {
-    checkPackageReadmeBinaryEntry(readme, packageJson.name, errors);
-  } else if (isRecord(packageJson.bin)) {
-    for (const binary of sortedStrings(Object.keys(packageJson.bin))) {
-      checkPackageReadmeBinaryEntry(readme, binary, errors);
+    for (const specifier of foundSpecifiers) {
+      if (!expectedSpecifiers.has(specifier)) {
+        errors.push(
+          `tooling/antidrift/README.md public entry points lists non-exported package specifier: ${specifier}`
+        );
+      }
     }
   }
+  for (const binary of packageBinNames(packageJson)) {
+    if (!readme.includes(`\`${binary}\``)) {
+      errors.push(
+        `tooling/antidrift/README.md public entry points missing CLI binary: ${binary}`
+      );
+    }
+  }
+  return errors;
 }
+
 export function checkPackageSurface(repoRoot, errors) {
-  const packageJson = readPackageJson(repoRoot, errors);
+  const root = resolve(repoRoot);
+  const packageJson = readPackageJson(root, errors);
   if (!packageJson) {
     return;
   }
@@ -467,35 +324,27 @@ export function checkPackageSurface(repoRoot, errors) {
     errors.push("tooling/antidrift/package.json exports must be a mapping.");
     return;
   }
-  checkSemanticAdapterPackageExportEntry(
-    exportsMap,
-    "./semantic-adapters",
-    "./src/semantic-adapters/index.d.mts",
-    "./src/semantic-adapters/index.mjs",
-    errors
-  );
-  const adapterModules = semanticAdapterModules();
-  for (const contract of Object.values(SEMANTIC_ADAPTER_CONTRACTS)) {
-    if (!isRecord(contract) || typeof contract.id !== "string") {
-      continue;
-    }
-    const exportKey = `./semantic-adapters/${contract.id}`;
-    const importPath = adapterModules.get(contract.exportName);
-    if (!importPath?.endsWith(`/${contract.id}${posix.extname(importPath)}`)) {
-      errors.push(
-        `tooling/antidrift/src/semantic-adapters/index.mjs must import adapter ${contract.exportName} from a module named ${contract.id}.`
-      );
-      continue;
-    }
-    checkSemanticAdapterPackageExportEntry(
-      exportsMap,
-      exportKey,
-      semanticAdapterTypesPath(importPath),
-      importPath,
-      errors
-    );
+  for (const exportKey of sortedStrings(Object.keys(exportsMap))) {
+    errors.push(...validateExportEntry(root, exportKey, exportsMap[exportKey]));
   }
-  checkPackageExportFilesAndDeclarations(packageJson, repoRoot, errors);
-  checkPackageBinTargets(packageJson, repoRoot, errors);
-  checkPackageReadmePublicEntryPoints(packageJson, repoRoot, errors);
+  if (typeof packageJson.bin === "string") {
+    const binary =
+      typeof packageJson.name === "string" && packageJson.name.length > 0
+        ? packageJson.name
+        : "default";
+    errors.push(...validateBinTarget(root, binary, packageJson.bin));
+  } else if (packageJson.bin !== undefined) {
+    if (!isRecord(packageJson.bin)) {
+      errors.push(
+        "tooling/antidrift/package.json bin must be a string or mapping."
+      );
+    } else {
+      for (const binary of sortedStrings(Object.keys(packageJson.bin))) {
+        errors.push(
+          ...validateBinTarget(root, binary, packageJson.bin[binary])
+        );
+      }
+    }
+  }
+  errors.push(...validateReadmeEntries(root, packageJson));
 }

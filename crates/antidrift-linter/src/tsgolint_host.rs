@@ -3,11 +3,13 @@ use std::sync::{Arc, Mutex};
 use rustc_hash::FxHashMap;
 use tsrs_ast::{SourceFile, SourceFileParseOptions};
 use tsrs_compiler::{CompilerHost, new_compiler_host};
-use tsrs_core::P;
 use tsrs_core::tspath::{self, Path};
+use tsrs_core::{
+    CompilerOptions, JsxEmit, ModuleKind, ModuleResolutionKind, P, ScriptTarget, Tristate,
+};
 use tsrs_vfs::{FS, bundled, cachedvfs, osvfs};
 use tsrslint::overlayfs::OverlayFS;
-use tsrslint::protocol::{Diagnostic, Payload};
+use tsrslint::protocol::{Diagnostic, Message, Payload, Range};
 use tsrslint::tsconfig::ExtendedConfigCache;
 
 pub(crate) type DeclarationCache = Mutex<FxHashMap<SourceFileParseOptions, P<SourceFile>>>;
@@ -144,4 +146,48 @@ pub(crate) fn filter_suppressed_diagnostics(
             *seen > allowed
         })
         .collect())
+}
+
+pub(crate) fn tsconfig_error_diagnostic(
+    diag: P<tsrs_ast::Diagnostic>,
+    config_file_name: &str,
+) -> Diagnostic {
+    let file_path = diag
+        .file()
+        .map(|file| file.file_name().to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| config_file_name.to_string());
+    let help = tsrs_compiler::diagnosticwriter::flatten_diagnostic_message(diag, "\n");
+    Diagnostic {
+        kind: 1,
+        range: diag.loc().map(Range::from),
+        message: Message {
+            id: "tsconfig-error".to_string(),
+            description: "Invalid tsconfig".to_string(),
+            help: Some(help),
+        },
+        file_path: Some(file_path),
+        labeled_ranges: Vec::new(),
+        rule: None,
+        fixes: Vec::new(),
+        suggestions: Vec::new(),
+    }
+}
+
+pub(crate) fn inferred_compiler_options() -> CompilerOptions {
+    CompilerOptions {
+        allow_js: Tristate::True,
+        module: ModuleKind::ESNext,
+        module_resolution: ModuleResolutionKind::Bundler,
+        target: ScriptTarget::ES2022,
+        jsx: JsxEmit::ReactJSX,
+        allow_importing_ts_extensions: Tristate::True,
+        strict_null_checks: Tristate::True,
+        strict_function_types: Tristate::True,
+        source_map: Tristate::True,
+        es_module_interop: Tristate::True,
+        allow_non_ts_extensions: Tristate::True,
+        resolve_json_module: Tristate::True,
+        ..Default::default()
+    }
 }

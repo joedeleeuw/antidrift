@@ -59,23 +59,6 @@ function moduleGraphConfigured(scope) {
   );
 }
 
-function touchedModuleGraphFor({ contract, surface, cwd, head, tsconfig }) {
-  if (!moduleGraphConfigured(contract.scope)) return null;
-  if (contract.scope.allowedEntrypoints.length === 0) {
-    throw new Error(
-      "change-contract: scope.allowedEntrypoints is required when scope.maxTouchedModuleRadius is configured"
-    );
-  }
-  return collectTouchedModuleGraph({
-    cwd,
-    head,
-    tsconfig,
-    changedFiles: surface.changedFiles,
-    allowedEntrypoints: contract.scope.allowedEntrypoints,
-    maxTouchedModuleRadius: contract.scope.maxTouchedModuleRadius,
-  });
-}
-
 /**
  * Inventory-only (v0): never blocks. A missing contract is not a failure; an invalid contract throws
  * loudly (ContractValidationError). Violations are reported, not enforced.
@@ -126,13 +109,24 @@ export function runChangeContract({
     surface.changedFiles
   );
   const violations = analyzeChangeScope(contract, surface);
-  const touchedModuleGraph = touchedModuleGraphFor({
-    contract,
-    surface,
-    cwd,
-    head,
-    tsconfig,
-  });
+  if (
+    moduleGraphConfigured(contract.scope) &&
+    contract.scope.allowedEntrypoints.length === 0
+  ) {
+    throw new Error(
+      "change-contract: scope.allowedEntrypoints is required when scope.maxTouchedModuleRadius is configured"
+    );
+  }
+  const touchedModuleGraph = moduleGraphConfigured(contract.scope)
+    ? collectTouchedModuleGraph({
+        cwd,
+        head,
+        tsconfig,
+        changedFiles: surface.changedFiles,
+        allowedEntrypoints: contract.scope.allowedEntrypoints,
+        maxTouchedModuleRadius: contract.scope.maxTouchedModuleRadius,
+      })
+    : null;
 
   return {
     contractState,

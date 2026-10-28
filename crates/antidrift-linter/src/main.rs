@@ -7,7 +7,6 @@ mod tsgolint_host;
 mod tsgolint_runner;
 
 use antidrift_rules::all_rules;
-use antidrift_rules::tsrslint_rules::all_typed_rules;
 use batch::run_batch_json;
 use cli::parse_cli_args;
 use runner::run_workspace;
@@ -66,29 +65,35 @@ fn main() -> ExitCode {
     if args.list_rules {
         let mut seen = FxHashSet::default();
         for rule in all_rules() {
-            if seen.insert(rule.id().to_string()) {
-                println!("{}", rule.id());
-            }
-        }
-        for typed_rule in all_typed_rules() {
-            if seen.insert(typed_rule.name().to_string()) {
-                println!("{}", typed_rule.name());
+            if seen.insert(rule.name().to_string()) {
+                println!("{}", rule.name());
             }
         }
         return ExitCode::SUCCESS;
     }
 
     if let Some(batch_spec) = &args.batch_json {
-        match run_batch_json(batch_spec) {
-            Ok(json_output) => {
-                println!("{json_output}");
-                return ExitCode::SUCCESS;
-            }
+        let spec = batch_spec.clone();
+        let spawned = std::thread::Builder::new()
+            .stack_size(256 << 20)
+            .spawn(move || run_batch_json(&spec));
+        return match spawned {
+            Ok(handle) => match handle.join() {
+                Ok(Ok(json_output)) => {
+                    println!("{json_output}");
+                    ExitCode::SUCCESS
+                }
+                Ok(Err(err)) => {
+                    eprintln!("antidrift-linter: {err}");
+                    ExitCode::from(2)
+                }
+                Err(_) => ExitCode::from(2),
+            },
             Err(err) => {
                 eprintln!("antidrift-linter: {err}");
-                return ExitCode::from(2);
+                ExitCode::from(2)
             }
-        }
+        };
     }
 
     match run_workspace(&args) {

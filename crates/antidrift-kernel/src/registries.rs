@@ -4,6 +4,60 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
+pub const NON_BAG_TYPE_NAMES: &[&str] = &[
+    "AbortController",
+    "AbortSignal",
+    "Array",
+    "ArrayBuffer",
+    "Blob",
+    "Buffer",
+    "Checker",
+    "CustomEvent",
+    "DataView",
+    "Date",
+    "Document",
+    "Element",
+    "Error",
+    "Event",
+    "File",
+    "FormData",
+    "Function",
+    "Headers",
+    "HTMLElement",
+    "Map",
+    "Node",
+    "Program",
+    "Promise",
+    "RangeError",
+    "ReadableStream",
+    "ReadonlyArray",
+    "ReadonlyMap",
+    "ReadonlySet",
+    "ReferenceError",
+    "RegExp",
+    "Request",
+    "Response",
+    "RuleContext",
+    "Set",
+    "SharedArrayBuffer",
+    "Signature",
+    "SourceCode",
+    "SourceFile",
+    "Symbol",
+    "SyntaxError",
+    "TransformStream",
+    "Type",
+    "TypeChecker",
+    "TypeError",
+    "Uint8Array",
+    "URL",
+    "URLSearchParams",
+    "WeakMap",
+    "WeakSet",
+    "Window",
+    "WritableStream",
+];
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OwnedUnionStatus {
@@ -44,6 +98,7 @@ pub struct GatewaysRegistry {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GeneratedSourceEntry {
     pub generated: String,
+    #[serde(default)]
     pub wrapper: String,
     #[serde(default)]
     pub banned_direct_imports: Vec<String>,
@@ -58,8 +113,18 @@ pub struct GeneratedRegistry {
     pub generated_sources: BTreeMap<String, GeneratedSourceEntry>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BoundariesRegistry {
+    #[serde(default)]
+    pub server_boundary_globs: Vec<String>,
+    #[serde(default)]
+    pub required_calls: BTreeMap<String, Vec<String>>,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct PolicyRegistries {
+    pub boundaries: BoundariesRegistry,
     pub domain: DomainRegistry,
     pub gateways: GatewaysRegistry,
     pub generated: GeneratedRegistry,
@@ -93,11 +158,13 @@ impl PolicyRegistries {
             raw_registries.insert(stem, value);
         }
 
+        let boundaries = decode_registry(&raw_registries, "boundaries")?;
         let domain = decode_registry(&raw_registries, "domain")?;
         let gateways = decode_registry(&raw_registries, "gateways")?;
         let generated = decode_registry(&raw_registries, "generated")?;
 
         Ok(Self {
+            boundaries,
             domain,
             gateways,
             generated,

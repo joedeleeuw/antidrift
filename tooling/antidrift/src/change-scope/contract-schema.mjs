@@ -208,19 +208,6 @@ function validateModuleRadius(scope, problems) {
   }
 }
 
-function validateScope(scope, problems) {
-  validateUnknownScopeKeys(scope, problems);
-  validateCheckedSurfaces(scope, problems);
-  validateAllowedPaths(scope, problems);
-  validateForbiddenPaths(scope, problems);
-  validateChangeTypes(scope, problems);
-  validateDependencyFields(scope, problems);
-  validateExports(scope, problems);
-  validateEntrypoints(scope, problems);
-  validateOwnerSymbols(scope, problems);
-  validateModuleRadius(scope, problems);
-}
-
 /**
  * Validate a raw parsed contract object and return a frozen, normalized contract.
  * Throws ContractValidationError (loud) listing every problem; never returns a partial default.
@@ -240,7 +227,16 @@ export function validateContract(raw) {
   if (raw.schemaVersion !== 1) problems.push("schemaVersion must be 1");
 
   if (isObject(raw.scope)) {
-    validateScope(raw.scope, problems);
+    validateUnknownScopeKeys(raw.scope, problems);
+    validateCheckedSurfaces(raw.scope, problems);
+    validateAllowedPaths(raw.scope, problems);
+    validateForbiddenPaths(raw.scope, problems);
+    validateChangeTypes(raw.scope, problems);
+    validateDependencyFields(raw.scope, problems);
+    validateExports(raw.scope, problems);
+    validateEntrypoints(raw.scope, problems);
+    validateOwnerSymbols(raw.scope, problems);
+    validateModuleRadius(raw.scope, problems);
   } else {
     problems.push("scope is required and must be a mapping");
   }

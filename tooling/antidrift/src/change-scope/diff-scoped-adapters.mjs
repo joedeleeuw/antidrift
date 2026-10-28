@@ -1,10 +1,18 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, relative, resolve } from "node:path";
-
-import { ESLint } from "eslint";
 
 import { collectChangeSurface } from "./change-context.mjs";
 import { semanticFactToJsonLine } from "../policy/lib/semantic-facts.mjs";
+import { resolveNativeLinterBinary } from "../policy/oxlint.mjs";
 
 const CODE_FILE_RE = /\.(?:js|mjs|cjs|ts|tsx|mts|cts)$/u;
 
@@ -15,7 +23,7 @@ function compareStrings(left, right) {
 }
 
 function relativePath(root, path) {
-  return relative(root, path).replace(/\\/gu, "/");
+  return relative(root, resolve(root, path)).replace(/\\/gu, "/");
 }
 
 function codeFiles(changedFiles) {
@@ -66,8 +74,9 @@ function factEntry(fact) {
 function countBy(entries, key) {
   const counts = {};
   for (const entry of entries) {
-    const value = entry[key] ?? "unknown";
-    counts[value] = (counts[value] ?? 0) + 1;
+    const bucket = entry[key];
+    if (typeof bucket !== "string" || bucket.length === 0) continue;
+    counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
   return Object.fromEntries(
     Object.entries(counts).sort(([left], [right]) =>
@@ -145,28 +154,47 @@ export async function diffScopedAdapters({
   const surface = collectChangeSurface({ base, head, cwd: root });
   const targets = codeFiles(surface.changedFiles);
   const facts = [];
-  const eslint = new ESLint({
-    cwd: root,
-    errorOnUnmatchedPattern: false,
-    overrideConfig: [
-      {
-        files: ["**/*.{js,mjs,cjs,ts,tsx,mts,cts}"],
-        settings: {
-          antidrift: {
-            semanticFacts: {
-              repoRoot: root,
-              sink: {
-                emit(fact) {
-                  facts.push(fact);
-                },
-              },
-            },
-          },
-        },
-      },
-    ],
-  });
-  const results = targets.length > 0 ? await eslint.lintFiles(targets) : [];
+  let results = [];
+  if (targets.length > 0) {
+    const tempDir = mkdtempSync(resolve(tmpdir(), "antidrift-diff-scoped-"));
+    const tempFactsPath = resolve(tempDir, "facts.jsonl");
+    const emptySuppressionsPath = resolve(tempDir, "suppressions.json");
+    writeFileSync(emptySuppressionsPath, "{}\n", "utf8");
+    try {
+      const linterBinary = resolveNativeLinterBinary();
+      const linterRun = spawnSync(
+        linterBinary,
+        [
+          "--format",
+          "json",
+          "--suppressions-location",
+          emptySuppressionsPath,
+          "--semantic-facts-out",
+          tempFactsPath,
+          ...targets,
+        ],
+        {
+          cwd: root,
+          encoding: "utf8",
+          maxBuffer: 64 * 1024 * 1024,
+        }
+      );
+      if (linterRun.error) throw linterRun.error;
+      const rawJson = (linterRun.stdout ?? "").trim();
+      results = rawJson.length > 0 ? JSON.parse(rawJson) : [];
+      if (existsSync(tempFactsPath)) {
+        const lines = readFileSync(tempFactsPath, "utf8")
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+        for (const line of lines) {
+          facts.push(JSON.parse(line));
+        }
+      }
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
   const allFindings = results
     .flatMap((result) =>
       result.messages.map((message) =>

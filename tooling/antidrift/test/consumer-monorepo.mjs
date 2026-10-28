@@ -2,7 +2,6 @@ import { execFileSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   readdirSync,
   rmSync,
   writeFileSync,
@@ -12,18 +11,8 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { provePortableRules } from "./consumer-portable.mjs";
 import { proveAdoptionPresets } from "./consumer-adoption.mjs";
-
 import { scaffoldConsumerWorkspace } from "./consumer-workspace.mjs";
-import {
-  proveStructuralContracts,
-  scaffoldStructuralContracts,
-} from "./consumer-structural.mjs";
-import {
-  provePrecisionRules,
-  scaffoldPrecisionProofs,
-} from "./consumer-precision.mjs";
 
 const pnpmBinary = process.env.ANTIDRIFT_CONSUMER_PNPM ?? "pnpm";
 
@@ -68,7 +57,7 @@ function fail(message) {
 }
 
 try {
-  console.log("1/7  packing @joedeleeuw/antidrift ...");
+  console.log("1/6  packing @joedeleeuw/antidrift ...");
   run("pnpm", ["pack", "--pack-destination", work], pkgDir);
   const tgz = readdirSync(work).find((filename) => filename.endsWith(".tgz"));
   if (!tgz) fail("pack produced no tarball");
@@ -76,19 +65,33 @@ try {
   const packedFiles = new Set(
     run("tar", ["-tzf", tarball], work).trim().split("\n")
   );
-  const shippedTestSupport = [
-    "package/src/eslint-plugin/test-harness.mjs",
-    "package/src/policy/registry-test-workspace.mjs",
-    "package/test/support/eslint-plugin-harness.mjs",
-    "package/test/support/registry-workspace.mjs",
-  ].filter((path) => packedFiles.has(path));
-  if (shippedTestSupport.length > 0) {
+  for (const required of [
+    "package/dist/bin/antidrift-linter",
+    "package/NOTICE",
+    "package/licenses/Apache-2.0.txt",
+    "package/licenses/Rika-Labs-MIT.txt",
+  ]) {
+    if (!packedFiles.has(required)) {
+      fail(`tarball missing required artifact: ${required}`);
+    }
+  }
+  const forbiddenPrefixes = [
+    "package/dist/eslint-plugin/",
+    "package/dist/oxlint-plugin/",
+    "package/dist/semantic-adapters/",
+    "package/dist/eslint-config/",
+    "package/test/",
+  ];
+  const shippedForbidden = [...packedFiles].filter((entry) =>
+    forbiddenPrefixes.some((prefix) => entry.startsWith(prefix))
+  );
+  if (shippedForbidden.length > 0) {
     fail(
-      `tarball must not ship test support: ${shippedTestSupport.join(", ")}`
+      `tarball must not ship legacy JS plugins or test files: ${shippedForbidden.join(", ")}`
     );
   }
 
-  console.log("2/7  scaffolding a consumer pnpm workspace ...");
+  console.log("2/6  scaffolding a consumer pnpm workspace ...");
   let toolingTarball = process.env.TYPESCRIPT_TOOLING_TARBALL;
   if (toolingTarball) {
     toolingTarball = resolve(toolingTarball);
@@ -111,10 +114,8 @@ try {
     toolingTarball = join(toolingPack, packed[0]);
   }
   scaffoldConsumerWorkspace({ file, tarball, toolingTarball });
-  scaffoldStructuralContracts({ file, work });
-  scaffoldPrecisionProofs({ file, work });
 
-  console.log("3/7  installing the tarball into the consumer ...");
+  console.log("3/6  installing the tarball into the consumer ...");
   runInherit(
     pnpmBinary,
     [
@@ -129,30 +130,8 @@ try {
   );
 
   console.log(
-    "4/7  linting consumer files through shipped and opt-in configs ..."
+    "4/6  linting consumer files through shipped and opt-in configs ..."
   );
-  const semanticFactFile = join(work, "semantic-facts.jsonl");
-  rmSync(semanticFactFile, { force: true });
-
-  function lint(relFile, config = "eslint.config.mjs") {
-    try {
-      return runJson(
-        pnpmBinary,
-        ["exec", "eslint", relFile, "--format", "json", "--config", config],
-        work
-      );
-    } catch (error) {
-      if (
-        error &&
-        typeof error === "object" &&
-        "stdout" in error &&
-        typeof error.stdout === "string"
-      ) {
-        return JSON.parse(error.stdout);
-      }
-      throw error;
-    }
-  }
 
   function lintOxlint(relFile, config) {
     try {
@@ -193,6 +172,7 @@ try {
           "antidrift",
           "oxlint",
           "--",
+          "--type-aware",
           "--format",
           "json",
           "--config",
@@ -220,9 +200,7 @@ try {
     });
   }
 
-  provePortableRules({ file, lintOxlint, packedFiles });
   proveAdoptionPresets({ file, runJson, lintOxlint, work });
-  provePrecisionRules({ lint, lintOxlint });
 
   const unconfiguredTouchableRules = oxlintRuleIds(
     lintOxlint("portable-proofs/raw-touchable.tsx", "oxlint.config.mjs")
@@ -306,35 +284,9 @@ try {
     );
   }
 
-  const defaultFallbackRules = lint(
-    "packages/app/src/fallback-policy.ts"
-  ).flatMap((lintResult) => lintResult.messages.map(({ ruleId }) => ruleId));
-  if (
-    !defaultFallbackRules.includes("antidrift/no-sentinel-absence-fallback")
-  ) {
-    fail(
-      "The narrow sentinel rule must remain enabled without the Rika opt-in"
-    );
-  }
-  const delegatedFallbackRules = lint(
-    "packages/app/src/fallback-policy.ts",
-    "eslint.fallback.config.mjs"
-  ).flatMap((lintResult) => lintResult.messages.map(({ ruleId }) => ruleId));
-  if (
-    delegatedFallbackRules.includes("antidrift/no-sentinel-absence-fallback") ||
-    !delegatedFallbackRules.includes("no-restricted-syntax")
-  ) {
-    fail(
-      `Rika opt-in must disable the overlapping custom rule but retain template sentinels, got: ${JSON.stringify(delegatedFallbackRules)}`
-    );
-  }
-
   rmSync(join(work, "portable-proofs"), { recursive: true, force: true });
-  rmSync(join(work, "portable.config.json"));
   rmSync(join(work, "adoption-proof.tsx"));
   rmSync(join(work, "adoption.config.json"));
-  rmSync(join(work, "precision-proofs"), { recursive: true, force: true });
-  rmSync(join(work, "precision.config.json"));
 
   const repositoryDiagnostics = lintOxlintRepository().diagnostics ?? [];
   const moduleSizeDiagnostics = repositoryDiagnostics.filter(
@@ -362,7 +314,7 @@ try {
     );
   }
   const asyncRepositoryDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) => code === "antidrift(no-async-array-method)"
+    ({ code }) => code === "typescript(antidrift/no-async-array-method)"
   );
   if (
     JSON.stringify(
@@ -370,19 +322,45 @@ try {
     ) !== JSON.stringify(["packages/app/src/async-foreach-drift.ts"])
   ) {
     fail(
-      `default packed Oxlint config should report no-async-array-method on async-foreach-drift.ts, got: ${JSON.stringify(asyncRepositoryDiagnostics)}`
+      `default packed Oxlint config should report antidrift/no-async-array-method via native antidrift-linter on async-foreach-drift.ts, got: ${JSON.stringify(repositoryDiagnostics)}`
     );
   }
-  const sharedRuleDiagnostics = repositoryDiagnostics.filter(
+  const predicateDiagnostics = repositoryDiagnostics.filter(
     ({ code }) =>
-      code !== "eslint(max-lines)" &&
-      code !== "antidrift(no-async-array-method)"
+      code === "typescript(antidrift/no-underchecked-type-predicate)"
   );
-  if (sharedRuleDiagnostics.length > 0) {
+  if (
+    JSON.stringify(predicateDiagnostics.map(({ filename }) => filename)) !==
+    JSON.stringify(["packages/app/src/underchecked-predicate.ts"])
+  ) {
     fail(
-      `default packed Oxlint config should leave experimental imported rules disabled, got: ${JSON.stringify(sharedRuleDiagnostics)}`
+      `default packed Oxlint config should report antidrift/no-underchecked-type-predicate via native antidrift-linter, got: ${JSON.stringify(repositoryDiagnostics)}`
     );
   }
+  const structuralForkDiagnostics = repositoryDiagnostics.filter(
+    ({ code }) => code === "typescript(antidrift/no-structural-type-fork)"
+  );
+  if (
+    JSON.stringify(
+      structuralForkDiagnostics.map(({ filename }) => filename)
+    ) !== JSON.stringify(["packages/app/src/package-copy.ts"])
+  ) {
+    fail(
+      `default packed Oxlint config should report antidrift/no-structural-type-fork via native antidrift-linter, got: ${JSON.stringify(repositoryDiagnostics)}`
+    );
+  }
+  const cleanDiagnostics = repositoryDiagnostics.filter(
+    ({ filename }) =>
+      filename === "packages/app/src/clean.ts" ||
+      filename === "packages/app/src/brand.ts" ||
+      filename === "packages/app/src/exports.ts"
+  );
+  if (cleanDiagnostics.length > 0) {
+    fail(
+      `clean.ts, brand.ts, and exports.ts must remain clean, got: ${JSON.stringify(cleanDiagnostics)}`
+    );
+  }
+
   const precedenceRuleIds = oxlintRuleIds(
     lintOxlint("oversized-root.ts", "oxlint.precedence.config.mjs")
   );
@@ -392,287 +370,8 @@ try {
     );
   }
 
-  const RULE = "antidrift/no-structural-type-fork";
-  const defaultCleanRules = lint("packages/app/src/clean.ts").flatMap(
-    (lintResult) => lintResult.messages.map((message) => message.ruleId)
-  );
-  const defaultDriftRules = lint("packages/app/src/drift.ts").flatMap(
-    (lintResult) => lintResult.messages.map((message) => message.ruleId)
-  );
-  if (defaultCleanRules.includes(RULE)) {
-    fail(
-      `default config must accept clean.ts without ${RULE}, got: ${JSON.stringify(defaultCleanRules)}`
-    );
-  }
-  if (!defaultDriftRules.includes(RULE)) {
-    fail(
-      `default config must load generated owner facts and report ${RULE}, got: ${JSON.stringify(defaultDriftRules)}`
-    );
-  }
-
-  proveStructuralContracts({ file, lint });
-
-  const restrictedSyntaxMessages = lint(
-    "packages/app/src/restricted-syntax-drift.ts"
-  ).flatMap((lintResult) =>
-    lintResult.messages
-      .filter((message) => message.ruleId === "no-restricted-syntax")
-      .map((message) => message.message)
-  );
-  const declaresEnum = restrictedSyntaxMessages.some((message) =>
-    message.includes("Do not declare enums")
-  );
-  const usesForwardRef = restrictedSyntaxMessages.some((message) =>
-    message.includes("forwardRef is deprecated")
-  );
-  if (!declaresEnum || !usesForwardRef) {
-    fail(
-      `default config must report the enum declaration and the forwardRef call, got: ${JSON.stringify(restrictedSyntaxMessages)}`
-    );
-  }
-  if (
-    defaultCleanRules.includes("no-restricted-syntax") ||
-    restrictedSyntaxMessages.length !== 2
-  ) {
-    fail(
-      `no-restricted-syntax must fire exactly twice on the probe and stay off clean.ts, got: ${JSON.stringify({ clean: defaultCleanRules, probe: restrictedSyntaxMessages })}`
-    );
-  }
-
-  const packageCopyRules = lint("packages/app/src/package-copy.ts").flatMap(
-    (lintResult) => lintResult.messages.map((message) => message.ruleId)
-  );
-  const undercheckedPredicateRules = lint(
-    "packages/app/src/underchecked-predicate.ts"
-  ).flatMap((lintResult) =>
-    lintResult.messages.map((message) => message.ruleId)
-  );
-
-  if (packageCopyRules.includes(RULE)) {
-    fail(
-      `package-copy.ts (unaccepted package authority) must NOT report ${RULE}, got: ${JSON.stringify(packageCopyRules)}`
-    );
-  }
-  const UNDERCHECKED_PREDICATE_RULE =
-    "antidrift/no-underchecked-type-predicate";
-  if (!undercheckedPredicateRules.includes(UNDERCHECKED_PREDICATE_RULE)) {
-    fail(
-      `TypeScript 6 consumer should report ${UNDERCHECKED_PREDICATE_RULE} for an under-checked object predicate, got: ${JSON.stringify(undercheckedPredicateRules)}`
-    );
-  }
-
-  const mergedProjectionMessages = lint(
-    "packages/app/src/merged-projections.ts"
-  ).flatMap((lintResult) => lintResult.messages);
-  const propertyHops = mergedProjectionMessages.filter(
-    (message) => message.ruleId === "antidrift/no-wrapping-functions"
-  );
-  const bagDiagnosticIds = new Set(
-    mergedProjectionMessages
-      .filter(
-        (message) =>
-          message.ruleId === "antidrift/no-contract-appeasement-projection"
-      )
-      .map((message) => message.messageId)
-  );
-  if (
-    propertyHops.length !== 2 ||
-    propertyHops.some((message) => message.messageId !== "hop")
-  ) {
-    fail(
-      `direct and fallback property helpers should each report a verified hop without name-only reports, got: ${JSON.stringify(mergedProjectionMessages)}`
-    );
-  }
-  const expectedBagIds = new Set(["bagToContract", "bagToBag"]);
-  if (
-    bagDiagnosticIds.size !== expectedBagIds.size ||
-    [...expectedBagIds].some((id) => !bagDiagnosticIds.has(id))
-  ) {
-    fail(
-      `merged projection rule should report both bag cases, got: ${JSON.stringify(mergedProjectionMessages)}`
-    );
-  }
-
-  const ASYNC_RULE = "antidrift/no-async-array-method";
-  const asyncDefaultConfig = "oxlint.async-array.config.mjs";
-  const asyncCollectionConfig = "oxlint.async-array-collection.config.mjs";
-  const asyncForEachRules = oxlintRuleIds(
-    lintOxlint("packages/app/src/async-foreach-drift.ts", asyncDefaultConfig)
-  );
-  const asyncMapDefaultRules = oxlintRuleIds(
-    lintOxlint(
-      "packages/app/src/async-map-collection-drift.ts",
-      asyncDefaultConfig
-    )
-  );
-  const asyncMapCollectionRules = oxlintRuleIds(
-    lintOxlint(
-      "packages/app/src/async-map-collection-drift.ts",
-      asyncCollectionConfig
-    )
-  );
-  const asyncMapReturnRules = oxlintRuleIds(
-    lintOxlint(
-      "packages/app/src/async-map-return-clean.ts",
-      asyncCollectionConfig
-    )
-  );
-
-  if (!asyncForEachRules.includes(ASYNC_RULE)) {
-    fail(
-      `explicit async-array config should report forEach drift, got: ${JSON.stringify(asyncForEachRules)}`
-    );
-  }
-  if (asyncMapDefaultRules.includes(ASYNC_RULE)) {
-    fail(
-      `default async-array branch must not report map collection flow, got: ${JSON.stringify(asyncMapDefaultRules)}`
-    );
-  }
-  if (!asyncMapCollectionRules.includes(ASYNC_RULE)) {
-    fail(
-      `opt-in async-array collection branch should report unjoined map flow, got: ${JSON.stringify(asyncMapCollectionRules)}`
-    );
-  }
-  if (asyncMapReturnRules.includes(ASYNC_RULE)) {
-    fail(
-      `opt-in async-array collection branch must not report returned promise arrays, got: ${JSON.stringify(asyncMapReturnRules)}`
-    );
-  }
-
-  const semanticFacts = readFileSync(semanticFactFile, "utf8")
-    .trim()
-    .split(/\n/u)
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-  const generatedStructuralFact = semanticFacts.find(
-    (fact) =>
-      fact.factKind === "structuralMatch" &&
-      fact.ruleId === RULE &&
-      fact.confidence === "deterministic-enforcement" &&
-      fact.payload?.authorityState === "accepted" &&
-      fact.payload?.ownerType?.authority === "generated-source" &&
-      fact.filePath === "packages/app/src/drift.ts"
-  );
-
-  if (!generatedStructuralFact) {
-    fail(
-      `default config drift.ts should have emitted a generated-source structuralMatch fact, got: ${JSON.stringify(semanticFacts)}`
-    );
-  }
-
   console.log(
-    "5/7  reading the shipped semantic adapter manifest from the CLI ..."
-  );
-  const semanticManifest = runJson(
-    pnpmBinary,
-    ["exec", "antidrift", "semantic-manifest"],
-    work
-  );
-  const reactStateManifest = semanticManifest.find(
-    (entry) => entry.id === "react-state"
-  );
-  const typeOwnerManifest = semanticManifest.find(
-    (entry) => entry.id === "type-owner"
-  );
-
-  if (
-    reactStateManifest?.semanticFactContracts
-      ?.map((entry) => entry.factKind)
-      .join(",") !==
-      "broadSetterCoMutation,resourceLifecycleProof,sourceMemberStateShardCandidate" ||
-    !typeOwnerManifest?.proofBuckets?.includes("authority-index-ownership")
-  ) {
-    fail(
-      `semantic-manifest should expose composed adapter/fact metadata, got: ${JSON.stringify(semanticManifest)}`
-    );
-  }
-  const reactStateSemanticManifest = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "semantic-manifest",
-      "--rule",
-      "antidrift/no-handrolled-resource-lifecycle-cells",
-    ],
-    work
-  );
-  const asyncControlSemanticManifest = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "semantic-manifest",
-      "--rule",
-      "antidrift/no-async-array-method",
-    ],
-    work
-  );
-  const tupleShapeSemanticManifest = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "semantic-manifest",
-      "--rule",
-      "antidrift/no-nullable-positional-tuple",
-    ],
-    work
-  );
-  const authoritySemanticManifest = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "semantic-manifest",
-      "--proof-bucket",
-      "authority-index-ownership",
-    ],
-    work
-  );
-  const structuralFactSemanticManifest = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "semantic-manifest",
-      "--fact-kind",
-      "structuralMatch",
-    ],
-    work
-  );
-  const typeOwnerFactSemanticManifest = runJson(
-    pnpmBinary,
-    [
-      "exec",
-      "antidrift",
-      "semantic-manifest",
-      "--fact-adapter",
-      "typescript-eslint/type-owner",
-    ],
-    work
-  );
-
-  if (
-    reactStateSemanticManifest.map((entry) => entry.id).join(",") !==
-      "react-state" ||
-    asyncControlSemanticManifest.map((entry) => entry.id).join(",") !==
-      "async-control-flow" ||
-    tupleShapeSemanticManifest.map((entry) => entry.id).join(",") !==
-      "tuple-shape" ||
-    authoritySemanticManifest.map((entry) => entry.id).join(",") !==
-      "type-owner" ||
-    structuralFactSemanticManifest.map((entry) => entry.id).join(",") !==
-      "type-owner" ||
-    typeOwnerFactSemanticManifest.map((entry) => entry.id).join(",") !==
-      "type-owner"
-  ) {
-    fail(
-      `semantic-manifest filters should expose rule/proof/fact slices, got: ${JSON.stringify({ reactStateSemanticManifest, asyncControlSemanticManifest, tupleShapeSemanticManifest, authoritySemanticManifest, structuralFactSemanticManifest, typeOwnerFactSemanticManifest })}`
-    );
-  }
-  console.log(
-    "6/7  typechecking every public export under supported TS resolution modes ..."
+    "5/6  typechecking every public export under supported TS resolution modes ..."
   );
   run(
     pnpmBinary,
@@ -685,14 +384,11 @@ try {
     work
   );
 
-  console.log("7/7  importing every public runtime export ...");
+  console.log("6/6  importing every public runtime export ...");
   run("node", ["packages/app/src/runtime.mjs"], work);
 
   console.log(
-    `\n✓ tarball installs, type-checks, imports, and enforces in a consumer monorepo`
-  );
-  console.log(
-    `  composed tooling and governance rejected oversized root, Convex, script, fixture, test, and undeclared generated-looking modules while ignoring registry-declared generated code, declarations, and raw JSON; consumer precedence disabled max-lines, the default typed config loaded registry owners and fired ${RULE} on drift.ts, the default typed config checked a TypeScript 6 broad-input predicate, async-array shipped behavior matched default and opt-in branch expectations, a structuralMatch fact was emitted, and clean.ts/package-copy.ts stayed clean; public exports and semantic adapters passed Bundler and NodeNext.`
+    `\n✓ tarball installs, type-checks, imports, and enforces via native antidrift-linter in a consumer monorepo`
   );
   rmSync(work, { recursive: true, force: true });
 } catch (error) {

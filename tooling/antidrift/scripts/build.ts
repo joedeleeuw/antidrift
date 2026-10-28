@@ -14,12 +14,14 @@ const typescriptCompiler = createRequire(import.meta.url).resolve(
 );
 
 rmSync(outputDirectory, { recursive: true, force: true });
-for (const project of ["tsconfig.build.json", "tsconfig.declarations.json"]) {
-  execFileSync(process.execPath, [typescriptCompiler, "-p", project], {
+execFileSync(
+  process.execPath,
+  [typescriptCompiler, "-p", "tsconfig.build.json"],
+  {
     cwd: packageRoot,
     stdio: "inherit",
-  });
-}
+  }
+);
 cpSync(sourceDirectory, outputDirectory, {
   recursive: true,
   filter: (source) =>
