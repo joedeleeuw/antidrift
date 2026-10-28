@@ -18,8 +18,8 @@ pub const RULE_NAME: &str = "antidrift/no-unlisted-external-imports";
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct DependencyOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     internal_prefixes: Vec<String>,
     ancestor_dev_dependencies: bool,
 }
@@ -27,8 +27,7 @@ struct DependencyOptions {
 impl Default for DependencyOptions {
     fn default() -> Self {
         Self {
-            files: None,
-            exclude_files: Vec::new(),
+            scope: ScopeOptions::default(),
             internal_prefixes: vec!["@/".to_string(), "~/".to_string()],
             ancestor_dev_dependencies: true,
         }
@@ -50,11 +49,7 @@ pub static DEFAULT_RULE: NoUnlistedExternalImports = NoUnlistedExternalImports {
 impl NoUnlistedExternalImports {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<DependencyOptions>(RULE_NAME, options)?;
-        let scope_opts = ScopeOptions {
-            files: parsed.files,
-            exclude_files: parsed.exclude_files,
-        };
-        let scope = RuleScope::from_scope_options(RULE_NAME, &scope_opts)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         let internal_prefixes = parsed
             .internal_prefixes
             .into_iter()

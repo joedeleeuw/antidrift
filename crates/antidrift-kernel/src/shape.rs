@@ -1,9 +1,9 @@
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use tsrs_ast::{
     self as ast, Kind, MappedTypeNode, Node, SourceFile, Symbol, SymbolFlags, TypeReferenceNode,
 };
 use tsrs_checker::{Checker, LiteralValue, Type, TypeFlags};
-use tsrs_core::{P, TextPos};
+use tsrs_core::P;
 use tsrslint::utils::{
     get_call_signatures, get_construct_signatures, is_intrinsic_type, is_object_type,
     is_type_flag_set, is_union_type, union_type_parts,
@@ -268,9 +268,13 @@ fn is_plain_bag_constituent_type(checker: &mut Checker, constituent_type: P<Type
         return false;
     }
     let props = checker.get_properties_of_type(constituent_type);
+    let mut non_callable_props = 0usize;
     for &prop in props {
-        if is_callable_property(checker, prop) {
+        if prop.flags.get().intersects(SymbolFlags::Method) {
             return false;
+        }
+        if !is_callable_property(checker, prop) {
+            non_callable_props += 1;
         }
     }
     if is_type_flag_set(
@@ -283,7 +287,7 @@ fn is_plain_bag_constituent_type(checker: &mut Checker, constituent_type: P<Type
         return false;
     }
     let str_type = checker.string_type;
-    !props.is_empty()
+    non_callable_props > 0
         || checker
             .get_index_type_of_type(constituent_type, str_type)
             .is_some()
@@ -300,11 +304,6 @@ pub fn is_plain_bag_type(checker: &mut Checker, typ: P<Type>) -> bool {
 const OMIT_TYPE: &str = "Omit";
 const MODIFIER_UTILITIES: [&str; 3] = ["Partial", "Readonly", "Required"];
 
-enum AliasEntry {
-    Unique { start: TextPos, target: P<Node> },
-    Ambiguous,
-}
-
 pub enum ReferenceKind {
     Omit {
         source: Option<P<Node>>,
@@ -320,19 +319,12 @@ pub enum ReferenceKind {
 
 pub struct LocalTypeAliases {
     pub sf: P<SourceFile>,
-    aliases: FxHashMap<&'static str, AliasEntry>,
 }
 
 impl LocalTypeAliases {
     #[must_use]
-    pub fn collect(sf: P<SourceFile>) -> Self {
-        let mut aliases: FxHashMap<&'static str, AliasEntry> = FxHashMap::default();
-        let mut shadowed: Vec<&'static str> = Vec::new();
-        collect_alias_nodes(sf.as_node(), &mut aliases, &mut shadowed);
-        for name in shadowed {
-            aliases.insert(name, AliasEntry::Ambiguous);
-        }
-        Self { sf, aliases }
+    pub const fn collect(sf: P<SourceFile>) -> Self {
+        Self { sf }
     }
 
     #[must_use]
@@ -357,11 +349,12 @@ impl LocalTypeAliases {
             return ReferenceKind::Passthrough(arguments.first().copied());
         }
         if let Some(alias_name) = name.filter(|name| !open.contains(name))
-            && let Some(AliasEntry::Unique { target, .. }) = self.aliases.get(alias_name.as_str())
+            && let Some(target) =
+                resolve_lexical_type_alias(self.sf, reference_node, alias_name.as_str())
         {
             return ReferenceKind::Alias {
                 name: alias_name,
-                target: *target,
+                target,
             };
         }
         ReferenceKind::Opaque
@@ -380,54 +373,60 @@ impl LocalTypeAliases {
     }
 }
 
-fn collect_alias_nodes(
-    node: P<Node>,
-    aliases: &mut FxHashMap<&'static str, AliasEntry>,
-    shadowed: &mut Vec<&'static str>,
-) {
-    match node.kind() {
-        Kind::ImportSpecifier | Kind::NamespaceImport | Kind::TypeParameter => {
-            if let Some(name) = node.name().filter(|n| ast::is_identifier(*n)) {
-                shadowed.push(name.as_identifier().text());
-            }
-        }
-        Kind::ImportClause => {
-            if let Some(name) = node
-                .as_import_clause()
+fn scope_declares_type_parameter(scope: P<Node>, target_name: &str) -> bool {
+    let mut found = false;
+    scope.for_each_child(&mut |child| {
+        let hit = child.kind() == Kind::TypeParameter
+            && child
                 .name()
-                .filter(|n| ast::is_identifier(*n))
-            {
-                shadowed.push(name.as_identifier().text());
-            }
-        }
-        Kind::TypeAliasDeclaration => {
-            let decl = node.as_type_alias_declaration();
-            if ast::is_identifier(decl.name())
-                && let Some(target) = decl.type_()
-            {
-                let name = decl.name().as_identifier().text();
-                let start = node.pos();
-                let entry = match aliases.get(name) {
-                    _ if !node.type_parameters().is_empty() => AliasEntry::Ambiguous,
-                    None => AliasEntry::Unique { start, target },
-                    Some(AliasEntry::Unique {
-                        start: existing,
-                        target: existing_target,
-                    }) if *existing == start => AliasEntry::Unique {
-                        start,
-                        target: *existing_target,
-                    },
-                    Some(_) => AliasEntry::Ambiguous,
-                };
-                aliases.insert(name, entry);
-            }
-        }
-        _ => {}
-    }
-    node.for_each_child(&mut |child| {
-        collect_alias_nodes(child, aliases, shadowed);
-        false
+                .is_some_and(|n| ast::is_identifier(n) && n.as_identifier().text() == target_name);
+        found |= hit;
+        hit
     });
+    found
+}
+
+fn resolve_lexical_type_alias(
+    sf: P<SourceFile>,
+    reference_node: P<Node>,
+    target_name: &str,
+) -> Option<P<Node>> {
+    let root = sf.as_node();
+    let mut current = reference_node.parent();
+    while let Some(scope) = current {
+        if scope_declares_type_parameter(scope, target_name) {
+            return None;
+        }
+        if let Some(locals) = scope.locals()
+            && let Some(sym) = locals.get().get(target_name)
+        {
+            let shadowed_flags = SymbolFlags::Alias
+                | SymbolFlags::TypeParameter
+                | SymbolFlags::Interface
+                | SymbolFlags::Class
+                | SymbolFlags::Enum;
+            if sym.flags.get().intersects(shadowed_flags) {
+                return None;
+            }
+            let mut decls = sym
+                .declarations()
+                .iter()
+                .copied()
+                .filter(|&decl| decl.kind() == Kind::TypeAliasDeclaration);
+            let decl = decls.next().filter(|_| decls.next().is_none())?;
+            let alias_decl = decl.as_type_alias_declaration();
+            return alias_decl
+                .type_parameters()
+                .is_none_or(|params| params.nodes().is_empty())
+                .then(|| alias_decl.type_())
+                .flatten();
+        }
+        if scope == root {
+            break;
+        }
+        current = scope.parent();
+    }
+    None
 }
 
 #[must_use]

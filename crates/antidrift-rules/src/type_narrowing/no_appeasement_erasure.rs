@@ -242,7 +242,24 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
     check_widen_then_assert(ctx, node, operand, type_node);
 }
 
-pub struct NoAppeasementErasure;
+pub struct NoAppeasementErasure {
+    pub scope: antidrift_kernel::rule_scope::RuleScope,
+}
+
+pub static DEFAULT_INSTANCE: NoAppeasementErasure = NoAppeasementErasure {
+    scope: antidrift_kernel::rule_scope::RuleScope::DEFAULT,
+};
+
+impl NoAppeasementErasure {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: antidrift_kernel::rule_scope::RuleScope::from_options(
+                "antidrift/no-appeasement-erasure",
+                options,
+            )?,
+        })
+    }
+}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::VariableDeclaration),
@@ -259,7 +276,10 @@ impl Rule for NoAppeasementErasure {
         "antidrift/no-appeasement-erasure"
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

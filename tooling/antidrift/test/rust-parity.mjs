@@ -403,6 +403,85 @@ const headlessProbes = [
     source: "export function loadUserUser() {}\n",
     expectedCount: 1,
   },
+  {
+    name: "no-contract-appeasement-projection (bagReshaper query envelope with callback & relational condition)",
+    rule: "antidrift/no-contract-appeasement-projection",
+    source: `
+      type QueryResult = {
+        status: "pending" | "error" | "success";
+        data: string[] | undefined;
+        error: { message: string } | null;
+        refetch: () => Promise<void>;
+      };
+      export function serviceModelListState(query: QueryResult) {
+        if (query.status === "pending") {
+          return { kind: "loading" as const };
+        }
+        if (query.status === "error") {
+          return {
+            kind: "error" as const,
+            message: query.error?.message ?? "Failed",
+            retry: () => void query.refetch(),
+          };
+        }
+        if ((query.data?.length ?? 0) > 0) {
+          return { kind: "ready" as const, models: query.data };
+        }
+        return { kind: "empty" as const };
+      }
+    `,
+    expectedCount: 1,
+  },
+  {
+    name: "no-contract-appeasement-projection (bagReshaper whole-root spread exemption)",
+    rule: "antidrift/no-contract-appeasement-projection",
+    source: `
+      type Bag = { ok: boolean; value: string };
+      export function wrapSpread(bag: Bag) {
+        return bag.ok ? { kind: "ok" as const, ...bag } : { kind: "err" as const, ...bag };
+      }
+    `,
+    expectedCount: 0,
+  },
+  {
+    name: "no-contract-appeasement-projection (bagReshaper whole-root shorthand exemption)",
+    rule: "antidrift/no-contract-appeasement-projection",
+    source: `
+      type Bag = { ok: boolean; value: string };
+      export function wrapShorthand(bag: Bag) {
+        return bag.ok ? { kind: "ok" as const, bag } : { kind: "err" as const, bag };
+      }
+    `,
+    expectedCount: 0,
+  },
+  {
+    name: "no-contract-appeasement-projection (bagReshaper satisfies table row contract exemption)",
+    rule: "antidrift/no-contract-appeasement-projection",
+    source: `
+      type RawEvent = { id: string; text: string };
+      type TaggedEvent =
+        | { kind: "message"; id: string; text: string }
+        | { kind: "error"; code: number };
+      type Decoders = { message: (raw: RawEvent) => TaggedEvent };
+      export const DECODERS = {
+        message: (raw) => ({ kind: "message", id: raw.id, text: raw.text }),
+      } satisfies Decoders;
+    `,
+    expectedCount: 0,
+  },
+  {
+    name: "no-contract-appeasement-projection (bagReshaper satisfies table row single contract reported)",
+    rule: "antidrift/no-contract-appeasement-projection",
+    source: `
+      type RawEvent = { id: string; text: string };
+      type TaggedEvent = { kind: "message"; id: string; text: string };
+      type Decoders = { message: (raw: RawEvent) => TaggedEvent };
+      export const DECODERS = {
+        message: (raw) => ({ kind: "message", id: raw.id, text: raw.text }),
+      } satisfies Decoders;
+    `,
+    expectedCount: 1,
+  },
 ];
 
 for (const probe of headlessProbes) {
@@ -593,13 +672,19 @@ try {
       "#[derive(Deserialize)]",
       "pub struct LooseConfig {",
       "    pub kind: String,",
+      "    pub exclude_files: Vec<String>,",
       "    pub seen: HashMap<String, bool>,",
       "    pub item: Option<BoundaryItem>,",
       "}",
+      "pub fn decode_rule_options(name: &str) -> Result<usize, String> {",
+      "    Ok(name.len())",
+      "}",
       "pub fn legacy_adapter(input: &str) -> Result<usize, String> {",
+      "    decode_rule_options(input)?;",
       '    input.parse::<usize>().map_err(|_| "parse failed".to_string())',
       "}",
       "pub fn hop_wrapper(input: &str) -> Result<usize, String> {",
+      "    let _ = input;",
       "    legacy_adapter(input)",
       "}",
       "",
@@ -631,6 +716,9 @@ try {
     "rust/no-anemic-errors",
     "rust/no-compat-names",
     "rust/no-wrapping-functions",
+    "rust/no-duplicate-scope-fields",
+    "rust/no-discarded-decoded-config",
+    "rust/no-let-underscore-suppression",
   ]) {
     assert.ok(
       reportedRuleIds.has(expectedRuleId),

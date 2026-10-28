@@ -33,18 +33,24 @@ pub fn create_rule(
                 unknown_input_must_be_decoded::UnknownInputMustBeDecoded::from_options(options)?,
             )))
         }
-        no_unsafe_deserialize::RULE_NAME | "no-unsafe-deserialize" => {
-            Ok(Some(Box::new(no_unsafe_deserialize::NoUnsafeDeserialize)))
+        no_unsafe_deserialize::RULE_NAME | "no-unsafe-deserialize" => Ok(Some(Box::new(
+            no_unsafe_deserialize::NoUnsafeDeserialize::from_options(options)?,
+        ))),
+        no_redundant_zod_parse::RULE_NAME | "no-redundant-zod-parse" => Ok(Some(Box::new(
+            no_redundant_zod_parse::NoRedundantZodParse::from_options(options)?,
+        ))),
+        no_identity_schema_transform::RULE_NAME | "no-identity-schema-transform" => {
+            Ok(Some(Box::new(
+                no_identity_schema_transform::NoIdentitySchemaTransform::from_options(options)?,
+            )))
         }
-        no_redundant_zod_parse::RULE_NAME | "no-redundant-zod-parse" => {
-            Ok(Some(Box::new(no_redundant_zod_parse::NoRedundantZodParse)))
+        no_schema_validator_transcoding::RULE_NAME | "no-schema-validator-transcoding" => {
+            Ok(Some(Box::new(
+                no_schema_validator_transcoding::NoSchemaValidatorTranscoding::from_options(
+                    options,
+                )?,
+            )))
         }
-        no_identity_schema_transform::RULE_NAME | "no-identity-schema-transform" => Ok(Some(
-            Box::new(no_identity_schema_transform::NoIdentitySchemaTransform),
-        )),
-        no_schema_validator_transcoding::RULE_NAME | "no-schema-validator-transcoding" => Ok(Some(
-            Box::new(no_schema_validator_transcoding::NoSchemaValidatorTranscoding),
-        )),
         require_convex_return_validator::RULE_NAME | "require-convex-return-validator" => {
             Ok(Some(Box::new(
                 require_convex_return_validator::RequireConvexReturnValidator::from_options(

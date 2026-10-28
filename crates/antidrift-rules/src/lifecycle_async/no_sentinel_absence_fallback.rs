@@ -1,5 +1,6 @@
 use super::syntax::{is_function, property_name, unwrap, without_parens};
-use antidrift_kernel::rule_scope::decode_rule_options;
+use antidrift_kernel::directives::split_identifier_words;
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -11,29 +12,36 @@ pub const RULE_NAME: &str = "antidrift/no-sentinel-absence-fallback";
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct AbsenceOptions {
     member_sentinels: bool,
+    #[serde(flatten)]
+    scope: ScopeOptions,
 }
 
 impl Default for AbsenceOptions {
     fn default() -> Self {
         Self {
             member_sentinels: true,
+            scope: ScopeOptions::default(),
         }
     }
 }
 
 pub struct NoSentinelAbsenceFallback {
     member_sentinels: bool,
+    scope: RuleScope,
 }
 
 pub static DEFAULT_RULE: NoSentinelAbsenceFallback = NoSentinelAbsenceFallback {
     member_sentinels: true,
+    scope: RuleScope::DEFAULT,
 };
 
 impl NoSentinelAbsenceFallback {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let decoded = decode_rule_options::<AbsenceOptions>(RULE_NAME, options)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &decoded.scope)?;
         Ok(Self {
             member_sentinels: decoded.member_sentinels,
+            scope,
         })
     }
 }
@@ -49,7 +57,10 @@ impl Rule for NoSentinelAbsenceFallback {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor {
             member_sentinels: self.member_sentinels,
         })
@@ -274,22 +285,7 @@ fn function_name(node: P<Node>) -> String {
 }
 
 fn detection_helper(name: &str) -> bool {
-    let mut spaced = String::new();
-    let mut previous = None;
-    for character in name.chars() {
-        if character.is_ascii_uppercase()
-            && previous.is_some_and(|prev: char| prev.is_ascii_lowercase() || prev.is_ascii_digit())
-        {
-            spaced.push(' ');
-        }
-        spaced.push(character);
-        previous = Some(character);
-    }
-    let tokens: Vec<_> = spaced
-        .split(|character: char| !character.is_ascii_alphanumeric())
-        .filter(|token| !token.is_empty())
-        .map(str::to_lowercase)
-        .collect();
+    let tokens = split_identifier_words(name);
     !tokens
         .iter()
         .any(|token| ["display", "format", "render"].contains(&token.as_str()))

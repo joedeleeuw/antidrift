@@ -191,7 +191,24 @@ fn check_function(ctx: &mut Ctx, fn_node: P<Node>) {
     );
 }
 
-pub struct NoUndercheckedTypePredicate;
+pub struct NoUndercheckedTypePredicate {
+    pub scope: antidrift_kernel::rule_scope::RuleScope,
+}
+
+pub static DEFAULT_INSTANCE: NoUndercheckedTypePredicate = NoUndercheckedTypePredicate {
+    scope: antidrift_kernel::rule_scope::RuleScope::DEFAULT,
+};
+
+impl NoUndercheckedTypePredicate {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: antidrift_kernel::rule_scope::RuleScope::from_options(
+                "antidrift/no-underchecked-type-predicate",
+                options,
+            )?,
+        })
+    }
+}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),
@@ -204,7 +221,10 @@ impl Rule for NoUndercheckedTypePredicate {
         "antidrift/no-underchecked-type-predicate"
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

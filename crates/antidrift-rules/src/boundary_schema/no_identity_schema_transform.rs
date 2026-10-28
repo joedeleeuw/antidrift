@@ -1,3 +1,4 @@
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{boundary, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags};
@@ -6,9 +7,21 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-identity-schema-transform";
 
-pub struct NoIdentitySchemaTransform;
+pub struct NoIdentitySchemaTransform {
+    scope: RuleScope,
+}
 
-pub static DEFAULT_RULE: NoIdentitySchemaTransform = NoIdentitySchemaTransform;
+pub static DEFAULT_RULE: NoIdentitySchemaTransform = NoIdentitySchemaTransform {
+    scope: RuleScope::DEFAULT,
+};
+
+impl NoIdentitySchemaTransform {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: RuleScope::from_options(RULE_NAME, options)?,
+        })
+    }
+}
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 
@@ -17,7 +30,10 @@ impl Rule for NoIdentitySchemaTransform {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

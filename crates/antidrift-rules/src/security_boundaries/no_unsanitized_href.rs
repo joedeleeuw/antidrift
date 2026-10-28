@@ -11,8 +11,8 @@ pub const RULE_NAME: &str = "antidrift/no-unsanitized-href";
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct HrefOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     sanitizers: Vec<ImportedOwner>,
 }
 
@@ -29,11 +29,7 @@ pub static DEFAULT_RULE: NoUnsanitizedHref = NoUnsanitizedHref {
 impl NoUnsanitizedHref {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<HrefOptions>(RULE_NAME, options)?;
-        let scope_opts = ScopeOptions {
-            files: parsed.files,
-            exclude_files: parsed.exclude_files,
-        };
-        let scope = RuleScope::from_scope_options(RULE_NAME, &scope_opts)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
             scope,
             sanitizers: parsed.sanitizers,

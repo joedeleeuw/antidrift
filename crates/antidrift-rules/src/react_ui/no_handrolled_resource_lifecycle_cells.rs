@@ -1,12 +1,12 @@
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
-use antidrift_kernel::rule_scope::decode_rule_options;
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use antidrift_kernel::tsrs_kernel::{is_function_like, static_member_chain, unwrap_expression};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::{P, TextPos};
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use tsrslint::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-handrolled-resource-lifecycle-cells";
 const MESSAGE: &str = "This async transition hand-rolls a resource lifecycle: a constant lifecycle cell is toggled around the request while sibling cells receive the resource value and caught error. Model one resource/reducer value instead of coupled setters.";
@@ -19,26 +19,24 @@ struct ResourceLifecycleOptions {
     _threshold: Option<f64>,
     #[serde(rename = "shardThreshold")]
     _shard_threshold: Option<f64>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
 }
 
-pub struct NoHandrolledResourceLifecycleCells;
+pub struct NoHandrolledResourceLifecycleCells {
+    scope: RuleScope,
+}
 
-pub static DEFAULT_RULE: NoHandrolledResourceLifecycleCells = NoHandrolledResourceLifecycleCells;
+pub static DEFAULT_RULE: NoHandrolledResourceLifecycleCells = NoHandrolledResourceLifecycleCells {
+    scope: RuleScope::DEFAULT,
+};
 
 impl NoHandrolledResourceLifecycleCells {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        decode_rule_options::<ResourceLifecycleOptions>(RULE_NAME, options).map(|_| Self)
+        let parsed = decode_rule_options::<ResourceLifecycleOptions>(RULE_NAME, options)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
+        Ok(Self { scope })
     }
-}
-
-struct NoopVisitor;
-
-impl RuleVisitor for NoopVisitor {
-    fn listeners(&self) -> &[Listener] {
-        &[]
-    }
-
-    fn visit(&mut self, _ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {}
 }
 
 impl Rule for NoHandrolledResourceLifecycleCells {
@@ -47,6 +45,9 @@ impl Rule for NoHandrolledResourceLifecycleCells {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         let mut traversal = LifecycleTraversal {
             imports: FileImports::collect(ctx.file),
             stack: Vec::new(),
@@ -60,7 +61,7 @@ impl Rule for NoHandrolledResourceLifecycleCells {
                 RuleMessage::new("handrolledResourceLifecycle", MESSAGE),
             );
         }
-        Box::new(NoopVisitor)
+        Box::new(EmptyVisitor)
     }
 }
 
@@ -465,9 +466,7 @@ fn is_abort_status_test(test: P<Node>, stack: &[StateFrame]) -> bool {
 }
 
 fn statement_exits(statement: Option<P<Node>>) -> bool {
-    let Some(stmt) = statement else {
-        return false;
-    };
+    let Some(stmt) = statement else { return false };
     match stmt.kind() {
         Kind::ReturnStatement
         | Kind::ThrowStatement

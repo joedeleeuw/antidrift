@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::decode_rule_options;
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use antidrift_kernel::tsrs_kernel;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -24,6 +24,8 @@ struct RawFieldBlockConfig {
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct StructuralTypeForkOptions {
     field_blocks: RawFieldBlockConfig,
+    #[serde(flatten)]
+    scope: ScopeOptions,
 }
 
 #[derive(Clone, Copy)]
@@ -46,6 +48,7 @@ pub struct ShapeEntry {
 
 pub struct NoStructuralTypeFork {
     field_blocks: FieldBlockConfig,
+    scope: RuleScope,
 }
 
 pub static RULE: NoStructuralTypeFork = NoStructuralTypeFork {
@@ -54,6 +57,7 @@ pub static RULE: NoStructuralTypeFork = NoStructuralTypeFork {
         min_shapes: 2,
         min_redundant_declarations: 3,
     },
+    scope: RuleScope::DEFAULT,
 };
 
 fn validate_positive_threshold(
@@ -74,6 +78,7 @@ impl NoStructuralTypeFork {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<StructuralTypeForkOptions>(RULE_NAME, options)?;
         let fb = parsed.field_blocks;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
             field_blocks: FieldBlockConfig {
                 min_shared_fields: validate_positive_threshold(
@@ -88,6 +93,7 @@ impl NoStructuralTypeFork {
                     3,
                 )?,
             },
+            scope,
         })
     }
 }
@@ -283,7 +289,10 @@ impl Rule for NoStructuralTypeFork {
         "antidrift/no-structural-type-fork"
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor {
             field_blocks: self.field_blocks,
             shapes: Vec::new(),

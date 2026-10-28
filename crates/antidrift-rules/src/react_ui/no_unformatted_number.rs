@@ -32,17 +32,14 @@ const TEST_SUFFIXES: [&str; 2] = [".test.", ".spec."];
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct UnformattedNumberOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     formatter: Option<String>,
 }
 
 impl ScopedOptions for UnformattedNumberOptions {
     fn scope(&self) -> ScopeOptions {
-        ScopeOptions {
-            files: self.files.clone(),
-            exclude_files: self.exclude_files.clone(),
-        }
+        self.scope.clone()
     }
 
     fn validate(&self, rule_name: &str) -> Result<(), String> {

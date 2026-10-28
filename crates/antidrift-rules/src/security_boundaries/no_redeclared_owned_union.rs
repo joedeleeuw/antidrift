@@ -5,7 +5,7 @@ use super::owned_union_source::{
 use super::package_ownership::absolute_filename;
 use super::package_resolution::resolver_with_mode;
 use antidrift_kernel::local_binding::Binding;
-use antidrift_kernel::rule_scope::decode_rule_options;
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use antidrift_kernel::ts_resolver::ResolutionMode;
 use oxc_resolver::{ResolveError, Resolver};
 use rustc_hash::FxHashSet;
@@ -32,8 +32,10 @@ struct StatusEntry {
 }
 
 #[derive(Clone, Default, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct OwnedUnionOptions {
+    #[serde(flatten)]
+    scope: ScopeOptions,
     allows: BTreeSet<String>,
     statuses: BTreeMap<String, StatusEntry>,
 }
@@ -46,11 +48,17 @@ struct UnionOwner {
 }
 
 pub struct NoRedeclaredOwnedUnion {
+    scope: RuleScope,
     options: OwnedUnionOptions,
 }
 
 pub static DEFAULT_RULE: NoRedeclaredOwnedUnion = NoRedeclaredOwnedUnion {
+    scope: RuleScope::DEFAULT,
     options: OwnedUnionOptions {
+        scope: ScopeOptions {
+            files: None,
+            exclude_files: Vec::new(),
+        },
         allows: BTreeSet::new(),
         statuses: BTreeMap::new(),
     },
@@ -58,9 +66,9 @@ pub static DEFAULT_RULE: NoRedeclaredOwnedUnion = NoRedeclaredOwnedUnion {
 
 impl NoRedeclaredOwnedUnion {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            options: decode_rule_options::<OwnedUnionOptions>(RULE_NAME, options)?,
-        })
+        let options = decode_rule_options::<OwnedUnionOptions>(RULE_NAME, options)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &options.scope)?;
+        Ok(Self { scope, options })
     }
 }
 
@@ -76,38 +84,33 @@ impl Rule for NoRedeclaredOwnedUnion {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         let owners = match union_owners(ctx.program, ctx.file) {
             Ok(owners) => owners,
             Err(error) => {
                 ctx.report_range(0, 0, RuleMessage::new("ownerResolution", error));
-                return Box::new(Visitor {
-                    rule: self,
-                    enabled: false,
-                    owners: Vec::new(),
-                    convex: FxHashSet::default(),
-                });
+                return Box::new(EmptyVisitor);
             }
         };
-        let convex = convex_bindings(ctx.file);
         Box::new(Visitor {
             rule: self,
-            enabled: true,
             owners,
-            convex,
+            convex: convex_bindings(ctx.file),
         })
     }
 }
 
 struct Visitor {
     rule: &'static NoRedeclaredOwnedUnion,
-    enabled: bool,
     owners: Vec<UnionOwner>,
     convex: FxHashSet<Binding>,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

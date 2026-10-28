@@ -1,3 +1,4 @@
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{boundary, tsrs_kernel};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -5,9 +6,21 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-schema-validator-transcoding";
 
-pub struct NoSchemaValidatorTranscoding;
+pub struct NoSchemaValidatorTranscoding {
+    scope: RuleScope,
+}
 
-pub static DEFAULT_RULE: NoSchemaValidatorTranscoding = NoSchemaValidatorTranscoding;
+pub static DEFAULT_RULE: NoSchemaValidatorTranscoding = NoSchemaValidatorTranscoding {
+    scope: RuleScope::DEFAULT,
+};
+
+impl NoSchemaValidatorTranscoding {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: RuleScope::from_options(RULE_NAME, options)?,
+        })
+    }
+}
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 
@@ -16,7 +29,10 @@ impl Rule for NoSchemaValidatorTranscoding {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

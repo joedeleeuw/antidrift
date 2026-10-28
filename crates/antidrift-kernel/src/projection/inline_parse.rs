@@ -182,6 +182,7 @@ pub fn classify_inline_parse_reshape(
     root_symbols.insert(root.symbol);
     let bag_state = BagState {
         parameter_name: String::new(),
+        parameter_node: None,
         bag_root_symbols: root_symbols,
         bag_field_symbols: FxHashSet::default(),
     };

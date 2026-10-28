@@ -37,8 +37,8 @@ const RAW_ISOLATING: [&str; 2] = ["bdi", "bdo"];
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct RenderedNameOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     name_props: Option<Vec<String>>,
     isolating_components: Option<Vec<String>>,
     owner: Option<String>,
@@ -46,10 +46,7 @@ struct RenderedNameOptions {
 
 impl ScopedOptions for RenderedNameOptions {
     fn scope(&self) -> ScopeOptions {
-        ScopeOptions {
-            files: self.files.clone(),
-            exclude_files: self.exclude_files.clone(),
-        }
+        self.scope.clone()
     }
 
     fn validate(&self, rule_name: &str) -> Result<(), String> {
@@ -83,8 +80,10 @@ pub struct RequireDirOnRenderedName {
 pub static DEFAULT_RULE: RequireDirOnRenderedName = RequireDirOnRenderedName {
     scope: RuleScope::DEFAULT,
     options: RenderedNameOptions {
-        files: None,
-        exclude_files: Vec::new(),
+        scope: ScopeOptions {
+            files: None,
+            exclude_files: Vec::new(),
+        },
         name_props: None,
         isolating_components: None,
         owner: None,

@@ -3,7 +3,7 @@ use super::syntax::{
     Span, awaited, expression_key, identifier, numeric_value, object_property, static_member,
 };
 use antidrift_kernel::local_binding::{
-    Binding, collect_binding_references, is_identifier_reference_position,
+    Binding, collect_binding_references, is_identifier_reference_position, resolve_lexical_binding,
 };
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -96,7 +96,7 @@ struct DependencyWalker<'o> {
 
 impl DependencyWalker<'_> {
     fn binding(&mut self, ident: P<Node>) {
-        let Some(binding) = self.oracle.symbol(ident) else {
+        let Some(binding) = resolve_lexical_binding(ident) else {
             return;
         };
         if !self.dependencies.symbols.insert(binding) {

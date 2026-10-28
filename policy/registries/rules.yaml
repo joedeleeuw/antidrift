@@ -206,10 +206,6 @@ retiredRules:
     status: retired
     reason: Replaced by generated no-restricted-imports patterns for the maintained React Native and gesture-handler primitive inventory. Namespace, default, named and re-export forms remain restricted; type-only imports are allowed and policy/registries/react-native.yaml owns exact owner-file exceptions.
     referenceDoc: docs/rule-investigations/no-raw-react-native-touchables.md
-  antidrift/no-host-path-literal:
-    status: retired
-    reason: Replaced by generated governance-eslint/no-restricted-syntax selectors for /Users/<user>/ and /home/<user>/ literals and no-substitution template text, retaining the Homebrew and test/story/mock/e2e exclusions.
-    referenceDoc: docs/rule-investigations/directive-rules.md
   antidrift/no-query-data-type-parameters:
     status: retired
     reason: Superseded by antidrift/no-explicit-type-arguments-on-owned-api, which resolves the callee symbol and proves registration ownership instead of matching method names; the syntax rule's ad-hoc key coverage was doctrine-rejected (no resolvable owner means no fork).

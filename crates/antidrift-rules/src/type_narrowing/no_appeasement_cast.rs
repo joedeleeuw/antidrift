@@ -250,7 +250,24 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
     );
 }
 
-pub struct NoAppeasementCast;
+pub struct NoAppeasementCast {
+    pub scope: antidrift_kernel::rule_scope::RuleScope,
+}
+
+pub static DEFAULT_INSTANCE: NoAppeasementCast = NoAppeasementCast {
+    scope: antidrift_kernel::rule_scope::RuleScope::DEFAULT,
+};
+
+impl NoAppeasementCast {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: antidrift_kernel::rule_scope::RuleScope::from_options(
+                "antidrift/no-appeasement-cast",
+                options,
+            )?,
+        })
+    }
+}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::AsExpression),
@@ -262,7 +279,10 @@ impl Rule for NoAppeasementCast {
         "antidrift/no-appeasement-cast"
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

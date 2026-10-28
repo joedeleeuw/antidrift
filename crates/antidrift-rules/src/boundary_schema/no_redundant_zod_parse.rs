@@ -1,3 +1,4 @@
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{boundary, projection, provenance, tsrs_kernel};
 use rustc_hash::FxHashMap;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags, SourceFile, Symbol};
@@ -7,9 +8,21 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-redundant-zod-parse";
 
-pub struct NoRedundantZodParse;
+pub struct NoRedundantZodParse {
+    scope: RuleScope,
+}
 
-pub static DEFAULT_RULE: NoRedundantZodParse = NoRedundantZodParse;
+pub static DEFAULT_RULE: NoRedundantZodParse = NoRedundantZodParse {
+    scope: RuleScope::DEFAULT,
+};
+
+impl NoRedundantZodParse {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: RuleScope::from_options(RULE_NAME, options)?,
+        })
+    }
+}
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 
@@ -18,7 +31,10 @@ impl Rule for NoRedundantZodParse {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor {
             provenance_map: FxHashMap::default(),
         })
@@ -202,7 +218,7 @@ impl NoRedundantZodParse {
         match node.kind() {
             Kind::BinaryExpression => {
                 let bin = node.as_binary_expression();
-                Self::is_assignment_operator(bin.operator_token().kind())
+                ast::is_assignment_operator(bin.operator_token().kind())
                     && Self::references_symbol_or_member(bin.left(), checker, target_sym)
             }
             Kind::PrefixUnaryExpression => {
@@ -246,27 +262,5 @@ impl NoRedundantZodParse {
         }
         ast::is_identifier(current)
             && provenance::symbol_at_node(checker, current) == Some(target_sym)
-    }
-
-    const fn is_assignment_operator(kind: Kind) -> bool {
-        matches!(
-            kind,
-            Kind::EqualsToken
-                | Kind::PlusEqualsToken
-                | Kind::MinusEqualsToken
-                | Kind::AsteriskEqualsToken
-                | Kind::AsteriskAsteriskEqualsToken
-                | Kind::SlashEqualsToken
-                | Kind::PercentEqualsToken
-                | Kind::LessThanLessThanEqualsToken
-                | Kind::GreaterThanGreaterThanEqualsToken
-                | Kind::GreaterThanGreaterThanGreaterThanEqualsToken
-                | Kind::AmpersandEqualsToken
-                | Kind::BarEqualsToken
-                | Kind::CaretEqualsToken
-                | Kind::BarBarEqualsToken
-                | Kind::AmpersandAmpersandEqualsToken
-                | Kind::QuestionQuestionEqualsToken
-        )
     }
 }

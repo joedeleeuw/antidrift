@@ -27,24 +27,32 @@ pub fn create_rule(
     match name {
         "antidrift/no-contract-appeasement-projection" | "no-contract-appeasement-projection" => {
             Ok(Some(Box::new(
-                no_contract_appeasement_projection::NoContractAppeasementProjection,
+                no_contract_appeasement_projection::NoContractAppeasementProjection::from_options(
+                    options,
+                )?,
             )))
         }
         "antidrift/no-structural-type-fork" | "no-structural-type-fork" => Ok(Some(Box::new(
             no_structural_type_fork::NoStructuralTypeFork::from_options(options)?,
         ))),
         "antidrift/no-nullable-positional-tuple" | "no-nullable-positional-tuple" => Ok(Some(
-            Box::new(no_nullable_positional_tuple::NoNullablePositionalTuple),
+            Box::new(no_nullable_positional_tuple::NoNullablePositionalTuple::from_options(
+                options,
+            )?),
         )),
         "antidrift/react-max-component-props" | "react-max-component-props" => Ok(Some(Box::new(
             react_max_component_props::ReactMaxComponentProps::from_options(options)?,
         ))),
         "antidrift/no-explicit-type-arguments-on-owned-api"
         | "no-explicit-type-arguments-on-owned-api" => Ok(Some(Box::new(
-            no_explicit_type_arguments_on_owned_api::NoExplicitTypeArgumentsOnOwnedApi,
+            no_explicit_type_arguments_on_owned_api::NoExplicitTypeArgumentsOnOwnedApi::from_options(
+                options,
+            )?,
         ))),
         "antidrift/no-service-constructor-imports" | "no-service-constructor-imports" => Ok(Some(
-            Box::new(no_service_constructor_imports::NoServiceConstructorImports),
+            Box::new(no_service_constructor_imports::NoServiceConstructorImports::from_options(
+                options,
+            )?),
         )),
         _ => Ok(None),
     }

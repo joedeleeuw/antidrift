@@ -43,17 +43,14 @@ const NATIVE_TOOLTIP_ATTRIBUTES: [&str; 1] = ["title"];
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct IconTooltipOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     icon_components: Vec<String>,
 }
 
 impl ScopedOptions for IconTooltipOptions {
     fn scope(&self) -> ScopeOptions {
-        ScopeOptions {
-            files: self.files.clone(),
-            exclude_files: self.exclude_files.clone(),
-        }
+        self.scope.clone()
     }
 }
 

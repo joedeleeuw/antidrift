@@ -219,7 +219,24 @@ fn check_node(ctx: &mut Ctx, node: P<Node>) {
     );
 }
 
-pub struct NoUnresolvedDependencyTypes;
+pub struct NoUnresolvedDependencyTypes {
+    pub scope: antidrift_kernel::rule_scope::RuleScope,
+}
+
+pub static DEFAULT_INSTANCE: NoUnresolvedDependencyTypes = NoUnresolvedDependencyTypes {
+    scope: antidrift_kernel::rule_scope::RuleScope::DEFAULT,
+};
+
+impl NoUnresolvedDependencyTypes {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: antidrift_kernel::rule_scope::RuleScope::from_options(
+                "antidrift/no-unresolved-dependency-types",
+                options,
+            )?,
+        })
+    }
+}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ImportDeclaration),
@@ -234,7 +251,10 @@ impl Rule for NoUnresolvedDependencyTypes {
         "antidrift/no-unresolved-dependency-types"
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

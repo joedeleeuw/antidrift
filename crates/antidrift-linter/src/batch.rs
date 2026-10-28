@@ -41,8 +41,6 @@ pub(crate) struct BatchCaseInput {
     #[serde(default)]
     pub(crate) rules: Option<BTreeMap<String, Value>>,
     #[serde(default)]
-    pub(crate) settings: Option<Value>,
-    #[serde(default)]
     pub(crate) cwd: Option<String>,
     #[serde(default)]
     pub(crate) report_unused_directives: bool,
@@ -83,7 +81,6 @@ pub(crate) fn run_batch_json(source_spec: &str) -> Result<String, String> {
 }
 
 fn evaluate_single_case(case: &BatchCaseInput) -> Result<BatchCaseOutput, String> {
-    let _ = &case.settings;
     let rule_set = build_case_rules(case)?;
     let normalized_file = tspath::normalize_slashes(&case.filename);
     let dir = case

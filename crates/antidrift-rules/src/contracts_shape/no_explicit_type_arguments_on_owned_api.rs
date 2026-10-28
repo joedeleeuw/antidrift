@@ -1,12 +1,27 @@
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use tsrs_ast::{Kind, Node};
 use tsrs_checker::{Checker, SignatureKind, Type, TypeFlags};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
-pub struct NoExplicitTypeArgumentsOnOwnedApi;
+const RULE_NAME: &str = "antidrift/no-explicit-type-arguments-on-owned-api";
 
-pub static RULE: NoExplicitTypeArgumentsOnOwnedApi = NoExplicitTypeArgumentsOnOwnedApi;
+pub struct NoExplicitTypeArgumentsOnOwnedApi {
+    scope: RuleScope,
+}
+
+pub static RULE: NoExplicitTypeArgumentsOnOwnedApi = NoExplicitTypeArgumentsOnOwnedApi {
+    scope: RuleScope::DEFAULT,
+};
+
+impl NoExplicitTypeArgumentsOnOwnedApi {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: RuleScope::from_options(RULE_NAME, options)?,
+        })
+    }
+}
 
 fn build_explicit_type_arguments_on_owned_api_message() -> RuleMessage {
     RuleMessage::new(
@@ -356,7 +371,10 @@ impl Rule for NoExplicitTypeArgumentsOnOwnedApi {
         "antidrift/no-explicit-type-arguments-on-owned-api"
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

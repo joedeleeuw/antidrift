@@ -9,8 +9,8 @@ pub const RULE_NAME: &str = "antidrift/confine-owner";
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct ConfineOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     registry: Option<String>,
     entries: Vec<OwnerEntry>,
 }
@@ -103,11 +103,7 @@ impl ConfineOwner {
                     .to_string(),
             );
         }
-        let scope_opts = ScopeOptions {
-            files: parsed.files,
-            exclude_files: parsed.exclude_files,
-        };
-        let scope = RuleScope::from_scope_options(RULE_NAME, &scope_opts)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
             scope,
             registry: parsed.registry,

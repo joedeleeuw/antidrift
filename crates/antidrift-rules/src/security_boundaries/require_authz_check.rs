@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::decode_rule_options;
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -9,24 +9,30 @@ pub const RULE_NAME: &str = "antidrift/require-authz-check";
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct AuthzOptions {
+    #[serde(flatten)]
+    scope: ScopeOptions,
     authz_functions: Vec<String>,
 }
 
 pub struct RequireAuthzCheck {
+    scope: RuleScope,
     authz_functions: Vec<String>,
 }
 
 pub static DEFAULT_RULE: RequireAuthzCheck = RequireAuthzCheck {
+    scope: RuleScope::DEFAULT,
     authz_functions: Vec::new(),
 };
 
 impl RequireAuthzCheck {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<AuthzOptions>(RULE_NAME, options)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         if parsed.authz_functions.iter().any(String::is_empty) {
             return Err("authzFunctions must contain non-empty strings".to_string());
         }
         Ok(Self {
+            scope,
             authz_functions: parsed.authz_functions,
         })
     }
@@ -57,7 +63,10 @@ impl Rule for RequireAuthzCheck {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor {
             functions: &self.authz_functions,
             frames: Vec::new(),

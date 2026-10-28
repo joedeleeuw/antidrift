@@ -219,7 +219,7 @@ clusters:
         message: Declare the case space first with a typed table, a discriminated union or an exhaustive switch.
       - id: provenance/no-host-path-literal # S4 /home/<user>/ and /Users/<user>/ literals outside tests.
         severity: error
-        detector: governance-eslint/no-restricted-syntax
+        detector: antidrift:no-host-path-literal
         message: Resolve paths from the home directory, the repository root or configuration.
       - id: provenance/no-dated-comments # S5 dated provenance prose in comments outside @example blocks.
         severity: error

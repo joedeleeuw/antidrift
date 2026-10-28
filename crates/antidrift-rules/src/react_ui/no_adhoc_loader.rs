@@ -46,8 +46,8 @@ impl AllowedFile {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct AdhocLoaderOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     loader_icons: Option<Vec<String>>,
     owner: Option<String>,
     skeleton: Option<String>,
@@ -56,10 +56,7 @@ struct AdhocLoaderOptions {
 
 impl ScopedOptions for AdhocLoaderOptions {
     fn scope(&self) -> ScopeOptions {
-        ScopeOptions {
-            files: self.files.clone(),
-            exclude_files: self.exclude_files.clone(),
-        }
+        self.scope.clone()
     }
 
     fn validate(&self, rule_name: &str) -> Result<(), String> {
@@ -86,8 +83,10 @@ pub struct NoAdhocLoader {
 pub static DEFAULT_RULE: NoAdhocLoader = NoAdhocLoader {
     scope: RuleScope::DEFAULT,
     options: AdhocLoaderOptions {
-        files: None,
-        exclude_files: Vec::new(),
+        scope: ScopeOptions {
+            files: None,
+            exclude_files: Vec::new(),
+        },
         loader_icons: None,
         owner: None,
         skeleton: None,

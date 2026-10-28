@@ -27,7 +27,6 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
           "@joedeleeuw/antidrift": `file:${tarball}`,
           "@joedeleeuw/typescript-tooling": `file:${toolingTarball}`,
           "@types/node": "22.19.19",
-          eslint: "10.13.0",
           oxlint: "1.89.0",
           typescript: "6.0.3",
           vitest: "2.1.9",
@@ -65,7 +64,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
         compilerOptions: {
           ...baseCompilerOptions,
         },
-        include: ["packages/app/src/**/*.ts"],
+        include: ["packages/app/src/**/*.ts", "portable-proofs/**/*.ts"],
       },
       null,
       2
@@ -138,7 +137,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
       'import { createConfig } from "@joedeleeuw/typescript-tooling/oxlint";\n' +
       "const repoRoot = resolve(import.meta.dirname, '..');\n" +
-      "const governance = createGovernanceOxlintConfig({ repoRoot, enforceNoPropertyDefaultFallbacks: true, propertyDefaultAllowedFiles: ['portable-proofs/allowed-fallback.ts'] });\n" +
+      "const governance = createGovernanceOxlintConfig({ repoRoot });\n" +
       "const tooling = createConfig({ repoRoot, typeAware: false, enforceNoPropertyDefaultFallbacks: true, propertyDefaultAllowedFiles: ['portable-proofs/allowed-fallback.ts'] });\n" +
       "export default { ...tooling, ...governance, rules: { ...tooling.rules, ...governance.rules }, jsPlugins: [...governance.jsPlugins, ...tooling.jsPlugins], plugins: [...new Set([...governance.plugins, ...tooling.plugins])], options: { ...tooling.options, ...governance.options }, ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])], overrides: [...(tooling.overrides ?? []), ...governance.overrides] };\n"
   );

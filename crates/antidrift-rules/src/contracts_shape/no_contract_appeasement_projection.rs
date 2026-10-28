@@ -1,11 +1,26 @@
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{projection, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
-pub struct NoContractAppeasementProjection;
+const RULE_NAME: &str = "antidrift/no-contract-appeasement-projection";
 
-pub static RULE: NoContractAppeasementProjection = NoContractAppeasementProjection;
+pub struct NoContractAppeasementProjection {
+    scope: RuleScope,
+}
+
+pub static RULE: NoContractAppeasementProjection = NoContractAppeasementProjection {
+    scope: RuleScope::DEFAULT,
+};
+
+impl NoContractAppeasementProjection {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: RuleScope::from_options(RULE_NAME, options)?,
+        })
+    }
+}
 
 fn build_contract_appeasement_projection_message() -> RuleMessage {
     RuleMessage::new(
@@ -199,7 +214,10 @@ impl Rule for NoContractAppeasementProjection {
         "antidrift/no-contract-appeasement-projection"
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

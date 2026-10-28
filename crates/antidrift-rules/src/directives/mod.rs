@@ -5,6 +5,7 @@ pub mod no_as_never;
 pub mod no_dated_comments;
 pub mod no_debug_residue_filenames;
 pub mod no_default_export_in_domain;
+pub mod no_host_path_literal;
 pub mod no_partial_record_satisfies;
 pub mod no_todo_without_issue;
 pub mod no_tutorial_comments;
@@ -22,6 +23,7 @@ pub fn rules() -> Vec<&'static dyn Rule> {
         &no_dated_comments::DEFAULT_RULE,
         &no_debug_residue_filenames::DEFAULT_RULE,
         &no_default_export_in_domain::DEFAULT_RULE,
+        &no_host_path_literal::DEFAULT_RULE,
         &no_partial_record_satisfies::DEFAULT_RULE,
         &no_todo_without_issue::DEFAULT_RULE,
         &no_tutorial_comments::DEFAULT_RULE,
@@ -53,6 +55,9 @@ pub fn create_rule(
         no_default_export_in_domain::RULE_NAME | "no-default-export-in-domain" => Ok(Some(
             Box::new(no_default_export_in_domain::NoDefaultExportInDomain::from_options(options)?),
         )),
+        no_host_path_literal::RULE_NAME | "no-host-path-literal" => Ok(Some(Box::new(
+            no_host_path_literal::NoHostPathLiteral::from_options(options)?,
+        ))),
         no_partial_record_satisfies::RULE_NAME | "no-partial-record-satisfies" => Ok(Some(
             Box::new(no_partial_record_satisfies::NoPartialRecordSatisfies::from_options(options)?),
         )),

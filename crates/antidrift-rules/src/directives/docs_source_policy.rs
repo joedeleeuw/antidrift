@@ -14,8 +14,8 @@ const MAX_QUARANTINE_MS: i64 = 31 * 24 * 60 * 60 * 1000;
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct DocsSourcePolicyOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     policy_file: Option<String>,
     dependencies: Option<Vec<String>>,
     sources: BTreeMap<String, DocSourceEntry>,
@@ -52,13 +52,7 @@ pub static DEFAULT_RULE: DocsSourcePolicy = DocsSourcePolicy {
 impl DocsSourcePolicy {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<DocsSourcePolicyOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(
-            RULE_NAME,
-            &ScopeOptions {
-                files: parsed.files.clone(),
-                exclude_files: parsed.exclude_files.clone(),
-            },
-        )?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
             scope,
             options: Some(parsed),

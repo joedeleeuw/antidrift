@@ -23,7 +23,7 @@ This ledger records the enforcement owner and provenance of each ruleset or tool
 | React and React Compiler              | `ecosystem-ruleset`: Oxlint React plugin and official `eslint-plugin-react-hooks`         | Opt-in shared tooling plus repository `oxlint.config.mts`      |
 | Import and Unicorn rules              | `ecosystem-ruleset`: Oxlint native plugins and `eslint-plugin-unicorn` under `unicorn-js` | `@joedeleeuw/typescript-tooling/oxlint`                        |
 | Property-default fallback policy      | `ecosystem-ruleset`: `@rikalabs/no-property-default-fallbacks`                            | Opt-in `typescript-tooling` rule plus Antidrift overlap config |
-| Host paths and template sentinels     | `generated-config`: ESLint builtin `no-restricted-syntax` selectors                       | `governance-eslint/no-restricted-syntax` JavaScript adapter    |
+| Host paths                            | `local-original`                                                                          | `antidrift-linter` (`antidrift/no-host-path-literal`)          |
 | Vitest integrity                      | `ecosystem-ruleset`: Oxlint Vitest plugin                                                 | Oxlint test override                                           |
 | Architecture boundaries               | `ecosystem-ruleset`: `eslint-plugin-boundaries`                                           | Oxlint JavaScript plugin host                                  |
 | Disable-comment policy                | `ecosystem-ruleset`: ESLint comments plugin plus Oxlint directive reporting               | Oxlint JavaScript plugin host and root options                 |

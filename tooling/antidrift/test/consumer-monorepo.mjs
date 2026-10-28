@@ -80,6 +80,8 @@ try {
     "package/dist/oxlint-plugin/",
     "package/dist/semantic-adapters/",
     "package/dist/eslint-config/",
+    "package/dist/oxlint-config/eslint-builtins.mjs",
+    "package/dist/policy/lib/property-default-fallbacks.mjs",
     "package/test/",
   ];
   const shippedForbidden = [...packedFiles].filter((entry) =>
@@ -141,6 +143,38 @@ try {
           "exec",
           "oxlint",
           relFile,
+          "--format",
+          "json",
+          "--config",
+          config,
+          "--tsconfig",
+          "tsconfig.bundler.json",
+        ],
+        work
+      );
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "stdout" in error &&
+        typeof error.stdout === "string"
+      ) {
+        return JSON.parse(error.stdout);
+      }
+      throw error;
+    }
+  }
+
+  function lintAntidriftOxlint(relFile, config) {
+    try {
+      return runJson(
+        pnpmBinary,
+        [
+          "exec",
+          "antidrift",
+          "oxlint",
+          relFile,
+          "--",
           "--format",
           "json",
           "--config",
@@ -247,7 +281,7 @@ try {
   }
 
   const fallbackConfig = "nested/oxlint.fallback.config.mjs";
-  const fallbackOutput = lintOxlint(
+  const fallbackOutput = lintAntidriftOxlint(
     "portable-proofs/fallback.ts",
     fallbackConfig
   );
@@ -257,26 +291,24 @@ try {
   );
   if (
     !fallbackRules.includes("@rikalabs/no-property-default-fallbacks") ||
-    !fallbackRules.includes("governance-eslint/no-restricted-syntax") ||
+    !fallbackRules.includes("typescript/antidrift/no-host-path-literal") ||
     hostPathDiagnostics.length !== 2
   ) {
     fail(
-      `Fallback opt-in must enforce Rika defaults and both host-path selector forms, got: ${JSON.stringify(fallbackOutput.diagnostics)}`
+      `Fallback opt-in must enforce Rika defaults and both host-path literal forms, got: ${JSON.stringify(fallbackOutput.diagnostics)}`
     );
   }
   if (
-    !(fallbackOutput.diagnostics ?? []).some(({ message }) =>
-      message.includes("hides a missing member behind a sentinel")
-    )
+    !fallbackRules.includes("typescript/antidrift/no-sentinel-absence-fallback")
   ) {
     fail("Template-literal sentinels must remain covered when Rika is enabled");
   }
   const allowedFallbackRules = oxlintRuleIds(
-    lintOxlint("portable-proofs/allowed-fallback.ts", fallbackConfig)
+    lintAntidriftOxlint("portable-proofs/allowed-fallback.ts", fallbackConfig)
   );
   if (
     allowedFallbackRules.includes("@rikalabs/no-property-default-fallbacks") ||
-    allowedFallbackRules.includes("governance-eslint/no-restricted-syntax")
+    allowedFallbackRules.includes("typescript/antidrift/no-host-path-literal")
   ) {
     fail(
       `Nested config must honor repo-relative fallback exceptions, got: ${JSON.stringify(allowedFallbackRules)}`

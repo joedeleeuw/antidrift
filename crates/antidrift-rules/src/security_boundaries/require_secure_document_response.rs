@@ -11,8 +11,8 @@ pub const RULE_NAME: &str = "antidrift/require-secure-document-response";
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct DocumentResponseOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     all_responses: bool,
     headers_module: Option<String>,
     owner: Option<String>,
@@ -35,11 +35,7 @@ pub static DEFAULT_RULE: RequireSecureDocumentResponse = RequireSecureDocumentRe
 impl RequireSecureDocumentResponse {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<DocumentResponseOptions>(RULE_NAME, options)?;
-        let scope_opts = ScopeOptions {
-            files: parsed.files,
-            exclude_files: parsed.exclude_files,
-        };
-        let scope = RuleScope::from_scope_options(RULE_NAME, &scope_opts)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
             scope,
             all_responses: parsed.all_responses,

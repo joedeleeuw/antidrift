@@ -326,4 +326,9 @@ export const portableCases = [
     invalid: 'import { thing } from "undeclared-package";',
     valid: 'import { thing } from "@homer/shared/machine";',
   },
+  {
+    name: "no-host-path-literal",
+    invalid: 'const root = "/Users/alice/code/app";',
+    valid: 'const root = "/var/tmp/app";',
+  },
 ];

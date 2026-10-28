@@ -1,13 +1,26 @@
 use antidrift_kernel::boundary;
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-unsafe-deserialize";
 
-pub struct NoUnsafeDeserialize;
+pub struct NoUnsafeDeserialize {
+    scope: RuleScope,
+}
 
-pub static DEFAULT_RULE: NoUnsafeDeserialize = NoUnsafeDeserialize;
+pub static DEFAULT_RULE: NoUnsafeDeserialize = NoUnsafeDeserialize {
+    scope: RuleScope::DEFAULT,
+};
+
+impl NoUnsafeDeserialize {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: RuleScope::from_options(RULE_NAME, options)?,
+        })
+    }
+}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
@@ -19,7 +32,10 @@ impl Rule for NoUnsafeDeserialize {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

@@ -14,8 +14,8 @@ pub const RULE_NAME: &str = "antidrift/no-unsafe-inner-html";
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct HtmlOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     sanitizers: Option<Vec<ImportedOwner>>,
     trusted_sources: Vec<ImportedOwner>,
 }
@@ -35,11 +35,7 @@ pub static DEFAULT_RULE: NoUnsafeInnerHtml = NoUnsafeInnerHtml {
 impl NoUnsafeInnerHtml {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<HtmlOptions>(RULE_NAME, options)?;
-        let scope_opts = ScopeOptions {
-            files: parsed.files,
-            exclude_files: parsed.exclude_files,
-        };
-        let scope = RuleScope::from_scope_options(RULE_NAME, &scope_opts)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         let sanitizers = parsed.sanitizers.unwrap_or_else(|| {
             vec![ImportedOwner {
                 module: "dompurify".to_string(),

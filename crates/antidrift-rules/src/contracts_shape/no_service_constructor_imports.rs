@@ -1,11 +1,26 @@
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use tsrs_ast::{Kind, Node, SourceFile, Symbol};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
-pub struct NoServiceConstructorImports;
+const RULE_NAME: &str = "antidrift/no-service-constructor-imports";
 
-pub static RULE: NoServiceConstructorImports = NoServiceConstructorImports;
+pub struct NoServiceConstructorImports {
+    scope: RuleScope,
+}
+
+pub static RULE: NoServiceConstructorImports = NoServiceConstructorImports {
+    scope: RuleScope::DEFAULT,
+};
+
+impl NoServiceConstructorImports {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: RuleScope::from_options(RULE_NAME, options)?,
+        })
+    }
+}
 
 struct ImportBinding {
     report_target: P<Node>,
@@ -151,7 +166,10 @@ impl Rule for NoServiceConstructorImports {
         "antidrift/no-service-constructor-imports"
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

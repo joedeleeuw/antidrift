@@ -62,6 +62,22 @@ impl SmellVisitor<'_> {
             );
         }
     }
+
+    fn check_wild_local(&mut self, span: Span, expr: &Expr) {
+        if is_decoded_config_call(expr) {
+            self.push(
+                span,
+                "rust/no-discarded-decoded-config",
+                "Decoded configuration or RuleScope is discarded; store the decoded value on the rule and enforce it during traversal.".to_string(),
+            );
+        } else if is_suppressed_binding_expr(expr) {
+            self.push(
+                span,
+                "rust/no-let-underscore-suppression",
+                "Do not suppress unused parameter, self, or field warnings with 'let _ = ...;'; remove the unused binding or use it.".to_string(),
+            );
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for SmellVisitor<'_> {
@@ -90,13 +106,41 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
     }
 
     fn visit_item_struct(&mut self, node: &'ast ItemStruct) {
-        self.check_ident_name(&node.ident.to_string(), node.ident.span());
-        for field in &node.fields {
-            if let Some(ident) = &field.ident {
-                self.check_ident_name(&ident.to_string(), ident.span());
+        let struct_name = node.ident.to_string();
+        self.check_ident_name(&struct_name, node.ident.span());
+        for ident in node.fields.iter().filter_map(|field| field.ident.as_ref()) {
+            let field_name = ident.to_string();
+            self.check_ident_name(&field_name, ident.span());
+            if field_name == "exclude_files"
+                && !matches!(struct_name.as_str(), "ScopeOptions" | "RuleScope")
+            {
+                self.push(
+                    ident.span(),
+                    "rust/no-duplicate-scope-fields",
+                    "Do not redeclare 'files' / 'exclude_files' on rule option structs; embed '#[serde(flatten)] scope: ScopeOptions' instead.".to_string(),
+                );
             }
         }
         visit::visit_item_struct(self, node);
+    }
+
+    fn visit_stmt(&mut self, node: &'ast Stmt) {
+        match node {
+            Stmt::Local(local) if is_wild_pat(&local.pat) => {
+                if let Some(init) = &local.init {
+                    self.check_wild_local(local.let_token.span, &init.expr);
+                }
+            }
+            Stmt::Expr(expr, Some(semi)) if is_decoded_config_call(expr) => {
+                self.push(
+                    semi.spans[0],
+                    "rust/no-discarded-decoded-config",
+                    "Decoded configuration or RuleScope is discarded; store the decoded value on the rule and enforce it during traversal.".to_string(),
+                );
+            }
+            _ => {}
+        }
+        visit::visit_stmt(self, node);
     }
 
     fn visit_item_enum(&mut self, node: &'ast ItemEnum) {
@@ -224,6 +268,34 @@ fn expr_mentions_ident(expr: &Expr, target: &str) -> bool {
     visitor.found
 }
 
+fn is_suppressed_binding_expr(expr: &Expr) -> bool {
+    match expr {
+        Expr::Reference(reference) => is_suppressed_binding_expr(&reference.expr),
+        Expr::Paren(paren) => is_suppressed_binding_expr(&paren.expr),
+        Expr::Path(_) | Expr::Field(_) | Expr::Tuple(_) => true,
+        _ => false,
+    }
+}
+
+fn is_decoded_config_call(expr: &Expr) -> bool {
+    let inner = match expr {
+        Expr::Try(expr_try) => &*expr_try.expr,
+        other => other,
+    };
+    let Expr::Call(ExprCall { func, .. }) = inner else {
+        return false;
+    };
+    let Expr::Path(callee) = &**func else {
+        return false;
+    };
+    callee.path.segments.last().is_some_and(|seg| {
+        matches!(
+            seg.ident.to_string().as_str(),
+            "decode_rule_options" | "from_options" | "from_scope_options"
+        )
+    })
+}
+
 fn detect_passthrough_wrapper(item_fn: &ItemFn) -> Option<String> {
     if item_fn.sig.inputs.is_empty() {
         return None;
@@ -236,10 +308,16 @@ fn detect_passthrough_wrapper(item_fn: &ItemFn) -> Option<String> {
         let (name, _) = extract_pat_ident(&pat_type.pat)?;
         param_names.push(name);
     }
-    if item_fn.block.stmts.len() != 1 {
+    let meaningful_stmts: Vec<&Stmt> = item_fn
+        .block
+        .stmts
+        .iter()
+        .filter(|stmt| !matches!(stmt, Stmt::Local(local) if is_wild_pat(&local.pat)))
+        .collect();
+    if meaningful_stmts.len() != 1 {
         return None;
     }
-    let expr = match &item_fn.block.stmts[0] {
+    let expr = match meaningful_stmts[0] {
         Stmt::Expr(expr, None) => expr,
         Stmt::Expr(Expr::Return(ret), _) => ret.expr.as_deref()?,
         _ => return None,

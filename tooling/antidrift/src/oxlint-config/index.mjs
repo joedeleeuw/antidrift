@@ -1,17 +1,8 @@
-import { fileURLToPath } from "node:url";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import { defineConfig } from "oxlint";
 
 import { loadRegistriesSync } from "../policy/lib/registries.mjs";
-import { templateSentinelSelectors } from "../policy/lib/property-default-fallbacks.mjs";
-
-const javascriptPlugins = [
-  {
-    name: "governance-eslint",
-    specifier: fileURLToPath(new URL("./eslint-builtins.mjs", import.meta.url)),
-  },
-];
 
 const touchableImports = new Map([
   [
@@ -47,32 +38,11 @@ const touchableImports = new Map([
   ],
 ]);
 
-const hostPathSelectors = [
-  {
-    selector: "Literal[value=/^\\/(?:Users|home)\\/(?!linuxbrew\\/)[^/]+\\//]",
-    message:
-      "Host-absolute path literal. Resolve the path from the home directory, the repository root, or configuration.",
-  },
-  {
-    selector:
-      "TemplateLiteral[expressions.length=0] > TemplateElement[value.cooked=/^\\/(?:Users|home)\\/(?!linuxbrew\\/)[^/]+\\//]",
-    message:
-      "Host-absolute path literal. Resolve the path from the home directory, the repository root, or configuration.",
-  },
-];
-
 const applicationExclusionFiles = [
   "**/examples/**",
   "**/example/**",
   "**/__tests__/**",
   "**/*.{test,spec}.{js,jsx,ts,tsx,mts,cts,mjs,cjs}",
-];
-
-const hostPathExclusionFiles = [
-  ...applicationExclusionFiles,
-  "**/*.stories.{js,jsx,ts,tsx,mts,cts,mjs,cjs}",
-  "**/__mocks__/**",
-  "**/e2e/**",
 ];
 
 function generatedImportPatterns(registries) {
@@ -238,10 +208,6 @@ function applicationExclusionOverrides(otherPatterns) {
             : "off",
       },
     },
-    {
-      files: hostPathExclusionFiles,
-      rules: { "governance-eslint/no-restricted-syntax": "off" },
-    },
   ];
 }
 
@@ -274,36 +240,9 @@ const governanceOptions = {
   reportUnusedDisableDirectives: "error",
 };
 
-function propertyDefaultOverride(file) {
-  if (typeof file !== "string" || file.length === 0) {
-    throw new TypeError(
-      "propertyDefaultAllowedFiles entries must be non-empty repository-relative file patterns."
-    );
-  }
-  const pattern = file.replaceAll("\\", "/").replace(/^\.\//u, "");
-  const invalid = [
-    pattern.startsWith("/"),
-    /^[A-Za-z]:\//u.test(pattern),
-    pattern.split("/").includes(".."),
-  ].some(Boolean);
-  if (invalid) {
-    throw new TypeError(
-      `propertyDefaultAllowedFiles entries must stay relative to the repository; received ${file}.`
-    );
-  }
-  return {
-    files: [pattern.startsWith("**/") ? pattern : `**/${pattern}`],
-    rules: {
-      "governance-eslint/no-restricted-syntax": ["error", ...hostPathSelectors],
-    },
-  };
-}
-
 export function createGovernanceOxlintConfig({
   repoRoot = process.cwd(),
   policyDir = "policy",
-  enforceNoPropertyDefaultFallbacks = false,
-  propertyDefaultAllowedFiles = [],
 } = {}) {
   const registries = loadRegistriesSync(resolve(repoRoot, policyDir));
   const generatedIgnores = generatedIgnorePatterns(registries, repoRoot);
@@ -317,13 +256,7 @@ export function createGovernanceOxlintConfig({
     ...otherPatterns,
     ...touchableImportPatterns(reactNativePolicy),
   ];
-  const rules = {
-    "governance-eslint/no-restricted-syntax": [
-      "error",
-      ...hostPathSelectors,
-      ...(enforceNoPropertyDefaultFallbacks ? templateSentinelSelectors : []),
-    ],
-  };
+  const rules = {};
   if (restrictedImportPatterns.length > 0) {
     rules["no-restricted-imports"] = restrictedImportsRule(
       restrictedImportPatterns
@@ -337,7 +270,7 @@ export function createGovernanceOxlintConfig({
       ...generatedIgnores,
       ...declarationIgnorePatterns,
     ],
-    jsPlugins: javascriptPlugins,
+    jsPlugins: [],
     options: governanceOptions,
     plugins: ["eslint", "typescript"],
     rules,
@@ -345,7 +278,6 @@ export function createGovernanceOxlintConfig({
       ...gatewayWrapperOverrides(registries, generatedPatterns),
       ...touchableOwnerOverrides(reactNativePolicy, otherPatterns),
       ...applicationExclusionOverrides(otherPatterns),
-      ...propertyDefaultAllowedFiles.map(propertyDefaultOverride),
     ],
   });
 }

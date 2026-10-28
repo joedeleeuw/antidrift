@@ -16,8 +16,8 @@ const DEVTOOLS_PACKAGES: &[&str] = &[
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct NoStaticDevtoolsImportOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     modules: Vec<String>,
 }
 
@@ -34,11 +34,7 @@ pub static DEFAULT_RULE: NoStaticDevtoolsImport = NoStaticDevtoolsImport {
 impl NoStaticDevtoolsImport {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<NoStaticDevtoolsImportOptions>(RULE_NAME, options)?;
-        let scope_opts = ScopeOptions {
-            files: parsed.files,
-            exclude_files: parsed.exclude_files,
-        };
-        let scope = RuleScope::from_scope_options(RULE_NAME, &scope_opts)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
             scope,
             modules: parsed.modules,

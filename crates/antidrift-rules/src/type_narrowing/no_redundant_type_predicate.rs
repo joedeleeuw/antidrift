@@ -387,7 +387,24 @@ fn check_callback(ctx: &mut Ctx, node: P<Node>) {
     }
 }
 
-pub struct NoRedundantTypePredicate;
+pub struct NoRedundantTypePredicate {
+    pub scope: antidrift_kernel::rule_scope::RuleScope,
+}
+
+pub static DEFAULT_INSTANCE: NoRedundantTypePredicate = NoRedundantTypePredicate {
+    scope: antidrift_kernel::rule_scope::RuleScope::DEFAULT,
+};
+
+impl NoRedundantTypePredicate {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        Ok(Self {
+            scope: antidrift_kernel::rule_scope::RuleScope::from_options(
+                "antidrift/no-redundant-type-predicate",
+                options,
+            )?,
+        })
+    }
+}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),
@@ -399,7 +416,10 @@ impl Rule for NoRedundantTypePredicate {
         "antidrift/no-redundant-type-predicate"
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
+        }
         Box::new(Visitor)
     }
 }

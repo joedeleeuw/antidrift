@@ -1,3 +1,4 @@
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions};
 use antidrift_kernel::tsrs_kernel;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -56,6 +57,8 @@ const AFTER_KEYWORDS: &[&str] = &[
 pub struct SqlConcatOptions {
     pub safe_identifier_members: Vec<SafeIdentifierMemberSpec>,
     pub safe_template_tags: Vec<SafeTemplateTagSpec>,
+    #[serde(flatten)]
+    pub scope: ScopeOptions,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -84,19 +87,29 @@ pub enum SafeTemplateTagSpec {
 
 pub struct NoSqlStringConcat {
     options: SqlConcatOptions,
+    scope: RuleScope,
 }
 
 pub static DEFAULT_RULE: NoSqlStringConcat = NoSqlStringConcat {
     options: SqlConcatOptions {
         safe_identifier_members: Vec::new(),
         safe_template_tags: Vec::new(),
+        scope: ScopeOptions {
+            files: None,
+            exclude_files: Vec::new(),
+        },
     },
+    scope: RuleScope::DEFAULT,
 };
 
 impl NoSqlStringConcat {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = super::decode_rule_options::<SqlConcatOptions>(RULE_NAME, options)?;
-        Ok(Self { options: parsed })
+        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
+        Ok(Self {
+            options: parsed,
+            scope,
+        })
     }
 }
 
@@ -105,7 +118,10 @@ impl Rule for NoSqlStringConcat {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor { rule: self })
     }
 }

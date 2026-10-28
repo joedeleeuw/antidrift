@@ -1,6 +1,6 @@
 use super::syntax::{Span, identifier, unwrap};
 use antidrift_kernel::local_binding::{
-    Binding, enclosing_variable_declaration, is_const_variable_declaration, resolve_lexical_binding,
+    enclosing_variable_declaration, is_const_variable_declaration, resolve_lexical_binding,
 };
 use antidrift_kernel::tsrs_kernel::is_function_like;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -74,14 +74,10 @@ impl Callback {
 }
 
 impl Oracle {
-    pub(super) fn symbol(&self, ident: P<Node>) -> Option<Binding> {
-        let _ = self;
-        resolve_lexical_binding(ident)
-    }
-
     pub(super) fn declaration(&self, ident: P<Node>) -> Option<P<Node>> {
-        let binding = self.symbol(ident)?;
-        (binding.decl.kind() == Kind::VariableDeclaration).then_some(binding.decl)
+        let binding = resolve_lexical_binding(ident)?;
+        (binding.decl != self.sf.as_node() && binding.decl.kind() == Kind::VariableDeclaration)
+            .then_some(binding.decl)
     }
 
     pub(super) fn initializer(&self, expression: P<Node>, constant: bool) -> Option<P<Node>> {
@@ -105,13 +101,17 @@ impl Oracle {
     }
 
     pub(super) fn binding_source(&self, expression: P<Node>) -> Option<P<Node>> {
-        let binding = self.symbol(identifier(expression)?)?;
+        let binding = resolve_lexical_binding(identifier(expression)?)?;
         let declaration = enclosing_variable_declaration(binding)?;
         if let Some(initializer) = declaration.as_variable_declaration().initializer() {
             return Some(initializer);
         }
+        let root = self.sf.as_node();
         let mut cursor = declaration.parent();
         while let Some(ancestor) = cursor {
+            if ancestor == root {
+                break;
+            }
             if ancestor.kind() == Kind::ForOfStatement {
                 return Some(ancestor.as_for_in_or_of_statement().expression());
             }
@@ -121,9 +121,12 @@ impl Oracle {
     }
 
     pub(super) fn owner(&self, node: P<Node>) -> Option<P<Node>> {
-        let _ = self;
+        let root = self.sf.as_node();
         let mut cursor = node.parent();
         while let Some(ancestor) = cursor {
+            if ancestor == root {
+                break;
+            }
             if is_function_like(ancestor) {
                 return Some(ancestor);
             }
@@ -134,7 +137,10 @@ impl Oracle {
 
     pub(super) fn local_function(&self, expression: P<Node>) -> Option<Callback> {
         let ident = identifier(unwrap(expression))?;
-        let binding = self.symbol(ident)?;
+        let binding = resolve_lexical_binding(ident)?;
+        if binding.decl == self.sf.as_node() {
+            return None;
+        }
         match binding.decl.kind() {
             Kind::FunctionDeclaration | Kind::FunctionExpression | Kind::ArrowFunction => {
                 Some(Callback(binding.decl))
@@ -150,7 +156,7 @@ impl Oracle {
         &self,
         expression: P<Node>,
     ) -> Option<(&'static str, Option<&'static str>)> {
-        let binding = self.symbol(identifier(expression)?)?;
+        let binding = resolve_lexical_binding(identifier(expression)?)?;
         let imported = match binding.decl.kind() {
             Kind::ImportSpecifier => {
                 let spec = binding.decl.as_import_specifier();
@@ -164,12 +170,16 @@ impl Oracle {
             Kind::ImportClause | Kind::NamespaceImport => None,
             _ => return None,
         };
+        let root = self.sf.as_node();
         let mut cursor = binding.decl.parent();
         while let Some(ancestor) = cursor {
             if ancestor.kind() == Kind::ImportDeclaration {
                 let spec = ancestor.as_import_declaration().module_specifier();
                 return ast::is_string_literal(spec)
                     .then(|| (spec.as_string_literal().text(), imported));
+            }
+            if ancestor == root {
+                break;
             }
             cursor = ancestor.parent();
         }

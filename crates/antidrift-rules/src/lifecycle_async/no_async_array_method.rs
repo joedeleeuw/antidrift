@@ -2,7 +2,7 @@ use super::syntax::{
     Binding, Span, binding_for_declarator, identifier, identifier_member, parent_expression,
     references_to, without_parens,
 };
-use antidrift_kernel::rule_scope::decode_rule_options;
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use serde::Deserialize;
 use tsrs_ast::{Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
@@ -18,10 +18,12 @@ enum AsyncBranch {
 }
 
 #[derive(Default, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct AsyncArrayOptions {
     #[serde(deserialize_with = "decode_branches")]
     branches: Vec<AsyncBranch>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
 }
 
 fn decode_branches<'de, D: serde::Deserializer<'de>>(
@@ -43,17 +45,21 @@ fn decode_branches<'de, D: serde::Deserializer<'de>>(
 
 pub struct NoAsyncArrayMethod {
     requires_collection: bool,
+    scope: RuleScope,
 }
 
 pub static DEFAULT_RULE: NoAsyncArrayMethod = NoAsyncArrayMethod {
     requires_collection: false,
+    scope: RuleScope::DEFAULT,
 };
 
 impl NoAsyncArrayMethod {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let decoded = decode_rule_options::<AsyncArrayOptions>(RULE_NAME, options)?;
+        let scope = RuleScope::from_scope_options(RULE_NAME, &decoded.scope)?;
         Ok(Self {
             requires_collection: decoded.branches.contains(&AsyncBranch::RequiresCollection),
+            scope,
         })
     }
 }
@@ -65,7 +71,10 @@ impl Rule for NoAsyncArrayMethod {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         Box::new(Visitor {
             requires_collection: self.requires_collection,
         })

@@ -13,17 +13,14 @@ const MESSAGE: &str = "Terminate this unreachable branch with a throw or the con
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct ExhaustivePanicOptions {
-    files: Option<Vec<String>>,
-    exclude_files: Vec<String>,
+    #[serde(flatten)]
+    scope: ScopeOptions,
     failure_functions: Vec<String>,
 }
 
 impl ScopedOptions for ExhaustivePanicOptions {
     fn scope(&self) -> ScopeOptions {
-        ScopeOptions {
-            files: self.files.clone(),
-            exclude_files: self.exclude_files.clone(),
-        }
+        self.scope.clone()
     }
 }
 

@@ -12,7 +12,7 @@ This is the ownership policy, not a second rule catalog. Plugin configs own acti
 
 ## Current integration details
 
-- Oxlint 1.89 does not provide native `no-restricted-syntax` or `unicorn/prefer-switch`. Antidrift exposes ESLint's builtin selector rule as `governance-eslint/no-restricted-syntax` through its JavaScript-plugin adapter. `typescript-tooling` loads the real Unicorn plugin as `unicorn-js` and enables `unicorn-js/prefer-switch` with `minimumCases: 4`.
+- `typescript-tooling` loads the real Unicorn plugin as `unicorn-js` and enables `unicorn-js/prefer-switch` with `minimumCases: 4`. Host-path literals are enforced natively by `antidrift/no-host-path-literal` in `antidrift-linter`.
 - Rika's `@rikalabs/no-property-default-fallbacks` is disabled by default. `enforceNoPropertyDefaultFallbacks: true` opts into that rule alone, not Rika's aggressive preset. `propertyDefaultAllowedFiles` declares repository-relative file patterns whose fully qualified suffixes match across checkout and config locations.
 - When Rika enforcement is enabled, Antidrift disables `no-sentinel-absence-fallback` in its ESLint config. It retains selectors for no-substitution template-literal sentinels, which Rika's implementation does not detect.
 - React Native restrictions remain opt-in. A consumer's `policy/registries/react-native.yaml` declares `replacementImport` and exact `allowedFiles`; without that policy, raw-touchable restrictions are inert.

@@ -3,7 +3,7 @@ use super::bindings::Oracle;
 use super::syntax::{
     argument, call, explicit_test_file, identifier, literal, static_member, unwrap,
 };
-use antidrift_kernel::local_binding::{Binding, binding_for_declarator};
+use antidrift_kernel::local_binding::{Binding, binding_for_declarator, resolve_lexical_binding};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 
@@ -70,7 +70,7 @@ fn indexed_root(
         return None;
     }
     let member = expression.as_element_access_expression();
-    if oracle.symbol(identifier(member.argument_expression())?)? != loop_symbol {
+    if resolve_lexical_binding(identifier(member.argument_expression())?)? != loop_symbol {
         return None;
     }
     let mut root = unwrap(member.expression());
