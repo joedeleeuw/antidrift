@@ -21,8 +21,8 @@ fn symbol_declares_in_convex_path(
     sym: Option<P<Symbol>>,
     segment: &str,
 ) -> bool {
-    let rest = symbol_package_path(checker, sym);
-    rest.starts_with("convex/") && rest.contains(segment)
+    symbol_package_path(checker, sym)
+        .is_some_and(|rest| rest.starts_with("convex/") && rest.contains(segment))
 }
 
 pub fn is_convex_registrar_call(checker: &mut Checker, call_node: P<Node>) -> bool {
@@ -61,28 +61,28 @@ pub fn is_convex_registrar_call(checker: &mut Checker, call_node: P<Node>) -> bo
     symbol_declares_in_convex_path(checker, provenance::type_symbol(resolved_type), "/server")
 }
 
-pub fn convex_validator_method(checker: &mut Checker, node: P<Node>) -> String {
+pub fn convex_validator_method(checker: &mut Checker, node: P<Node>) -> Option<&'static str> {
     let unwrapped = tsrs_kernel::unwrap_expression(node);
     if !ast::is_call_expression(unwrapped) {
-        return String::new();
+        return None;
     }
     let callee = unwrapped.as_call_expression().expression();
     if !ast::is_property_access_expression(callee) {
-        return String::new();
+        return None;
     }
     let prop = callee.as_property_access_expression();
     let name_node = prop.name();
     if !ast::is_identifier(name_node) {
-        return String::new();
+        return None;
     }
     let method_sym = provenance::symbol_at_node(checker, name_node);
     let receiver_sym = provenance::symbol_at_node(checker, prop.expression());
     if !symbol_declares_in_convex_path(checker, method_sym, "/values")
         && !symbol_declares_in_convex_path(checker, receiver_sym, "/values")
     {
-        return String::new();
+        return None;
     }
-    name_node.as_identifier().text().to_string()
+    Some(name_node.as_identifier().text())
 }
 
 fn convex_object_contains_any(checker: &mut Checker, call: &CallExpression) -> bool {
@@ -110,13 +110,15 @@ pub fn contains_convex_any(checker: &mut Checker, node: P<Node>) -> bool {
         return false;
     }
     let call = target.as_call_expression();
-    let method = convex_validator_method(checker, target);
-    match method.as_str() {
+    let Some(method) = convex_validator_method(checker, target) else {
+        return false;
+    };
+    match method {
         "any" => return call.arguments().nodes().is_empty(),
         "object" => return convex_object_contains_any(checker, call),
         _ => {}
     }
-    if CONVEX_COMBINATORS.contains(&method.as_str()) {
+    if CONVEX_COMBINATORS.contains(&method) {
         for &arg in call.arguments().nodes() {
             if contains_convex_any(checker, arg) {
                 return true;
@@ -185,8 +187,9 @@ fn is_json_schema_conversion_call(checker: &mut Checker, call_node: P<Node>) -> 
         let name_node = prop.name();
         if ast::is_identifier(name_node) && name_node.as_identifier().text() == "toJSONSchema" {
             let prop_sym = provenance::symbol_at_node(checker, name_node);
-            let rest = symbol_package_path(checker, prop_sym);
-            if rest == "zod" || rest.starts_with("zod/") {
+            if symbol_package_path(checker, prop_sym)
+                .is_some_and(|rest| rest == "zod" || rest.starts_with("zod/"))
+            {
                 return true;
             }
         }
@@ -199,7 +202,9 @@ fn is_json_schema_conversion_call(checker: &mut Checker, call_node: P<Node>) -> 
     let Some(symbol) = sym else {
         return false;
     };
-    let rest = symbol_package_path(checker, Some(symbol));
+    let Some(rest) = symbol_package_path(checker, Some(symbol)) else {
+        return false;
+    };
     if symbol.name() == "make" && rest.starts_with("effect/") && rest.contains("JSONSchema") {
         return true;
     }
@@ -217,9 +222,8 @@ pub fn is_openapi_documentation_call(checker: &mut Checker, call_node: P<Node>) 
         callee
     };
     let sym = provenance::symbol_at_node(checker, target);
-    let rest = symbol_package_path(checker, sym);
-    !rest.is_empty()
-        && package_name_of_path(&rest)
-            .to_ascii_lowercase()
-            .contains("openapi")
+    let Some(rest) = symbol_package_path(checker, sym) else {
+        return false;
+    };
+    package_name_of_path(&rest).is_some_and(|pkg| pkg.to_ascii_lowercase().contains("openapi"))
 }

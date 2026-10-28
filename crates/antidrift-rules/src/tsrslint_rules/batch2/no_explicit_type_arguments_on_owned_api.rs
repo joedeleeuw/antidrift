@@ -80,7 +80,9 @@ fn is_convex_hook_call(checker: &mut Checker, call_node: P<Node>) -> bool {
     ) {
         return false;
     }
-    let pkg = boundary::symbol_package_path(checker, Some(symbol));
+    let Some(pkg) = boundary::symbol_package_path(checker, Some(symbol)) else {
+        return false;
+    };
     if !((pkg == "convex" || pkg.starts_with("convex/")) && pkg.contains("/react")) {
         return false;
     }
@@ -111,7 +113,8 @@ fn is_trpc_procedure_hook_call(checker: &mut Checker, call_node: P<Node>) -> boo
     let Some(symbol) = provenance::symbol_at_node(checker, name_node) else {
         return false;
     };
-    boundary::symbol_package_path(checker, Some(symbol)).starts_with("@trpc/")
+    boundary::symbol_package_path(checker, Some(symbol))
+        .is_some_and(|pkg| pkg.starts_with("@trpc/"))
 }
 
 fn is_concrete_return_type(checker: &mut Checker, return_type: P<Type>) -> bool {
@@ -146,7 +149,9 @@ fn is_swr_owned_fetcher_call(checker: &mut Checker, call_node: P<Node>) -> bool 
     ) {
         return false;
     }
-    let pkg = boundary::symbol_package_path(checker, Some(symbol));
+    let Some(pkg) = boundary::symbol_package_path(checker, Some(symbol)) else {
+        return false;
+    };
     if !(pkg == "swr" || pkg.starts_with("swr/")) {
         return false;
     }
@@ -177,7 +182,8 @@ fn is_tanstack_identifier_callee(checker: &mut Checker, callee: P<Node>) -> bool
     matches!(
         resolved.name(),
         "useQuery" | "useMutation" | "useSuspenseQuery" | "useInfiniteQuery"
-    ) && boundary::symbol_package_path(checker, Some(symbol)).starts_with("@tanstack/react-query")
+    ) && boundary::symbol_package_path(checker, Some(symbol))
+        .is_some_and(|pkg| pkg.starts_with("@tanstack/react-query"))
 }
 
 fn is_tanstack_property_callee(checker: &mut Checker, callee: P<Node>) -> bool {
@@ -193,8 +199,9 @@ fn is_tanstack_property_callee(checker: &mut Checker, callee: P<Node>) -> bool {
     let Some(symbol) = provenance::symbol_at_node(checker, name_node) else {
         return false;
     };
-    let pkg = boundary::symbol_package_path(checker, Some(symbol));
-    pkg.starts_with("@tanstack/react-query") || pkg.starts_with("@tanstack/query-core")
+    boundary::symbol_package_path(checker, Some(symbol)).is_some_and(|pkg| {
+        pkg.starts_with("@tanstack/react-query") || pkg.starts_with("@tanstack/query-core")
+    })
 }
 
 fn is_tanstack_callee(checker: &mut Checker, callee: P<Node>) -> bool {
@@ -216,8 +223,9 @@ fn is_registration_identifier_factory(checker: &mut Checker, callee: P<Node>) ->
     ) {
         return false;
     }
-    let pkg = boundary::symbol_package_path(checker, Some(symbol));
-    pkg.starts_with("@tanstack/react-query") || pkg.starts_with("@tanstack/query-core")
+    boundary::symbol_package_path(checker, Some(symbol)).is_some_and(|pkg| {
+        pkg.starts_with("@tanstack/react-query") || pkg.starts_with("@tanstack/query-core")
+    })
 }
 
 fn is_registration_property_factory(checker: &mut Checker, callee: P<Node>) -> bool {
@@ -225,8 +233,9 @@ fn is_registration_property_factory(checker: &mut Checker, callee: P<Node>) -> b
     let Some(symbol) = provenance::symbol_at_node(checker, name_node) else {
         return false;
     };
-    let pkg = boundary::symbol_package_path(checker, Some(symbol));
-    pkg.starts_with("@trpc/") || pkg.starts_with("@orpc/") || pkg.starts_with("@tanstack/")
+    boundary::symbol_package_path(checker, Some(symbol)).is_some_and(|pkg| {
+        pkg.starts_with("@trpc/") || pkg.starts_with("@orpc/") || pkg.starts_with("@tanstack/")
+    })
 }
 
 fn is_registration_factory_call(checker: &mut Checker, node: P<Node>) -> bool {

@@ -1,9 +1,12 @@
-use antidrift_kernel::{provenance, rule_scope, tsrs_kernel};
+use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::tsrs_kernel;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::Type;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor, options_object};
+use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrslint::utils::{is_intersection_type, is_union_type};
+
+const RULE_NAME: &str = "antidrift/no-vague-names";
 
 const VAGUE_NOUNS: &[&str] = &[
     "data",
@@ -70,29 +73,6 @@ const FILLER_SUFFIXES: &[&str] = &[
 ];
 
 const FILLER_PREFIXES: &[&str] = &["my", "the", "some", "temp", "tmp"];
-
-fn extract_patterns(options: Option<&serde_json::Value>, key: &str) -> Vec<String> {
-    let map = options_object(options);
-    let Some(arr) = map.get(key).and_then(serde_json::Value::as_array) else {
-        return Vec::new();
-    };
-    arr.iter()
-        .filter_map(serde_json::Value::as_str)
-        .map(str::to_owned)
-        .collect()
-}
-
-fn matches_scope(file_name: &str, cwd: &str, files: &[String], exclude_files: &[String]) -> bool {
-    let normalized = tsrs_kernel::normalize_path(file_name);
-    let local = provenance::relative_to_cwd(cwd, &normalized);
-    let matches_any = |patterns: &[String]| {
-        patterns.iter().any(|pattern| {
-            rule_scope::glob_matches(&local, pattern)
-                || rule_scope::glob_matches(&normalized, pattern)
-        })
-    };
-    (files.is_empty() || matches_any(files)) && !matches_any(exclude_files)
-}
 
 fn is_exempt_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
@@ -295,8 +275,7 @@ fn is_jsx_expression(node: P<Node>) -> bool {
 
 fn is_component_function(fn_node: P<Node>) -> bool {
     tsrs_kernel::function_name(fn_node)
-        .as_bytes()
-        .first()
+        .and_then(|name| name.as_bytes().first())
         .is_some_and(u8::is_ascii_uppercase)
         || tsrs_kernel::collect_return_expressions(fn_node.body())
             .into_iter()
@@ -392,25 +371,21 @@ fn check_function(ctx: &mut Ctx, node: P<Node>) {
 }
 
 pub struct NoVagueNames {
-    files: Vec<String>,
-    exclude_files: Vec<String>,
+    scope: RuleScope,
 }
 
 impl NoVagueNames {
     pub const DEFAULT: Self = Self {
-        files: Vec::new(),
-        exclude_files: Vec::new(),
+        scope: RuleScope::DEFAULT,
     };
 }
 
 pub static DEFAULT_INSTANCE: NoVagueNames = NoVagueNames::DEFAULT;
 
-#[must_use]
-pub fn create(options: Option<&serde_json::Value>) -> Box<dyn Rule> {
-    Box::new(NoVagueNames {
-        files: extract_patterns(options, "files"),
-        exclude_files: extract_patterns(options, "excludeFiles"),
-    })
+pub fn create(options: Option<&serde_json::Value>) -> Result<Box<dyn Rule>, String> {
+    Ok(Box::new(NoVagueNames {
+        scope: RuleScope::from_options(RULE_NAME, options)?,
+    }))
 }
 
 const LISTENERS: &[Listener] = &[
@@ -428,12 +403,12 @@ const LISTENERS: &[Listener] = &[
 
 impl Rule for NoVagueNames {
     fn name(&self) -> &'static str {
-        "antidrift/no-vague-names"
+        RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let cwd = ctx.program.host().get_current_directory();
-        let enabled = matches_scope(ctx.file.file_name(), cwd, &self.files, &self.exclude_files);
+        let enabled = self.scope.matches(ctx.file.file_name(), cwd);
         Box::new(Visitor { enabled })
     }
 }

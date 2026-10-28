@@ -1,30 +1,10 @@
-use antidrift_kernel::{callgraph, provenance, rule_scope, tsrs_kernel};
+use antidrift_kernel::callgraph;
+use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor, options_object};
+use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
-fn extract_patterns(options: Option<&serde_json::Value>, key: &str) -> Vec<String> {
-    let map = options_object(options);
-    let Some(arr) = map.get(key).and_then(serde_json::Value::as_array) else {
-        return Vec::new();
-    };
-    arr.iter()
-        .filter_map(serde_json::Value::as_str)
-        .map(str::to_owned)
-        .collect()
-}
-
-fn matches_scope(file_name: &str, cwd: &str, files: &[String], exclude_files: &[String]) -> bool {
-    let normalized = tsrs_kernel::normalize_path(file_name);
-    let local = provenance::relative_to_cwd(cwd, &normalized);
-    let matches_any = |patterns: &[String]| {
-        patterns.iter().any(|pattern| {
-            rule_scope::glob_matches(&local, pattern)
-                || rule_scope::glob_matches(&normalized, pattern)
-        })
-    };
-    (files.is_empty() || matches_any(files)) && !matches_any(exclude_files)
-}
+const RULE_NAME: &str = "antidrift/no-pass-through-parameters";
 
 fn build_pass_through_message(name: &str, targets: &[String]) -> RuleMessage {
     RuleMessage::new(
@@ -37,25 +17,21 @@ fn build_pass_through_message(name: &str, targets: &[String]) -> RuleMessage {
 }
 
 pub struct NoPassThroughParameters {
-    files: Vec<String>,
-    exclude_files: Vec<String>,
+    scope: RuleScope,
 }
 
 impl NoPassThroughParameters {
     pub const DEFAULT: Self = Self {
-        files: Vec::new(),
-        exclude_files: Vec::new(),
+        scope: RuleScope::DEFAULT,
     };
 }
 
 pub static DEFAULT_INSTANCE: NoPassThroughParameters = NoPassThroughParameters::DEFAULT;
 
-#[must_use]
-pub fn create(options: Option<&serde_json::Value>) -> Box<dyn Rule> {
-    Box::new(NoPassThroughParameters {
-        files: extract_patterns(options, "files"),
-        exclude_files: extract_patterns(options, "excludeFiles"),
-    })
+pub fn create(options: Option<&serde_json::Value>) -> Result<Box<dyn Rule>, String> {
+    Ok(Box::new(NoPassThroughParameters {
+        scope: RuleScope::from_options(RULE_NAME, options)?,
+    }))
 }
 
 const LISTENERS: &[Listener] = &[
@@ -66,12 +42,12 @@ const LISTENERS: &[Listener] = &[
 
 impl Rule for NoPassThroughParameters {
     fn name(&self) -> &'static str {
-        "antidrift/no-pass-through-parameters"
+        RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let cwd = ctx.program.host().get_current_directory();
-        let enabled = matches_scope(ctx.file.file_name(), cwd, &self.files, &self.exclude_files);
+        let enabled = self.scope.matches(ctx.file.file_name(), cwd);
         Box::new(Visitor { enabled })
     }
 }

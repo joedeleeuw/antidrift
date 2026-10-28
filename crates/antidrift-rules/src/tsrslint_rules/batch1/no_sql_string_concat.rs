@@ -59,6 +59,7 @@ pub struct SqlConcatOptions {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SafeIdentifierMemberSpec {
     #[serde(rename = "type")]
     pub type_name: String,
@@ -66,7 +67,7 @@ pub struct SafeIdentifierMemberSpec {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
+#[serde(untagged, deny_unknown_fields)]
 pub enum SafeTemplateTagSpec {
     Imported {
         module: String,
@@ -426,7 +427,7 @@ impl NoSqlStringConcat {
             };
             let normalized_source = tsrs_kernel::normalize_path(source);
             member == member_name
-                && type_name == &owner_name
+                && type_name == owner_name
                 && file_name.ends_with(&normalized_source)
         })
     }

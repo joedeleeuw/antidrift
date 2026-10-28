@@ -22,9 +22,9 @@ pub struct PackageJsonManifest {
 pub fn parse_package_json_manifest(source_text: &str) -> Option<PackageJsonManifest> {
     let wrapped = format!("({source_text}\n)");
     let allocator = Allocator::default();
-    let parsed = Parser::new(&allocator, &wrapped, SourceType::mjs())
-        .parse_expression()
-        .ok()?;
+    let Ok(parsed) = Parser::new(&allocator, &wrapped, SourceType::mjs()).parse_expression() else {
+        return None;
+    };
     let expr = parsed.without_parentheses();
     let Expression::ObjectExpression(root_obj) = expr else {
         return None;

@@ -170,23 +170,19 @@ fn check_function_candidate(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>
         && let Some(classification) =
             projection::classify_bag_reshaper(function, candidate, ctx.checker, ctx.file)
     {
-        match classification.kind {
-            "bagToContract" => {
+        match classification {
+            projection::BagReshaperClassification::BagToContract {
+                parameter_name,
+                target_contract,
+            } => {
                 ctx.report_node(
                     candidate,
-                    build_bag_to_contract_message(
-                        &classification.parameter_name,
-                        &classification.target_contract,
-                    ),
+                    build_bag_to_contract_message(&parameter_name, &target_contract),
                 );
             }
-            "bagToBag" => {
-                ctx.report_node(
-                    candidate,
-                    build_bag_to_bag_message(&classification.parameter_name),
-                );
+            projection::BagReshaperClassification::BagToBag { parameter_name } => {
+                ctx.report_node(candidate, build_bag_to_bag_message(&parameter_name));
             }
-            _ => {}
         }
         return;
     }

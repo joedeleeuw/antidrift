@@ -151,7 +151,7 @@ impl ProjectionWalker<'_> {
             return None;
         }
         let root_name = tsrs_kernel::member_chain_root_identifier(unwrapped)?;
-        if !self.bindings.contains_key(&root_name) {
+        if !self.bindings.contains_key(root_name) {
             return None;
         }
         Some((

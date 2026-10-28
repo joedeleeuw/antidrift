@@ -4,19 +4,21 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-#[must_use]
 pub(crate) fn format_diagnostics(
     format: OutputFormat,
     diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>,
-) -> String {
+) -> Result<String, String> {
     match format {
-        OutputFormat::Human => format_human(diagnostics_by_file),
+        OutputFormat::Human => format_human(diagnostics_by_file)
+            .map_err(|err| format!("failed to format output: {err}")),
         OutputFormat::Json => format_eslint_json(diagnostics_by_file),
         OutputFormat::Sarif => format_sarif(diagnostics_by_file),
     }
 }
 
-fn format_human(diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>) -> String {
+fn format_human(
+    diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>,
+) -> Result<String, std::fmt::Error> {
     let mut out = String::new();
     let mut total_errors = 0_usize;
     let mut total_warnings = 0_usize;
@@ -24,7 +26,7 @@ fn format_human(diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>) -> 
         if diags.is_empty() {
             continue;
         }
-        let _ = writeln!(out, "\n{file_path}");
+        writeln!(out, "\n{file_path}")?;
         for diag in diags {
             let level = match diag.severity {
                 Severity::Error => {
@@ -37,24 +39,26 @@ fn format_human(diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>) -> 
                 }
                 Severity::Off => continue,
             };
-            let _ = writeln!(
+            writeln!(
                 out,
                 "  {}:{}  {level}  {}  {}",
                 diag.location.line, diag.location.column, diag.message, diag.rule_id
-            );
+            )?;
         }
     }
     let total = total_errors + total_warnings;
     if total > 0 {
-        let _ = writeln!(
+        writeln!(
             out,
             "\n✖ {total} problems ({total_errors} errors, {total_warnings} warnings)"
-        );
+        )?;
     }
-    out
+    Ok(out)
 }
 
-fn format_eslint_json(diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>) -> String {
+fn format_eslint_json(
+    diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>,
+) -> Result<String, String> {
     let mut files: Vec<Value> = Vec::with_capacity(diagnostics_by_file.len());
     for (file_path, diags) in diagnostics_by_file {
         let mut error_count = 0_usize;
@@ -84,10 +88,13 @@ fn format_eslint_json(diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>
             "warningCount": warning_count,
         }));
     }
-    serde_json::to_string_pretty(&files).unwrap_or_else(|_| "[]".to_string())
+    serde_json::to_string_pretty(&files)
+        .map_err(|err| format!("failed to serialize JSON output: {err}"))
 }
 
-fn format_sarif(diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>) -> String {
+fn format_sarif(
+    diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>,
+) -> Result<String, String> {
     let mut results: Vec<Value> = Vec::new();
     for (file_path, diags) in diagnostics_by_file {
         for diag in diags {
@@ -127,5 +134,6 @@ fn format_sarif(diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>) -> 
             "results": results,
         }]
     });
-    serde_json::to_string_pretty(&sarif).unwrap_or_else(|_| "{}".to_string())
+    serde_json::to_string_pretty(&sarif)
+        .map_err(|err| format!("failed to serialize SARIF output: {err}"))
 }

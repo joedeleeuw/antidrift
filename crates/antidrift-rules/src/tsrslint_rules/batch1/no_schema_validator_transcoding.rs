@@ -61,7 +61,7 @@ impl NoSchemaValidatorTranscoding {
         let Some(key_name) = tsrs_kernel::property_name_text(assignment.name()) else {
             return;
         };
-        if !matches!(key_name.as_str(), "args" | "returns") {
+        if !matches!(key_name, "args" | "returns") {
             return;
         }
         if boundary::is_json_schema_conversion_result(ctx.checker, assignment.initializer(), 4) {

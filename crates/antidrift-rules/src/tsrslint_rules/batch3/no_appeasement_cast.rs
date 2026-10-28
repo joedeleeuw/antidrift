@@ -8,30 +8,9 @@ use tsrslint::utils::{
     union_type_parts,
 };
 
-fn assertion_parts(node: P<Node>) -> Option<(P<Node>, P<Node>)> {
-    match node.kind() {
-        Kind::AsExpression => {
-            let as_expr = node.as_as_expression();
-            Some((as_expr.expression(), as_expr.type_()))
-        }
-        Kind::TypeAssertionExpression => {
-            let assertion = node.as_type_assertion();
-            Some((assertion.expression(), assertion.type_()))
-        }
-        _ => None,
-    }
-}
-
-fn is_const_assertion(type_node: P<Node>) -> bool {
-    if type_node.kind() != Kind::TypeReference {
-        return false;
-    }
-    let type_name = type_node.as_type_reference_node().type_name();
-    ast::is_identifier(type_name) && type_name.as_identifier().text() == "const"
-}
-
 fn is_double_cast_chain(node: P<Node>, operand: P<Node>) -> bool {
-    if let Some((_, inner_type)) = assertion_parts(tsrs_kernel::unwrap_parentheses(operand))
+    if let Some((_, inner_type)) =
+        tsrs_kernel::assertion_parts(tsrs_kernel::unwrap_parentheses(operand))
         && matches!(inner_type.kind(), Kind::AnyKeyword | Kind::UnknownKeyword)
     {
         return true;
@@ -240,10 +219,10 @@ fn is_explicit_any_or_unknown_type_node(checker: &mut Checker, type_node: P<Node
 }
 
 fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
-    let Some((operand, type_node)) = assertion_parts(node) else {
+    let Some((operand, type_node)) = tsrs_kernel::assertion_parts(node) else {
         return;
     };
-    if is_const_assertion(type_node) || is_double_cast_chain(node, operand) {
+    if tsrs_kernel::is_const_assertion(type_node) || is_double_cast_chain(node, operand) {
         return;
     }
     if is_explicit_any_or_unknown_type_node(ctx.checker, type_node)
@@ -272,11 +251,6 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
 }
 
 pub struct NoAppeasementCast;
-
-#[must_use]
-pub fn create(_options: Option<&serde_json::Value>) -> Box<dyn Rule> {
-    Box::new(NoAppeasementCast)
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::AsExpression),

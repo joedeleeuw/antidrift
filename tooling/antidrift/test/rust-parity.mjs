@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { portableCases } from "./portable-cases.mjs";
@@ -25,12 +27,16 @@ const registeredRules = new Set(
     .filter(Boolean)
 );
 
+const batchRuleIds = new Set([
+  "antidrift/no-as-never",
+  "antidrift/no-debug-residue-filenames",
+]);
 const batchInputs = [];
 const expectations = new Map();
 
 for (const entry of portableCases) {
   const fullRuleId = `antidrift/${entry.name}`;
-  if (!registeredRules.has(fullRuleId)) {
+  if (!batchRuleIds.has(fullRuleId)) {
     continue;
   }
   const invalidId = `${entry.name}:invalid`;
@@ -107,13 +113,19 @@ function parseHeadlessOutput(buf) {
 }
 
 function runHeadlessProbe(payload, extraEnv = {}) {
-  const stdoutBuf = execFileSync(binaryPath, ["headless"], {
+  const proc = spawnSync(binaryPath, ["headless"], {
     cwd: repoRoot,
     input: Buffer.from(JSON.stringify(payload), "utf8"),
     env: { ...process.env, ...extraEnv },
     maxBuffer: 32 * 1024 * 1024,
   });
-  return parseHeadlessOutput(stdoutBuf);
+  const parsed = parseHeadlessOutput(proc.stdout ?? Buffer.alloc(0));
+  if (proc.status !== 0) {
+    throw new Error(
+      `Headless process exited with ${proc.status}: ${(proc.stderr ?? Buffer.alloc(0)).toString("utf8")}`
+    );
+  }
+  return parsed;
 }
 
 const probeFileA = resolve(repoRoot, "tooling/antidrift/src/__probe_a.ts");
@@ -199,6 +211,21 @@ const headlessProbes = [
     `,
     expectedCount: 0,
   },
+  {
+    name: "eslint-disable inside string literal does not suppress native antidrift rule",
+    rule: "antidrift/no-compat-names",
+    source: `
+      export const fakeDirective = "/* eslint-disable antidrift/no-compat-names */";
+      export const legacyAdapter = 1;
+    `,
+    expectedCount: 1,
+  },
+  {
+    name: "no-vague-names (duplicate context stem)",
+    rule: "antidrift/no-vague-names",
+    source: "export function loadUserUser() {}\n",
+    expectedCount: 1,
+  },
 ];
 
 for (const probe of headlessProbes) {
@@ -270,6 +297,163 @@ assert.equal(
   `Per-file config isolation failed: ${JSON.stringify(perFileIsolationDiags)}`
 );
 
+assert.ok(
+  registeredRules.has("antidrift/no-vague-names"),
+  "Expected --list-rules to include antidrift/no-vague-names"
+);
+
+const emptyFilesScopeDiags = runHeadlessProbe({
+  version: 2,
+  configs: [
+    {
+      file_paths: [probeFileA],
+      rules: [{ name: "antidrift/no-compat-names", options: [{ files: [] }] }],
+    },
+  ],
+  source_overrides: {
+    [probeFileA]: "export const legacyAdapter = 1;\n",
+  },
+});
+assert.equal(
+  emptyFilesScopeDiags.length,
+  0,
+  `Expected files: [] to match 0 files, got ${JSON.stringify(emptyFilesScopeDiags)}`
+);
+
+assert.throws(
+  () =>
+    runHeadlessProbe({
+      version: 2,
+      configs: [
+        {
+          file_paths: [probeFileA],
+          rules: [
+            {
+              name: "antidrift/react-max-component-props",
+              options: [{ max: 0 }],
+            },
+          ],
+        },
+      ],
+      source_overrides: {
+        [probeFileA]: "export const x = 1;\n",
+      },
+    }),
+  /max must be >= 1/
+);
+
+assert.throws(
+  () =>
+    runHeadlessProbe({
+      version: 2,
+      configs: [
+        {
+          file_paths: [probeFileA],
+          rules: [
+            {
+              name: "antidrift/no-compat-names",
+              options: [{ files: ["["] }],
+            },
+          ],
+        },
+      ],
+      source_overrides: {
+        [probeFileA]: "export const x = 1;\n",
+      },
+    }),
+  /invalid glob/
+);
+
+const missingPathRun = spawnSync(
+  binaryPath,
+  ["nonexistent-smoke-target-file.ts"],
+  {
+    cwd: repoRoot,
+    encoding: "utf8",
+  }
+);
+assert.notEqual(
+  missingPathRun.status,
+  0,
+  "Expected missing CLI path to fail with non-zero exit code"
+);
+
+const tempWorkspace = mkdtempSync(join(tmpdir(), "antidrift-rust-smoke-"));
+try {
+  const kernelSrc = join(tempWorkspace, "crates/antidrift-kernel/src");
+  mkdirSync(kernelSrc, { recursive: true });
+  writeFileSync(
+    join(tempWorkspace, "crates/antidrift-kernel/Cargo.toml"),
+    [
+      "[package]",
+      'name = "antidrift-kernel"',
+      'version = "0.20.0"',
+      "",
+      "[lib]",
+      'path = "src/lib.rs"',
+      "test = false",
+      "",
+      "[lints]",
+      "workspace = true",
+      "",
+    ].join("\n")
+  );
+  writeFileSync(
+    join(kernelSrc, "lib.rs"),
+    "pub mod boundary;\npub mod provenance;\n"
+  );
+  writeFileSync(join(kernelSrc, "boundary.rs"), "pub struct BoundaryItem;\n");
+  writeFileSync(
+    join(kernelSrc, "provenance.rs"),
+    [
+      "use crate::{",
+      "    boundary::BoundaryItem,",
+      "};",
+      "use serde::Deserialize;",
+      "use std::collections::HashMap;",
+      "// forbidden inline comment",
+      "#[derive(Deserialize)]",
+      "pub struct LooseConfig {",
+      "    pub kind: String,",
+      "    pub seen: HashMap<String, bool>,",
+      "    pub item: Option<BoundaryItem>,",
+      "}",
+      "",
+    ].join("\n")
+  );
+  writeFileSync(join(kernelSrc, "orphan_file.rs"), "pub fn unused() {}\n");
+  writeFileSync(join(kernelSrc, "bad_helpers.rs"), "pub fn helper() {}\n");
+
+  const rustSubcmd = spawnSync(binaryPath, ["rust", "--json", tempWorkspace], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(
+    rustSubcmd.status,
+    1,
+    `Expected antidrift-linter rust to exit 1 on violations, got ${rustSubcmd.status}: ${rustSubcmd.stderr}`
+  );
+  const rustDiags = JSON.parse(rustSubcmd.stdout);
+  const reportedRuleIds = new Set(rustDiags.map((diag) => diag.ruleId));
+  for (const expectedRuleId of [
+    "rust/target-manifest-policy",
+    "rust/no-inline-comment",
+    "rust/no-layer-violation",
+    "rust/require-strict-serde",
+    "rust/no-stringly-variant",
+    "rust/no-boolean-map",
+    "rust/no-orphan-module",
+    "rust/no-grab-bag-module",
+  ]) {
+    assert.ok(
+      reportedRuleIds.has(expectedRuleId),
+      `Expected antidrift-linter rust to report ${expectedRuleId}, got ${JSON.stringify(rustDiags)}`
+    );
+  }
+} finally {
+  rmSync(tempWorkspace, { recursive: true, force: true });
+}
+
 console.log(
-  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes verified)`
+  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path & rust linter smokes verified)`
 );

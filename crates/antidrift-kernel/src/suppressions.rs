@@ -5,6 +5,7 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SuppressionCount {
     pub count: usize,
 }
@@ -15,12 +16,6 @@ pub type SuppressionsMap = BTreeMap<String, FileRuleSuppressions>;
 #[derive(Debug, Clone, Default)]
 pub struct SuppressionsTable {
     entries: SuppressionsMap,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SuppressionVerdict {
-    pub unsuppressed_diagnostics: BTreeMap<String, Vec<RuleDiagnostic>>,
-    pub unused_suppressions: Vec<(String, String, usize, usize)>,
 }
 
 impl SuppressionsTable {
@@ -47,31 +42,18 @@ impl SuppressionsTable {
     pub fn evaluate(
         &self,
         diagnostics_by_file: &BTreeMap<String, Vec<RuleDiagnostic>>,
-    ) -> SuppressionVerdict {
+    ) -> BTreeMap<String, Vec<RuleDiagnostic>> {
         let mut unsuppressed_diagnostics: BTreeMap<String, Vec<RuleDiagnostic>> = BTreeMap::new();
-        let mut observed_counts: BTreeMap<(String, String), usize> = BTreeMap::new();
-
         for (file_path, diagnostics) in diagnostics_by_file {
-            self.evaluate_file_diagnostics(
-                file_path,
-                diagnostics,
-                &mut observed_counts,
-                &mut unsuppressed_diagnostics,
-            );
+            self.evaluate_file_diagnostics(file_path, diagnostics, &mut unsuppressed_diagnostics);
         }
-
-        let unused_suppressions = self.collect_unused_suppressions(&observed_counts);
-        SuppressionVerdict {
-            unsuppressed_diagnostics,
-            unused_suppressions,
-        }
+        unsuppressed_diagnostics
     }
 
     fn evaluate_file_diagnostics(
         &self,
         file_path: &str,
         diagnostics: &[RuleDiagnostic],
-        observed_counts: &mut BTreeMap<(String, String), usize>,
         unsuppressed_diagnostics: &mut BTreeMap<String, Vec<RuleDiagnostic>>,
     ) {
         let mut by_rule: BTreeMap<&str, Vec<&RuleDiagnostic>> = BTreeMap::new();
@@ -80,29 +62,18 @@ impl SuppressionsTable {
         }
         for (rule_id, rule_diags) in by_rule {
             let actual = rule_diags.len();
-            observed_counts.insert((file_path.to_string(), rule_id.to_string()), actual);
             let suppressed = self.suppressed_count(file_path, rule_id);
             if actual > suppressed {
                 unsuppressed_diagnostics
                     .entry(file_path.to_string())
                     .or_default()
-                    .extend(rule_diags.into_iter().cloned());
+                    .extend(rule_diags.into_iter().skip(suppressed).cloned());
             }
         }
     }
 
-    fn collect_unused_suppressions(
-        &self,
-        observed_counts: &BTreeMap<(String, String), usize>,
-    ) -> Vec<(String, String, usize, usize)> {
-        let mut unused = Vec::new();
-        for (file_path, rules) in &self.entries {
-            append_unused_for_file(file_path, rules, observed_counts, &mut unused);
-        }
-        unused
-    }
-
-    fn suppressed_count(&self, file_path: &str, rule_id: &str) -> usize {
+    #[must_use]
+    pub fn suppressed_count(&self, file_path: &str, rule_id: &str) -> usize {
         self.entries
             .get(file_path)
             .and_then(|rules| rules.get(rule_id))
@@ -147,23 +118,6 @@ impl SuppressionsTable {
                     .or_default()
                     .insert(rule_id.clone(), SuppressionCount { count });
             }
-        }
-    }
-}
-
-fn append_unused_for_file(
-    file_path: &str,
-    rules: &FileRuleSuppressions,
-    observed_counts: &BTreeMap<(String, String), usize>,
-    unused: &mut Vec<(String, String, usize, usize)>,
-) {
-    for (rule_id, entry) in rules {
-        let actual = observed_counts
-            .get(&(file_path.to_string(), rule_id.clone()))
-            .copied()
-            .unwrap_or(0);
-        if actual < entry.count {
-            unused.push((file_path.to_string(), rule_id.clone(), entry.count, actual));
         }
     }
 }

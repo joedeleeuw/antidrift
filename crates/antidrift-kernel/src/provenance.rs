@@ -193,32 +193,23 @@ pub fn classify_symbol_origin(
     DeclarationOrigin::Unknown
 }
 
-pub fn classify_type_origin(
-    program: &Program,
-    checker: &mut Checker,
-    typ: P<Type>,
-    current_file: Option<P<SourceFile>>,
-) -> DeclarationOrigin {
-    let sym = type_symbol(typ);
-    classify_symbol_origin(program, checker, sym, current_file)
-}
-
 #[must_use]
-pub fn type_name_text(type_name: P<Node>) -> String {
+pub fn type_name_text(type_name: P<Node>) -> Option<&'static str> {
     if ast::is_identifier(type_name) {
-        return type_name.as_identifier().text().to_string();
+        return Some(type_name.as_identifier().text());
     }
     if ast::is_qualified_name(type_name) {
         let qn = type_name.as_qualified_name();
-        let left = type_name_text(qn.left());
-        if !left.is_empty() {
-            return left;
+        if let Some(left) = type_name_text(qn.left())
+            && !left.is_empty()
+        {
+            return Some(left);
         }
         if ast::is_identifier(qn.right()) {
-            return qn.right().as_identifier().text().to_string();
+            return Some(qn.right().as_identifier().text());
         }
     }
-    String::new()
+    None
 }
 
 pub fn collect_type_owner_names(type_node: Option<P<Node>>, names: &mut FxHashSet<String>) {
@@ -228,9 +219,11 @@ pub fn collect_type_owner_names(type_node: Option<P<Node>>, names: &mut FxHashSe
     match node.kind() {
         Kind::TypeReference => {
             let type_ref = node.as_type_reference_node();
-            let name = type_name_text(type_ref.type_name());
-            if !name.is_empty() && !is_builtin_owner_name(&name) {
-                names.insert(name);
+            if let Some(name) = type_name_text(type_ref.type_name())
+                && !name.is_empty()
+                && !is_builtin_owner_name(name)
+            {
+                names.insert(name.to_string());
             }
             if let Some(args) = type_ref.type_arguments() {
                 for &arg in args.nodes() {
@@ -298,12 +291,10 @@ fn is_owned_type_reference_node(
     type_ref: &TypeReferenceNode,
     current_file: Option<P<SourceFile>>,
 ) -> bool {
-    let name = type_name_text(type_ref.type_name());
-    if is_builtin_owner_name(&name) {
-        if matches!(
-            name.as_str(),
-            "Promise" | "PromiseLike" | "Readonly" | "NonNullable"
-        ) && let Some(args) = type_ref.type_arguments()
+    let name = type_name_text(type_ref.type_name()).unwrap_or("");
+    if is_builtin_owner_name(name) {
+        if matches!(name, "Promise" | "PromiseLike" | "Readonly" | "NonNullable")
+            && let Some(args) = type_ref.type_arguments()
             && args.nodes().len() == 1
         {
             return is_owned_contract_type_node(
@@ -417,8 +408,12 @@ fn collect_json_strings(val: &serde_json::Value, out: &mut Vec<String>) {
 }
 
 fn manifest_entries(pkg_path: &std::path::Path) -> Option<Vec<String>> {
-    let text = std::fs::read_to_string(pkg_path).ok()?;
-    let val = serde_json::from_str::<serde_json::Value>(&text).ok()?;
+    let Ok(text) = std::fs::read_to_string(pkg_path) else {
+        return None;
+    };
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return None;
+    };
     let obj = val.as_object()?;
     let mut entries = Vec::new();
     for key in [

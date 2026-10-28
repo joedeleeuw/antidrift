@@ -5,7 +5,7 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OwnedUnionStatus {
     pub owner: String,
     #[serde(default)]
@@ -15,7 +15,7 @@ pub struct OwnedUnionStatus {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DomainRegistry {
     #[serde(default)]
     pub canonical_entities: BTreeMap<String, String>,
@@ -26,7 +26,7 @@ pub struct DomainRegistry {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ApprovedGateway {
     pub wrapper: String,
     #[serde(default)]
@@ -34,14 +34,14 @@ pub struct ApprovedGateway {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GatewaysRegistry {
     #[serde(default)]
     pub approved_gateways: BTreeMap<String, ApprovedGateway>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GeneratedSourceEntry {
     pub generated: String,
     pub wrapper: String,
@@ -52,7 +52,7 @@ pub struct GeneratedSourceEntry {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GeneratedRegistry {
     #[serde(default)]
     pub generated_sources: BTreeMap<String, GeneratedSourceEntry>,
@@ -93,18 +93,9 @@ impl PolicyRegistries {
             raw_registries.insert(stem, value);
         }
 
-        let domain = raw_registries
-            .get("domain")
-            .and_then(|val| serde_json::from_value(val.clone()).ok())
-            .unwrap_or_default();
-        let gateways = raw_registries
-            .get("gateways")
-            .and_then(|val| serde_json::from_value(val.clone()).ok())
-            .unwrap_or_default();
-        let generated = raw_registries
-            .get("generated")
-            .and_then(|val| serde_json::from_value(val.clone()).ok())
-            .unwrap_or_default();
+        let domain = decode_registry(&raw_registries, "domain")?;
+        let gateways = decode_registry(&raw_registries, "gateways")?;
+        let generated = decode_registry(&raw_registries, "generated")?;
 
         Ok(Self {
             domain,
@@ -112,5 +103,16 @@ impl PolicyRegistries {
             generated,
             raw_registries,
         })
+    }
+}
+
+fn decode_registry<T: Default + serde::de::DeserializeOwned>(
+    raw_registries: &BTreeMap<String, Value>,
+    key: &str,
+) -> Result<T, String> {
+    match raw_registries.get(key) {
+        Some(val) => serde_json::from_value(val.clone())
+            .map_err(|err| format!("invalid {key} registry schema: {err}")),
+        None => Ok(T::default()),
     }
 }

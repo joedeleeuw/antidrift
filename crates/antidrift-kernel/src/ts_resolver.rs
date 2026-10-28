@@ -98,7 +98,9 @@ impl TsDeclarationResolver {
             }
         }
         let dt_specifier = definitely_typed_specifier(specifier)?;
-        let resolution = resolver.resolve(containing_dir, &dt_specifier).ok()?;
+        let Ok(resolution) = resolver.resolve(containing_dir, &dt_specifier) else {
+            return None;
+        };
         let resolved_path = resolution.full_path();
         if is_type_or_source_file(&resolved_path) {
             return Some(ResolvedTypeTarget {

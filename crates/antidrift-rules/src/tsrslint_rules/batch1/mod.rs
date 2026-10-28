@@ -7,34 +7,8 @@ pub mod require_convex_return_validator;
 pub mod unknown_input_must_be_decoded;
 pub mod unknown_input_probe;
 
-use serde::de::DeserializeOwned;
+use antidrift_kernel::rule_scope::decode_rule_options;
 use tsrslint::rule::Rule;
-
-pub(crate) fn decode_rule_options<T: DeserializeOwned + Default>(
-    rule_name: &str,
-    options: Option<&serde_json::Value>,
-) -> Result<T, String> {
-    let Some(raw) = options else {
-        return Ok(T::default());
-    };
-    if raw.is_null() {
-        return Ok(T::default());
-    }
-    let target = match raw.as_array() {
-        Some(arr) => {
-            let Some(first) = arr.first() else {
-                return Ok(T::default());
-            };
-            if first.is_null() {
-                return Ok(T::default());
-            }
-            first
-        }
-        None => raw,
-    };
-    serde_json::from_value::<T>(target.clone())
-        .map_err(|err| format!("invalid options for {rule_name}: {err}"))
-}
 
 #[must_use]
 pub fn rules() -> Vec<&'static dyn Rule> {
@@ -75,7 +49,7 @@ pub fn create_rule(
             Ok(Some(Box::new(
                 require_convex_return_validator::RequireConvexReturnValidator::from_options(
                     options,
-                ),
+                )?,
             )))
         }
         no_sql_string_concat::RULE_NAME | "no-sql-string-concat" => Ok(Some(Box::new(

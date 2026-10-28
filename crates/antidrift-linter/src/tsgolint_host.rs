@@ -119,121 +119,13 @@ pub(crate) fn build_shared_host(
     })
 }
 
-fn skip_leading_trivia(source_text: &str, start: usize, end: usize) -> usize {
-    let bytes = source_text.as_bytes();
-    let limit = end.min(bytes.len());
-    let mut pos = start.min(limit);
-    while pos < limit {
-        while pos < limit && matches!(bytes[pos], b' ' | b'\t' | b'\r' | b'\n') {
-            pos += 1;
-        }
-        if pos + 1 < limit && bytes[pos] == b'/' && bytes[pos + 1] == b'/' {
-            pos += 2;
-            while pos < limit && bytes[pos] != b'\n' {
-                pos += 1;
-            }
-        } else if pos + 1 < limit && bytes[pos] == b'/' && bytes[pos + 1] == b'*' {
-            pos += 2;
-            while pos + 1 < limit && !(bytes[pos] == b'*' && bytes[pos + 1] == b'/') {
-                pos += 1;
-            }
-            pos = (pos + 2).min(limit);
-        } else {
-            break;
-        }
-    }
-    pos
-}
-
-fn directive_matches_rule(rest: &str, rule_id: &str) -> bool {
-    let before_desc = rest.split("--").next().unwrap_or(rest).trim();
-    let tokens: Vec<&str> = before_desc
-        .split([',', ' ', '\t'])
-        .map(str::trim)
-        .filter(|tok| !tok.is_empty())
-        .collect();
-    if tokens.is_empty() {
-        return true;
-    }
-    let short = rule_id.strip_prefix("antidrift/").unwrap_or(rule_id);
-    tokens.iter().any(|&tok| tok == rule_id || tok == short)
-}
-
-fn extract_line_comment(line: &str) -> Option<&str> {
-    if let Some((_, after)) = line.split_once("//") {
-        return Some(after.trim());
-    }
-    if let Some((_, after_open)) = line.split_once("/*") {
-        let content = after_open
-            .split_once("*/")
-            .map_or(after_open, |(inner, _)| inner);
-        return Some(content.trim());
-    }
-    None
-}
-
-pub(crate) fn is_inline_disabled(source_text: &str, pos: i32, end: i32, rule_id: &str) -> bool {
-    let start_offset = usize::try_from(pos.max(0)).unwrap_or(0);
-    let end_offset = usize::try_from(end.max(0)).unwrap_or(0);
-    let token_pos = skip_leading_trivia(source_text, start_offset, end_offset);
-    let prefix = source_text.get(..token_pos).unwrap_or(source_text);
-    let target_line = prefix.bytes().filter(|&ch| ch == b'\n').count();
-    let mut block_disabled = false;
-    for (line_idx, line) in source_text.lines().take(target_line + 1).enumerate() {
-        let Some(comment) = extract_line_comment(line) else {
-            continue;
-        };
-        let mut parts = comment.splitn(2, char::is_whitespace);
-        let Some(directive) = parts.next() else {
-            continue;
-        };
-        let rest = parts.next().unwrap_or("");
-        if !directive_matches_rule(rest, rule_id) {
-            continue;
-        }
-        match directive {
-            "eslint-disable-next-line" | "oxlint-disable-next-line"
-                if line_idx + 1 == target_line =>
-            {
-                return true;
-            }
-            "eslint-disable-line" | "oxlint-disable-line" if line_idx == target_line => {
-                return true;
-            }
-            "eslint-disable" | "oxlint-disable" if line_idx <= target_line => {
-                block_disabled = true;
-            }
-            "eslint-enable" | "oxlint-enable" if line_idx <= target_line => {
-                block_disabled = false;
-            }
-            _ => {}
-        }
-    }
-    block_disabled
-}
-
 pub(crate) fn filter_suppressed_diagnostics(
     cwd: &str,
     diagnostics: Vec<Diagnostic>,
 ) -> Result<Vec<Diagnostic>, String> {
     let path = std::path::Path::new(cwd).join("eslint-suppressions.json");
-    let raw = match std::fs::read_to_string(&path) {
-        Ok(content) => content,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(diagnostics),
-        Err(err) => return Err(format!("failed to read {}: {err}", path.display())),
-    };
-    let parsed: serde_json::Value = serde_json::from_str(&raw)
-        .map_err(|err| format!("failed to parse {}: {err}", path.display()))?;
-    let Some(suppressions) = parsed.as_object() else {
-        return Err(format!("invalid {}: expected JSON object", path.display()));
-    };
-    let mut counts: FxHashMap<(String, String), usize> = FxHashMap::default();
-    for diag in &diagnostics {
-        if let Some(fp) = &diag.file_path {
-            let rel = antidrift_kernel::provenance::relative_to_cwd(cwd, fp);
-            *counts.entry((rel, diag.message.id.clone())).or_insert(0) += 1;
-        }
-    }
+    let suppressions = antidrift_kernel::suppressions::SuppressionsTable::load(&path)?;
+    let mut seen_counts: FxHashMap<(String, String), usize> = FxHashMap::default();
     Ok(diagnostics
         .into_iter()
         .filter(|diag| {
@@ -241,21 +133,15 @@ pub(crate) fn filter_suppressed_diagnostics(
                 return true;
             };
             let rel = antidrift_kernel::provenance::relative_to_cwd(cwd, fp);
-            let allowed = suppressions
-                .get(&rel)
-                .and_then(|file_map| file_map.get(&diag.message.id))
-                .and_then(|entry| entry.get("count"))
-                .and_then(serde_json::Value::as_u64)
-                .and_then(|val| usize::try_from(val).ok())
-                .unwrap_or(0);
+            let allowed = suppressions.suppressed_count(&rel, &diag.message.id);
             if allowed == 0 {
                 return true;
             }
-            let actual = counts
-                .get(&(rel, diag.message.id.clone()))
-                .copied()
-                .unwrap_or(0);
-            actual > allowed
+            let seen = seen_counts
+                .entry((rel, diag.message.id.clone()))
+                .and_modify(|count| *count += 1)
+                .or_insert(1);
+            *seen > allowed
         })
         .collect())
 }

@@ -17,10 +17,14 @@ const ANONYMOUS_UTILITY_TYPE_NAMES: &[&str] =
     &["Omit", "Partial", "Pick", "Readonly", "Record", "Required"];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BagReshaperClassification {
-    pub kind: &'static str,
-    pub parameter_name: String,
-    pub target_contract: String,
+pub enum BagReshaperClassification {
+    BagToContract {
+        parameter_name: String,
+        target_contract: String,
+    },
+    BagToBag {
+        parameter_name: String,
+    },
 }
 
 pub fn collect_return_expressions_from_expression(
@@ -67,7 +71,7 @@ fn collect_single_bag_var_decl(
     }
     if ast::is_identifier(name_node) {
         let val_check = inspect_bag_value_expression(init, bag_state, checker);
-        if !val_check.valid || !val_check.reads_bag_field {
+        if !val_check.reads_bag_field() {
             return false;
         }
         let Some(local_sym) = provenance::symbol_at_node(checker, name_node) else {
@@ -160,25 +164,24 @@ fn named_contract_from_type_reference(
     type_node: P<Node>,
     type_ref: &TypeReferenceNode,
     sf: P<SourceFile>,
-) -> String {
+) -> Option<String> {
     let type_name = tsrs_kernel::node_text(sf, type_ref.type_name()).trim();
     if type_name == "Record" {
-        return String::new();
+        return None;
     }
     if ANONYMOUS_UTILITY_TYPE_NAMES.contains(&type_name)
         && let Some(args) = type_ref.type_arguments()
         && args.nodes().len() == 1
         && args.nodes()[0].kind() == Kind::TypeLiteral
     {
-        return String::new();
+        return None;
     }
-    tsrs_kernel::node_text(sf, type_node).trim().to_string()
+    let text = tsrs_kernel::node_text(sf, type_node).trim();
+    (!text.is_empty()).then(|| text.to_string())
 }
 
-fn named_contract_from_type_node(type_node: Option<P<Node>>, sf: P<SourceFile>) -> String {
-    let Some(node) = type_node else {
-        return String::new();
-    };
+fn named_contract_from_type_node(type_node: Option<P<Node>>, sf: P<SourceFile>) -> Option<String> {
+    let node = type_node?;
     match node.kind() {
         Kind::ParenthesizedType => {
             named_contract_from_type_node(Some(node.as_parenthesized_type_node().type_()), sf)
@@ -186,20 +189,22 @@ fn named_contract_from_type_node(type_node: Option<P<Node>>, sf: P<SourceFile>) 
         Kind::TypeReference => {
             named_contract_from_type_reference(node, node.as_type_reference_node(), sf)
         }
-        Kind::IndexedAccessType => tsrs_kernel::node_text(sf, node).trim().to_string(),
+        Kind::IndexedAccessType => {
+            let text = tsrs_kernel::node_text(sf, node).trim();
+            (!text.is_empty()).then(|| text.to_string())
+        }
         Kind::UnionType | Kind::IntersectionType => {
             for &part in tsrs_kernel::union_or_intersection_type_nodes(node) {
                 if is_nullish_or_void_member_type_node(part) {
                     continue;
                 }
-                let name = named_contract_from_type_node(Some(part), sf);
-                if !name.is_empty() {
-                    return name;
+                if let Some(name) = named_contract_from_type_node(Some(part), sf) {
+                    return Some(name);
                 }
             }
-            String::new()
+            None
         }
-        _ => String::new(),
+        _ => None,
     }
 }
 
@@ -268,7 +273,7 @@ pub fn classify_bag_reshaper(
         .or_else(|| container_return_type_node(container_node));
     let mut target_contract = named_contract_from_type_node(declared_return_type, sf);
     for ret_expr in return_expressions {
-        if target_contract.is_empty()
+        if target_contract.is_none()
             && let Some(assertion_type) = explicit_type_node_on_expression(ret_expr)
         {
             target_contract = named_contract_from_type_node(Some(assertion_type), sf);
@@ -280,16 +285,13 @@ pub fn classify_bag_reshaper(
             return None;
         }
     }
-    if !target_contract.is_empty() {
-        return Some(BagReshaperClassification {
-            kind: "bagToContract",
+    if let Some(target_contract) = target_contract {
+        return Some(BagReshaperClassification::BagToContract {
             parameter_name: bag_param.parameter_name,
             target_contract,
         });
     }
-    Some(BagReshaperClassification {
-        kind: "bagToBag",
+    Some(BagReshaperClassification::BagToBag {
         parameter_name: bag_param.parameter_name,
-        target_contract: String::new(),
     })
 }

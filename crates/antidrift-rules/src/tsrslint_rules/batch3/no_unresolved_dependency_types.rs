@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use antidrift_kernel::json_manifest::parse_package_json_manifest;
 use antidrift_kernel::ts_resolver;
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node};
@@ -83,32 +84,24 @@ fn is_package_installed(start_dir: &Path, pkg_name: &str) -> bool {
     false
 }
 
-fn collect_section_deps(
-    obj: &serde_json::Map<String, serde_json::Value>,
-    section: &str,
-    seen: &mut FxHashSet<String>,
-    declared: &mut Vec<String>,
-) {
-    let Some(deps) = obj.get(section).and_then(serde_json::Value::as_object) else {
-        return;
-    };
-    for key in deps.keys() {
-        if seen.insert(key.clone()) {
-            declared.push(key.clone());
-        }
-    }
-}
-
 fn load_manifest_info(file_path: &Path) -> Option<ManifestInfo> {
     let manifest_path = find_nearest_package_json(file_path)?;
     let package_dir = manifest_path.parent()?;
-    let content = std::fs::read_to_string(&manifest_path).ok()?;
-    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let obj = json.as_object()?;
+    let Ok(content) = std::fs::read_to_string(&manifest_path) else {
+        return None;
+    };
+    let manifest = parse_package_json_manifest(&content)?;
     let mut declared = Vec::new();
     let mut seen = FxHashSet::default();
     for section in ["dependencies", "devDependencies", "peerDependencies"] {
-        collect_section_deps(obj, section, &mut seen, &mut declared);
+        let Some(entries) = manifest.sections.get(section) else {
+            continue;
+        };
+        for entry in entries {
+            if seen.insert(entry.key.clone()) {
+                declared.push(entry.key.clone());
+            }
+        }
     }
     let mut missing_by_name = FxHashMap::default();
     let mut installed_by_name = FxHashMap::default();
@@ -227,11 +220,6 @@ fn check_node(ctx: &mut Ctx, node: P<Node>) {
 }
 
 pub struct NoUnresolvedDependencyTypes;
-
-#[must_use]
-pub fn create(_options: Option<&serde_json::Value>) -> Box<dyn Rule> {
-    Box::new(NoUnresolvedDependencyTypes)
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ImportDeclaration),

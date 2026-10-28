@@ -18,7 +18,6 @@ oxc_resolver.workspace = true
 rustc-hash.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-sha2.workspace = true
 tsrs_ast.workspace = true
 tsrs_checker.workspace = true
 tsrs_compiler.workspace = true

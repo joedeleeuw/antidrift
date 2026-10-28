@@ -4,28 +4,6 @@ use tsrs_checker::{Checker, TypeFlags};
 use tsrs_core::P;
 use tsrslint::utils::is_type_flag_set;
 
-pub fn assertion_parts(node: P<Node>) -> Option<(P<Node>, P<Node>)> {
-    match node.kind() {
-        Kind::AsExpression => {
-            let as_expr = node.as_as_expression();
-            Some((as_expr.expression(), as_expr.type_()))
-        }
-        Kind::TypeAssertionExpression => {
-            let assertion = node.as_type_assertion();
-            Some((assertion.expression(), assertion.type_()))
-        }
-        _ => None,
-    }
-}
-
-pub fn is_const_assertion(type_node: P<Node>) -> bool {
-    if type_node.kind() != Kind::TypeReference {
-        return false;
-    }
-    let name = type_node.as_type_reference_node().type_name();
-    ast::is_identifier(name) && name.as_identifier().text() == "const"
-}
-
 pub fn is_const_declaration(decl_node: P<Node>) -> bool {
     decl_node.parent().is_some_and(|parent| {
         parent.kind() == Kind::VariableDeclarationList
@@ -199,8 +177,10 @@ pub fn is_known_value_expression(checker: &mut Checker, expr: P<Node>) -> bool {
         Kind::SatisfiesExpression => {
             is_known_value_expression(checker, node.as_satisfies_expression().expression())
         }
-        Kind::AsExpression | Kind::TypeAssertionExpression => assertion_parts(node)
-            .is_some_and(|(op, t)| is_const_assertion(t) && is_known_value_expression(checker, op)),
+        Kind::AsExpression | Kind::TypeAssertionExpression => tsrs_kernel::assertion_parts(node)
+            .is_some_and(|(op, t)| {
+                tsrs_kernel::is_const_assertion(t) && is_known_value_expression(checker, op)
+            }),
         Kind::NewExpression => {
             let typ = checker.get_type_at_location(node);
             !is_type_flag_set(typ, TypeFlags::AnyOrUnknown)
@@ -279,7 +259,7 @@ pub fn is_mutated_object_binding(
 
 pub fn erased_unknown_source(type_node: Option<P<Node>>, init: P<Node>) -> Option<P<Node>> {
     let unwrapped_init = tsrs_kernel::unwrap_parentheses(init);
-    if let Some((operand, cast_type)) = assertion_parts(unwrapped_init)
+    if let Some((operand, cast_type)) = tsrs_kernel::assertion_parts(unwrapped_init)
         && cast_type.kind() == Kind::UnknownKeyword
     {
         return Some(tsrs_kernel::unwrap_parentheses(operand));
@@ -297,7 +277,7 @@ fn is_laundered_reference(checker: &mut Checker, node: P<Node>) -> bool {
         return boundary::schema_validation_call_parts(parent, checker)
             .is_some_and(|parts| tsrs_kernel::unwrap_parentheses(parts.arg_node) == node);
     }
-    assertion_parts(parent).is_some_and(|(_, t)| t.kind() == Kind::TypeReference)
+    tsrs_kernel::assertion_parts(parent).is_some_and(|(_, t)| t.kind() == Kind::TypeReference)
 }
 
 pub fn has_laundered_unknown_use(
@@ -326,7 +306,7 @@ pub fn is_widened_known_declaration(checker: &mut Checker, decl_node: P<Node>) -
         return false;
     };
     let unwrapped_init = tsrs_kernel::unwrap_parentheses(init);
-    if let Some((operand, cast_type)) = assertion_parts(unwrapped_init)
+    if let Some((operand, cast_type)) = tsrs_kernel::assertion_parts(unwrapped_init)
         && classify_widening_target(cast_type).is_some()
     {
         return is_known_value_expression(checker, operand);

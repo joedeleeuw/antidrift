@@ -150,77 +150,67 @@ pub fn unwrap_transparent_type_node(type_node: P<Node>) -> P<Node> {
     }
 }
 
-fn classify_closed_mapped_type(checker: &mut Checker, mapped: &MappedTypeNode) -> &'static str {
+fn classify_closed_mapped_type(
+    checker: &mut Checker,
+    mapped: &MappedTypeNode,
+) -> Option<&'static str> {
     if mapped.question_token().is_some() {
-        return "";
+        return None;
     }
     let tp_node = mapped.type_parameter();
-    let Some(constraint) = tp_node.as_type_parameter_declaration().constraint() else {
-        return "";
-    };
+    let constraint = tp_node.as_type_parameter_declaration().constraint()?;
     let constraint_type = checker.get_type_from_type_node(constraint);
-    if is_closed_key_domain_type(constraint_type) {
-        "mapped type"
-    } else {
-        ""
-    }
+    is_closed_key_domain_type(constraint_type).then_some("mapped type")
 }
 
 fn classify_closed_type_reference(
     checker: &mut Checker,
     type_ref: &TypeReferenceNode,
     visited: &mut FxHashSet<P<Symbol>>,
-) -> &'static str {
+) -> Option<&'static str> {
     if ast::is_identifier(type_ref.type_name())
         && type_ref.type_name().as_identifier().text() == "Record"
         && let Some(args) = type_ref.type_arguments()
         && args.nodes().len() == 2
     {
         let key_type = checker.get_type_from_type_node(args.nodes()[0]);
-        return if is_closed_key_domain_type(key_type) {
-            "Record<K, V>"
-        } else {
-            ""
-        };
+        return is_closed_key_domain_type(key_type).then_some("Record<K, V>");
     }
-    let Some(sym) = provenance::symbol_at_node(checker, type_ref.type_name()) else {
-        return "";
-    };
+    let sym = provenance::symbol_at_node(checker, type_ref.type_name())?;
     if !visited.insert(sym) {
-        return "";
+        return None;
     }
     for decl in provenance::symbol_declarations(checker, Some(sym)) {
         if decl.kind() == Kind::TypeAliasDeclaration
             && let Some(alias_type) = decl.as_type_alias_declaration().type_()
+            && let Some(matched) =
+                classify_closed_case_table_with_visited(checker, alias_type, visited)
         {
-            let matched = classify_closed_case_table_with_visited(checker, alias_type, visited);
-            if !matched.is_empty() {
-                return matched;
-            }
+            return Some(matched);
         }
     }
-    ""
+    None
 }
 
 fn classify_closed_case_table_with_visited(
     checker: &mut Checker,
     type_node: P<Node>,
     visited: &mut FxHashSet<P<Symbol>>,
-) -> &'static str {
+) -> Option<&'static str> {
     let current = unwrap_transparent_type_node(type_node);
     match current.kind() {
         Kind::MappedType => classify_closed_mapped_type(checker, current.as_mapped_type_node()),
         Kind::TypeReference => {
             classify_closed_type_reference(checker, current.as_type_reference_node(), visited)
         }
-        _ => "",
+        _ => None,
     }
 }
 
 pub fn classify_closed_case_table_annotation(
     checker: &mut Checker,
     type_node: P<Node>,
-) -> &'static str {
+) -> Option<&'static str> {
     let mut visited = FxHashSet::default();
     classify_closed_case_table_with_visited(checker, type_node, &mut visited)
 }

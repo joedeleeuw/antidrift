@@ -167,57 +167,32 @@ pub fn is_domain_file(file_path: &str) -> bool {
 }
 
 #[must_use]
-pub fn is_gateway_file(file_path: &str) -> bool {
-    let normalized = normalize_path(file_path);
-    has_script_ext(&normalized)
-        && path_matches_dir_or_stem(
-            &normalized,
-            &[
-                "gateway",
-                "gateways",
-                "adapter",
-                "adapters",
-                "client",
-                "clients",
-                "infra",
-                "infrastructure",
-            ],
-        )
-}
-
-#[must_use]
-pub fn is_boundary_function_node(node: P<Node>) -> bool {
-    let name = function_name(node);
-    if name.is_empty() {
-        return false;
-    }
-    let lower = name.to_ascii_lowercase();
-    const PREFIXES: &[&str] = &[
-        "parse",
-        "decode",
-        "deserialize",
-        "validate",
-        "fromwire",
-        "fromdto",
-        "fromraw",
-        "fromjson",
-        "fromdb",
-        "fromrow",
-        "fromapi",
-        "toapi",
-        "towire",
-        "todto",
-        "torow",
-        "serialize",
-        "encode",
-        "hydrate",
-    ];
-    PREFIXES.iter().any(|prefix| lower.starts_with(prefix))
-}
-
-#[must_use]
 pub fn unwrap_parentheses(node: P<Node>) -> P<Node> {
     ast::skip_parentheses(node)
+}
+
+#[must_use]
+pub fn assertion_parts(node: P<Node>) -> Option<(P<Node>, P<Node>)> {
+    match node.kind() {
+        Kind::AsExpression => {
+            let as_expr = node.as_as_expression();
+            Some((as_expr.expression(), as_expr.type_()))
+        }
+        Kind::TypeAssertionExpression => {
+            let assertion = node.as_type_assertion();
+            Some((assertion.expression(), assertion.type_()))
+        }
+        _ => None,
+    }
+}
+
+#[must_use]
+pub fn is_const_assertion(type_node: P<Node>) -> bool {
+    if type_node.kind() != Kind::TypeReference {
+        return false;
+    }
+    let name = type_node.as_type_reference_node().type_name();
+    ast::is_identifier(name) && name.as_identifier().text() == "const"
 }
 
 #[must_use]
@@ -283,17 +258,14 @@ pub fn function_node_from_declaration(node: P<Node>) -> Option<P<Node>> {
 }
 
 #[must_use]
-pub fn property_name_text(name: P<Node>) -> Option<String> {
+pub fn property_name_text(name: P<Node>) -> Option<&'static str> {
     match name.kind() {
-        Kind::Identifier => Some(name.as_identifier().text().to_string()),
-        Kind::PrivateIdentifier => Some(
-            name.as_private_identifier()
-                .text()
-                .trim_start_matches('#')
-                .to_string(),
-        ),
+        Kind::Identifier => Some(name.as_identifier().text()),
+        Kind::PrivateIdentifier => {
+            Some(name.as_private_identifier().text().trim_start_matches('#'))
+        }
         Kind::StringLiteral | Kind::NumericLiteral | Kind::NoSubstitutionTemplateLiteral => {
-            Some(name.text().to_string())
+            Some(name.text())
         }
         Kind::ComputedPropertyName => {
             let expr = unwrap_expression(name.as_computed_property_name().expression());
@@ -301,7 +273,7 @@ pub fn property_name_text(name: P<Node>) -> Option<String> {
                 || ast::is_numeric_literal(expr)
                 || ast::is_no_substitution_template_literal(expr)
             {
-                Some(expr.text().to_string())
+                Some(expr.text())
             } else {
                 None
             }
@@ -311,11 +283,11 @@ pub fn property_name_text(name: P<Node>) -> Option<String> {
 }
 
 #[must_use]
-pub fn function_name(node: P<Node>) -> String {
+pub fn function_name(node: P<Node>) -> Option<&'static str> {
     if let Some(name_node) = node.name()
         && let Some(text) = property_name_text(name_node)
     {
-        return text;
+        return Some(text);
     }
     if let Some(parent) = node.parent()
         && matches!(
@@ -325,14 +297,9 @@ pub fn function_name(node: P<Node>) -> String {
         && let Some(name_node) = parent.name()
         && let Some(text) = property_name_text(name_node)
     {
-        return text;
+        return Some(text);
     }
-    String::new()
-}
-
-#[must_use]
-pub fn function_parameters(func: P<Node>) -> &'static [P<Node>] {
-    func.parameters()
+    None
 }
 
 #[must_use]
@@ -347,9 +314,9 @@ pub fn function_body_node(func: P<Node>) -> Option<P<Node>> {
 }
 
 #[must_use]
-pub fn static_member_chain(node: P<Node>) -> Option<(P<Node>, Vec<String>)> {
+pub fn static_member_chain(node: P<Node>) -> Option<(P<Node>, Vec<&'static str>)> {
     let mut current = unwrap_expression(node);
-    let mut members: Vec<String> = Vec::new();
+    let mut members: Vec<&'static str> = Vec::new();
     loop {
         match current.kind() {
             Kind::PropertyAccessExpression => {
@@ -367,7 +334,7 @@ pub fn static_member_chain(node: P<Node>) -> Option<(P<Node>, Vec<String>)> {
                 {
                     return None;
                 }
-                members.push(arg.text().to_string());
+                members.push(arg.text());
                 current = unwrap_expression(elem.expression());
             }
             _ => {
@@ -382,13 +349,13 @@ pub fn static_member_chain(node: P<Node>) -> Option<(P<Node>, Vec<String>)> {
 }
 
 #[must_use]
-pub fn member_chain_root_identifier(node: P<Node>) -> Option<String> {
+pub fn member_chain_root_identifier(node: P<Node>) -> Option<&'static str> {
     let (root, _) = static_member_chain(node)?;
-    ast::is_identifier(root).then(|| root.as_identifier().text().to_string())
+    ast::is_identifier(root).then(|| root.as_identifier().text())
 }
 
 #[must_use]
-pub fn terminal_member_name(node: P<Node>) -> Option<String> {
+pub fn terminal_member_name(node: P<Node>) -> Option<&'static str> {
     let unwrapped = unwrap_expression(node);
     match unwrapped.kind() {
         Kind::PropertyAccessExpression => {
@@ -401,7 +368,7 @@ pub fn terminal_member_name(node: P<Node>) -> Option<String> {
                     .argument_expression(),
             );
             if ast::is_string_literal(arg) || ast::is_no_substitution_template_literal(arg) {
-                Some(arg.text().to_string())
+                Some(arg.text())
             } else {
                 None
             }
@@ -506,16 +473,6 @@ pub fn node_text(sf: P<SourceFile>, node: P<Node>) -> &'static str {
         return "";
     };
     text.get(start_idx..end_idx).unwrap_or("")
-}
-
-#[must_use]
-pub fn base_file_name(file_path: &str) -> String {
-    let normalized = normalize_path(file_path);
-    normalized
-        .rsplit('/')
-        .next()
-        .unwrap_or(&normalized)
-        .to_string()
 }
 
 #[must_use]

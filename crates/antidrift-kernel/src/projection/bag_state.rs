@@ -18,9 +18,41 @@ pub struct BagState {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BagValueCheck {
-    pub valid: bool,
-    pub reads_bag_field: bool,
+pub enum BagValueCheck {
+    #[default]
+    Invalid,
+    ValidLiteral,
+    ReadsBagField,
+}
+
+impl BagValueCheck {
+    #[must_use]
+    pub const fn is_valid(self) -> bool {
+        !matches!(self, Self::Invalid)
+    }
+
+    #[must_use]
+    pub const fn reads_bag_field(self) -> bool {
+        matches!(self, Self::ReadsBagField)
+    }
+
+    #[must_use]
+    pub const fn combine(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Invalid, _) | (_, Self::Invalid) => Self::Invalid,
+            (Self::ReadsBagField, _) | (_, Self::ReadsBagField) => Self::ReadsBagField,
+            (Self::ValidLiteral, Self::ValidLiteral) => Self::ValidLiteral,
+        }
+    }
+
+    #[must_use]
+    pub const fn from_field_read(ok: bool) -> Self {
+        if ok {
+            Self::ReadsBagField
+        } else {
+            Self::Invalid
+        }
+    }
 }
 
 #[must_use]
@@ -270,7 +302,7 @@ fn is_pure_binary_bag_condition(
 
 pub fn is_pure_bag_condition(node: P<Node>, bag_state: &BagState, checker: &mut Checker) -> bool {
     let unwrapped = tsrs_kernel::unwrap_expression(node);
-    if inspect_bag_value_expression(unwrapped, bag_state, checker).valid {
+    if inspect_bag_value_expression(unwrapped, bag_state, checker).is_valid() {
         return true;
     }
     if ast::is_prefix_unary_expression(unwrapped) {
@@ -282,7 +314,7 @@ pub fn is_pure_bag_condition(node: P<Node>, bag_state: &BagState, checker: &mut 
     if unwrapped.kind() == Kind::TypeOfExpression {
         let expr = unwrapped.as_type_of_expression().expression();
         return is_bag_object_reference(expr, bag_state, checker)
-            || inspect_bag_value_expression(expr, bag_state, checker).valid;
+            || inspect_bag_value_expression(expr, bag_state, checker).is_valid();
     }
     if ast::is_binary_expression(unwrapped) {
         return is_pure_binary_bag_condition(unwrapped.as_binary_expression(), bag_state, checker);
@@ -301,12 +333,9 @@ fn inspect_binary_bag_value(
     ) {
         let left = inspect_bag_value_expression(bin.left(), bag_state, checker);
         let right = inspect_bag_value_expression(bin.right(), bag_state, checker);
-        return BagValueCheck {
-            valid: left.valid && right.valid,
-            reads_bag_field: left.reads_bag_field || right.reads_bag_field,
-        };
+        return left.combine(right);
     }
-    BagValueCheck::default()
+    BagValueCheck::Invalid
 }
 
 fn inspect_conditional_bag_value(
@@ -315,14 +344,11 @@ fn inspect_conditional_bag_value(
     checker: &mut Checker,
 ) -> BagValueCheck {
     if !is_pure_bag_condition(cond.condition(), bag_state, checker) {
-        return BagValueCheck::default();
+        return BagValueCheck::Invalid;
     }
     let when_true = inspect_bag_value_expression(cond.when_true(), bag_state, checker);
     let when_false = inspect_bag_value_expression(cond.when_false(), bag_state, checker);
-    BagValueCheck {
-        valid: when_true.valid && when_false.valid,
-        reads_bag_field: when_true.reads_bag_field || when_false.reads_bag_field,
-    }
+    when_true.combine(when_false)
 }
 
 fn inspect_call_bag_value(
@@ -333,16 +359,13 @@ fn inspect_call_bag_value(
     let callee = call.expression();
     let args = call.arguments().nodes();
     if !ast::is_identifier(callee) || args.len() != 1 {
-        return BagValueCheck::default();
+        return BagValueCheck::Invalid;
     }
     if !PRIMITIVE_COERCION_CALLEES.contains(&callee.as_identifier().text()) {
-        return BagValueCheck::default();
+        return BagValueCheck::Invalid;
     }
     let arg_check = inspect_bag_value_expression(args[0], bag_state, checker);
-    BagValueCheck {
-        valid: arg_check.valid && arg_check.reads_bag_field,
-        reads_bag_field: arg_check.reads_bag_field,
-    }
+    BagValueCheck::from_field_read(arg_check.reads_bag_field())
 }
 
 pub fn inspect_bag_value_expression(
@@ -352,27 +375,18 @@ pub fn inspect_bag_value_expression(
 ) -> BagValueCheck {
     let unwrapped = tsrs_kernel::unwrap_expression(node);
     if is_static_scalar_literal(unwrapped) {
-        return BagValueCheck {
-            valid: true,
-            reads_bag_field: false,
-        };
+        return BagValueCheck::ValidLiteral;
     }
     if ast::is_identifier(unwrapped) {
         if let Some(sym) = provenance::symbol_at_node(checker, unwrapped)
             && bag_state.bag_field_symbols.contains(&sym)
         {
-            return BagValueCheck {
-                valid: true,
-                reads_bag_field: true,
-            };
+            return BagValueCheck::ReadsBagField;
         }
-        return BagValueCheck::default();
+        return BagValueCheck::Invalid;
     }
     if is_bag_member_chain(unwrapped, bag_state, checker) {
-        return BagValueCheck {
-            valid: true,
-            reads_bag_field: true,
-        };
+        return BagValueCheck::ReadsBagField;
     }
     match unwrapped.kind() {
         Kind::PrefixUnaryExpression => {
@@ -380,7 +394,7 @@ pub fn inspect_bag_value_expression(
             if prefix.operator() == Kind::ExclamationToken {
                 return inspect_bag_value_expression(prefix.operand(), bag_state, checker);
             }
-            BagValueCheck::default()
+            BagValueCheck::Invalid
         }
         Kind::BinaryExpression => {
             inspect_binary_bag_value(unwrapped.as_binary_expression(), bag_state, checker)
@@ -391,14 +405,10 @@ pub fn inspect_bag_value_expression(
         Kind::CallExpression => {
             inspect_call_bag_value(unwrapped.as_call_expression(), bag_state, checker)
         }
-        Kind::ObjectLiteralExpression => {
-            let nested = inspect_object_literal_bag_projection(unwrapped, bag_state, checker);
-            BagValueCheck {
-                valid: nested,
-                reads_bag_field: nested,
-            }
-        }
-        _ => BagValueCheck::default(),
+        Kind::ObjectLiteralExpression => BagValueCheck::from_field_read(
+            inspect_object_literal_bag_projection(unwrapped, bag_state, checker),
+        ),
+        _ => BagValueCheck::Invalid,
     }
 }
 
@@ -408,32 +418,22 @@ fn inspect_object_literal_property(
     checker: &mut Checker,
 ) -> BagValueCheck {
     match prop_node.kind() {
-        Kind::SpreadAssignment => {
-            let ok = is_bag_object_reference(
-                prop_node.as_spread_assignment().expression(),
-                bag_state,
-                checker,
-            );
-            BagValueCheck {
-                valid: ok,
-                reads_bag_field: ok,
-            }
-        }
+        Kind::SpreadAssignment => BagValueCheck::from_field_read(is_bag_object_reference(
+            prop_node.as_spread_assignment().expression(),
+            bag_state,
+            checker,
+        )),
         Kind::ShorthandPropertyAssignment => {
             let shorthand = prop_node.as_shorthand_property_assignment();
             if let Some(init) = shorthand.object_assignment_initializer()
                 && !is_static_scalar_literal(init)
             {
-                return BagValueCheck::default();
+                return BagValueCheck::Invalid;
             }
             let Some(sym) = provenance::symbol_at_node(checker, shorthand.name()) else {
-                return BagValueCheck::default();
+                return BagValueCheck::Invalid;
             };
-            let ok = bag_state.bag_field_symbols.contains(&sym);
-            BagValueCheck {
-                valid: ok,
-                reads_bag_field: ok,
-            }
+            BagValueCheck::from_field_read(bag_state.bag_field_symbols.contains(&sym))
         }
         Kind::PropertyAssignment => {
             let pa = prop_node.as_property_assignment();
@@ -441,11 +441,11 @@ fn inspect_object_literal_property(
             if name_node.kind() == Kind::ComputedPropertyName
                 && !is_static_scalar_literal(name_node.as_computed_property_name().expression())
             {
-                return BagValueCheck::default();
+                return BagValueCheck::Invalid;
             }
             inspect_bag_value_expression(pa.initializer(), bag_state, checker)
         }
-        _ => BagValueCheck::default(),
+        _ => BagValueCheck::Invalid,
     }
 }
 
@@ -467,10 +467,10 @@ pub fn inspect_object_literal_bag_projection(
     let mut bag_field_read_count = 0usize;
     for &prop_node in props {
         let check = inspect_object_literal_property(prop_node, bag_state, checker);
-        if !check.valid {
+        if !check.is_valid() {
             return false;
         }
-        if check.reads_bag_field {
+        if check.reads_bag_field() {
             bag_field_read_count += 1;
         }
     }

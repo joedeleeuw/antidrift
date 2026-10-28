@@ -18,7 +18,7 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
     let cwd = std::env::current_dir()
         .map_err(|err| format!("failed to read current directory: {err}"))?;
     let registries = PolicyRegistries::load_from_repo(&cwd)?;
-    let files = collect_lintable_files(&args.paths, &cwd);
+    let files = collect_lintable_files(&args.paths, &cwd)?;
     let rules = all_rules();
     let active_rules = BTreeMap::new();
     let settings = Value::Null;
@@ -27,8 +27,9 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
 
     let per_file_results: Vec<(String, Vec<RuleDiagnostic>, Vec<SemanticFact>)> = files
         .par_iter()
-        .filter_map(|path| {
-            let source_text = fs::read_to_string(path).ok()?;
+        .map(|path| {
+            let source_text = fs::read_to_string(path)
+                .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
             let rel_path = path
                 .strip_prefix(&cwd)
                 .unwrap_or(path)
@@ -47,11 +48,12 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
             if args.fix
                 && let Some(fixed) = apply_fixes(&source_text, &output.diagnostics)
             {
-                let _ = fs::write(path, fixed);
+                fs::write(path, fixed)
+                    .map_err(|err| format!("failed to write {}: {err}", path.display()))?;
             }
-            Some((rel_path, output.diagnostics, output.facts))
+            Ok((rel_path, output.diagnostics, output.facts))
         })
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
 
     let mut diagnostics_by_file: BTreeMap<String, Vec<RuleDiagnostic>> = BTreeMap::new();
     let mut all_facts: Vec<SemanticFact> = Vec::new();
@@ -85,12 +87,12 @@ fn handle_suppressions_and_format(
         return Ok(0);
     }
 
-    let verdict = suppressions.evaluate(diagnostics_by_file);
-    let formatted = format_diagnostics(args.format, &verdict.unsuppressed_diagnostics);
+    let unsuppressed_diagnostics = suppressions.evaluate(diagnostics_by_file);
+    let formatted = format_diagnostics(args.format, &unsuppressed_diagnostics)?;
     if !formatted.is_empty() {
         print!("{formatted}");
     }
-    if !verdict.unsuppressed_diagnostics.is_empty() {
+    if !unsuppressed_diagnostics.is_empty() {
         return Ok(1);
     }
     Ok(0)
@@ -105,12 +107,12 @@ fn write_semantic_facts(path: &Path, facts: &[SemanticFact]) -> Result<(), Strin
     }
     let mut buf = String::new();
     for fact in facts {
-        buf.push_str(&semantic_fact_to_json_line(fact));
+        buf.push_str(&semantic_fact_to_json_line(fact)?);
     }
     fs::write(path, buf).map_err(|err| format!("failed to write {}: {err}", path.display()))
 }
 
-fn collect_lintable_files(paths: &[PathBuf], cwd: &Path) -> Vec<PathBuf> {
+fn collect_lintable_files(paths: &[PathBuf], cwd: &Path) -> Result<Vec<PathBuf>, String> {
     let mut collected = Vec::new();
     for root in paths {
         let full = if root.is_absolute() {
@@ -118,6 +120,9 @@ fn collect_lintable_files(paths: &[PathBuf], cwd: &Path) -> Vec<PathBuf> {
         } else {
             cwd.join(root)
         };
+        if !full.exists() {
+            return Err(format!("path does not exist: {}", root.display()));
+        }
         if full.is_file() {
             if is_supported_file(&full) {
                 collected.push(full);
@@ -125,7 +130,8 @@ fn collect_lintable_files(paths: &[PathBuf], cwd: &Path) -> Vec<PathBuf> {
             continue;
         }
         let walker = WalkBuilder::new(&full).standard_filters(true).build();
-        for entry in walker.flatten() {
+        for entry in walker {
+            let entry = entry.map_err(|err| format!("failed to walk {}: {err}", full.display()))?;
             let path = entry.path();
             if path.is_file() && is_supported_file(path) {
                 collected.push(path.to_path_buf());
@@ -134,7 +140,7 @@ fn collect_lintable_files(paths: &[PathBuf], cwd: &Path) -> Vec<PathBuf> {
     }
     collected.sort();
     collected.dedup();
-    collected
+    Ok(collected)
 }
 
 fn is_supported_file(path: &Path) -> bool {

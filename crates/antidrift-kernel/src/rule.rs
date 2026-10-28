@@ -2,7 +2,7 @@ use crate::diagnostic::{RuleDiagnostic, RuleFix, Severity};
 use crate::directives::DirectiveSet;
 use crate::json_manifest::{PackageJsonManifest, parse_package_json_manifest};
 use crate::registries::PolicyRegistries;
-use crate::semantic_facts::{SemanticFact, SemanticFactInput, build_semantic_fact};
+use crate::semantic_facts::SemanticFact;
 use crate::span_index::LineIndex;
 use crate::ts_resolver::TsDeclarationResolver;
 use oxc::allocator::Allocator;
@@ -14,46 +14,10 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "file role flags are independent orthogonal predicates"
-)]
-pub struct FileRole {
-    pub is_test: bool,
-    pub is_domain: bool,
-    pub is_shared: bool,
-    pub is_declaration: bool,
-    pub is_package_json: bool,
-}
-
-impl FileRole {
-    #[must_use]
-    pub fn from_path(file_path: &str) -> Self {
-        let normalized = file_path.replace('\\', "/");
-        let file_name = normalized.rsplit('/').next().unwrap_or(&normalized);
-        let is_test = file_name.contains(".test.")
-            || file_name.contains(".spec.")
-            || normalized.contains("/__tests__/")
-            || normalized.starts_with("__tests__/");
-        let is_domain = normalized.starts_with("domain/")
-            || normalized.starts_with("model/")
-            || normalized.contains("/domain/")
-            || normalized.contains("/model/");
-        let is_shared =
-            normalized.starts_with("packages/shared/") || normalized.contains("/packages/shared/");
-        let is_declaration = file_name.ends_with(".d.ts")
-            || file_name.ends_with(".d.mts")
-            || file_name.ends_with(".d.cts");
-        let is_package_json = file_name == "package.json";
-        Self {
-            is_test,
-            is_domain,
-            is_shared,
-            is_declaration,
-            is_package_json,
-        }
-    }
+fn is_package_json_path(file_path: &str) -> bool {
+    let normalized = file_path.replace('\\', "/");
+    let file_name = normalized.rsplit('/').next().unwrap_or(&normalized);
+    file_name == "package.json"
 }
 
 #[derive(Debug, Clone)]
@@ -64,21 +28,10 @@ pub struct ReportDiagnostic {
     pub fix: Option<RuleFix>,
 }
 
-#[derive(Debug, Clone)]
-pub struct EmitFactRequest {
-    pub span: Span,
-    pub fact_kind: String,
-    pub adapter_id: String,
-    pub confidence: String,
-    pub provenance: Vec<String>,
-    pub payload: Value,
-}
-
 pub struct RuleContext<'a, 'b> {
     pub file_path: &'b str,
     pub source_text: &'a str,
     pub line_index: &'b LineIndex,
-    pub role: FileRole,
     pub program: Option<&'b Program<'a>>,
     pub semantic: Option<&'b Semantic<'a>>,
     pub package_json: Option<&'b PackageJsonManifest>,
@@ -89,17 +42,9 @@ pub struct RuleContext<'a, 'b> {
     active_rule_id: &'static str,
     active_severity: Severity,
     diagnostics: &'b mut Vec<RuleDiagnostic>,
-    facts: &'b mut Vec<SemanticFact>,
 }
 
-impl<'a> RuleContext<'a, '_> {
-    #[must_use]
-    pub fn span_text(&self, span: Span) -> &'a str {
-        let start = usize::try_from(span.start).unwrap_or(0);
-        let end = usize::try_from(span.end).unwrap_or(0);
-        self.source_text.get(start..end).unwrap_or("")
-    }
-
+impl RuleContext<'_, '_> {
     pub fn report(&mut self, report: ReportDiagnostic) {
         let location = self
             .line_index
@@ -113,25 +58,6 @@ impl<'a> RuleContext<'a, '_> {
             location,
             fix: report.fix,
         });
-    }
-
-    pub fn emit_fact(&mut self, request: EmitFactRequest) {
-        let location = Some(
-            self.line_index
-                .fact_location(self.source_text, request.span),
-        );
-        let fact = build_semantic_fact(SemanticFactInput {
-            fact_kind: request.fact_kind,
-            rule_id: self.active_rule_id.to_string(),
-            adapter_id: request.adapter_id,
-            confidence: request.confidence,
-            provenance: request.provenance,
-            file_path: self.file_path.to_string(),
-            location,
-            source_text: Some(self.source_text.to_string()),
-            payload: request.payload,
-        });
-        self.facts.push(fact);
     }
 }
 
@@ -168,19 +94,17 @@ pub struct LintFileOutput {
 #[must_use]
 pub fn lint_file(request: &LintFileRequest<'_>, rules: &[Box<dyn Rule>]) -> LintFileOutput {
     let line_index = LineIndex::new(request.source_text);
-    let role = FileRole::from_path(request.file_path);
     let mut diagnostics = Vec::new();
-    let mut facts = Vec::new();
+    let facts = Vec::new();
 
-    if role.is_package_json {
+    if is_package_json_path(request.file_path) {
         let manifest = parse_package_json_manifest(request.source_text);
         run_active_rules(
             request,
             rules,
             &line_index,
-            role,
-            (None, None, manifest.as_ref()),
-            (&mut diagnostics, &mut facts),
+            ParsedRuleInput::Package(manifest.as_ref()),
+            &mut diagnostics,
         );
         return LintFileOutput { diagnostics, facts };
     }
@@ -189,6 +113,21 @@ pub fn lint_file(request: &LintFileRequest<'_>, rules: &[Box<dyn Rule>]) -> Lint
     let source_type =
         SourceType::from_path(Path::new(request.file_path)).unwrap_or_else(|_| SourceType::tsx());
     let parsed = Parser::new(&allocator, request.source_text, source_type).parse();
+    for parse_err in &parsed.diagnostics {
+        let span = parse_err.labels.first().map_or(Span::new(0, 0), |label| {
+            let start = label.offset();
+            Span::new(start, start.saturating_add(label.len()))
+        });
+        diagnostics.push(RuleDiagnostic {
+            rule_id: "syntax-error".to_string(),
+            message_id: Some("syntaxError".to_string()),
+            message: parse_err.message.to_string(),
+            severity: Severity::Error,
+            span,
+            location: line_index.diagnostic_location(request.source_text, span),
+            fix: None,
+        });
+    }
     let semantic_ret = SemanticBuilder::new().with_cfg(true).build(&parsed.program);
     let mut directive_set =
         DirectiveSet::from_comments(&parsed.program.comments, request.source_text, &line_index);
@@ -197,9 +136,11 @@ pub fn lint_file(request: &LintFileRequest<'_>, rules: &[Box<dyn Rule>]) -> Lint
         request,
         rules,
         &line_index,
-        role,
-        (Some(&parsed.program), Some(&semantic_ret.semantic), None),
-        (&mut diagnostics, &mut facts),
+        ParsedRuleInput::Script {
+            program: &parsed.program,
+            semantic: &semantic_ret.semantic,
+        },
+        &mut diagnostics,
     );
 
     let filtered = directive_set.filter_diagnostics(
@@ -214,20 +155,26 @@ pub fn lint_file(request: &LintFileRequest<'_>, rules: &[Box<dyn Rule>]) -> Lint
     }
 }
 
+#[derive(Clone, Copy)]
+enum ParsedRuleInput<'a> {
+    Package(Option<&'a PackageJsonManifest>),
+    Script {
+        program: &'a Program<'a>,
+        semantic: &'a Semantic<'a>,
+    },
+}
+
 fn run_active_rules<'a>(
     request: &LintFileRequest<'a>,
     rules: &[Box<dyn Rule>],
     line_index: &LineIndex,
-    role: FileRole,
-    parsed: (
-        Option<&Program<'a>>,
-        Option<&Semantic<'a>>,
-        Option<&PackageJsonManifest>,
-    ),
-    outputs: (&mut Vec<RuleDiagnostic>, &mut Vec<SemanticFact>),
+    parsed: ParsedRuleInput<'a>,
+    diagnostics: &mut Vec<RuleDiagnostic>,
 ) {
-    let (program, semantic, package_json) = parsed;
-    let (diagnostics, facts) = outputs;
+    let (program, semantic, package_json) = match parsed {
+        ParsedRuleInput::Package(pkg) => (None, None, pkg),
+        ParsedRuleInput::Script { program, semantic } => (Some(program), Some(semantic), None),
+    };
     let empty_options = Value::Null;
 
     for rule in rules {
@@ -248,7 +195,6 @@ fn run_active_rules<'a>(
             file_path: request.file_path,
             source_text: request.source_text,
             line_index,
-            role,
             program,
             semantic,
             package_json,
@@ -259,7 +205,6 @@ fn run_active_rules<'a>(
             active_rule_id: rule.id(),
             active_severity: severity,
             diagnostics,
-            facts,
         };
         rule.run(&mut ctx);
     }

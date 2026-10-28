@@ -27,6 +27,21 @@ pub struct UnknownInputOptions {
     pub defensive_shape_probe_threshold: Option<usize>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BoundarySourceKind {
+    Json,
+    HttpBody,
+}
+
+impl BoundarySourceKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::HttpBody => "http-body",
+        }
+    }
+}
+
 pub struct UnknownInputMustBeDecoded {
     pub(super) probe_threshold: usize,
 }
@@ -288,12 +303,13 @@ impl UnknownInputMustBeDecoded {
             return;
         };
         let target_str = type_to_string(ctx.checker, target_type);
+        let source_label = source_kind.as_str();
         ctx.report_node(
             sink_node,
             RuleMessage::new(
                 "unknown-input-must-be-decoded",
                 format!(
-                    "Untrusted {source_kind} input reaches '{target_str}' without a runtime decode or proving type guard."
+                    "Untrusted {source_label} input reaches '{target_str}' without a runtime decode or proving type guard."
                 ),
             ),
         );
@@ -303,7 +319,7 @@ impl UnknownInputMustBeDecoded {
         expr: P<Node>,
         program: &Program,
         checker: &mut Checker,
-    ) -> Option<&'static str> {
+    ) -> Option<BoundarySourceKind> {
         let unwrapped = tsrs_kernel::unwrap_awaited_expression(expr);
         if unwrapped.kind() == Kind::CallExpression {
             return Self::direct_boundary_call_kind(unwrapped, program, checker);
@@ -331,9 +347,9 @@ impl UnknownInputMustBeDecoded {
         call_node: P<Node>,
         program: &Program,
         checker: &mut Checker,
-    ) -> Option<&'static str> {
+    ) -> Option<BoundarySourceKind> {
         if boundary::is_global_json_parse(Some(program), checker, call_node) {
-            return Some("json");
+            return Some(BoundarySourceKind::Json);
         }
         let callee = tsrs_kernel::unwrap_expression(call_node.as_call_expression().expression());
         if callee.kind() != Kind::PropertyAccessExpression {
@@ -346,6 +362,7 @@ impl UnknownInputMustBeDecoded {
         }
         let receiver_type = checker.get_type_at_location(prop.expression());
         let sym = receiver_type.symbol()?;
-        matches!(sym.name(), "Response" | "Request" | "Body" | "BodyMixin").then_some("http-body")
+        matches!(sym.name(), "Response" | "Request" | "Body" | "BodyMixin")
+            .then_some(BoundarySourceKind::HttpBody)
     }
 }

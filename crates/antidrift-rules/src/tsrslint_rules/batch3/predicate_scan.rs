@@ -27,15 +27,15 @@ pub fn unit_literal_key(typ: P<Type>) -> Option<String> {
 
 #[derive(Default)]
 pub struct BodyScanState {
-    pub param_names: FxHashSet<String>,
-    pub alias_paths: FxHashMap<String, Vec<String>>,
-    pub destructured_aliases: FxHashMap<String, String>,
-    pub checked_props: FxHashSet<String>,
-    pub checked_paths: FxHashSet<String>,
-    pub checked_path_list: Vec<String>,
-    pub tag_literals: FxHashMap<String, FxHashSet<String>>,
-    pub tag_fields: Vec<String>,
-    pub proven: bool,
+    pub(super) param_names: FxHashSet<String>,
+    pub(super) alias_paths: FxHashMap<String, Vec<String>>,
+    pub(super) destructured_aliases: FxHashMap<String, String>,
+    pub(super) checked_props: FxHashSet<String>,
+    pub(super) checked_paths: FxHashSet<String>,
+    pub(super) checked_path_list: Vec<String>,
+    pub(super) tag_literals: FxHashMap<String, FxHashSet<String>>,
+    pub(super) tag_fields: Vec<String>,
+    pub(super) proven: bool,
 }
 
 impl BodyScanState {
@@ -67,12 +67,12 @@ impl BodyScanState {
         }
         if let Some((target, prop_name)) = reflect_get_parts(unwrapped) {
             let mut base = self.path_of(target)?;
-            base.push(prop_name);
+            base.push(prop_name.to_string());
             return Some(base);
         }
         let (root, chain) = tsrs_kernel::static_member_chain(unwrapped)?;
         let mut base = self.path_of(root)?;
-        base.extend(chain);
+        base.extend(chain.into_iter().map(str::to_string));
         Some(base)
     }
 
@@ -81,7 +81,7 @@ impl BodyScanState {
     }
 }
 
-fn reflect_get_parts(node: P<Node>) -> Option<(P<Node>, String)> {
+fn reflect_get_parts(node: P<Node>) -> Option<(P<Node>, &'static str)> {
     if !ast::is_call_expression(node) {
         return None;
     }
@@ -94,7 +94,7 @@ fn reflect_get_parts(node: P<Node>) -> Option<(P<Node>, String)> {
     let recv = tsrs_kernel::unwrap_expression(prop.expression());
     if !ast::is_identifier(recv)
         || recv.as_identifier().text() != "Reflect"
-        || tsrs_kernel::property_name_text(prop.name()).as_deref() != Some("get")
+        || tsrs_kernel::property_name_text(prop.name()) != Some("get")
     {
         return None;
     }
@@ -116,7 +116,7 @@ fn record_binding_elements(pattern: P<Node>, state: &mut BodyScanState) {
         let prop = bind
             .property_name()
             .and_then(tsrs_kernel::property_name_text)
-            .unwrap_or_else(|| local.clone());
+            .map_or_else(|| local.clone(), str::to_string);
         state.destructured_aliases.insert(local, prop);
     }
 }
@@ -219,7 +219,7 @@ fn check_delegated_predicate_call(
     if ast::is_property_access_expression(callee) {
         let method_node = callee.as_property_access_expression().name();
         if matches!(
-            tsrs_kernel::property_name_text(method_node).as_deref(),
+            tsrs_kernel::property_name_text(method_node),
             Some("parse" | "parseAsync" | "safeParse")
         ) && boundary::is_zod_method(checker, method_node)
         {
@@ -242,7 +242,7 @@ fn check_has_own_probe(callee: P<Node>, args: &[P<Node>], state: &mut BodyScanSt
     }
     let prop = callee.as_property_access_expression();
     if !matches!(
-        tsrs_kernel::property_name_text(prop.name()).as_deref(),
+        tsrs_kernel::property_name_text(prop.name()),
         Some("hasOwn" | "hasOwnProperty")
     ) {
         return false;
@@ -262,7 +262,7 @@ fn check_has_own_probe(callee: P<Node>, args: &[P<Node>], state: &mut BodyScanSt
     let Some(key) = tsrs_kernel::property_name_text(tsrs_kernel::unwrap_expression(key_arg)) else {
         return false;
     };
-    base.push(key);
+    base.push(key.to_string());
     state.record_path(&base);
     true
 }
@@ -363,7 +363,7 @@ fn visit_binary_in_body(
                 && let Some(key) =
                     tsrs_kernel::property_name_text(tsrs_kernel::unwrap_expression(left))
             {
-                base.push(key);
+                base.push(key.to_string());
                 state.record_path(&base);
             }
         }

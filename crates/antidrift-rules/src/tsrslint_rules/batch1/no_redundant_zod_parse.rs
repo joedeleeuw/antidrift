@@ -54,16 +54,15 @@ impl NoRedundantZodParse {
         if let Some(reshape) =
             projection::classify_inline_parse_reshape(parts.arg_node, ctx.checker)
         {
-            let message = if reshape.kind == "inlineConditionalReshape" {
-                format!(
+            let message = match reshape.kind {
+                projection::InlineParseReshapeKind::Conditional => format!(
                     "Do not branch on or default fields inside `.{}(...)` over `{}`; move coercion, defaults, and shape normalization into the schema definition or boundary decoder.",
                     parts.method, reshape.source
-                )
-            } else {
-                format!(
+                ),
+                projection::InlineParseReshapeKind::Object => format!(
                     "Do not rebuild `{}` field-by-field inside `.{}(...)`; parse the boundary payload directly with the schema or move normalization into the schema definition.",
                     reshape.source, parts.method
-                )
+                ),
             };
             ctx.report_node(
                 parts.arg_node,

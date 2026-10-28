@@ -1,12 +1,30 @@
+use antidrift_kernel::rule_scope::decode_rule_options;
 use antidrift_kernel::tsrs_kernel;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
+use serde::Deserialize;
 use tsrs_ast::{Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor, options_object};
+use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
-use super::structural_type_fork_helpers::{
+use super::structural_fork_analysis::{
     check_redundant_local_return, check_structural_fork_declaration, has_modifier,
 };
+
+const RULE_NAME: &str = "antidrift/no-structural-type-fork";
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+struct RawFieldBlockConfig {
+    min_shared_fields: Option<usize>,
+    min_shapes: Option<usize>,
+    min_redundant_declarations: Option<usize>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+struct StructuralTypeForkOptions {
+    field_blocks: RawFieldBlockConfig,
+}
 
 #[derive(Clone, Copy)]
 pub struct FieldBlockConfig {
@@ -38,25 +56,39 @@ pub static RULE: NoStructuralTypeFork = NoStructuralTypeFork {
     },
 };
 
+fn validate_positive_threshold(
+    field: &str,
+    value: Option<usize>,
+    default: usize,
+) -> Result<usize, String> {
+    let resolved = value.unwrap_or(default);
+    if resolved == 0 {
+        return Err(format!(
+            "invalid options for {RULE_NAME}: {field} must be >= 1"
+        ));
+    }
+    Ok(resolved)
+}
+
 impl NoStructuralTypeFork {
-    #[must_use]
-    pub fn from_options(options: Option<&serde_json::Value>) -> Self {
-        let opts = options_object(options);
-        let fb = opts
-            .get("fieldBlocks")
-            .and_then(serde_json::Value::as_object);
-        let read_usize = |key: &str, default: usize| -> usize {
-            fb.and_then(|map| map.get(key))
-                .and_then(serde_json::Value::as_u64)
-                .map_or(default, |val| (val as usize).max(1))
-        };
-        Self {
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        let parsed = decode_rule_options::<StructuralTypeForkOptions>(RULE_NAME, options)?;
+        let fb = parsed.field_blocks;
+        Ok(Self {
             field_blocks: FieldBlockConfig {
-                min_shared_fields: read_usize("minSharedFields", 2),
-                min_shapes: read_usize("minShapes", 2),
-                min_redundant_declarations: read_usize("minRedundantDeclarations", 3),
+                min_shared_fields: validate_positive_threshold(
+                    "fieldBlocks.minSharedFields",
+                    fb.min_shared_fields,
+                    2,
+                )?,
+                min_shapes: validate_positive_threshold("fieldBlocks.minShapes", fb.min_shapes, 2)?,
+                min_redundant_declarations: validate_positive_threshold(
+                    "fieldBlocks.minRedundantDeclarations",
+                    fb.min_redundant_declarations,
+                    3,
+                )?,
             },
-        }
+        })
     }
 }
 
@@ -255,7 +287,7 @@ impl Rule for NoStructuralTypeFork {
         Box::new(Visitor {
             field_blocks: self.field_blocks,
             shapes: Vec::new(),
-            seen_type_literals: FxHashMap::default(),
+            seen_type_literals: FxHashSet::default(),
         })
     }
 }
@@ -263,7 +295,7 @@ impl Rule for NoStructuralTypeFork {
 struct Visitor {
     field_blocks: FieldBlockConfig,
     shapes: Vec<ShapeEntry>,
-    seen_type_literals: FxHashMap<P<Node>, bool>,
+    seen_type_literals: FxHashSet<P<Node>>,
 }
 
 fn is_valid_type_literal_parent(parent: P<Node>) -> bool {
@@ -295,7 +327,7 @@ impl Visitor {
     }
 
     fn record_type_literal_shape(&mut self, ctx: &Ctx, node: P<Node>) {
-        if self.seen_type_literals.insert(node, true).is_some() {
+        if !self.seen_type_literals.insert(node) {
             return;
         }
         let Some(parent) = node.parent() else {

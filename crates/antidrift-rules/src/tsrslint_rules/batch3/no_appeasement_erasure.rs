@@ -3,11 +3,11 @@ use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
-use super::erasure_helpers::{
-    assertion_parts, classify_widening_target, erased_unknown_source, has_laundered_unknown_use,
-    is_const_assertion, is_const_declaration, is_empty_container_literal,
-    is_known_value_expression, is_mutated_object_binding, is_populated_case_table_object,
-    is_widened_known_declaration, skip_parentheses_up,
+use super::erasure_analysis::{
+    classify_widening_target, erased_unknown_source, has_laundered_unknown_use,
+    is_const_declaration, is_empty_container_literal, is_known_value_expression,
+    is_mutated_object_binding, is_populated_case_table_object, is_widened_known_declaration,
+    skip_parentheses_up,
 };
 
 fn check_case_table_annotation(
@@ -20,10 +20,9 @@ fn check_case_table_annotation(
     if !is_populated_case_table_object(init) {
         return false;
     }
-    let kind = shape::classify_closed_case_table_annotation(ctx.checker, type_node);
-    if kind.is_empty() {
+    let Some(kind) = shape::classify_closed_case_table_annotation(ctx.checker, type_node) else {
         return false;
-    }
+    };
     let Some(sym) = ctx.checker.get_symbol_at_location_exported(name_node) else {
         return false;
     };
@@ -166,7 +165,7 @@ fn extract_root_ident(operand: P<Node>) -> Option<P<Node>> {
 
 fn check_widen_then_assert(ctx: &mut Ctx, node: P<Node>, operand: P<Node>, type_node: P<Node>) {
     if matches!(type_node.kind(), Kind::AnyKeyword | Kind::UnknownKeyword)
-        || is_const_assertion(type_node)
+        || tsrs_kernel::is_const_assertion(type_node)
     {
         return;
     }
@@ -225,7 +224,7 @@ fn is_laundered_unknown_initializer(ctx: &mut Ctx, node: P<Node>, type_node: P<N
 }
 
 fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
-    let Some((operand, type_node)) = assertion_parts(node) else {
+    let Some((operand, type_node)) = tsrs_kernel::assertion_parts(node) else {
         return;
     };
     if is_laundered_unknown_initializer(ctx, node, type_node) {
@@ -244,11 +243,6 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
 }
 
 pub struct NoAppeasementErasure;
-
-#[must_use]
-pub fn create(_options: Option<&serde_json::Value>) -> Box<dyn Rule> {
-    Box::new(NoAppeasementErasure)
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::VariableDeclaration),

@@ -1,6 +1,7 @@
 use antidrift_kernel::diagnostic::{RuleDiagnostic, Severity, apply_fixes};
 use antidrift_kernel::registries::PolicyRegistries;
 use antidrift_kernel::rule::{LintFileRequest, RuleActivation, lint_file};
+use antidrift_kernel::rule_scope::RuleScope;
 use antidrift_kernel::semantic_facts::SemanticFact;
 use antidrift_kernel::ts_resolver::TsDeclarationResolver;
 use antidrift_rules::all_rules;
@@ -13,7 +14,7 @@ use std::io::{self, Read};
 use std::path::Path;
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct BatchCaseInput {
     pub(crate) id: String,
     pub(crate) filename: String,
@@ -57,12 +58,12 @@ pub(crate) fn run_batch_json(source_spec: &str) -> Result<String, String> {
     let cases: Vec<BatchCaseInput> =
         serde_json::from_str(&raw).map_err(|err| format!("failed to parse batch JSON: {err}"))?;
     let rules = all_rules();
-    let default_registries = PolicyRegistries::load_from_repo(Path::new(".")).unwrap_or_default();
+    let default_registries = PolicyRegistries::load_from_repo(Path::new("."))?;
 
     let outputs: Vec<BatchCaseOutput> = cases
         .par_iter()
         .map(|case| evaluate_single_case(case, &rules, &default_registries))
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
 
     serde_json::to_string(&outputs)
         .map_err(|err| format!("failed to serialize batch output: {err}"))
@@ -72,9 +73,9 @@ fn evaluate_single_case(
     case: &BatchCaseInput,
     rules: &[Box<dyn antidrift_kernel::rule::Rule>],
     default_registries: &PolicyRegistries,
-) -> BatchCaseOutput {
-    let active_rules = build_case_activations(case);
-    let settings = case.settings.clone().unwrap_or(Value::Null);
+) -> Result<BatchCaseOutput, String> {
+    let active_rules = build_case_activations(case, rules)?;
+    let settings = case.settings.as_ref().unwrap_or(&Value::Null);
     let resolver = case.cwd.as_ref().map(|cwd| {
         let tsconfig = TsDeclarationResolver::discover_governing_tsconfig(Path::new(cwd));
         TsDeclarationResolver::new(tsconfig)
@@ -84,29 +85,46 @@ fn evaluate_single_case(
         file_path: &case.filename,
         source_text: &case.source_text,
         active_rules: &active_rules,
-        settings: &settings,
+        settings,
         registries: default_registries,
         resolver: resolver.as_ref(),
         report_unused_directives: case.report_unused_directives,
     };
     let result = lint_file(&request, rules);
     let fixed_text = apply_fixes(&case.source_text, &result.diagnostics);
-    BatchCaseOutput {
+    Ok(BatchCaseOutput {
         id: case.id.clone(),
         diagnostics: result.diagnostics,
         facts: result.facts,
         fixed_text,
-    }
+    })
 }
 
-fn build_case_activations(case: &BatchCaseInput) -> BTreeMap<String, RuleActivation> {
+fn is_known_batch_rule(rule_name: &str, rules: &[Box<dyn antidrift_kernel::rule::Rule>]) -> bool {
+    rules.iter().any(|rule| {
+        let short = rule.id().strip_prefix("antidrift/").unwrap_or(rule.id());
+        rule.id() == rule_name || short == rule_name
+    })
+}
+
+fn build_case_activations(
+    case: &BatchCaseInput,
+    rules: &[Box<dyn antidrift_kernel::rule::Rule>],
+) -> Result<BTreeMap<String, RuleActivation>, String> {
     let mut activations = BTreeMap::new();
     if let Some(rule_name) = &case.rule {
+        if !is_known_batch_rule(rule_name, rules) {
+            return Err(format!(
+                "unknown rule '{rule_name}' in batch case '{}'",
+                case.id
+            ));
+        }
         let options = match &case.options {
             Some(Value::Array(arr)) => Value::Array(arr.clone()),
             Some(Value::Null) | None => Value::Array(Vec::new()),
             Some(single) => Value::Array(vec![single.clone()]),
         };
+        RuleScope::from_options(rule_name, Some(&options))?;
         activations.insert(
             rule_name.clone(),
             RuleActivation {
@@ -117,50 +135,71 @@ fn build_case_activations(case: &BatchCaseInput) -> BTreeMap<String, RuleActivat
     }
     if let Some(rules_map) = &case.rules {
         for (rule_id, config) in rules_map {
-            if let Some(act) = parse_rule_config_entry(config) {
-                activations.insert(rule_id.clone(), act);
+            if !is_known_batch_rule(rule_id, rules) {
+                return Err(format!(
+                    "unknown rule '{rule_id}' in batch case '{}'",
+                    case.id
+                ));
             }
+            let act = parse_rule_config_entry(rule_id, config)?;
+            RuleScope::from_options(rule_id, Some(&act.options))?;
+            activations.insert(rule_id.clone(), act);
         }
     }
-    activations
+    Ok(activations)
 }
 
-#[must_use]
-pub(crate) fn parse_rule_config_entry(config: &Value) -> Option<RuleActivation> {
+pub(crate) fn parse_rule_config_entry(
+    rule_id: &str,
+    config: &Value,
+) -> Result<RuleActivation, String> {
     match config {
-        Value::String(level) => Some(RuleActivation {
-            severity: parse_severity_level(level)?,
+        Value::String(level) => Ok(RuleActivation {
+            severity: parse_severity_level(rule_id, level)?,
             options: Value::Array(Vec::new()),
         }),
         Value::Number(num) => {
-            let severity = match num.as_u64()? {
-                0 => Severity::Off,
-                1 => Severity::Warn,
-                _ => Severity::Error,
+            let severity = match num.as_u64() {
+                Some(0) => Severity::Off,
+                Some(1) => Severity::Warn,
+                Some(2) => Severity::Error,
+                _ => {
+                    return Err(format!(
+                        "invalid numeric severity {num} for rule '{rule_id}': expected 0, 1, or 2"
+                    ));
+                }
             };
-            Some(RuleActivation {
+            Ok(RuleActivation {
                 severity,
                 options: Value::Array(Vec::new()),
             })
         }
         Value::Array(items) => {
-            let first = items.first()?;
-            let base = parse_rule_config_entry(first)?;
+            let Some(first) = items.first() else {
+                return Err(format!(
+                    "invalid empty array config for rule '{rule_id}': expected [severity, ...options]"
+                ));
+            };
+            let base = parse_rule_config_entry(rule_id, first)?;
             let tail: Vec<Value> = items.iter().skip(1).cloned().collect();
-            Some(RuleActivation {
+            Ok(RuleActivation {
                 severity: base.severity,
                 options: Value::Array(tail),
             })
         }
-        _ => None,
+        other => Err(format!(
+            "invalid config entry {other} for rule '{rule_id}': expected string, number, or array"
+        )),
     }
 }
 
-fn parse_severity_level(level: &str) -> Option<Severity> {
+fn parse_severity_level(rule_id: &str, level: &str) -> Result<Severity, String> {
     match level {
-        "off" | "0" => Some(Severity::Off),
-        "warn" | "warning" | "1" => Some(Severity::Warn),
-        "error" | "2" => Some(Severity::Error),
-        _ => None,
+        "off" | "0" => Ok(Severity::Off),
+        "warn" | "warning" | "1" => Ok(Severity::Warn),
+        "error" | "2" => Ok(Severity::Error),
+        other => Err(format!(
+            "invalid severity '{other}' for rule '{rule_id}': expected off, warn, or error"
+        )),
     }
 }

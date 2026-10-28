@@ -12,7 +12,7 @@
     "build": "pnpm -r --if-present build",
     "typecheck": "tsc -b --pretty false && tsc -p tooling/antidrift --pretty false",
     "lint": "pnpm lint:rust && pnpm lint:oxlint && pnpm lint:boundaries && pnpm lint:exports",
-    "lint:rust": "node tooling/antidrift/src/rust-governance/check.mjs && cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings",
+    "lint:rust": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo run --quiet -p antidrift-linter -- rust",
     "parity:rust": "node tooling/antidrift/test/rust-parity.mjs",
     "lint:oxlint": "antidrift oxlint",
     "lint:boundaries": "depcruise --config .dependency-cruiser.mjs --output-type err tooling/antidrift/src apps packages",

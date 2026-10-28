@@ -2,7 +2,7 @@ use oxc::span::Span;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DiagnosticLocation {
     pub line: u32,
     pub column: u32,
@@ -11,7 +11,7 @@ pub struct DiagnosticLocation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FactLocation {
     pub column: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -65,18 +65,6 @@ impl LineIndex {
             column: col0.saturating_add(1),
             end_line,
             end_column: end_col0.saturating_add(1),
-        }
-    }
-
-    #[must_use]
-    pub fn fact_location(&self, source_text: &str, span: Span) -> FactLocation {
-        let (line, column) = self.line_col_zero_based(source_text, span.start);
-        let (end_line, end_column) = self.line_col_zero_based(source_text, span.end);
-        FactLocation {
-            column,
-            end_column: Some(end_column),
-            end_line: Some(end_line),
-            line,
         }
     }
 }

@@ -1,9 +1,19 @@
+use antidrift_kernel::rule_scope::decode_rule_options;
 use antidrift_kernel::tsrs_kernel;
 use rustc_hash::FxHashSet;
+use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
 use tsrs_checker::{Checker, SignatureKind, Type, TypeFlags};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor, options_object};
+use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+
+const RULE_NAME: &str = "antidrift/react-max-component-props";
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+struct MaxComponentPropsOptions {
+    max: Option<usize>,
+}
 
 pub struct ReactMaxComponentProps {
     max: usize,
@@ -12,13 +22,13 @@ pub struct ReactMaxComponentProps {
 pub static RULE: ReactMaxComponentProps = ReactMaxComponentProps { max: 12 };
 
 impl ReactMaxComponentProps {
-    #[must_use]
-    pub fn from_options(options: Option<&serde_json::Value>) -> Self {
-        let max = options_object(options)
-            .get("max")
-            .and_then(serde_json::Value::as_u64)
-            .map_or(12, |val| val as usize);
-        Self { max: max.max(1) }
+    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
+        let parsed = decode_rule_options::<MaxComponentPropsOptions>(RULE_NAME, options)?;
+        let max = parsed.max.unwrap_or(12);
+        if max == 0 {
+            return Err(format!("invalid options for {RULE_NAME}: max must be >= 1"));
+        }
+        Ok(Self { max })
     }
 }
 

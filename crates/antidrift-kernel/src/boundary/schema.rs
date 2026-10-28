@@ -36,7 +36,7 @@ pub struct SchemaValidationCall {
     pub call_node: P<Node>,
     pub arg_node: P<Node>,
     pub schema_node: P<Node>,
-    pub method: String,
+    pub method: &'static str,
     pub returns_schema_output: bool,
 }
 
@@ -46,7 +46,7 @@ pub struct DeclaredSchemaParam {
     pub schema_sym: P<Symbol>,
 }
 
-pub fn symbol_package_path(checker: &mut Checker, sym: Option<P<Symbol>>) -> String {
+pub fn symbol_package_path(checker: &mut Checker, sym: Option<P<Symbol>>) -> Option<String> {
     for decl in provenance::symbol_declarations(checker, sym) {
         let Some(sf) = ast::get_source_file_of_node(decl) else {
             continue;
@@ -54,36 +54,42 @@ pub fn symbol_package_path(checker: &mut Checker, sym: Option<P<Symbol>>) -> Str
         let file = tsrs_kernel::normalize_path(sf.file_name());
         if let Some(idx) = file.rfind("/node_modules/") {
             let start = idx + "/node_modules/".len();
-            if let Some(rest) = file.get(start..) {
-                return rest.to_string();
+            if let Some(rest) = file.get(start..)
+                && !rest.is_empty()
+            {
+                return Some(rest.to_string());
             }
         }
     }
-    String::new()
+    None
 }
 
 #[must_use]
-pub fn package_name_of_path(pkg_path: &str) -> String {
+pub fn package_name_of_path(pkg_path: &str) -> Option<&str> {
     if pkg_path.is_empty() {
-        return String::new();
+        return None;
     }
-    let mut parts = pkg_path.split('/');
-    let Some(first) = parts.next() else {
-        return String::new();
-    };
-    if first.starts_with('@')
-        && let Some(second) = parts.next()
-    {
-        return format!("{first}/{second}");
+    if pkg_path.starts_with('@') {
+        let slash_after_scope = pkg_path.find('/')?;
+        let rest = &pkg_path[slash_after_scope + 1..];
+        if rest.is_empty() {
+            return None;
+        }
+        return Some(match rest.find('/') {
+            Some(second_slash) => &pkg_path[..slash_after_scope + 1 + second_slash],
+            None => pkg_path,
+        });
     }
-    first.to_string()
+    Some(match pkg_path.find('/') {
+        Some(slash) => &pkg_path[..slash],
+        None => pkg_path,
+    })
 }
 
 fn is_package_symbol(checker: &mut Checker, sym: Option<P<Symbol>>, prefixes: &[&str]) -> bool {
-    let rest = symbol_package_path(checker, sym);
-    if rest.is_empty() {
+    let Some(rest) = symbol_package_path(checker, sym) else {
         return false;
-    }
+    };
     prefixes.iter().any(|&prefix| {
         rest == prefix
             || rest
@@ -138,7 +144,7 @@ fn zod_parse_call_parts(
         call_node,
         arg_node: args[0],
         schema_node: prop.expression(),
-        method: method_name.to_string(),
+        method: method_name,
         returns_schema_output: ZOD_PARSE_METHODS.contains(&method_name),
     })
 }
@@ -184,7 +190,7 @@ fn effect_decode_call_parts(
         call_node,
         arg_node: value_arg,
         schema_node: schema_args[0],
-        method: method_name.to_string(),
+        method: method_name,
         returns_schema_output: true,
     })
 }
@@ -232,7 +238,7 @@ fn schema_first_validation_call_parts(
         call_node,
         arg_node: args[1],
         schema_node: args[0],
-        method: method_name.to_string(),
+        method: method_name,
         returns_schema_output: method_name != "Check",
     })
 }
@@ -306,17 +312,17 @@ fn schema_symbol_from_type_query(checker: &mut Checker, tq: &TypeQueryNode) -> O
     provenance::symbol_at_node(checker, owner)
 }
 
-fn rightmost_identifier_name(node: P<Node>) -> &'static str {
+fn rightmost_identifier_name(node: P<Node>) -> Option<&'static str> {
     if ast::is_identifier(node) {
-        return node.as_identifier().text();
+        return Some(node.as_identifier().text());
     }
     if ast::is_qualified_name(node) {
         let right = node.as_qualified_name().right();
         if ast::is_identifier(right) {
-            return right.as_identifier().text();
+            return Some(right.as_identifier().text());
         }
     }
-    ""
+    None
 }
 
 fn schema_symbol_of_output_alias(checker: &mut Checker, type_node: P<Node>) -> Option<P<Symbol>> {
@@ -327,7 +333,7 @@ fn schema_symbol_of_output_alias(checker: &mut Checker, type_node: P<Node>) -> O
         return None;
     }
     let type_ref = type_node.as_type_reference_node();
-    let member_name = rightmost_identifier_name(type_ref.type_name());
+    let member_name = rightmost_identifier_name(type_ref.type_name())?;
     if !SCHEMA_OUTPUT_TYPE_NAMES.contains(&member_name) {
         return None;
     }

@@ -389,11 +389,6 @@ fn check_callback(ctx: &mut Ctx, node: P<Node>) {
 
 pub struct NoRedundantTypePredicate;
 
-#[must_use]
-pub fn create(_options: Option<&serde_json::Value>) -> Box<dyn Rule> {
-    Box::new(NoRedundantTypePredicate)
-}
-
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),
     Listener::Enter(Kind::FunctionExpression),

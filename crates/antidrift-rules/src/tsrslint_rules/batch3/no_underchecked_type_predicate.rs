@@ -193,11 +193,6 @@ fn check_function(ctx: &mut Ctx, fn_node: P<Node>) {
 
 pub struct NoUndercheckedTypePredicate;
 
-#[must_use]
-pub fn create(_options: Option<&serde_json::Value>) -> Box<dyn Rule> {
-    Box::new(NoUndercheckedTypePredicate)
-}
-
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),
     Listener::Enter(Kind::FunctionExpression),

@@ -1,4 +1,4 @@
-pub mod erasure_helpers;
+pub mod erasure_analysis;
 pub mod no_appeasement_cast;
 pub mod no_appeasement_erasure;
 pub mod no_compat_names;
@@ -10,6 +10,8 @@ pub mod no_vague_names;
 pub mod no_wrapping_functions;
 pub mod predicate_scan;
 
+use antidrift_kernel::rule_scope::ScopeOptions;
+use antidrift_kernel::rule_scope::decode_rule_options;
 use tsrslint::rule::Rule;
 
 #[must_use]
@@ -27,31 +29,59 @@ pub fn rules() -> Vec<&'static dyn Rule> {
 }
 
 #[must_use]
-pub fn create_rule(name: &str, options: Option<&serde_json::Value>) -> Option<Box<dyn Rule>> {
+pub fn all_rules() -> Vec<&'static dyn Rule> {
+    let mut list = rules();
+    list.push(&no_vague_names::DEFAULT_INSTANCE);
+    list
+}
+
+pub fn create_rule(
+    name: &str,
+    options: Option<&serde_json::Value>,
+) -> Result<Option<Box<dyn Rule>>, String> {
     match name {
         "antidrift/no-appeasement-cast" | "no-appeasement-cast" => {
-            Some(no_appeasement_cast::create(options))
+            decode_rule_options::<ScopeOptions>("antidrift/no-appeasement-cast", options)?;
+            Ok(Some(Box::new(no_appeasement_cast::NoAppeasementCast)))
         }
         "antidrift/no-appeasement-erasure" | "no-appeasement-erasure" => {
-            Some(no_appeasement_erasure::create(options))
+            decode_rule_options::<ScopeOptions>("antidrift/no-appeasement-erasure", options)?;
+            Ok(Some(Box::new(no_appeasement_erasure::NoAppeasementErasure)))
         }
         "antidrift/no-redundant-type-predicate" | "no-redundant-type-predicate" => {
-            Some(no_redundant_type_predicate::create(options))
+            decode_rule_options::<ScopeOptions>("antidrift/no-redundant-type-predicate", options)?;
+            Ok(Some(Box::new(
+                no_redundant_type_predicate::NoRedundantTypePredicate,
+            )))
         }
         "antidrift/no-underchecked-type-predicate" | "no-underchecked-type-predicate" => {
-            Some(no_underchecked_type_predicate::create(options))
+            decode_rule_options::<ScopeOptions>(
+                "antidrift/no-underchecked-type-predicate",
+                options,
+            )?;
+            Ok(Some(Box::new(
+                no_underchecked_type_predicate::NoUndercheckedTypePredicate,
+            )))
         }
         "antidrift/no-wrapping-functions" | "no-wrapping-functions" => {
-            Some(no_wrapping_functions::create(options))
+            Ok(Some(no_wrapping_functions::create(options)?))
         }
         "antidrift/no-pass-through-parameters" | "no-pass-through-parameters" => {
-            Some(no_pass_through_parameters::create(options))
+            Ok(Some(no_pass_through_parameters::create(options)?))
         }
         "antidrift/no-unresolved-dependency-types" | "no-unresolved-dependency-types" => {
-            Some(no_unresolved_dependency_types::create(options))
+            decode_rule_options::<ScopeOptions>(
+                "antidrift/no-unresolved-dependency-types",
+                options,
+            )?;
+            Ok(Some(Box::new(
+                no_unresolved_dependency_types::NoUnresolvedDependencyTypes,
+            )))
         }
-        "antidrift/no-compat-names" | "no-compat-names" => Some(no_compat_names::create(options)),
-        "antidrift/no-vague-names" | "no-vague-names" => Some(no_vague_names::create(options)),
-        _ => None,
+        "antidrift/no-compat-names" | "no-compat-names" => {
+            Ok(Some(no_compat_names::create(options)?))
+        }
+        "antidrift/no-vague-names" | "no-vague-names" => Ok(Some(no_vague_names::create(options)?)),
+        _ => Ok(None),
     }
 }

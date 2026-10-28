@@ -9,9 +9,15 @@ use crate::projection::bag_state::{
 };
 use crate::{provenance, tsrs_kernel};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InlineParseReshapeKind {
+    Object,
+    Conditional,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InlineParseReshapeClassification {
-    pub kind: &'static str,
+    pub kind: InlineParseReshapeKind,
     pub source: String,
 }
 
@@ -105,14 +111,12 @@ fn is_inline_reshape_branch(branch: P<Node>, bag_state: &BagState, checker: &mut
                 bag_state,
                 checker,
             ),
-            Kind::PropertyAssignment => {
-                inspect_bag_value_expression(
-                    prop.as_property_assignment().initializer(),
-                    bag_state,
-                    checker,
-                )
-                .valid
-            }
+            Kind::PropertyAssignment => inspect_bag_value_expression(
+                prop.as_property_assignment().initializer(),
+                bag_state,
+                checker,
+            )
+            .is_valid(),
             _ => false,
         };
         if !valid {
@@ -185,7 +189,7 @@ pub fn classify_inline_parse_reshape(
         && inspect_object_literal_bag_projection(raw_arg, &bag_state, checker)
     {
         return Some(InlineParseReshapeClassification {
-            kind: "inlineObjectReshape",
+            kind: InlineParseReshapeKind::Object,
             source: root.name,
         });
     }
@@ -193,7 +197,7 @@ pub fn classify_inline_parse_reshape(
         && is_conditional_inline_reshape(raw_arg.as_conditional_expression(), &bag_state, checker)
     {
         return Some(InlineParseReshapeClassification {
-            kind: "inlineConditionalReshape",
+            kind: InlineParseReshapeKind::Conditional,
             source: root.name,
         });
     }

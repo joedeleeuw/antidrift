@@ -14,4 +14,6 @@ pub use bag_state::{
     is_static_scalar_literal, resolve_bag_parameter,
 };
 pub use contract_projection::is_contract_appeasement_projection;
-pub use inline_parse::{InlineParseReshapeClassification, classify_inline_parse_reshape};
+pub use inline_parse::{
+    InlineParseReshapeClassification, InlineParseReshapeKind, classify_inline_parse_reshape,
+};

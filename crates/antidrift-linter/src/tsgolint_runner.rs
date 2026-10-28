@@ -21,8 +21,9 @@ use tsrslint::rules;
 use tsrslint::tsconfig::{ExtendedConfigCache, ParseHost, TsConfigResolver};
 
 use crate::tsgolint_host::{
-    DeclarationCache, base_fs, build_shared_host, filter_suppressed_diagnostics, is_inline_disabled,
+    DeclarationCache, base_fs, build_shared_host, filter_suppressed_diagnostics,
 };
+use antidrift_kernel::directives::is_inline_disabled;
 
 fn apply_debug_flag(raw: &str, opts: &mut Options) -> Result<(), String> {
     for part in raw.split(',') {
@@ -247,7 +248,9 @@ fn lint_program_files(
             continue;
         }
         let normalized = tspath::normalize_slashes(name);
-        let config_idx = plan.file_to_config.get(&normalized).copied().unwrap_or(0);
+        let Some(&config_idx) = plan.file_to_config.get(&normalized) else {
+            continue;
+        };
         let bucket = u8::from(plan.inject_defaults && is_js_script_file(name));
         groups.entry((config_idx, bucket)).or_default().push(sf);
     }
