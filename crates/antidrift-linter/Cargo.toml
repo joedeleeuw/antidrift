@@ -9,6 +9,8 @@ publish.workspace = true
 [[bin]]
 name = "antidrift-linter"
 path = "src/main.rs"
+test = false
+doctest = false
 
 [dependencies]
 antidrift-kernel.workspace = true
@@ -16,8 +18,18 @@ antidrift-rules.workspace = true
 ignore.workspace = true
 oxc.workspace = true
 rayon.workspace = true
+rustc-hash.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tsrs_ast.workspace = true
+tsrs_checker.workspace = true
+tsrs_compiler.workspace = true
+tsrs_contentmapper.workspace = true
+tsrs_core.workspace = true
+tsrs_diagnostics.workspace = true
+tsrs_tsoptions.workspace = true
+tsrs_vfs.workspace = true
+tsrslint.workspace = true
 
 [lints]
 workspace = true

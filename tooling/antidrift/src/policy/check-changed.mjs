@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { protectedPolicyFiles } from "./lib/generated-targets.mjs";
@@ -40,13 +39,6 @@ export function checkChanged() {
     exit: (status) => status,
   });
   if (oxlintStatus !== 0) process.exit(oxlintStatus);
-
-  const eslintResult = spawnSync(
-    "pnpm",
-    ["exec", "eslint", ...codeFiles, "--max-warnings", "0"],
-    { stdio: "inherit" }
-  );
-  if (eslintResult.status !== 0) process.exit(eslintResult.status ?? 1);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

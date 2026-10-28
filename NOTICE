@@ -1,0 +1,14 @@
+Antidrift
+Copyright (c) 2026 Joe de Leeuw
+
+This product links and adapts components from the following open-source projects:
+
+1. tsrs (https://github.com/oxc-project/tsrs / https://github.com/maschwenk/tsrs)
+   Licensed under the Apache License, Version 2.0.
+   Derived from microsoft/typescript-go (https://github.com/microsoft/typescript-go),
+   Copyright (c) Microsoft Corporation, licensed under the Apache License, Version 2.0.
+
+2. tsrslint (https://github.com/maschwenk/tsrslint)
+   Licensed under the MIT License.
+   Derived from oxc-project/tsgolint (https://github.com/oxc-project/tsgolint),
+   Copyright (c) 2025 Boshen and Oxc contributors, licensed under the MIT License.

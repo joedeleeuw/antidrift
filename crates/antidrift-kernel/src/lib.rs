@@ -1,10 +1,16 @@
+pub mod boundary;
+pub mod callgraph;
 pub mod diagnostic;
 pub mod directives;
 pub mod json_manifest;
+pub mod projection;
+pub mod provenance;
 pub mod registries;
 pub mod rule;
 pub mod rule_scope;
 pub mod semantic_facts;
+pub mod shape;
 pub mod span_index;
 pub mod suppressions;
 pub mod ts_resolver;
+pub mod tsrs_kernel;

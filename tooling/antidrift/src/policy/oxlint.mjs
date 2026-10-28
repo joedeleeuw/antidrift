@@ -1,15 +1,34 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const defaultStdout = { write: (value) => process.stdout.write(value) };
 const defaultStderr = { write: (value) => process.stderr.write(value) };
+const moduleRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const repoRoot = resolve(moduleRoot, "../..");
 
 export function resolveOxlintBinary() {
   const require = createRequire(import.meta.url);
   const packageJsonPath = require.resolve("oxlint/package.json");
   const packageJson = require(packageJsonPath);
   return resolve(dirname(packageJsonPath), packageJson.bin.oxlint);
+}
+
+function resolveTsgolintBinary(cwd = process.cwd()) {
+  if (process.env.OXLINT_TSGOLINT_PATH) {
+    return process.env.OXLINT_TSGOLINT_PATH;
+  }
+  const candidates = [
+    resolve(moduleRoot, "bin/antidrift-linter"),
+    resolve(moduleRoot, "dist/bin/antidrift-linter"),
+    resolve(cwd, "target/release/antidrift-linter"),
+    resolve(repoRoot, "target/release/antidrift-linter"),
+    resolve(cwd, "target/debug/antidrift-linter"),
+    resolve(repoRoot, "target/debug/antidrift-linter"),
+  ];
+  return candidates.find((candidate) => existsSync(candidate));
 }
 
 function defaultTargets() {
@@ -78,13 +97,25 @@ export function runOxlint({
     );
     return exit(0);
   }
+  const tsgolintBinary = resolveTsgolintBinary(cwd);
+  if (!tsgolintBinary) {
+    stderr.write(
+      "Missing antidrift-linter native binary; build crates/antidrift-linter or run pnpm --filter @joedeleeuw/antidrift build.\n"
+    );
+    return exit(1);
+  }
   const args = [
     resolveOxlintBinary(),
     "--disable-nested-config",
     ...parsed.passthrough,
     ...parsed.targets,
   ];
-  const result = spawn(process.execPath, args, { cwd, stdio: "inherit" });
+  const env = {
+    ...process.env,
+    OXLINT_TSGOLINT_PATH: tsgolintBinary,
+    ANTIDRIFT_TSGOLINT_DEFAULTS: "1",
+  };
+  const result = spawn(process.execPath, args, { cwd, env, stdio: "inherit" });
   if (result.error) {
     stderr.write(`Failed to run oxlint: ${result.error.message}\n`);
     return exit(1);

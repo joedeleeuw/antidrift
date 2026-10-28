@@ -9,7 +9,7 @@ members = [
 [workspace.package]
 version = "0.20.0"
 edition = "2024"
-rust-version = "1.95.0"
+rust-version = "1.99"
 license = "MIT"
 publish = false
 
@@ -20,10 +20,22 @@ globset = "0.4.18"
 ignore = "0.4.25"
 oxc = { version = "0.146.0", features = ["semantic", "cfg", "ast_visit", "isolated_declarations"] }
 oxc_resolver = "11.24.3"
-rayon = "1.11.0"
+rayon = "1.12.0"
+rustc-hash = "2.1.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 sha2 = "0.10.9"
+tsrs_ast = { git = "https://github.com/maschwenk/tsrs", branch = "main" }
+tsrs_checker = { git = "https://github.com/maschwenk/tsrs", branch = "main" }
+tsrs_compiler = { git = "https://github.com/maschwenk/tsrs", branch = "main" }
+tsrs_contentmapper = { git = "https://github.com/maschwenk/tsrs", branch = "main" }
+tsrs_core = { git = "https://github.com/maschwenk/tsrs", branch = "main" }
+tsrs_diagnostics = { git = "https://github.com/maschwenk/tsrs", branch = "main" }
+tsrs_parser = { git = "https://github.com/maschwenk/tsrs", branch = "main" }
+tsrs_scanner = { git = "https://github.com/maschwenk/tsrs", branch = "main" }
+tsrs_tsoptions = { git = "https://github.com/maschwenk/tsrs", branch = "main" }
+tsrs_vfs = { git = "https://github.com/maschwenk/tsrs", branch = "main" }
+tsrslint = { git = "https://github.com/maschwenk/tsrslint", rev = "feea8d69d1cca176fb08318eb167c9013cce2630", default-features = false }
 yaml_serde = "0.10.7"
 
 [workspace.lints.rust]
@@ -35,23 +47,58 @@ unused_variables = "deny"
 unreachable_pub = "deny"
 
 [workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
 allow_attributes = "deny"
 allow_attributes_without_reason = "deny"
+assigning_clones = "deny"
+clone_on_copy = "deny"
+clone_on_ref_ptr = "deny"
+cloned_instead_of_copied = "deny"
 cognitive_complexity = "deny"
 collapsible_if = "deny"
 dbg_macro = "deny"
+disallowed_macros = "deny"
+disallowed_methods = "deny"
+disallowed_types = "deny"
 excessive_nesting = "deny"
 expect_used = "deny"
+format_push_string = "deny"
+implicit_clone = "deny"
+inefficient_to_string = "deny"
+inline_always = "deny"
+iter_over_hash_type = "deny"
+large_stack_arrays = "deny"
+large_stack_frames = "deny"
+large_types_passed_by_value = "deny"
 manual_let_else = "deny"
+many_single_char_names = "deny"
 match_same_arms = "deny"
+mem_forget = "deny"
+mutex_atomic = "deny"
+mutex_integer = "deny"
+needless_collect = "deny"
+needless_pass_by_ref_mut = "deny"
 needless_pass_by_value = "deny"
+non_send_fields_in_send_ty = "deny"
 panic = "deny"
+rc_buffer = "deny"
+rc_mutex = "deny"
 redundant_clone = "deny"
 semicolon_if_nothing_returned = "deny"
+set_contains_or_insert = "deny"
+significant_drop_in_scrutinee = "deny"
+stable_sort_primitive = "deny"
 todo = "deny"
 too_many_arguments = "deny"
 too_many_lines = "deny"
+trivially_copy_pass_by_ref = "deny"
+type_complexity = "deny"
 unimplemented = "deny"
+unnecessary_box_returns = "deny"
+unnecessary_wraps = "deny"
 unnested_or_patterns = "deny"
+unused_self = "deny"
 unwrap_used = "deny"
+vec_box = "deny"
 wildcard_imports = "deny"
+zero_sized_map_values = "deny"

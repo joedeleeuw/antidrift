@@ -3,6 +3,7 @@ mod lifecycle_async;
 mod react_ui;
 mod security_boundaries;
 mod test_oracle;
+pub mod tsrslint_rules;
 mod typed_contracts;
 
 use antidrift_kernel::rule::Rule;

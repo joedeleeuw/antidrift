@@ -99,3 +99,18 @@ rikalabs @rikalabs/bun-no-bun-specific-in-shared 46561a398736b2ccd7eb024d293e7be
 MODIFIED src/oxlint-plugin/portable/syntax.js <- @rikalabs/oxlint-standards 0.8.1 dist/plugin/utils.js SHA-256 1f3df79e78250d53f28bb8306b686f9e1bf6bf07af54ffdcaf33bdfc1c5bebc3
 MODIFIED src/oxlint-plugin/portable/ast.js <- .oxlint-plugins/utils.ts SHA-256 33eb3b41e66b3ad3080dfdeec21100114fec749c4177ab1f9ab1b2574632ef71
 MODIFIED src/oxlint-plugin/portable/physical-properties.js <- .oxlint-plugins/physical-properties.ts SHA-256 af9c03068897a8547f04f01e119586d4b1c04e766d95500e19c86713ac6a776a
+
+----- Native Rust Rule Engine Attribution (0.20.0) -----
+
+1. oxc (https://github.com/oxc-project/oxc)
+   Copyright (c) 2023-2026 Boshen and Oxc contributors, licensed under the MIT License.
+
+2. tsrs (https://github.com/oxc-project/tsrs / https://github.com/maschwenk/tsrs)
+   Licensed under the Apache License, Version 2.0 (licenses/Apache-2.0.txt).
+   Derived from microsoft/typescript-go (https://github.com/microsoft/typescript-go),
+   Copyright (c) Microsoft Corporation, licensed under the Apache License, Version 2.0.
+
+3. tsrslint (https://github.com/maschwenk/tsrslint)
+   Licensed under the MIT License.
+   Derived from oxc-project/tsgolint (https://github.com/oxc-project/tsgolint),
+   Copyright (c) 2025-2026 Boshen and Oxc contributors, licensed under the MIT License.
