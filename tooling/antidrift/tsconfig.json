@@ -19,7 +19,8 @@
     "src/**/*.mts",
     "src/**/*.mjs",
     "src/**/*.js",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "test/**/*.mjs"
   ],
   "exclude": ["src/**/fixtures/**", "src/**/*.test.*"]
 }

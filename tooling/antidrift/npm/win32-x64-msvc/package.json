@@ -1,0 +1,19 @@
+{
+  "name": "@joedeleeuw/antidrift-linter-win32-x64-msvc",
+  "version": "0.20.0",
+  "license": "MIT",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "antidrift-linter.exe",
+  "files": [
+    "antidrift-linter.exe"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

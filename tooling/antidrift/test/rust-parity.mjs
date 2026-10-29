@@ -281,7 +281,7 @@ function parseHeadlessOutput(buf) {
       .toString("utf8");
     offset += 5 + length;
     if (kind === 1) {
-      diagnostics.push(JSON.parse(payloadText));
+      diagnostics.push(JSON.parse(String(payloadText)));
     } else if (kind === 0) {
       throw new Error(`Headless protocol error: ${payloadText}`);
     }

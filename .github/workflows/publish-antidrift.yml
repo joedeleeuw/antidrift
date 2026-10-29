@@ -9,8 +9,71 @@ permissions:
   id-token: write
 
 jobs:
+  build-native-binaries:
+    if: startsWith(github.event.release.tag_name, 'antidrift-v')
+    runs-on: ${{ matrix.runner }}
+    environment: npm-publish
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            package: linux-x64-gnu
+            binary: antidrift-linter
+          - runner: ubuntu-24.04-arm
+            package: linux-arm64-gnu
+            binary: antidrift-linter
+          - runner: macos-15-intel
+            package: darwin-x64
+            binary: antidrift-linter
+          - runner: macos-14
+            package: darwin-arm64
+            binary: antidrift-linter
+          - runner: windows-latest
+            package: win32-x64-msvc
+            binary: antidrift-linter.exe
+          - runner: windows-11-arm
+            package: win32-arm64-msvc
+            binary: antidrift-linter.exe
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.1
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: npm install -g npm@latest
+
+      - name: Verify release tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./tooling/antidrift/package.json').version")"
+          EXPECTED_TAG="antidrift-v${VERSION}"
+          if [ "${RELEASE_TAG}" != "${EXPECTED_TAG}" ]; then
+            echo "release tag ${RELEASE_TAG} must match ${EXPECTED_TAG}" >&2
+            exit 1
+          fi
+
+      - run: cargo build --release --locked -p antidrift-linter
+
+      - name: Stage platform binary
+        run: node tooling/antidrift/scripts/stage-linter-binary.mjs "target/release/${{ matrix.binary }}" "tooling/antidrift/npm/${{ matrix.package }}/${{ matrix.binary }}"
+
+      - name: Publish platform package
+        run: npm publish "./tooling/antidrift/npm/${{ matrix.package }}" --access public
+
   publish:
     if: startsWith(github.event.release.tag_name, 'antidrift-v')
+    needs: build-native-binaries
     runs-on: ubuntu-latest
     environment: npm-publish
     steps:

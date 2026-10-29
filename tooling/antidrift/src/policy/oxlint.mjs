@@ -17,17 +17,42 @@ export function resolveOxlintBinary() {
 }
 
 export function resolveNativeLinterBinary(cwd = process.cwd()) {
-  if (process.env.OXLINT_TSGOLINT_PATH) {
-    return process.env.OXLINT_TSGOLINT_PATH;
+  if (process.env.ANTIDRIFT_LINTER_BIN) {
+    return process.env.ANTIDRIFT_LINTER_BIN;
   }
   const candidates = [
     resolve(moduleRoot, "bin/antidrift-linter"),
+    resolve(moduleRoot, "../bin/antidrift-linter"),
     resolve(moduleRoot, "dist/bin/antidrift-linter"),
     resolve(cwd, "target/release/antidrift-linter"),
     resolve(repoRoot, "target/release/antidrift-linter"),
     resolve(cwd, "target/debug/antidrift-linter"),
     resolve(repoRoot, "target/debug/antidrift-linter"),
   ];
+  const platformKey = {
+    "linux-x64": "linux-x64-gnu",
+    "linux-arm64": "linux-arm64-gnu",
+    "darwin-x64": "darwin-x64",
+    "darwin-arm64": "darwin-arm64",
+    "win32-x64": "win32-x64-msvc",
+    "win32-arm64": "win32-arm64-msvc",
+  }[`${process.platform}-${process.arch}`];
+  if (platformKey) {
+    const require = createRequire(import.meta.url);
+    try {
+      candidates.unshift(
+        require.resolve(`@joedeleeuw/antidrift-linter-${platformKey}`)
+      );
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !("code" in error) ||
+        error.code !== "MODULE_NOT_FOUND"
+      ) {
+        throw error;
+      }
+    }
+  }
   const found = candidates.find((candidate) => existsSync(candidate));
   if (found && (statSync(found).mode & 0o111) === 0) {
     chmodSync(found, 0o755);

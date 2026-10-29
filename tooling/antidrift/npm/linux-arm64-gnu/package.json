@@ -1,0 +1,22 @@
+{
+  "name": "@joedeleeuw/antidrift-linter-linux-arm64-gnu",
+  "version": "0.20.0",
+  "license": "MIT",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "main": "antidrift-linter",
+  "files": [
+    "antidrift-linter"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

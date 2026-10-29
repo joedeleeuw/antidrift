@@ -365,11 +365,18 @@ fn check_candidate(ctx: &mut Ctx, fn_node: P<Node>, name_ident: P<Node>, decl: P
     {
         return;
     }
+    let package_entry = match provenance::is_package_entry_file(ctx.file.file_name()) {
+        Ok(package_entry) => package_entry,
+        Err(error) => {
+            ctx.report_node(
+                candidate.name_node,
+                RuleMessage::new("invalidPackageJson", error.to_string()),
+            );
+            return;
+        }
+    };
     let exported = is_exported_declaration(candidate.declaration) || audit.has_export_specifier;
-    if exported
-        && (is_reexported_in_program(ctx.program, ctx.checker, ctx.file)
-            || provenance::is_package_entry_file(ctx.file.file_name()))
-    {
+    if exported && (is_reexported_in_program(ctx.program, ctx.checker, ctx.file) || package_entry) {
         return;
     }
     let total_refs = non_test_refs + test_refs;

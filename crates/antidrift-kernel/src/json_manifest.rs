@@ -1,4 +1,5 @@
-use serde_json::Value;
+use crate::error::KernelError;
+use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -17,11 +18,12 @@ pub struct PackageJsonManifest {
     pub sections: BTreeMap<String, Vec<JsonPropertySpan>>,
 }
 
-#[must_use]
-pub fn parse_package_json_manifest(source_text: &str) -> Option<PackageJsonManifest> {
-    let Ok(Value::Object(root)) = serde_json::from_str(source_text) else {
-        return None;
-    };
+pub fn parse_package_json_manifest(source_text: &str) -> Result<PackageJsonManifest, KernelError> {
+    let root: Map<String, Value> =
+        serde_json::from_str(source_text).map_err(|source| KernelError::JsonDecode {
+            location: "package.json source text".to_owned(),
+            source,
+        })?;
     let mut sections: BTreeMap<String, Vec<JsonPropertySpan>> = BTreeMap::new();
     for (key_name, value) in root {
         let Value::Object(nested) = value else {
@@ -36,7 +38,7 @@ pub fn parse_package_json_manifest(source_text: &str) -> Option<PackageJsonManif
             .collect();
         sections.insert(key_name, entries);
     }
-    Some(PackageJsonManifest { sections })
+    Ok(PackageJsonManifest { sections })
 }
 
 fn collect_json_strings(val: &Value, out: &mut Vec<String>) {
@@ -56,37 +58,41 @@ fn collect_json_strings(val: &Value, out: &mut Vec<String>) {
     }
 }
 
-#[must_use]
-pub fn package_entrypoint_paths(pkg_path: &Path) -> Option<Vec<String>> {
-    let Ok(text) = std::fs::read_to_string(pkg_path) else {
-        return None;
-    };
-    let Ok(Value::Object(obj)) = serde_json::from_str::<Value>(&text) else {
-        return None;
-    };
+pub fn package_entrypoint_paths(pkg_path: &Path) -> Result<Vec<String>, KernelError> {
+    let text = std::fs::read_to_string(pkg_path).map_err(|source| KernelError::Io {
+        operation: "read",
+        path: pkg_path.to_path_buf(),
+        source,
+    })?;
+    let obj: Map<String, Value> =
+        serde_json::from_str(&text).map_err(|source| KernelError::JsonDecode {
+            location: pkg_path.display().to_string(),
+            source,
+        })?;
     let mut entries = Vec::new();
     for key in ENTRYPOINT_KEYS {
         if let Some(field) = obj.get(key) {
             collect_json_strings(field, &mut entries);
         }
     }
-    Some(entries)
+    Ok(entries)
 }
 
-#[must_use]
-pub fn load_nearest_package_json_manifest(file_path: &Path) -> Option<PackageJsonManifest> {
+pub fn load_nearest_package_json_manifest(
+    file_path: &Path,
+) -> Result<Option<PackageJsonManifest>, KernelError> {
     let mut current = file_path.parent();
     while let Some(dir) = current {
         let candidate = dir.join("package.json");
         if candidate.is_file() {
-            let Ok(text) = std::fs::read_to_string(&candidate) else {
-                return None;
-            };
-            if let Some(manifest) = parse_package_json_manifest(&text) {
-                return Some(manifest);
-            }
+            let text = std::fs::read_to_string(&candidate).map_err(|source| KernelError::Io {
+                operation: "read",
+                path: candidate.clone(),
+                source,
+            })?;
+            return parse_package_json_manifest(&text).map(Some);
         }
         current = dir.parent();
     }
-    None
+    Ok(None)
 }

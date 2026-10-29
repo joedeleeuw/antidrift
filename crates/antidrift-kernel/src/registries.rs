@@ -1,3 +1,4 @@
+use crate::error::KernelError;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -76,23 +77,33 @@ pub struct PolicyRegistries {
 }
 
 impl PolicyRegistries {
-    pub fn load_from_repo(repo_root: &Path) -> Result<Self, String> {
+    pub fn load_from_repo(repo_root: &Path) -> Result<Self, KernelError> {
         let registries_dir = repo_root.join("policy").join("registries");
         if !registries_dir.is_dir() {
             return Ok(Self::default());
         }
         let mut registries = Self::default();
-        let entries = fs::read_dir(&registries_dir)
-            .map_err(|err| format!("failed to read {}: {err}", registries_dir.display()))?;
+        let entries = fs::read_dir(&registries_dir).map_err(|source| KernelError::Io {
+            operation: "read directory",
+            path: registries_dir.clone(),
+            source,
+        })?;
         for entry in entries {
-            let entry = entry.map_err(|err| format!("failed to read directory entry: {err}"))?;
+            let entry = entry.map_err(|source| KernelError::Io {
+                operation: "read directory entry in",
+                path: registries_dir.clone(),
+                source,
+            })?;
             let path = entry.path();
             if path.extension().and_then(|ext| ext.to_str()) != Some("yaml") {
                 continue;
             }
             let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-            let text = fs::read_to_string(&path)
-                .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
+            let text = fs::read_to_string(&path).map_err(|source| KernelError::Io {
+                operation: "read",
+                path: path.clone(),
+                source,
+            })?;
             match stem {
                 "boundaries" => {
                     registries.boundaries = decode_yaml_registry(&path, "boundaries", &text)?;
@@ -107,8 +118,12 @@ impl PolicyRegistries {
                     registries.generated = decode_yaml_registry(&path, "generated", &text)?;
                 }
                 _ => {
-                    let _: serde::de::IgnoredAny = yaml_serde::from_str(&text)
-                        .map_err(|err| format!("failed to parse {}: {err}", path.display()))?;
+                    let _: serde::de::IgnoredAny =
+                        yaml_serde::from_str(&text).map_err(|source| KernelError::YamlDecode {
+                            key: "unknown".to_owned(),
+                            path: path.clone(),
+                            source,
+                        })?;
                 }
             }
         }
@@ -121,7 +136,10 @@ fn decode_yaml_registry<T: serde::de::DeserializeOwned>(
     path: &Path,
     key: &str,
     text: &str,
-) -> Result<T, String> {
-    yaml_serde::from_str(text)
-        .map_err(|err| format!("invalid {key} registry schema in {}: {err}", path.display()))
+) -> Result<T, KernelError> {
+    yaml_serde::from_str(text).map_err(|source| KernelError::YamlDecode {
+        key: key.to_owned(),
+        path: path.to_path_buf(),
+        source,
+    })
 }

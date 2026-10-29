@@ -421,23 +421,20 @@ pub fn relative_to_cwd(cwd: &str, file_path: &str) -> String {
         .to_owned()
 }
 
-#[must_use]
-pub fn is_package_entry_file(file_name: &str) -> bool {
+pub fn is_package_entry_file(file_name: &str) -> Result<bool, crate::error::KernelError> {
     let norm_file = tspath::normalize_slashes(file_name);
     let mut dir = std::path::Path::new(&norm_file).parent();
     while let Some(cur) = dir {
         let pkg_path = cur.join("package.json");
         if pkg_path.is_file() {
-            let Some(entries) = package_entrypoint_paths(&pkg_path) else {
-                return false;
-            };
+            let entries = package_entrypoint_paths(&pkg_path)?;
             let pkg_dir = tspath::normalize_slashes(&cur.to_string_lossy());
-            return entries.iter().any(|entry| {
+            return Ok(entries.iter().any(|entry| {
                 let rel = entry.trim_start_matches("./").trim_start_matches('/');
                 format!("{pkg_dir}/{rel}") == norm_file
-            });
+            }));
         }
         dir = cur.parent();
     }
-    false
+    Ok(false)
 }

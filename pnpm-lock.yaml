@@ -257,6 +257,37 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+    optionalDependencies:
+      "@joedeleeuw/antidrift-linter-darwin-arm64":
+        specifier: 0.20.0
+        version: link:npm/darwin-arm64
+      "@joedeleeuw/antidrift-linter-darwin-x64":
+        specifier: 0.20.0
+        version: link:npm/darwin-x64
+      "@joedeleeuw/antidrift-linter-linux-arm64-gnu":
+        specifier: 0.20.0
+        version: link:npm/linux-arm64-gnu
+      "@joedeleeuw/antidrift-linter-linux-x64-gnu":
+        specifier: 0.20.0
+        version: link:npm/linux-x64-gnu
+      "@joedeleeuw/antidrift-linter-win32-arm64-msvc":
+        specifier: 0.20.0
+        version: link:npm/win32-arm64-msvc
+      "@joedeleeuw/antidrift-linter-win32-x64-msvc":
+        specifier: 0.20.0
+        version: link:npm/win32-x64-msvc
+
+  tooling/antidrift/npm/darwin-arm64: {}
+
+  tooling/antidrift/npm/darwin-x64: {}
+
+  tooling/antidrift/npm/linux-arm64-gnu: {}
+
+  tooling/antidrift/npm/linux-x64-gnu: {}
+
+  tooling/antidrift/npm/win32-arm64-msvc: {}
+
+  tooling/antidrift/npm/win32-x64-msvc: {}
 
 packages:
   "@babel/code-frame@7.29.7":
