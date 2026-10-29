@@ -1,7 +1,8 @@
+use antidrift_kernel::callgraph::{IdentifierRef, ProgramSymbolIndex};
 use antidrift_kernel::rule_scope::RuleScope;
 use antidrift_kernel::{callgraph, provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
-use tsrs_ast::{self as ast, Kind, Node, Symbol};
+use tsrs_ast::{self as ast, Kind, Node, SourceFile, Symbol};
 use tsrs_checker::Checker;
 use tsrs_compiler::Program;
 use tsrs_core::P;
@@ -180,14 +181,15 @@ fn parameters_match_in_order(
     Some((scan.has_bound_literal, scan.has_preceding_effect))
 }
 
+#[derive(Default)]
 struct RefAudit {
-    target: P<Symbol>,
     has_identity_ref: bool,
     has_export_specifier: bool,
     has_non_immutable_arg: bool,
     call_count: usize,
-    caller_files: FxHashSet<String>,
-    current_file: String,
+    caller_files: FxHashSet<P<SourceFile>>,
+    non_test_refs: usize,
+    test_refs: usize,
 }
 
 fn is_immutable_call_argument(arg: P<Node>, checker: &mut Checker) -> bool {
@@ -246,66 +248,54 @@ fn call_for_direct_reference(ident: P<Node>) -> Option<P<Node>> {
     valid.then_some(call_node)
 }
 
-fn audit_refs_in_node(node: P<Node>, checker: &mut Checker, audit: &mut RefAudit) {
-    if ast::is_identifier(node)
-        && provenance::symbol_at_node(checker, node) == Some(audit.target)
-        && !node
-            .parent()
-            .is_some_and(|parent| audit.target.declarations().contains(&parent))
-    {
-        let parent = node.parent();
-        if parent.is_some_and(ast::is_import_specifier) {
-            return;
-        }
-        if let Some(exp) = parent
-            && ast::is_export_specifier(exp)
-        {
-            if exp.as_export_specifier().name().text() == "default" {
-                audit.has_identity_ref = true;
-            } else {
-                audit.has_export_specifier = true;
-            }
-            return;
-        }
-        if let Some(call_node) = call_for_direct_reference(node) {
-            audit.call_count += 1;
-            audit.caller_files.insert(audit.current_file.clone());
-            if call_node
-                .as_call_expression()
-                .arguments()
-                .nodes()
-                .iter()
-                .any(|&arg| !is_immutable_call_argument(arg, checker))
-            {
-                audit.has_non_immutable_arg = true;
-            }
-        } else {
-            audit.has_identity_ref = true;
-        }
+fn audit_reference(reference: IdentifierRef, checker: &mut Checker, audit: &mut RefAudit) {
+    if reference.is_test_file {
+        audit.test_refs += 1;
+    } else {
+        audit.non_test_refs += 1;
     }
-    node.for_each_child(&mut |child| {
-        audit_refs_in_node(child, checker, audit);
-        false
-    });
+    let node = reference.node;
+    let parent = node.parent();
+    if parent.is_some_and(ast::is_import_specifier) {
+        return;
+    }
+    if let Some(exp) = parent
+        && ast::is_export_specifier(exp)
+    {
+        if exp.as_export_specifier().name().text() == "default" {
+            audit.has_identity_ref = true;
+        } else {
+            audit.has_export_specifier = true;
+        }
+        return;
+    }
+    let Some(call_node) = call_for_direct_reference(node) else {
+        audit.has_identity_ref = true;
+        return;
+    };
+    audit.call_count += 1;
+    audit.caller_files.insert(reference.file);
+    if call_node
+        .as_call_expression()
+        .arguments()
+        .nodes()
+        .iter()
+        .any(|&arg| !is_immutable_call_argument(arg, checker))
+    {
+        audit.has_non_immutable_arg = true;
+    }
 }
 
-fn audit_program_references(program: &Program, checker: &mut Checker, sym: P<Symbol>) -> RefAudit {
-    let target = provenance::resolve_aliased_symbol(checker, sym);
-    let mut audit = RefAudit {
-        target,
-        has_identity_ref: false,
-        has_export_specifier: false,
-        has_non_immutable_arg: false,
-        call_count: 0,
-        caller_files: FxHashSet::default(),
-        current_file: String::new(),
-    };
-    for &sf in program.get_source_files() {
-        if tsrs_kernel::is_declaration_file(sf.file_name()) {
-            continue;
-        }
-        sf.file_name().clone_into(&mut audit.current_file);
-        audit_refs_in_node(sf.as_node(), checker, &mut audit);
+fn audit_program_references(
+    program: &Program,
+    checker: &mut Checker,
+    sym: P<Symbol>,
+    name: &'static str,
+) -> RefAudit {
+    let index = ProgramSymbolIndex::for_program(program);
+    let mut audit = RefAudit::default();
+    for reference in index.references_to_symbol(checker, sym, name) {
+        audit_reference(reference, checker, &mut audit);
     }
     audit
 }
@@ -313,7 +303,7 @@ fn audit_program_references(program: &Program, checker: &mut Checker, sym: P<Sym
 fn is_reexported_in_program(
     program: &Program,
     checker: &mut Checker,
-    target_sf: P<ast::SourceFile>,
+    target_sf: P<SourceFile>,
 ) -> bool {
     for &sf in program.get_source_files() {
         if sf == target_sf || tsrs_kernel::is_declaration_file(sf.file_name()) {
@@ -356,9 +346,8 @@ fn check_candidate(ctx: &mut Ctx, fn_node: P<Node>, name_ident: P<Node>, decl: P
     else {
         return;
     };
-    let (non_test_refs, test_refs) =
-        callgraph::count_program_references_to_symbol(ctx.program, ctx.checker, Some(sym));
-    let audit = audit_program_references(ctx.program, ctx.checker, sym);
+    let name = candidate.name_node.as_identifier().text();
+    let audit = audit_program_references(ctx.program, ctx.checker, sym, name);
     if audit.has_identity_ref
         || (has_bound_literal && audit.caller_files.len() >= 2)
         || (has_preceding_effect && audit.has_non_immutable_arg)
@@ -372,9 +361,8 @@ fn check_candidate(ctx: &mut Ctx, fn_node: P<Node>, name_ident: P<Node>, decl: P
     {
         return;
     }
-    let total_refs = non_test_refs + test_refs;
+    let total_refs = audit.non_test_refs + audit.test_refs;
     let calls = audit.call_count.min(total_refs);
-    let name = candidate.name_node.as_identifier().text();
     let callee = tsrs_kernel::node_text(ctx.file, candidate.callee_node);
     if exported && calls == 0 {
         return;

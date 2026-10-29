@@ -70,16 +70,20 @@ impl RuleVisitor for Visitor {
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
         for comment in scan_source_comments(ctx.file.text()) {
-            if is_tutorial_comment(comment.raw_content) {
-                ctx.report_range(
-                    comment.pos,
-                    comment.end,
-                    RuleMessage::new(
-                        "tutorial",
-                        "Tutorial-style explanatory comment detected. Remove the narration and keep the code direct.",
-                    ),
-                );
-            }
+            let message = if is_tutorial_comment(comment.raw_content) {
+                RuleMessage::new(
+                    "tutorial",
+                    "Tutorial-style explanatory comment detected. Remove the narration and keep the code direct.",
+                )
+            } else if !comment.is_block && is_section_divider(comment.text) {
+                RuleMessage::new(
+                    "sectionDivider",
+                    "ASCII section-divider banner detected. Delete the banner; split the file along the seam it marks instead.",
+                )
+            } else {
+                continue;
+            };
+            ctx.report_range(comment.pos, comment.end, message);
         }
     }
 }
@@ -100,4 +104,37 @@ fn is_tutorial_comment(text: &str) -> bool {
         .iter()
         .skip(1)
         .any(|word| VERB_WORDS.contains(&word.as_str()))
+}
+
+const DIVIDER_CHARS: &[char] = &['=', '-', '*', '~'];
+const HEADER_WORDS: &[&str] = &["copyright", "license", "spdx"];
+
+fn divider_run(mut chars: impl Iterator<Item = char>) -> usize {
+    let Some(first) = chars.next().filter(|ch| DIVIDER_CHARS.contains(ch)) else {
+        return 0;
+    };
+    1 + chars.take_while(|&ch| ch == first).count()
+}
+
+fn is_section_divider(text: &str) -> bool {
+    if text.is_empty() || text.starts_with('/') || text.contains("://") || text.contains('|') {
+        return false;
+    }
+    let lowered = text.to_ascii_lowercase();
+    if HEADER_WORDS.iter().any(|word| lowered.contains(word)) {
+        return false;
+    }
+    let divider_count = text.chars().filter(|ch| DIVIDER_CHARS.contains(ch)).count();
+    if text
+        .chars()
+        .all(|ch| DIVIDER_CHARS.contains(&ch) || ch.is_whitespace())
+    {
+        return divider_count >= 8;
+    }
+    let (lead, trail) = (divider_run(text.chars()), divider_run(text.chars().rev()));
+    if lead < 3 || trail < 3 {
+        return false;
+    }
+    let label = text.get(lead..text.len() - trail).map_or("", str::trim);
+    !label.is_empty() && label.len() <= 48 && !label.starts_with(DIVIDER_CHARS)
 }

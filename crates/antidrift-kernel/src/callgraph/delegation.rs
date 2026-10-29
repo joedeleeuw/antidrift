@@ -1,12 +1,9 @@
 use tsrs_ast::{
-    self as ast, ArrayLiteralExpression, Kind, Node, ObjectLiteralExpression, Symbol,
-    TemplateExpression,
+    self as ast, ArrayLiteralExpression, Kind, Node, ObjectLiteralExpression, TemplateExpression,
 };
-use tsrs_checker::Checker;
-use tsrs_compiler::Program;
 use tsrs_core::P;
 
-use crate::{provenance, tsrs_kernel};
+use crate::tsrs_kernel;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct DelegatedCallCandidate {
@@ -182,59 +179,4 @@ pub fn find_delegated_call(
         call_node: call,
         callee_node: callee,
     })
-}
-
-struct SymbolRefCountState {
-    resolved_target: P<Symbol>,
-    is_test: bool,
-    non_test_refs: usize,
-    test_refs: usize,
-}
-
-fn count_symbol_refs_in_node(
-    node: P<Node>,
-    checker: &mut Checker,
-    state: &mut SymbolRefCountState,
-) {
-    if ast::is_identifier(node)
-        && provenance::symbol_at_node(checker, node) == Some(state.resolved_target)
-        && !node
-            .parent()
-            .is_some_and(|parent| state.resolved_target.declarations().contains(&parent))
-    {
-        if state.is_test {
-            state.test_refs += 1;
-        } else {
-            state.non_test_refs += 1;
-        }
-    }
-    node.for_each_child(&mut |child| {
-        count_symbol_refs_in_node(child, checker, state);
-        false
-    });
-}
-
-pub fn count_program_references_to_symbol(
-    program: &Program,
-    checker: &mut Checker,
-    target_sym: Option<P<Symbol>>,
-) -> (usize, usize) {
-    let Some(target) = target_sym else {
-        return (0, 0);
-    };
-    let resolved_target = provenance::resolve_aliased_symbol(checker, target);
-    let mut state = SymbolRefCountState {
-        resolved_target,
-        is_test: false,
-        non_test_refs: 0,
-        test_refs: 0,
-    };
-    for &sf in program.get_source_files() {
-        if tsrs_kernel::is_declaration_file(sf.file_name()) {
-            continue;
-        }
-        state.is_test = tsrs_kernel::is_test_file(sf.file_name());
-        count_symbol_refs_in_node(sf.as_node(), checker, &mut state);
-    }
-    (state.non_test_refs, state.test_refs)
 }

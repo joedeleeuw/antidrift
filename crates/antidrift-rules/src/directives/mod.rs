@@ -7,6 +7,7 @@ pub mod no_debug_residue_filenames;
 pub mod no_default_export_in_domain;
 pub mod no_host_path_literal;
 pub mod no_partial_record_satisfies;
+pub mod no_reexport_only_module;
 pub mod no_todo_without_issue;
 pub mod no_tutorial_comments;
 pub mod no_unknown_type_aliases;
@@ -25,6 +26,7 @@ pub fn rules() -> Vec<&'static dyn Rule> {
         &no_default_export_in_domain::DEFAULT_RULE,
         &no_host_path_literal::DEFAULT_RULE,
         &no_partial_record_satisfies::DEFAULT_RULE,
+        &no_reexport_only_module::DEFAULT_RULE,
         &no_todo_without_issue::DEFAULT_RULE,
         &no_tutorial_comments::DEFAULT_RULE,
         &no_unknown_type_aliases::DEFAULT_RULE,
@@ -61,6 +63,9 @@ pub fn create_rule(
         no_partial_record_satisfies::RULE_NAME | "no-partial-record-satisfies" => Ok(Some(
             Box::new(no_partial_record_satisfies::NoPartialRecordSatisfies::from_options(options)?),
         )),
+        no_reexport_only_module::RULE_NAME | "no-reexport-only-module" => Ok(Some(Box::new(
+            no_reexport_only_module::NoReexportOnlyModule::from_options(options)?,
+        ))),
         no_todo_without_issue::RULE_NAME | "no-todo-without-issue" => Ok(Some(Box::new(
             no_todo_without_issue::NoTodoWithoutIssue::from_options(options)?,
         ))),

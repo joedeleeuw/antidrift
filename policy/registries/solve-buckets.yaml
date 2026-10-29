@@ -216,6 +216,34 @@ rules:
       target: semantic-ast,
       note: "TypeChecker 1-hop declaration and default-parameter proof catching synchronous wall-clock and PRNG calls inside non-async React render paths.",
     }
+  antidrift/no-hypothetical-seam:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "One ProgramSymbolIndex pass resolves implements/extends clauses and annotated object literals to the seam symbol and counts leaf production and test adapters; call sites resolved to the function symbol prove no production caller overrides an effectful default.",
+    }
+  antidrift/no-reexport-only-module:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "Top-level statement proof that a non-entrypoint module only re-exports imported or from-clause bindings; underscore-prefixed private sibling facades and side-effect imports stay clean.",
+    }
+  antidrift/no-closed-string-parameter:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "TypeChecker symbol proof that a string parameter is rejected outside a const literal set of two or more members; boolean mode flags additionally require a bare true/false argument at an indexed call site.",
+    }
+  antidrift/no-argument-mutation-side-effect:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "Module-scope void functions whose TypeChecker-resolved data-bag parameter (type literal, Record, Map or method-free interface) is written through a member assignment or Map.set without a local rebind.",
+    }
 
 # Behaviors the taxonomy reveals we do not have blocking coverage for yet. Some need a missing
 # bucket; others, like diff-scope-creep, now have an inventory spine but still need promotion

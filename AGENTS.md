@@ -25,7 +25,7 @@ Run `pnpm policy:verify-session` before pushing.
 - **generated-type-drift** (types-platform): gen/require-import-from-generated
 - **authorization-control-drift** (security): auth/no-boundaryless-route, auth/no-client-only-authorization, auth/require-authz-check
 - **error-handling** (reliability): errors/preserve-caught-error, errors/no-anemic-errors
-- **directive-smells** (engineering-productivity): arch/no-pass-through-parameters, compat/no-compat-names, simplicity/no-nested-ternary, simplicity/no-else-if-chain, provenance/no-host-path-literal, provenance/no-dated-comments
+- **directive-smells** (engineering-productivity): arch/no-pass-through-parameters, compat/no-compat-names, simplicity/no-nested-ternary, simplicity/no-else-if-chain, provenance/no-host-path-literal, provenance/no-dated-comments, arch/no-hypothetical-seam, arch/no-reexport-only-module, ts/no-closed-string-parameter, simplicity/no-argument-mutation-side-effect
 - **test-integrity** (quality): test/no-only-or-skip, test/no-conditional-expect, test/no-test-without-assertion
 - **design-system** (design-system): ui/no-raw-tailwind-color, ui/no-hover-translate-card, ui/no-generic-ai-copy
 - **observability-drift** (reliability): obs/async-boundary-requires-context, obs/no-fire-and-forget-without-tracking

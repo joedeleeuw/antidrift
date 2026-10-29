@@ -32,7 +32,7 @@ clusters:
         severity: error
         detector: componentUseStateCountGte:4
         message: Use a reducer, state object, query resource, or state machine when state values change together.
-      - id: react/no-handrolled-resource-lifecycle-cells # An async transition hand-rolls a resource lifecycle: a constant lifecycle cell is toggled while a sibling receives the awaited resource and the caught error.
+      - id: react/no-handrolled-resource-lifecycle-cells # An async transition hand-rolls a resource lifecycle (a constant lifecycle cell toggled while a sibling receives the awaited resource and the caught error), or a useState cell mirrors a prop or hook result and is only re-synced from an effect.
         severity: error
         detector: sameFunctionDistinctStateSettersGte:3
         message: Model one transition instead of scattering updates across setters.
@@ -233,6 +233,22 @@ clusters:
         severity: error
         detector: antidrift:no-dated-comments
         message: History belongs in commit bodies and field notes, not in code.
+      - id: arch/no-hypothetical-seam # G11 an abstract class or implemented interface with one production adapter, or an effectful default parameter only tests override.
+        severity: error
+        detector: antidrift:no-hypothetical-seam
+        message: Depend on the one adapter directly and add the seam when a second production adapter exists.
+      - id: arch/no-reexport-only-module # G10 a non-entrypoint module whose statements only re-export bindings owned elsewhere.
+        severity: error
+        detector: antidrift:no-reexport-only-module
+        message: Import from the owning module and delete the re-export hop.
+      - id: ts/no-closed-string-parameter # G9 a string parameter the body closes to a literal set, or a positional boolean that only selects a mode.
+        severity: error
+        detector: antidrift:no-closed-string-parameter
+        message: Type the parameter as the literal union decoded at the boundary, or split each boolean mode into its own function.
+      - id: simplicity/no-argument-mutation-side-effect # D2 a module function that returns nothing and writes fields into a data argument.
+        severity: error
+        detector: antidrift:no-argument-mutation-side-effect
+        message: Return the new value and let the caller own the update.
 
   - id: test-integrity # Agents often write tests that execute code without constraining behavior.
     owner: quality # Quality owns test evidence policy.

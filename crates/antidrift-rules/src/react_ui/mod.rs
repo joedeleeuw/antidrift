@@ -22,6 +22,7 @@ pub mod require_dir_on_rendered_name;
 pub mod require_effect_deps;
 pub mod require_exhaustive_panic;
 pub mod require_stable_snapshot;
+mod shadow_state_mirror;
 
 use icon_button_requires_tooltip::IconButtonRequiresTooltip;
 use no_adhoc_loader::NoAdhocLoader;

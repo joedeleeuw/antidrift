@@ -52,10 +52,27 @@ export const portableCases = [
   },
   {
     name: "no-tutorial-comments",
+    occurrences: 3,
     invalid:
-      "// This function returns the value\nfunction value() { return 1; }",
+      "// This function returns the value\n// ====================\n// --- Helpers ---\nfunction value() { return 1; }",
     valid:
-      "// The wire protocol uses big endian order.\nfunction value() { return 1; }",
+      "// The wire protocol uses big endian order.\n// |---|---|\n// https://example.com/a---b\nconst gap = 3 - 1; // a --- b\nfunction value() { return gap; }",
+  },
+  {
+    name: "no-reexport-only-module",
+    filename: "parsers.ts",
+    occurrences: 1,
+    invalid:
+      'import { parse } from "./owner";\nexport { parse };\nexport * from "./owner";',
+    valid: 'export { parse } from "./_internal";',
+  },
+  {
+    name: "no-handrolled-resource-lifecycle-cells",
+    filename: "Field.tsx",
+    invalid:
+      'import { useState, useEffect } from "react";\nexport function Field({ value }) {\n  const [draft, setDraft] = useState(value);\n  useEffect(() => { setDraft(value); }, [value]);\n  return <input value={draft} />;\n}',
+    valid:
+      'import { useState, useEffect } from "react";\nexport function Field({ value }) {\n  const [draft, setDraft] = useState(value);\n  useEffect(() => { setDraft(value); }, [value]);\n  return <input value={draft} onChange={(event) => setDraft(event.target.value)} />;\n}',
   },
   {
     name: "no-debug-residue-filenames",

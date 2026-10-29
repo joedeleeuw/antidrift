@@ -3,11 +3,28 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve } from "node:path";
 
+import { z } from "zod";
+
 import { collectChangeSurface } from "./change-context.mjs";
 import { semanticFactToJsonLine } from "../policy/lib/semantic-facts.mjs";
 import { resolveNativeLinterBinary } from "../policy/oxlint.mjs";
 
 const CODE_FILE_RE = /\.(?:js|mjs|cjs|ts|tsx|mts|cts)$/u;
+
+const LinterJsonOutput = z.array(
+  z.object({
+    filePath: z.string(),
+    messages: z.array(
+      z.object({
+        ruleId: z.string(),
+        severity: z.number(),
+        message: z.string(),
+        line: z.number(),
+        column: z.number(),
+      })
+    ),
+  })
+);
 
 function compareStrings(left, right) {
   if (left < right) return -1;
@@ -40,12 +57,12 @@ function inPatchHunks(entry, patchHunks) {
 function findingFromMessage(cwd, result, message) {
   return {
     path: relativePath(cwd, result.filePath),
-    ruleId: message.ruleId ?? null,
-    line: message.line ?? null,
-    column: message.column ?? null,
+    ruleId: message.ruleId,
+    line: message.line,
+    column: message.column,
     severity: message.severity === 2 ? "error" : "warn",
     message: message.message,
-    fatal: Boolean(message.fatal),
+    fatal: false,
   };
 }
 
@@ -171,7 +188,8 @@ export async function diffScopedAdapters({
       );
       if (linterRun.error) throw linterRun.error;
       const rawJson = (linterRun.stdout ?? "").trim();
-      results = rawJson.length > 0 ? JSON.parse(rawJson) : [];
+      results =
+        rawJson.length > 0 ? LinterJsonOutput.parse(JSON.parse(rawJson)) : [];
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

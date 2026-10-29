@@ -1,6 +1,8 @@
 pub mod erasure_analysis;
 pub mod no_appeasement_cast;
 pub mod no_appeasement_erasure;
+pub mod no_argument_mutation_side_effect;
+pub mod no_closed_string_parameter;
 pub mod no_compat_names;
 pub mod no_pass_through_parameters;
 pub mod no_redundant_type_predicate;
@@ -21,6 +23,8 @@ pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
         &no_underchecked_type_predicate::DEFAULT_INSTANCE,
         &no_wrapping_functions::DEFAULT_INSTANCE,
         &no_unresolved_dependency_types::DEFAULT_INSTANCE,
+        &no_closed_string_parameter::DEFAULT_RULE,
+        &no_argument_mutation_side_effect::DEFAULT_RULE,
     ]
 }
 
@@ -69,6 +73,16 @@ pub fn create_rule(
         }
         "antidrift/no-compat-names" | "no-compat-names" => {
             Ok(Some(no_compat_names::create(options)?))
+        }
+        no_closed_string_parameter::RULE_NAME | "no-closed-string-parameter" => Ok(Some(Box::new(
+            no_closed_string_parameter::NoClosedStringParameter::from_options(options)?,
+        ))),
+        no_argument_mutation_side_effect::RULE_NAME | "no-argument-mutation-side-effect" => {
+            Ok(Some(Box::new(
+                no_argument_mutation_side_effect::NoArgumentMutationSideEffect::from_options(
+                    options,
+                )?,
+            )))
         }
         "antidrift/no-vague-names" | "no-vague-names" => Ok(Some(no_vague_names::create(options)?)),
         _ => Ok(None),

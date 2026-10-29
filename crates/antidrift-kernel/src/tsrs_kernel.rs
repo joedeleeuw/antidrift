@@ -92,6 +92,14 @@ pub fn is_test_file(file_path: &str) -> bool {
 }
 
 #[must_use]
+pub fn is_authored_source_file(sf: P<SourceFile>) -> bool {
+    let file_name = sf.file_name();
+    !is_declaration_file(file_name)
+        && !is_test_file(file_name)
+        && !is_generated_file(file_name, sf.text())
+}
+
+#[must_use]
 pub fn is_boundary_file(file_path: &str) -> bool {
     let normalized = normalize_path(file_path);
     has_script_ext(&normalized)

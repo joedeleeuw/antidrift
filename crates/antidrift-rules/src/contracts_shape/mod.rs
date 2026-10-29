@@ -1,5 +1,6 @@
 pub mod no_contract_appeasement_projection;
 pub mod no_explicit_type_arguments_on_owned_api;
+pub mod no_hypothetical_seam;
 pub mod no_nullable_positional_tuple;
 pub mod no_service_constructor_imports;
 pub mod no_structural_type_fork;
@@ -17,6 +18,7 @@ pub fn rules() -> Vec<&'static dyn Rule> {
         &react_max_component_props::RULE,
         &no_explicit_type_arguments_on_owned_api::RULE,
         &no_service_constructor_imports::RULE,
+        &no_hypothetical_seam::DEFAULT_RULE,
     ]
 }
 
@@ -54,6 +56,9 @@ pub fn create_rule(
                 options,
             )?),
         )),
+        no_hypothetical_seam::RULE_NAME | "no-hypothetical-seam" => Ok(Some(Box::new(
+            no_hypothetical_seam::NoHypotheticalSeam::from_options(options)?,
+        ))),
         _ => Ok(None),
     }
 }

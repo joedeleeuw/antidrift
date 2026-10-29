@@ -1,3 +1,4 @@
+use super::shadow_state_mirror::{SHADOW_STATE_MIRROR_MESSAGE, shadow_state_mirrors};
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
@@ -47,6 +48,12 @@ impl Rule for NoHandrolledResourceLifecycleCells {
             ctx.report_node(
                 node,
                 RuleMessage::new("handrolledResourceLifecycle", MESSAGE),
+            );
+        }
+        for node in shadow_state_mirrors(ctx.file, &traversal.imports) {
+            ctx.report_node(
+                node,
+                RuleMessage::new("shadowStateMirror", SHADOW_STATE_MIRROR_MESSAGE),
             );
         }
         Box::new(EmptyVisitor)
