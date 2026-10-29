@@ -216,6 +216,13 @@ rules:
       target: semantic-ast,
       note: "TypeChecker 1-hop declaration and default-parameter proof catching synchronous wall-clock and PRNG calls inside non-async React render paths.",
     }
+  antidrift/no-query-join-or-tree-reshape:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "Lexical-binding provenance proof over a single function: render-body joins of two or more distinct reactive query/store roots, two-level tree flattening over query/prop sources, and three mutually independent serial awaits.",
+    }
 
 # Behaviors the taxonomy reveals we do not have blocking coverage for yet. Some need a missing
 # bucket; others, like diff-scope-creep, now have an inventory spine but still need promotion

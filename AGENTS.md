@@ -29,7 +29,7 @@ Run `pnpm policy:verify-session` before pushing.
 - **test-integrity** (quality): test/no-only-or-skip, test/no-conditional-expect, test/no-test-without-assertion
 - **design-system** (design-system): ui/no-raw-tailwind-color, ui/no-hover-translate-card, ui/no-generic-ai-copy
 - **observability-drift** (reliability): obs/async-boundary-requires-context, obs/no-fire-and-forget-without-tracking
-- **performance-resource-drift** (performance): perf/no-await-in-loop-with-io, perf/no-async-array-method, perf/no-unbounded-promise-all, perf/require-timeout-for-network-call, perf/no-redundant-validation
+- **performance-resource-drift** (performance): perf/no-await-in-loop-with-io, perf/no-async-array-method, perf/no-unbounded-promise-all, perf/require-timeout-for-network-call, perf/no-redundant-validation, perf/no-query-join-or-tree-reshape
 - **injection-and-secret-drift** (security): sec/no-hardcoded-secret, sec/no-sql-string-concat, sec/no-unsafe-deserialize
 - **agent-ops** (developer-experience): agent/block-generated-policy-edits, agent/lint-after-edit, agent/require-checks-before-push
 - **quality-gate-drift** (developer-experience): policy/no-check-weakening-without-policy-task, policy/no-inline-disable-without-ticket

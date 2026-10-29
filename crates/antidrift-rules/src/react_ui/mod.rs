@@ -1,3 +1,4 @@
+pub mod await_waterfall;
 pub mod icon_button_requires_tooltip;
 pub mod no_adhoc_loader;
 pub mod no_ambient_hotkey_format;
@@ -14,6 +15,7 @@ pub mod no_omitted_prop_respread;
 pub mod no_physical_properties;
 pub mod no_portal_under_interactive_ancestor;
 pub mod no_query_envelope_leak;
+pub mod no_query_join_or_tree_reshape;
 pub mod no_raw_foreground_opacity;
 pub mod no_unformatted_number;
 pub mod no_unstable_render_default_collection;
@@ -39,6 +41,7 @@ use no_omitted_prop_respread::NoOmittedPropRespread;
 use no_physical_properties::NoPhysicalProperties;
 use no_portal_under_interactive_ancestor::NoPortalUnderInteractiveAncestor;
 use no_query_envelope_leak::NoQueryEnvelopeLeak;
+use no_query_join_or_tree_reshape::NoQueryJoinOrTreeReshape;
 use no_raw_foreground_opacity::NoRawForegroundOpacity;
 use no_unformatted_number::NoUnformattedNumber;
 use no_unstable_render_default_collection::NoUnstableRenderDefaultCollection;
@@ -54,6 +57,7 @@ pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
     vec![
         &no_impure_render_call::DEFAULT_RULE,
         &no_query_envelope_leak::DEFAULT_RULE,
+        &no_query_join_or_tree_reshape::DEFAULT_RULE,
     ]
 }
 
@@ -118,6 +122,7 @@ pub fn create_rule(
             boxed(NoPortalUnderInteractiveAncestor::from_options(options))
         }
         "no-query-envelope-leak" => boxed(NoQueryEnvelopeLeak::from_options(options)),
+        "no-query-join-or-tree-reshape" => boxed(NoQueryJoinOrTreeReshape::from_options(options)),
         "no-raw-foreground-opacity" => boxed(NoRawForegroundOpacity::from_options(options)),
         "no-unformatted-number" => boxed(NoUnformattedNumber::from_options(options)),
         "no-unstable-render-default-collection" => {

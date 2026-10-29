@@ -385,3 +385,62 @@ pub fn is_identifier_mutated_in_subtree(root: P<Node>, target_name: &str) -> boo
         .into_iter()
         .any(is_write_reference)
 }
+
+#[must_use]
+pub fn binding_pattern_identifiers(name: P<Node>) -> Vec<P<Node>> {
+    if ast::is_identifier(name) {
+        return vec![name];
+    }
+    if !matches!(
+        name.kind(),
+        Kind::ObjectBindingPattern | Kind::ArrayBindingPattern
+    ) {
+        return Vec::new();
+    }
+    name.as_binding_pattern()
+        .elements()
+        .nodes()
+        .iter()
+        .filter_map(|element| element.name())
+        .flat_map(binding_pattern_identifiers)
+        .collect()
+}
+
+#[must_use]
+pub fn declared_bindings(declaration: P<Node>) -> Vec<Binding> {
+    declaration
+        .name()
+        .map(binding_pattern_identifiers)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|ident| Binding {
+            decl: declaration,
+            ident,
+        })
+        .collect()
+}
+
+pub fn for_each_resolved_reference(
+    node: P<Node>,
+    enter_functions: bool,
+    visit: &mut dyn FnMut(Binding),
+) {
+    if ast::is_identifier(node) {
+        if is_identifier_reference_position(node)
+            && node
+                .parent()
+                .is_none_or(|parent| parent.kind() != Kind::JsxAttribute)
+            && let Some(binding) = resolve_lexical_binding(node)
+        {
+            visit(binding);
+        }
+        return;
+    }
+    if !enter_functions && is_function_like(node) {
+        return;
+    }
+    node.for_each_child(&mut |child| {
+        for_each_resolved_reference(child, enter_functions, visit);
+        false
+    });
+}

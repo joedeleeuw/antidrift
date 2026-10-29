@@ -331,6 +331,15 @@ pub fn member_chain_root_identifier(node: P<Node>) -> Option<&'static str> {
 }
 
 #[must_use]
+pub fn callee_name(call: P<Node>) -> Option<&'static str> {
+    let callee = unwrap_expression(call.as_call_expression().expression());
+    if ast::is_identifier(callee) {
+        return Some(callee.as_identifier().text());
+    }
+    terminal_member_name(callee)
+}
+
+#[must_use]
 pub fn terminal_member_name(node: P<Node>) -> Option<&'static str> {
     let unwrapped = unwrap_expression(node);
     match unwrapped.kind() {
