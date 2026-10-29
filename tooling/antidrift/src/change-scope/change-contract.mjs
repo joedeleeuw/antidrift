@@ -5,42 +5,9 @@ import { analyzeChangeScope } from "./analyze.mjs";
 import { collectChangeSurface } from "./change-context.mjs";
 import { parseContract } from "./contract-schema.mjs";
 import { collectTouchedModuleGraph } from "./module-graph.mjs";
-import {
-  semanticFact,
-  semanticFactToJsonLine,
-} from "../policy/lib/semantic-facts.mjs";
 
 export const CHANGE_CONTRACT_CLAIM =
   "the diff exceeded the declared scope contract";
-
-/**
- * Build the inventory-only semantic fact for a change-contract conformance result.
- * @param {ReturnType<typeof runChangeContract>} result
- * @param {string} contractPath
- */
-function changeContractFact(result, contractPath) {
-  return semanticFact({
-    factKind: "changeContractConformance",
-    ruleId: "antidrift/change-contract-conformance",
-    adapterId: "change-contract",
-    confidence: "deterministic-inventory",
-    provenance: [
-      "change-contract",
-      "git-diff",
-      "package-manifest",
-      "ts-program",
-    ],
-    filePath: contractPath,
-    payload: {
-      contractState: result.contractState,
-      changeContext: result.changeContext,
-      declaredScope: result.declaredScope,
-      actualChangeSurface: result.actualChangeSurface,
-      violations: result.violations,
-      decision: result.decision,
-    },
-  });
-}
 
 function contractStateFor(contractRelativePath, changedFiles) {
   const match = changedFiles.find(
@@ -152,7 +119,6 @@ const CHANGE_CONTRACT_VALUE_FLAGS = Object.freeze({
   "--head": "head",
   "--tsconfig": "tsconfig",
   "--output": "output",
-  "--facts-out": "factsOut",
   "--mode": "mode",
 });
 
@@ -166,7 +132,6 @@ export function parseArgs(argv) {
     cwd: process.cwd(),
     tsconfig: null,
     output: null,
-    factsOut: null,
     requireContract: false,
     mode: "inventory",
   };
@@ -190,11 +155,6 @@ export function parseArgs(argv) {
   return parsed;
 }
 
-/**
- * CLI entry: inventory-only (v0). Missing contract exits 0; invalid contract or a present contract
- * without a base ref fails loudly. Violations are reported, never enforced.
- * @param {string[]} argv
- */
 export function changeContractCommand(argv) {
   const parsed = parseArgs(argv);
   if (parsed.mode !== "inventory") {
@@ -216,12 +176,6 @@ export function changeContractCommand(argv) {
     writeFileSync(
       resolve(parsed.cwd, parsed.output),
       `${JSON.stringify(result, null, 2)}\n`
-    );
-  }
-  if (parsed.factsOut && result.contractState !== "missing") {
-    writeFileSync(
-      resolve(parsed.cwd, parsed.factsOut),
-      semanticFactToJsonLine(changeContractFact(result, parsed.contractPath))
     );
   }
   if (result.contractState === "missing") {

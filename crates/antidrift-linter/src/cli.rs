@@ -8,20 +8,21 @@ pub(crate) enum OutputFormat {
 }
 
 #[derive(Debug, Clone)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "CLI flag switches are independent boolean options"
-)]
 pub(crate) struct CliArgs {
     pub(crate) format: OutputFormat,
     pub(crate) fix: bool,
     pub(crate) prune_suppressions: bool,
     pub(crate) suppress_rules: Vec<String>,
     pub(crate) suppressions_path: PathBuf,
-    pub(crate) batch_json: Option<String>,
     pub(crate) report_unused_directives: bool,
-    pub(crate) list_rules: bool,
     pub(crate) paths: Vec<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum CliAction {
+    ListRules,
+    BatchJson(String),
+    Lint(CliArgs),
 }
 
 impl Default for CliArgs {
@@ -32,30 +33,48 @@ impl Default for CliArgs {
             prune_suppressions: false,
             suppress_rules: Vec::new(),
             suppressions_path: PathBuf::from("eslint-suppressions.json"),
-            batch_json: None,
             report_unused_directives: false,
-            list_rules: false,
             paths: Vec::new(),
         }
     }
 }
 
-pub(crate) fn parse_cli_args<I>(raw_args: I) -> Result<CliArgs, String>
+pub(crate) fn parse_cli_args<I>(raw_args: I) -> Result<CliAction, String>
 where
     I: IntoIterator<Item = String>,
 {
     let mut parsed = CliArgs::default();
+    let mut batch_json: Option<String> = None;
+    let mut list_rules = false;
     let mut iter = raw_args.into_iter();
     while let Some(arg) = iter.next() {
-        apply_single_arg(&arg, &mut iter, &mut parsed)?;
+        apply_single_arg(
+            &arg,
+            &mut iter,
+            &mut parsed,
+            &mut batch_json,
+            &mut list_rules,
+        )?;
     }
-    if parsed.paths.is_empty() && parsed.batch_json.is_none() && !parsed.list_rules {
+    if list_rules {
+        return Ok(CliAction::ListRules);
+    }
+    if let Some(spec) = batch_json {
+        return Ok(CliAction::BatchJson(spec));
+    }
+    if parsed.paths.is_empty() {
         parsed.paths.push(PathBuf::from("."));
     }
-    Ok(parsed)
+    Ok(CliAction::Lint(parsed))
 }
 
-fn apply_single_arg<I>(arg: &str, iter: &mut I, parsed: &mut CliArgs) -> Result<(), String>
+fn apply_single_arg<I>(
+    arg: &str,
+    iter: &mut I,
+    parsed: &mut CliArgs,
+    batch_json: &mut Option<String>,
+    list_rules: &mut bool,
+) -> Result<(), String>
 where
     I: Iterator<Item = String>,
 {
@@ -63,7 +82,7 @@ where
         "--fix" => parsed.fix = true,
         "--prune-suppressions" => parsed.prune_suppressions = true,
         "--report-unused-disable-directives" => parsed.report_unused_directives = true,
-        "--list-rules" => parsed.list_rules = true,
+        "--list-rules" => *list_rules = true,
         "--format" => {
             let val = iter.next().ok_or("missing value for --format")?;
             parsed.format = parse_format(&val)?;
@@ -80,7 +99,7 @@ where
         }
         "--batch-json" => {
             let val = iter.next().ok_or("missing value for --batch-json")?;
-            parsed.batch_json = Some(val);
+            *batch_json = Some(val);
         }
         other if other.starts_with('-') => {
             return Err(format!("unknown flag: {other}"));

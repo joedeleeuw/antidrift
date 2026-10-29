@@ -6,7 +6,6 @@ import { dirname, relative, resolve } from "node:path";
 import { z } from "zod";
 
 import { collectChangeSurface } from "./change-context.mjs";
-import { semanticFactToJsonLine } from "../policy/lib/semantic-facts.mjs";
 import { resolveNativeLinterBinary } from "../policy/oxlint.mjs";
 
 const CODE_FILE_RE = /\.(?:js|mjs|cjs|ts|tsx|mts|cts)$/u;
@@ -67,21 +66,6 @@ function findingFromMessage(cwd, result, message) {
   };
 }
 
-function factEntry(fact) {
-  return {
-    factKind: fact.factKind,
-    ruleId: fact.ruleId,
-    adapterId: fact.adapterId,
-    confidence: fact.confidence,
-    path: (fact.filePath ?? "").replace(/\\/gu, "/"),
-    line: fact.location?.line ?? null,
-    column: fact.location?.column ?? null,
-    evidenceHash: fact.evidenceHash,
-    factId: fact.factId,
-    payload: fact.payload ?? {},
-  };
-}
-
 function countBy(entries, key) {
   const counts = {};
   for (const entry of entries) {
@@ -102,16 +86,6 @@ function writeJson(output, cwd, summary) {
   writeFileSync(target, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
 }
 
-function writeFacts(output, cwd, facts) {
-  const target = resolve(cwd, output);
-  mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(
-    target,
-    facts.map((fact) => semanticFactToJsonLine(fact)).join(""),
-    "utf8"
-  );
-}
-
 function requireValue(argv, index, flag) {
   const value = argv[index + 1];
   if (value === undefined || value.startsWith("--")) {
@@ -125,7 +99,6 @@ const argumentOptions = {
   "--head": { field: "head", read: String },
   "--cwd": { field: "cwd", read: resolve },
   "--output": { field: "output", read: String },
-  "--facts-out": { field: "factsOut", read: String },
   "--slice": { field: "slice", read: String },
 };
 
@@ -135,7 +108,6 @@ export function parseArgs(argv) {
     head: "HEAD",
     cwd: process.cwd(),
     output: null,
-    factsOut: null,
     slice: "diff-scoped-adapters",
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -157,14 +129,12 @@ export async function diffScopedAdapters({
   head = "HEAD",
   cwd = process.cwd(),
   output = null,
-  factsOut = null,
   slice = "diff-scoped-adapters",
   report = console.log,
 } = {}) {
   const root = resolve(cwd);
   const surface = collectChangeSurface({ base, head, cwd: root });
   const targets = codeFiles(surface.changedFiles);
-  const facts = [];
   let results = [];
   if (targets.length > 0) {
     const tempDir = mkdtempSync(resolve(tmpdir(), "antidrift-diff-scoped-"));
@@ -210,19 +180,6 @@ export async function diffScopedAdapters({
   const diffFindings = allFindings.filter((finding) =>
     inPatchHunks(finding, surface.patchHunks)
   );
-  const allFactEntries = facts
-    .map(factEntry)
-    .sort((left, right) =>
-      compareStrings(
-        `${left.path}:${left.line}:${left.factKind}:${left.evidenceHash}`,
-        `${right.path}:${right.line}:${right.factKind}:${right.evidenceHash}`
-      )
-    );
-  const diffFactEntries = allFactEntries.filter((fact) =>
-    inPatchHunks(fact, surface.patchHunks)
-  );
-  const diffFactIds = new Set(diffFactEntries.map((fact) => fact.factId));
-  const diffFacts = facts.filter((fact) => diffFactIds.has(fact.factId));
   const summary = {
     schemaVersion: 1,
     command: "antidrift diff-scoped-adapters",
@@ -235,17 +192,9 @@ export async function diffScopedAdapters({
       diffScoped: diffFindings.length,
       byRule: countBy(diffFindings, "ruleId"),
     },
-    factCounts: {
-      total: allFactEntries.length,
-      diffScoped: diffFactEntries.length,
-      byFactKind: countBy(diffFactEntries, "factKind"),
-    },
     findings: diffFindings,
-    facts: diffFactEntries,
-    decision: "inventory",
   };
   if (output) writeJson(output, root, summary);
-  if (factsOut) writeFacts(factsOut, root, diffFacts);
   if (!output) report(JSON.stringify(summary, null, 2));
   return summary;
 }

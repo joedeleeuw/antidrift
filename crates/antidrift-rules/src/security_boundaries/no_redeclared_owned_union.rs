@@ -5,7 +5,7 @@ use super::owned_union_source::{
 use super::package_ownership::absolute_filename;
 use super::package_resolution::resolver_with_mode;
 use antidrift_kernel::local_binding::Binding;
-use antidrift_kernel::registries::OwnedUnionStatus;
+use antidrift_kernel::registries::OwnedUnion;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use antidrift_kernel::ts_resolver::ResolutionMode;
 use oxc_resolver::{ResolveError, Resolver};
@@ -29,7 +29,7 @@ struct OwnedUnionOptions {
     #[serde(flatten)]
     scope: ScopeOptions,
     allows: BTreeSet<String>,
-    statuses: BTreeMap<String, OwnedUnionStatus>,
+    statuses: BTreeMap<String, OwnedUnion>,
 }
 
 struct UnionOwner {
@@ -413,7 +413,7 @@ fn imported_arrays<'c>(
 
 fn status_report(
     node: P<Node>,
-    statuses: &BTreeMap<String, OwnedUnionStatus>,
+    statuses: &BTreeMap<String, OwnedUnion>,
     filename: &str,
 ) -> Option<String> {
     if node.kind() != Kind::LiteralType {

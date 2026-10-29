@@ -31,10 +31,20 @@ impl Rule for NoReexportOnlyModule {
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         if !self.scope.in_scope(ctx)
             || !tsrs_kernel::is_authored_source_file(ctx.file)
-            || provenance::is_package_entry_file(ctx.file.file_name())
             || is_tool_config_file(ctx.file.file_name())
         {
             return Box::new(EmptyVisitor);
+        }
+        match provenance::is_package_entry_file(ctx.file.file_name()) {
+            Ok(true) => return Box::new(EmptyVisitor),
+            Ok(false) => {}
+            Err(error) => {
+                ctx.report_node(
+                    ctx.file.as_node(),
+                    RuleMessage::new("invalidPackageJson", error.to_string()),
+                );
+                return Box::new(EmptyVisitor);
+            }
         }
         let statements = ctx.file.statements().nodes();
         if let Some(first_export) = reexport_only_anchor(statements) {

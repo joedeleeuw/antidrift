@@ -104,7 +104,7 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/package.json` — package metadata for consumer tooling
 - `@joedeleeuw/antidrift/brand` — `Brand<T, Name>`, `Unbrand<T>`, and `brand(name, check)`
 - `@joedeleeuw/antidrift/oxlint-config` — custom drift governance and registry-aware import restrictions
-- `@joedeleeuw/antidrift/policy` — functional policy checks, semantic fact sinks, and shipped `SEMANTIC_FACT_KINDS` contracts for advanced tooling
+- `@joedeleeuw/antidrift/policy` — functional policy checks, artifact generation, and registry validation for advanced tooling
 - `antidrift` — the CLI binary for generate/check/report commands, `antidrift oxlint`, and opt-in `shell` guardrails
 
 ## Brand values

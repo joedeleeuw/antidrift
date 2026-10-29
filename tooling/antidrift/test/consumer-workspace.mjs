@@ -306,14 +306,11 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'import { createGovernanceOxlintConfig, loadPolicy, loadRegistriesSync, renderPolicyArtifacts, type AgentGuardrailsPolicy, type AntidriftGovernanceOxlintConfigOptions, type AntidriftRegistries, type PolicyArtifacts } from "@joedeleeuw/antidrift";\n' +
       'import { brand, type Brand, type BrandKit, type BrandSafeResult, type Unbrand } from "@joedeleeuw/antidrift/brand";\n' +
       'import { createGovernanceOxlintConfig as createGovernanceOxlintConfigFromSubpath, type AntidriftGovernanceOxlintConfigOptions as OxlintSubpathConfigOptions } from "@joedeleeuw/antidrift/oxlint-config";\n' +
-      'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkChanged, checkGenerated, checkRegistries, createJsonlFactSink, createMemoryFactSink, defaultAstGrepBinary, DEFAULT_AST_GREP_CONFIG, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, parseOxlintArgs, parseShellGuardrailsArgs, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, runOxlint, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, shellGuardrails, verifySession, type AgentGuardrailsPolicy as PolicySubpathPolicy, type OxlintArgs, type SemanticFact, type SemanticFactKind, type SemanticFactKindContractEntry } from "@joedeleeuw/antidrift/policy";\n' +
+      'import { checkChanged, checkGenerated, checkRegistries, defaultAstGrepBinary, DEFAULT_AST_GREP_CONFIG, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, parseOxlintArgs, parseShellGuardrailsArgs, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, runOxlint, shellGuardrails, verifySession, type AgentGuardrailsPolicy as PolicySubpathPolicy, type OxlintArgs } from "@joedeleeuw/antidrift/policy";\n' +
       "\n" +
       "const policy = { clusters: [] } satisfies AgentGuardrailsPolicy;\n" +
       "const subpathPolicy = policy satisfies PolicySubpathPolicy;\n" +
       "const artifacts = renderPolicyArtifacts(policy);\n" +
-      'const semantic = semanticFact({ factKind: "test", ruleId: "antidrift/test", adapterId: "test", confidence: "deterministic-inventory", provenance: ["AST"], payload: {} });\n' +
-      "const memorySink = createMemoryFactSink();\n" +
-      "const jsonlSink = createJsonlFactSink(() => {});\n" +
       'const oxlintOptions = { repoRoot: ".", policyDir: "policy" } satisfies AntidriftGovernanceOxlintConfigOptions & OxlintSubpathConfigOptions;\n' +
       'const oxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false }) satisfies OxlintArgs;\n' +
       'const branded = brand("UserId", (value): value is string => typeof value === "string" && value.startsWith("user_"));\n' +
@@ -331,20 +328,6 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "loadPolicyFromPolicy satisfies (policyPath?: string) => Promise<PolicySubpathPolicy>;\n" +
       "loadRegistriesFromPolicy satisfies (policyDir?: string) => AntidriftRegistries;\n" +
       "renderPolicyArtifactsFromPolicy(subpathPolicy) satisfies PolicyArtifacts;\n" +
-      "SEMANTIC_FACT_KINDS.structuralMatch.payloadFields satisfies readonly string[];\n" +
-      "SEMANTIC_FACT_KINDS.structuralMatch.association satisfies string;\n" +
-      "SEMANTIC_FACT_KINDS.structuralMatch.noSinkBehavior satisfies string;\n" +
-      "SEMANTIC_FACT_KIND_CONTRACT_LIST satisfies readonly SemanticFactKindContractEntry[];\n" +
-      'semanticFactKindContractsForAdapterId("react-state") satisfies readonly SemanticFactKindContractEntry[];\n' +
-      'semanticFactKindContractsForConfidence("deterministic-enforcement") satisfies readonly SemanticFactKindContractEntry[];\n' +
-      'semanticFactKindContractsForEmission("blocking-diagnostic") satisfies readonly SemanticFactKindContractEntry[];\n' +
-      'semanticFactKindContractsForRule("antidrift/no-handrolled-resource-lifecycle-cells") satisfies readonly SemanticFactKindContractEntry[];\n' +
-      '"structuralMatch" satisfies SemanticFactKind;\n' +
-      "SEMANTIC_FACT_SCHEMA_VERSION satisfies 1;\n" +
-      "semantic satisfies SemanticFact;\n" +
-      "semanticFactToJsonLine(semantic) satisfies string;\n" +
-      "memorySink.facts satisfies SemanticFact[];\n" +
-      "jsonlSink.emit(semantic);\n" +
       "oxlintArgs.targets satisfies string[];\n" +
       "runOxlint satisfies (options?: Record<string, unknown>) => number;\n" +
       'branded satisfies BrandKit<string, "UserId">;\n' +
@@ -369,7 +352,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'import packageMetadata from "@joedeleeuw/antidrift/package.json" with { type: "json" };\n' +
       'import { brand } from "@joedeleeuw/antidrift/brand";\n' +
       'import { createGovernanceOxlintConfig as createGovernanceOxlintConfigFromSubpath } from "@joedeleeuw/antidrift/oxlint-config";\n' +
-      'import { SEMANTIC_FACT_KINDS, SEMANTIC_FACT_KIND_CONTRACT_LIST, SEMANTIC_FACT_SCHEMA_VERSION, checkChanged, checkGenerated, checkRegistries, createJsonlFactSink, createMemoryFactSink, defaultAstGrepBinary, DEFAULT_AST_GREP_CONFIG, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, parseOxlintArgs, parseShellGuardrailsArgs, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, runOxlint, semanticFact, semanticFactKindContractsForAdapterId, semanticFactKindContractsForConfidence, semanticFactKindContractsForEmission, semanticFactKindContractsForRule, semanticFactToJsonLine, shellGuardrails, verifySession } from "@joedeleeuw/antidrift/policy";\n' +
+      'import { checkChanged, checkGenerated, checkRegistries, defaultAstGrepBinary, DEFAULT_AST_GREP_CONFIG, generate, loadPolicy as loadPolicyFromPolicy, loadRegistriesSync as loadRegistriesFromPolicy, parseOxlintArgs, parseShellGuardrailsArgs, renderPolicyArtifacts as renderPolicyArtifactsFromPolicy, runOxlint, shellGuardrails, verifySession } from "@joedeleeuw/antidrift/policy";\n' +
       "\n" +
       "const exportsToCheck = {\n" +
       "  complexityRules, toolingOxlint, typescriptSyntaxRules, typescriptTypeAwareRules, typescriptBaselineTier, adoptionPresets, createAdoptionOxlintConfig,\n" +
@@ -390,17 +373,6 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       "  parseOxlintArgs,\n" +
       "  parseShellGuardrailsArgs,\n" +
       "  renderPolicyArtifactsFromPolicy,\n" +
-      "  SEMANTIC_FACT_KINDS,\n" +
-      "  SEMANTIC_FACT_KIND_CONTRACT_LIST,\n" +
-      "  SEMANTIC_FACT_SCHEMA_VERSION,\n" +
-      "  semanticFactKindContractsForAdapterId,\n" +
-      "  semanticFactKindContractsForConfidence,\n" +
-      "  semanticFactKindContractsForEmission,\n" +
-      "  semanticFactKindContractsForRule,\n" +
-      "  createJsonlFactSink,\n" +
-      "  createMemoryFactSink,\n" +
-      "  semanticFact,\n" +
-      "  semanticFactToJsonLine,\n" +
       "  runOxlint,\n" +
       "  shellGuardrails,\n" +
       "  verifySession,\n" +
@@ -419,9 +391,6 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
       'const runtimeOxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false });\n' +
       'if (runtimeOxlintArgs.targets.join(",") !== ".") {\n' +
       '  throw new Error("Missing oxlint policy export behavior");\n' +
-      "}\n" +
-      'if (!SEMANTIC_FACT_KINDS.structuralMatch.payloadFields.includes("ownerType")) {\n' +
-      '  throw new Error("Missing structuralMatch semantic fact contract");\n' +
       "}\n"
   );
 }

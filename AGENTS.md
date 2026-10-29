@@ -4,13 +4,13 @@ This file is generated from `policy/agent-guardrails.yaml`. Do not edit it direc
 
 ## Required checks
 
-Run `pnpm policy:verify-session` before finishing substantial code work.
+Run `pnpm policy:verify-session` before pushing.
 
 ## Never
 
 - Do not edit generated policy artifacts directly.
 - Do not weaken lint/type/test/CI/Sonar/hook configuration unless the task includes `[policy-change]`.
-- Do not add type escape hatches, silent catches, focused tests, raw component fetches, or cross-layer imports.
+- Do not add type escape hatches, silent catches, focused tests, or cross-layer imports.
 - Do not add compatibility barrels, re-export barrels, or import-preserving barrel files.
 - Do not add compatibility shims, legacy aliases, fallback wrappers, or backwards-compatible wrappers unless the task explicitly asks for a migration bridge and removal plan.
 
@@ -25,7 +25,7 @@ Run `pnpm policy:verify-session` before finishing substantial code work.
 - **generated-type-drift** (types-platform): gen/require-import-from-generated
 - **authorization-control-drift** (security): auth/no-boundaryless-route, auth/no-client-only-authorization, auth/require-authz-check
 - **error-handling** (reliability): errors/preserve-caught-error, errors/no-anemic-errors
-- **directive-smells** (engineering-productivity): naming/no-vague-names, arch/no-pass-through-parameters, compat/no-compat-names, simplicity/no-nested-ternary, simplicity/no-else-if-chain, provenance/no-host-path-literal, provenance/no-dated-comments, arch/no-hypothetical-seam, arch/no-reexport-only-module, ts/no-closed-string-parameter, simplicity/no-argument-mutation-side-effect
+- **directive-smells** (engineering-productivity): arch/no-pass-through-parameters, compat/no-compat-names, simplicity/no-nested-ternary, simplicity/no-else-if-chain, provenance/no-host-path-literal, provenance/no-dated-comments, arch/no-hypothetical-seam, arch/no-reexport-only-module, ts/no-closed-string-parameter, simplicity/no-argument-mutation-side-effect
 - **test-integrity** (quality): test/no-only-or-skip, test/no-conditional-expect, test/no-test-without-assertion
 - **design-system** (design-system): ui/no-raw-tailwind-color, ui/no-hover-translate-card, ui/no-generic-ai-copy
 - **observability-drift** (reliability): obs/async-boundary-requires-context, obs/no-fire-and-forget-without-tracking

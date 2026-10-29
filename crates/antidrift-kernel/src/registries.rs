@@ -6,7 +6,7 @@ use std::path::Path;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct OwnedUnionStatus {
+pub struct OwnedUnion {
     pub owner: String,
     #[serde(default)]
     pub values_export: Option<String>,
@@ -20,9 +20,9 @@ pub struct DomainRegistry {
     #[serde(default)]
     pub canonical_entities: BTreeMap<String, String>,
     #[serde(default)]
-    pub statuses: BTreeMap<String, OwnedUnionStatus>,
+    pub statuses: BTreeMap<String, OwnedUnion>,
     #[serde(default)]
-    pub roles: Option<OwnedUnionStatus>,
+    pub roles: Option<OwnedUnion>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

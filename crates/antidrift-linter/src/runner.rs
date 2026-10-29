@@ -21,8 +21,8 @@ use tsrslint::rule::{ReportedDiagnostic, Rule};
 use crate::batch::reported_to_rule_diagnostic;
 use crate::cli::CliArgs;
 use crate::format::format_diagnostics;
-use crate::tsgolint_host::{BoundProgram, ProgramBuilderEnv, collect_missing_bound_files};
-use crate::tsgolint_runner::default_workspace_rules;
+use crate::headless::default_workspace_rules;
+use crate::headless_host::{BoundProgram, ProgramBuilderEnv, collect_missing_bound_files};
 
 pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
     tsrs_checker::links::set_sparse_id_pages(true);

@@ -23,7 +23,7 @@ export function checkRuleRegistry(registry, repoRoot, errors) {
   const root = resolve(repoRoot);
   if (!isRecord(registry) || Object.keys(registry).length === 0) {
     errors.push(
-      "policy/registries/rules.yaml must exist and contain semantic fact or retirement records."
+      "policy/registries/rules.yaml must exist and contain retirement records."
     );
     return;
   }

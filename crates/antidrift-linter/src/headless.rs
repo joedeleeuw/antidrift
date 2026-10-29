@@ -17,7 +17,7 @@ use tsrslint::protocol::{
 use tsrslint::rule::{ReportedDiagnostic, Rule};
 use tsrslint::rules;
 
-use crate::tsgolint_host::{
+use crate::headless_host::{
     ProgramBuilderEnv, base_fs, collect_missing_bound_files, filter_suppressed_diagnostics,
 };
 

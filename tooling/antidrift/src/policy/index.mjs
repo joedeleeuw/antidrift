@@ -1,18 +1,5 @@
 export { loadRegistriesSync } from "./lib/registries.mjs";
 export {
-  SEMANTIC_FACT_KINDS,
-  SEMANTIC_FACT_KIND_CONTRACT_LIST,
-  SEMANTIC_FACT_SCHEMA_VERSION,
-  createJsonlFactSink,
-  createMemoryFactSink,
-  semanticFact,
-  semanticFactKindContractsForAdapterId,
-  semanticFactKindContractsForConfidence,
-  semanticFactKindContractsForEmission,
-  semanticFactKindContractsForRule,
-  semanticFactToJsonLine,
-} from "./lib/semantic-facts.mjs";
-export {
   generate,
   loadPolicy,
   renderPolicyArtifacts,
