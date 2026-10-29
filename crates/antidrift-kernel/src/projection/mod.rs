@@ -3,6 +3,7 @@ pub mod bag_state;
 pub mod constant_return_field;
 pub mod contract_projection;
 pub mod inline_parse;
+pub mod sum_erasure;
 
 pub use bag_reshaper::{
     BagReshaperClassification, classify_bag_reshaper, collect_binding_pattern_symbols,
@@ -22,3 +23,4 @@ pub use contract_projection::is_contract_appeasement_projection;
 pub use inline_parse::{
     InlineParseReshapeClassification, InlineParseReshapeKind, classify_inline_parse_reshape,
 };
+pub use sum_erasure::find_sum_to_product_erasure;

@@ -1,4 +1,4 @@
-use super::await_waterfall::independent_await_runs;
+use super::await_waterfall::{independent_await_runs, relational_key_join_calls};
 use antidrift_kernel::jsx::{
     function_returns_jsx, is_component_or_hook_function, react_function_name,
 };
@@ -118,8 +118,14 @@ impl RuleVisitor for Visitor {
                     .into_iter()
                     .map(|statement| (statement, Finding::SequentialAsyncWaterfall)),
             );
-        } else if is_render_function(node) {
+        }
+        if is_render_function(node) {
             RenderScan::run(node, body, &mut findings);
+        }
+        for call in relational_key_join_calls(body) {
+            if !findings.iter().any(|(existing, _)| *existing == call) {
+                findings.push((call, Finding::MultiQueryRenderJoin));
+            }
         }
         for (reported, finding) in findings {
             ctx.report_node(reported, finding.message());

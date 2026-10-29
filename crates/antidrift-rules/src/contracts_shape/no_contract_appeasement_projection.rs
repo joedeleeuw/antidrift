@@ -1,6 +1,7 @@
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_symbol_origin, symbol_at_node};
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{projection, tsrs_kernel};
+use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -57,6 +58,15 @@ fn build_constant_return_field_message(
         "constantReturnField",
         format!(
             "Return contract '{contract_name}' declares '{field_name}' as boolean, but every return branch in this module hardcodes '{field_name}: {constant_literal}'; compute the real value per branch or remove the dead contract field."
+        ),
+    )
+}
+
+fn build_sum_to_product_erasure_message(discriminant_field: &str) -> RuleMessage {
+    RuleMessage::new(
+        "sumToProductErasure",
+        format!(
+            "Do not flatten discriminated state ('{discriminant_field}') into a boolean-flag + nullable-error product bag; preserve the discriminated union across the boundary."
         ),
     )
 }
@@ -225,7 +235,7 @@ fn is_cross_boundary_domain_mapper(ctx: &mut Ctx, function: P<Node>, candidate: 
     ) && return_origin == DeclarationOrigin::LocalDomain
 }
 
-fn check_function_candidate(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>) {
+fn check_function_candidate(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>) -> bool {
     let file_name = ctx.file.file_name();
     if !tsrs_kernel::is_test_file(file_name)
         && !tsrs_kernel::is_generated_file(file_name, ctx.file.text())
@@ -242,20 +252,24 @@ fn check_function_candidate(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>
                         candidate,
                         build_bag_to_contract_message(&parameter_name, &target_contract),
                     );
+                    return true;
                 }
             }
             projection::BagReshaperClassification::BagToBag { parameter_name } => {
                 ctx.report_node(candidate, build_bag_to_bag_message(&parameter_name));
+                return true;
             }
         }
-        return;
+        return false;
     }
     if is_exported_boundary(candidate, ctx.file) {
-        return;
+        return false;
     }
     if projection::is_contract_appeasement_projection(function, ctx.file, ctx.checker) {
         ctx.report_node(candidate, build_contract_appeasement_projection_message());
+        return true;
     }
+    false
 }
 
 impl Rule for NoContractAppeasementProjection {
@@ -269,24 +283,34 @@ impl Rule for NoContractAppeasementProjection {
         }
         Box::new(Visitor {
             candidates: Vec::new(),
+            object_literals: Vec::new(),
+            reported_functions: FxHashSet::default(),
         })
     }
 }
 
 struct Visitor {
     candidates: Vec<(P<Node>, P<Node>)>,
+    object_literals: Vec<P<Node>>,
+    reported_functions: FxHashSet<P<Node>>,
 }
 
-const LISTENERS: [Listener; 6] = [
+const LISTENERS: [Listener; 7] = [
     Listener::Enter(Kind::FunctionDeclaration),
     Listener::Enter(Kind::VariableDeclaration),
     Listener::Enter(Kind::MethodDeclaration),
     Listener::Enter(Kind::PropertyDeclaration),
     Listener::Enter(Kind::PropertyAssignment),
+    Listener::Enter(Kind::ObjectLiteralExpression),
     Listener::Exit(Kind::EndOfFile),
 ];
 
-fn report_constant_return_fields(ctx: &mut Ctx, candidates: &[(P<Node>, P<Node>)]) {
+fn report_end_of_file(
+    ctx: &mut Ctx,
+    candidates: &[(P<Node>, P<Node>)],
+    object_literals: &[P<Node>],
+    reported_functions: &FxHashSet<P<Node>>,
+) {
     let file_name = ctx.file.file_name();
     if tsrs_kernel::is_test_file(file_name)
         || tsrs_kernel::is_generated_file(file_name, ctx.file.text())
@@ -305,6 +329,16 @@ fn report_constant_return_fields(ctx: &mut Ctx, candidates: &[(P<Node>, P<Node>)
             ),
         );
     }
+    for &obj_node in object_literals {
+        if tsrs_kernel::enclosing_function(obj_node)
+            .is_some_and(|fn_node| reported_functions.contains(&fn_node))
+        {
+            continue;
+        }
+        if let Some(disc) = projection::find_sum_to_product_erasure(obj_node) {
+            ctx.report_node(obj_node, build_sum_to_product_erasure_message(&disc));
+        }
+    }
 }
 
 impl RuleVisitor for Visitor {
@@ -314,12 +348,23 @@ impl RuleVisitor for Visitor {
 
     fn visit(&mut self, ctx: &mut Ctx, listener: Listener, node: P<Node>) {
         if matches!(listener, Listener::Exit(Kind::EndOfFile)) {
-            report_constant_return_fields(ctx, &self.candidates);
+            report_end_of_file(
+                ctx,
+                &self.candidates,
+                &self.object_literals,
+                &self.reported_functions,
+            );
+            return;
+        }
+        if node.kind() == Kind::ObjectLiteralExpression {
+            self.object_literals.push(node);
             return;
         }
         if let Some(fn_node) = tsrs_kernel::function_node_from_declaration(node) {
             self.candidates.push((fn_node, node));
-            check_function_candidate(ctx, fn_node, node);
+            if check_function_candidate(ctx, fn_node, node) {
+                self.reported_functions.insert(fn_node);
+            }
         }
     }
 }

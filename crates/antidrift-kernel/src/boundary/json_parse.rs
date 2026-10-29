@@ -25,6 +25,100 @@ pub fn is_json_parse_call(node: P<Node>) -> bool {
     ast::is_identifier(name_node) && name_node.as_identifier().text() == "parse"
 }
 
+#[must_use]
+pub fn is_json_stringify_call(node: P<Node>) -> bool {
+    let unwrapped = tsrs_kernel::unwrap_expression(node);
+    if !ast::is_call_expression(unwrapped) {
+        return false;
+    }
+    let callee = unwrapped.as_call_expression().expression();
+    if !ast::is_property_access_expression(callee) {
+        return false;
+    }
+    let prop = callee.as_property_access_expression();
+    let expr = prop.expression();
+    if !ast::is_identifier(expr) || expr.as_identifier().text() != "JSON" {
+        return false;
+    }
+    let name_node = prop.name();
+    ast::is_identifier(name_node) && name_node.as_identifier().text() == "stringify"
+}
+
+fn contains_json_stringify(node: P<Node>) -> bool {
+    if is_json_stringify_call(node) {
+        return true;
+    }
+    let mut found = false;
+    node.for_each_child(&mut |child| {
+        if contains_json_stringify(child) {
+            found = true;
+            return true;
+        }
+        false
+    });
+    found
+}
+
+fn is_family_callback_parameter(param_decl: P<Node>) -> bool {
+    let Some(fn_node) = param_decl.parent() else {
+        return false;
+    };
+    let Some(call_node) = fn_node.parent() else {
+        return false;
+    };
+    if !ast::is_call_expression(call_node) {
+        return false;
+    }
+    let callee = call_node.as_call_expression().expression();
+    if ast::is_identifier(callee) {
+        let text = callee.as_identifier().text();
+        return text == "family" || text.ends_with("Family");
+    }
+    if ast::is_property_access_expression(callee) {
+        let name = callee.as_property_access_expression().name();
+        return ast::is_identifier(name)
+            && (name.as_identifier().text() == "family"
+                || name.as_identifier().text().ends_with("Family"));
+    }
+    false
+}
+
+pub fn is_json_stringify_roundtrip(checker: &mut Checker, call_node: P<Node>) -> bool {
+    if !is_json_parse_call(call_node) {
+        return false;
+    }
+    let args = call_node.as_call_expression().arguments().nodes();
+    let Some(&first_arg) = args.first() else {
+        return false;
+    };
+    let arg = tsrs_kernel::unwrap_expression(first_arg);
+    if is_json_stringify_call(arg) {
+        return true;
+    }
+    if !ast::is_identifier(arg) {
+        return false;
+    }
+    let sym = provenance::symbol_at_node(checker, arg);
+    for decl in provenance::symbol_declarations(checker, sym) {
+        if ast::is_variable_declaration(decl)
+            && decl
+                .as_variable_declaration()
+                .initializer()
+                .is_some_and(contains_json_stringify)
+        {
+            return true;
+        }
+        if decl.kind() == Kind::Parameter
+            && is_family_callback_parameter(decl)
+            && let Some(sf) = ast::get_source_file_of_node(call_node)
+            && contains_json_stringify(sf.as_node())
+        {
+            return true;
+        }
+    }
+    false
+}
+
 pub fn is_global_json_parse(
     program: Option<&Program>,
     checker: &mut Checker,

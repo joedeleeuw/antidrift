@@ -1,11 +1,11 @@
 use tsrs_ast::{self as ast, Kind, Node};
-use tsrs_checker::Checker;
+use tsrs_checker::{Checker, Type, TypeFlags};
 use tsrs_core::P;
-use tsrslint::utils::is_object_type;
+use tsrslint::utils::{is_object_type, is_type_flag_set};
 
 use crate::{provenance, shape};
 
-use super::schema::is_zod_method;
+use super::schema::{is_effect_schema_method, is_valibot_method, is_zod_method};
 
 const THROW_ASSERTION_MATCHERS: &[&str] = &["toThrow", "toThrowError"];
 
@@ -160,7 +160,10 @@ pub fn zod_transform_call_parts(
     if !matches!(cb.kind(), Kind::ArrowFunction | Kind::FunctionExpression) {
         return None;
     }
-    if !is_zod_method(checker, name_node) {
+    if !is_zod_method(checker, name_node)
+        && !is_valibot_method(checker, name_node)
+        && !is_effect_schema_method(checker, name_node)
+    {
         return None;
     }
     Some(ZodTransformCall {
@@ -169,25 +172,55 @@ pub fn zod_transform_call_parts(
     })
 }
 
-pub fn closed_zod_transform_input_keys(receiver: P<Node>, checker: &mut Checker) -> Vec<String> {
-    let receiver_type = checker.get_type_at_location(receiver);
-    let Some(sym) = receiver_type.symbol() else {
-        return Vec::new();
-    };
-    if sym.name() != "ZodObject" {
+fn closed_type_property_names(checker: &mut Checker, input_type: P<Type>) -> Vec<String> {
+    if is_type_flag_set(input_type, TypeFlags::AnyOrUnknown) {
         return Vec::new();
     }
-    let Some(output_sym) = checker.get_property_of_type(receiver_type, "_output") else {
-        return Vec::new();
-    };
-    let Some(input_type) = checker.get_type_of_symbol_at_location(output_sym, Some(receiver))
-    else {
-        return Vec::new();
-    };
+    if is_type_flag_set(input_type, TypeFlags::Union) {
+        let mut iter = input_type.as_union_type().types().iter().copied();
+        let Some(first_member) = iter.next() else {
+            return Vec::new();
+        };
+        let mut first_keys = closed_type_property_names(checker, first_member);
+        if first_keys.is_empty() {
+            return Vec::new();
+        }
+        first_keys.sort();
+        for member in iter {
+            let mut member_keys = closed_type_property_names(checker, member);
+            member_keys.sort();
+            if member_keys != first_keys {
+                return Vec::new();
+            }
+        }
+        return first_keys;
+    }
     if !is_object_type(input_type)
         || shape::has_string_or_number_index_signature(checker, input_type)
     {
         return Vec::new();
     }
     shape::object_property_names(checker, input_type)
+}
+
+pub fn closed_zod_transform_input_keys(receiver: P<Node>, checker: &mut Checker) -> Vec<String> {
+    let receiver_type = checker.get_type_at_location(receiver);
+    if let Some(output_sym) = checker.get_property_of_type(receiver_type, "_output")
+        && let Some(input_type) = checker.get_type_of_symbol_at_location(output_sym, Some(receiver))
+    {
+        let keys = closed_type_property_names(checker, input_type);
+        if !keys.is_empty() {
+            return keys;
+        }
+    }
+    if let Some(prop) = receiver.parent()
+        && let Some(call) = prop.parent()
+        && ast::is_call_expression(call)
+        && let Some(&cb) = call.as_call_expression().arguments().nodes().first()
+        && let Some(&param) = cb.parameters().first()
+    {
+        let param_type = checker.get_type_at_location(param);
+        return closed_type_property_names(checker, param_type);
+    }
+    Vec::new()
 }

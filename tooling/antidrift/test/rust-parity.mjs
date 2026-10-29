@@ -199,9 +199,9 @@ const boundaryProbes = [
     id: "resource-lifecycle:invalid",
     rule: "antidrift/no-handrolled-resource-lifecycle-cells",
     sourceText:
-      'import { useState } from "react";\nexport function UsersView() {\n  const [users, setUsers] = useState([]);\n  const [loading, setLoading] = useState(false);\n  const [error, setError] = useState(null);\n  async function load() {\n    setLoading(true);\n    try {\n      const result = await fetch("/api/users");\n      setUsers(result);\n    } catch (err) {\n      setError(err);\n    } finally {\n      setLoading(false);\n    }\n  }\n  return <button onClick={load}>{loading ? "Loading" : error ? "Error" : users.length}</button>;\n}\n',
+      'import { useState } from "react";\nexport function UsersView() {\n  const [users, setUsers] = useState([]);\n  const [loading, setLoading] = useState(false);\n  const [error, setError] = useState(null);\n  async function load() {\n    setLoading(true);\n    try {\n      const result = await fetch("/api/users");\n      setUsers(result);\n    } catch (err) {\n      setError(err);\n    } finally {\n      setLoading(false);\n    }\n  }\n  const [state, setState] = useState({ entries: [], loading: false, error: null });\n  async function search() {\n    setState((prev) => ({ ...prev, loading: true, error: null }));\n    try {\n      const payload = await fetch("/api/search");\n      setState({ entries: payload, loading: false, error: null });\n    } catch (err) {\n      setState({ entries: [], loading: false, error: String(err) });\n    }\n  }\n  return <button onClick={() => { void load(); void search(); }}>{loading || state.loading ? "Loading" : error || state.error ? "Error" : users.length}</button>;\n}\n',
     filename: join(sourceWorkspace, "UsersView.tsx"),
-    expectedCount: 1,
+    expectedCount: 2,
   },
   {
     id: "reexport-only:tool-config",
@@ -326,26 +326,31 @@ const headlessProbes = [
     expectedCount: 1,
   },
   {
-    name: "no-unsafe-deserialize (alias-to-contract)",
+    name: "no-unsafe-deserialize (alias-to-contract and JSON.stringify roundtrip)",
     rule: "antidrift/no-unsafe-deserialize",
     source: `
       type Account = { id: string };
       export function parseAccount(text: string) {
         const raw = JSON.parse(text);
         const account: Account = raw;
-        return account.id;
+        const cloned = JSON.parse(JSON.stringify(account));
+        return String(account.id) + String(cloned);
       }
     `,
-    expectedCount: 1,
+    expectedCount: 2,
   },
   {
-    name: "no-identity-schema-transform (direct identity x => x)",
+    name: "no-identity-schema-transform (direct identity, union transform, and full-object call repack)",
     rule: "antidrift/no-identity-schema-transform",
     source: `
       import { z } from "zod";
+      const PartSchema = z.union([z.object({ id: z.string(), kind: z.literal("a") }), z.object({ id: z.string(), kind: z.literal("b") })]);
+      declare function mapPart(input: { id: string; kind: "a" | "b" }): string;
       export const schema = z.string().transform((value) => value);
+      export const unionEnvelope = PartSchema.transform((part) => ({ id: part.id, kind: part.kind }));
+      export const mappedEnvelope = unionEnvelope.transform((part) => mapPart({ id: part.id, kind: part.kind }));
     `,
-    expectedCount: 1,
+    expectedCount: 3,
   },
   {
     name: "no-redundant-zod-parse (z.infer<typeof schema>)",
@@ -1116,7 +1121,7 @@ const headlessProbes = [
     expectedCount: 0,
   },
   {
-    name: "no-contract-appeasement-projection (constantReturnField on non-union contract vs sibling producer and union)",
+    name: "no-contract-appeasement-projection (constantReturnField and sumToProductErasure vs sibling producer)",
     rule: "antidrift/no-contract-appeasement-projection",
     file: "tooling/antidrift/src/__probe_constant_return_field.ts",
     source: `
@@ -1132,6 +1137,25 @@ const headlessProbes = [
       }
       export function fetchReset(rows: string[]): TimelinePage {
         return { rows, reset: true };
+      }
+      export function toStatusBag(envId: string, result: { _tag: "Success" | "Failure"; waiting: boolean }) {
+        return { envId, isPending: result.waiting, error: result._tag === "Failure" ? "failed" : null };
+      }
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-query-join-or-tree-reshape (non-React relational key lookup join)",
+    rule: "antidrift/no-query-join-or-tree-reshape",
+    source: `
+      export function joinProviders(
+        selections: ReadonlyArray<{ instanceId: string; model: string }>,
+        providers: ReadonlyArray<{ instanceId: string; ready: boolean }>,
+      ) {
+        return selections.map((sel) => ({
+          model: sel.model,
+          ready: providers.find((prov) => prov.instanceId === sel.instanceId)?.ready ?? false,
+        }));
       }
     `,
     expectedCount: 1,

@@ -1,11 +1,14 @@
-use super::shadow_state_mirror::{SHADOW_STATE_MIRROR_MESSAGE, shadow_state_mirrors};
+use super::shadow_state_mirror::{
+    AbortGuard, SHADOW_STATE_MIRROR_MESSAGE, classify_object_literal_writes, if_statement_guards,
+    is_guarded, non_computed_member, shadow_state_mirrors,
+};
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
-use antidrift_kernel::tsrs_kernel::{is_function_like, static_member_chain, unwrap_expression};
+use antidrift_kernel::tsrs_kernel::{static_member_chain, unwrap_expression};
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node};
-use tsrs_core::{P, TextPos};
+use tsrs_core::P;
 use tsrslint::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-handrolled-resource-lifecycle-cells";
@@ -61,7 +64,7 @@ impl Rule for NoHandrolledResourceLifecycleCells {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-enum WriteClass {
+pub(super) enum WriteClass {
     TrueConst,
     FalseConst,
     NullConst,
@@ -73,12 +76,6 @@ enum ArgumentClass {
     Updater,
     Other,
     Recorded(WriteClass),
-}
-
-struct AbortGuard {
-    block: P<Node>,
-    start: Option<TextPos>,
-    end: TextPos,
 }
 
 #[derive(Default)]
@@ -97,17 +94,30 @@ struct FrameCells {
     abort_guarded_setters: FxHashSet<&'static str>,
 }
 
-struct StateFrame {
+pub(super) struct StateFrame {
     node: P<Node>,
     cells: FrameCells,
 }
 
 impl StateFrame {
     fn new(node: P<Node>) -> Self {
-        Self {
-            node,
-            cells: FrameCells::default(),
+        let mut cells = FrameCells::default();
+        for &param in node.parameters() {
+            let name = param.as_parameter_declaration().name();
+            if ast::is_identifier(name) && matches!(name.as_identifier().text(), "set" | "setState")
+            {
+                cells.setters.insert(name.as_identifier().text());
+            }
         }
+        Self { node, cells }
+    }
+
+    pub(super) fn has_abort_controller(&self, name: &str) -> bool {
+        self.cells.abort_controllers.contains(name)
+    }
+
+    pub(super) fn has_abort_controller_ref(&self, name: &str) -> bool {
+        self.cells.abort_controller_refs.contains(name)
     }
 
     fn record_write(&mut self, setter: &'static str, class: WriteClass) {
@@ -117,6 +127,46 @@ impl StateFrame {
             self.cells
                 .writes
                 .push((setter, FxHashSet::from_iter([class])));
+        }
+    }
+
+    fn merge_parent_writes(&mut self, parent: &Self) {
+        if self.cells.catch_setters.is_empty()
+            || !self
+                .cells
+                .writes
+                .iter()
+                .any(|(_, c)| c.contains(&WriteClass::FalseConst))
+        {
+            return;
+        }
+        for (setter, parent_classes) in &parent.cells.writes {
+            if let Some((_, classes)) = self.cells.writes.iter_mut().find(|(n, _)| n == setter) {
+                classes.extend(parent_classes.clone());
+            } else {
+                self.cells.writes.push((*setter, parent_classes.clone()));
+            }
+        }
+    }
+
+    fn record_object_writes(
+        &mut self,
+        prop_writes: Vec<(&'static str, WriteClass)>,
+        guarded: bool,
+        in_catch: bool,
+    ) {
+        for (prop_name, write_class) in prop_writes {
+            self.cells.setters.insert(prop_name);
+            self.record_write(prop_name, write_class);
+            if guarded {
+                self.cells.abort_guarded_setters.insert(prop_name);
+            }
+            if in_catch
+                && write_class == WriteClass::CaughtError
+                && !self.cells.catch_setters.contains(&prop_name)
+            {
+                self.cells.catch_setters.push(prop_name);
+            }
         }
     }
 
@@ -222,7 +272,7 @@ impl LifecycleTraversal {
     }
 
     fn exit_frame(&mut self) {
-        let Some(frame) = self.stack.pop() else {
+        let Some(mut frame) = self.stack.pop() else {
             return;
         };
         if !frame.cells.is_transition {
@@ -231,6 +281,7 @@ impl LifecycleTraversal {
         let mut owned = frame.cells.setters.clone();
         if let Some(parent) = self.stack.last() {
             owned.extend(parent.cells.setters.iter().copied());
+            frame.merge_parent_writes(parent);
         }
         if let Some(payload) = frame.lifecycle_payload_cell(&owned)
             && !frame.cells.abort_guarded_setters.contains(payload)
@@ -307,11 +358,26 @@ impl LifecycleTraversal {
             .last()
             .is_some_and(|f| is_guarded(&f.cells.abort_guards, call_node));
         let in_catch = !self.catch_params.is_empty();
-        let class = first_argument(call.arguments().nodes()).map(|arg| {
-            let awaited = self.stack.last().map(|f| &f.cells.awaited_names);
+        let Some(arg) = first_argument(call.arguments().nodes()) else {
+            return;
+        };
+        let obj_writes = self.stack.last().and_then(|f| {
+            classify_object_literal_writes(arg, &f.cells.awaited_names, &self.catch_params)
+        });
+        if let Some(prop_writes) = obj_writes {
+            if let Some(frame) = self.stack.last_mut() {
+                frame.record_object_writes(prop_writes, guarded, in_catch);
+            }
+            return;
+        }
+        let (source_write, class) = self.stack.last().map_or((false, None), |f| {
             (
-                awaited.is_some_and(|a| is_source_member_write(arg, a)),
-                awaited.map(|a| classify_write(arg, a, &self.catch_params)),
+                is_source_member_write(arg, &f.cells.awaited_names),
+                Some(classify_write(
+                    arg,
+                    &f.cells.awaited_names,
+                    &self.catch_params,
+                )),
             )
         });
         let Some(frame) = self.stack.last_mut() else {
@@ -323,9 +389,6 @@ impl LifecycleTraversal {
         if in_catch && !frame.cells.catch_setters.contains(&setter) {
             frame.cells.catch_setters.push(setter);
         }
-        let Some((source_write, class)) = class else {
-            return;
-        };
         if let Some(cell) = cell {
             frame.cells.cell_of.entry(setter).or_insert(cell);
             if source_write {
@@ -374,16 +437,6 @@ fn array_state_pair(pattern: P<Node>) -> (Option<&'static str>, Option<&'static 
     (elem_id(0), elem_id(1))
 }
 
-fn non_computed_member(expression: P<Node>, target: &str) -> Option<P<Node>> {
-    let inner = unwrap_expression(expression);
-    if inner.kind() != Kind::PropertyAccessExpression {
-        return None;
-    }
-    let access = inner.as_property_access_expression();
-    let prop = access.name();
-    (ast::is_identifier(prop) && prop.as_identifier().text() == target).then(|| access.expression())
-}
-
 fn is_source_member_write(expression: P<Node>, awaited: &FxHashSet<&str>) -> bool {
     static_member_chain(expression).is_some_and(|(root, members)| {
         members.len() == 1
@@ -421,112 +474,4 @@ fn first_argument(arguments: &[P<Node>]) -> Option<P<Node>> {
         .first()
         .copied()
         .filter(|first| first.kind() != Kind::SpreadElement)
-}
-
-fn is_known_controller(expression: P<Node>, stack: &[StateFrame]) -> bool {
-    let inner = unwrap_expression(expression);
-    if ast::is_identifier(inner) {
-        let name = inner.as_identifier().text();
-        return stack
-            .iter()
-            .any(|frame| frame.cells.abort_controllers.contains(name));
-    }
-    non_computed_member(expression, "current").is_some_and(|obj| {
-        let inner_obj = unwrap_expression(obj);
-        ast::is_identifier(inner_obj)
-            && stack.iter().any(|frame| {
-                frame
-                    .cells
-                    .abort_controller_refs
-                    .contains(inner_obj.as_identifier().text())
-            })
-    })
-}
-
-fn is_abort_status_test(test: P<Node>, stack: &[StateFrame]) -> bool {
-    let inner = unwrap_expression(test);
-    if inner.kind() == Kind::BinaryExpression {
-        let bin = inner.as_binary_expression();
-        if matches!(
-            bin.operator_token().kind(),
-            Kind::AmpersandAmpersandToken | Kind::BarBarToken | Kind::QuestionQuestionToken
-        ) {
-            return is_abort_status_test(bin.left(), stack)
-                || is_abort_status_test(bin.right(), stack);
-        }
-    }
-    non_computed_member(test, "aborted")
-        .and_then(|signal| non_computed_member(signal, "signal"))
-        .is_some_and(|controller| is_known_controller(controller, stack))
-}
-
-fn statement_exits(statement: Option<P<Node>>) -> bool {
-    let Some(stmt) = statement else { return false };
-    match stmt.kind() {
-        Kind::ReturnStatement
-        | Kind::ThrowStatement
-        | Kind::BreakStatement
-        | Kind::ContinueStatement => true,
-        Kind::Block => statement_exits(stmt.as_block().statements().nodes().last().copied()),
-        Kind::IfStatement => {
-            statement_exits(Some(stmt.as_if_statement().then_statement()))
-                && statement_exits(stmt.as_if_statement().else_statement())
-        }
-        _ => false,
-    }
-}
-
-fn statement_block(node: P<Node>) -> Option<P<Node>> {
-    let mut cursor = node.parent();
-    while let Some(ancestor) = cursor {
-        if matches!(ancestor.kind(), Kind::Block | Kind::SourceFile) {
-            return Some(ancestor);
-        }
-        if is_function_like(ancestor) {
-            return None;
-        }
-        cursor = ancestor.parent();
-    }
-    None
-}
-
-fn if_statement_guards(if_node: P<Node>, stack: &[StateFrame]) -> Vec<AbortGuard> {
-    let mut guards = Vec::new();
-    let stmt = if_node.as_if_statement();
-    let (test, consequent) = (stmt.expression(), stmt.then_statement());
-    if is_abort_status_test(test, stack)
-        && statement_exits(Some(consequent))
-        && let Some(block) = statement_block(if_node)
-    {
-        guards.push(AbortGuard {
-            block,
-            start: None,
-            end: if_node.end(),
-        });
-    }
-    let inner_test = unwrap_expression(test);
-    if inner_test.kind() == Kind::PrefixUnaryExpression
-        && inner_test.as_prefix_unary_expression().operator() == Kind::ExclamationToken
-        && is_abort_status_test(inner_test.as_prefix_unary_expression().operand(), stack)
-        && consequent.kind() == Kind::Block
-    {
-        guards.push(AbortGuard {
-            block: consequent,
-            start: Some(consequent.pos()),
-            end: consequent.end(),
-        });
-    }
-    guards
-}
-
-fn is_guarded(guards: &[AbortGuard], node: P<Node>) -> bool {
-    statement_block(node).is_some_and(|block| {
-        let start = node.pos();
-        guards.iter().any(|guard| {
-            guard.block == block
-                && guard
-                    .start
-                    .map_or(guard.end <= start, |s| s <= start && start <= guard.end)
-        })
-    })
 }

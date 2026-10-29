@@ -134,18 +134,22 @@ impl NoIdentitySchemaTransform {
     }
 
     fn returned_object_literal(callback: P<Node>) -> Option<P<Node>> {
-        let body = tsrs_kernel::function_body_node(callback)?;
-        let expr = if body.kind() == Kind::Block {
-            let statements = body.as_block().statements().nodes();
-            if statements.len() != 1 || statements[0].kind() != Kind::ReturnStatement {
-                return None;
-            }
-            statements[0].as_return_statement().expression()?
-        } else {
-            body
-        };
-        let unwrapped = tsrs_kernel::unwrap_expression(expr);
-        (unwrapped.kind() == Kind::ObjectLiteralExpression).then_some(unwrapped)
+        let unwrapped = Self::returned_expression(callback)?;
+        if unwrapped.kind() == Kind::ObjectLiteralExpression {
+            return Some(unwrapped);
+        }
+        (unwrapped.kind() == Kind::CallExpression)
+            .then(|| {
+                unwrapped
+                    .as_call_expression()
+                    .arguments()
+                    .nodes()
+                    .iter()
+                    .copied()
+                    .map(tsrs_kernel::unwrap_expression)
+                    .find(|arg| arg.kind() == Kind::ObjectLiteralExpression)
+            })
+            .flatten()
     }
 
     fn keys_from_identifier_param(param_name: &str, obj: P<Node>) -> Option<FxHashSet<String>> {

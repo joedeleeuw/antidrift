@@ -1,4 +1,5 @@
 use super::RustDiagnostic;
+use super::boundary_decode::is_serde_roundtrip_call;
 use antidrift_rules::type_narrowing::no_compat_names::is_compat_name;
 use proc_macro2::Span;
 use std::path::Path;
@@ -198,8 +199,7 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
     }
 
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
-        if is_serde_call(node, "from_value") && node.args.first().is_some_and(is_serde_to_value_arg)
-        {
+        if is_serde_roundtrip_call(node) {
             self.push(
                 node.func.span(),
                 "rust/no-value-roundtrip",
@@ -429,30 +429,6 @@ fn is_ident_to_string_call(expr: &Expr) -> bool {
 
 fn is_to_string_call(expr: &Expr) -> bool {
     matches!(expr, Expr::MethodCall(call) if call.method == "to_string" && call.args.is_empty())
-}
-
-fn is_serde_call(call: &ExprCall, name: &str) -> bool {
-    let Expr::Path(callee) = &*call.func else {
-        return false;
-    };
-    callee
-        .path
-        .segments
-        .last()
-        .is_some_and(|seg| seg.ident == name)
-}
-
-fn is_serde_to_value_arg(expr: &Expr) -> bool {
-    match expr {
-        Expr::Try(expr_try) => is_serde_to_value_arg(&expr_try.expr),
-        Expr::MethodCall(call)
-            if (call.method == "unwrap" || call.method == "expect") && call.args.is_empty() =>
-        {
-            is_serde_to_value_arg(&call.receiver)
-        }
-        Expr::Call(call) => is_serde_call(call, "to_value"),
-        _ => false,
-    }
 }
 
 fn is_str_lit(expr: &Expr) -> bool {

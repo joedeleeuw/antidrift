@@ -9,8 +9,8 @@ pub use convex::{
     is_json_schema_conversion_result, is_openapi_documentation_call,
 };
 pub use json_parse::{
-    is_global_json_parse, is_json_parse_call, is_unsafe_json_parse_input, parsed_json_origin,
-    parsed_json_target,
+    is_global_json_parse, is_json_parse_call, is_json_stringify_roundtrip,
+    is_unsafe_json_parse_input, parsed_json_origin, parsed_json_target,
 };
 pub use schema::{
     DeclaredSchemaParam, SchemaValidationCall, declared_schema_parameter, is_effect_schema_method,

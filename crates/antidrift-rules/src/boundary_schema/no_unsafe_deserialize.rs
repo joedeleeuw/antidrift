@@ -48,6 +48,16 @@ impl RuleVisitor for Visitor {
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+        if boundary::is_json_stringify_roundtrip(ctx.checker, node) {
+            ctx.report_node(
+                node,
+                RuleMessage::new(
+                    "valueSerializationRoundtrip",
+                    "Do not round-trip in-memory values through `JSON.stringify(...)` and `JSON.parse(...)`; clone with `structuredClone(...)` or key by a structured tuple/value.",
+                ),
+            );
+            return;
+        }
         let target = boundary::parsed_json_target(Some(ctx.program), ctx.checker, node);
         if !target.is_empty() {
             ctx.report_node(

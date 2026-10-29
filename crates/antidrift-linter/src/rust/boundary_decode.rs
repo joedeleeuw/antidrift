@@ -211,3 +211,43 @@ fn is_ok_tuple_pat(pat: &Pat) -> bool {
             if tuple.path.segments.last().is_some_and(|seg| seg.ident == "Ok")
     )
 }
+
+fn is_serde_call(call: &ExprCall, name: &str) -> bool {
+    let Expr::Path(callee) = &*call.func else {
+        return false;
+    };
+    callee
+        .path
+        .segments
+        .last()
+        .is_some_and(|seg| seg.ident == name)
+}
+
+fn is_serde_serializer_arg(expr: &Expr, names: &[&str]) -> bool {
+    match expr {
+        Expr::Reference(r) => is_serde_serializer_arg(&r.expr, names),
+        Expr::Try(expr_try) => is_serde_serializer_arg(&expr_try.expr, names),
+        Expr::MethodCall(call)
+            if (call.method == "unwrap"
+                || call.method == "expect"
+                || call.method == "as_str"
+                || call.method == "as_bytes")
+                && call.args.is_empty() =>
+        {
+            is_serde_serializer_arg(&call.receiver, names)
+        }
+        Expr::Call(call) => names.iter().any(|name| is_serde_call(call, name)),
+        _ => false,
+    }
+}
+
+pub(super) fn is_serde_roundtrip_call(call: &ExprCall) -> bool {
+    let Some(arg) = call.args.first() else {
+        return false;
+    };
+    (is_serde_call(call, "from_value") && is_serde_serializer_arg(arg, &["to_value"]))
+        || (is_serde_call(call, "from_str")
+            && is_serde_serializer_arg(arg, &["to_string", "to_string_pretty"]))
+        || (is_serde_call(call, "from_slice")
+            && is_serde_serializer_arg(arg, &["to_vec", "to_vec_pretty"]))
+}

@@ -333,7 +333,17 @@ fn is_structural_query_envelope(checker: &mut Checker, typ: P<Type>) -> bool {
     let is_async_result = names.contains("_tag")
         && names.contains("pipe")
         && (names.contains("value") || names.contains("error"));
-    is_query || is_mutation || is_async_result
+    let is_lifecycle_carrier = (names.contains("status")
+        || names.contains("isLoading")
+        || names.contains("isPending")
+        || names.contains("loading"))
+        && names.contains("error")
+        && (names.contains("data") || names.contains("value"))
+        && (names.contains("refetch")
+            || names.contains("mutate")
+            || names.contains("reload")
+            || names.contains("revalidate"));
+    is_query || is_mutation || is_async_result || is_lifecycle_carrier
 }
 
 fn is_query_envelope_type(checker: &mut Checker, typ: P<Type>) -> bool {
