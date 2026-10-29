@@ -51,12 +51,12 @@ fn check_hollow_module(
         return;
     }
     if ast.items.is_empty() {
-        diagnostics.push(RustDiagnostic {
-            file: rel_path.to_owned(),
-            line: 1,
-            rule_id: "rust/no-hollow-module",
-            message: "Module contains no items; delete hollow stub modules.".to_owned(),
-        });
+        diagnostics.push(RustDiagnostic::error(
+            rel_path.to_owned(),
+            1,
+            "rust/no-hollow-module",
+            "Module contains no items; delete hollow stub modules.".to_owned(),
+        ));
         return;
     }
     let mut fn_count = 0usize;
@@ -73,13 +73,12 @@ fn check_hollow_module(
         }
     }
     if fn_count > 0 {
-        diagnostics.push(RustDiagnostic {
-            file: rel_path.to_owned(),
-            line: 1,
-            rule_id: "rust/no-hollow-module",
-            message:
-                "Module functions only return empty stub literals; implement real behavior or delete the module.".to_owned(),
-        });
+        diagnostics.push(RustDiagnostic::error(
+            rel_path.to_owned(),
+            1,
+            "rust/no-hollow-module",
+            "Module functions only return empty stub literals; implement real behavior or delete the module.".to_owned(),
+        ));
     }
 }
 
@@ -154,12 +153,12 @@ struct AstRuleVisitor<'a> {
 
 impl AstRuleVisitor<'_> {
     fn push(&mut self, span: Span, rule_id: &'static str, message: String) {
-        self.diagnostics.push(RustDiagnostic {
-            file: self.rel_path.to_owned(),
-            line: span.start().line.max(1),
+        self.diagnostics.push(RustDiagnostic::error(
+            self.rel_path.to_owned(),
+            span.start().line.max(1),
             rule_id,
             message,
-        });
+        ));
     }
 
     fn check_attributes(&mut self, attrs: &[Attribute]) {

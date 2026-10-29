@@ -130,15 +130,15 @@ pub(super) fn check_constant_return_fields(
         }
         for (field_name, field) in candidate.fields {
             if let FieldInitState::Constant(constant) = field.init_state {
-                diagnostics.push(RustDiagnostic {
-                    file: candidate.file.clone(),
-                    line: field.line,
-                    rule_id: "rust/no-constant-return-field",
-                    message: format!(
+                diagnostics.push(RustDiagnostic::error(
+                    candidate.file.clone(),
+                    field.line,
+                    "rust/no-constant-return-field",
+                    format!(
                         "Field '{field_name}' on struct '{}' is initialized to the same constant '{constant}' across all {} construction sites and never mutated; delete the dead field or derive it at the boundary.",
                         key.join("::"), candidate.construction_sites
                     ),
-                });
+                ));
             }
         }
     }

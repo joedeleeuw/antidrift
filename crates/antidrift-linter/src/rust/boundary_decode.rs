@@ -38,14 +38,14 @@ struct DecodeToOptionVisitor<'a> {
 
 impl DecodeToOptionVisitor<'_> {
     fn push(&mut self, span: Span, callee: &str, suppression: &str) {
-        self.diagnostics.push(RustDiagnostic {
-            file: self.rel_path.to_owned(),
-            line: span.start().line.max(1),
-            rule_id: "rust/no-decode-to-option",
-            message: format!(
+        self.diagnostics.push(RustDiagnostic::error(
+            self.rel_path.to_owned(),
+            span.start().line.max(1),
+            "rust/no-decode-to-option",
+            format!(
                 "Boundary decode '{callee}' is collapsed via '{suppression}', erasing schema/syntax failures into absence or a silent default; propagate or report the decode error explicitly."
             ),
-        });
+        ));
     }
 
     fn is_exempt(&self, decode_call: &ExprCall) -> bool {

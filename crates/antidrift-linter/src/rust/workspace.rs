@@ -196,12 +196,12 @@ fn check_source_file(
             return Ok(Some(ast));
         }
         Err(err) => {
-            diagnostics.push(RustDiagnostic {
-                file: rel_path,
-                line: err.span().start().line.max(1),
-                rule_id: "rust/syntax-error",
-                message: format!("Failed to parse Rust source: {err}"),
-            });
+            diagnostics.push(RustDiagnostic::error(
+                rel_path,
+                err.span().start().line.max(1),
+                "rust/syntax-error",
+                format!("Failed to parse Rust source: {err}"),
+            ));
         }
     }
     Ok(None)
@@ -279,13 +279,12 @@ fn check_orphan_modules(
     for file_path in rs_files {
         if !reachable.contains(file_path) {
             let rel_path = relative_display(workspace_root, file_path);
-            diagnostics.push(RustDiagnostic {
-                file: rel_path,
-                line: 1,
-                rule_id: "rust/no-orphan-module",
-                message:
-                    "Rust source file is not reachable from any Cargo target root (including manifest target paths); wire `mod` or delete the orphan file.".to_owned(),
-            });
+            diagnostics.push(RustDiagnostic::error(
+                rel_path,
+                1,
+                "rust/no-orphan-module",
+                "Rust source file is not reachable from any Cargo target root (including manifest target paths); wire `mod` or delete the orphan file.".to_owned(),
+            ));
         }
     }
 }
@@ -341,14 +340,14 @@ fn check_rule_scope_ownership(
         };
         let struct_name = last_seg.ident.to_string();
         if all_structs.contains(&struct_name) && !structs_with_scope.contains(&struct_name) {
-            diagnostics.push(RustDiagnostic {
-                file: rel_path.to_owned(),
-                line: last_seg.ident.span().start().line.max(1),
-                rule_id: "rust/require-rule-scope",
-                message: format!(
+            diagnostics.push(RustDiagnostic::error(
+                rel_path.to_owned(),
+                last_seg.ident.span().start().line.max(1),
+                "rust/require-rule-scope",
+                format!(
                     "Rule struct '{struct_name}' implements 'Rule' without a 'RuleScope' field; embed 'scope: RuleScope', expose 'from_options', and check 'in_scope' during visitor creation."
                 ),
-            });
+            ));
         }
     }
 }

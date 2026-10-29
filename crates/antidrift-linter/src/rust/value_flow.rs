@@ -272,12 +272,12 @@ impl<'ast> Visit<'ast> for ValueFlow<'_, 'ast> {
             && let Origin::Serialized(encoded) = self.origin(arg)
             && encoded == decoded
         {
-            self.diagnostics.push(RustDiagnostic {
-                file: self.rel_path.to_owned(),
-                line: node.func.span().start().line.max(1),
-                rule_id: "rust/no-value-roundtrip",
-                message: "Do not serialize and deserialize the same value; construct or convert the target type directly.".to_owned(),
-            });
+            self.diagnostics.push(RustDiagnostic::error(
+                self.rel_path.to_owned(),
+                node.func.span().start().line.max(1),
+                "rust/no-value-roundtrip",
+                "Do not serialize and deserialize the same value; construct or convert the target type directly.".to_owned(),
+            ));
         }
         visit::visit_expr_call(self, node);
     }
@@ -290,12 +290,12 @@ impl<'ast> Visit<'ast> for ValueFlow<'_, 'ast> {
             && is_string_key_probe(&node.receiver)
             && (self.probe_is_untyped(&node.receiver) || node.args.iter().any(has_value_evidence));
         if !self.boundary && (specific || string_probe) {
-            self.diagnostics.push(RustDiagnostic {
-                file: self.rel_path.to_owned(),
-                line: node.method.span().start().line.max(1),
-                rule_id: "rust/no-untyped-config-probe",
-                message: format!("Untyped config probe '.{}()' outside boundary decoder; deserialize once into a typed struct at the boundary.", node.method),
-            });
+            self.diagnostics.push(RustDiagnostic::error(
+                self.rel_path.to_owned(),
+                node.method.span().start().line.max(1),
+                "rust/no-untyped-config-probe",
+                format!("Untyped config probe '.{}()' outside boundary decoder; deserialize once into a typed struct at the boundary.", node.method),
+            ));
         }
         self.visit_expr(&node.receiver);
         for argument in &node.args {

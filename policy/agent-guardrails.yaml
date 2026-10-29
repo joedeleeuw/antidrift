@@ -98,16 +98,16 @@ clusters:
         message: Inline or name a real domain concept.
       - id: arch/max-function-lines # Long functions hide generated complexity.
         severity: error
-        detector: functionLinesGt:50
-        message: Split by responsibility rather than arbitrary wrappers.
+        detector: functionLinesGt:50,warnAt:40
+        message: Split by responsibility rather than arbitrary wrappers (warn above 40 lines, error above 50 lines).
       - id: arch/max-component-lines # Large components mix data, state, render, and effects.
         severity: error
-        detector: reactComponentLinesGt:180
-        message: Split container, view, and state/resource boundaries.
+        detector: reactComponentLinesGt:180,warnAt:150
+        message: Split container, view, and state/resource boundaries (warn above 150 lines, error above 180 lines).
       - id: arch/max-module-lines # Oversized modules accumulate unrelated responsibilities and defeat local ownership.
         severity: error
-        detector: oxlint:max-lines,max:1500,skipBlankLines:false,skipComments:false
-        message: Split modules over 1,500 lines by owned responsibility.
+        detector: oxlint:max-lines,warnAt:1200,max:1500,skipBlankLines:false,skipComments:false
+        message: Split modules over 1,500 lines by owned responsibility (warn above 1,200 lines before reaching the ceiling).
       - id: react/max-component-props # Large prop bags make component API combinations hard to reason about.
         severity: error
         detector: locallyOwnedReactComponentPropsGt:12
@@ -396,8 +396,8 @@ clusters:
         message: Put rationale and history in the commit body or field notes instead of inline comments.
       - id: rust/max-file-lines
         severity: error
-        detector: antidrift-linter:rust/max-file-lines
-        message: Keep Rust modules at or below 500 non-blank lines.
+        detector: antidrift-linter:rust/max-file-lines,warnAt:425,max:500
+        message: Keep Rust modules at or below 500 non-blank lines (warn above 425 non-blank lines to split along a domain seam before reaching the ceiling).
       - id: rust/no-orphan-module
         severity: error
         detector: antidrift-linter:rust/no-orphan-module

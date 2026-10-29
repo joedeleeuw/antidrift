@@ -1,6 +1,7 @@
 use super::RustDiagnostic;
 use std::path::Path;
 
+const WARN_NON_BLANK_LINES: usize = 425;
 const MAX_NON_BLANK_LINES: usize = 500;
 
 const BANNED_EXACT_FILENAMES: &[&str] = &[
@@ -34,14 +35,14 @@ fn check_grab_bag_filename(rel_path: &str, path: &Path, diagnostics: &mut Vec<Ru
             .iter()
             .any(|suffix| file_name.ends_with(suffix));
     if is_banned {
-        diagnostics.push(RustDiagnostic {
-            file: rel_path.to_owned(),
-            line: 1,
-            rule_id: "rust/no-grab-bag-module",
-            message: format!(
+        diagnostics.push(RustDiagnostic::error(
+            rel_path.to_owned(),
+            1,
+            "rust/no-grab-bag-module",
+            format!(
                 "Module filename '{file_name}' is a grab-bag name; name the module after the domain concept it owns."
             ),
-        });
+        ));
     }
 }
 
@@ -51,14 +52,23 @@ fn check_max_lines(rel_path: &str, source: &str, diagnostics: &mut Vec<RustDiagn
         .filter(|line| !line.trim().is_empty())
         .count();
     if non_blank_lines > MAX_NON_BLANK_LINES {
-        diagnostics.push(RustDiagnostic {
-            file: rel_path.to_owned(),
-            line: 1,
-            rule_id: "rust/max-file-lines",
-            message: format!(
+        diagnostics.push(RustDiagnostic::error(
+            rel_path.to_owned(),
+            1,
+            "rust/max-file-lines",
+            format!(
                 "File has {non_blank_lines} non-blank lines (max {MAX_NON_BLANK_LINES}); split along a domain seam."
             ),
-        });
+        ));
+    } else if non_blank_lines > WARN_NON_BLANK_LINES {
+        diagnostics.push(RustDiagnostic::warn(
+            rel_path.to_owned(),
+            1,
+            "rust/max-file-lines",
+            format!(
+                "File has {non_blank_lines} non-blank lines (warn threshold {WARN_NON_BLANK_LINES}, max {MAX_NON_BLANK_LINES}); split along a domain seam before reaching the ceiling."
+            ),
+        ));
     }
 }
 
@@ -95,24 +105,24 @@ pub(super) fn scan_inline_comments(
             continue;
         }
         if byte == b'/' && idx + 1 < len && bytes[idx + 1] == b'/' {
-            diagnostics.push(RustDiagnostic {
-                file: rel_path.to_owned(),
+            diagnostics.push(RustDiagnostic::error(
+                rel_path.to_owned(),
                 line,
-                rule_id: "rust/no-inline-comment",
-                message: "Inline line comment is forbidden; put rationale in the commit body or type names.".to_owned(),
-            });
+                "rust/no-inline-comment",
+                "Inline line comment is forbidden; put rationale in the commit body or type names."
+                    .to_owned(),
+            ));
             idx = skip_to_line_end(bytes, idx + 2);
             continue;
         }
         if byte == b'/' && idx + 1 < len && bytes[idx + 1] == b'*' {
-            diagnostics.push(RustDiagnostic {
-                file: rel_path.to_owned(),
+            diagnostics.push(RustDiagnostic::error(
+                rel_path.to_owned(),
                 line,
-                rule_id: "rust/no-inline-comment",
-                message:
-                    "Block comment is forbidden; put rationale in the commit body or type names."
-                        .to_owned(),
-            });
+                "rust/no-inline-comment",
+                "Block comment is forbidden; put rationale in the commit body or type names."
+                    .to_owned(),
+            ));
             let (next_idx, next_line) = skip_block_comment(bytes, idx + 2, line);
             idx = next_idx;
             line = next_line;

@@ -21,31 +21,31 @@ pub(super) fn check_cargo_manifest(
                     .is_some_and(|setting| setting == "true"))
     });
     if !has_workspace_lints {
-        diagnostics.push(RustDiagnostic {
-            file: manifest_rel.to_owned(),
-            line: 1,
-            rule_id: "rust/target-manifest-policy",
-            message: "Crate Cargo.toml must inherit `[lints] workspace = true`.".to_owned(),
-        });
+        diagnostics.push(RustDiagnostic::error(
+            manifest_rel.to_owned(),
+            1,
+            "rust/target-manifest-policy",
+            "Crate Cargo.toml must inherit `[lints] workspace = true`.".to_owned(),
+        ));
     }
 
     for sec in sections {
         if matches!(sec.header.as_str(), "[lib]" | "[[bin]]") {
             if sec.kv.get("test") != Some(&"false".to_owned()) {
-                diagnostics.push(RustDiagnostic {
-                    file: manifest_rel.to_owned(),
-                    line: sec.line,
-                    rule_id: "rust/target-manifest-policy",
-                    message: format!("Section {} must set `test = false`.", sec.header),
-                });
+                diagnostics.push(RustDiagnostic::error(
+                    manifest_rel.to_owned(),
+                    sec.line,
+                    "rust/target-manifest-policy",
+                    format!("Section {} must set `test = false`.", sec.header),
+                ));
             }
             if sec.kv.get("doctest") != Some(&"false".to_owned()) {
-                diagnostics.push(RustDiagnostic {
-                    file: manifest_rel.to_owned(),
-                    line: sec.line,
-                    rule_id: "rust/target-manifest-policy",
-                    message: format!("Section {} must set `doctest = false`.", sec.header),
-                });
+                diagnostics.push(RustDiagnostic::error(
+                    manifest_rel.to_owned(),
+                    sec.line,
+                    "rust/target-manifest-policy",
+                    format!("Section {} must set `doctest = false`.", sec.header),
+                ));
             }
         }
     }
@@ -74,12 +74,12 @@ fn check_dependency_dag(
                 .keys()
                 .any(|key| key.split('.').next() == Some(forbidden))
             {
-                diagnostics.push(RustDiagnostic {
-                    file: manifest_rel.to_owned(),
-                    line: sec.line,
-                    rule_id: "rust/target-manifest-policy",
-                    message: format!("antidrift-kernel cannot depend on {forbidden}."),
-                });
+                diagnostics.push(RustDiagnostic::error(
+                    manifest_rel.to_owned(),
+                    sec.line,
+                    "rust/target-manifest-policy",
+                    format!("antidrift-kernel cannot depend on {forbidden}."),
+                ));
             }
         }
     } else if crate_name == "antidrift-rules"
@@ -88,12 +88,12 @@ fn check_dependency_dag(
             .keys()
             .any(|key| key.split('.').next() == Some("antidrift-linter"))
     {
-        diagnostics.push(RustDiagnostic {
-            file: manifest_rel.to_owned(),
-            line: sec.line,
-            rule_id: "rust/target-manifest-policy",
-            message: "antidrift-rules cannot depend on antidrift-linter.".to_owned(),
-        });
+        diagnostics.push(RustDiagnostic::error(
+            manifest_rel.to_owned(),
+            sec.line,
+            "rust/target-manifest-policy",
+            "antidrift-rules cannot depend on antidrift-linter.".to_owned(),
+        ));
     }
 }
 

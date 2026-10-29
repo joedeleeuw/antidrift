@@ -42,12 +42,12 @@ struct CorpusSmellVisitor<'a> {
 
 impl CorpusSmellVisitor<'_> {
     fn push(&mut self, span: Span, rule_id: &'static str, message: impl Into<String>) {
-        self.diagnostics.push(RustDiagnostic {
-            file: self.rel_path.to_owned(),
-            line: span.start().line.max(1),
+        self.diagnostics.push(RustDiagnostic::error(
+            self.rel_path.to_owned(),
+            span.start().line.max(1),
             rule_id,
-            message: message.into(),
-        });
+            message.into(),
+        ));
     }
 
     fn visit_fn_scope(&mut self, is_async: bool, body: impl FnOnce(&mut Self)) {

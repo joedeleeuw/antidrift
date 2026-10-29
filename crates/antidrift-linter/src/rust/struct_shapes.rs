@@ -22,26 +22,26 @@ pub(super) fn check_structural_type_forks(
             Ok(Some(signature)) => signature,
             Ok(None) => continue,
             Err(error) => {
-                diagnostics.push(RustDiagnostic {
-                    file: rel_path,
-                    line: error.span().start().line.max(1),
-                    rule_id: "rust/syntax-error",
-                    message: format!("Invalid struct attribute: {error}"),
-                });
+                diagnostics.push(RustDiagnostic::error(
+                    rel_path,
+                    error.span().start().line.max(1),
+                    "rust/syntax-error",
+                    format!("Invalid struct attribute: {error}"),
+                ));
                 continue;
             }
         };
         let struct_name = item_struct.ident.to_string();
         let line = item_struct.ident.span().start().line.max(1);
         if let Some((owner_name, owner_file, owner_line)) = seen.get(&signature) {
-            diagnostics.push(RustDiagnostic {
-                file: rel_path,
+            diagnostics.push(RustDiagnostic::error(
+                rel_path,
                 line,
-                rule_id: "rust/no-structural-type-fork",
-                message: format!(
+                "rust/no-structural-type-fork",
+                format!(
                     "Struct '{struct_name}' duplicates the field shape of '{owner_name}' ({owner_file}:{owner_line}); share or import one owned struct instead of forking a parallel shape."
                 ),
-            });
+            ));
         } else {
             seen.insert(signature, (struct_name, rel_path, line));
         }
@@ -76,15 +76,15 @@ fn check_redundant_owner_prefix(
         })
     });
     if all_prefixed {
-        diagnostics.push(RustDiagnostic {
-            file: rel_path.to_owned(),
-            line: item_struct.ident.span().start().line.max(1),
-            rule_id: "rust/no-redundant-owner-prefix",
-            message: format!(
+        diagnostics.push(RustDiagnostic::error(
+            rel_path.to_owned(),
+            item_struct.ident.span().start().line.max(1),
+            "rust/no-redundant-owner-prefix",
+            format!(
                 "Struct '{struct_name}' prefixes all {} fields with '{prefix}'; drop the redundant owner prefix from field names.",
                 named.named.len()
             ),
-        });
+        ));
     }
 }
 

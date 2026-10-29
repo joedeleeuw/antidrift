@@ -23,14 +23,14 @@ pub(super) fn check_smells(
         && let Some(stem) = path.file_stem().and_then(|name| name.to_str())
         && has_banned_lifecycle_token(stem)
     {
-        diagnostics.push(RustDiagnostic {
-            file: rel_path.to_owned(),
-            line: 1,
-            rule_id: "rust/no-compat-names",
-            message: format!(
+        diagnostics.push(RustDiagnostic::error(
+            rel_path.to_owned(),
+            1,
+            "rust/no-compat-names",
+            format!(
                 "Module '{stem}' uses compatibility, retirement, or batch-scaffolding naming; name the module after the domain concept it owns."
             ),
-        });
+        ));
     }
     let mut visitor = SmellVisitor {
         rel_path,
@@ -50,12 +50,12 @@ struct SmellVisitor<'a> {
 
 impl SmellVisitor<'_> {
     fn push(&mut self, span: Span, rule_id: &'static str, message: String) {
-        self.diagnostics.push(RustDiagnostic {
-            file: self.rel_path.to_owned(),
-            line: span.start().line.max(1),
+        self.diagnostics.push(RustDiagnostic::error(
+            self.rel_path.to_owned(),
+            span.start().line.max(1),
             rule_id,
             message,
-        });
+        ));
     }
 
     fn check_ident_name(&mut self, name: &str, span: Span) {
@@ -187,7 +187,7 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
                 "'.map_err(|_| ...)' discards the underlying error cause; preserve or format the source error.".to_owned(),
             );
         }
-        if node.method == "as_str" && is_ident_to_string_call(&node.receiver) {
+        if node.method == "as_str" && ident_to_string_call_span(&node.receiver).is_some() {
             self.push(
                 node.method.span(),
                 "rust/no-ident-to-string-compare",
@@ -206,9 +206,21 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
 
     fn visit_expr_binary(&mut self, node: &'ast ExprBinary) {
         if matches!(node.op, BinOp::Eq(_) | BinOp::Ne(_)) {
-            let span = if is_str_lit(&node.right) {
+            let span = if matches!(
+                &*node.right,
+                Expr::Lit(ExprLit {
+                    lit: Lit::Str(_),
+                    ..
+                })
+            ) {
                 ident_to_string_call_span(&node.left)
-            } else if is_str_lit(&node.left) {
+            } else if matches!(
+                &*node.left,
+                Expr::Lit(ExprLit {
+                    lit: Lit::Str(_),
+                    ..
+                })
+            ) {
                 ident_to_string_call_span(&node.right)
             } else {
                 None
@@ -360,22 +372,8 @@ fn ident_to_string_call_span(expr: &Expr) -> Option<Span> {
     (field_ident == "ident" || field_ident == "method").then(|| call.method.span())
 }
 
-fn is_ident_to_string_call(expr: &Expr) -> bool {
-    ident_to_string_call_span(expr).is_some()
-}
-
 fn is_to_string_call(expr: &Expr) -> bool {
     matches!(expr, Expr::MethodCall(call) if call.method == "to_string" && call.args.is_empty())
-}
-
-fn is_str_lit(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::Lit(ExprLit {
-            lit: Lit::Str(_),
-            ..
-        })
-    )
 }
 
 fn is_raii_or_marker_field(field_name: &str, ty: &syn::Type) -> bool {

@@ -1122,6 +1122,71 @@ try {
     0,
     `Expected single-file rust target to exit 0, got ${singleRsRun.status}: ${singleRsRun.stderr}`
   );
+  const nearCapFile = join(tempWorkspace, "near_cap.rs");
+  writeFileSync(
+    nearCapFile,
+    Array.from(
+      { length: 430 },
+      (_, idx) => `pub const C_${idx}: usize = ${idx};`
+    ).join("\n") + "\n"
+  );
+  const nearCapRun = spawnSync(binaryPath, ["rust", "--json", nearCapFile], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(
+    nearCapRun.status,
+    0,
+    `Expected near-cap warning to exit 0 without --deny-warnings, got ${nearCapRun.status}`
+  );
+  const nearCapDiags = JSON.parse(String(nearCapRun.stdout ?? ""));
+  assert.equal(
+    nearCapDiags.filter(
+      (diag) =>
+        diag.ruleId === "rust/max-file-lines" && diag.severity === "warn"
+    ).length,
+    1,
+    `Expected 1 warn rust/max-file-lines diagnostic, got ${JSON.stringify(nearCapDiags)}`
+  );
+  const nearCapDenyRun = spawnSync(
+    binaryPath,
+    ["rust", "--json", "--deny-warnings", nearCapFile],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }
+  );
+  assert.equal(
+    nearCapDenyRun.status,
+    1,
+    `Expected near-cap warning to exit 1 with --deny-warnings, got ${nearCapDenyRun.status}`
+  );
+  const overCapFile = join(tempWorkspace, "over_cap.rs");
+  writeFileSync(
+    overCapFile,
+    Array.from(
+      { length: 505 },
+      (_, idx) => `pub const D_${idx}: usize = ${idx};`
+    ).join("\n") + "\n"
+  );
+  const overCapRun = spawnSync(binaryPath, ["rust", "--json", overCapFile], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(
+    overCapRun.status,
+    1,
+    `Expected over-cap error to exit 1, got ${overCapRun.status}`
+  );
+  const overCapDiags = JSON.parse(String(overCapRun.stdout ?? ""));
+  assert.equal(
+    overCapDiags.filter(
+      (diag) =>
+        diag.ruleId === "rust/max-file-lines" && diag.severity === "error"
+    ).length,
+    1,
+    `Expected 1 error rust/max-file-lines diagnostic, got ${JSON.stringify(overCapDiags)}`
+  );
 } finally {
   rmSync(tempWorkspace, { recursive: true, force: true });
 }
