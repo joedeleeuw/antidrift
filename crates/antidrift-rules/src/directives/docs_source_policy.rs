@@ -168,7 +168,7 @@ fn evaluate_policy(
         classifications
             .entry(exclusion.dependency.clone())
             .or_default()
-            .push("exclusion".to_string());
+            .push("exclusion".to_owned());
         check_exclusion(exclusion, now_ms, &mut failures);
     }
 

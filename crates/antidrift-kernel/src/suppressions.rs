@@ -65,7 +65,7 @@ impl SuppressionsTable {
             let suppressed = self.suppressed_count(file_path, rule_id);
             if actual > suppressed {
                 unsuppressed_diagnostics
-                    .entry(file_path.to_string())
+                    .entry(file_path.to_owned())
                     .or_default()
                     .extend(rule_diags.into_iter().skip(suppressed).cloned());
             }
@@ -114,7 +114,7 @@ impl SuppressionsTable {
             let count = count_rule_diagnostics(diagnostics, rule_id);
             if count > 0 {
                 self.entries
-                    .entry(file_path.to_string())
+                    .entry(file_path.to_owned())
                     .or_default()
                     .insert(rule_id.clone(), SuppressionCount { count });
             }

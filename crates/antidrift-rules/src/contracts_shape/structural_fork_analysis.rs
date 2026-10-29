@@ -1,9 +1,10 @@
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_source_file_origin};
-use antidrift_kernel::tsrs_kernel;
+use antidrift_kernel::{shape, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, NodeFlags, SourceFile};
 use tsrs_checker::Checker;
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, RuleMessage};
+use tsrslint::utils::is_object_type;
 
 #[must_use]
 pub fn has_modifier(node: P<Node>, flags: ModifierFlags) -> bool {
@@ -331,6 +332,68 @@ fn plain_declaration_member_names(node: P<Node>) -> Option<(String, Vec<String>)
     }
 }
 
+fn exported_owner_member_names(
+    checker: &mut Checker,
+    node: P<Node>,
+) -> Option<(String, Vec<String>)> {
+    if let Some(plain) = plain_declaration_member_names(node) {
+        return Some(plain);
+    }
+    if node.kind() != Kind::TypeAliasDeclaration {
+        return None;
+    }
+    let alias = node.as_type_alias_declaration();
+    if alias
+        .type_parameters()
+        .is_some_and(|tp| !tp.nodes().is_empty())
+        || alias.name().kind() != Kind::Identifier
+    {
+        return None;
+    }
+    let owner_type = checker.get_type_at_location(node);
+    if !is_object_type(owner_type)
+        || checker.is_array_type(owner_type)
+        || tsrs_checker::is_tuple_type_exported(owner_type)
+        || shape::has_string_or_number_index_signature(checker, owner_type)
+    {
+        return None;
+    }
+    let names = shape::object_property_names(checker, owner_type);
+    (names.len() >= 2).then(|| (alias.name().as_identifier().text().to_owned(), names))
+}
+
+fn identifier_words(name: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut current = String::new();
+    for ch in name.chars() {
+        if !ch.is_alphanumeric() {
+            if !current.is_empty() {
+                words.push(std::mem::take(&mut current));
+            }
+            continue;
+        }
+        if ch.is_uppercase() && !current.is_empty() {
+            words.push(std::mem::take(&mut current));
+        }
+        current.push(ch.to_ascii_lowercase());
+    }
+    if !current.is_empty() {
+        words.push(current);
+    }
+    words
+}
+
+fn shares_identifier_stem(left: &str, right: &str) -> bool {
+    if left == right {
+        return true;
+    }
+    let left_words = identifier_words(left);
+    let right_words = identifier_words(right);
+    left_words
+        .iter()
+        .any(|lw| lw.len() >= 3 && right_words.iter().any(|rw| rw == lw))
+}
+
 fn has_exact_same_property_types(
     checker: &mut Checker,
     cand_node: P<Node>,
@@ -339,30 +402,24 @@ fn has_exact_same_property_types(
 ) -> bool {
     let cand_type = checker.get_type_at_location(cand_node);
     let owner_type = checker.get_type_at_location(owner_node);
-    for name in prop_names {
+    prop_names.iter().all(|name| {
         let Some(cand_sym) = checker.get_property_of_type_exported(cand_type, name) else {
             return false;
         };
         let Some(owner_sym) = checker.get_property_of_type_exported(owner_type, name) else {
             return false;
         };
-        let Some(cand_prop_type) =
-            checker.get_type_of_symbol_at_location(cand_sym, Some(cand_node))
+        let Some(cand_prop) = checker.get_type_of_symbol_at_location(cand_sym, Some(cand_node))
         else {
             return false;
         };
-        let Some(owner_prop_type) =
-            checker.get_type_of_symbol_at_location(owner_sym, Some(owner_node))
+        let Some(owner_prop) = checker.get_type_of_symbol_at_location(owner_sym, Some(owner_node))
         else {
             return false;
         };
-        if !checker.is_type_assignable_to(cand_prop_type, owner_prop_type)
-            || !checker.is_type_assignable_to(owner_prop_type, cand_prop_type)
-        {
-            return false;
-        }
-    }
-    true
+        checker.is_type_assignable_to(cand_prop, owner_prop)
+            && checker.is_type_assignable_to(owner_prop, cand_prop)
+    })
 }
 
 fn find_owner_in_source_file(
@@ -373,15 +430,20 @@ fn find_owner_in_source_file(
     cand_name: &str,
     cand_props: &[String],
 ) -> Option<String> {
+    let cand_exported = has_modifier(cand_node, ModifierFlags::Export);
     for &stmt in sf.statements().nodes() {
         if !has_modifier(stmt, ModifierFlags::Export) {
             continue;
         }
-        let Some((owner_name, owner_props)) = plain_declaration_member_names(stmt) else {
+        let Some((owner_name, owner_props)) = exported_owner_member_names(checker, stmt) else {
             continue;
         };
+        let authority_match = is_accepted_authority
+            && (cand_props.len() >= 3
+                || !cand_exported
+                || shares_identifier_stem(cand_name, &owner_name));
         if owner_props == cand_props
-            && (is_accepted_authority || owner_name == cand_name)
+            && (authority_match || owner_name == cand_name)
             && has_exact_same_property_types(checker, cand_node, stmt, cand_props)
         {
             return Some(owner_name);
@@ -392,10 +454,12 @@ fn find_owner_in_source_file(
 
 fn find_matching_exported_owner(
     ctx: &mut Ctx,
+    file_origin: DeclarationOrigin,
     cand_node: P<Node>,
     cand_name: &str,
     cand_props: &[String],
 ) -> Option<String> {
+    let cand_exported = has_modifier(cand_node, ModifierFlags::Export);
     for &sf in ctx.program.get_source_files() {
         if sf == ctx.file || tsrs_kernel::is_test_file(sf.file_name()) {
             continue;
@@ -409,10 +473,16 @@ fn find_matching_exported_owner(
         ) {
             continue;
         }
-        let is_accepted_authority = matches!(
-            origin,
-            DeclarationOrigin::Generated | DeclarationOrigin::LocalDomain
-        );
+        if file_origin == DeclarationOrigin::LocalDomain
+            && origin == DeclarationOrigin::LocalDomain
+            && cand_exported
+            && sf.file_name() > ctx.file.file_name()
+        {
+            continue;
+        }
+        let is_accepted_authority = origin == DeclarationOrigin::Generated
+            || (origin == DeclarationOrigin::LocalDomain
+                && (file_origin != DeclarationOrigin::LocalDomain || !cand_exported));
         if let Some(owner_name) = find_owner_in_source_file(
             ctx.checker,
             sf,
@@ -444,7 +514,9 @@ pub fn check_structural_fork_declaration(ctx: &mut Ctx, node: P<Node>) {
     let Some((cand_name, cand_props)) = plain_declaration_member_names(node) else {
         return;
     };
-    if let Some(owner_name) = find_matching_exported_owner(ctx, node, &cand_name, &cand_props) {
+    if let Some(owner_name) =
+        find_matching_exported_owner(ctx, file_origin, node, &cand_name, &cand_props)
+    {
         ctx.report_node(node, build_structural_fork_message(&cand_name, &owner_name));
     }
 }

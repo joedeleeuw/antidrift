@@ -118,14 +118,14 @@ fn describe_chain(expression: P<Node>) -> Option<BuilderChain> {
             Kind::Identifier => {
                 steps.reverse();
                 return Some(BuilderChain {
-                    root: current.as_identifier().text().to_string(),
+                    root: current.as_identifier().text().to_owned(),
                     steps,
                 });
             }
             Kind::ThisKeyword => {
                 steps.reverse();
                 return Some(BuilderChain {
-                    root: "this".to_string(),
+                    root: "this".to_owned(),
                     steps,
                 });
             }
@@ -137,16 +137,16 @@ fn describe_chain(expression: P<Node>) -> Option<BuilderChain> {
                 let computed = current.as_element_access_expression();
                 let arg = unwrap(computed.argument_expression());
                 let property = if arg.kind() == Kind::NoSubstitutionTemplateLiteral {
-                    Some(arg.text().to_string())
+                    Some(arg.text().to_owned())
                 } else {
-                    member(current).map(|(_, name)| name.to_string())
+                    member(current).map(|(_, name)| name.to_owned())
                 };
                 steps.push(property.map_or(ChainStep::Computed, ChainStep::Property));
                 current = unwrap(computed.expression());
             }
             _ => {
                 let (object, name) = member(current)?;
-                steps.push(ChainStep::Property(name.to_string()));
+                steps.push(ChainStep::Property(name.to_owned()));
                 current = unwrap(object);
             }
         }

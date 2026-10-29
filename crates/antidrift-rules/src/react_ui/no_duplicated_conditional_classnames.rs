@@ -23,7 +23,7 @@ struct ClassnameOptions {
 impl Default for ClassnameOptions {
     fn default() -> Self {
         Self {
-            attributes: vec!["class".to_string(), "className".to_string()],
+            attributes: vec!["class".to_owned(), "className".to_owned()],
             helpers: Vec::new(),
             min_shared_ratio: 0.65,
             min_shared_tokens: 4,

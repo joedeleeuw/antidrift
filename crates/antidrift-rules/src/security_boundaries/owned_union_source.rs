@@ -25,7 +25,7 @@ pub(super) struct ExportedArray {
 pub(super) fn literal_expression(expression: P<Node>) -> Option<OwnedLiteral> {
     match expression.kind() {
         Kind::StringLiteral => Some(OwnedLiteral::Text(
-            expression.as_string_literal().text().to_string(),
+            expression.as_string_literal().text().to_owned(),
         )),
         Kind::NumericLiteral => numeric_value(expression).map(number_literal),
         Kind::PrefixUnaryExpression => {
@@ -208,7 +208,7 @@ fn collect_bindings(
             continue;
         };
         let name = name_node.as_identifier().text();
-        bindings.insert(name.to_string(), members);
+        bindings.insert(name.to_owned(), members);
         if exported {
             record_export(exports, name, name);
         }
@@ -219,7 +219,7 @@ fn record_export(exports: &mut Vec<(String, String)>, name: &str, local: &str) {
     if let Some((_, binding)) = exports.iter_mut().find(|(export, _)| export == name) {
         local.clone_into(binding);
     } else {
-        exports.push((name.to_string(), local.to_string()));
+        exports.push((name.to_owned(), local.to_owned()));
     }
 }
 
@@ -349,13 +349,13 @@ pub(super) fn call_site(node: P<Node>) -> Option<String> {
                     Kind::StringLiteral => Some(prop.as_string_literal().text()),
                     _ => None,
                 }?;
-                segments.push(name.to_string());
+                segments.push(name.to_owned());
             }
             Kind::VariableDeclaration => {
                 if let Some(name_node) = ancestor.name()
                     && ast::is_identifier(name_node)
                 {
-                    segments.push(name_node.as_identifier().text().to_string());
+                    segments.push(name_node.as_identifier().text().to_owned());
                     segments.reverse();
                     return Some(segments.join("."));
                 }

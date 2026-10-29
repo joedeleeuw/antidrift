@@ -26,9 +26,17 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
       - run: npm install -g npm@latest
-      - run: node --version && npm --version && pnpm --version
+      - run: node --version && npm --version && pnpm --version && cargo --version
       - run: pnpm install --frozen-lockfile
+      - run: cargo build --release --locked -p antidrift-linter
 
       - name: Verify release tag matches package version
         env:

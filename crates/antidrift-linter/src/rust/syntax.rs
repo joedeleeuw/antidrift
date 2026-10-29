@@ -35,7 +35,7 @@ fn check_grab_bag_filename(rel_path: &str, path: &Path, diagnostics: &mut Vec<Ru
             .any(|suffix| file_name.ends_with(suffix));
     if is_banned {
         diagnostics.push(RustDiagnostic {
-            file: rel_path.to_string(),
+            file: rel_path.to_owned(),
             line: 1,
             rule_id: "rust/no-grab-bag-module",
             message: format!(
@@ -52,7 +52,7 @@ fn check_max_lines(rel_path: &str, source: &str, diagnostics: &mut Vec<RustDiagn
         .count();
     if non_blank_lines > MAX_NON_BLANK_LINES {
         diagnostics.push(RustDiagnostic {
-            file: rel_path.to_string(),
+            file: rel_path.to_owned(),
             line: 1,
             rule_id: "rust/max-file-lines",
             message: format!(
@@ -96,22 +96,22 @@ pub(super) fn scan_inline_comments(
         }
         if byte == b'/' && idx + 1 < len && bytes[idx + 1] == b'/' {
             diagnostics.push(RustDiagnostic {
-                file: rel_path.to_string(),
+                file: rel_path.to_owned(),
                 line,
                 rule_id: "rust/no-inline-comment",
-                message: "Inline line comment is forbidden; put rationale in the commit body or type names.".to_string(),
+                message: "Inline line comment is forbidden; put rationale in the commit body or type names.".to_owned(),
             });
             idx = skip_to_line_end(bytes, idx + 2);
             continue;
         }
         if byte == b'/' && idx + 1 < len && bytes[idx + 1] == b'*' {
             diagnostics.push(RustDiagnostic {
-                file: rel_path.to_string(),
+                file: rel_path.to_owned(),
                 line,
                 rule_id: "rust/no-inline-comment",
                 message:
                     "Block comment is forbidden; put rationale in the commit body or type names."
-                        .to_string(),
+                        .to_owned(),
             });
             let (next_idx, next_line) = skip_block_comment(bytes, idx + 2, line);
             idx = next_idx;

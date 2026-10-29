@@ -1,5 +1,10 @@
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::path::Path;
+
+const ENTRYPOINT_KEYS: [&str; 8] = [
+    "exports", "main", "module", "types", "typings", "browser", "bin", "source",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsonPropertySpan {
@@ -32,4 +37,38 @@ pub fn parse_package_json_manifest(source_text: &str) -> Option<PackageJsonManif
         sections.insert(key_name, entries);
     }
     Some(PackageJsonManifest { sections })
+}
+
+fn collect_json_strings(val: &Value, out: &mut Vec<String>) {
+    match val {
+        Value::String(s) => out.push(s.clone()),
+        Value::Array(arr) => {
+            for item in arr {
+                collect_json_strings(item, out);
+            }
+        }
+        Value::Object(map) => {
+            for item in map.values() {
+                collect_json_strings(item, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[must_use]
+pub fn package_entrypoint_paths(pkg_path: &Path) -> Option<Vec<String>> {
+    let Ok(text) = std::fs::read_to_string(pkg_path) else {
+        return None;
+    };
+    let Ok(Value::Object(obj)) = serde_json::from_str::<Value>(&text) else {
+        return None;
+    };
+    let mut entries = Vec::new();
+    for key in ENTRYPOINT_KEYS {
+        if let Some(field) = obj.get(key) {
+            collect_json_strings(field, &mut entries);
+        }
+    }
+    Some(entries)
 }

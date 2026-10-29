@@ -38,9 +38,9 @@ impl NoUnsafeInnerHtml {
         let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         let sanitizers = parsed.sanitizers.unwrap_or_else(|| {
             vec![ImportedOwner {
-                module: "dompurify".to_string(),
-                export: "default".to_string(),
-                member: Some("sanitize".to_string()),
+                module: "dompurify".to_owned(),
+                export: "default".to_owned(),
+                member: Some("sanitize".to_owned()),
             }]
         });
         Ok(Self {
@@ -53,9 +53,9 @@ impl NoUnsafeInnerHtml {
     fn effective_sanitizers(&self) -> Vec<ImportedOwner> {
         if self.sanitizers.is_empty() {
             vec![ImportedOwner {
-                module: "dompurify".to_string(),
-                export: "default".to_string(),
-                member: Some("sanitize".to_string()),
+                module: "dompurify".to_owned(),
+                export: "default".to_owned(),
+                member: Some("sanitize".to_owned()),
             }]
         } else {
             self.sanitizers.clone()

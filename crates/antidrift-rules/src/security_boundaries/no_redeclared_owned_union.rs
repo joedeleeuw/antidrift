@@ -5,6 +5,7 @@ use super::owned_union_source::{
 use super::package_ownership::absolute_filename;
 use super::package_resolution::resolver_with_mode;
 use antidrift_kernel::local_binding::Binding;
+use antidrift_kernel::registries::OwnedUnionStatus;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use antidrift_kernel::ts_resolver::ResolutionMode;
 use oxc_resolver::{ResolveError, Resolver};
@@ -22,22 +23,13 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-redeclared-owned-union";
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct StatusEntry {
-    owner: String,
-    values: Vec<String>,
-    #[serde(default, rename = "valuesExport")]
-    _values_export: Option<String>,
-}
-
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct OwnedUnionOptions {
     #[serde(flatten)]
     scope: ScopeOptions,
     allows: BTreeSet<String>,
-    statuses: BTreeMap<String, StatusEntry>,
+    statuses: BTreeMap<String, OwnedUnionStatus>,
 }
 
 struct UnionOwner {
@@ -262,8 +254,8 @@ fn add_import_owners(clause_node: P<Node>, arrays: &[ExportedArray], owners: &mu
         for array in arrays {
             if array.name == "default" {
                 owners.push(UnionOwner {
-                    name: local_text.to_string(),
-                    binding_name: local_text.to_string(),
+                    name: local_text.to_owned(),
+                    binding_name: local_text.to_owned(),
                     symbol,
                     members: array.members.clone(),
                 });
@@ -302,7 +294,7 @@ fn add_namespace_import_owners(
         if array.name != "default" {
             owners.push(UnionOwner {
                 name: format!("{local_text}.{}", array.name),
-                binding_name: local_text.to_string(),
+                binding_name: local_text.to_owned(),
                 symbol,
                 members: array.members.clone(),
             });
@@ -342,8 +334,8 @@ fn add_named_import_specifier_owners(
     for array in arrays {
         if array.name == imported_text {
             owners.push(UnionOwner {
-                name: local_text.to_string(),
-                binding_name: local_text.to_string(),
+                name: local_text.to_owned(),
+                binding_name: local_text.to_owned(),
                 symbol,
                 members: array.members.clone(),
             });
@@ -421,7 +413,7 @@ fn imported_arrays<'c>(
 
 fn status_report(
     node: P<Node>,
-    statuses: &BTreeMap<String, StatusEntry>,
+    statuses: &BTreeMap<String, OwnedUnionStatus>,
     filename: &str,
 ) -> Option<String> {
     if node.kind() != Kind::LiteralType {

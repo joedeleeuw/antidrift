@@ -220,10 +220,10 @@ fn hardcoded_color(value: &str) -> Option<String> {
     }
     let stripped = strip_var_expressions(value);
     if let Some(hex) = hex_color(&stripped) {
-        return Some(hex.to_string());
+        return Some(hex.to_owned());
     }
     if let Some(function) = color_function(&stripped) {
-        return Some(function.to_string());
+        return Some(function.to_owned());
     }
     named_color(&remove_white_space_property(&stripped))
 }

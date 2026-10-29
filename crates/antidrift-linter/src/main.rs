@@ -45,11 +45,20 @@ fn main() -> ExitCode {
     }
     if matches!(
         raw_vec.first().map(String::as_str),
-        Some("--version" | "version")
+        Some("--version" | "version" | "-V")
     ) {
         println!(
             "antidrift-linter {} (tsgolint headless protocol v2)",
             env!("CARGO_PKG_VERSION")
+        );
+        return ExitCode::SUCCESS;
+    }
+    if matches!(
+        raw_vec.first().map(String::as_str),
+        Some("--help" | "-h" | "help")
+    ) {
+        println!(
+            "Usage:\n  antidrift-linter [--format human|json|sarif] [--fix] [--list-rules] [paths...]\n  antidrift-linter rust [--json] [paths...]\n  antidrift-linter headless"
         );
         return ExitCode::SUCCESS;
     }
@@ -65,7 +74,7 @@ fn main() -> ExitCode {
     if args.list_rules {
         let mut seen = FxHashSet::default();
         for rule in all_rules() {
-            if seen.insert(rule.name().to_string()) {
+            if seen.insert(rule.name().to_owned()) {
                 println!("{}", rule.name());
             }
         }

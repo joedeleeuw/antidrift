@@ -149,7 +149,7 @@ fn collect_from_import_decl(
     {
         let local = default_name.as_identifier().text();
         if let Some(matched) = source_for_import(sources, module_specifier, local) {
-            tainted.insert(local.to_string(), matched.to_string());
+            tainted.insert(local.to_owned(), matched.to_owned());
         }
     }
     let Some(bindings) = clause.named_bindings() else {
@@ -162,7 +162,7 @@ fn collect_from_import_decl(
             {
                 let local = ns_name.as_identifier().text();
                 if let Some(matched) = source_for_import(sources, module_specifier, local) {
-                    tainted.insert(local.to_string(), matched.to_string());
+                    tainted.insert(local.to_owned(), matched.to_owned());
                 }
             }
         }
@@ -196,7 +196,7 @@ fn record_named_specifier(
         .and_then(|prop| ast::is_identifier(prop).then(|| prop.as_identifier().text()))
         .unwrap_or(local_name);
     if let Some(matched) = source_for_import(sources, module_specifier, imported_name) {
-        tainted.insert(local_name.to_string(), matched.to_string());
+        tainted.insert(local_name.to_owned(), matched.to_owned());
     }
 }
 
@@ -381,13 +381,13 @@ fn taint_root_name(
         Kind::Identifier => {
             let name = target.as_identifier().text();
             if tainted_imports.contains_key(name) {
-                return Some(name.to_string());
+                return Some(name.to_owned());
             }
             let binding = resolve_lexical_binding(target)?;
             if !visited_syms.insert(binding) {
                 return None;
             }
-            binding_is_tainted(binding, tainted_imports, visited_syms).then(|| name.to_string())
+            binding_is_tainted(binding, tainted_imports, visited_syms).then(|| name.to_owned())
         }
         Kind::CallExpression => source_file_read_call_name(target).or_else(|| {
             taint_root_name(
@@ -494,7 +494,7 @@ fn literal_keyed_source_call(
                     .iter()
                     .all(|&arg| arg.kind() != Kind::SpreadElement && is_literal_like(arg))
             {
-                return Some(callee.as_identifier().text().to_string());
+                return Some(callee.as_identifier().text().to_owned());
             }
             literal_keyed_source_call(call.expression(), tainted_imports)
         }

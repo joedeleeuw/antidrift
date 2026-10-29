@@ -101,7 +101,7 @@ fn credential_call(sf: P<SourceFile>, call_node: P<Node>) -> Option<String> {
 
 fn member_name(sf: P<SourceFile>, member: P<Node>) -> Option<String> {
     if let Some(name) = static_property_name(member) {
-        return Some(name.to_string());
+        return Some(name.to_owned());
     }
     if member.kind() == Kind::ElementAccessExpression {
         return static_string(

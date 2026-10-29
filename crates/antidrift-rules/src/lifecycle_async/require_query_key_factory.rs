@@ -1,12 +1,26 @@
 use super::syntax::{
     const_initializer, identifier, member, object_property, property_name, symbol, unwrap,
 };
+use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/require-query-key-factory";
+
+const CACHE_METHODS: [&str; 10] = [
+    "invalidateQueries",
+    "setQueryData",
+    "getQueryData",
+    "ensureQueryData",
+    "prefetchQuery",
+    "fetchQuery",
+    "refetchQueries",
+    "resetQueries",
+    "removeQueries",
+    "cancelQueries",
+];
 
 pub struct RequireQueryKeyFactory {
     scope: RuleScope,
@@ -35,14 +49,15 @@ impl Rule for RequireQueryKeyFactory {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {
-            enabled: self.scope.in_scope(ctx),
-        })
+        let enabled = self.scope.in_scope(ctx);
+        let imports = FileImports::collect(ctx.file);
+        Box::new(Visitor { enabled, imports })
     }
 }
 
 struct Visitor {
     enabled: bool,
+    imports: FileImports,
 }
 
 impl RuleVisitor for Visitor {
@@ -52,7 +67,7 @@ impl RuleVisitor for Visitor {
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
         match node.kind() {
-            Kind::CallExpression => inspect_call(ctx, node),
+            Kind::CallExpression => inspect_call(ctx, &self.imports, node),
             Kind::BinaryExpression => {
                 let bin = node.as_binary_expression();
                 if matches!(
@@ -88,9 +103,18 @@ fn inside_predicate_property(node: P<Node>) -> bool {
     false
 }
 
-fn inspect_call(ctx: &mut Ctx<'_>, call_node: P<Node>) {
+fn inspect_call(ctx: &mut Ctx<'_>, imports: &FileImports, call_node: P<Node>) {
     let call = call_node.as_call_expression();
     let callee = unwrap(call.expression());
+    let args = call.arguments().nodes();
+    if imports.is_unshadowed_call(callee, "swr", &["mutate"]) {
+        if let Some(&key) = args.first()
+            && key.kind() != Kind::SpreadElement
+        {
+            report_array(ctx, key);
+        }
+        return;
+    }
     if callee.kind() != Kind::PropertyAccessExpression {
         return;
     }
@@ -99,18 +123,10 @@ fn inspect_call(ctx: &mut Ctx<'_>, call_node: P<Node>) {
         return;
     }
     let method = name_node.as_identifier().text();
-    if ![
-        "invalidateQueries",
-        "setQueryData",
-        "removeQueries",
-        "cancelQueries",
-    ]
-    .contains(&method)
-    {
+    if !CACHE_METHODS.contains(&method) {
         return;
     }
-    let args = call.arguments().nodes();
-    if method == "setQueryData"
+    if matches!(method, "setQueryData" | "getQueryData")
         && let Some(&key) = args.first()
         && key.kind() != Kind::SpreadElement
     {

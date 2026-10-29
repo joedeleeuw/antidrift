@@ -52,7 +52,7 @@ fn root_source_from_member_chain(unwrapped: P<Node>, checker: &mut Checker) -> O
     {
         return Some(RootSource {
             symbol: sym,
-            name: base.as_identifier().text().to_string(),
+            name: base.as_identifier().text().to_owned(),
         });
     }
     None
@@ -72,7 +72,7 @@ fn find_single_root_source(expr: P<Node>, checker: &mut Checker) -> Option<RootS
             {
                 return Some(RootSource {
                     symbol: sym,
-                    name: target.as_identifier().text().to_string(),
+                    name: target.as_identifier().text().to_owned(),
                 });
             }
             return find_single_root_source(target, checker);

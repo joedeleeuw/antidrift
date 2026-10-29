@@ -1,5 +1,5 @@
 use antidrift_kernel::imports::FileImports;
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -9,17 +9,17 @@ pub const RULE_NAME: &str = "antidrift/require-effect-deps";
 const EFFECT_HOOKS: [&str; 2] = ["useEffect", "useLayoutEffect"];
 
 pub struct RequireEffectDeps {
-    _scope: RuleScope,
+    scope: RuleScope,
 }
 
 pub static DEFAULT_RULE: RequireEffectDeps = RequireEffectDeps {
-    _scope: RuleScope::DEFAULT,
+    scope: RuleScope::DEFAULT,
 };
 
 impl RequireEffectDeps {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         Ok(Self {
-            _scope: RuleScope::from_options(RULE_NAME, options)?,
+            scope: RuleScope::from_options(RULE_NAME, options)?,
         })
     }
 }
@@ -32,6 +32,9 @@ impl Rule for RequireEffectDeps {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        if !self.scope.in_scope(ctx) {
+            return Box::new(EmptyVisitor);
+        }
         let imports = FileImports::collect(ctx.file);
         let direct = imports.locals_from("react", &EFFECT_HOOKS);
         let namespaces = imports.namespaces_from("react");

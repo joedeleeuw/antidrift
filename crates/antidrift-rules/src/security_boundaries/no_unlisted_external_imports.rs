@@ -28,7 +28,7 @@ impl Default for DependencyOptions {
     fn default() -> Self {
         Self {
             scope: ScopeOptions::default(),
-            internal_prefixes: vec!["@/".to_string(), "~/".to_string()],
+            internal_prefixes: vec!["@/".to_owned(), "~/".to_owned()],
             ancestor_dev_dependencies: true,
         }
     }
@@ -325,11 +325,11 @@ fn file_resolution_mode(
 
 fn imported_name(package_name: &str) -> String {
     let Some(types_package) = package_name.strip_prefix("@types/") else {
-        return package_name.to_string();
+        return package_name.to_owned();
     };
     match types_package.split_once("__") {
         Some((scope, name)) => format!("@{scope}/{name}"),
-        None => types_package.to_string(),
+        None => types_package.to_owned(),
     }
 }
 

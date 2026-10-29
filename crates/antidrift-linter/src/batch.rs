@@ -131,8 +131,8 @@ pub(crate) fn reported_to_rule_diagnostic(
                 .collect(),
         });
     RuleDiagnostic {
-        rule_id: item.rule_name.to_string(),
-        message_id: Some(item.message.id.to_string()),
+        rule_id: item.rule_name.to_owned(),
+        message_id: Some(item.message.id.to_owned()),
         message: item.message.description.clone(),
         severity,
         location: line_index.diagnostic_location(source_text, start, end),
@@ -159,7 +159,7 @@ fn lint_source_file(
         );
     }
     let mut overrides = FxHashMap::default();
-    overrides.insert(normalized_file.to_string(), source_text.to_string());
+    overrides.insert(normalized_file.to_owned(), source_text.to_owned());
     let os_fs: Arc<dyn FS> = Arc::new(osvfs::fs());
     let overlay: Arc<dyn FS> = Arc::new(OverlayFS::new(os_fs, overrides));
     let fs: Arc<dyn FS> = Arc::new(bundled::wrap_fs(cachedvfs::from(overlay)));
@@ -170,11 +170,11 @@ fn lint_source_file(
     copts.no_lib = Tristate::True;
     let config = P::new(tsrs_tsoptions::new_parsed_command_line(
         P::new(copts),
-        vec![normalized_file.to_string()],
+        vec![normalized_file.to_owned()],
         Vec::new(),
         tspath::ComparePathsOptions {
             use_case_sensitive_file_names: use_case,
-            current_directory: dir.to_string(),
+            current_directory: dir.to_owned(),
         },
     ));
     let mut popts = ProgramOptions::new(config, compiler_host);
@@ -244,7 +244,7 @@ fn build_case_rules(case: &BatchCaseInput) -> Result<CaseRuleSet, String> {
             Some(single) => Some(Value::Array(vec![single.clone()])),
         };
         let resolved = resolve_case_rule(rule_name, options.as_ref(), &case.filename, &case.id)?;
-        severities.insert(resolved.name().to_string(), Severity::Error);
+        severities.insert(resolved.name().to_owned(), Severity::Error);
         rules.push(resolved);
     }
     if let Some(rules_map) = &case.rules {
@@ -253,7 +253,7 @@ fn build_case_rules(case: &BatchCaseInput) -> Result<CaseRuleSet, String> {
             let resolved =
                 resolve_case_rule(rule_id, Some(&act.options), &case.filename, &case.id)?;
             if act.severity != Severity::Off {
-                severities.insert(resolved.name().to_string(), act.severity);
+                severities.insert(resolved.name().to_owned(), act.severity);
                 rules.push(resolved);
             }
         }

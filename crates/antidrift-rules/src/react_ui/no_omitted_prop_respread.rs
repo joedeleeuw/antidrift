@@ -271,7 +271,7 @@ struct Supplier {
 
 fn type_signature(aliases: &LocalTypeAliases, type_node: Option<P<Node>>) -> String {
     let Some(type_node) = type_node else {
-        return "?".to_string();
+        return "?".to_owned();
     };
     match type_node.kind() {
         Kind::ParenthesizedType => type_signature(
@@ -280,8 +280,7 @@ fn type_signature(aliases: &LocalTypeAliases, type_node: Option<P<Node>>) -> Str
         ),
         Kind::TypeReference => {
             let reference = type_node.as_type_reference_node();
-            let name =
-                type_reference_name(reference.type_name()).unwrap_or_else(|| "?".to_string());
+            let name = type_reference_name(reference.type_name()).unwrap_or_else(|| "?".to_owned());
             let args = type_node.type_arguments();
             if args.is_empty() {
                 name
@@ -297,11 +296,11 @@ fn type_signature(aliases: &LocalTypeAliases, type_node: Option<P<Node>>) -> Str
             let lit = type_node.as_literal_type_node().literal();
             match lit.kind() {
                 Kind::StringLiteral => serde_json::to_string(lit.as_string_literal().text())
-                    .unwrap_or_else(|_| "null".to_string()),
-                Kind::NumericLiteral => lit.text().to_string(),
-                Kind::TrueKeyword => "true".to_string(),
-                Kind::FalseKeyword => "false".to_string(),
-                _ => "null".to_string(),
+                    .unwrap_or_else(|_| "null".to_owned()),
+                Kind::NumericLiteral => lit.text().to_owned(),
+                Kind::TrueKeyword => "true".to_owned(),
+                Kind::FalseKeyword => "false".to_owned(),
+                _ => "null".to_owned(),
             }
         }
         Kind::TypeLiteral => {
@@ -319,7 +318,7 @@ fn type_signature(aliases: &LocalTypeAliases, type_node: Option<P<Node>>) -> Str
                     }
                     _ => None,
                 })
-                .map(|name| name.unwrap_or_else(|| "?".to_string()))
+                .map(|name| name.unwrap_or_else(|| "?".to_owned()))
                 .collect();
             names.sort();
             format!("{{{}}}", names.join(","))
@@ -336,7 +335,7 @@ fn type_signature(aliases: &LocalTypeAliases, type_node: Option<P<Node>>) -> Str
                 .collect();
             format!("({})", rendered.join(sep))
         }
-        _ => node_text(aliases.sf, type_node).to_string(),
+        _ => node_text(aliases.sf, type_node).to_owned(),
     }
 }
 

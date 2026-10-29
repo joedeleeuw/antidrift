@@ -482,6 +482,49 @@ const headlessProbes = [
     `,
     expectedCount: 1,
   },
+  {
+    name: "no-appeasement-cast (unnarrowed string cast to closed literal union reported)",
+    rule: "antidrift/no-appeasement-cast",
+    source: `
+      export function parseRole(raw: string) {
+        return raw as "admin" | "member";
+      }
+    `,
+    expectedCount: 1,
+  },
+  {
+    name: "no-appeasement-cast (direct JSON.parse cast deferred to unknown-input-must-be-decoded)",
+    rule: "antidrift/no-appeasement-cast",
+    source: `
+      export function parsePayload(raw: string) {
+        return JSON.parse(raw) as { id: string };
+      }
+    `,
+    expectedCount: 0,
+  },
+  {
+    name: "no-sql-string-concat (English prose with update and set stays clean)",
+    rule: "antidrift/no-sql-string-concat",
+    source: `
+      export function describeAction(name: string) {
+        return "Please update your profile before you set " + name;
+      }
+    `,
+    expectedCount: 0,
+  },
+  {
+    name: "require-query-key-factory (QueryClient getQueryData, prefetchQuery, and SWR mutate reported)",
+    rule: "antidrift/require-query-key-factory",
+    source: `
+      import { mutate } from "swr";
+      export function refreshUser(queryClient: { getQueryData: (k: unknown) => unknown; prefetchQuery: (o: unknown) => unknown }, id: string) {
+        queryClient.getQueryData(["user", id]);
+        queryClient.prefetchQuery({ queryKey: ["user", id] });
+        mutate(["user", id]);
+      }
+    `,
+    expectedCount: 3,
+  },
 ];
 
 for (const probe of headlessProbes) {
@@ -687,6 +730,13 @@ try {
       "    let _ = input;",
       "    legacy_adapter(input)",
       "}",
+      "pub struct Holder { pub ident: String }",
+      "pub fn compare_ident(h: &Holder, val: &serde_json::Value) -> bool {",
+      '    let _ = val["k"].as_str();',
+      '    h.ident.to_string() == "foo"',
+      "}",
+      "#[cfg(all(test))]",
+      "mod inline_tests {}",
       "",
     ].join("\n")
   );
@@ -719,6 +769,9 @@ try {
     "rust/no-duplicate-scope-fields",
     "rust/no-discarded-decoded-config",
     "rust/no-let-underscore-suppression",
+    "rust/no-ident-to-string-compare",
+    "rust/no-untyped-config-probe",
+    "rust/no-inline-tests",
   ]) {
     assert.ok(
       reportedRuleIds.has(expectedRuleId),

@@ -61,7 +61,7 @@ impl Assertion {
         let call_expr = node.as_call_expression();
         let callee = call_expr.expression();
         let (owner, method) =
-            static_member(callee).unwrap_or_else(|| (callee, "assert".to_string()));
+            static_member(callee).unwrap_or_else(|| (callee, "assert".to_owned()));
         if identifier(owner)?.as_identifier().text() != "assert" {
             return None;
         }
@@ -172,7 +172,7 @@ pub(super) fn is_membership(node: P<Node>) -> bool {
     let call_expr = node.as_call_expression();
     let callee = call_expr.expression();
     let name = identifier(callee)
-        .map(|id| id.as_identifier().text().to_string())
+        .map(|id| id.as_identifier().text().to_owned())
         .or_else(|| static_member(callee).map(|(_, name)| name));
     let subject = argument(node, 0);
     if let (Some(name), Some(subject)) = (name, subject) {

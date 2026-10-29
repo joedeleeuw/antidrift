@@ -80,7 +80,7 @@ fn act_output(expression: P<Node>, oracle: &Oracle, depth: usize) -> bool {
 
 fn reads_acceptance(subject: P<Node>, origin_call: P<Node>) -> bool {
     let mut current = awaited(subject);
-    while super::syntax::call(current).is_none_or(|call_node| call_node != origin_call) {
+    while call(current).is_none_or(|call_node| call_node != origin_call) {
         let Some((object, property)) = member(current) else {
             return false;
         };

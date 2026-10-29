@@ -142,18 +142,18 @@ fn vague_reason(name: &str) -> Option<String> {
     }
     let stem = name.trim_end_matches(|ch: char| ch.is_ascii_digit());
     if !stem.is_empty() && VAGUE_NOUNS.contains(&stem.to_ascii_lowercase().as_str()) {
-        return Some("a vague noun".to_string());
+        return Some("a vague noun".to_owned());
     }
     if let Some(full) = abbreviation_expansion(name) {
         return Some(format!("an abbreviation of '{full}'"));
     }
     if is_single_letter_vague(name) {
-        return Some("a single letter".to_string());
+        return Some("a single letter".to_owned());
     }
     if has_filler_suffix(name) {
-        return Some("a filler suffix".to_string());
+        return Some("a filler suffix".to_owned());
     }
-    has_filler_prefix(name).then(|| "a filler prefix".to_string())
+    has_filler_prefix(name).then(|| "a filler prefix".to_owned())
 }
 
 fn duplicate_context_word(name: &str) -> Option<String> {

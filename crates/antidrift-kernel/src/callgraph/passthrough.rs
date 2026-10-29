@@ -256,14 +256,14 @@ fn forward_target_for_identifier(
         }?;
         if is_delegated_result_call(call) && is_first_party_layer_callee(callee, checker) {
             let text = tsrs_kernel::node_text(sf, callee).trim();
-            return (!text.is_empty()).then(|| text.to_string());
+            return (!text.is_empty()).then(|| text.to_owned());
         }
         return None;
     }
     let tag_name = forwarding_jsx_tag_name_for_identifier(node)?;
     if is_first_party_layer_callee(tag_name, checker) {
         let text = tsrs_kernel::node_text(sf, tag_name).trim();
-        return (!text.is_empty()).then(|| text.to_string());
+        return (!text.is_empty()).then(|| text.to_owned());
     }
     None
 }
@@ -377,7 +377,7 @@ fn evaluate_param_pass_through(
     }
     Some(PassThroughParam {
         name_node: def_ident,
-        name: def_ident.as_identifier().text().to_string(),
+        name: def_ident.as_identifier().text().to_owned(),
         targets,
     })
 }

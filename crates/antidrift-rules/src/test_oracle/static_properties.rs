@@ -98,7 +98,7 @@ fn assertion_subject(call_node: P<Node>) -> Option<P<Node>> {
     {
         return None;
     }
-    let expect_call = super::syntax::call(object)?;
+    let expect_call = call(object)?;
     let expect_expr = expect_call.as_call_expression();
     if identifier(expect_expr.expression())?.as_identifier().text() != "expect"
         || expect_expr.arguments().nodes().len() != 1

@@ -6,9 +6,9 @@ meta:
   generatedFilesAreReadOnly: true # Agents must edit this source file instead of generated policy artifacts.
   lintOwnership:
     nativeAndTypeAwareBaseline: oxlint
-    typeAwareProvider: oxlint-tsgolint
-    customSyntax: oxlint-js-plugin
-    customTypeChecker: eslint
+    typeAwareProvider: antidrift-linter
+    customSyntax: antidrift-linter
+    customTypeChecker: antidrift-linter
     customRuleRetirement: explicit-review-only
     duplicateEnforcement: forbidden
     sarifOwner: oxlint
@@ -36,14 +36,6 @@ clusters:
         severity: error
         detector: sameFunctionDistinctStateSettersGte:3
         message: Model one transition instead of scattering updates across setters.
-      - id: react/no-shattered-ingested-entity-state # Merged into react/no-handrolled-resource-lifecycle-cells; sourceMemberStateShardCandidate inventory facts are emitted by the unified React state lifecycle adapter.
-        severity: off
-        detector: mergedInto:react/no-handrolled-resource-lifecycle-cells
-        message: Keep an ingested entity together unless the split cells are proven editable draft fields.
-      - id: react/no-status-triplet-state # Retired standalone name inventory; semantic AST lifecycle proof lives in no-handrolled-resource-lifecycle-cells.
-        severity: off
-        detector: retiredNameInventoryOnly
-        message: Use react/no-handrolled-resource-lifecycle-cells for deterministic lifecycle proof.
       - id: react/no-derived-state-effect # Setting derived state in effects creates extra renders and stale state.
         severity: error
         detector: useEffectSynchronouslyCallsSetterFromDeps
@@ -64,10 +56,6 @@ clusters:
         severity: error
         detector: typeAwareContractProjectionWithExplicitReturnType
         message: Use the source value directly, or construct/validate the target contract at the owning boundary.
-      - id: ts/no-mechanical-get-x-from-y # Merged into type-aware contract projection detection; names alone are not proof.
-        severity: off
-        detector: mergedInto:ts/no-contract-appeasement-projection
-        message: Do not use helper names as proof; use the type-aware contract projection rule.
       - id: ts/no-structural-type-fork
         severity: error
         detector: antidrift:no-structural-type-fork
@@ -351,25 +339,85 @@ clusters:
         detector: mcpServerUsesFloatingVersion
         message: Pin tool versions.
 
-  - id: sonar-governance # Sonar is the portfolio/PR gate, not the bespoke rule authoring layer.
-    owner: engineering-productivity # Eng productivity owns quality gates and external issue ingestion.
+  - id: rust-self-governance # Deterministic Rust workspace and AST checks enforced by antidrift-linter --rust.
+    owner: engineering-productivity
     rules:
-      - id: sonar/import-custom-eslint-issues # Custom policy failures need PR visibility.
+      - id: rust/no-inline-comment
         severity: error
-        detector: missingExternalIssueReport
-        message: Import policy reports into Sonar.
-      - id: sonar/ai-code-governance-preset # Broad AI-assisted quality and reward-hacking symptoms belong in the Sonar profile/gate preset.
+        detector: antidrift-linter:rust/no-inline-comment
+        message: Put rationale and history in the commit body or field notes instead of inline comments.
+      - id: rust/max-file-lines
         severity: error
-        detector: delegated:sonar/antidrift-ai-code-governance.yaml
-        message: Apply the Antidrift Sonar AI code governance preset instead of reimplementing broad Sonar rules locally.
-      - id: sonar/no-new-critical-issues # New generated code must not add critical reliability/security debt.
+        detector: antidrift-linter:rust/max-file-lines
+        message: Keep Rust modules at or below 500 non-blank lines.
+      - id: rust/no-orphan-module
         severity: error
-        detector: sonarQualityGateNewCriticalIssues
-        message: Fix or explicitly triage before merge.
-      - id: sonar/complexity-budget # Agents create plausible but over-complex code.
+        detector: antidrift-linter:rust/no-orphan-module
+        message: Every Rust source file under crates/*/src must be reachable from lib.rs or main.rs.
+      - id: rust/no-grab-bag-module
         severity: error
-        detector: cognitiveComplexityBudget
-        message: Simplify functions exceeding budget.
+        detector: antidrift-linter:rust/no-grab-bag-module
+        message: Name modules after the domain concept they own instead of utils, helpers, common, or misc.
+      - id: rust/no-hollow-module
+        severity: error
+        detector: antidrift-linter:rust/no-hollow-module
+        message: Delete empty or stub-only Rust modules.
+      - id: rust/no-layer-violation
+        severity: error
+        detector: antidrift-linter:rust/no-layer-violation
+        message: Preserve strict crate and kernel layer DAG ordering.
+      - id: rust/no-boolean-map
+        severity: error
+        detector: antidrift-linter:rust/no-boolean-map
+        message: Replace Map<K, bool> with Set<K> or a closed state enum.
+      - id: rust/require-strict-serde
+        severity: error
+        detector: antidrift-linter:rust/require-strict-serde
+        message: Require #[serde(deny_unknown_fields)] on structs deriving Deserialize.
+      - id: rust/no-stringly-variant
+        severity: error
+        detector: antidrift-linter:rust/no-stringly-variant
+        message: Use closed enums instead of String/str discriminant fields.
+      - id: rust/no-untyped-config-probe
+        severity: error
+        detector: antidrift-linter:rust/no-untyped-config-probe
+        message: Decode configuration once at the boundary instead of probing serde_json::Value inward.
+      - id: rust/no-discarded-decoded-config
+        severity: error
+        detector: antidrift-linter:rust/no-discarded-decoded-config
+        message: Store and enforce decoded rule options and RuleScope instead of discarding them.
+      - id: rust/no-duplicate-scope-fields
+        severity: error
+        detector: antidrift-linter:rust/no-duplicate-scope-fields
+        message: Embed #[serde(flatten)] scope: ScopeOptions instead of redeclaring files/exclude_files.
+      - id: rust/no-let-underscore-suppression
+        severity: error
+        detector: antidrift-linter:rust/no-let-underscore-suppression
+        message: Do not suppress unused bindings or struct fields with let _ = ... or leading underscores.
+      - id: rust/no-ident-to-string-compare
+        severity: error
+        detector: antidrift-linter:rust/no-ident-to-string-compare
+        message: Compare syn::Ident directly against string literals without allocating .to_string().
+      - id: rust/no-compat-names
+        severity: error
+        detector: antidrift-linter:rust/no-compat-names
+        message: Delete legacy, compat, or batch-scaffolding names instead of preserving them.
+      - id: rust/no-wrapping-functions
+        severity: error
+        detector: antidrift-linter:rust/no-wrapping-functions
+        message: Call the underlying function directly instead of adding a pass-through wrapper.
+      - id: rust/no-anemic-errors
+        severity: error
+        detector: antidrift-linter:rust/no-anemic-errors
+        message: Preserve underlying error causes in map_err closures.
+      - id: rust/no-inline-tests
+        severity: error
+        detector: antidrift-linter:rust/no-inline-tests
+        message: Validate via real CLI smoke runs instead of inline unit tests.
+      - id: rust/target-manifest-policy
+        severity: error
+        detector: antidrift-linter:rust/target-manifest-policy
+        message: Keep test = false and doctest = false on all workspace Cargo targets.
 
   - id: agent-instructions # Natural-language guidance should be generated and linted.
     owner: developer-experience # DX owns multi-agent instruction consistency.

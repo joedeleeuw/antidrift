@@ -17,7 +17,7 @@ pub(super) fn resolve(expression: P<Node>, oracle: &Oracle, depth: usize) -> Opt
 
 pub(super) fn template_text(expression: P<Node>) -> Option<String> {
     if expression.kind() == Kind::NoSubstitutionTemplateLiteral {
-        return Some(expression.text().to_string());
+        return Some(expression.text().to_owned());
     }
     None
 }

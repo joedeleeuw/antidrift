@@ -60,7 +60,7 @@ fn collect_object_binding_pattern_for_projection(
         };
         if ast::is_identifier(name_node) {
             bindings.insert(
-                name_node.as_identifier().text().to_string(),
+                name_node.as_identifier().text().to_owned(),
                 SourceBinding {
                     kind: SourceBindingKind::Destructured,
                     owner_names: owner_names.clone(),
@@ -83,7 +83,7 @@ fn source_bindings_for_function(func: P<Node>) -> FxHashMap<String, SourceBindin
         let name_node = param.name();
         if ast::is_identifier(name_node) {
             bindings.insert(
-                name_node.as_identifier().text().to_string(),
+                name_node.as_identifier().text().to_owned(),
                 SourceBinding {
                     kind: SourceBindingKind::Identity,
                     owner_names,
@@ -198,7 +198,7 @@ impl ProjectionWalker<'_> {
         }
         let key = tsrs_kernel::node_text(self.sf, tsrs_kernel::unwrap_expression(source_expr))
             .trim()
-            .to_string();
+            .to_owned();
         vec![EqualityConstraint { key, literal: lit }]
     }
 
@@ -258,7 +258,7 @@ impl ProjectionWalker<'_> {
                     tsrs_kernel::unwrap_expression(sw.expression()),
                 )
                 .trim()
-                .to_string();
+                .to_owned();
                 let mut disc_type_keys = FxHashSet::default();
                 shape::type_literal_keys(disc_type, &mut disc_type_keys);
                 (disc_key, disc_type_keys)

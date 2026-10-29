@@ -27,29 +27,29 @@ pub(super) fn resolver_with_mode(
         }),
         builtin_modules: true,
         condition_names: ["types", condition, "node", "default"]
-            .map(str::to_string)
+            .map(str::to_owned)
             .to_vec(),
         main_fields: ["types", "typings", "module", "main"]
-            .map(str::to_string)
+            .map(str::to_owned)
             .to_vec(),
         extensions: [
             ".ts", ".tsx", ".d.ts", ".mts", ".d.mts", ".cts", ".d.cts", ".js", ".jsx", ".mjs",
             ".cjs", ".json",
         ]
-        .map(str::to_string)
+        .map(str::to_owned)
         .to_vec(),
         extension_alias: vec![
             (
-                ".js".to_string(),
-                [".ts", ".tsx", ".d.ts", ".js"].map(str::to_string).to_vec(),
+                ".js".to_owned(),
+                [".ts", ".tsx", ".d.ts", ".js"].map(str::to_owned).to_vec(),
             ),
             (
-                ".mjs".to_string(),
-                [".mts", ".d.mts", ".mjs"].map(str::to_string).to_vec(),
+                ".mjs".to_owned(),
+                [".mts", ".d.mts", ".mjs"].map(str::to_owned).to_vec(),
             ),
             (
-                ".cjs".to_string(),
-                [".cts", ".d.cts", ".cjs"].map(str::to_string).to_vec(),
+                ".cjs".to_owned(),
+                [".cts", ".d.cts", ".cjs"].map(str::to_owned).to_vec(),
             ),
         ],
         ..ResolveOptions::default()

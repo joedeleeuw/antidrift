@@ -1,5 +1,5 @@
 {
-  "name": "agent-guardrails-monorepo-template",
+  "name": "antidrift-monorepo",
   "version": "0.0.0",
   "private": true,
   "type": "module",

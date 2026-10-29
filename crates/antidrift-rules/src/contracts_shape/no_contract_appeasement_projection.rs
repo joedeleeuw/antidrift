@@ -1,3 +1,4 @@
+use antidrift_kernel::provenance::{DeclarationOrigin, classify_symbol_origin, symbol_at_node};
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{projection, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, SourceFile};
@@ -178,6 +179,39 @@ fn is_exported_function_boundary(fn_node: P<Node>, sf: P<SourceFile>) -> bool {
         .is_some_and(|parent| is_directly_exported(parent, sf))
 }
 
+fn type_reference_origin(ctx: &mut Ctx, type_node: Option<P<Node>>) -> DeclarationOrigin {
+    let Some(node) = type_node else {
+        return DeclarationOrigin::Unknown;
+    };
+    if node.kind() != Kind::TypeReference {
+        return DeclarationOrigin::Unknown;
+    }
+    let sym = symbol_at_node(ctx.checker, node.as_type_reference_node().type_name());
+    classify_symbol_origin(ctx.program, ctx.checker, sym, Some(ctx.file))
+}
+
+fn is_cross_boundary_domain_mapper(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>) -> bool {
+    if !is_exported_boundary(candidate, ctx.file) {
+        return false;
+    }
+    let mut non_this = function.parameters().iter().copied().filter(|&param| {
+        let name = param.as_parameter_declaration().name();
+        !(ast::is_identifier(name) && name.as_identifier().text() == "this")
+    });
+    let Some(param_node) = non_this.next().filter(|_| non_this.next().is_none()) else {
+        return false;
+    };
+    let param_origin = type_reference_origin(ctx, param_node.as_parameter_declaration().type_());
+    let return_origin =
+        type_reference_origin(ctx, tsrs_kernel::function_return_type_node(function));
+    matches!(
+        param_origin,
+        DeclarationOrigin::NodeModules
+            | DeclarationOrigin::Generated
+            | DeclarationOrigin::LocalBoundary
+    ) && return_origin == DeclarationOrigin::LocalDomain
+}
+
 fn check_function_candidate(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>) {
     let file_name = ctx.file.file_name();
     if !tsrs_kernel::is_test_file(file_name)
@@ -190,10 +224,12 @@ fn check_function_candidate(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>
                 parameter_name,
                 target_contract,
             } => {
-                ctx.report_node(
-                    candidate,
-                    build_bag_to_contract_message(&parameter_name, &target_contract),
-                );
+                if !is_cross_boundary_domain_mapper(ctx, function, candidate) {
+                    ctx.report_node(
+                        candidate,
+                        build_bag_to_contract_message(&parameter_name, &target_contract),
+                    );
+                }
             }
             projection::BagReshaperClassification::BagToBag { parameter_name } => {
                 ctx.report_node(candidate, build_bag_to_bag_message(&parameter_name));

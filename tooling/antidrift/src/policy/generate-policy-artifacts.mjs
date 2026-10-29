@@ -14,9 +14,17 @@ async function write(path, content) {
 
 export function renderPolicyArtifacts(policy) {
   const clusterLines = policy.clusters
+    .map((cluster) => ({
+      id: cluster.id,
+      owner: cluster.owner,
+      rules: cluster.rules
+        .filter((rule) => rule.severity !== "off")
+        .map((rule) => rule.id),
+    }))
+    .filter((cluster) => cluster.rules.length > 0)
     .map(
       (cluster) =>
-        `- **${cluster.id}** (${cluster.owner}): ${cluster.rules.map((rule) => rule.id).join(", ")}`
+        `- **${cluster.id}** (${cluster.owner}): ${cluster.rules.join(", ")}`
     )
     .join("\n");
   const header =

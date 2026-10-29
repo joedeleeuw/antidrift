@@ -304,7 +304,7 @@ fn audit_program_references(program: &Program, checker: &mut Checker, sym: P<Sym
         if tsrs_kernel::is_declaration_file(sf.file_name()) {
             continue;
         }
-        audit.current_file = sf.file_name().to_string();
+        sf.file_name().clone_into(&mut audit.current_file);
         audit_refs_in_node(sf.as_node(), checker, &mut audit);
     }
     audit
@@ -377,15 +377,6 @@ fn check_candidate(ctx: &mut Ctx, fn_node: P<Node>, name_ident: P<Node>, decl: P
     let name = candidate.name_node.as_identifier().text();
     let callee = tsrs_kernel::node_text(ctx.file, candidate.callee_node);
     if exported && calls == 0 {
-        ctx.report_node(
-            candidate.name_node,
-            RuleMessage::new(
-                "incomplete",
-                format!(
-                    "Incomplete analysis for '{name}', a candidate hop to '{callee}': it is exported and has no caller in this TypeScript program, so its consumers (other programs or loaders that resolve exports by name) are unknown."
-                ),
-            ),
-        );
         return;
     }
     if calls == 0 {

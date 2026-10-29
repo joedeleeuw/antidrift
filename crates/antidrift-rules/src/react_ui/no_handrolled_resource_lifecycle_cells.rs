@@ -1,9 +1,8 @@
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::tsrs_kernel::{is_function_like, static_member_chain, unwrap_expression};
 use rustc_hash::{FxHashMap, FxHashSet};
-use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::{P, TextPos};
 use tsrslint::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
@@ -11,17 +10,6 @@ use tsrslint::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
 pub const RULE_NAME: &str = "antidrift/no-handrolled-resource-lifecycle-cells";
 const MESSAGE: &str = "This async transition hand-rolls a resource lifecycle: a constant lifecycle cell is toggled around the request while sibling cells receive the resource value and caught error. Model one resource/reducer value instead of coupled setters.";
 const GLOBAL_OBJECTS: [&str; 3] = ["globalThis", "window", "self"];
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct ResourceLifecycleOptions {
-    #[serde(rename = "threshold")]
-    _threshold: Option<f64>,
-    #[serde(rename = "shardThreshold")]
-    _shard_threshold: Option<f64>,
-    #[serde(flatten)]
-    scope: ScopeOptions,
-}
 
 pub struct NoHandrolledResourceLifecycleCells {
     scope: RuleScope,
@@ -33,9 +21,9 @@ pub static DEFAULT_RULE: NoHandrolledResourceLifecycleCells = NoHandrolledResour
 
 impl NoHandrolledResourceLifecycleCells {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<ResourceLifecycleOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
-        Ok(Self { scope })
+        Ok(Self {
+            scope: RuleScope::from_options(RULE_NAME, options)?,
+        })
     }
 }
 

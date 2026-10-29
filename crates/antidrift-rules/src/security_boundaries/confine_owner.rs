@@ -100,7 +100,7 @@ impl ConfineOwner {
         {
             return Err(
                 "confine-owner entries must have non-empty id, owner, and allowed reasons"
-                    .to_string(),
+                    .to_owned(),
             );
         }
         let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;

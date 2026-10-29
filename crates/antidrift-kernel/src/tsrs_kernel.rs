@@ -373,9 +373,9 @@ pub fn expression_literal_key(node: P<Node>) -> Option<String> {
             Some(format!("string:{}", unwrapped.text()))
         }
         Kind::NumericLiteral => Some(format!("number:{}", unwrapped.text())),
-        Kind::TrueKeyword => Some("boolean:true".to_string()),
-        Kind::FalseKeyword => Some("boolean:false".to_string()),
-        Kind::NullKeyword => Some("object:null".to_string()),
+        Kind::TrueKeyword => Some("boolean:true".to_owned()),
+        Kind::FalseKeyword => Some("boolean:false".to_owned()),
+        Kind::NullKeyword => Some("object:null".to_owned()),
         _ => None,
     }
 }

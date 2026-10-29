@@ -1,10 +1,11 @@
 use super::RustDiagnostic;
+use antidrift_rules::type_narrowing::no_compat_names::is_compat_name;
 use proc_macro2::Span;
 use std::path::Path;
 use syn::visit::{self, Visit};
 use syn::{
-    Expr, ExprCall, ExprClosure, ExprMethodCall, ExprPath, FnArg, ItemEnum, ItemFn, ItemStruct,
-    ItemType, Pat, Stmt,
+    BinOp, Expr, ExprBinary, ExprCall, ExprClosure, ExprField, ExprLit, ExprMethodCall, ExprPath,
+    FnArg, ItemEnum, ItemFn, ItemStruct, ItemType, Lit, Member, Pat, Stmt,
 };
 
 pub(super) fn check_smells(
@@ -19,7 +20,7 @@ pub(super) fn check_smells(
         && has_banned_lifecycle_token(stem)
     {
         diagnostics.push(RustDiagnostic {
-            file: rel_path.to_string(),
+            file: rel_path.to_owned(),
             line: 1,
             rule_id: "rust/no-compat-names",
             message: format!(
@@ -44,7 +45,7 @@ struct SmellVisitor<'a> {
 impl SmellVisitor<'_> {
     fn push(&mut self, span: Span, rule_id: &'static str, message: String) {
         self.diagnostics.push(RustDiagnostic {
-            file: self.rel_path.to_string(),
+            file: self.rel_path.to_owned(),
             line: span.start().line.max(1),
             rule_id,
             message,
@@ -68,13 +69,13 @@ impl SmellVisitor<'_> {
             self.push(
                 span,
                 "rust/no-discarded-decoded-config",
-                "Decoded configuration or RuleScope is discarded; store the decoded value on the rule and enforce it during traversal.".to_string(),
+                "Decoded configuration or RuleScope is discarded; store the decoded value on the rule and enforce it during traversal.".to_owned(),
             );
         } else if is_suppressed_binding_expr(expr) {
             self.push(
                 span,
                 "rust/no-let-underscore-suppression",
-                "Do not suppress unused parameter, self, or field warnings with 'let _ = ...;'; remove the unused binding or use it.".to_string(),
+                "Do not suppress unused parameter, self, or field warnings with 'let _ = ...;'; remove the unused binding or use it.".to_owned(),
             );
         }
     }
@@ -111,13 +112,22 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
         for ident in node.fields.iter().filter_map(|field| field.ident.as_ref()) {
             let field_name = ident.to_string();
             self.check_ident_name(&field_name, ident.span());
-            if field_name == "exclude_files"
-                && !matches!(struct_name.as_str(), "ScopeOptions" | "RuleScope")
+            if field_name.starts_with('_') {
+                self.push(
+                    ident.span(),
+                    "rust/no-let-underscore-suppression",
+                    format!(
+                        "Struct '{}' field '{field_name}' uses a leading underscore to suppress dead-code or serde field checks; use the field or remove it.",
+                        node.ident
+                    ),
+                );
+            }
+            if ident == "exclude_files" && node.ident != "ScopeOptions" && node.ident != "RuleScope"
             {
                 self.push(
                     ident.span(),
                     "rust/no-duplicate-scope-fields",
-                    "Do not redeclare 'files' / 'exclude_files' on rule option structs; embed '#[serde(flatten)] scope: ScopeOptions' instead.".to_string(),
+                    "Do not redeclare 'files' / 'exclude_files' on rule option structs; embed '#[serde(flatten)] scope: ScopeOptions' instead.".to_owned(),
                 );
             }
         }
@@ -135,7 +145,7 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
                 self.push(
                     semi.spans[0],
                     "rust/no-discarded-decoded-config",
-                    "Decoded configuration or RuleScope is discarded; store the decoded value on the rule and enforce it during traversal.".to_string(),
+                    "Decoded configuration or RuleScope is discarded; store the decoded value on the rule and enforce it during traversal.".to_owned(),
                 );
             }
             _ => {}
@@ -165,31 +175,45 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
             self.push(
                 node.method.span(),
                 "rust/no-anemic-errors",
-                "'.map_err(|_| ...)' discards the underlying error cause; preserve or format the source error.".to_string(),
+                "'.map_err(|_| ...)' discards the underlying error cause; preserve or format the source error.".to_owned(),
+            );
+        }
+        if node.method == "as_str" && is_ident_to_string_call(&node.receiver) {
+            self.push(
+                node.method.span(),
+                "rust/no-ident-to-string-compare",
+                "Do not allocate '.to_string().as_str()' on 'syn::Ident'; compare 'ident == \"...\"' directly.".to_owned(),
             );
         }
         visit::visit_expr_method_call(self, node);
     }
+
+    fn visit_expr_binary(&mut self, node: &'ast ExprBinary) {
+        if matches!(node.op, BinOp::Eq(_) | BinOp::Ne(_)) {
+            let span = if is_str_lit(&node.right) {
+                ident_to_string_call_span(&node.left)
+            } else if is_str_lit(&node.left) {
+                ident_to_string_call_span(&node.right)
+            } else {
+                None
+            };
+            if let Some(span) = span {
+                self.push(
+                    span,
+                    "rust/no-ident-to-string-compare",
+                    "Do not allocate '.to_string()' on 'syn::Ident' to compare against a string literal; compare 'ident == \"...\"' directly.".to_owned(),
+                );
+            }
+        }
+        visit::visit_expr_binary(self, node);
+    }
 }
 
 fn has_banned_lifecycle_token(name: &str) -> bool {
-    let lower = name.to_ascii_lowercase();
-    if lower.contains("legacy")
-        || lower.contains("deprecated")
-        || lower.contains("retire")
-        || lower.contains("nolonger")
-        || lower.contains("no_longer")
-    {
+    if is_compat_name(name) {
         return true;
     }
-    let mut search_from = 0usize;
-    while let Some(offset) = lower[search_from..].find("compat") {
-        let abs = search_from + offset;
-        if !lower[abs..].starts_with("compatible") {
-            return true;
-        }
-        search_from = abs + 6;
-    }
+    let lower = name.to_ascii_lowercase();
     has_numbered_prefix(&lower, "batch") || has_numbered_prefix(&lower, "slice_v")
 }
 
@@ -289,11 +313,41 @@ fn is_decoded_config_call(expr: &Expr) -> bool {
         return false;
     };
     callee.path.segments.last().is_some_and(|seg| {
-        matches!(
-            seg.ident.to_string().as_str(),
-            "decode_rule_options" | "from_options" | "from_scope_options"
-        )
+        seg.ident == "decode_rule_options"
+            || seg.ident == "from_options"
+            || seg.ident == "from_scope_options"
     })
+}
+
+fn ident_to_string_call_span(expr: &Expr) -> Option<Span> {
+    let Expr::MethodCall(call) = expr else {
+        return None;
+    };
+    if call.method != "to_string" || !call.args.is_empty() {
+        return None;
+    };
+    let Expr::Field(ExprField {
+        member: Member::Named(field_ident),
+        ..
+    }) = &*call.receiver
+    else {
+        return None;
+    };
+    (field_ident == "ident" || field_ident == "method").then(|| call.method.span())
+}
+
+fn is_ident_to_string_call(expr: &Expr) -> bool {
+    ident_to_string_call_span(expr).is_some()
+}
+
+fn is_str_lit(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Lit(ExprLit {
+            lit: Lit::Str(_),
+            ..
+        })
+    )
 }
 
 fn detect_passthrough_wrapper(item_fn: &ItemFn) -> Option<String> {

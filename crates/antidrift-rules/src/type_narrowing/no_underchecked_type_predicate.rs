@@ -48,7 +48,7 @@ fn required_type_props(checker: &mut Checker, typ: P<Type>) -> Vec<String> {
         if !prop.flags.get().intersects(SymbolFlags::Optional) {
             let prop_type = checker.get_type_of_symbol(prop);
             if get_call_signatures(checker, prop_type).is_empty() {
-                names.push(prop.name().to_string());
+                names.push(prop.name().to_owned());
             }
         }
     }

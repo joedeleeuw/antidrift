@@ -160,8 +160,7 @@ fn check_orphan_modules(
                 line: 1,
                 rule_id: "rust/no-orphan-module",
                 message:
-                    "Rust source file is not reachable from any Cargo target root (lib.rs or main.rs); wire `mod` or delete the orphan file."
-                        .to_string(),
+                    "Rust source file is not reachable from any Cargo target root (lib.rs or main.rs); wire `mod` or delete the orphan file.".to_owned(),
             });
         }
     }
@@ -248,29 +247,29 @@ fn check_cargo_manifest(
     let sections = parse_toml_sections(manifest_text);
     let has_workspace_lints = sections
         .iter()
-        .any(|sec| sec.header == "[lints]" && sec.kv.get("workspace") == Some(&"true".to_string()));
+        .any(|sec| sec.header == "[lints]" && sec.kv.get("workspace") == Some(&"true".to_owned()));
     if !has_workspace_lints {
         diagnostics.push(RustDiagnostic {
-            file: manifest_rel.to_string(),
+            file: manifest_rel.to_owned(),
             line: 1,
             rule_id: "rust/target-manifest-policy",
-            message: "Crate Cargo.toml must inherit `[lints] workspace = true`.".to_string(),
+            message: "Crate Cargo.toml must inherit `[lints] workspace = true`.".to_owned(),
         });
     }
 
     for sec in &sections {
         if matches!(sec.header.as_str(), "[lib]" | "[[bin]]") {
-            if sec.kv.get("test") != Some(&"false".to_string()) {
+            if sec.kv.get("test") != Some(&"false".to_owned()) {
                 diagnostics.push(RustDiagnostic {
-                    file: manifest_rel.to_string(),
+                    file: manifest_rel.to_owned(),
                     line: sec.line,
                     rule_id: "rust/target-manifest-policy",
                     message: format!("Section {} must set `test = false`.", sec.header),
                 });
             }
-            if sec.kv.get("doctest") != Some(&"false".to_string()) {
+            if sec.kv.get("doctest") != Some(&"false".to_owned()) {
                 diagnostics.push(RustDiagnostic {
-                    file: manifest_rel.to_string(),
+                    file: manifest_rel.to_owned(),
                     line: sec.line,
                     rule_id: "rust/target-manifest-policy",
                     message: format!("Section {} must set `doctest = false`.", sec.header),
@@ -300,7 +299,7 @@ fn check_dependency_dag(
         for forbidden in ["antidrift-rules", "antidrift-linter"] {
             if sec.kv.contains_key(forbidden) {
                 diagnostics.push(RustDiagnostic {
-                    file: manifest_rel.to_string(),
+                    file: manifest_rel.to_owned(),
                     line: sec.line,
                     rule_id: "rust/target-manifest-policy",
                     message: format!("antidrift-kernel cannot depend on {forbidden}."),
@@ -309,10 +308,10 @@ fn check_dependency_dag(
         }
     } else if crate_name == "antidrift-rules" && sec.kv.contains_key("antidrift-linter") {
         diagnostics.push(RustDiagnostic {
-            file: manifest_rel.to_string(),
+            file: manifest_rel.to_owned(),
             line: sec.line,
             rule_id: "rust/target-manifest-policy",
-            message: "antidrift-rules cannot depend on antidrift-linter.".to_string(),
+            message: "antidrift-rules cannot depend on antidrift-linter.".to_owned(),
         });
     }
 }
@@ -342,7 +341,7 @@ fn parse_toml_sections(text: &str) -> Vec<TomlSection> {
                 sections.push(current);
             }
             current = TomlSection {
-                header: trimmed.to_string(),
+                header: trimmed.to_owned(),
                 line: line_no,
                 kv: FxHashMap::default(),
             };
@@ -355,8 +354,8 @@ fn parse_toml_sections(text: &str) -> Vec<TomlSection> {
                 .next()
                 .unwrap_or("")
                 .trim()
-                .to_string();
-            let val = raw_val.trim().to_string();
+                .to_owned();
+            let val = raw_val.trim().to_owned();
             current.kv.insert(key, val);
         }
     }

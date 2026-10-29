@@ -16,7 +16,7 @@ pub(super) fn source_file_read_call_name(call_node: P<Node>) -> Option<String> {
     let callee = unwrap_expr(call.expression());
     let reader_name = match callee.kind() {
         Kind::Identifier if FILE_READ_FUNCTIONS.contains(&callee.as_identifier().text()) => {
-            callee.as_identifier().text().to_string()
+            callee.as_identifier().text().to_owned()
         }
         Kind::PropertyAccessExpression => {
             let access = callee.as_property_access_expression();
@@ -26,11 +26,11 @@ pub(super) fn source_file_read_call_name(call_node: P<Node>) -> Option<String> {
             }
             let prop = prop_node.as_identifier().text();
             if FILE_READ_FUNCTIONS.contains(&prop) {
-                prop.to_string()
+                prop.to_owned()
             } else if prop == "file" {
                 let obj = unwrap_expr(access.expression());
                 if ast::is_identifier(obj) && obj.as_identifier().text() == "Bun" {
-                    "Bun.file".to_string()
+                    "Bun.file".to_owned()
                 } else {
                     return None;
                 }
@@ -56,13 +56,13 @@ pub(super) fn source_file_read_call_name(call_node: P<Node>) -> Option<String> {
 fn collect_static_path_segments(expr: P<Node>, visited: &mut FxHashSet<Binding>) -> Vec<String> {
     let inner = unwrap_expr(expr);
     match inner.kind() {
-        Kind::StringLiteral => vec![inner.as_string_literal().text().to_string()],
+        Kind::StringLiteral => vec![inner.as_string_literal().text().to_owned()],
         Kind::NoSubstitutionTemplateLiteral => {
             let text = inner.text();
             if text.is_empty() {
                 Vec::new()
             } else {
-                vec![text.to_string()]
+                vec![text.to_owned()]
             }
         }
         Kind::TemplateExpression => {
@@ -70,14 +70,14 @@ fn collect_static_path_segments(expr: P<Node>, visited: &mut FxHashSet<Binding>)
             let mut out = Vec::new();
             let head = tpl.head().text();
             if !head.is_empty() {
-                out.push(head.to_string());
+                out.push(head.to_owned());
             }
             for &span_node in tpl.template_spans().nodes() {
                 let span = span_node.as_template_span();
                 out.extend(collect_static_path_segments(span.expression(), visited));
                 let tail = span.literal().text();
                 if !tail.is_empty() {
-                    out.push(tail.to_string());
+                    out.push(tail.to_owned());
                 }
             }
             out

@@ -23,8 +23,7 @@ const DEFAULT_SKELETON: &str = "accessible placeholder text";
 #[serde(deny_unknown_fields)]
 struct DocumentedAllowedFile {
     path: String,
-    #[serde(rename = "reason")]
-    _reason: String,
+    reason: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -61,7 +60,14 @@ impl ScopedOptions for AdhocLoaderOptions {
 
     fn validate(&self, rule_name: &str) -> Result<(), String> {
         require_non_empty(rule_name, "owner", self.owner.as_ref())?;
-        require_non_empty(rule_name, "skeleton", self.skeleton.as_ref())
+        require_non_empty(rule_name, "skeleton", self.skeleton.as_ref())?;
+        for allowed in &self.allowed_files {
+            if let AllowedFile::Documented(doc) = allowed {
+                require_non_empty(rule_name, "allowedFiles[].path", Some(&doc.path))?;
+                require_non_empty(rule_name, "allowedFiles[].reason", Some(&doc.reason))?;
+            }
+        }
+        Ok(())
     }
 }
 

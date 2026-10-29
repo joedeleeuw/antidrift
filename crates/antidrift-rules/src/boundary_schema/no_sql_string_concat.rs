@@ -372,7 +372,7 @@ impl NoSqlStringConcat {
         let mut idents: Vec<String> = Vec::new();
         specifier.for_each_child(&mut |child| {
             if ast::is_identifier(child) {
-                idents.push(child.as_identifier().text().to_string());
+                idents.push(child.as_identifier().text().to_owned());
             }
             false
         });
@@ -386,7 +386,7 @@ impl NoSqlStringConcat {
         while let Some(curr) = current {
             if curr.kind() == Kind::ImportDeclaration {
                 let spec = curr.as_import_declaration().module_specifier();
-                return ast::is_string_literal(spec).then(|| spec.text().to_string());
+                return ast::is_string_literal(spec).then(|| spec.text().to_owned());
             }
             current = curr.parent();
         }
@@ -488,12 +488,11 @@ impl NoSqlStringConcat {
     }
 
     fn static_string_text(node: P<Node>) -> Option<String> {
-        match node.kind() {
-            Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral => {
-                Some(node.text().to_string())
-            }
-            _ => None,
-        }
+        matches!(
+            node.kind(),
+            Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral
+        )
+        .then(|| node.text().to_owned())
     }
 
     fn combined_template_text(template_node: P<Node>) -> String {
@@ -512,25 +511,27 @@ impl NoSqlStringConcat {
             .filter(|word| !word.is_empty())
             .map(str::to_ascii_lowercase)
             .collect();
-        Self::tokens_match_sql_pair(&tokens, "select", "from")
-            || Self::tokens_match_sql_pair(&tokens, "insert", "into")
-            || Self::tokens_match_sql_pair(&tokens, "update", "set")
-            || Self::tokens_match_sql_pair(&tokens, "delete", "from")
-            || Self::tokens_match_adjacent(&tokens, "create", "table")
-            || Self::tokens_match_adjacent(&tokens, "alter", "table")
-            || Self::tokens_match_adjacent(&tokens, "drop", "table")
-    }
-
-    fn tokens_match_sql_pair(tokens: &[String], first: &str, second: &str) -> bool {
-        let Some(first_pos) = tokens.iter().position(|tok| tok == first) else {
+        let Some(first) = tokens.first().map(String::as_str) else {
             return false;
         };
-        tokens[first_pos + 1..].iter().any(|tok| tok == second)
-    }
-
-    fn tokens_match_adjacent(tokens: &[String], first: &str, second: &str) -> bool {
-        tokens
-            .windows(2)
-            .any(|pair| pair[0] == first && pair[1] == second)
+        let adj = |a: &str, b: &str| tokens.windows(2).any(|w| w[0] == a && w[1] == b);
+        (matches!(first, "select" | "with")
+            && tokens
+                .iter()
+                .position(|tok| tok == "select")
+                .is_some_and(|pos| tokens[pos + 1..].iter().any(|tok| tok == "from")))
+            || (first == "update"
+                && matches!(
+                    (
+                        tokens.get(2).map(String::as_str),
+                        tokens.get(3).map(String::as_str)
+                    ),
+                    (Some("set"), _) | (_, Some("set"))
+                ))
+            || (matches!(first, "insert" | "replace") && adj(first, "into"))
+            || (first == "delete" && adj("delete", "from"))
+            || adj("create", "table")
+            || adj("alter", "table")
+            || adj("drop", "table")
     }
 }

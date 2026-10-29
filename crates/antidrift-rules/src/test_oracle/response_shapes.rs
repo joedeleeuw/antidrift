@@ -30,12 +30,12 @@ pub(super) fn resolve(
     }
     let expression = awaited(expression);
     let shape = match expression.kind() {
-        Kind::StringLiteral => Shape::String(expression.as_string_literal().text().to_string()),
+        Kind::StringLiteral => Shape::String(expression.as_string_literal().text().to_owned()),
         Kind::NumericLiteral => Shape::Number(numeric_value(expression)?.to_bits()),
         Kind::TrueKeyword => Shape::Boolean(true),
         Kind::FalseKeyword => Shape::Boolean(false),
         Kind::NullKeyword => Shape::Null,
-        Kind::BigIntLiteral => Shape::BigInt(expression.text().trim_end_matches('n').to_string()),
+        Kind::BigIntLiteral => Shape::BigInt(expression.text().trim_end_matches('n').to_owned()),
         Kind::NoSubstitutionTemplateLiteral => Shape::String(template_text(expression)?),
         Kind::ArrayLiteralExpression => Shape::Array(
             expression

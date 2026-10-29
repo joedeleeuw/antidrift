@@ -79,9 +79,9 @@ impl DirectiveSet {
                 continue;
             }
             retained.push(RuleDiagnostic {
-                rule_id: "unused-disable-directive".to_string(),
-                message_id: Some("unusedDisableDirective".to_string()),
-                message: "Unused inline disable directive.".to_string(),
+                rule_id: "unused-disable-directive".to_owned(),
+                message_id: Some("unusedDisableDirective".to_owned()),
+                message: "Unused inline disable directive.".to_owned(),
                 severity: Severity::Error,
                 location: line_index.diagnostic_location(
                     source_text,

@@ -20,7 +20,10 @@ pub(crate) fn run_rust_cli(raw_args: &[String]) -> Result<i32, String> {
     let mut json_output = false;
     let mut roots = Vec::new();
     for arg in raw_args {
-        if arg == "--json" {
+        if arg == "--help" || arg == "-h" {
+            println!("Usage: antidrift-linter rust [--json] [paths...]");
+            return Ok(0);
+        } else if arg == "--json" {
             json_output = true;
         } else if let Some(flag) = arg.strip_prefix('-') {
             return Err(format!("unknown `rust` flag: -{flag}"));
@@ -29,7 +32,7 @@ pub(crate) fn run_rust_cli(raw_args: &[String]) -> Result<i32, String> {
         }
     }
     if roots.is_empty() {
-        roots.push(".".to_string());
+        roots.push(".".to_owned());
     }
 
     let mut diagnostics = Vec::new();

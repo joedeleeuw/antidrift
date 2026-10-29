@@ -218,6 +218,24 @@ fn is_explicit_any_or_unknown_type_node(checker: &mut Checker, type_node: P<Node
     })
 }
 
+fn is_closed_literal_union_for_primitive(declared_type: P<Type>, target_type: P<Type>) -> bool {
+    let parts = shape::non_nullish_type_parts(target_type);
+    if parts.len() < 2 {
+        return false;
+    }
+    if is_type_flag_set(declared_type, TypeFlags::String) {
+        return parts
+            .into_iter()
+            .all(|part| is_type_flag_set(part, TypeFlags::StringLiteral));
+    }
+    if is_type_flag_set(declared_type, TypeFlags::Number) {
+        return parts
+            .into_iter()
+            .all(|part| is_type_flag_set(part, TypeFlags::NumberLiteral));
+    }
+    false
+}
+
 fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
     let Some((operand, type_node)) = tsrs_kernel::assertion_parts(node) else {
         return;
@@ -227,6 +245,11 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
     }
     if is_explicit_any_or_unknown_type_node(ctx.checker, type_node)
         || is_type_predicate_subject(ctx.checker, node, operand)
+        || antidrift_kernel::boundary::is_global_json_parse(
+            Some(ctx.program),
+            ctx.checker,
+            tsrs_kernel::unwrap_expression(operand),
+        )
     {
         return;
     }
@@ -236,9 +259,9 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
     }
     let flow_type = ctx.checker.get_type_at_location(operand);
     let declared_type = declared_operand_type(ctx.checker, operand, flow_type);
-    if !is_broad_source_type(ctx.checker, declared_type)
-        || is_checker_narrowing_proof(ctx.checker, flow_type, target_type)
-    {
+    let unproven_source = is_broad_source_type(ctx.checker, declared_type)
+        || is_closed_literal_union_for_primitive(declared_type, target_type);
+    if !unproven_source || is_checker_narrowing_proof(ctx.checker, flow_type, target_type) {
         return;
     }
     ctx.report_node(

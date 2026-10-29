@@ -29,7 +29,7 @@ impl RequireAuthzCheck {
         let parsed = decode_rule_options::<AuthzOptions>(RULE_NAME, options)?;
         let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         if parsed.authz_functions.iter().any(String::is_empty) {
-            return Err("authzFunctions must contain non-empty strings".to_string());
+            return Err("authzFunctions must contain non-empty strings".to_owned());
         }
         Ok(Self {
             scope,

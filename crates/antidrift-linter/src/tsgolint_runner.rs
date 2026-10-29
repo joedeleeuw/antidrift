@@ -39,7 +39,7 @@ fn parse_headless_flags(args: &[String]) -> Result<Options, String> {
     while idx < args.len() {
         let trimmed = args[idx].trim_start_matches('-');
         let (name, value) = match trimmed.split_once('=') {
-            Some((key, val)) => (key, Some(val.to_string())),
+            Some((key, val)) => (key, Some(val.to_owned())),
             None => (trimmed, None),
         };
         match name {
@@ -206,7 +206,7 @@ fn to_protocol_diagnostic(reported: &ReportedDiagnostic) -> Diagnostic {
     if reported.rule_name.starts_with("antidrift/") {
         proto.kind = 1;
         proto.rule = None;
-        proto.message.id = reported.rule_name.to_string();
+        reported.rule_name.clone_into(&mut proto.message.id);
     }
     proto
 }

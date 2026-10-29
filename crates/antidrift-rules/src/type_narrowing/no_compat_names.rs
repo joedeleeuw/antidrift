@@ -5,7 +5,8 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 const RULE_NAME: &str = "antidrift/no-compat-names";
 
-fn is_compat_name(name: &str) -> bool {
+#[must_use]
+pub fn is_compat_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     if lower.contains("legacy")
         || lower.contains("deprecated")

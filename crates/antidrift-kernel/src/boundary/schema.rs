@@ -57,7 +57,7 @@ pub fn symbol_package_path(checker: &mut Checker, sym: Option<P<Symbol>>) -> Opt
             if let Some(rest) = file.get(start..)
                 && !rest.is_empty()
             {
-                return Some(rest.to_string());
+                return Some(rest.to_owned());
             }
         }
     }

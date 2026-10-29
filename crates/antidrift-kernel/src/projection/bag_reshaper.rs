@@ -75,7 +75,7 @@ fn build_bag_state_from_name(
     if ast::is_identifier(name_node) {
         let root_sym = provenance::symbol_at_node(checker, name_node)?;
         return Some(BagState {
-            parameter_name: name_node.as_identifier().text().to_string(),
+            parameter_name: name_node.as_identifier().text().to_owned(),
             parameter_node: Some(param_node),
             bag_root_symbols: FxHashSet::from_iter([root_sym]),
             bag_field_symbols: FxHashSet::default(),
@@ -235,7 +235,7 @@ fn named_contract_from_type_reference(
         return None;
     }
     let text = tsrs_kernel::node_text(sf, type_node).trim();
-    (!text.is_empty()).then(|| text.to_string())
+    (!text.is_empty()).then(|| text.to_owned())
 }
 
 fn named_contract_from_type_node(type_node: Option<P<Node>>, sf: P<SourceFile>) -> Option<String> {
@@ -249,7 +249,7 @@ fn named_contract_from_type_node(type_node: Option<P<Node>>, sf: P<SourceFile>) 
         }
         Kind::IndexedAccessType => {
             let text = tsrs_kernel::node_text(sf, node).trim();
-            (!text.is_empty()).then(|| text.to_string())
+            (!text.is_empty()).then(|| text.to_owned())
         }
         Kind::UnionType | Kind::IntersectionType => {
             tsrs_kernel::union_or_intersection_type_nodes(node)

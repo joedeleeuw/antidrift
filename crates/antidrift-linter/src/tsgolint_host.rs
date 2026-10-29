@@ -154,16 +154,16 @@ pub(crate) fn tsconfig_error_diagnostic(
 ) -> Diagnostic {
     let file_path = diag
         .file()
-        .map(|file| file.file_name().to_string())
+        .map(|file| file.file_name().to_owned())
         .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| config_file_name.to_string());
+        .unwrap_or_else(|| config_file_name.to_owned());
     let help = tsrs_compiler::diagnosticwriter::flatten_diagnostic_message(diag, "\n");
     Diagnostic {
         kind: 1,
         range: diag.loc().map(Range::from),
         message: Message {
-            id: "tsconfig-error".to_string(),
-            description: "Invalid tsconfig".to_string(),
+            id: "tsconfig-error".to_owned(),
+            description: "Invalid tsconfig".to_owned(),
             help: Some(help),
         },
         file_path: Some(file_path),
@@ -209,13 +209,13 @@ impl ProgramBuilderEnv {
     pub(crate) fn new(fs: Arc<dyn FS>, cwd: &str) -> Self {
         let host: &'static ParseHost = Box::leak(Box::new(ParseHost {
             fs: Arc::clone(&fs),
-            cwd: cwd.to_string(),
+            cwd: cwd.to_owned(),
         }));
         let ext_cache: &'static ExtendedConfigCache = Box::leak(Box::default());
         let declarations: &'static DeclarationCache = Box::leak(Box::default());
         let resolver = TsConfigResolver::new(host, ext_cache);
         Self {
-            cwd: cwd.to_string(),
+            cwd: cwd.to_owned(),
             fs,
             ext_cache,
             declarations,

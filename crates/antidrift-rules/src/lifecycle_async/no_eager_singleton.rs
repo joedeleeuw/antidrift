@@ -25,9 +25,9 @@ impl Default for SingletonOptions {
             scope: ScopeOptions::default(),
             constructors: DEFAULT_CONSTRUCTORS
                 .iter()
-                .map(|s| (*s).to_string())
+                .map(|s| (*s).to_owned())
                 .collect(),
-            factories: DEFAULT_FACTORIES.iter().map(|s| (*s).to_string()).collect(),
+            factories: DEFAULT_FACTORIES.iter().map(|s| (*s).to_owned()).collect(),
         }
     }
 }

@@ -30,7 +30,6 @@ dependencies = [
  "tsrs_checker",
  "tsrs_compiler",
  "tsrs_core",
- "tsrs_scanner",
  "tsrslint",
  "yaml_serde",
 ]
@@ -72,7 +71,6 @@ dependencies = [
  "tsrs_checker",
  "tsrs_compiler",
  "tsrs_core",
- "tsrs_scanner",
  "tsrslint",
 ]
 

@@ -14,11 +14,11 @@ pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, String)> {
             let name = access.name();
             match name.kind() {
                 Kind::Identifier => {
-                    Some((access.expression(), name.as_identifier().text().to_string()))
+                    Some((access.expression(), name.as_identifier().text().to_owned()))
                 }
                 Kind::PrivateIdentifier => Some((
                     access.expression(),
-                    name.as_private_identifier().text().to_string(),
+                    name.as_private_identifier().text().to_owned(),
                 )),
                 _ => None,
             }
@@ -51,7 +51,7 @@ pub(super) fn static_member(expression: P<Node>) -> Option<(P<Node>, String)> {
 
 pub(super) fn segment(expression: P<Node>) -> Option<String> {
     match expression.kind() {
-        Kind::StringLiteral => Some(expression.as_string_literal().text().to_string()),
+        Kind::StringLiteral => Some(expression.as_string_literal().text().to_owned()),
         Kind::NumericLiteral => numeric_value(expression).map(|val| val.to_string()),
         _ => None,
     }
@@ -78,13 +78,13 @@ pub(super) fn object_property(prop: P<Node>) -> Option<(String, P<Node>, bool)> 
 
 pub(super) fn property_name(key: P<Node>, computed: bool) -> Option<String> {
     match key.kind() {
-        Kind::Identifier if !computed => Some(key.as_identifier().text().to_string()),
-        Kind::StringLiteral => Some(key.as_string_literal().text().to_string()),
+        Kind::Identifier if !computed => Some(key.as_identifier().text().to_owned()),
+        Kind::StringLiteral => Some(key.as_string_literal().text().to_owned()),
         Kind::NumericLiteral => numeric_value(key).map(|val| val.to_string()),
         Kind::ComputedPropertyName => {
             let inner = key.as_computed_property_name().expression();
             match inner.kind() {
-                Kind::StringLiteral => Some(inner.as_string_literal().text().to_string()),
+                Kind::StringLiteral => Some(inner.as_string_literal().text().to_owned()),
                 Kind::NumericLiteral => numeric_value(inner).map(|val| val.to_string()),
                 _ => None,
             }

@@ -191,7 +191,7 @@ impl NoIdentitySchemaTransform {
         {
             return None;
         }
-        Some(key.to_string())
+        Some(key.to_owned())
     }
 
     fn keys_from_binding_pattern(pattern: P<Node>, obj: P<Node>) -> Option<FxHashSet<String>> {
@@ -232,14 +232,14 @@ impl NoIdentitySchemaTransform {
         {
             return None;
         }
-        Some(local_name.to_string())
+        Some(local_name.to_owned())
     }
 
     fn matching_destructured_property(prop: P<Node>) -> Option<String> {
         match prop.kind() {
             Kind::ShorthandPropertyAssignment => {
                 let name = prop.as_shorthand_property_assignment().name();
-                ast::is_identifier(name).then(|| name.as_identifier().text().to_string())
+                ast::is_identifier(name).then(|| name.as_identifier().text().to_owned())
             }
             Kind::PropertyAssignment => {
                 let assign = prop.as_property_assignment();
@@ -249,7 +249,7 @@ impl NoIdentitySchemaTransform {
                     return None;
                 }
                 let key = name_node.as_identifier().text();
-                (value_node.as_identifier().text() == key).then(|| key.to_string())
+                (value_node.as_identifier().text() == key).then(|| key.to_owned())
             }
             _ => None,
         }

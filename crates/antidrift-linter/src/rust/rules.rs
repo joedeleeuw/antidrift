@@ -9,13 +9,7 @@ use syn::{
     ItemStruct, ItemUse, Lit, Macro, Meta, PathArguments, Stmt, Type, TypePath, UseTree,
 };
 
-const BOUNDARY_DECODER_FILES: &[&str] = &[
-    "rule_scope.rs",
-    "batch.rs",
-    "json_manifest.rs",
-    "provenance.rs",
-    "registries.rs",
-];
+const BOUNDARY_DECODER_FILES: &[&str] = &["rule_scope.rs", "batch.rs", "json_manifest.rs"];
 
 const STRINGLY_VARIANT_FIELDS: &[&str] = &[
     "kind",
@@ -71,10 +65,10 @@ fn check_hollow_module(
     }
     if ast.items.is_empty() {
         diagnostics.push(RustDiagnostic {
-            file: rel_path.to_string(),
+            file: rel_path.to_owned(),
             line: 1,
             rule_id: "rust/no-hollow-module",
-            message: "Module contains no items; delete hollow stub modules.".to_string(),
+            message: "Module contains no items; delete hollow stub modules.".to_owned(),
         });
         return;
     }
@@ -93,12 +87,11 @@ fn check_hollow_module(
     }
     if fn_count > 0 {
         diagnostics.push(RustDiagnostic {
-            file: rel_path.to_string(),
+            file: rel_path.to_owned(),
             line: 1,
             rule_id: "rust/no-hollow-module",
             message:
-                "Module functions only return empty stub literals; implement real behavior or delete the module."
-                    .to_string(),
+                "Module functions only return empty stub literals; implement real behavior or delete the module.".to_owned(),
         });
     }
 }
@@ -144,18 +137,14 @@ fn is_empty_vec_macro(mac: &Macro) -> bool {
 }
 
 fn path_ends_with(path: &syn::Path, expected: &[&str]) -> bool {
-    let segments: Vec<String> = path
-        .segments
-        .iter()
-        .map(|seg| seg.ident.to_string())
-        .collect();
-    if segments.len() < expected.len() {
+    if path.segments.len() < expected.len() {
         return false;
     }
-    let tail = &segments[segments.len() - expected.len()..];
-    tail.iter()
-        .zip(expected.iter())
-        .all(|(actual, want)| actual == want)
+    path.segments
+        .iter()
+        .rev()
+        .zip(expected.iter().rev())
+        .all(|(seg, want)| seg.ident == *want)
 }
 
 fn crate_name_of(rel_path: &str) -> Option<&str> {
@@ -191,7 +180,7 @@ struct AstRuleVisitor<'a> {
 impl AstRuleVisitor<'_> {
     fn push(&mut self, span: Span, rule_id: &'static str, message: String) {
         self.diagnostics.push(RustDiagnostic {
-            file: self.rel_path.to_string(),
+            file: self.rel_path.to_owned(),
             line: span.start().line.max(1),
             rule_id,
             message,
@@ -204,7 +193,7 @@ impl AstRuleVisitor<'_> {
                 self.push(
                     attr.span(),
                     "rust/no-inline-tests",
-                    "Inline #[test], #[tokio::test], and #[cfg(test)] blocks are forbidden; validate via real CLI smoke runs.".to_string(),
+                    "Inline #[test], #[tokio::test], and #[cfg(test)] blocks are forbidden; validate via real CLI smoke runs.".to_owned(),
                 );
             }
         }
@@ -228,7 +217,7 @@ impl AstRuleVisitor<'_> {
                 self.push(
                     span,
                     "rust/no-layer-violation",
-                    "antidrift-rules cannot depend on antidrift_linter.".to_string(),
+                    "antidrift-rules cannot depend on antidrift_linter.".to_owned(),
                 );
             }
         }
@@ -298,19 +287,18 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
             .map(|seg| seg.ident.to_string())
             .collect();
         self.check_module_path(&segments, node.span());
-        if let Some(last) = node.path.segments.last() {
-            let ident = last.ident.to_string();
-            if matches!(ident.as_str(), "HashMap" | "FxHashMap" | "BTreeMap")
-                && has_bool_second_type_arg(&last.arguments)
-            {
-                self.push(
-                    last.span(),
-                    "rust/no-boolean-map",
-                    format!(
-                        "{ident}<K, bool> is a two-state boolean map; use a Set<K> or a closed state enum instead."
-                    ),
-                );
-            }
+        if let Some(last) = node.path.segments.last()
+            && (last.ident == "HashMap" || last.ident == "FxHashMap" || last.ident == "BTreeMap")
+            && has_bool_second_type_arg(&last.arguments)
+        {
+            self.push(
+                last.span(),
+                "rust/no-boolean-map",
+                format!(
+                    "{}<K, bool> is a two-state boolean map; use a Set<K> or a closed state enum instead.",
+                    last.ident
+                ),
+            );
         }
         visit::visit_type_path(self, node);
     }
@@ -331,14 +319,14 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
             let Some(ident) = &field.ident else {
                 continue;
             };
-            let name = ident.to_string();
-            if STRINGLY_VARIANT_FIELDS.contains(&name.as_str()) && is_string_or_str_type(&field.ty)
+            if STRINGLY_VARIANT_FIELDS.iter().any(|name| ident == *name)
+                && is_string_or_str_type(&field.ty)
             {
                 self.push(
                     ident.span(),
                     "rust/no-stringly-variant",
                     format!(
-                        "Struct '{}' field '{name}' uses a stringly discriminant; replace with a closed enum.",
+                        "Struct '{}' field '{ident}' uses a stringly discriminant; replace with a closed enum.",
                         node.ident
                     ),
                 );
@@ -349,20 +337,25 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
 
     fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
         if !BOUNDARY_DECODER_FILES.contains(&self.file_name) {
-            let method = node.method.to_string();
-            if UNTYPED_VALUE_METHODS.contains(&method.as_str()) {
+            if UNTYPED_VALUE_METHODS
+                .iter()
+                .any(|name| node.method == *name)
+            {
                 self.push(
                     node.method.span(),
                     "rust/no-untyped-config-probe",
                     format!(
-                        "Untyped JSON probe '.{method}()' outside boundary decoder; deserialize once via decode_rule_options."
+                        "Untyped JSON probe '.{}()' outside boundary decoder; deserialize once via decode_rule_options.",
+                        node.method
                     ),
                 );
-            } else if method == "and_then" && is_string_key_get_call(&node.receiver) {
+            } else if (node.method == "and_then" || node.method == "as_str")
+                && is_string_key_probe(&node.receiver)
+            {
                 self.push(
                     node.method.span(),
                     "rust/no-untyped-config-probe",
-                    "Untyped '.get(\"...\").and_then(...)' config probe outside boundary decoder; deserialize once via decode_rule_options.".to_string(),
+                    "Untyped string-key JSON config probe outside boundary decoder; deserialize once via decode_rule_options.".to_owned(),
                 );
             }
         }
@@ -374,7 +367,7 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
             self.push(
                 node.span(),
                 "antidrift/no-tsrslint-sourcefile-listener",
-                "Listener::Enter(Kind::SourceFile) and Listener::Exit(Kind::SourceFile) never fire in tsrslint; attach listeners to statement/declaration kinds or use post-walk state.".to_string(),
+                "Listener::Enter(Kind::SourceFile) and Listener::Exit(Kind::SourceFile) never fire in tsrslint; attach listeners to statement/declaration kinds or use post-walk state.".to_owned(),
             );
         }
         visit::visit_expr_call(self, node);
@@ -411,16 +404,28 @@ fn flatten_use_tree(tree: &UseTree, prefix: &mut Vec<String>, out: &mut Vec<(Vec
 
 fn is_banned_test_attribute(attr: &Attribute) -> bool {
     let path = attr.path();
-    if path.is_ident("test") || path_ends_with(path, &["tokio", "test"]) {
+    if path
+        .segments
+        .last()
+        .is_some_and(|seg| seg.ident == "test" || seg.ident == "rstest")
+    {
         return true;
     }
-    if !path.is_ident("cfg") {
-        return false;
-    }
-    let Ok(nested) = attr.parse_args::<Meta>() else {
+    let Meta::List(list) = &attr.meta else {
         return false;
     };
-    nested.path().is_ident("test")
+    path.segments
+        .last()
+        .is_some_and(|seg| seg.ident == "cfg" || seg.ident == "cfg_attr")
+        && token_stream_contains_test(list.tokens.clone())
+}
+
+fn token_stream_contains_test(tokens: proc_macro2::TokenStream) -> bool {
+    tokens.into_iter().any(|tree| match tree {
+        proc_macro2::TokenTree::Ident(ident) => ident == "test",
+        proc_macro2::TokenTree::Group(group) => token_stream_contains_test(group.stream()),
+        _ => false,
+    })
 }
 
 fn derives_deserialize(attrs: &[Attribute]) -> bool {
@@ -455,8 +460,8 @@ fn has_serde_deny_unknown_fields(attrs: &[Attribute]) -> bool {
                 found = true;
             }
             if meta.input.peek(syn::token::Eq) {
-                let _: syn::Token![=] = meta.input.parse()?;
-                let _: Expr = meta.input.parse()?;
+                meta.input.parse::<syn::Token![=]>()?;
+                meta.input.parse::<Expr>()?;
             }
             Ok(())
         });
@@ -493,14 +498,16 @@ fn has_bool_second_type_arg(args: &PathArguments) -> bool {
     second.path.is_ident("bool")
 }
 
-fn is_string_key_get_call(expr: &Expr) -> bool {
-    let Expr::MethodCall(call) = expr else {
-        return false;
-    };
-    if call.method != "get" || call.args.len() != 1 {
-        return false;
+fn is_string_key_probe(expr: &Expr) -> bool {
+    match expr {
+        Expr::MethodCall(call) if call.method == "get" && call.args.len() == 1 => {
+            matches!(&call.args[0], Expr::Lit(expr_lit) if matches!(&expr_lit.lit, Lit::Str(_)))
+        }
+        Expr::Index(idx) => {
+            matches!(&*idx.index, Expr::Lit(expr_lit) if matches!(&expr_lit.lit, Lit::Str(_)))
+        }
+        _ => false,
     }
-    matches!(&call.args[0], Expr::Lit(expr_lit) if matches!(&expr_lit.lit, Lit::Str(_)))
 }
 
 fn is_source_file_listener_call(call: &ExprCall) -> bool {

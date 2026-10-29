@@ -28,16 +28,20 @@ cpSync(sourceDirectory, outputDirectory, {
     !source.endsWith("/fixtures") && !compiledSource.test(source),
 });
 
-const binaryCandidates = [
-  resolve(repoRoot, "target/release/antidrift-linter"),
-  resolve(repoRoot, "target/debug/antidrift-linter"),
-];
-const sourceBinary = binaryCandidates.find((candidate) =>
-  existsSync(candidate)
-);
-if (!sourceBinary) {
+const sourceBinary = resolve(repoRoot, "target/release/antidrift-linter");
+if (!existsSync(sourceBinary)) {
+  execFileSync(
+    "cargo",
+    ["build", "--release", "--locked", "-p", "antidrift-linter"],
+    {
+      cwd: repoRoot,
+      stdio: "inherit",
+    }
+  );
+}
+if (!existsSync(sourceBinary)) {
   throw new Error(
-    `Missing native antidrift-linter binary at ${binaryCandidates.join(" or ")}; build crates/antidrift-linter first.`
+    `Missing release antidrift-linter binary at ${sourceBinary}; run cargo build --release --locked -p antidrift-linter first.`
   );
 }
 const binDirectory = resolve(outputDirectory, "bin");

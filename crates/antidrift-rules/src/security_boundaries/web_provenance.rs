@@ -71,8 +71,8 @@ pub(super) fn static_string(
 ) -> Option<String> {
     let inner = unwrap_expression(expression);
     match inner.kind() {
-        Kind::StringLiteral => Some(inner.as_string_literal().text().to_string()),
-        Kind::NoSubstitutionTemplateLiteral => Some(inner.text().to_string()),
+        Kind::StringLiteral => Some(inner.as_string_literal().text().to_owned()),
+        Kind::NoSubstitutionTemplateLiteral => Some(inner.text().to_owned()),
         Kind::BinaryExpression => {
             let bin = inner.as_binary_expression();
             if bin.operator_token().kind() != Kind::PlusToken {

@@ -128,7 +128,7 @@ pub fn bare_package_name(specifier: &str) -> Option<String> {
         return Some(format!("@{scope}/{name}"));
     }
     let pkg = specifier.split('/').next()?;
-    (!pkg.is_empty()).then(|| pkg.to_string())
+    (!pkg.is_empty()).then(|| pkg.to_owned())
 }
 
 #[must_use]
@@ -150,14 +150,14 @@ pub fn definitely_typed_specifier(specifier: &str) -> Option<String> {
 fn build_resolve_options(tsconfig_path: Option<PathBuf>, mode: ResolutionMode) -> ResolveOptions {
     let condition_names = match mode {
         ResolutionMode::Import => vec![
-            "types".to_string(),
-            "import".to_string(),
-            "default".to_string(),
+            "types".to_owned(),
+            "import".to_owned(),
+            "default".to_owned(),
         ],
         ResolutionMode::Require => vec![
-            "types".to_string(),
-            "require".to_string(),
-            "default".to_string(),
+            "types".to_owned(),
+            "require".to_owned(),
+            "default".to_owned(),
         ],
     };
     let tsconfig = tsconfig_path.map(|config_file| {
@@ -171,42 +171,42 @@ fn build_resolve_options(tsconfig_path: Option<PathBuf>, mode: ResolutionMode) -
         condition_names,
         extension_alias: vec![
             (
-                ".js".to_string(),
+                ".js".to_owned(),
                 vec![
-                    ".ts".to_string(),
-                    ".tsx".to_string(),
-                    ".d.ts".to_string(),
-                    ".js".to_string(),
+                    ".ts".to_owned(),
+                    ".tsx".to_owned(),
+                    ".d.ts".to_owned(),
+                    ".js".to_owned(),
                 ],
             ),
             (
-                ".mjs".to_string(),
-                vec![".mts".to_string(), ".d.mts".to_string(), ".mjs".to_string()],
+                ".mjs".to_owned(),
+                vec![".mts".to_owned(), ".d.mts".to_owned(), ".mjs".to_owned()],
             ),
             (
-                ".cjs".to_string(),
-                vec![".cts".to_string(), ".d.cts".to_string(), ".cjs".to_string()],
+                ".cjs".to_owned(),
+                vec![".cts".to_owned(), ".d.cts".to_owned(), ".cjs".to_owned()],
             ),
         ],
         extensions: vec![
-            ".ts".to_string(),
-            ".tsx".to_string(),
-            ".d.ts".to_string(),
-            ".mts".to_string(),
-            ".d.mts".to_string(),
-            ".cts".to_string(),
-            ".d.cts".to_string(),
-            ".js".to_string(),
-            ".jsx".to_string(),
-            ".mjs".to_string(),
-            ".cjs".to_string(),
-            ".json".to_string(),
+            ".ts".to_owned(),
+            ".tsx".to_owned(),
+            ".d.ts".to_owned(),
+            ".mts".to_owned(),
+            ".d.mts".to_owned(),
+            ".cts".to_owned(),
+            ".d.cts".to_owned(),
+            ".js".to_owned(),
+            ".jsx".to_owned(),
+            ".mjs".to_owned(),
+            ".cjs".to_owned(),
+            ".json".to_owned(),
         ],
         main_fields: vec![
-            "types".to_string(),
-            "typings".to_string(),
-            "module".to_string(),
-            "main".to_string(),
+            "types".to_owned(),
+            "typings".to_owned(),
+            "module".to_owned(),
+            "main".to_owned(),
         ],
         enforce_extension: EnforceExtension::Disabled,
         ..ResolveOptions::default()

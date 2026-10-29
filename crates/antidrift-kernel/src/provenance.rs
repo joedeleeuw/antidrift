@@ -6,6 +6,7 @@ use tsrs_core::P;
 use tsrs_core::tspath;
 use tsrslint::utils::is_source_file_default_library;
 
+use crate::json_manifest::package_entrypoint_paths;
 use crate::tsrs_kernel;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -72,9 +73,39 @@ const BUILTIN_OWNER_NAMES: &[&str] = &[
     "BigInt",
 ];
 
+const EXTRA_NON_BAG_TYPE_NAMES: &[&str] = &[
+    "Buffer",
+    "Checker",
+    "CustomEvent",
+    "DataView",
+    "Document",
+    "Element",
+    "Event",
+    "HTMLElement",
+    "Node",
+    "Program",
+    "ReadableStream",
+    "ReferenceError",
+    "RuleContext",
+    "SharedArrayBuffer",
+    "Signature",
+    "SourceCode",
+    "SourceFile",
+    "TransformStream",
+    "Type",
+    "TypeChecker",
+    "Window",
+    "WritableStream",
+];
+
 #[must_use]
 pub fn is_builtin_owner_name(name: &str) -> bool {
     BUILTIN_OWNER_NAMES.contains(&name)
+}
+
+#[must_use]
+pub fn is_non_bag_type_name(name: &str) -> bool {
+    BUILTIN_OWNER_NAMES.contains(&name) || EXTRA_NON_BAG_TYPE_NAMES.contains(&name)
 }
 
 pub fn resolve_aliased_symbol(checker: &mut Checker, sym: P<Symbol>) -> P<Symbol> {
@@ -223,7 +254,7 @@ pub fn collect_type_owner_names(type_node: Option<P<Node>>, names: &mut FxHashSe
                 && !name.is_empty()
                 && !is_builtin_owner_name(name)
             {
-                names.insert(name.to_string());
+                names.insert(name.to_owned());
             }
             if let Some(args) = type_ref.type_arguments() {
                 for &arg in args.nodes() {
@@ -387,43 +418,7 @@ pub fn relative_to_cwd(cwd: &str, file_path: &str) -> String {
     norm_file
         .strip_prefix(&norm_cwd)
         .unwrap_or(&norm_file)
-        .to_string()
-}
-
-fn collect_json_strings(val: &serde_json::Value, out: &mut Vec<String>) {
-    match val {
-        serde_json::Value::String(s) => out.push(s.clone()),
-        serde_json::Value::Array(arr) => {
-            for item in arr {
-                collect_json_strings(item, out);
-            }
-        }
-        serde_json::Value::Object(map) => {
-            for item in map.values() {
-                collect_json_strings(item, out);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn manifest_entries(pkg_path: &std::path::Path) -> Option<Vec<String>> {
-    let Ok(text) = std::fs::read_to_string(pkg_path) else {
-        return None;
-    };
-    let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) else {
-        return None;
-    };
-    let obj = val.as_object()?;
-    let mut entries = Vec::new();
-    for key in [
-        "exports", "main", "module", "types", "typings", "browser", "bin", "source",
-    ] {
-        if let Some(field) = obj.get(key) {
-            collect_json_strings(field, &mut entries);
-        }
-    }
-    Some(entries)
+        .to_owned()
 }
 
 #[must_use]
@@ -433,7 +428,7 @@ pub fn is_package_entry_file(file_name: &str) -> bool {
     while let Some(cur) = dir {
         let pkg_path = cur.join("package.json");
         if pkg_path.is_file() {
-            let Some(entries) = manifest_entries(&pkg_path) else {
+            let Some(entries) = package_entrypoint_paths(&pkg_path) else {
                 return false;
             };
             let pkg_dir = tspath::normalize_slashes(&cur.to_string_lossy());

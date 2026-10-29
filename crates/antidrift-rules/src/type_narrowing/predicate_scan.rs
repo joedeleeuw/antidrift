@@ -20,9 +20,9 @@ pub fn unit_literal_key(typ: P<Type>) -> Option<String> {
         return Some(format!("number:{}", num.string()));
     }
     if shape::is_true_literal_type(typ) {
-        return Some("boolean:true".to_string());
+        return Some("boolean:true".to_owned());
     }
-    shape::is_false_literal_type(typ).then(|| "boolean:false".to_string())
+    shape::is_false_literal_type(typ).then(|| "boolean:false".to_owned())
 }
 
 #[derive(Default)]
@@ -41,7 +41,7 @@ pub struct BodyScanState {
 impl BodyScanState {
     pub fn new(param_name: &str) -> Self {
         let mut state = Self::default();
-        state.param_names.insert(param_name.to_string());
+        state.param_names.insert(param_name.to_owned());
         state
     }
 
@@ -67,12 +67,12 @@ impl BodyScanState {
         }
         if let Some((target, prop_name)) = reflect_get_parts(unwrapped) {
             let mut base = self.path_of(target)?;
-            base.push(prop_name.to_string());
+            base.push(prop_name.to_owned());
             return Some(base);
         }
         let (root, chain) = tsrs_kernel::static_member_chain(unwrapped)?;
         let mut base = self.path_of(root)?;
-        base.extend(chain.into_iter().map(str::to_string));
+        base.extend(chain.into_iter().map(str::to_owned));
         Some(base)
     }
 
@@ -112,11 +112,11 @@ fn record_binding_elements(pattern: P<Node>, state: &mut BodyScanState) {
         if !ast::is_identifier(bind_name) {
             continue;
         }
-        let local = bind_name.as_identifier().text().to_string();
+        let local = bind_name.as_identifier().text().to_owned();
         let prop = bind
             .property_name()
             .and_then(tsrs_kernel::property_name_text)
-            .map_or_else(|| local.clone(), str::to_string);
+            .map_or_else(|| local.clone(), str::to_owned);
         state.destructured_aliases.insert(local, prop);
     }
 }
@@ -129,7 +129,7 @@ fn record_variable_declaration(node: P<Node>, state: &mut BodyScanState) {
     };
     if ast::is_identifier(name_node) {
         if let Some(path) = state.path_of(init) {
-            let name = name_node.as_identifier().text().to_string();
+            let name = name_node.as_identifier().text().to_owned();
             if path.is_empty() {
                 state.param_names.insert(name);
             } else {
@@ -191,7 +191,7 @@ fn apply_delegated_predicate_decl(
     }
     let props = checker.get_properties_of_type(delegated);
     for &prop in props {
-        state.checked_props.insert(prop.name().to_string());
+        state.checked_props.insert(prop.name().to_owned());
     }
     false
 }
@@ -262,7 +262,7 @@ fn check_has_own_probe(callee: P<Node>, args: &[P<Node>], state: &mut BodyScanSt
     let Some(key) = tsrs_kernel::property_name_text(tsrs_kernel::unwrap_expression(key_arg)) else {
         return false;
     };
-    base.push(key.to_string());
+    base.push(key.to_owned());
     state.record_path(&base);
     true
 }
@@ -288,7 +288,7 @@ fn check_call_property_probes(call_node: P<Node>, state: &mut BodyScanState) {
     let key = tsrs_kernel::unwrap_expression(key_node)
         .as_string_literal()
         .text()
-        .to_string();
+        .to_owned();
     for &arg in args {
         if arg != key_node
             && arg.kind() != Kind::SpreadElement
@@ -363,7 +363,7 @@ fn visit_binary_in_body(
                 && let Some(key) =
                     tsrs_kernel::property_name_text(tsrs_kernel::unwrap_expression(left))
             {
-                base.push(key.to_string());
+                base.push(key.to_owned());
                 state.record_path(&base);
             }
         }

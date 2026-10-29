@@ -14,6 +14,12 @@ The positive pattern behind the rules is one owner per concept: domain owns busi
 
 ## Install
 
+```sh
+pnpm add -D @joedeleeuw/antidrift typescript
+```
+
+## Default Ruleset
+
 `antidrift/no-wrapping-functions` runs as a typed rule in `antidrift-linter` that inlines each candidate in memory and reports only verified hops. Named functions and named arrows that only delegate to another call, read a parameter property, or apply a literal property fallback must earn their extra layer through a concrete boundary or callback requirement. Exports are included. Anonymous inline callbacks, calculations, argument transformations and functions that own additional behavior stay outside the rule. It provides no automatic fix. When removing a callback adapter, preserve its exact signature, receiver behavior, hook position and stable identity; pass the existing owner directly only when it already satisfies that callback contract.
 
 The default `antidrift-linter` ruleset also enforces shared AGENT.md directives recorded in `policy/agent-guardrails.yaml`: `antidrift/no-anemic-errors` (G7), `antidrift/no-dated-comments` (S5), `antidrift/no-host-path-literal` (S4), `antidrift/no-pass-through-parameters` (G22), and `antidrift/no-compat-names` (G5) (`antidrift/no-vague-names` for G21 remains registered for explicit opt-in). G8 maps to native `no-nested-ternary`, owned by `@joedeleeuw/typescript-tooling`. G9 maps to `unicorn-js/prefer-switch` there.
@@ -25,11 +31,7 @@ The default ruleset also enforces these rules at error:
 - G4 boundary decoding: `antidrift/unknown-input-must-be-decoded`
 - G7 loud failure: `antidrift/no-sentinel-absence-fallback`
 - React and markup hygiene: `antidrift/no-calling-components-as-functions`, `antidrift/no-duplicated-conditional-classnames`
-- Type-checked authority & boundary rules: `antidrift/no-structural-type-fork`, `antidrift/no-contract-appeasement-projection`, `antidrift/no-redundant-zod-parse`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-unresolved-dependency-types`, and `antidrift/no-service-constructor-imports`. `antidrift/no-sql-string-concat` remains registered for explicit opt-in.
-
-```sh
-pnpm add -D @joedeleeuw/antidrift typescript
-```
+- Type-checked authority & boundary rules: `antidrift/no-structural-type-fork`, `antidrift/no-contract-appeasement-projection`, `antidrift/no-redundant-zod-parse`, `antidrift/no-identity-schema-transform`, `antidrift/require-convex-return-validator`, `antidrift/no-explicit-type-arguments-on-owned-api`, `antidrift/no-schema-validator-transcoding`, `antidrift/no-redundant-type-predicate`, `antidrift/no-underchecked-type-predicate`, `antidrift/no-unresolved-dependency-types`, `antidrift/no-service-constructor-imports`, and `antidrift/no-sql-string-concat`.
 
 ## Quickstart (Standalone)
 

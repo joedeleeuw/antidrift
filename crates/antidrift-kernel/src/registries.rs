@@ -1,62 +1,7 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
-
-pub const NON_BAG_TYPE_NAMES: &[&str] = &[
-    "AbortController",
-    "AbortSignal",
-    "Array",
-    "ArrayBuffer",
-    "Blob",
-    "Buffer",
-    "Checker",
-    "CustomEvent",
-    "DataView",
-    "Date",
-    "Document",
-    "Element",
-    "Error",
-    "Event",
-    "File",
-    "FormData",
-    "Function",
-    "Headers",
-    "HTMLElement",
-    "Map",
-    "Node",
-    "Program",
-    "Promise",
-    "RangeError",
-    "ReadableStream",
-    "ReadonlyArray",
-    "ReadonlyMap",
-    "ReadonlySet",
-    "ReferenceError",
-    "RegExp",
-    "Request",
-    "Response",
-    "RuleContext",
-    "Set",
-    "SharedArrayBuffer",
-    "Signature",
-    "SourceCode",
-    "SourceFile",
-    "Symbol",
-    "SyntaxError",
-    "TransformStream",
-    "Type",
-    "TypeChecker",
-    "TypeError",
-    "Uint8Array",
-    "URL",
-    "URLSearchParams",
-    "WeakMap",
-    "WeakSet",
-    "Window",
-    "WritableStream",
-];
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -128,7 +73,6 @@ pub struct PolicyRegistries {
     pub domain: DomainRegistry,
     pub gateways: GatewaysRegistry,
     pub generated: GeneratedRegistry,
-    pub raw_registries: BTreeMap<String, Value>,
 }
 
 impl PolicyRegistries {
@@ -137,7 +81,7 @@ impl PolicyRegistries {
         if !registries_dir.is_dir() {
             return Ok(Self::default());
         }
-        let mut raw_registries = BTreeMap::new();
+        let mut registries = Self::default();
         let entries = fs::read_dir(&registries_dir)
             .map_err(|err| format!("failed to read {}: {err}", registries_dir.display()))?;
         for entry in entries {
@@ -146,40 +90,38 @@ impl PolicyRegistries {
             if path.extension().and_then(|ext| ext.to_str()) != Some("yaml") {
                 continue;
             }
-            let stem = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_string();
+            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
             let text = fs::read_to_string(&path)
                 .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
-            let value: Value = yaml_serde::from_str(&text)
-                .map_err(|err| format!("failed to parse {}: {err}", path.display()))?;
-            raw_registries.insert(stem, value);
+            match stem {
+                "boundaries" => {
+                    registries.boundaries = decode_yaml_registry(&path, "boundaries", &text)?;
+                }
+                "domain" => {
+                    registries.domain = decode_yaml_registry(&path, "domain", &text)?;
+                }
+                "gateways" => {
+                    registries.gateways = decode_yaml_registry(&path, "gateways", &text)?;
+                }
+                "generated" => {
+                    registries.generated = decode_yaml_registry(&path, "generated", &text)?;
+                }
+                _ => {
+                    let _: serde::de::IgnoredAny = yaml_serde::from_str(&text)
+                        .map_err(|err| format!("failed to parse {}: {err}", path.display()))?;
+                }
+            }
         }
 
-        let boundaries = decode_registry(&raw_registries, "boundaries")?;
-        let domain = decode_registry(&raw_registries, "domain")?;
-        let gateways = decode_registry(&raw_registries, "gateways")?;
-        let generated = decode_registry(&raw_registries, "generated")?;
-
-        Ok(Self {
-            boundaries,
-            domain,
-            gateways,
-            generated,
-            raw_registries,
-        })
+        Ok(registries)
     }
 }
 
-fn decode_registry<T: Default + serde::de::DeserializeOwned>(
-    raw_registries: &BTreeMap<String, Value>,
+fn decode_yaml_registry<T: serde::de::DeserializeOwned>(
+    path: &Path,
     key: &str,
+    text: &str,
 ) -> Result<T, String> {
-    match raw_registries.get(key) {
-        Some(val) => serde_json::from_value(val.clone())
-            .map_err(|err| format!("invalid {key} registry schema: {err}")),
-        None => Ok(T::default()),
-    }
+    yaml_serde::from_str(text)
+        .map_err(|err| format!("invalid {key} registry schema in {}: {err}", path.display()))
 }

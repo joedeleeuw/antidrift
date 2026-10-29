@@ -140,7 +140,7 @@ fn name_segments(name: &str) -> Vec<String> {
     spaced
         .to_lowercase()
         .split_whitespace()
-        .map(str::to_string)
+        .map(str::to_owned)
         .collect()
 }
 

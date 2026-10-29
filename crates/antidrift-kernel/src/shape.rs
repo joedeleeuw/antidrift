@@ -10,7 +10,6 @@ use tsrslint::utils::{
 };
 
 use crate::provenance;
-use crate::registries::NON_BAG_TYPE_NAMES;
 
 pub fn same_type(checker: &mut Checker, left: P<Type>, right: P<Type>) -> bool {
     checker.is_type_assignable_to(left, right) && checker.is_type_assignable_to(right, left)
@@ -198,9 +197,9 @@ pub fn type_literal_keys(typ: P<Type>, out: &mut FxHashSet<String>) {
         return;
     }
     if is_true_literal_type(typ) {
-        out.insert("boolean:true".to_string());
+        out.insert("boolean:true".to_owned());
     } else if is_false_literal_type(typ) {
-        out.insert("boolean:false".to_string());
+        out.insert("boolean:false".to_owned());
     }
 }
 
@@ -217,7 +216,7 @@ pub fn object_property_names(checker: &mut Checker, typ: P<Type>) -> Vec<String>
         .iter()
         .filter_map(|&prop| {
             let name = prop.name();
-            (!name.is_empty()).then(|| name.to_string())
+            (!name.is_empty()).then(|| name.to_owned())
         })
         .collect();
     names.sort();
@@ -226,7 +225,7 @@ pub fn object_property_names(checker: &mut Checker, typ: P<Type>) -> Vec<String>
 
 fn is_disallowed_bag_symbol(sym: Option<P<Symbol>>) -> bool {
     sym.is_some_and(|symbol| {
-        NON_BAG_TYPE_NAMES.contains(&symbol.name())
+        provenance::is_non_bag_type_name(symbol.name())
             || symbol.flags.get().intersects(SymbolFlags::Class)
     })
 }
@@ -366,7 +365,7 @@ impl LocalTypeAliases {
         open: &mut FxHashSet<String>,
         visit: impl FnOnce(&Self, &mut FxHashSet<String>) -> T,
     ) -> T {
-        open.insert(name.to_string());
+        open.insert(name.to_owned());
         let visited = visit(self, open);
         open.remove(name);
         visited
@@ -432,7 +431,7 @@ fn resolve_lexical_type_alias(
 #[must_use]
 pub fn type_reference_name(type_name: P<Node>) -> Option<String> {
     match type_name.kind() {
-        Kind::Identifier => Some(type_name.as_identifier().text().to_string()),
+        Kind::Identifier => Some(type_name.as_identifier().text().to_owned()),
         Kind::QualifiedName => {
             let q = type_name.as_qualified_name();
             let right = q.right();
@@ -448,8 +447,8 @@ pub fn type_reference_name(type_name: P<Node>) -> Option<String> {
 #[must_use]
 pub fn property_key_name(key: P<Node>) -> Option<String> {
     match key.kind() {
-        Kind::Identifier => Some(key.as_identifier().text().to_string()),
-        Kind::StringLiteral => Some(key.as_string_literal().text().to_string()),
+        Kind::Identifier => Some(key.as_identifier().text().to_owned()),
+        Kind::StringLiteral => Some(key.as_string_literal().text().to_owned()),
         _ => None,
     }
 }
@@ -463,7 +462,7 @@ pub fn literal_keys_of(type_node: Option<P<Node>>) -> Vec<String> {
         Kind::LiteralType => {
             let lit = node.as_literal_type_node().literal();
             if lit.kind() == Kind::StringLiteral {
-                vec![lit.as_string_literal().text().to_string()]
+                vec![lit.as_string_literal().text().to_owned()]
             } else {
                 Vec::new()
             }

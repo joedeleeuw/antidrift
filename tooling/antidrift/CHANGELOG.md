@@ -1,6 +1,20 @@
 # changelog
 
-## Unreleased
+## 0.20.0
+
+- Migrate all 83 `antidrift/*` rules (20 TypeChecker-backed rules and 63 portable AST rules) into the native Rust `antidrift-linter` engine (`crates/antidrift-kernel`, `crates/antidrift-rules`, `crates/antidrift-linter`) built on `tsrs_ast`, `tsrs_compiler`, `tsrs_checker`, `tsrslint`, and `oxc_resolver`. Delete the legacy JS/TS ESLint plugin (`src/eslint-plugin/`), Oxlint JS plugin (`src/oxlint-plugin/`), and JS semantic adapters (`src/semantic-adapters/`).
+- Add native Rust self-governance (`antidrift-linter rust`) enforcing crate and kernel DAG layering, `<= 500` non-blank lines per module, strict `#[serde(deny_unknown_fields)]`, no stringly-typed variant fields, no boolean maps, no untyped JSON config probing outside boundary decoders, no discarded decoded config, no duplicate scope fields, no `_`-prefixed field/binding suppressions, no `syn::Ident::to_string()` literal comparisons, no compatibility/batch naming, no pass-through wrappers, no anemic `map_err` closures, and no inline unit tests.
+- Refine rule precision and ecosystem coverage:
+  - `antidrift/no-structural-type-fork` resolves exported `TypeAliasDeclaration` owners with derived RHS (such as `export type User = z.infer<typeof UserSchema>`) via `Checker`, breaks symmetric ties between `LocalDomain` peers deterministically, and requires shared identifier stems for 2-property exported shapes when names differ.
+  - `antidrift/no-contract-appeasement-projection` exempts exported cross-boundary domain mappers that convert `NodeModules`, `Generated`, or `LocalBoundary` inputs into `LocalDomain` contracts.
+  - `antidrift/no-appeasement-cast` defers direct `JSON.parse(...)` casts to `antidrift/unknown-input-must-be-decoded` (single owner) and flags unnarrowed primitive casts to closed literal unions (`string as "a" | "b"`).
+  - `antidrift/no-sentinel-absence-fallback` exempts direct JSX text children (`<span>{user.name ?? "Anonymous"}</span>`) and removes function-name prefix heuristics.
+  - `antidrift/require-query-key-factory` covers TanStack `QueryClient` read/prefetch/reset methods (`getQueryData`, `ensureQueryData`, `prefetchQuery`, `fetchQuery`, `refetchQueries`, `resetQueries`) and SWR `mutate` imported from `"swr"`.
+  - `antidrift/no-sql-string-concat` requires SQL clause token positions (`SELECT ... FROM`, `UPDATE <table> SET`, `INSERT INTO`, `DELETE FROM`) so ordinary English prose containing words like `update` and `set` stays clean.
+  - `antidrift/no-wrapping-functions` no longer emits `incompleteAnalysis` on exported functions with zero callers in the current `tsconfig` program.
+- Require a release `antidrift-linter` binary (`lto = "fat"`, `codegen-units = 1`, `strip = "symbols"`) in `scripts/build.ts` and CI release workflows instead of falling back to `target/debug`.
+
+## 0.19.0
 
 - Disable `antidrift/no-sql-string-concat` and `antidrift/no-vague-names` in the shipped ESLint preset. Both rules remain exported for explicit opt-in; packed-consumer proof covers default silence and opted-in diagnostics for each.
 - Resolve `no-unlisted-external-imports` through TypeScript's actual configuration and module resolver, including local `paths`, package `imports`, conditional usage, and declared `@types` providers for type-only usage. Same-name sibling packages still require declarations, and runtime imports no longer borrow type-provider ownership.

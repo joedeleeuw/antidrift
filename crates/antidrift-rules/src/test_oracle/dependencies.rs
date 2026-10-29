@@ -33,14 +33,14 @@ fn identity(
     match expression.kind() {
         Kind::Identifier => identity(oracle.initializer(expression, true)?, oracle, &seen),
         Kind::StringLiteral => Some(Identity::String(
-            expression.as_string_literal().text().to_string(),
+            expression.as_string_literal().text().to_owned(),
         )),
         Kind::NumericLiteral => Some(Identity::Number(numeric_value(expression)?.to_bits())),
         Kind::TrueKeyword => Some(Identity::Boolean(true)),
         Kind::FalseKeyword => Some(Identity::Boolean(false)),
         Kind::NullKeyword => Some(Identity::Null),
         Kind::BigIntLiteral => Some(Identity::BigInt(
-            expression.text().trim_end_matches('n').to_string(),
+            expression.text().trim_end_matches('n').to_owned(),
         )),
         Kind::PrefixUnaryExpression => {
             let unary = expression.as_prefix_unary_expression();
