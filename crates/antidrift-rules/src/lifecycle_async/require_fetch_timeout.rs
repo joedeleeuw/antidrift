@@ -1,7 +1,7 @@
 use super::syntax::{
-    Binding, binding_for_declarator, const_initializer, declaration, identifier,
-    is_write_reference, member, object_property, property_name, symbol, symbol_is_mutated, unwrap,
-    without_parens,
+    Binding, binding_for_declarator, const_binding_initializer, enclosing_variable_declaration,
+    identifier_of, is_binding_mutated, is_write_reference, member, object_property, property_name,
+    resolve_lexical_binding, unwrap_expression, unwrap_parentheses,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -111,11 +111,11 @@ impl Visitor {
         if !ast::is_assignment_operator(bin.operator_token().kind()) {
             return;
         }
-        let Some(ident) = identifier(bin.left()) else {
+        let Some(ident) = identifier_of(bin.left()) else {
             self.clear_assigned(bin.left());
             return;
         };
-        let Some(binding) = symbol(ident) else {
+        let Some(binding) = resolve_lexical_binding(ident) else {
             return;
         };
         let prior = self
@@ -135,7 +135,7 @@ impl Visitor {
     fn clear_assigned(&mut self, target: P<Node>) {
         if ast::is_identifier(target)
             && is_write_reference(target)
-            && let Some(binding) = symbol(target)
+            && let Some(binding) = resolve_lexical_binding(target)
         {
             self.signals.insert(binding, SignalState::Absent);
         }
@@ -159,8 +159,8 @@ impl Visitor {
             .and_then(request_signal)
             .or_else(|| {
                 input
-                    .and_then(identifier)
-                    .and_then(symbol)
+                    .and_then(identifier_of)
+                    .and_then(resolve_lexical_binding)
                     .and_then(|binding| self.signals.get(&binding).copied())
             })
             .unwrap_or(SignalState::Absent);
@@ -176,7 +176,7 @@ impl Visitor {
 }
 
 fn object_signal(expression: P<Node>) -> SignalState {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     if inner.kind() != Kind::ObjectLiteralExpression {
         return SignalState::Opaque;
     }
@@ -194,12 +194,12 @@ fn object_signal(expression: P<Node>) -> SignalState {
 }
 
 fn request_signal(expression: P<Node>) -> Option<SignalState> {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     if inner.kind() != Kind::NewExpression {
         return None;
     }
     let ctor = inner.as_new_expression();
-    if !identifier(ctor.expression()).is_some_and(|id| id.as_identifier().text() == "Request") {
+    if !identifier_of(ctor.expression()).is_some_and(|id| id.as_identifier().text() == "Request") {
         return None;
     }
     let second_arg = ctor
@@ -209,7 +209,7 @@ fn request_signal(expression: P<Node>) -> Option<SignalState> {
         if arg.kind() == Kind::SpreadElement {
             return SignalState::Opaque;
         }
-        let unwrapped = without_parens(arg);
+        let unwrapped = unwrap_parentheses(arg);
         if unwrapped.kind() == Kind::ObjectLiteralExpression {
             object_signal(unwrapped)
         } else {
@@ -219,18 +219,18 @@ fn request_signal(expression: P<Node>) -> Option<SignalState> {
 }
 
 fn fetch_origin(sf: P<SourceFile>, expression: P<Node>, visited: &mut FxHashSet<Binding>) -> bool {
-    let inner = unwrap(expression);
-    let Some(ident) = identifier(inner) else {
+    let inner = unwrap_expression(expression);
+    let Some(ident) = identifier_of(inner) else {
         return inner.kind() == Kind::PropertyAccessExpression
             && member(inner).is_some_and(|(object, method)| {
                 method == "fetch"
-                    && identifier(object).is_some_and(|host| {
+                    && identifier_of(object).is_some_and(|host| {
                         ["globalThis", "window", "self", "global"]
                             .contains(&host.as_identifier().text())
                     })
             });
     };
-    let Some(binding) = symbol(ident) else {
+    let Some(binding) = resolve_lexical_binding(ident) else {
         return ident.as_identifier().text() == "fetch";
     };
     if !visited.insert(binding) {
@@ -241,7 +241,8 @@ fn fetch_origin(sf: P<SourceFile>, expression: P<Node>, visited: &mut FxHashSet<
         (param.type_(), param.initializer())
     } else {
         (
-            declaration(binding).and_then(|decl| decl.as_variable_declaration().type_()),
+            enclosing_variable_declaration(binding)
+                .and_then(|decl| decl.as_variable_declaration().type_()),
             None,
         )
     };
@@ -256,7 +257,7 @@ fn fetch_origin(sf: P<SourceFile>, expression: P<Node>, visited: &mut FxHashSet<
     if let Some(initializer) = initializer {
         return fetch_origin(sf, initializer, visited);
     }
-    !symbol_is_mutated(sf.as_node(), binding)
-        && const_initializer(binding)
+    !is_binding_mutated(sf.as_node(), binding)
+        && const_binding_initializer(binding)
             .is_some_and(|initializer| fetch_origin(sf, initializer, visited))
 }

@@ -1,6 +1,6 @@
 use super::web_provenance::{
-    AliasStability, const_initializer, member_expression, member_object, static_property_name,
-    symbol_for, unwrap_expression,
+    AliasStability, const_initializer, member_expression, member_object, resolve_lexical_binding,
+    static_property_name, unwrap_expression,
 };
 use antidrift_kernel::local_binding::Binding;
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
@@ -72,7 +72,8 @@ impl RuleVisitor for Visitor {
 fn browser_open(sf: P<SourceFile>, expression: P<Node>) -> bool {
     let expression = unwrap_expression(expression);
     if expression.kind() == Kind::Identifier {
-        return expression.as_identifier().text() == "open" && symbol_for(expression).is_none();
+        return expression.as_identifier().text() == "open"
+            && resolve_lexical_binding(expression).is_none();
     }
     member_expression(expression).is_some_and(|member| {
         static_property_name(member) == Some("open")
@@ -83,7 +84,7 @@ fn browser_open(sf: P<SourceFile>, expression: P<Node>) -> bool {
 fn browser_global(sf: P<SourceFile>, expression: P<Node>, visited: &mut Vec<Binding>) -> bool {
     let expression = unwrap_expression(expression);
     if expression.kind() == Kind::Identifier {
-        let symbol = symbol_for(expression);
+        let symbol = resolve_lexical_binding(expression);
         if matches!(
             expression.as_identifier().text(),
             "window" | "globalThis" | "self"

@@ -1,6 +1,6 @@
 use super::web_provenance::{
-    AliasStability, ImportedOwner, const_initializer, imported_owner, property_name, symbol_for,
-    unwrap_expression,
+    AliasStability, ImportedOwner, const_initializer, imported_owner, property_name,
+    resolve_lexical_binding, unwrap_expression,
 };
 use antidrift_kernel::local_binding::Binding;
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options, in_scope};
@@ -161,7 +161,7 @@ impl HtmlPolicy<'_> {
         if expression.kind() != Kind::Identifier {
             return false;
         }
-        let Some(symbol) = symbol_for(expression) else {
+        let Some(symbol) = resolve_lexical_binding(expression) else {
             return false;
         };
         if visited.contains(&symbol) {

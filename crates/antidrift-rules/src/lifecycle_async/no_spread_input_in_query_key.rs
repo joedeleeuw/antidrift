@@ -1,6 +1,7 @@
 use super::syntax::{
-    Span, binding_for_declarator, call_expression, const_initializer, identifier, object_property,
-    parent_expression, property_name, root_identifier, symbol, unwrap,
+    Span, binding_for_declarator, call_expression_of, const_binding_initializer, identifier_of,
+    object_property, parent_expression, property_name, resolve_lexical_binding, root_identifier,
+    unwrap_expression,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
@@ -69,7 +70,7 @@ impl RuleVisitor for Visitor {
             }
             Kind::CallExpression => {
                 let call = node.as_call_expression();
-                if identifier(call.expression()).is_some_and(|callee| {
+                if identifier_of(call.expression()).is_some_and(|callee| {
                     ["useSWR", "useSWRImmutable", "useSWRMutation"]
                         .contains(&callee.as_identifier().text())
                 }) && let Some(&key) = call.arguments().nodes().first()
@@ -84,12 +85,12 @@ impl RuleVisitor for Visitor {
 }
 
 fn report_key(ctx: &mut Ctx<'_>, expression: P<Node>) {
-    let mut expression = unwrap(expression);
-    if let Some(ident) = identifier(expression) {
-        let Some(binding) = symbol(ident) else {
+    let mut expression = unwrap_expression(expression);
+    if let Some(ident) = identifier_of(expression) {
+        let Some(binding) = resolve_lexical_binding(ident) else {
             return;
         };
-        let Some(initializer) = const_initializer(binding) else {
+        let Some(initializer) = const_binding_initializer(binding) else {
             return;
         };
         if binding.range(ctx.file).0 >= Span::of(ctx.file, ident).start {
@@ -101,8 +102,8 @@ fn report_key(ctx: &mut Ctx<'_>, expression: P<Node>) {
 }
 
 fn composition(expression: P<Node>) -> bool {
-    let inner = unwrap(expression);
-    if let Some(call) = call_expression(inner) {
+    let inner = unwrap_expression(expression);
+    if let Some(call) = call_expression_of(inner) {
         return composition(call.as_call_expression().expression());
     }
     let is_member = matches!(
@@ -114,7 +115,7 @@ fn composition(expression: P<Node>) -> bool {
 }
 
 fn explicit_object(expression: P<Node>) -> bool {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::ObjectLiteralExpression => inner
             .as_object_literal_expression()
@@ -151,7 +152,7 @@ fn report_element(ctx: &mut Ctx<'_>, element: P<Node>) {
 }
 
 fn report_expression(ctx: &mut Ctx<'_>, expression: P<Node>) {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::BinaryExpression => {
             let bin = inner.as_binary_expression();

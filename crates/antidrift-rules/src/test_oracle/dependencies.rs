@@ -1,6 +1,7 @@
 use super::bindings::{Callback, Oracle};
 use super::syntax::{
-    Span, awaited, expression_key, identifier, numeric_value, object_property, static_member,
+    Span, expression_key, identifier_of, numeric_literal_value, object_property, static_member,
+    unwrap_awaited_expression,
 };
 use antidrift_kernel::local_binding::{
     Binding, collect_binding_references, is_identifier_reference_position, resolve_lexical_binding,
@@ -25,7 +26,7 @@ fn identity(
     oracle: &Oracle,
     ancestors: &FxHashSet<(i32, i32)>,
 ) -> Option<Identity> {
-    let expression = awaited(expression);
+    let expression = unwrap_awaited_expression(expression);
     let mut seen = ancestors.clone();
     if !seen.insert(expression_key(oracle.sf, expression)) {
         return None;
@@ -35,7 +36,9 @@ fn identity(
         Kind::StringLiteral => Some(Identity::String(
             expression.as_string_literal().text().to_owned(),
         )),
-        Kind::NumericLiteral => Some(Identity::Number(numeric_value(expression)?.to_bits())),
+        Kind::NumericLiteral => Some(Identity::Number(
+            numeric_literal_value(expression)?.to_bits(),
+        )),
         Kind::TrueKeyword => Some(Identity::Boolean(true)),
         Kind::FalseKeyword => Some(Identity::Boolean(false)),
         Kind::NullKeyword => Some(Identity::Null),
@@ -44,7 +47,7 @@ fn identity(
         )),
         Kind::PrefixUnaryExpression => {
             let unary = expression.as_prefix_unary_expression();
-            let val = numeric_value(unary.operand())?;
+            let val = numeric_literal_value(unary.operand())?;
             match unary.operator() {
                 Kind::MinusToken => Some(Identity::Number((-val).to_bits())),
                 Kind::PlusToken => Some(Identity::Number(val.to_bits())),
@@ -188,7 +191,7 @@ impl DependencyWalker<'_> {
                 "push" | "unshift" | "splice" | "fill" | "set" | "add"
             );
         let assigns = method == "assign"
-            && identifier(object).is_some_and(|ident| ident.as_identifier().text() == "Object")
+            && identifier_of(object).is_some_and(|ident| ident.as_identifier().text() == "Object")
             && arguments
                 .next()
                 .is_some_and(|argument| Span::of(self.oracle.sf, argument) == target);
@@ -200,7 +203,7 @@ impl DependencyWalker<'_> {
     }
 
     fn callee(&mut self, expression: P<Node>) {
-        let callee = awaited(expression);
+        let callee = unwrap_awaited_expression(expression);
         match callee.kind() {
             Kind::PropertyAccessExpression => {
                 self.visit_expression(callee.as_property_access_expression().expression());
@@ -231,7 +234,7 @@ impl DependencyWalker<'_> {
     }
 
     fn visit_expression(&mut self, expression: P<Node>) {
-        let expression = awaited(expression);
+        let expression = unwrap_awaited_expression(expression);
         if !self
             .dependencies
             .nodes

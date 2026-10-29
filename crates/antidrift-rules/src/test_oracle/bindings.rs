@@ -1,4 +1,4 @@
-use super::syntax::{Span, identifier, unwrap};
+use super::syntax::{Span, identifier_of, unwrap_expression};
 use antidrift_kernel::local_binding::{
     enclosing_variable_declaration, is_const_variable_declaration, resolve_lexical_binding,
 };
@@ -81,7 +81,7 @@ impl Oracle {
     }
 
     pub(super) fn initializer(&self, expression: P<Node>, constant: bool) -> Option<P<Node>> {
-        let declaration = self.declaration(identifier(expression)?)?;
+        let declaration = self.declaration(identifier_of(expression)?)?;
         if constant && !is_const_variable_declaration(declaration) {
             return None;
         }
@@ -93,7 +93,7 @@ impl Oracle {
         expression: P<Node>,
         callback: Callback,
     ) -> Option<P<Node>> {
-        let declaration = self.declaration(identifier(expression)?)?;
+        let declaration = self.declaration(identifier_of(expression)?)?;
         if self.owner(declaration) != Some(callback.id()) {
             return None;
         }
@@ -101,7 +101,7 @@ impl Oracle {
     }
 
     pub(super) fn binding_source(&self, expression: P<Node>) -> Option<P<Node>> {
-        let binding = resolve_lexical_binding(identifier(expression)?)?;
+        let binding = resolve_lexical_binding(identifier_of(expression)?)?;
         let declaration = enclosing_variable_declaration(binding)?;
         if let Some(initializer) = declaration.as_variable_declaration().initializer() {
             return Some(initializer);
@@ -136,7 +136,7 @@ impl Oracle {
     }
 
     pub(super) fn local_function(&self, expression: P<Node>) -> Option<Callback> {
-        let ident = identifier(unwrap(expression))?;
+        let ident = identifier_of(unwrap_expression(expression))?;
         let binding = resolve_lexical_binding(ident)?;
         if binding.decl == self.sf.as_node() {
             return None;
@@ -145,7 +145,7 @@ impl Oracle {
             Kind::FunctionDeclaration | Kind::FunctionExpression | Kind::ArrowFunction => {
                 Some(Callback(binding.decl))
             }
-            Kind::VariableDeclaration => Callback::from_expression(unwrap(
+            Kind::VariableDeclaration => Callback::from_expression(unwrap_expression(
                 binding.decl.as_variable_declaration().initializer()?,
             )),
             _ => None,
@@ -156,7 +156,7 @@ impl Oracle {
         &self,
         expression: P<Node>,
     ) -> Option<(&'static str, Option<&'static str>)> {
-        let binding = resolve_lexical_binding(identifier(expression)?)?;
+        let binding = resolve_lexical_binding(identifier_of(expression)?)?;
         let imported = match binding.decl.kind() {
             Kind::ImportSpecifier => {
                 let spec = binding.decl.as_import_specifier();

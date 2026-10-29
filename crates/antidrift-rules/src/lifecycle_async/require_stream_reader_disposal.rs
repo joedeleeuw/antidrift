@@ -1,7 +1,8 @@
 use super::stream_origin::{canonical, is_stream};
 use super::syntax::{
-    Binding, Span, binding_for_declarator, call_expression, identifier, is_const_decl, is_function,
-    is_write_reference, member, owner, parent_expression, references_to, symbol,
+    Binding, Span, binding_for_declarator, call_expression_of, collect_binding_references,
+    identifier_of, is_const_variable_declaration, is_function_like, is_write_reference, member,
+    owner, parent_expression, resolve_lexical_binding,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -92,7 +93,7 @@ impl RuleVisitor for Visitor {
                 |&stmt| Span::of(ctx.file, stmt).end,
             );
         let call_end = Span::of(ctx.file, node).end;
-        let mutated = references_to(ctx.file.as_node(), binding)
+        let mutated = collect_binding_references(ctx.file.as_node(), binding)
             .into_iter()
             .any(|reference| {
                 let span = Span::of(ctx.file, reference);
@@ -125,7 +126,10 @@ fn disposal_message(id: &'static str) -> RuleMessage {
 fn acquisition_owner(node: P<Node>) -> Option<(Binding, bool)> {
     let parent = parent_expression(node).parent()?;
     match parent.kind() {
-        Kind::VariableDeclaration => Some((binding_for_declarator(parent)?, is_const_decl(parent))),
+        Kind::VariableDeclaration => Some((
+            binding_for_declarator(parent)?,
+            is_const_variable_declaration(parent),
+        )),
         Kind::BinaryExpression => {
             let bin = parent.as_binary_expression();
             if !ast::is_assignment_operator(bin.operator_token().kind())
@@ -133,7 +137,7 @@ fn acquisition_owner(node: P<Node>) -> Option<(Binding, bool)> {
             {
                 return None;
             }
-            Some((symbol(identifier(bin.left())?)?, false))
+            Some((resolve_lexical_binding(identifier_of(bin.left())?)?, false))
         }
         _ => None,
     }
@@ -155,7 +159,7 @@ fn directly_returned(node: P<Node>) -> bool {
 
 impl ReaderAnalysis {
     pub(super) fn method(&self, expression: P<Node>, expected: &str) -> bool {
-        let Some(call) = call_expression(expression) else {
+        let Some(call) = call_expression_of(expression) else {
             return false;
         };
         self.method_call(call, expected)
@@ -174,7 +178,7 @@ impl ReaderAnalysis {
     }
 
     fn collect_nodes_within(&self, node: P<Node>, span: Span, out: &mut Vec<P<Node>>) {
-        if node != self.root && is_function(node) {
+        if node != self.root && is_function_like(node) {
             return;
         }
         if span.contains_inclusive(Span::of(self.sf, node))
@@ -239,7 +243,7 @@ impl ReaderAnalysis {
         let Some((body, acquisition_index)) = Self::statement_site(call) else {
             return false;
         };
-        let root_body: Option<&'static [P<Node>]> = if is_function(self.root) {
+        let root_body: Option<&'static [P<Node>]> = if is_function_like(self.root) {
             self.root
                 .body()
                 .filter(|b| b.kind() == Kind::Block)

@@ -1,4 +1,4 @@
-use super::syntax::is_function;
+use super::syntax::is_function_like;
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
@@ -119,7 +119,7 @@ impl RuleVisitor for Visitor {
         let mut suppressed = false;
         let mut cursor = node.parent();
         while let Some(ancestor) = cursor {
-            if is_function(ancestor)
+            if is_function_like(ancestor)
                 || (ancestor.kind() == Kind::PropertyDeclaration
                     && !ancestor.modifier_flags().intersects(ModifierFlags::Static))
             {

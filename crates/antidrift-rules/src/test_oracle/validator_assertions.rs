@@ -1,7 +1,10 @@
 use super::Finding;
 use super::assertions::{Assertion, AssertionStyle};
 use super::bindings::{Callback, Oracle};
-use super::syntax::{awaited, call, identifier, member, root_identifier, static_member};
+use super::syntax::{
+    call_expression_of, identifier_of, member, root_identifier, static_member,
+    unwrap_awaited_expression,
+};
 use super::validators::{origin, schema_provenance};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -49,8 +52,8 @@ fn act_output(expression: P<Node>, oracle: &Oracle, depth: usize) -> bool {
     if depth > 12 {
         return false;
     }
-    let expression = awaited(expression);
-    if identifier(expression).is_some() {
+    let expression = unwrap_awaited_expression(expression);
+    if identifier_of(expression).is_some() {
         return oracle
             .binding_source(expression)
             .is_some_and(|source| act_output(source, oracle, depth + 1));
@@ -58,11 +61,11 @@ fn act_output(expression: P<Node>, oracle: &Oracle, depth: usize) -> bool {
     if let Some(object) = super::syntax::member_object(expression) {
         return act_output(object, oracle, depth + 1);
     }
-    let Some(call_node) = call(expression) else {
+    let Some(call_node) = call_expression_of(expression) else {
         return false;
     };
     let call_expr = call_node.as_call_expression();
-    let callee = awaited(call_expr.expression());
+    let callee = unwrap_awaited_expression(call_expr.expression());
     let forwards = static_member(callee).is_some_and(|(object, _)| {
         root_identifier(object).is_some_and(|ident| {
             matches!(ident.as_identifier().text(), "Array" | "JSON" | "Object")
@@ -79,15 +82,15 @@ fn act_output(expression: P<Node>, oracle: &Oracle, depth: usize) -> bool {
 }
 
 fn reads_acceptance(subject: P<Node>, origin_call: P<Node>) -> bool {
-    let mut current = awaited(subject);
-    while call(current).is_none_or(|call_node| call_node != origin_call) {
+    let mut current = unwrap_awaited_expression(subject);
+    while call_expression_of(current).is_none_or(|call_node| call_node != origin_call) {
         let Some((object, property)) = member(current) else {
             return false;
         };
         if matches!(property.as_str(), "error" | "issues" | "success") {
             return true;
         }
-        current = awaited(object);
+        current = unwrap_awaited_expression(object);
     }
     false
 }
@@ -100,11 +103,11 @@ pub(super) fn finding(call_node: P<Node>, oracle: &Oracle) -> Option<Finding> {
         return None;
     }
     if let Some(expect_call) = record.expect_call
-        && identifier(expect_call.as_call_expression().expression()).is_none()
+        && identifier_of(expect_call.as_call_expression().expression()).is_none()
     {
         return None;
     }
-    let subject = awaited(record.subject?);
+    let subject = unwrap_awaited_expression(record.subject?);
     if matches!(
         record.method.as_str(),
         "doesNotReject" | "doesNotThrow" | "rejects" | "throws" | "toThrow" | "toThrowError"

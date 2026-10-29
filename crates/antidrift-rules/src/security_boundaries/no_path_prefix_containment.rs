@@ -1,6 +1,6 @@
 use antidrift_kernel::local_binding::{Binding, is_binding_mutated, resolve_lexical_binding};
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
-use antidrift_kernel::tsrs_kernel::unwrap_expression;
+use antidrift_kernel::tsrs_kernel::{numeric_literal_value, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -212,24 +212,14 @@ fn bare_path_prefix(call_node: P<Node>, provenance: &PathProvenance) -> bool {
 fn zero_start(expression: P<Node>, provenance: &PathProvenance) -> bool {
     let stable = provenance.stable(expression);
     match stable.kind() {
-        Kind::NumericLiteral => numeric_zero(stable),
+        Kind::NumericLiteral => numeric_literal_value(stable) == Some(0.0),
         Kind::PrefixUnaryExpression => {
             let unary = stable.as_prefix_unary_expression();
             matches!(unary.operator(), Kind::PlusToken | Kind::MinusToken)
-                && numeric_zero(unwrap_expression(unary.operand()))
+                && numeric_literal_value(unwrap_expression(unary.operand())) == Some(0.0)
         }
         _ => false,
     }
-}
-
-fn numeric_zero(node: P<Node>) -> bool {
-    if node.kind() != Kind::NumericLiteral {
-        return false;
-    }
-    let Ok(val) = node.text().replace('_', "").parse::<f64>() else {
-        return false;
-    };
-    val == 0.0
 }
 
 fn separator(expression: P<Node>, provenance: &PathProvenance) -> bool {

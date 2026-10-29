@@ -1,6 +1,6 @@
 use super::syntax::{
-    Binding, Span, binding_for_declarator, identifier, identifier_member, parent_expression,
-    references_to, without_parens,
+    Binding, Span, binding_for_declarator, collect_binding_references, identifier_member,
+    identifier_of, parent_expression, unwrap_parentheses,
 };
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use serde::Deserialize;
@@ -101,7 +101,7 @@ impl RuleVisitor for Visitor {
         if first_arg.kind() == Kind::SpreadElement {
             return;
         }
-        let callback = without_parens(first_arg);
+        let callback = unwrap_parentheses(first_arg);
         if !matches!(
             callback.kind(),
             Kind::ArrowFunction | Kind::FunctionExpression
@@ -155,7 +155,7 @@ fn combinator(call: P<Node>) -> bool {
     call.kind() == Kind::CallExpression
         && identifier_member(call.as_call_expression().expression()).is_some_and(
             |(object, method)| {
-                identifier(object).is_some_and(|root| root.as_identifier().text() == "Promise")
+                identifier_of(object).is_some_and(|root| root.as_identifier().text() == "Promise")
                     && ["all", "allSettled", "race"].contains(&method)
             },
         )
@@ -220,7 +220,7 @@ fn collected(sf: P<SourceFile>, call: P<Node>) -> bool {
 }
 
 fn handled_binding(sf: P<SourceFile>, binding: Binding, after: i32) -> bool {
-    references_to(sf.as_node(), binding)
+    collect_binding_references(sf.as_node(), binding)
         .into_iter()
         .any(|reference| {
             if Span::of(sf, reference).start < after {

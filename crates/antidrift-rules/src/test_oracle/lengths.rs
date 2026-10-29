@@ -5,7 +5,7 @@ use super::block::BlockFacts;
 use super::classification::Classification;
 use super::literals;
 use super::paths::{act_for_root, length_parts, member_path};
-use super::syntax::{identifier, numeric_value, unwrap};
+use super::syntax::{identifier_of, numeric_literal_value, unwrap_expression};
 use tsrs_ast::Kind;
 
 pub(super) fn echo(record: &Assertion, facts: &BlockFacts, oracle: &Oracle) -> Option<Finding> {
@@ -15,12 +15,12 @@ pub(super) fn echo(record: &Assertion, facts: &BlockFacts, oracle: &Oracle) -> O
             .path
             .last()
             .is_some_and(|segment| segment == "length")
-        && identifier(reference.root)
+        && identifier_of(reference.root)
             .is_some_and(|ident| facts.argument_names.contains(ident.as_identifier().text()))
     {
         return Some(Finding::LengthEcho);
     }
-    let count_val = numeric_value(unwrap(count))?;
+    let count_val = numeric_literal_value(unwrap_expression(count))?;
     let act = act_for_root(collection.root, facts)?;
     act.as_call_expression()
         .arguments()
@@ -60,7 +60,7 @@ pub(super) fn has_contents_oracle(
     let Some((collection, _)) = length_parts(record) else {
         return false;
     };
-    let Some(collection_root) = identifier(collection.root) else {
+    let Some(collection_root) = identifier_of(collection.root) else {
         return false;
     };
     facts
@@ -89,7 +89,7 @@ pub(super) fn has_contents_oracle(
             }
             member_path(actual).is_some_and(|reference| {
                 reference.path == collection.path
-                    && identifier(reference.root).is_some_and(|ident| {
+                    && identifier_of(reference.root).is_some_and(|ident| {
                         ident.as_identifier().text() == collection_root.as_identifier().text()
                     })
             })

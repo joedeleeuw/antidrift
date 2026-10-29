@@ -1,5 +1,6 @@
 use super::syntax::{
-    declaration, global, identifier_member, is_var_decl, member, symbol, unwrap, without_parens,
+    enclosing_variable_declaration, global, identifier_member, is_var_variable_declaration, member,
+    resolve_lexical_binding, unwrap_expression, unwrap_parentheses,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
@@ -50,7 +51,7 @@ impl RuleVisitor for Visitor {
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
         let call = node.as_call_expression();
         let callee = call.expression();
-        let method = member(callee).or_else(|| identifier_member(unwrap(callee)));
+        let method = member(callee).or_else(|| identifier_member(unwrap_expression(callee)));
         let Some((_, method @ ("replace" | "replaceAll"))) = method else {
             return;
         };
@@ -62,11 +63,11 @@ impl RuleVisitor for Visitor {
             return;
         }
         let replacement = args[1];
-        if allowed(unwrap(replacement)) {
+        if allowed(unwrap_expression(replacement)) {
             return;
         }
         ctx.report_node(
-            without_parens(replacement),
+            unwrap_parentheses(replacement),
             RuleMessage::new(
                 "requireFunctionReplacer",
                 format!(
@@ -91,20 +92,20 @@ fn allowed(expression: P<Node>) -> bool {
                 && tagged.template().kind() == Kind::NoSubstitutionTemplateLiteral
         }
         Kind::Identifier => {
-            let Some(binding) = symbol(expression) else {
+            let Some(binding) = resolve_lexical_binding(expression) else {
                 return false;
             };
             if binding.decl.kind() == Kind::FunctionDeclaration {
                 return true;
             }
-            declaration(binding).is_some_and(|decl| {
-                !is_var_decl(decl)
+            enclosing_variable_declaration(binding).is_some_and(|decl| {
+                !is_var_variable_declaration(decl)
                     && decl
                         .as_variable_declaration()
                         .initializer()
                         .is_some_and(|init| {
                             matches!(
-                                unwrap(init).kind(),
+                                unwrap_expression(init).kind(),
                                 Kind::ArrowFunction | Kind::FunctionExpression
                             )
                         })

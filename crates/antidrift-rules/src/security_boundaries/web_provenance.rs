@@ -1,5 +1,5 @@
 pub(super) use antidrift_kernel::local_binding::{
-    Binding, const_binding_initializer, is_binding_mutated, resolve_lexical_binding as symbol_for,
+    Binding, const_binding_initializer, is_binding_mutated, resolve_lexical_binding,
 };
 pub(super) use antidrift_kernel::tsrs_kernel::unwrap_expression;
 use serde::Deserialize;
@@ -83,7 +83,7 @@ pub(super) fn static_string(
             Some(left + &right)
         }
         Kind::Identifier => {
-            let symbol = symbol_for(inner)?;
+            let symbol = resolve_lexical_binding(inner)?;
             if visited.contains(&symbol) {
                 return None;
             }
@@ -134,7 +134,7 @@ fn matches_import(
     if expression.kind() != Kind::Identifier {
         return false;
     }
-    let Some(symbol) = symbol_for(expression) else {
+    let Some(symbol) = resolve_lexical_binding(expression) else {
         return false;
     };
     if visited.contains(&symbol) {

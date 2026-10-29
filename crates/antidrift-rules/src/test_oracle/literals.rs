@@ -1,5 +1,5 @@
 use super::bindings::Oracle;
-use super::syntax::{literal_container, numeric_value, object_property as prop_info, unwrap};
+use super::syntax::{literal_container, numeric_literal_value, object_property, unwrap_expression};
 use rustc_hash::FxHashMap;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -8,7 +8,7 @@ pub(super) fn resolve(expression: P<Node>, oracle: &Oracle, depth: usize) -> Opt
     if depth == 0 {
         return None;
     }
-    let expression = unwrap(expression);
+    let expression = unwrap_expression(expression);
     if expression.kind() == Kind::Identifier {
         return resolve(oracle.initializer(expression, true)?, oracle, depth - 1);
     }
@@ -22,7 +22,7 @@ pub(super) fn template_text(expression: P<Node>) -> Option<String> {
     None
 }
 
-fn object_property(
+fn find_object_property(
     object: P<Node>,
     segment: &str,
     oracle: &Oracle,
@@ -37,11 +37,12 @@ fn object_property(
             let arg = property.as_spread_assignment().expression();
             if let Some(spread_obj) = resolve(arg, oracle, depth - 1)
                 .filter(|node| node.kind() == Kind::ObjectLiteralExpression)
-                && let Some(inherited) = object_property(spread_obj, segment, oracle, depth - 1)
+                && let Some(inherited) =
+                    find_object_property(spread_obj, segment, oracle, depth - 1)
             {
                 matched = Some(inherited);
             }
-        } else if let Some((name, value, _)) = prop_info(property)
+        } else if let Some((name, value, _)) = object_property(property)
             && name == segment
         {
             matched = Some(value);
@@ -56,7 +57,7 @@ pub(super) fn at_path(base: P<Node>, path: &[String], oracle: &Oracle) -> Option
     for segment in path {
         depth = depth.checked_sub(1)?;
         let next = match current.kind() {
-            Kind::ObjectLiteralExpression => object_property(current, segment, oracle, depth)?,
+            Kind::ObjectLiteralExpression => find_object_property(current, segment, oracle, depth)?,
             Kind::ArrayLiteralExpression => {
                 let elements = current.as_array_literal_expression().elements().nodes();
                 if elements.iter().any(|element| {
@@ -74,7 +75,7 @@ pub(super) fn at_path(base: P<Node>, path: &[String], oracle: &Oracle) -> Option
             }
             _ => return None,
         };
-        current = resolve(next, oracle, depth).unwrap_or_else(|| unwrap(next));
+        current = resolve(next, oracle, depth).unwrap_or_else(|| unwrap_expression(next));
     }
     Some(current)
 }
@@ -83,14 +84,14 @@ pub(super) fn equal(left: P<Node>, right: P<Node>, depth: usize) -> bool {
     if depth == 0 {
         return false;
     }
-    let left = unwrap(left);
-    let right = unwrap(right);
+    let left = unwrap_expression(left);
+    let right = unwrap_expression(right);
     match (left.kind(), right.kind()) {
         (Kind::StringLiteral, Kind::StringLiteral) => {
             left.as_string_literal().text() == right.as_string_literal().text()
         }
-        (Kind::NumericLiteral, Kind::NumericLiteral) => numeric_value(left)
-            .zip(numeric_value(right))
+        (Kind::NumericLiteral, Kind::NumericLiteral) => numeric_literal_value(left)
+            .zip(numeric_literal_value(right))
             .is_some_and(|(l, r)| l == r),
         (Kind::TrueKeyword, Kind::TrueKeyword)
         | (Kind::FalseKeyword, Kind::FalseKeyword)
@@ -134,13 +135,13 @@ fn objects_equal(left: P<Node>, right: P<Node>, depth: usize) -> bool {
     }
     let mut right_properties = FxHashMap::default();
     for &property in r_props {
-        let Some((name, val, _)) = prop_info(property) else {
+        let Some((name, val, _)) = object_property(property) else {
             return false;
         };
         right_properties.insert(name, val);
     }
     l_props.iter().all(|&property| {
-        prop_info(property).is_some_and(|(name, l_val, _)| {
+        object_property(property).is_some_and(|(name, l_val, _)| {
             right_properties
                 .get(&name)
                 .is_some_and(|&r_val| equal(l_val, r_val, depth))
@@ -155,7 +156,9 @@ pub(super) fn vacuous(expression: P<Node>, truthy: bool) -> bool {
         | Kind::RegularExpressionLiteral
         | Kind::TrueKeyword => true,
         Kind::StringLiteral => !truthy || !expression.as_string_literal().text().is_empty(),
-        Kind::NumericLiteral => !truthy || numeric_value(expression).is_some_and(|val| val != 0.0),
+        Kind::NumericLiteral => {
+            !truthy || numeric_literal_value(expression).is_some_and(|val| val != 0.0)
+        }
         Kind::FalseKeyword | Kind::NullKeyword => !truthy,
         Kind::BigIntLiteral => !truthy || !matches!(expression.text(), "0" | "0n"),
         Kind::NoSubstitutionTemplateLiteral => {

@@ -1,5 +1,6 @@
 use super::syntax::{
-    const_initializer, identifier, member, object_property, property_name, symbol, unwrap,
+    const_binding_initializer, identifier_of, member, object_property, property_name,
+    resolve_lexical_binding, unwrap_expression,
 };
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::rule_scope::RuleScope;
@@ -105,7 +106,7 @@ fn inside_predicate_property(node: P<Node>) -> bool {
 
 fn inspect_call(ctx: &mut Ctx<'_>, imports: &FileImports, call_node: P<Node>) {
     let call = call_node.as_call_expression();
-    let callee = unwrap(call.expression());
+    let callee = unwrap_expression(call.expression());
     let args = call.arguments().nodes();
     if imports.is_unshadowed_call(callee, "swr", &["mutate"]) {
         if let Some(&key) = args.first()
@@ -140,18 +141,18 @@ fn inspect_call(ctx: &mut Ctx<'_>, imports: &FileImports, call_node: P<Node>) {
 }
 
 fn inspect_options(ctx: &mut Ctx<'_>, expression: P<Node>) {
-    let mut expression = unwrap(expression);
-    if let Some(ident) = identifier(expression) {
-        let Some(binding) = symbol(ident) else {
+    let mut expression = unwrap_expression(expression);
+    if let Some(ident) = identifier_of(expression) {
+        let Some(binding) = resolve_lexical_binding(ident) else {
             return;
         };
         if binding.is_top_level() {
             return;
         }
-        let Some(initializer) = const_initializer(binding) else {
+        let Some(initializer) = const_binding_initializer(binding) else {
             return;
         };
-        expression = unwrap(initializer);
+        expression = unwrap_expression(initializer);
     }
     if expression.kind() != Kind::ObjectLiteralExpression {
         return;
@@ -170,7 +171,7 @@ fn inspect_options(ctx: &mut Ctx<'_>, expression: P<Node>) {
 }
 
 fn report_array(ctx: &mut Ctx<'_>, expression: P<Node>) {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     if inner.kind() == Kind::ArrayLiteralExpression {
         ctx.report_node(
             inner,
@@ -183,8 +184,8 @@ fn report_array(ctx: &mut Ctx<'_>, expression: P<Node>) {
 }
 
 fn query_key(expression: P<Node>) -> bool {
-    identifier(expression).is_some_and(|ident| ident.as_identifier().text() == "queryKey") || {
-        let inner = unwrap(expression);
+    identifier_of(expression).is_some_and(|ident| ident.as_identifier().text() == "queryKey") || {
+        let inner = unwrap_expression(expression);
         inner.kind() == Kind::PropertyAccessExpression && {
             let name = inner.as_property_access_expression().name();
             ast::is_identifier(name) && name.as_identifier().text() == "queryKey"
@@ -193,7 +194,7 @@ fn query_key(expression: P<Node>) -> bool {
 }
 
 fn numeric(expression: P<Node>) -> bool {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::NumericLiteral => true,
         Kind::PrefixUnaryExpression => {
@@ -205,7 +206,7 @@ fn numeric(expression: P<Node>) -> bool {
 }
 
 fn key_position(expression: P<Node>) -> bool {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::ElementAccessExpression => {
             let access = inner.as_element_access_expression();
@@ -216,7 +217,7 @@ fn key_position(expression: P<Node>) -> bool {
             let args = call.arguments().nodes();
             member(call.expression()).is_some_and(|(object, method)| {
                 method == "at"
-                    && unwrap(call.expression()).kind() == Kind::PropertyAccessExpression
+                    && unwrap_expression(call.expression()).kind() == Kind::PropertyAccessExpression
                     && query_key(object)
                     && args.len() == 1
                     && args[0].kind() != Kind::SpreadElement

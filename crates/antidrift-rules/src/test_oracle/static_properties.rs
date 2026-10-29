@@ -1,15 +1,16 @@
 use super::assertions::test_callee;
 use super::bindings::Oracle;
 use super::syntax::{
-    argument, call, identifier, is_test_or_spec_file, literal, static_member, unwrap,
+    argument, call_expression_of, identifier_of, is_test_or_spec_file, literal, static_member,
+    unwrap_expression,
 };
 use antidrift_kernel::local_binding::{Binding, binding_for_declarator, resolve_lexical_binding};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 
 fn projection(expression: P<Node>, parameter: &str) -> bool {
-    let expression = unwrap(expression);
-    if identifier(expression).is_some_and(|ident| ident.as_identifier().text() == parameter) {
+    let expression = unwrap_expression(expression);
+    if identifier_of(expression).is_some_and(|ident| ident.as_identifier().text() == parameter) {
         return true;
     }
     if let Some((object, _)) = static_member(expression) {
@@ -25,24 +26,26 @@ fn projection(expression: P<Node>, parameter: &str) -> bool {
         return false;
     }
     let conditional = expression.as_conditional_expression();
-    let guard = call(unwrap(conditional.condition())).is_some_and(|call_node| {
-        let call_expr = call_node.as_call_expression();
-        call_expr.arguments().nodes().len() == 1
-            && static_member(call_expr.expression()).is_some_and(|(object, method)| {
-                identifier(object).is_some_and(|ident| ident.as_identifier().text() == "Array")
-                    && method == "isArray"
-            })
-            && argument(call_node, 0)
-                .and_then(identifier)
-                .is_some_and(|ident| ident.as_identifier().text() == parameter)
-    });
+    let guard =
+        call_expression_of(unwrap_expression(conditional.condition())).is_some_and(|call_node| {
+            let call_expr = call_node.as_call_expression();
+            call_expr.arguments().nodes().len() == 1
+                && static_member(call_expr.expression()).is_some_and(|(object, method)| {
+                    identifier_of(object)
+                        .is_some_and(|ident| ident.as_identifier().text() == "Array")
+                        && method == "isArray"
+                })
+                && argument(call_node, 0)
+                    .and_then(identifier_of)
+                    .is_some_and(|ident| ident.as_identifier().text() == parameter)
+        });
     guard
         && projection(conditional.when_true(), parameter)
         && projection(conditional.when_false(), parameter)
 }
 
 fn transparent(expression: P<Node>, oracle: &Oracle) -> Option<P<Node>> {
-    let call_node = call(expression)?;
+    let call_node = call_expression_of(expression)?;
     if call_node.as_call_expression().arguments().nodes().len() != 1 {
         return None;
     }
@@ -62,7 +65,7 @@ fn indexed_root(
     if depth > 12 {
         return None;
     }
-    let expression = unwrap(expression);
+    let expression = unwrap_expression(expression);
     if let Some(arg) = transparent(expression, oracle) {
         return indexed_root(arg, loop_symbol, oracle, depth + 1);
     }
@@ -70,22 +73,22 @@ fn indexed_root(
         return None;
     }
     let member = expression.as_element_access_expression();
-    if resolve_lexical_binding(identifier(member.argument_expression())?)? != loop_symbol {
+    if resolve_lexical_binding(identifier_of(member.argument_expression())?)? != loop_symbol {
         return None;
     }
-    let mut root = unwrap(member.expression());
+    let mut root = unwrap_expression(member.expression());
     loop {
         root = match root.kind() {
             Kind::PropertyAccessExpression => {
-                unwrap(root.as_property_access_expression().expression())
+                unwrap_expression(root.as_property_access_expression().expression())
             }
             Kind::ElementAccessExpression => {
-                unwrap(root.as_element_access_expression().expression())
+                unwrap_expression(root.as_element_access_expression().expression())
             }
             _ => break,
         };
     }
-    identifier(root)?;
+    identifier_of(root)?;
     Some(root)
 }
 
@@ -98,9 +101,12 @@ fn assertion_subject(call_node: P<Node>) -> Option<P<Node>> {
     {
         return None;
     }
-    let expect_call = call(object)?;
+    let expect_call = call_expression_of(object)?;
     let expect_expr = expect_call.as_call_expression();
-    if identifier(expect_expr.expression())?.as_identifier().text() != "expect"
+    if identifier_of(expect_expr.expression())?
+        .as_identifier()
+        .text()
+        != "expect"
         || expect_expr.arguments().nodes().len() != 1
     {
         return None;
@@ -159,7 +165,7 @@ pub(super) fn is_echo(statement: P<Node>, oracle: &Oracle, filename: &str) -> bo
     let Some(symbol) = binding_for_declarator(decl) else {
         return false;
     };
-    let right = unwrap(for_of.expression());
+    let right = unwrap_expression(for_of.expression());
     if right.kind() != Kind::ArrayLiteralExpression {
         return false;
     }

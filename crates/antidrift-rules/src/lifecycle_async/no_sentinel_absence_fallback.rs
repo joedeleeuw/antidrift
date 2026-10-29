@@ -1,4 +1,4 @@
-use super::syntax::unwrap;
+use super::syntax::unwrap_expression;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use serde::Deserialize;
 use tsrs_ast::{Kind, Node};
@@ -78,7 +78,7 @@ impl RuleVisitor for Visitor {
         let bin = node.as_binary_expression();
         if bin.operator_token().kind() == Kind::QuestionQuestionToken
             && matches!(
-                unwrap(bin.left()).kind(),
+                unwrap_expression(bin.left()).kind(),
                 Kind::PropertyAccessExpression | Kind::ElementAccessExpression
             )
             && let Some(sentinel) = string_literal(bin.right())
@@ -116,7 +116,7 @@ fn is_direct_jsx_text_expression(node: P<Node>) -> bool {
 }
 
 fn string_literal(expression: P<Node>) -> Option<&'static str> {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::StringLiteral => Some(inner.as_string_literal().text()),
         Kind::NoSubstitutionTemplateLiteral => Some(inner.text()),

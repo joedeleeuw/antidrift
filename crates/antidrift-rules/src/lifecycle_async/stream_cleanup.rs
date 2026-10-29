@@ -1,7 +1,8 @@
 use super::require_stream_reader_disposal::ReaderAnalysis;
 use super::syntax::{
-    Span, binding_for_declarator, call_expression, declaration, identifier, is_let_decl,
-    is_var_decl, member, object_property, symbol, unwrap,
+    Span, binding_for_declarator, call_expression_of, enclosing_variable_declaration,
+    identifier_of, is_let_variable_declaration, is_var_variable_declaration, member,
+    object_property, resolve_lexical_binding, unwrap_expression,
 };
 use tsrs_ast::{Kind, Node, NodeFlags};
 use tsrs_core::P;
@@ -75,10 +76,10 @@ impl ReaderAnalysis {
     }
 
     fn unconditional_call(&self, expression: P<Node>, method: &str) -> bool {
-        if let Some(call) = call_expression(expression) {
+        if let Some(call) = call_expression_of(expression) {
             return self.unconditional_invocation(call, method);
         }
-        let inner = unwrap(expression);
+        let inner = unwrap_expression(expression);
         match inner.kind() {
             Kind::AwaitExpression => {
                 self.unconditional_call(inner.as_await_expression().expression(), method)
@@ -87,7 +88,7 @@ impl ReaderAnalysis {
                 let bin = inner.as_binary_expression();
                 match bin.operator_token().kind() {
                     Kind::EqualsToken
-                        if identifier(bin.left()).is_some_and(|ident| self.can_write(ident)) =>
+                        if identifier_of(bin.left()).is_some_and(|ident| self.can_write(ident)) =>
                     {
                         self.unconditional_call(bin.right(), method)
                     }
@@ -131,7 +132,7 @@ impl ReaderAnalysis {
             if self.unconditional_call(item, method) {
                 return true;
             }
-            let inner = unwrap(item);
+            let inner = unwrap_expression(item);
             if !matches!(inner.kind(), Kind::Identifier | Kind::ThisKeyword) && !is_literal(inner) {
                 return false;
             }
@@ -143,11 +144,11 @@ impl ReaderAnalysis {
         if statement.kind() != Kind::ExpressionStatement {
             return false;
         }
-        let mut expression = unwrap(statement.as_expression_statement().expression());
+        let mut expression = unwrap_expression(statement.as_expression_statement().expression());
         while let Some(next) = self.unwrap_cancel_step(expression) {
             expression = next;
         }
-        let Some(call) = call_expression(expression) else {
+        let Some(call) = call_expression_of(expression) else {
             return false;
         };
         member(call.as_call_expression().expression())
@@ -156,12 +157,14 @@ impl ReaderAnalysis {
 
     fn unwrap_cancel_step(&self, expression: P<Node>) -> Option<P<Node>> {
         match expression.kind() {
-            Kind::AwaitExpression => Some(unwrap(expression.as_await_expression().expression())),
+            Kind::AwaitExpression => Some(unwrap_expression(
+                expression.as_await_expression().expression(),
+            )),
             Kind::BinaryExpression => {
                 let bin = expression.as_binary_expression();
                 (bin.operator_token().kind() == Kind::EqualsToken
-                    && identifier(bin.left()).is_some_and(|ident| self.can_write(ident)))
-                .then(|| unwrap(bin.right()))
+                    && identifier_of(bin.left()).is_some_and(|ident| self.can_write(ident)))
+                .then(|| unwrap_expression(bin.right()))
             }
             _ => None,
         }
@@ -172,7 +175,7 @@ impl ReaderAnalysis {
     }
 
     fn binding_access(&self, ident: P<Node>, write: bool) -> bool {
-        let Some(binding) = symbol(ident) else {
+        let Some(binding) = resolve_lexical_binding(ident) else {
             return false;
         };
         if binding.decl.kind() == Kind::Parameter
@@ -183,9 +186,9 @@ impl ReaderAnalysis {
         {
             return true;
         }
-        declaration(binding).is_some_and(|decl| {
-            is_var_decl(decl)
-                || ((!write || is_let_decl(decl))
+        enclosing_variable_declaration(binding).is_some_and(|decl| {
+            is_var_variable_declaration(decl)
+                || ((!write || is_let_variable_declaration(decl))
                     && Span::of(self.sf, ident).start >= Span::of(self.sf, decl).end)
         })
     }
@@ -209,13 +212,13 @@ impl ReaderAnalysis {
                         })
             }
             Kind::ExpressionStatement if assignments => {
-                let expr = unwrap(statement.as_expression_statement().expression());
+                let expr = unwrap_expression(statement.as_expression_statement().expression());
                 if expr.kind() != Kind::BinaryExpression {
                     return false;
                 }
                 let bin = expr.as_binary_expression();
                 bin.operator_token().kind() == Kind::EqualsToken
-                    && identifier(bin.left()).is_some_and(|ident| self.can_write(ident))
+                    && identifier_of(bin.left()).is_some_and(|ident| self.can_write(ident))
                     && self.cannot_throw(bin.right())
             }
             _ => false,
@@ -223,7 +226,7 @@ impl ReaderAnalysis {
     }
 
     fn cannot_throw(&self, expression: P<Node>) -> bool {
-        let inner = unwrap(expression);
+        let inner = unwrap_expression(expression);
         if is_literal(inner) {
             return true;
         }
@@ -249,13 +252,13 @@ impl ReaderAnalysis {
                     object_property(prop)
                         .is_some_and(|(_, value, computed)| !computed && self.cannot_throw(value))
                 }),
-            _ => identifier(inner).is_some_and(|ident| self.binding_access(ident, false)),
+            _ => identifier_of(inner).is_some_and(|ident| self.binding_access(ident, false)),
         }
     }
 }
 
 fn collect_comma_items(expression: P<Node>, out: &mut Vec<P<Node>>) {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     if inner.kind() == Kind::BinaryExpression {
         let bin = inner.as_binary_expression();
         if bin.operator_token().kind() == Kind::CommaToken {
@@ -281,7 +284,7 @@ fn is_literal(expression: P<Node>) -> bool {
 }
 
 fn optional_member(expression: P<Node>) -> bool {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::PropertyAccessExpression => inner
             .as_property_access_expression()

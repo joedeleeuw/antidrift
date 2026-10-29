@@ -1,5 +1,8 @@
 use super::bindings::Oracle;
-use super::syntax::{argument, awaited, call, identifier, root_identifier, static_member};
+use super::syntax::{
+    argument, call_expression_of, identifier_of, root_identifier, static_member,
+    unwrap_awaited_expression,
+};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 
@@ -27,8 +30,8 @@ pub(super) fn schema_provenance(expression: P<Node>, oracle: &Oracle, depth: usi
     if depth > 12 {
         return false;
     }
-    let expression = awaited(expression);
-    if identifier(expression).is_some() {
+    let expression = unwrap_awaited_expression(expression);
+    if identifier_of(expression).is_some() {
         if oracle
             .import(expression)
             .is_some_and(|(source, _)| schema_source(source))
@@ -44,7 +47,8 @@ pub(super) fn schema_provenance(expression: P<Node>, oracle: &Oracle, depth: usi
     }
     let callee = match expression.kind() {
         Kind::NewExpression => Some(expression.as_new_expression().expression()),
-        _ => call(expression).map(|call_node| call_node.as_call_expression().expression()),
+        _ => call_expression_of(expression)
+            .map(|call_node| call_node.as_call_expression().expression()),
     };
     callee.is_some_and(|callee| {
         schema_provenance(
@@ -83,26 +87,29 @@ fn validator_member(expression: P<Node>, oracle: &Oracle) -> bool {
 }
 
 fn validator_function(expression: P<Node>, oracle: &Oracle, depth: usize) -> bool {
-    if depth > 12 || identifier(expression).is_none() {
+    if depth > 12 || identifier_of(expression).is_none() {
         return false;
     }
     if let Some((source, imported)) = oracle.import(expression) {
         return schema_source(source)
             && imported.is_some_and(|method| distinctive(method) || schema_method(method));
     }
-    let Some(initializer) = oracle.initializer(expression, true).map(awaited) else {
+    let Some(initializer) = oracle
+        .initializer(expression, true)
+        .map(unwrap_awaited_expression)
+    else {
         return false;
     };
-    if identifier(initializer).is_some() {
+    if identifier_of(initializer).is_some() {
         return validator_function(initializer, oracle, depth + 1);
     }
     if static_member(initializer).is_some() {
         return validator_member(initializer, oracle);
     }
-    call(initializer)
+    call_expression_of(initializer)
         .and_then(|call_node| static_member(call_node.as_call_expression().expression()))
         .is_some_and(|(object, method)| {
-            method == "bind" && validator_member(awaited(object), oracle)
+            method == "bind" && validator_member(unwrap_awaited_expression(object), oracle)
         })
 }
 
@@ -110,22 +117,22 @@ fn invocation(expression: P<Node>, oracle: &Oracle, depth: usize) -> bool {
     if depth > 12 {
         return false;
     }
-    let Some(call_node) = call(expression) else {
+    let Some(call_node) = call_expression_of(expression) else {
         return false;
     };
-    let callee = awaited(call_node.as_call_expression().expression());
+    let callee = unwrap_awaited_expression(call_node.as_call_expression().expression());
     if static_member(callee).is_some() {
         return validator_member(callee, oracle);
     }
-    if identifier(callee).is_some() {
+    if identifier_of(callee).is_some() {
         return validator_function(callee, oracle, 0);
     }
     invocation(callee, oracle, depth + 1)
 }
 
 fn projection(call_node: P<Node>) -> Option<P<Node>> {
-    let callee = awaited(call_node.as_call_expression().expression());
-    if let Some(ident) = identifier(callee) {
+    let callee = unwrap_awaited_expression(call_node.as_call_expression().expression());
+    if let Some(ident) = identifier_of(callee) {
         return matches!(
             ident.as_identifier().text(),
             "Boolean" | "Number" | "String"
@@ -164,22 +171,22 @@ pub(super) fn origin(expression: P<Node>, oracle: &Oracle, depth: usize) -> Opti
     if depth > 12 {
         return None;
     }
-    let expression = awaited(expression);
+    let expression = unwrap_awaited_expression(expression);
     if invocation(expression, oracle, 0) {
-        return call(expression);
+        return call_expression_of(expression);
     }
-    if identifier(expression).is_some() {
+    if identifier_of(expression).is_some() {
         return origin(oracle.initializer(expression, true)?, oracle, depth + 1);
     }
     if let Some(object) = super::syntax::member_object(expression) {
         return origin(object, oracle, depth + 1);
     }
-    if let Some(call_node) = call(expression) {
+    if let Some(call_node) = call_expression_of(expression) {
         return origin(projection(call_node)?, oracle, depth + 1);
     }
     if expression.kind() == Kind::NewExpression {
         let constructor = expression.as_new_expression();
-        if identifier(constructor.expression()).is_some_and(|ident| {
+        if identifier_of(constructor.expression()).is_some_and(|ident| {
             matches!(
                 ident.as_identifier().text(),
                 "Map" | "Set" | "WeakMap" | "WeakSet"

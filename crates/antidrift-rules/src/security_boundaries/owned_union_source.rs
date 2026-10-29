@@ -1,7 +1,7 @@
 use antidrift_kernel::local_binding::{
     Binding, is_const_variable_declaration, lookup_scope_binding, resolve_lexical_binding,
 };
-use antidrift_kernel::tsrs_kernel::is_const_assertion;
+use antidrift_kernel::tsrs_kernel::{is_const_assertion, numeric_literal_value};
 use rustc_hash::FxHashSet;
 use std::collections::{BTreeMap, BTreeSet};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -27,26 +27,16 @@ pub(super) fn literal_expression(expression: P<Node>) -> Option<OwnedLiteral> {
         Kind::StringLiteral => Some(OwnedLiteral::Text(
             expression.as_string_literal().text().to_owned(),
         )),
-        Kind::NumericLiteral => numeric_value(expression).map(number_literal),
+        Kind::NumericLiteral => numeric_literal_value(expression).map(number_literal),
         Kind::PrefixUnaryExpression => {
             let unary = expression.as_prefix_unary_expression();
             if unary.operator() != Kind::MinusToken {
                 return None;
             }
-            numeric_value(unary.operand()).map(|val| number_literal(-val))
+            numeric_literal_value(unary.operand()).map(|val| number_literal(-val))
         }
         _ => None,
     }
-}
-
-fn numeric_value(node: P<Node>) -> Option<f64> {
-    if node.kind() != Kind::NumericLiteral {
-        return None;
-    }
-    let Ok(value) = node.text().replace('_', "").parse::<f64>() else {
-        return None;
-    };
-    Some(value)
 }
 
 fn number_literal(number: f64) -> OwnedLiteral {

@@ -1,6 +1,6 @@
 use super::web_provenance::{
-    AliasStability, const_initializer, member_expression, member_object, static_property_name,
-    static_string, symbol_for, unwrap_expression,
+    AliasStability, const_initializer, member_expression, member_object, resolve_lexical_binding,
+    static_property_name, static_string, unwrap_expression,
 };
 use antidrift_kernel::local_binding::Binding;
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
@@ -118,9 +118,9 @@ fn is_web_storage(sf: P<SourceFile>, expression: P<Node>, visited: &mut Vec<Bind
     if expression.kind() == Kind::Identifier {
         let name = expression.as_identifier().text();
         if matches!(name, "localStorage" | "sessionStorage") {
-            return symbol_for(expression).is_none();
+            return resolve_lexical_binding(expression).is_none();
         }
-        let Some(symbol) = symbol_for(expression) else {
+        let Some(symbol) = resolve_lexical_binding(expression) else {
             return false;
         };
         if visited.contains(&symbol) {
@@ -143,9 +143,9 @@ fn browser_host(sf: P<SourceFile>, expression: P<Node>, visited: &mut Vec<Bindin
     if expression.kind() == Kind::Identifier {
         let name = expression.as_identifier().text();
         if matches!(name, "window" | "globalThis" | "self") {
-            return symbol_for(expression).is_none();
+            return resolve_lexical_binding(expression).is_none();
         }
-        let Some(symbol) = symbol_for(expression) else {
+        let Some(symbol) = resolve_lexical_binding(expression) else {
             return false;
         };
         if visited.contains(&symbol) {

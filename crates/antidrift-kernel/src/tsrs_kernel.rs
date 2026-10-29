@@ -493,7 +493,19 @@ pub fn numeric_literal_value(expression: P<Node>) -> Option<f64> {
     if expression.kind() != Kind::NumericLiteral {
         return None;
     }
-    let Ok(value) = expression.text().replace('_', "").parse::<f64>() else {
+    let clean = expression.as_numeric_literal().text().replace('_', "");
+    for (lower, upper, radix) in [("0x", "0X", 16), ("0o", "0O", 8), ("0b", "0B", 2)] {
+        if let Some(rest) = clean
+            .strip_prefix(lower)
+            .or_else(|| clean.strip_prefix(upper))
+        {
+            let Ok(val) = u64::from_str_radix(rest, radix) else {
+                return None;
+            };
+            return Some(val as f64);
+        }
+    }
+    let Ok(value) = clean.parse::<f64>() else {
         return None;
     };
     Some(value)

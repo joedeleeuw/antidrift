@@ -1,6 +1,9 @@
 use super::assertions::{Assertion, AssertionStyle};
 use super::block::BlockFacts;
-use super::syntax::{awaited, call, identifier, member, static_member, unwrap};
+use super::syntax::{
+    call_expression_of, identifier_of, member, static_member, unwrap_awaited_expression,
+    unwrap_expression,
+};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 
@@ -16,10 +19,10 @@ pub(super) struct ActPath {
 
 pub(super) fn member_path(expression: P<Node>) -> Option<PathReference> {
     let mut path = Vec::new();
-    let mut current = unwrap(expression);
+    let mut current = unwrap_expression(expression);
     while let Some((object, segment)) = member(current) {
         path.push(segment);
-        current = unwrap(object);
+        current = unwrap_expression(object);
     }
     if matches!(
         current.kind(),
@@ -35,13 +38,13 @@ pub(super) fn member_path(expression: P<Node>) -> Option<PathReference> {
 }
 
 pub(super) fn act_for_root(root: P<Node>, facts: &BlockFacts) -> Option<P<Node>> {
-    if let Some(call_node) = call(root) {
+    if let Some(call_node) = call_expression_of(root) {
         return Some(call_node);
     }
-    call(awaited(
+    call_expression_of(unwrap_awaited_expression(
         *facts
             .bindings
-            .get(identifier(root)?.as_identifier().text())?,
+            .get(identifier_of(root)?.as_identifier().text())?,
     ))
 }
 
@@ -58,8 +61,8 @@ pub(super) fn arranged_path(
     if depth == 0 {
         return None;
     }
-    let expression = unwrap(expression);
-    if let Some(ident) = identifier(expression) {
+    let expression = unwrap_expression(expression);
+    if let Some(ident) = identifier_of(expression) {
         if let Some(act) = arranged_act(expression, facts) {
             return Some(ActPath {
                 act,
@@ -78,7 +81,7 @@ pub(super) fn arranged_path(
         base.path.extend(reference.path);
         return Some(base);
     }
-    if let Some(call_node) = call(expression)
+    if let Some(call_node) = call_expression_of(expression)
         && let Some((object, method)) = static_member(call_node.as_call_expression().expression())
         && let Some(mut base) = arranged_path(object, facts, depth - 1)
     {
@@ -100,7 +103,7 @@ pub(super) fn outcome(expression: P<Node>, facts: &BlockFacts) -> bool {
     {
         return arranged_act(reference.root, facts).is_some();
     }
-    let Some(call_node) = call(expression) else {
+    let Some(call_node) = call_expression_of(expression) else {
         return false;
     };
     let call_expr = call_node.as_call_expression();

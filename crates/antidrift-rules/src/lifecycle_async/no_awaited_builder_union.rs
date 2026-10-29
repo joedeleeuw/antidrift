@@ -1,4 +1,4 @@
-use super::syntax::{Span, member, unwrap, without_parens};
+use super::syntax::{Span, member, unwrap_expression, unwrap_parentheses};
 use antidrift_kernel::directives::scan_source_comments;
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
@@ -60,7 +60,7 @@ impl RuleVisitor for Visitor {
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
         let argument = node.as_await_expression().expression();
-        if unwrap(argument).kind() != Kind::ConditionalExpression {
+        if unwrap_expression(argument).kind() != Kind::ConditionalExpression {
             return;
         }
         let mut branches = Vec::new();
@@ -100,7 +100,7 @@ impl RuleVisitor for Visitor {
 }
 
 fn collect_branches(expression: P<Node>, branches: &mut Vec<P<Node>>) {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     if inner.kind() == Kind::ConditionalExpression {
         let conditional = inner.as_conditional_expression();
         collect_branches(conditional.when_true(), branches);
@@ -111,7 +111,7 @@ fn collect_branches(expression: P<Node>, branches: &mut Vec<P<Node>>) {
 }
 
 fn describe_chain(expression: P<Node>) -> Option<BuilderChain> {
-    let mut current = unwrap(expression);
+    let mut current = unwrap_expression(expression);
     let mut steps = Vec::new();
     loop {
         match current.kind() {
@@ -131,23 +131,23 @@ fn describe_chain(expression: P<Node>) -> Option<BuilderChain> {
             }
             Kind::CallExpression => {
                 steps.push(ChainStep::Call);
-                current = unwrap(current.as_call_expression().expression());
+                current = unwrap_expression(current.as_call_expression().expression());
             }
             Kind::ElementAccessExpression => {
                 let computed = current.as_element_access_expression();
-                let arg = unwrap(computed.argument_expression());
+                let arg = unwrap_expression(computed.argument_expression());
                 let property = if arg.kind() == Kind::NoSubstitutionTemplateLiteral {
                     Some(arg.text().to_owned())
                 } else {
                     member(current).map(|(_, name)| name.to_owned())
                 };
                 steps.push(property.map_or(ChainStep::Computed, ChainStep::Property));
-                current = unwrap(computed.expression());
+                current = unwrap_expression(computed.expression());
             }
             _ => {
                 let (object, name) = member(current)?;
                 steps.push(ChainStep::Property(name.to_owned()));
-                current = unwrap(object);
+                current = unwrap_expression(object);
             }
         }
     }
@@ -217,7 +217,7 @@ fn builder_fix(
         return None;
     }
     let span = Span::of(ctx.file, awaited);
-    let arg_span = Span::of(ctx.file, unwrap(argument));
+    let arg_span = Span::of(ctx.file, unwrap_expression(argument));
     let await_end = span.start + 5;
     let source_text = ctx.file.text();
     if scan_source_comments(source_text)
@@ -237,7 +237,7 @@ fn builder_fix(
     let removal_end = await_end.checked_add(whitespace_length)?;
     let mut edits = vec![(span.start, removal_end, "")];
     edits.extend(branches.iter().map(|&branch| {
-        let start = Span::of(ctx.file, without_parens(branch)).start;
+        let start = Span::of(ctx.file, unwrap_parentheses(branch)).start;
         (start, start, "await ")
     }));
     Some(edits)

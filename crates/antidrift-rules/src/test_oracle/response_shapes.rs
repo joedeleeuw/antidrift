@@ -3,7 +3,8 @@ use super::bindings::{Callback, Oracle};
 use super::block::BlockFacts;
 use super::literals::template_text;
 use super::syntax::{
-    argument, awaited, call, identifier, numeric_value, object_property, static_member,
+    argument, call_expression_of, identifier_of, numeric_literal_value, object_property,
+    static_member, unwrap_awaited_expression,
 };
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -28,10 +29,10 @@ pub(super) fn resolve(
     if depth > 8 {
         return None;
     }
-    let expression = awaited(expression);
+    let expression = unwrap_awaited_expression(expression);
     let shape = match expression.kind() {
         Kind::StringLiteral => Shape::String(expression.as_string_literal().text().to_owned()),
-        Kind::NumericLiteral => Shape::Number(numeric_value(expression)?.to_bits()),
+        Kind::NumericLiteral => Shape::Number(numeric_literal_value(expression)?.to_bits()),
         Kind::TrueKeyword => Shape::Boolean(true),
         Kind::FalseKeyword => Shape::Boolean(false),
         Kind::NullKeyword => Shape::Null,
@@ -87,10 +88,10 @@ fn shape_factory(
     oracle: &Oracle,
     depth: usize,
 ) -> Option<(Shape, bool)> {
-    let call_node = call(expression)?;
+    let call_node = call_expression_of(expression)?;
     let (object, method) = static_member(call_node.as_call_expression().expression())?;
     if !matches!(method.as_str(), "arrayContaining" | "objectContaining")
-        || identifier(object)?.as_identifier().text() != "expect"
+        || identifier_of(object)?.as_identifier().text() != "expect"
     {
         return None;
     }
@@ -161,14 +162,14 @@ fn response_json(expression: P<Node>, callback: Callback, oracle: &Oracle, depth
     if depth > 8 {
         return false;
     }
-    let expression = awaited(expression);
-    if call(expression).is_some_and(|call_node| {
+    let expression = unwrap_awaited_expression(expression);
+    if call_expression_of(expression).is_some_and(|call_node| {
         static_member(call_node.as_call_expression().expression())
             .is_some_and(|(_, method)| method == "json")
     }) {
         return true;
     }
-    if identifier(expression).is_some() {
+    if identifier_of(expression).is_some() {
         return oracle
             .local_initializer(expression, callback)
             .is_some_and(|initializer| response_json(initializer, callback, oracle, depth + 1));

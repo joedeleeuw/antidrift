@@ -1,5 +1,7 @@
 use super::bindings::Callback;
-use super::syntax::{argument, call, identifier, static_member, unwrap};
+use super::syntax::{
+    argument, call_expression_of, identifier_of, static_member, unwrap_expression,
+};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -28,23 +30,23 @@ impl Assertion {
     fn expect(node: P<Node>) -> Option<Self> {
         let call_expr = node.as_call_expression();
         let (receiver, method) = static_member(call_expr.expression())?;
-        let mut current = unwrap(receiver);
+        let mut current = unwrap_expression(receiver);
         let mut modifiers = FxHashSet::default();
         while let Some((object, modifier)) = static_member(current) {
             modifiers.insert(modifier);
-            current = unwrap(object);
+            current = unwrap_expression(object);
         }
-        let expect_call = call(current)?;
+        let expect_call = call_expression_of(current)?;
         let expect_callee = expect_call.as_call_expression().expression();
         let expect_owner = static_member(expect_callee).map_or(expect_callee, |(object, _)| object);
-        if identifier(expect_owner)?.as_identifier().text() != "expect" {
+        if identifier_of(expect_owner)?.as_identifier().text() != "expect" {
             return None;
         }
         Some(Self {
             call: node,
             style: AssertionStyle::Expect,
             method,
-            subject: argument(expect_call, 0).map(unwrap),
+            subject: argument(expect_call, 0).map(unwrap_expression),
             expected: call_expr
                 .arguments()
                 .nodes()
@@ -62,14 +64,14 @@ impl Assertion {
         let callee = call_expr.expression();
         let (owner, method) =
             static_member(callee).unwrap_or_else(|| (callee, "assert".to_owned()));
-        if identifier(owner)?.as_identifier().text() != "assert" {
+        if identifier_of(owner)?.as_identifier().text() != "assert" {
             return None;
         }
         Some(Self {
             call: node,
             style: AssertionStyle::Assert,
             method,
-            subject: argument(node, 0).map(unwrap),
+            subject: argument(node, 0).map(unwrap_expression),
             expected: call_expr
                 .arguments()
                 .nodes()
@@ -107,7 +109,7 @@ pub(super) fn equality_method(name: &str) -> bool {
 }
 
 pub(super) fn test_callee(expression: P<Node>, specify: bool) -> bool {
-    if let Some(ident) = identifier(expression) {
+    if let Some(ident) = identifier_of(expression) {
         let name = ident.as_identifier().text();
         return matches!(name, "fit" | "it" | "test" | "xit" | "xtest")
             || (specify && name == "specify");
@@ -115,7 +117,7 @@ pub(super) fn test_callee(expression: P<Node>, specify: bool) -> bool {
     if let Some((object, _)) = static_member(expression) {
         return test_callee(object, specify);
     }
-    call(expression)
+    call_expression_of(expression)
         .is_some_and(|call_node| test_callee(call_node.as_call_expression().expression(), specify))
 }
 
@@ -134,13 +136,13 @@ pub(super) fn test_callback(call_node: P<Node>) -> Option<Callback> {
 }
 
 fn predicate(expression: P<Node>) -> bool {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     if inner.kind() == Kind::BinaryExpression
         && inner.as_binary_expression().operator_token().kind() == Kind::InKeyword
     {
         return true;
     }
-    let Some(call_node) = call(inner) else {
+    let Some(call_node) = call_expression_of(inner) else {
         return false;
     };
     let Some((object, method)) = static_member(call_node.as_call_expression().expression()) else {
@@ -148,7 +150,7 @@ fn predicate(expression: P<Node>) -> bool {
     };
     match method.as_str() {
         "includes" | "hasOwnProperty" => true,
-        "hasOwn" => identifier(object).is_some_and(|id| id.as_identifier().text() == "Object"),
+        "hasOwn" => identifier_of(object).is_some_and(|id| id.as_identifier().text() == "Object"),
         "some" => argument(call_node, 0)
             .and_then(Callback::from_expression)
             .is_some_and(|callback| {
@@ -171,7 +173,7 @@ fn is_boolean_literal(node: P<Node>) -> bool {
 pub(super) fn is_membership(node: P<Node>) -> bool {
     let call_expr = node.as_call_expression();
     let callee = call_expr.expression();
-    let name = identifier(callee)
+    let name = identifier_of(callee)
         .map(|id| id.as_identifier().text().to_owned())
         .or_else(|| static_member(callee).map(|(_, name)| name));
     let subject = argument(node, 0);
@@ -182,7 +184,7 @@ pub(super) fn is_membership(node: P<Node>) -> bool {
         {
             return true;
         }
-        let inner_subj = unwrap(subject);
+        let inner_subj = unwrap_expression(subject);
         let negated = inner_subj.kind() == Kind::PrefixUnaryExpression
             && inner_subj.as_prefix_unary_expression().operator() == Kind::ExclamationToken
             && predicate(inner_subj.as_prefix_unary_expression().operand());

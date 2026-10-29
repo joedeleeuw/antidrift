@@ -1,6 +1,7 @@
 use super::syntax::{
-    Binding, binding_property, const_initializer, global, object_property, owner, property,
-    property_name, root_identifier, symbol, symbol_is_mutated, unwrap,
+    Binding, binding_property, const_binding_initializer, global, is_binding_mutated,
+    object_property, owner, property, property_name, resolve_lexical_binding, root_identifier,
+    unwrap_expression,
 };
 use antidrift_kernel::local_binding::is_identifier_reference_position;
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
@@ -161,18 +162,18 @@ fn resolve_function(
     expression: P<Node>,
     visited: &mut FxHashSet<Binding>,
 ) -> Option<P<Node>> {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::FunctionExpression | Kind::ArrowFunction => Some(inner),
         Kind::Identifier => {
-            let binding = symbol(inner)?;
-            if !visited.insert(binding) || symbol_is_mutated(root, binding) {
+            let binding = resolve_lexical_binding(inner)?;
+            if !visited.insert(binding) || is_binding_mutated(root, binding) {
                 return None;
             }
             if binding.decl.kind() == Kind::FunctionDeclaration {
                 return Some(binding.decl);
             }
-            resolve_function(root, const_initializer(binding)?, visited)
+            resolve_function(root, const_binding_initializer(binding)?, visited)
         }
         _ => None,
     }
@@ -198,7 +199,7 @@ fn network_kind(callee: P<Node>, api_module: Option<&str>) -> Option<NetworkKind
     if global(callee, "fetch") {
         return Some(NetworkKind::Fetch);
     }
-    let inner = unwrap(callee);
+    let inner = unwrap_expression(callee);
     if inner.kind() != Kind::PropertyAccessExpression {
         return None;
     }
@@ -218,7 +219,7 @@ fn network_kind(callee: P<Node>, api_module: Option<&str>) -> Option<NetworkKind
     if !["get", "post", "put", "patch", "delete", "head"].contains(&method) {
         return None;
     }
-    let binding = symbol(root_identifier(access.expression())?)?;
+    let binding = resolve_lexical_binding(root_identifier(access.expression())?)?;
     if binding.decl.kind() != Kind::ImportSpecifier {
         return None;
     }

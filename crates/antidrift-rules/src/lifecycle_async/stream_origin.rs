@@ -1,6 +1,7 @@
 use super::syntax::{
-    Binding, binding_property, const_initializer, declaration, global, identifier, is_const_decl,
-    member, symbol, unwrap,
+    Binding, binding_property, const_binding_initializer, enclosing_variable_declaration, global,
+    identifier_of, is_const_variable_declaration, member, resolve_lexical_binding,
+    unwrap_expression,
 };
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -57,7 +58,7 @@ fn named_type(annotation: P<Node>, expected: StreamType) -> bool {
             let type_name = annotation.as_type_reference_node().type_name();
             ast::is_identifier(type_name)
                 && type_name.as_identifier().text() == expected.name()
-                && symbol(type_name).is_none()
+                && resolve_lexical_binding(type_name).is_none()
         }
         _ => false,
     }
@@ -73,7 +74,7 @@ fn binding_type(binding: Binding, expected: StreamType) -> bool {
 }
 
 fn constructor(expression: P<Node>, expected: StreamType) -> bool {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     if inner.kind() != Kind::NewExpression {
         return false;
     }
@@ -91,13 +92,13 @@ pub(super) fn global_host(expression: P<Node>, name: &str) -> bool {
 }
 
 fn has_origin(expression: P<Node>, expected: StreamType, visited: &mut FxHashSet<Binding>) -> bool {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     if constructor(inner, expected) {
         return true;
     }
     match (expected, inner.kind()) {
         (StreamType::Response, Kind::AwaitExpression) => {
-            let arg = unwrap(inner.as_await_expression().expression());
+            let arg = unwrap_expression(inner.as_await_expression().expression());
             return arg.kind() == Kind::CallExpression
                 && global_host(arg.as_call_expression().expression(), "fetch");
         }
@@ -118,10 +119,10 @@ fn has_origin(expression: P<Node>, expected: StreamType, visited: &mut FxHashSet
         }
         _ => {}
     }
-    let Some(ident) = identifier(inner) else {
+    let Some(ident) = identifier_of(inner) else {
         return false;
     };
-    let Some(binding) = symbol(ident) else {
+    let Some(binding) = resolve_lexical_binding(ident) else {
         return false;
     };
     if !visited.insert(binding) {
@@ -133,14 +134,15 @@ fn has_origin(expression: P<Node>, expected: StreamType, visited: &mut FxHashSet
     if matches!(expected, StreamType::ReadableStream) && destructured_body(binding) {
         return true;
     }
-    const_initializer(binding).is_some_and(|initializer| has_origin(initializer, expected, visited))
+    const_binding_initializer(binding)
+        .is_some_and(|initializer| has_origin(initializer, expected, visited))
 }
 
 fn destructured_body(binding: Binding) -> bool {
-    let Some(decl) = declaration(binding) else {
+    let Some(decl) = enclosing_variable_declaration(binding) else {
         return false;
     };
-    if !is_const_decl(decl) {
+    if !is_const_variable_declaration(decl) {
         return false;
     }
     let Some(pattern) = decl.name() else {
@@ -172,12 +174,12 @@ fn destructured_body(binding: Binding) -> bool {
 }
 
 pub(super) fn canonical(expression: P<Node>) -> Option<Binding> {
-    let mut binding = symbol(identifier(expression)?)?;
+    let mut binding = resolve_lexical_binding(identifier_of(expression)?)?;
     let mut visited = FxHashSet::default();
     while visited.insert(binding) {
-        let Some(aliased) = const_initializer(binding)
-            .and_then(identifier)
-            .and_then(symbol)
+        let Some(aliased) = const_binding_initializer(binding)
+            .and_then(identifier_of)
+            .and_then(resolve_lexical_binding)
         else {
             break;
         };

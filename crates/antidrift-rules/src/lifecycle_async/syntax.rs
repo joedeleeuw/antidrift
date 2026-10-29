@@ -1,20 +1,18 @@
 pub(super) use antidrift_kernel::local_binding::{
-    Binding, binding_for_declarator, collect_binding_references as references_to,
-    const_binding_initializer as const_initializer, enclosing_variable_declaration as declaration,
-    is_binding_mutated as symbol_is_mutated, is_const_variable_declaration as is_const_decl,
-    is_let_variable_declaration as is_let_decl, is_var_variable_declaration as is_var_decl,
-    is_write_reference, resolve_lexical_binding as symbol,
+    Binding, binding_for_declarator, collect_binding_references, const_binding_initializer,
+    enclosing_variable_declaration, is_binding_mutated, is_const_variable_declaration,
+    is_let_variable_declaration, is_var_variable_declaration, is_write_reference,
+    resolve_lexical_binding,
 };
 pub(super) use antidrift_kernel::tsrs_kernel::{
-    Span, call_expression_of as call_expression, identifier_of as identifier,
-    is_function_like as is_function, unwrap_expression as unwrap,
-    unwrap_parentheses as without_parens,
+    Span, call_expression_of, identifier_of, is_function_like, unwrap_expression,
+    unwrap_parentheses,
 };
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 
 pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, &'static str)> {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::PropertyAccessExpression => {
             let access = inner.as_property_access_expression();
@@ -30,7 +28,7 @@ pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, &'static str)> {
         }
         Kind::ElementAccessExpression => {
             let access = inner.as_element_access_expression();
-            let arg = unwrap(access.argument_expression());
+            let arg = unwrap_expression(access.argument_expression());
             if ast::is_string_literal(arg) {
                 Some((access.expression(), arg.as_string_literal().text()))
             } else {
@@ -42,7 +40,7 @@ pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, &'static str)> {
 }
 
 pub(super) fn identifier_member(expression: P<Node>) -> Option<(P<Node>, &'static str)> {
-    let inner = without_parens(expression);
+    let inner = unwrap_parentheses(expression);
     match inner.kind() {
         Kind::PropertyAccessExpression => {
             let access = inner.as_property_access_expression();
@@ -52,7 +50,7 @@ pub(super) fn identifier_member(expression: P<Node>) -> Option<(P<Node>, &'stati
         }
         Kind::ElementAccessExpression => {
             let access = inner.as_element_access_expression();
-            let arg = without_parens(access.argument_expression());
+            let arg = unwrap_parentheses(access.argument_expression());
             ast::is_identifier(arg).then(|| (access.expression(), arg.as_identifier().text()))
         }
         _ => None,
@@ -64,7 +62,7 @@ pub(super) fn property_name(key: P<Node>) -> Option<&'static str> {
         Kind::Identifier => Some(key.as_identifier().text()),
         Kind::StringLiteral => Some(key.as_string_literal().text()),
         Kind::ComputedPropertyName => {
-            let expr = without_parens(key.as_computed_property_name().expression());
+            let expr = unwrap_parentheses(key.as_computed_property_name().expression());
             match expr.kind() {
                 Kind::Identifier => Some(expr.as_identifier().text()),
                 Kind::StringLiteral => Some(expr.as_string_literal().text()),
@@ -110,7 +108,7 @@ pub(super) fn binding_property(elem: P<Node>) -> Option<(&'static str, P<Node>)>
 }
 
 pub(super) fn property(expression: P<Node>, name: &str) -> Option<P<Node>> {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     if inner.kind() != Kind::ObjectLiteralExpression {
         return None;
     }
@@ -125,14 +123,15 @@ pub(super) fn property(expression: P<Node>, name: &str) -> Option<P<Node>> {
 }
 
 pub(super) fn global(expression: P<Node>, name: &str) -> bool {
-    identifier(expression)
-        .is_some_and(|ident| ident.as_identifier().text() == name && symbol(ident).is_none())
+    identifier_of(expression).is_some_and(|ident| {
+        ident.as_identifier().text() == name && resolve_lexical_binding(ident).is_none()
+    })
 }
 
 pub(super) fn owner(node: P<Node>) -> P<Node> {
     let mut cursor = node.parent();
     while let Some(ancestor) = cursor {
-        if is_function(ancestor) || ancestor.kind() == Kind::SourceFile {
+        if is_function_like(ancestor) || ancestor.kind() == Kind::SourceFile {
             return ancestor;
         }
         cursor = ancestor.parent();
@@ -160,7 +159,7 @@ pub(super) fn parent_expression(node: P<Node>) -> P<Node> {
 }
 
 pub(super) fn root_identifier(expression: P<Node>) -> Option<P<Node>> {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::Identifier => Some(inner),
         Kind::PropertyAccessExpression => {

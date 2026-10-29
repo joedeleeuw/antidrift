@@ -1,7 +1,8 @@
 use super::require_stream_reader_disposal::ReaderAnalysis;
 use super::syntax::{
-    Span, binding_property, declaration, identifier, is_const_decl, is_function, member, symbol,
-    symbol_is_mutated, unwrap,
+    Span, binding_property, enclosing_variable_declaration, identifier_of, is_binding_mutated,
+    is_const_variable_declaration, is_function_like, member, resolve_lexical_binding,
+    unwrap_expression,
 };
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -83,7 +84,7 @@ impl ReaderAnalysis {
     fn nearest_loop(&self, node: P<Node>, boundary: Span) -> Option<P<Node>> {
         let mut cursor = node.parent();
         while let Some(ancestor) = cursor {
-            if Span::of(self.sf, ancestor) == boundary || is_function(ancestor) {
+            if Span::of(self.sf, ancestor) == boundary || is_function_like(ancestor) {
                 return None;
             }
             if is_loop(ancestor) {
@@ -134,7 +135,7 @@ impl ReaderAnalysis {
         let mut child = node;
         let mut cursor = node.parent();
         while let Some(ancestor) = cursor {
-            if is_function(ancestor) {
+            if is_function_like(ancestor) {
                 break;
             }
             if ancestor.kind() == Kind::IfStatement && self.if_branch_done_guarded(ancestor, child)
@@ -154,8 +155,8 @@ impl ReaderAnalysis {
     }
 
     fn done_guard(&self, expression: P<Node>) -> bool {
-        let inner = unwrap(expression);
-        if identifier(inner).is_some() {
+        let inner = unwrap_expression(expression);
+        if identifier_of(inner).is_some() {
             return self.read_result(inner) == Some(ReadResult::Complete);
         }
         if let Some((object, "done")) = member(inner) {
@@ -173,18 +174,18 @@ impl ReaderAnalysis {
     }
 
     fn read_result(&self, expression: P<Node>) -> Option<ReadResult> {
-        let ident = identifier(expression)?;
-        let binding = symbol(ident)?;
-        if symbol_is_mutated(self.sf.as_node(), binding) {
+        let ident = identifier_of(expression)?;
+        let binding = resolve_lexical_binding(ident)?;
+        if is_binding_mutated(self.sf.as_node(), binding) {
             return None;
         }
-        let decl = declaration(binding)?;
-        if !is_const_decl(decl) {
+        let decl = enclosing_variable_declaration(binding)?;
+        if !is_const_variable_declaration(decl) {
             return None;
         }
-        let mut initializer = unwrap(decl.as_variable_declaration().initializer()?);
+        let mut initializer = unwrap_expression(decl.as_variable_declaration().initializer()?);
         if initializer.kind() == Kind::AwaitExpression {
-            initializer = unwrap(initializer.as_await_expression().expression());
+            initializer = unwrap_expression(initializer.as_await_expression().expression());
         }
         if !self.method(initializer, "read") {
             return None;
@@ -217,7 +218,7 @@ impl ReaderAnalysis {
         let label = node.as_break_statement().label();
         let mut cursor = node.parent();
         while let Some(ancestor) = cursor {
-            if is_function(ancestor) {
+            if is_function_like(ancestor) {
                 return false;
             }
             let target = if let Some(label) = label {
@@ -262,5 +263,5 @@ fn infinite(node: P<Node>) -> bool {
 }
 
 fn literal_true(expression: P<Node>) -> bool {
-    unwrap(expression).kind() == Kind::TrueKeyword
+    unwrap_expression(expression).kind() == Kind::TrueKeyword
 }

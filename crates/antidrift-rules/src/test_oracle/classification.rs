@@ -4,7 +4,9 @@ use super::bindings::{Callback, Oracle};
 use super::block::BlockFacts;
 use super::literals;
 use super::paths::{PathReference, act_for_root, arranged_path, member_path, outcome};
-use super::syntax::{call, identifier, literal_container, static_member, unwrap};
+use super::syntax::{
+    call_expression_of, identifier_of, literal_container, static_member, unwrap_expression,
+};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 
@@ -43,7 +45,7 @@ fn classified(finding: Option<Finding>) -> Classification {
 }
 
 fn arranged_parse(expression: P<Node>) -> bool {
-    call(expression).is_some_and(|call_node| {
+    call_expression_of(expression).is_some_and(|call_node| {
         let call_expr = call_node.as_call_expression();
         !call_expr.arguments().nodes().is_empty()
             && static_member(call_expr.expression())
@@ -106,16 +108,16 @@ pub(super) fn error_shape(record: &Assertion, facts: &BlockFacts, oracle: &Oracl
             .iter()
             .copied()
             .filter(|arg| arg.kind() != Kind::SpreadElement)
-            .any(|argument| identifier(argument).is_some() || literal_container(argument))
+            .any(|argument| identifier_of(argument).is_some() || literal_container(argument))
 }
 
 fn outcome_echo(record: &Assertion, facts: &BlockFacts) -> Option<Finding> {
     if record.style == AssertionStyle::Assert && matches!(record.method.as_str(), "ok" | "assert") {
-        let inner = unwrap(record.subject?);
+        let inner = unwrap_expression(record.subject?);
         let target = if inner.kind() == Kind::PrefixUnaryExpression
             && inner.as_prefix_unary_expression().operator() == Kind::ExclamationToken
         {
-            unwrap(inner.as_prefix_unary_expression().operand())
+            unwrap_expression(inner.as_prefix_unary_expression().operand())
         } else {
             inner
         };
@@ -123,7 +125,7 @@ fn outcome_echo(record: &Assertion, facts: &BlockFacts) -> Option<Finding> {
     }
     let (actual, expected) = record.equality()?;
     (matches!(
-        unwrap(expected).kind(),
+        unwrap_expression(expected).kind(),
         Kind::TrueKeyword | Kind::FalseKeyword
     ) && outcome(actual, facts))
     .then_some(Finding::OutcomeEcho)
@@ -133,7 +135,8 @@ fn input_echo(record: &Assertion, facts: &BlockFacts, oracle: &Oracle) -> Option
     let (actual, expected) = record.equality()?;
     let reference = member_path(actual)?;
     let act = act_for_root(reference.root, facts)?;
-    echoes_argument(&reference, unwrap(expected), act, oracle).then_some(Finding::InputEcho)
+    echoes_argument(&reference, unwrap_expression(expected), act, oracle)
+        .then_some(Finding::InputEcho)
 }
 
 fn echoes_argument(
@@ -147,11 +150,11 @@ fn echoes_argument(
         .iter()
         .copied()
         .filter(|arg| arg.kind() != Kind::SpreadElement)
-        .filter_map(identifier)
+        .filter_map(identifier_of)
         .map(|ident| ident.as_identifier().text())
         .collect();
     if reference.path.is_empty()
-        && identifier(expected)
+        && identifier_of(expected)
             .is_some_and(|ident| argument_names.contains(&ident.as_identifier().text()))
     {
         return true;
@@ -159,7 +162,7 @@ fn echoes_argument(
     if let Some(expected_path) = member_path(expected)
         && !expected_path.path.is_empty()
         && expected_path.path == reference.path
-        && identifier(expected_path.root)
+        && identifier_of(expected_path.root)
             .is_some_and(|ident| argument_names.contains(&ident.as_identifier().text()))
     {
         return true;
@@ -171,7 +174,7 @@ fn echoes_argument(
         !props.is_empty()
             && props.iter().all(|&prop| {
                 prop.kind() == Kind::SpreadAssignment
-                    && identifier(prop.as_spread_assignment().expression())
+                    && identifier_of(prop.as_spread_assignment().expression())
                         .is_some_and(|ident| argument_names.contains(&ident.as_identifier().text()))
             })
     } else {
@@ -233,7 +236,7 @@ fn mock_echo(record: &Assertion, facts: &BlockFacts) -> Option<Finding> {
         .copied()
         .skip(skip)
         .any(|argument| {
-            if let Some(ident) = identifier(argument) {
+            if let Some(ident) = identifier_of(argument) {
                 return facts.argument_names.contains(ident.as_identifier().text());
             }
             facts

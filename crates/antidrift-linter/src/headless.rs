@@ -50,16 +50,20 @@ fn parse_headless_flags(args: &[String]) -> Result<Options, String> {
                     Some(val) => val,
                     None => {
                         idx += 1;
-                        args.get(idx).cloned().unwrap_or_default()
+                        args.get(idx)
+                            .cloned()
+                            .ok_or_else(|| "flag needs an argument: -debug".to_owned())?
                     }
                 };
                 apply_debug_flag(&raw, &mut opts)?;
             }
-            "trace" | "cpuprof" | "heap" | "allocs" => {
-                if value.is_none() {
-                    idx += 1;
+            "trace" | "cpuprof" | "heap" | "allocs" if value.is_none() => {
+                idx += 1;
+                if idx >= args.len() {
+                    return Err(format!("flag needs an argument: -{name}"));
                 }
             }
+            "trace" | "cpuprof" | "heap" | "allocs" => {}
             other => return Err(format!("flag provided but not defined: -{other}")),
         }
         idx += 1;

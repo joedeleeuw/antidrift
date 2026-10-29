@@ -1,13 +1,12 @@
 pub(super) use antidrift_kernel::tsrs_kernel::{
-    Span, call_expression_of as call, identifier_of as identifier, is_test_or_spec_file,
-    numeric_literal_value as numeric_value, unwrap_awaited_expression as awaited,
-    unwrap_expression as unwrap,
+    Span, call_expression_of, identifier_of, is_test_or_spec_file, numeric_literal_value,
+    unwrap_awaited_expression, unwrap_expression,
 };
 use tsrs_ast::{Kind, Node, SourceFile};
 use tsrs_core::P;
 
 pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, String)> {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::PropertyAccessExpression => {
             let access = inner.as_property_access_expression();
@@ -32,7 +31,7 @@ pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, String)> {
 }
 
 pub(super) fn member_object(expression: P<Node>) -> Option<P<Node>> {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     match inner.kind() {
         Kind::PropertyAccessExpression => Some(inner.as_property_access_expression().expression()),
         Kind::ElementAccessExpression => Some(inner.as_element_access_expression().expression()),
@@ -42,9 +41,9 @@ pub(super) fn member_object(expression: P<Node>) -> Option<P<Node>> {
 
 pub(super) fn static_member(expression: P<Node>) -> Option<(P<Node>, String)> {
     let pair = member(expression)?;
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     let numeric = inner.kind() == Kind::ElementAccessExpression
-        && unwrap(inner.as_element_access_expression().argument_expression()).kind()
+        && unwrap_expression(inner.as_element_access_expression().argument_expression()).kind()
             == Kind::NumericLiteral;
     (!numeric).then_some(pair)
 }
@@ -52,7 +51,7 @@ pub(super) fn static_member(expression: P<Node>) -> Option<(P<Node>, String)> {
 pub(super) fn segment(expression: P<Node>) -> Option<String> {
     match expression.kind() {
         Kind::StringLiteral => Some(expression.as_string_literal().text().to_owned()),
-        Kind::NumericLiteral => numeric_value(expression).map(|val| val.to_string()),
+        Kind::NumericLiteral => numeric_literal_value(expression).map(|val| val.to_string()),
         _ => None,
     }
 }
@@ -80,12 +79,12 @@ pub(super) fn property_name(key: P<Node>, computed: bool) -> Option<String> {
     match key.kind() {
         Kind::Identifier if !computed => Some(key.as_identifier().text().to_owned()),
         Kind::StringLiteral => Some(key.as_string_literal().text().to_owned()),
-        Kind::NumericLiteral => numeric_value(key).map(|val| val.to_string()),
+        Kind::NumericLiteral => numeric_literal_value(key).map(|val| val.to_string()),
         Kind::ComputedPropertyName => {
             let inner = key.as_computed_property_name().expression();
             match inner.kind() {
                 Kind::StringLiteral => Some(inner.as_string_literal().text().to_owned()),
-                Kind::NumericLiteral => numeric_value(inner).map(|val| val.to_string()),
+                Kind::NumericLiteral => numeric_literal_value(inner).map(|val| val.to_string()),
                 _ => None,
             }
         }
@@ -103,7 +102,7 @@ pub(super) fn argument(call_node: P<Node>, index: usize) -> Option<P<Node>> {
 }
 
 pub(super) fn root_identifier(expression: P<Node>) -> Option<P<Node>> {
-    let expression = awaited(expression);
+    let expression = unwrap_awaited_expression(expression);
     if let Some((object, _)) = member(expression) {
         return root_identifier(object);
     }
@@ -114,13 +113,13 @@ pub(super) fn root_identifier(expression: P<Node>) -> Option<P<Node>> {
         Kind::ElementAccessExpression => {
             root_identifier(expression.as_element_access_expression().expression())
         }
-        _ => identifier(expression),
+        _ => identifier_of(expression),
     }
 }
 
 pub(super) fn literal_container(expression: P<Node>) -> bool {
     matches!(
-        unwrap(expression).kind(),
+        unwrap_expression(expression).kind(),
         Kind::ObjectLiteralExpression
             | Kind::ArrayLiteralExpression
             | Kind::StringLiteral
@@ -136,7 +135,7 @@ pub(super) fn literal_container(expression: P<Node>) -> bool {
 }
 
 pub(super) fn literal(expression: P<Node>) -> bool {
-    let inner = unwrap(expression);
+    let inner = unwrap_expression(expression);
     literal_container(inner)
         && !matches!(
             inner.kind(),

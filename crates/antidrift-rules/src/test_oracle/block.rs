@@ -4,7 +4,7 @@ use super::bindings::{Callback, Oracle};
 use super::classification;
 use super::lengths;
 use super::response_shapes::{self, Shape};
-use super::syntax::{Span, identifier, literal_container, unwrap};
+use super::syntax::{Span, identifier_of, literal_container, unwrap_expression};
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -70,8 +70,8 @@ impl BlockFacts {
     }
 
     fn collect_argument(&mut self, argument: P<Node>) {
-        let expression = unwrap(argument);
-        if let Some(ident) = identifier(expression) {
+        let expression = unwrap_expression(argument);
+        if let Some(ident) = identifier_of(expression) {
             self.argument_names.insert(ident.as_identifier().text());
         } else if literal_container(expression) {
             self.argument_literals.push(expression);
