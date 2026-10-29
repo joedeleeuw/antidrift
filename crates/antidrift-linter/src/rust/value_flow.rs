@@ -104,7 +104,7 @@ impl ValueFlow<'_, '_> {
             let origin = if is_value_type(&typed.ty) {
                 Origin::Untyped
             } else {
-                Origin::Unknown
+                Origin::Typed
             };
             self.bindings.bind(&typed.pat, origin);
         }
@@ -115,7 +115,7 @@ impl ValueFlow<'_, '_> {
         matches!(
             self.origin(expr),
             Origin::Untyped | Origin::Serialized(Representation::Value)
-        ) || matches!(expr, Expr::Index(_))
+        ) || matches!(expr, Expr::Index(index) if !matches!(self.origin(&index.expr), Origin::Typed))
             || matches!(expr, Expr::MethodCall(call) if self.probe_is_untyped(&call.receiver))
     }
 }
@@ -180,7 +180,7 @@ impl<'ast> Visit<'ast> for ValueFlow<'_, 'ast> {
         visit::visit_local(self, node);
         let origin = match &node.pat {
             Pat::Type(typed) if is_value_type(&typed.ty) => Origin::Untyped,
-            Pat::Type(typed) if !matches!(&*typed.ty, Type::Infer(_)) => Origin::Unknown,
+            Pat::Type(typed) if !matches!(&*typed.ty, Type::Infer(_)) => Origin::Typed,
             _ => node
                 .init
                 .as_ref()

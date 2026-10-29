@@ -1022,6 +1022,8 @@ try {
       '    let _ = h.ident.to_string() == "foo";',
       '    if let Ok(text) = std::fs::read_to_string("foo.txt") { let _ = text.len(); }',
       '    let _ = std::fs::read_to_string("bar.txt").unwrap_or_default();',
+      "    let raw_json = serde_json::to_string(&h.ident).unwrap();",
+      "    let _ = serde_json::from_str::<LooseConfig>(&raw_json);",
       "    let _ = h.ident.to_string().parse::<u32>();",
       "    let _ = serde_json::from_str::<LooseConfig>(&h.ident).ok();",
       "    match legacy_adapter(&h.ident) { Ok(_) => true, Err(_) => false }",
@@ -1096,6 +1098,7 @@ try {
   }
   for (const expectedMessage of [
     'collapsed into "" via fallback',
+    "Do not serialize and deserialize the same value",
     "Blocking 'std::thread::sleep' inside async fn",
     "Nested '.find(...)' performs an O(N*M)",
   ]) {
@@ -1106,6 +1109,19 @@ try {
       `Expected antidrift-linter rust diagnostics to include '${expectedMessage}', got ${JSON.stringify(rustDiags)}`
     );
   }
+  const singleRsRun = spawnSync(
+    binaryPath,
+    ["rust", "crates/antidrift-linter/src/main.rs"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }
+  );
+  assert.equal(
+    singleRsRun.status,
+    0,
+    `Expected single-file rust target to exit 0, got ${singleRsRun.status}: ${singleRsRun.stderr}`
+  );
 } finally {
   rmSync(tempWorkspace, { recursive: true, force: true });
 }

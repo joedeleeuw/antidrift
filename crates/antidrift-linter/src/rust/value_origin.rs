@@ -23,6 +23,7 @@ pub(super) enum Representation {
 pub(super) enum Origin {
     #[default]
     Unknown,
+    Typed,
     Untyped,
     Serialized(Representation),
 }
@@ -31,6 +32,7 @@ impl Origin {
     fn after_mutation(self) -> Self {
         match self {
             Self::Untyped | Self::Serialized(Representation::Value) => Self::Untyped,
+            Self::Typed => Self::Typed,
             _ => Self::Unknown,
         }
     }
@@ -136,12 +138,12 @@ pub(super) fn serde_representation(call: &ExprCall, encode: bool) -> Option<Repr
         return None;
     };
     let operation = &callee.path.segments.last()?.ident;
-    let qualified = callee.path.segments.iter().rev().nth(1).is_some_and(|seg| {
+    let qualified = callee.path.segments.iter().any(|seg| {
         ["serde_json", "toml", "serde_yaml", "yaml_serde"]
             .iter()
             .any(|name| seg.ident == *name)
     });
-    if !qualified && !matches!(operation.to_string().as_str(), "to_value" | "from_value") {
+    if !qualified {
         return None;
     }
     let operations: &[(&[&str], Representation)] = if encode {

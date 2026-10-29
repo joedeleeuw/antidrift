@@ -28,11 +28,27 @@ pub(super) fn check_workspace_root(
             .extension()
             .is_some_and(|extension| extension == "rs")
     {
-        let enclosing = root_ref
+        if let Some(crate_dir) = root_ref
             .ancestors()
             .skip(1)
-            .find(|directory| directory.join("Cargo.toml").is_file());
-        let display_root = enclosing.unwrap_or_else(|| root_ref.parent().unwrap_or(Path::new(".")));
+            .find(|directory| directory.join("Cargo.toml").is_file())
+        {
+            let workspace_dir = crate_dir
+                .ancestors()
+                .skip(1)
+                .find(|directory| directory.join("Cargo.toml").is_file())
+                .unwrap_or(crate_dir);
+            let target_rel = relative_display(workspace_dir, root_ref);
+            let mut crate_diags = Vec::new();
+            check_crate_dir(workspace_dir, crate_dir, &mut crate_diags)?;
+            diagnostics.extend(
+                crate_diags
+                    .into_iter()
+                    .filter(|diag| diag.file == target_rel),
+            );
+            return Ok(1);
+        }
+        let display_root = root_ref.parent().unwrap_or(Path::new("."));
         check_source_file(display_root, root_ref, diagnostics)?;
         return Ok(1);
     }

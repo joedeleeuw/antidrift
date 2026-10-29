@@ -20,15 +20,19 @@ export function resolveNativeLinterBinary(cwd = process.cwd()) {
   if (process.env.ANTIDRIFT_LINTER_BIN) {
     return process.env.ANTIDRIFT_LINTER_BIN;
   }
-  const candidates = [
+  const localCandidates = [
+    resolve(cwd, "target/debug/antidrift-linter"),
+    resolve(repoRoot, "target/debug/antidrift-linter"),
+    resolve(cwd, "target/release/antidrift-linter"),
+    resolve(repoRoot, "target/release/antidrift-linter"),
     resolve(moduleRoot, "bin/antidrift-linter"),
     resolve(moduleRoot, "../bin/antidrift-linter"),
     resolve(moduleRoot, "dist/bin/antidrift-linter"),
-    resolve(cwd, "target/release/antidrift-linter"),
-    resolve(repoRoot, "target/release/antidrift-linter"),
-    resolve(cwd, "target/debug/antidrift-linter"),
-    resolve(repoRoot, "target/debug/antidrift-linter"),
-  ];
+  ].filter((candidate) => existsSync(candidate));
+  localCandidates.sort(
+    (left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs
+  );
+  const candidates = [...localCandidates];
   const platformKey = {
     "linux-x64": "linux-x64-gnu",
     "linux-arm64": "linux-arm64-gnu",
@@ -40,7 +44,7 @@ export function resolveNativeLinterBinary(cwd = process.cwd()) {
   if (platformKey) {
     const require = createRequire(import.meta.url);
     try {
-      candidates.unshift(
+      candidates.push(
         require.resolve(`@joedeleeuw/antidrift-linter-${platformKey}`)
       );
     } catch (error) {
