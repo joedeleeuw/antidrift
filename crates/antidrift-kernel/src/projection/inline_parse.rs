@@ -183,8 +183,8 @@ pub fn classify_inline_parse_reshape(
     let bag_state = BagState {
         parameter_name: String::new(),
         parameter_node: None,
-        bag_root_symbols: root_symbols,
-        bag_field_symbols: FxHashSet::default(),
+        root_symbols,
+        field_symbols: FxHashSet::default(),
     };
     if ast::is_object_literal_expression(raw_arg)
         && inspect_object_literal_bag_projection(raw_arg, &bag_state, checker)

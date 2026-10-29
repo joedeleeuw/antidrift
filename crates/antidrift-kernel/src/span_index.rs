@@ -11,20 +11,20 @@ pub struct DiagnosticLocation {
 
 #[derive(Debug, Clone)]
 pub struct LineIndex {
-    line_starts: Vec<u32>,
+    starts: Vec<u32>,
 }
 
 impl LineIndex {
     #[must_use]
     pub fn new(source_text: &str) -> Self {
-        let mut line_starts = vec![0];
+        let mut starts = vec![0];
         for (idx, byte) in source_text.bytes().enumerate() {
             if byte == b'\n' {
                 let next = u32::try_from(idx.saturating_add(1)).unwrap_or(u32::MAX);
-                line_starts.push(next);
+                starts.push(next);
             }
         }
-        Self { line_starts }
+        Self { starts }
     }
 
     #[must_use]
@@ -33,11 +33,11 @@ impl LineIndex {
             .unwrap_or(source_text.len())
             .min(source_text.len());
         let clamped_u32 = u32::try_from(clamped).unwrap_or(u32::MAX);
-        let line_idx = match self.line_starts.binary_search(&clamped_u32) {
+        let line_idx = match self.starts.binary_search(&clamped_u32) {
             Ok(exact) => exact,
             Err(insert) => insert.saturating_sub(1),
         };
-        let line_start = usize::try_from(self.line_starts[line_idx]).unwrap_or(0);
+        let line_start = usize::try_from(self.starts[line_idx]).unwrap_or(0);
         let slice = source_text.get(line_start..clamped).unwrap_or("");
         let utf16_col = u32::try_from(slice.encode_utf16().count()).unwrap_or(0);
         let one_based_line = u32::try_from(line_idx.saturating_add(1)).unwrap_or(1);

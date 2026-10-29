@@ -1,14 +1,13 @@
 use super::RustDiagnostic;
+use super::boundary_decode::check_decode_to_option;
 use super::rules::check_syn_ast;
+use super::struct_shapes::{check_constant_return_fields, check_structural_type_forks};
 use super::syntax::check_file_surface;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
-use syn::{
-    Attribute, Expr, ExprLit, Fields, GenericArgument, Item, ItemMod, Lit, Meta, PathArguments,
-    Type,
-};
+use syn::{Attribute, Expr, ExprLit, Item, ItemMod, Lit, Meta, Type};
 
 pub(super) fn check_workspace_root(
     root: &Path,
@@ -78,6 +77,7 @@ fn check_crate_dir(
         match syn::parse_file(&source) {
             Ok(ast) => {
                 check_syn_ast(&rel_path, file_path, &ast, diagnostics);
+                check_decode_to_option(&rel_path, &ast, diagnostics);
                 check_rule_scope_ownership(&rel_path, &ast, diagnostics);
                 parsed_files.insert(file_path.clone(), ast);
             }
@@ -100,6 +100,7 @@ fn check_crate_dir(
         diagnostics,
     );
     check_structural_type_forks(workspace_root, &rs_files, &parsed_files, diagnostics);
+    check_constant_return_fields(workspace_root, &rs_files, &parsed_files, diagnostics);
     Ok(rs_files.len())
 }
 
@@ -427,99 +428,4 @@ fn is_rule_scope_type(ty: &Type) -> bool {
         .segments
         .last()
         .is_some_and(|seg| seg.ident == "RuleScope")
-}
-
-fn check_structural_type_forks(
-    workspace_root: &Path,
-    rs_files: &[PathBuf],
-    parsed_files: &FxHashMap<PathBuf, syn::File>,
-    diagnostics: &mut Vec<RustDiagnostic>,
-) {
-    let mut seen: FxHashMap<Vec<(String, String)>, (String, String, usize)> = FxHashMap::default();
-    for file_path in rs_files {
-        let Some(ast) = parsed_files.get(file_path) else {
-            continue;
-        };
-        let rel_path = relative_display(workspace_root, file_path);
-        for item in &ast.items {
-            let Item::Struct(item_struct) = item else {
-                continue;
-            };
-            let Some(signature) = struct_field_signature(item_struct) else {
-                continue;
-            };
-            let struct_name = item_struct.ident.to_string();
-            let line = item_struct.ident.span().start().line.max(1);
-            if let Some((owner_name, owner_file, owner_line)) = seen.get(&signature) {
-                diagnostics.push(RustDiagnostic {
-                    file: rel_path.clone(),
-                    line,
-                    rule_id: "rust/no-structural-type-fork",
-                    message: format!(
-                        "Struct '{struct_name}' duplicates the field shape of '{owner_name}' ({owner_file}:{owner_line}); share or import one owned struct instead of forking a parallel shape."
-                    ),
-                });
-            } else {
-                seen.insert(signature, (struct_name, rel_path.clone(), line));
-            }
-        }
-    }
-}
-
-fn struct_field_signature(item_struct: &syn::ItemStruct) -> Option<Vec<(String, String)>> {
-    let Fields::Named(named) = &item_struct.fields else {
-        return None;
-    };
-    if named.named.len() < 3 {
-        return None;
-    }
-    let mut signature = Vec::with_capacity(named.named.len());
-    for field in &named.named {
-        let ident = field.ident.as_ref()?;
-        let norm_ty = normalize_syn_type(&field.ty)?;
-        signature.push((ident.to_string(), norm_ty));
-    }
-    signature.sort_by(|a, b| a.0.cmp(&b.0));
-    Some(signature)
-}
-
-fn normalize_angle_args(angle: &syn::AngleBracketedGenericArguments) -> Option<String> {
-    let mut args = Vec::new();
-    for arg in &angle.args {
-        if let GenericArgument::Type(inner) = arg {
-            args.push(normalize_syn_type(inner)?);
-        }
-    }
-    Some(if args.is_empty() {
-        String::new()
-    } else {
-        format!("<{}>", args.join(","))
-    })
-}
-
-fn normalize_syn_type(ty: &Type) -> Option<String> {
-    match ty {
-        Type::Path(tp) => {
-            let last = tp.path.segments.last()?;
-            let mut out = last.ident.to_string();
-            if let PathArguments::AngleBracketed(angle) = &last.arguments {
-                out.push_str(&normalize_angle_args(angle)?);
-            }
-            Some(out)
-        }
-        Type::Reference(tr) => {
-            let prefix = if tr.mutability.is_some() {
-                "&mut "
-            } else {
-                "&"
-            };
-            Some(format!("{prefix}{}", normalize_syn_type(&tr.elem)?))
-        }
-        Type::Slice(ts) => Some(format!("[{}]", normalize_syn_type(&ts.elem)?)),
-        Type::Tuple(tt) => {
-            let elems: Option<Vec<_>> = tt.elems.iter().map(normalize_syn_type).collect();
-            Some(format!("({})", elems?.join(",")))
-        }
-        _ => None,
-    }
 }

@@ -12,7 +12,7 @@ pub(super) struct PackageManifest {
     pub(super) peer_dependencies: Option<BTreeMap<String, String>>,
     pub(super) optional_dependencies: Option<BTreeMap<String, String>>,
     workspaces: Option<IgnoredAny>,
-    pub(super) package_format: Option<PackageFormat>,
+    pub(super) format: Option<PackageFormat>,
 }
 
 #[derive(Deserialize)]
@@ -59,7 +59,7 @@ impl<'de> Visitor<'de> for ManifestVisitor {
                     manifest.optional_dependencies = fields.next_value()?;
                 }
                 PackageField::Workspaces => manifest.workspaces = fields.next_value()?,
-                PackageField::Format => manifest.package_format = fields.next_value()?,
+                PackageField::Format => manifest.format = fields.next_value()?,
                 PackageField::Other => {
                     fields.next_value::<IgnoredAny>()?;
                 }

@@ -1,5 +1,7 @@
+mod boundary_decode;
 mod rules;
 mod smells;
+mod struct_shapes;
 mod syntax;
 mod workspace;
 

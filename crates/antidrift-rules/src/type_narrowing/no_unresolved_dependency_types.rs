@@ -7,8 +7,7 @@ use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
-struct ManifestInfo {
-    manifest_label: String,
+struct DependencyResolution {
     missing_by_name: FxHashMap<String, String>,
     installed_by_name: FxHashMap<String, String>,
 }
@@ -84,9 +83,9 @@ fn is_package_installed(start_dir: &Path, pkg_name: &str) -> bool {
     false
 }
 
-fn load_manifest_info(
+fn load_dependency_resolution(
     file_path: &Path,
-) -> Result<Option<ManifestInfo>, antidrift_kernel::error::KernelError> {
+) -> Result<Option<DependencyResolution>, antidrift_kernel::error::KernelError> {
     let Some(manifest_path) = find_nearest_package_json(file_path) else {
         return Ok(None);
     };
@@ -129,8 +128,7 @@ fn load_manifest_info(
             missing_by_name.entry(dep.clone()).or_insert(dep);
         }
     }
-    Ok(Some(ManifestInfo {
-        manifest_label: "package.json".to_owned(),
+    Ok(Some(DependencyResolution {
         missing_by_name,
         installed_by_name,
     }))
@@ -187,8 +185,8 @@ fn check_node(ctx: &mut Ctx, node: P<Node>) {
     };
     let file_name = ctx.file.file_name().to_owned();
     let file_path = Path::new(&file_name);
-    let manifest_info = match load_manifest_info(file_path) {
-        Ok(Some(manifest_info)) => manifest_info,
+    let resolution = match load_dependency_resolution(file_path) {
+        Ok(Some(resolution)) => resolution,
         Ok(None) => return,
         Err(error) => {
             ctx.report_node(
@@ -198,20 +196,19 @@ fn check_node(ctx: &mut Ctx, node: P<Node>) {
             return;
         }
     };
-    if let Some(pkg_name) = manifest_info.missing_by_name.get(&imported) {
+    if let Some(pkg_name) = resolution.missing_by_name.get(&imported) {
         ctx.report_node(
             specifier_node,
             RuleMessage::new(
                 "uninstalledImport",
                 format!(
-                    "{pkg_name} is declared in {} but not installed, so its exported types are not compared with first-party types.",
-                    manifest_info.manifest_label
+                    "{pkg_name} is declared in package.json but not installed, so its exported types are not compared with first-party types."
                 ),
             ),
         );
         return;
     }
-    let Some(pkg_name) = manifest_info.installed_by_name.get(&imported) else {
+    let Some(pkg_name) = resolution.installed_by_name.get(&imported) else {
         return;
     };
     let subpath = &specifier_text[imported.len()..];

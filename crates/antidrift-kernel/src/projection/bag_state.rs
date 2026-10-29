@@ -14,8 +14,8 @@ const PRIMITIVE_COERCION_CALLEES: &[&str] = &["Boolean", "Number", "String"];
 pub struct BagState {
     pub parameter_name: String,
     pub parameter_node: Option<P<Node>>,
-    pub bag_root_symbols: FxHashSet<P<Symbol>>,
-    pub bag_field_symbols: FxHashSet<P<Symbol>>,
+    pub root_symbols: FxHashSet<P<Symbol>>,
+    pub field_symbols: FxHashSet<P<Symbol>>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -112,8 +112,7 @@ pub fn is_empty_object_fallback(node: P<Node>) -> bool {
 
 fn has_bag_symbol(bag_state: &BagState, sym: Option<P<Symbol>>) -> bool {
     sym.is_some_and(|symbol| {
-        bag_state.bag_root_symbols.contains(&symbol)
-            || bag_state.bag_field_symbols.contains(&symbol)
+        bag_state.root_symbols.contains(&symbol) || bag_state.field_symbols.contains(&symbol)
     })
 }
 
@@ -301,7 +300,7 @@ fn is_zero_arg_bag_callback_thunk(
     let callee = tsrs_kernel::unwrap_expression(call.expression());
     if ast::is_identifier(callee) {
         return provenance::symbol_at_node(checker, callee)
-            .is_some_and(|sym| bag_state.bag_field_symbols.contains(&sym));
+            .is_some_and(|sym| bag_state.field_symbols.contains(&sym));
     }
     is_bag_member_chain(callee, bag_state, checker)
 }
@@ -363,7 +362,7 @@ pub fn inspect_bag_value_expression(
     }
     if ast::is_identifier(unwrapped) {
         if let Some(sym) = provenance::symbol_at_node(checker, unwrapped)
-            && bag_state.bag_field_symbols.contains(&sym)
+            && bag_state.field_symbols.contains(&sym)
         {
             return BagValueCheck::ReadsBagField;
         }
@@ -403,7 +402,7 @@ fn is_whole_root_reference(node: P<Node>, bag_state: &BagState, checker: &mut Ch
     let unwrapped = tsrs_kernel::unwrap_expression(node);
     ast::is_identifier(unwrapped)
         && provenance::symbol_at_node(checker, unwrapped)
-            .is_some_and(|sym| bag_state.bag_root_symbols.contains(&sym))
+            .is_some_and(|sym| bag_state.root_symbols.contains(&sym))
 }
 
 fn inspect_object_literal_property(
@@ -435,10 +434,9 @@ fn inspect_object_literal_property(
             let Some(sym) = provenance::symbol_at_node(checker, shorthand.name()) else {
                 return BagValueCheck::Invalid;
             };
-            if bag_state.bag_field_symbols.contains(&sym) {
+            if bag_state.field_symbols.contains(&sym) {
                 BagValueCheck::ReadsBagField
-            } else if whole_root_reference_is_envelope && bag_state.bag_root_symbols.contains(&sym)
-            {
+            } else if whole_root_reference_is_envelope && bag_state.root_symbols.contains(&sym) {
                 BagValueCheck::ValidLiteral
             } else {
                 BagValueCheck::Invalid

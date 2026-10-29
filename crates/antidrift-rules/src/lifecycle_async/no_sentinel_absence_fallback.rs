@@ -1,9 +1,12 @@
 use super::syntax::unwrap_expression;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::tsrs_kernel::node_text;
 use serde::Deserialize;
 use tsrs_ast::{Kind, Node};
+use tsrs_checker::{Checker, TypeFlags};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use tsrslint::utils::{is_object_type, is_type_flag_set, is_union_type};
 
 pub const RULE_NAME: &str = "antidrift/no-sentinel-absence-fallback";
 
@@ -76,7 +79,8 @@ impl RuleVisitor for Visitor {
             return;
         }
         let bin = node.as_binary_expression();
-        if bin.operator_token().kind() == Kind::QuestionQuestionToken
+        let op = bin.operator_token().kind();
+        if op == Kind::QuestionQuestionToken
             && matches!(
                 unwrap_expression(bin.left()).kind(),
                 Kind::PropertyAccessExpression | Kind::ElementAccessExpression
@@ -94,8 +98,95 @@ impl RuleVisitor for Visitor {
                     ),
                 ),
             );
+            return;
+        }
+        if let Some((subject, sentinel)) =
+            dual_empty_sentinel_guard(ctx, bin.left(), op, bin.right())
+            && has_object_string_nullish_union(ctx.checker, subject)
+        {
+            ctx.report_node(
+                node,
+                RuleMessage::new(
+                    "dualEmptySentinel",
+                    format!(
+                        "This check collapses nullishness and string sentinel \"{sentinel}\" on the same union. Model absence once instead of mixing undefined/null with \"{sentinel}\"."
+                    ),
+                ),
+            );
         }
     }
+}
+
+fn dual_empty_sentinel_guard(
+    ctx: &Ctx,
+    left: P<Node>,
+    op: Kind,
+    right: P<Node>,
+) -> Option<(P<Node>, &'static str)> {
+    let left_inner = unwrap_expression(left);
+    let right_inner = unwrap_expression(right);
+    if right_inner.kind() != Kind::BinaryExpression {
+        return None;
+    }
+    let cmp = right_inner.as_binary_expression();
+    let cmp_op = cmp.operator_token().kind();
+    let (subject, expected_cmp) = match op {
+        Kind::BarBarToken if left_inner.kind() == Kind::PrefixUnaryExpression => {
+            let prefix = left_inner.as_prefix_unary_expression();
+            if prefix.operator() != Kind::ExclamationToken {
+                return None;
+            }
+            (
+                unwrap_expression(prefix.operand()),
+                &[Kind::EqualsEqualsEqualsToken, Kind::EqualsEqualsToken][..],
+            )
+        }
+        Kind::AmpersandAmpersandToken => (
+            left_inner,
+            &[
+                Kind::ExclamationEqualsEqualsToken,
+                Kind::ExclamationEqualsToken,
+            ][..],
+        ),
+        _ => return None,
+    };
+    if !expected_cmp.contains(&cmp_op) {
+        return None;
+    }
+    let (cmp_subj, sentinel) = if let Some(s) = string_literal(cmp.right()) {
+        (unwrap_expression(cmp.left()), s)
+    } else {
+        let s = string_literal(cmp.left())?;
+        (unwrap_expression(cmp.right()), s)
+    };
+    let subj_text = node_text(ctx.file, subject).trim();
+    let cmp_text = node_text(ctx.file, cmp_subj).trim();
+    (!subj_text.is_empty() && subj_text == cmp_text).then_some((subject, sentinel))
+}
+
+fn has_object_string_nullish_union(checker: &mut Checker, subject: P<Node>) -> bool {
+    let typ = checker.get_type_at_location(subject);
+    if !is_union_type(typ) {
+        return false;
+    }
+    let mut has_obj = false;
+    let mut has_str_lit = false;
+    let mut has_nullish = false;
+    for &part in typ.types() {
+        if is_object_type(part)
+            || is_type_flag_set(part, TypeFlags::Object | TypeFlags::NonPrimitive)
+        {
+            has_obj = true;
+        } else if is_type_flag_set(part, TypeFlags::StringLiteral) {
+            has_str_lit = true;
+        } else if is_type_flag_set(
+            part,
+            TypeFlags::Undefined | TypeFlags::Null | TypeFlags::Void,
+        ) {
+            has_nullish = true;
+        }
+    }
+    has_obj && has_str_lit && has_nullish
 }
 
 fn is_direct_jsx_text_expression(node: P<Node>) -> bool {

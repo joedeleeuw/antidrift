@@ -77,8 +77,8 @@ fn build_bag_state_from_name(
         return Some(BagState {
             parameter_name: name_node.as_identifier().text().to_owned(),
             parameter_node: Some(param_node),
-            bag_root_symbols: FxHashSet::from_iter([root_sym]),
-            bag_field_symbols: FxHashSet::default(),
+            root_symbols: FxHashSet::from_iter([root_sym]),
+            field_symbols: FxHashSet::default(),
         });
     }
     let mut field_symbols = FxHashSet::default();
@@ -94,8 +94,8 @@ fn build_bag_state_from_name(
     Some(BagState {
         parameter_name: raw_text,
         parameter_node: Some(param_node),
-        bag_root_symbols: FxHashSet::default(),
-        bag_field_symbols: field_symbols,
+        root_symbols: FxHashSet::default(),
+        field_symbols,
     })
 }
 
@@ -159,16 +159,12 @@ fn collect_single_bag_var_decl(
     let name_node = decl.name();
     if name_node.kind() == Kind::ObjectBindingPattern {
         return is_bag_object_reference(init, bag_state, checker)
-            && collect_binding_pattern_symbols(
-                name_node,
-                checker,
-                &mut bag_state.bag_field_symbols,
-            );
+            && collect_binding_pattern_symbols(name_node, checker, &mut bag_state.field_symbols);
     }
     ast::is_identifier(name_node)
         && inspect_bag_value_expression(init, bag_state, checker).reads_bag_field()
         && provenance::symbol_at_node(checker, name_node).is_some_and(|local_sym| {
-            bag_state.bag_field_symbols.insert(local_sym);
+            bag_state.field_symbols.insert(local_sym);
             true
         })
 }

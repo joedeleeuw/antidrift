@@ -2,6 +2,7 @@ mod anemic_error_fallback;
 pub mod docs_source_policy;
 pub mod no_anemic_errors;
 pub mod no_as_never;
+pub mod no_branch_tree;
 pub mod no_dated_comments;
 pub mod no_debug_residue_filenames;
 pub mod no_default_export_in_domain;
@@ -21,6 +22,7 @@ pub fn rules() -> Vec<&'static dyn Rule> {
         &docs_source_policy::DEFAULT_RULE,
         &no_anemic_errors::DEFAULT_RULE,
         &no_as_never::DEFAULT_RULE,
+        &no_branch_tree::DEFAULT_RULE,
         &no_dated_comments::DEFAULT_RULE,
         &no_debug_residue_filenames::DEFAULT_RULE,
         &no_default_export_in_domain::DEFAULT_RULE,
@@ -47,6 +49,9 @@ pub fn create_rule(
         ))),
         no_as_never::RULE_NAME | "no-as-never" => Ok(Some(Box::new(
             no_as_never::NoAsNever::from_options(options)?,
+        ))),
+        no_branch_tree::RULE_NAME | "no-branch-tree" => Ok(Some(Box::new(
+            no_branch_tree::NoBranchTree::from_options(options)?,
         ))),
         no_dated_comments::RULE_NAME | "no-dated-comments" => Ok(Some(Box::new(
             no_dated_comments::NoDatedComments::from_options(options)?,

@@ -1012,6 +1012,92 @@ const headlessProbes = [
     `,
     expectedCount: 0,
   },
+  {
+    name: "no-sentinel-absence-fallback (dualEmptySentinel: object | string-literal | undefined tested with !x || x === sentinel)",
+    rule: "antidrift/no-sentinel-absence-fallback",
+    file: "tooling/antidrift/src/__probe_dual_sentinel.ts",
+    source: `
+      type BindingHolder = { phase: "claimed" | "reserved" | "released"; unitRecovery: boolean };
+      declare function readBinding(): BindingHolder | "unbound" | undefined;
+      declare function readClean(): BindingHolder | undefined;
+      export function checkDualSentinel() {
+        const holder = readBinding();
+        if (!holder || holder === "unbound") {
+          return false;
+        }
+        return holder.unitRecovery;
+      }
+      export function checkPositiveDualSentinel() {
+        const holder = readBinding();
+        if (holder && holder !== "unbound") {
+          return holder.unitRecovery;
+        }
+        return false;
+      }
+      export function checkSingleEmptyRepresentation() {
+        const holder = readClean();
+        if (!holder) {
+          return false;
+        }
+        return holder.unitRecovery;
+      }
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-branch-tree (subjectCoupledBranchTree and negatedDiscriminantScatter on withLock pattern reported)",
+    rule: "antidrift/no-branch-tree",
+    file: "tooling/antidrift/src/__probe_branch_tree_bad.ts",
+    source: `
+      type Holder = { phase: "claimed" | "reserved" | "released"; unitRecovery: boolean };
+      declare function readHubPortBinding(): Promise<Holder | "unbound" | undefined>;
+      declare function foreign(holder: Holder): boolean;
+      declare function write(phase: string, recovery: boolean): Promise<void>;
+      export async function acquirePort() {
+        const holder = await readHubPortBinding();
+        if (holder && holder !== "unbound") {
+          if (holder.phase !== "released" && foreign(holder)) {
+            throw new Error("foreign binding owns port authority");
+          }
+          if (holder.phase !== "claimed") {
+            await write("reserved", foreign(holder) ? false : holder.unitRecovery);
+          }
+        } else {
+          await write("reserved", false);
+        }
+      }
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-branch-tree (flat early-return guards, independent subjects, and switch over discriminant stay clean)",
+    rule: "antidrift/no-branch-tree",
+    file: "tooling/antidrift/src/__probe_branch_tree_clean.ts",
+    source: `
+      type Holder =
+        | { phase: "unbound" }
+        | { phase: "claimed" | "reserved" | "released"; foreign: boolean; unitRecovery: boolean };
+      declare function write(phase: string, recovery: boolean): Promise<void>;
+      export async function acquireClean(holder: Holder) {
+        if (holder.phase === "unbound") {
+          await write("reserved", false);
+          return;
+        }
+        if (holder.foreign && holder.phase !== "released") {
+          throw new Error("foreign binding owns port authority");
+        }
+        switch (holder.phase) {
+          case "claimed":
+            return;
+          case "reserved":
+          case "released":
+            await write("reserved", holder.foreign ? false : holder.unitRecovery);
+            return;
+        }
+      }
+    `,
+    expectedCount: 0,
+  },
 ];
 
 const sharedHelperFiles = {
@@ -1264,11 +1350,19 @@ try {
       "    legacy_adapter(input)",
       "}",
       "pub struct Holder { pub ident: String }",
+      "pub struct StatusEnvelope { pub ok: bool, pub count: usize }",
+      "pub fn make_envelope_a(n: usize) -> StatusEnvelope {",
+      "    StatusEnvelope { ok: true, count: n }",
+      "}",
+      "pub fn make_envelope_b(n: usize) -> StatusEnvelope {",
+      "    StatusEnvelope { ok: true, count: n + 1 }",
+      "}",
       "pub fn compare_ident(h: &Holder, val: &serde_json::Value) -> bool {",
       '    let _ = val["k"].as_str();',
       '    let _ = h.ident.to_string() == "foo";',
       '    if let Ok(text) = std::fs::read_to_string("foo.txt") { let _ = text.len(); }',
       "    let _ = h.ident.to_string().parse::<u32>();",
+      "    let _ = serde_json::from_str::<LooseConfig>(&h.ident).ok();",
       "    match legacy_adapter(&h.ident) {",
       "        Ok(_) => true,",
       "        Err(_) => false,",
@@ -1343,6 +1437,8 @@ try {
     "rust/require-rule-scope",
     "rust/no-structural-type-fork",
     "rust/no-value-roundtrip",
+    "rust/no-decode-to-option",
+    "rust/no-constant-return-field",
   ]) {
     assert.ok(
       reportedRuleIds.has(expectedRuleId),

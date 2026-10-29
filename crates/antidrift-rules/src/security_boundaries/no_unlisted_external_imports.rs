@@ -315,7 +315,7 @@ fn file_resolution_mode(
     {
         Some("cts" | "cjs") => ResolutionMode::Require,
         Some("mts" | "mjs") => ResolutionMode::Import,
-        _ => match owner.and_then(|owner| owner.manifest.package_format) {
+        _ => match owner.and_then(|owner| owner.manifest.format) {
             Some(PackageFormat::Module) => ResolutionMode::Import,
             Some(PackageFormat::Commonjs) => ResolutionMode::Require,
             None => configured,
