@@ -240,6 +240,45 @@ fn forwarding_jsx_tag_name_for_identifier(node: P<Node>) -> Option<P<Node>> {
     .then(|| elem.tag_name())
 }
 
+fn is_expression_statement_call(call: P<Node>) -> bool {
+    let mut node = outer_expression(call);
+    while let Some(parent) = node.parent() {
+        match parent.kind() {
+            Kind::AwaitExpression | Kind::VoidExpression | Kind::NonNullExpression => {
+                node = outer_expression(parent);
+            }
+            Kind::ExpressionStatement => return true,
+            _ => return false,
+        }
+    }
+    false
+}
+
+fn call_joins_local_variable(call: P<Node>, param_ident: P<Node>, checker: &mut Checker) -> bool {
+    if !ast::is_call_expression(call) || !is_expression_statement_call(call) {
+        return false;
+    }
+    let Some(enclosing_fn) = tsrs_kernel::enclosing_function(call) else {
+        return false;
+    };
+    for &arg in call.as_call_expression().arguments().nodes() {
+        let unwrapped = tsrs_kernel::unwrap_expression(arg);
+        if unwrapped == param_ident || !ast::is_identifier(unwrapped) {
+            continue;
+        }
+        let Some(sym) = checker.get_symbol_at_location_exported(unwrapped) else {
+            continue;
+        };
+        if sym.declarations().iter().copied().any(|decl| {
+            decl.kind() == Kind::VariableDeclaration
+                && tsrs_kernel::enclosing_function(decl) == Some(enclosing_fn)
+        }) {
+            return true;
+        }
+    }
+    false
+}
+
 fn forward_target_for_identifier(
     ident: P<Node>,
     sf: P<SourceFile>,
@@ -247,6 +286,9 @@ fn forward_target_for_identifier(
 ) -> Option<String> {
     let node = outer_expression(ident);
     if let Some(call) = forwarding_call_for_identifier(node) {
+        if call_joins_local_variable(call, node, checker) {
+            return None;
+        }
         let callee = if ast::is_call_expression(call) {
             Some(call.as_call_expression().expression())
         } else if ast::is_new_expression(call) {

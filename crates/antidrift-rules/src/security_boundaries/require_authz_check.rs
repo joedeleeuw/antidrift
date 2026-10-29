@@ -145,17 +145,22 @@ impl Visitor {
         let Some(frame) = self.frames.last_mut() else {
             return;
         };
-        if member_identifier(node) != Some("params") {
+        let Some(member_name) = member_identifier(node) else {
             return;
-        }
+        };
         let Some(raw_obj) = antidrift_kernel::tsrs_kernel::member_object(node) else {
             return;
         };
         let obj = ast::skip_parentheses(raw_obj);
-        if ast::is_identifier(obj)
-            && ["req", "request", "ctx", "context", "event"].contains(&obj.as_identifier().text())
-        {
-            frame.params_access = Some(node);
+        if !ast::is_identifier(obj) {
+            return;
+        }
+        let obj_name = obj.as_identifier().text();
+        let is_req_params = member_name == "params"
+            && ["req", "request", "ctx", "context", "event"].contains(&obj_name);
+        let is_direct_params = obj_name == "params" && !member_name.is_empty();
+        if is_req_params || is_direct_params {
+            frame.params_access.get_or_insert(node);
         }
     }
 
@@ -183,7 +188,13 @@ fn member_identifier(node: P<Node>) -> Option<&'static str> {
         Kind::ElementAccessExpression => {
             let arg =
                 ast::skip_parentheses(node.as_element_access_expression().argument_expression());
-            ast::is_identifier(arg).then(|| arg.as_identifier().text())
+            if ast::is_identifier(arg) {
+                Some(arg.as_identifier().text())
+            } else if ast::is_string_literal(arg) {
+                Some(arg.as_string_literal().text())
+            } else {
+                None
+            }
         }
         _ => None,
     }
