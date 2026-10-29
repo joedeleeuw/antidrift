@@ -32,12 +32,55 @@ fn is_exported_declaration(decl: P<Node>) -> bool {
     find_modifier(stmt, Kind::ExportKeyword).is_some()
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BodyForwarding {
+    Direct,
+    BoundLiteral,
+    PrecedingEffect,
+    BoundLiteralAndPrecedingEffect,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ScanStatus {
+    Clean(BodyForwarding),
+    ArgumentsHazard,
+}
+
+impl ScanStatus {
+    fn record_bound_literal(&mut self) {
+        if let Self::Clean(curr) = *self {
+            let next = match curr {
+                BodyForwarding::Direct | BodyForwarding::BoundLiteral => {
+                    BodyForwarding::BoundLiteral
+                }
+                BodyForwarding::PrecedingEffect
+                | BodyForwarding::BoundLiteralAndPrecedingEffect => {
+                    BodyForwarding::BoundLiteralAndPrecedingEffect
+                }
+            };
+            *self = Self::Clean(next);
+        }
+    }
+
+    fn record_preceding_effect(&mut self) {
+        if let Self::Clean(curr) = *self {
+            let next = match curr {
+                BodyForwarding::Direct | BodyForwarding::PrecedingEffect => {
+                    BodyForwarding::PrecedingEffect
+                }
+                BodyForwarding::BoundLiteral | BodyForwarding::BoundLiteralAndPrecedingEffect => {
+                    BodyForwarding::BoundLiteralAndPrecedingEffect
+                }
+            };
+            *self = Self::Clean(next);
+        }
+    }
+}
+
 struct BodyUseScan {
     param_symbols: Vec<Option<P<Symbol>>>,
     used_indices: Vec<usize>,
-    has_arguments_hazard: bool,
-    has_bound_literal: bool,
-    has_preceding_effect: bool,
+    status: ScanStatus,
 }
 
 fn is_literal_kind(kind: Kind) -> bool {
@@ -96,7 +139,7 @@ fn is_literal_constant(checker: &mut Checker, sym: Option<P<Symbol>>) -> bool {
 
 fn scan_call_body(node: P<Node>, checker: &mut Checker, state: &mut BodyUseScan) {
     if is_literal_kind(node.kind()) {
-        state.has_bound_literal = true;
+        state.status.record_bound_literal();
     }
     if ast::is_identifier(node) {
         let sym = checker.get_symbol_at_location_exported(node);
@@ -107,9 +150,9 @@ fn scan_call_body(node: P<Node>, checker: &mut Checker, state: &mut BodyUseScan)
         {
             state.used_indices.push(pos);
         } else if sym.is_none() && node.as_identifier().text() == "arguments" {
-            state.has_arguments_hazard = true;
+            state.status = ScanStatus::ArgumentsHazard;
         } else if is_literal_constant(checker, sym) {
-            state.has_bound_literal = true;
+            state.status.record_bound_literal();
         }
         return;
     }
@@ -126,7 +169,7 @@ fn scan_call_body(node: P<Node>, checker: &mut Checker, state: &mut BodyUseScan)
     }
     if ast::is_property_access_expression(node) {
         if state.used_indices.is_empty() {
-            state.has_preceding_effect = true;
+            state.status.record_preceding_effect();
         }
         scan_call_body(
             node.as_property_access_expression().expression(),
@@ -149,11 +192,6 @@ fn scan_call_body(node: P<Node>, checker: &mut Checker, state: &mut BodyUseScan)
     });
 }
 
-struct BodyForwarding {
-    has_bound_literal: bool,
-    has_preceding_effect: bool,
-}
-
 enum WrapperVerdict {
     AddedSemantics,
     UnusedHop,
@@ -161,14 +199,22 @@ enum WrapperVerdict {
 }
 
 fn classify_wrapper(
-    forwarding: &BodyForwarding,
+    forwarding: BodyForwarding,
     audit: &RefAudit,
     exported: bool,
     reexported_or_entry: bool,
 ) -> WrapperVerdict {
+    let has_bound_literal = matches!(
+        forwarding,
+        BodyForwarding::BoundLiteral | BodyForwarding::BoundLiteralAndPrecedingEffect
+    );
+    let has_preceding_effect = matches!(
+        forwarding,
+        BodyForwarding::PrecedingEffect | BodyForwarding::BoundLiteralAndPrecedingEffect
+    );
     if audit.has_identity_ref
-        || (forwarding.has_bound_literal && audit.caller_files.len() >= 2)
-        || (forwarding.has_preceding_effect && audit.has_non_immutable_arg)
+        || (has_bound_literal && audit.caller_files.len() >= 2)
+        || (has_preceding_effect && audit.has_non_immutable_arg)
         || (exported && reexported_or_entry)
     {
         return WrapperVerdict::AddedSemantics;
@@ -192,33 +238,29 @@ fn parameters_match_in_order(
     checker: &mut Checker,
 ) -> Option<BodyForwarding> {
     let params = fn_node.parameters();
-    let mut param_symbols = Vec::with_capacity(params.len());
-    for &param in params {
-        let sym = param
-            .name()
-            .and_then(|name| checker.get_symbol_at_location_exported(name));
-        param_symbols.push(sym);
-    }
+    let param_symbols: Vec<_> = params
+        .iter()
+        .map(|&p| {
+            p.name()
+                .and_then(|n| checker.get_symbol_at_location_exported(n))
+        })
+        .collect();
     let mut scan = BodyUseScan {
         param_symbols,
         used_indices: Vec::new(),
-        has_arguments_hazard: false,
-        has_bound_literal: false,
-        has_preceding_effect: false,
+        status: ScanStatus::Clean(BodyForwarding::Direct),
     };
     scan_call_body(call_node, checker, &mut scan);
-    if scan.has_arguments_hazard || scan.used_indices.len() != params.len() {
+    let ScanStatus::Clean(forwarding) = scan.status else {
         return None;
-    }
-    for (expected, &actual) in scan.used_indices.iter().enumerate() {
-        if expected != actual {
-            return None;
-        }
-    }
-    Some(BodyForwarding {
-        has_bound_literal: scan.has_bound_literal,
-        has_preceding_effect: scan.has_preceding_effect,
-    })
+    };
+    (scan.used_indices.len() == params.len()
+        && scan
+            .used_indices
+            .iter()
+            .enumerate()
+            .all(|(expected, &actual)| expected == actual))
+    .then_some(forwarding)
 }
 
 #[derive(Default)]
@@ -402,30 +444,22 @@ fn check_candidate(ctx: &mut Ctx, fn_node: P<Node>, name_ident: P<Node>, decl: P
     let reexported_or_entry =
         exported && (is_reexported_in_program(ctx.program, ctx.checker, ctx.file) || package_entry);
     let callee = tsrs_kernel::node_text(ctx.file, candidate.callee_node);
-    match classify_wrapper(&forwarding, &audit, exported, reexported_or_entry) {
+    match classify_wrapper(forwarding, &audit, exported, reexported_or_entry) {
         WrapperVerdict::AddedSemantics => {}
-        WrapperVerdict::UnusedHop => {
-            ctx.report_node(
-                candidate.name_node,
-                RuleMessage::new(
-                    "unusedHop",
-                    format!(
-                        "'{name}' is a hop to '{callee}' with no call site; deleting it type-checks. Delete '{name}'."
-                    ),
-                ),
-            );
-        }
-        WrapperVerdict::Hop(calls) => {
-            ctx.report_node(
-                candidate.name_node,
-                RuleMessage::new(
-                    "hop",
-                    format!(
-                        "'{name}' is a hop to '{callee}': inlining it at its {calls} call site(s) type-checks and keeps each call's type, bindings and evaluation order. Call the owner directly and delete '{name}'."
-                    ),
-                ),
-            );
-        }
+        WrapperVerdict::UnusedHop => ctx.report_node(
+            candidate.name_node,
+            RuleMessage::new(
+                "unusedHop",
+                format!("'{name}' is a hop to '{callee}' with no call site; deleting it type-checks. Delete '{name}'."),
+            ),
+        ),
+        WrapperVerdict::Hop(calls) => ctx.report_node(
+            candidate.name_node,
+            RuleMessage::new(
+                "hop",
+                format!("'{name}' is a hop to '{callee}': inlining it at its {calls} call site(s) type-checks and keeps each call's type, bindings and evaluation order. Call the owner directly and delete '{name}'."),
+            ),
+        ),
     }
 }
 

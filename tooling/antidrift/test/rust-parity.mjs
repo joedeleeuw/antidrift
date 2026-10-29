@@ -408,6 +408,26 @@ const headlessProbes = [
     expectedCount: 1,
   },
   {
+    name: "no-vague-names (import alias filler suffix & type declaration filler suffix)",
+    rule: "antidrift/no-vague-names",
+    source: `
+      import { type PlanViewRow as PlanViewRowType, User as UserIcon } from "./nonexistent-module-for-probe.js";
+      export type AccountData = { id: string; row?: PlanViewRowType; icon?: typeof UserIcon };
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-unformatted-number (checker-typed number outside NUMERIC_WORDS)",
+    rule: "antidrift/no-unformatted-number",
+    file: "tooling/antidrift/src/__probe_unformatted_num.tsx",
+    source: `
+      export function UnreadBadge({ unread }: { unread: number }) {
+        return <span>{unread}</span>;
+      }
+    `,
+    expectedCount: 1,
+  },
+  {
     name: "no-contract-appeasement-projection (bagReshaper query envelope with callback & relational condition)",
     rule: "antidrift/no-contract-appeasement-projection",
     source: `
@@ -1207,7 +1227,14 @@ try {
     join(kernelSrc, "lib.rs"),
     "pub mod boundary;\npub mod provenance;\n"
   );
-  writeFileSync(join(kernelSrc, "boundary.rs"), "pub struct BoundaryItem;\n");
+  writeFileSync(
+    join(kernelSrc, "boundary.rs"),
+    [
+      "pub struct BoundaryItem;",
+      "pub struct WindowBounds { pub x: i32, pub y: i32, pub width: u32 }",
+      "",
+    ].join("\n")
+  );
   writeFileSync(
     join(kernelSrc, "provenance.rs"),
     [
@@ -1217,6 +1244,7 @@ try {
       "use serde::Deserialize;",
       "use std::collections::HashMap;",
       "// forbidden inline comment",
+      "pub struct FrameBounds { pub x: i32, pub y: i32, pub width: u32 }",
       "#[derive(Deserialize)]",
       "pub struct LooseConfig {",
       "    pub kind: String,",
@@ -1312,6 +1340,7 @@ try {
     "rust/no-inline-tests",
     "rust/no-silent-result-discard",
     "rust/require-rule-scope",
+    "rust/no-structural-type-fork",
   ]) {
     assert.ok(
       reportedRuleIds.has(expectedRuleId),

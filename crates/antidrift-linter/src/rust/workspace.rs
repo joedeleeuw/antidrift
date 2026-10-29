@@ -5,7 +5,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
-use syn::{Attribute, Expr, ExprLit, Item, ItemMod, Lit, Meta, Type};
+use syn::{
+    Attribute, Expr, ExprLit, Fields, GenericArgument, Item, ItemMod, Lit, Meta, PathArguments,
+    Type,
+};
 
 pub(super) fn check_workspace_root(
     root: &Path,
@@ -30,11 +33,12 @@ fn discover_crate_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
     };
     let mut dirs = Vec::new();
     if crates_parent.is_dir() {
-        let entries = fs::read_dir(&crates_parent)
-            .map_err(|err| format!("failed to read {}: {err}", crates_parent.display()))?;
-        for entry in entries {
-            let entry = entry.map_err(|err| format!("failed to read directory entry: {err}"))?;
-            let path = entry.path();
+        for entry in fs::read_dir(&crates_parent)
+            .map_err(|err| format!("failed to read {}: {err}", crates_parent.display()))?
+        {
+            let path = entry
+                .map_err(|err| format!("failed to read directory entry: {err}"))?
+                .path();
             if path.is_dir() && path.join("Cargo.toml").is_file() {
                 dirs.push(path);
             }
@@ -95,6 +99,7 @@ fn check_crate_dir(
         &parsed_files,
         diagnostics,
     );
+    check_structural_type_forks(workspace_root, &rs_files, &parsed_files, diagnostics);
     Ok(rs_files.len())
 }
 
@@ -208,35 +213,30 @@ fn resolve_external_mod(item_mod: &ItemMod, base_dir: &Path) -> Option<PathBuf> 
         }
     }
     let name = item_mod.ident.to_string();
-    let direct = base_dir.join(format!("{name}.rs"));
-    if direct.is_file() {
-        return Some(direct);
-    }
-    let nested = base_dir.join(name).join("mod.rs");
-    if nested.is_file() {
-        return Some(nested);
-    }
-    None
+    [
+        base_dir.join(format!("{name}.rs")),
+        base_dir.join(name).join("mod.rs"),
+    ]
+    .into_iter()
+    .find(|p| p.is_file())
 }
 
 fn extract_path_attr(attrs: &[Attribute]) -> Option<String> {
-    for attr in attrs {
+    attrs.iter().find_map(|attr| {
         if !attr.path().is_ident("path") {
-            continue;
+            return None;
         }
         let Meta::NameValue(nv) = &attr.meta else {
-            continue;
+            return None;
         };
         let Expr::Lit(ExprLit {
-            lit: Lit::Str(lit_str),
-            ..
+            lit: Lit::Str(s), ..
         }) = &nv.value
         else {
-            continue;
+            return None;
         };
-        return Some(lit_str.value());
-    }
-    None
+        Some(s.value())
+    })
 }
 
 fn check_cargo_manifest(
@@ -330,9 +330,7 @@ fn parse_toml_sections(text: &str) -> Vec<TomlSection> {
         line: 1,
         kv: FxHashMap::default(),
     };
-
     for (idx, raw_line) in text.lines().enumerate() {
-        let line_no = idx + 1;
         let trimmed = raw_line.trim();
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
@@ -343,21 +341,12 @@ fn parse_toml_sections(text: &str) -> Vec<TomlSection> {
             }
             current = TomlSection {
                 header: trimmed.to_owned(),
-                line: line_no,
+                line: idx + 1,
                 kv: FxHashMap::default(),
             };
-            continue;
-        }
-        if let Some((raw_key, raw_val)) = trimmed.split_once('=') {
-            let key = raw_key
-                .trim()
-                .split('.')
-                .next()
-                .unwrap_or("")
-                .trim()
-                .to_owned();
-            let val = raw_val.trim().to_owned();
-            current.kv.insert(key, val);
+        } else if let Some((raw_key, raw_val)) = trimmed.split_once('=') {
+            let key = raw_key.trim().split('.').next().unwrap_or("").trim();
+            current.kv.insert(key.to_owned(), raw_val.trim().to_owned());
         }
     }
     if !current.header.is_empty() {
@@ -438,4 +427,99 @@ fn is_rule_scope_type(ty: &Type) -> bool {
         .segments
         .last()
         .is_some_and(|seg| seg.ident == "RuleScope")
+}
+
+fn check_structural_type_forks(
+    workspace_root: &Path,
+    rs_files: &[PathBuf],
+    parsed_files: &FxHashMap<PathBuf, syn::File>,
+    diagnostics: &mut Vec<RustDiagnostic>,
+) {
+    let mut seen: FxHashMap<Vec<(String, String)>, (String, String, usize)> = FxHashMap::default();
+    for file_path in rs_files {
+        let Some(ast) = parsed_files.get(file_path) else {
+            continue;
+        };
+        let rel_path = relative_display(workspace_root, file_path);
+        for item in &ast.items {
+            let Item::Struct(item_struct) = item else {
+                continue;
+            };
+            let Some(signature) = struct_field_signature(item_struct) else {
+                continue;
+            };
+            let struct_name = item_struct.ident.to_string();
+            let line = item_struct.ident.span().start().line.max(1);
+            if let Some((owner_name, owner_file, owner_line)) = seen.get(&signature) {
+                diagnostics.push(RustDiagnostic {
+                    file: rel_path.clone(),
+                    line,
+                    rule_id: "rust/no-structural-type-fork",
+                    message: format!(
+                        "Struct '{struct_name}' duplicates the field shape of '{owner_name}' ({owner_file}:{owner_line}); share or import one owned struct instead of forking a parallel shape."
+                    ),
+                });
+            } else {
+                seen.insert(signature, (struct_name, rel_path.clone(), line));
+            }
+        }
+    }
+}
+
+fn struct_field_signature(item_struct: &syn::ItemStruct) -> Option<Vec<(String, String)>> {
+    let Fields::Named(named) = &item_struct.fields else {
+        return None;
+    };
+    if named.named.len() < 3 {
+        return None;
+    }
+    let mut signature = Vec::with_capacity(named.named.len());
+    for field in &named.named {
+        let ident = field.ident.as_ref()?;
+        let norm_ty = normalize_syn_type(&field.ty)?;
+        signature.push((ident.to_string(), norm_ty));
+    }
+    signature.sort_by(|a, b| a.0.cmp(&b.0));
+    Some(signature)
+}
+
+fn normalize_angle_args(angle: &syn::AngleBracketedGenericArguments) -> Option<String> {
+    let mut args = Vec::new();
+    for arg in &angle.args {
+        if let GenericArgument::Type(inner) = arg {
+            args.push(normalize_syn_type(inner)?);
+        }
+    }
+    Some(if args.is_empty() {
+        String::new()
+    } else {
+        format!("<{}>", args.join(","))
+    })
+}
+
+fn normalize_syn_type(ty: &Type) -> Option<String> {
+    match ty {
+        Type::Path(tp) => {
+            let last = tp.path.segments.last()?;
+            let mut out = last.ident.to_string();
+            if let PathArguments::AngleBracketed(angle) = &last.arguments {
+                out.push_str(&normalize_angle_args(angle)?);
+            }
+            Some(out)
+        }
+        Type::Reference(tr) => {
+            let prefix = if tr.mutability.is_some() {
+                "&mut "
+            } else {
+                "&"
+            };
+            Some(format!("{prefix}{}", normalize_syn_type(&tr.elem)?))
+        }
+        Type::Slice(ts) => Some(format!("[{}]", normalize_syn_type(&ts.elem)?)),
+        Type::Tuple(tt) => {
+            let elems: Option<Vec<_>> = tt.elems.iter().map(normalize_syn_type).collect();
+            Some(format!("({})", elems?.join(",")))
+        }
+        _ => None,
+    }
 }

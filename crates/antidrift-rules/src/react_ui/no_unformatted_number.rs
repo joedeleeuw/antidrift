@@ -5,6 +5,7 @@ use antidrift_kernel::rule_scope::{
 use antidrift_kernel::tsrs_kernel::{is_test_or_spec_file, unwrap_parentheses};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
+use tsrs_checker::TypeFlags;
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
@@ -106,9 +107,9 @@ impl RuleVisitor for Visitor {
             .parent()
             .is_some_and(|parent| matches!(parent.kind(), Kind::JsxElement | Kind::JsxFragment));
         let unwrapped = unwrap_parentheses(expression);
-        if is_string_call(unwrapped)
-            || is_numeric_template(unwrapped)
-            || (is_text_child && is_numeric_expression(unwrapped))
+        if is_string_call(ctx, unwrapped)
+            || is_numeric_template(ctx, unwrapped)
+            || (is_text_child && is_numeric_expression(ctx, unwrapped))
         {
             let formatter = self.rule.formatter.as_deref().unwrap_or(DEFAULT_FORMATTER);
             ctx.report_node(
@@ -149,31 +150,40 @@ fn is_numeric_name(name: &str) -> bool {
         .any(|segment| NUMERIC_WORDS.contains(&segment.as_str()))
 }
 
-fn is_numeric_expression(expression: P<Node>) -> bool {
+fn is_checker_number(ctx: &mut Ctx, node: P<Node>) -> bool {
+    let typ = ctx.checker.get_type_at_location(node);
+    let flags = typ.flags();
+    flags.intersects(TypeFlags::NumberLike)
+        && !flags.intersects(TypeFlags::Any | TypeFlags::Unknown | TypeFlags::Never)
+}
+
+fn is_numeric_expression(ctx: &mut Ctx, expression: P<Node>) -> bool {
     let inner = unwrap_parentheses(expression);
     match inner.kind() {
-        Kind::Identifier => is_numeric_name(inner.as_identifier().text()),
+        Kind::Identifier => {
+            is_numeric_name(inner.as_identifier().text()) || is_checker_number(ctx, inner)
+        }
         Kind::PropertyAccessExpression => {
             let prop = inner.as_property_access_expression().name();
             if !ast::is_identifier(prop) {
                 return false;
             }
             let name = prop.as_identifier().text();
-            name == "length" || is_numeric_name(name)
+            name == "length" || is_numeric_name(name) || is_checker_number(ctx, inner)
         }
         Kind::ElementAccessExpression => {
             let arg = inner.as_element_access_expression().argument_expression();
             if !ast::is_identifier(arg) {
-                return false;
+                return is_checker_number(ctx, inner);
             }
             let name = arg.as_identifier().text();
-            name == "length" || is_numeric_name(name)
+            name == "length" || is_numeric_name(name) || is_checker_number(ctx, inner)
         }
         _ => false,
     }
 }
 
-fn is_string_call(expression: P<Node>) -> bool {
+fn is_string_call(ctx: &mut Ctx, expression: P<Node>) -> bool {
     if expression.kind() != Kind::CallExpression {
         return false;
     }
@@ -181,21 +191,19 @@ fn is_string_call(expression: P<Node>) -> bool {
     let callee = call.expression();
     ast::is_identifier(callee)
         && callee.as_identifier().text() == "String"
-        && call
-            .arguments()
-            .nodes()
-            .first()
-            .is_some_and(|&arg| arg.kind() != Kind::SpreadElement && is_numeric_expression(arg))
+        && call.arguments().nodes().first().is_some_and(|&arg| {
+            arg.kind() != Kind::SpreadElement && is_numeric_expression(ctx, arg)
+        })
 }
 
-fn is_numeric_template(expression: P<Node>) -> bool {
+fn is_numeric_template(ctx: &mut Ctx, expression: P<Node>) -> bool {
     expression.kind() == Kind::TemplateExpression
         && expression
             .as_template_expression()
             .template_spans()
             .nodes()
             .iter()
-            .any(|&span| is_numeric_expression(span.as_template_span().expression()))
+            .any(|&span| is_numeric_expression(ctx, span.as_template_span().expression()))
 }
 
 fn is_test_output_element(container: P<Node>) -> bool {

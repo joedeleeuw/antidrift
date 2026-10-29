@@ -350,6 +350,30 @@ fn check_function(ctx: &mut Ctx, node: P<Node>) {
     }
 }
 
+fn check_import_specifier(ctx: &mut Ctx, node: P<Node>) {
+    let spec = node.as_import_specifier();
+    if spec.property_name().is_none() {
+        return;
+    }
+    let alias = spec.name();
+    if !ast::is_identifier(alias) {
+        return;
+    }
+    let name = alias.as_identifier().text();
+    let reason = vague_reason(name).or_else(|| {
+        (name.len() > 4 && name.ends_with("Type")).then(|| "a filler suffix".to_owned())
+    });
+    if let Some(reason) = reason {
+        ctx.report_node(
+            alias,
+            RuleMessage::new(
+                "vague",
+                format!("'{name}' is {reason}. Name the binding for what it holds in this domain."),
+            ),
+        );
+    }
+}
+
 pub struct NoVagueNames {
     scope: RuleScope,
 }
@@ -379,6 +403,9 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::SetAccessor),
     Listener::Enter(Kind::CatchClause),
     Listener::Enter(Kind::ClassDeclaration),
+    Listener::Enter(Kind::TypeAliasDeclaration),
+    Listener::Enter(Kind::InterfaceDeclaration),
+    Listener::Enter(Kind::ImportSpecifier),
 ];
 
 impl Rule for NoVagueNames {
@@ -433,8 +460,13 @@ impl RuleVisitor for Visitor {
                     check_binding_node(ctx, var_decl.name());
                 }
             }
-            Listener::Enter(Kind::ClassDeclaration) => {
+            Listener::Enter(
+                Kind::ClassDeclaration | Kind::TypeAliasDeclaration | Kind::InterfaceDeclaration,
+            ) => {
                 check_ident(ctx, node.name());
+            }
+            Listener::Enter(Kind::ImportSpecifier) => {
+                check_import_specifier(ctx, node);
             }
             _ => {}
         }
