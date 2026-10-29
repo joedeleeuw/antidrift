@@ -1,6 +1,10 @@
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 
+use crate::outcome_shape::{
+    OutcomeArm, is_outcome_error_field, is_outcome_flag_field, outcome_shape_key,
+};
+use crate::projection::bag_state::is_nullish_expression;
 use crate::tsrs_kernel;
 
 const LIFECYCLE_BOOL_FIELDS: &[&str] = &[
@@ -156,4 +160,38 @@ pub fn find_sum_to_product_erasure(obj_node: P<Node>) -> Option<String> {
         }
     }
     None
+}
+
+fn is_absent_error_value(value: P<Node>) -> bool {
+    is_nullish_expression(value)
+        || (ast::is_string_literal(value) && value.as_string_literal().text().is_empty())
+}
+
+#[must_use]
+pub fn outcome_arm(obj_node: P<Node>) -> Option<OutcomeArm> {
+    if obj_node.kind() != Kind::ObjectLiteralExpression {
+        return None;
+    }
+    let props = obj_node.as_object_literal_expression().properties().nodes();
+    let (mut flag, mut error_present) = (None, None);
+    let mut names = Vec::with_capacity(props.len());
+    for &prop in props {
+        let (name, value) = property_name_and_value(prop)?;
+        if is_outcome_flag_field(name) {
+            flag = match value.kind() {
+                Kind::TrueKeyword => Some(true),
+                Kind::FalseKeyword => Some(false),
+                _ => None,
+            };
+        }
+        if is_outcome_error_field(name) {
+            error_present = Some(!is_absent_error_value(value));
+        }
+        names.push(name);
+    }
+    Some(OutcomeArm {
+        shape: outcome_shape_key("", names),
+        flag: flag?,
+        error_present: error_present?,
+    })
 }

@@ -1,5 +1,8 @@
 use super::RustDiagnostic;
 use super::syn_kernel::is_ok_tuple_pat;
+use antidrift_kernel::decode_guards::{
+    is_line_chunk_identifier, is_parser_module_path, is_sniffer_function_name,
+};
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
@@ -8,16 +11,12 @@ use syn::{
     ImplItemFn, ItemFn, Pat,
 };
 
-const LINE_CHUNK_IDENTIFIERS: &[&str] = &["line", "raw", "text", "chunk", "candidate", "trimmed"];
-const SNIFFER_FN_PREFIXES: &[&str] = &["try_", "sniff_", "probe_", "extract_", "detect_", "maybe_"];
-
 pub(super) fn check_decode_to_option(
     rel_path: &str,
     ast: &syn::File,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
-    let lower = rel_path.to_ascii_lowercase();
-    if lower.contains("parser") || lower.contains("grammar") || lower.contains("tool_call") {
+    if is_parser_module_path(rel_path) {
         return;
     }
     let mut visitor = DecodeToOptionVisitor {
@@ -142,9 +141,7 @@ fn is_sniffer_signature(
     fn_name: &str,
     inputs: &syn::punctuated::Punctuated<FnArg, syn::Token![,]>,
 ) -> bool {
-    SNIFFER_FN_PREFIXES
-        .iter()
-        .any(|prefix| fn_name.starts_with(prefix))
+    is_sniffer_function_name(fn_name)
         || inputs.iter().any(|arg| {
             matches!(
                 arg,
@@ -152,7 +149,7 @@ fn is_sniffer_signature(
                     if matches!(
                         &*pat_type.pat,
                         Pat::Ident(pat_ident)
-                            if LINE_CHUNK_IDENTIFIERS.iter().any(|name| pat_ident.ident == *name)
+                            if is_line_chunk_identifier(&pat_ident.ident.to_string())
                     )
             )
         })
@@ -201,7 +198,7 @@ fn arg_mentions_line_or_chunk(expr: &Expr) -> bool {
             .path
             .segments
             .last()
-            .is_some_and(|seg| LINE_CHUNK_IDENTIFIERS.iter().any(|name| seg.ident == *name)),
+            .is_some_and(|seg| is_line_chunk_identifier(&seg.ident.to_string())),
         _ => false,
     }
 }

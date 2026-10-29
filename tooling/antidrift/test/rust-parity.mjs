@@ -1041,6 +1041,18 @@ try {
       "    let _ = cloned.ident.len();",
       "    match legacy_adapter(err) { Ok(v) => OutcomeBag { ok: true, count: v, error: None }, Err(e) => OutcomeBag { ok: false, count: 0, error: Some(e) } }",
       "}",
+      "pub async fn serial_reads(h: &Holder) -> usize {",
+      "    let first = read_one(h).await;",
+      "    let second = read_two(h).await;",
+      "    let third = read_three(h).await;",
+      "    first + second + third",
+      "}",
+      "async fn read_one(h: &Holder) -> usize { h.ident.len() }",
+      "async fn read_two(h: &Holder) -> usize { h.ident.len() + 1 }",
+      "async fn read_three(h: &Holder) -> usize { h.ident.len() + 2 }",
+      "pub fn branch_bag(flag: bool, h: &Holder) -> OutcomeBag {",
+      "    if flag { OutcomeBag { ok: true, count: 1, error: None } } else { OutcomeBag { ok: false, count: 0, error: Some(h.ident.clone()) } }",
+      "}",
       "#[cfg(all(test))]\nmod inline_tests {}",
       "",
     ].join("\n")
@@ -1107,7 +1119,8 @@ try {
   for (const expectedMessage of [
     'collapsed into "" via fallback',
     "Do not serialize and deserialize the same value",
-    "Blocking 'std::thread::sleep' inside async fn",
+    "wall-clock sleep 'std::thread::sleep' inside an async context",
+    "Three or more independent reads are awaited one after another",
     "Nested '.find(...)' performs an O(N*M)",
     "spans multiple build output tiers",
     "Untyped config probe '.as_u64()'",
@@ -1119,6 +1132,13 @@ try {
       `Expected antidrift-linter rust diagnostics to include '${expectedMessage}', got ${JSON.stringify(rustDiags)}`
     );
   }
+  assert.equal(
+    rustDiags.filter((diag) =>
+      String(diag.message).startsWith("Success and failure arms")
+    ).length,
+    2,
+    `Expected the match and if/else outcome bags to each report once, got ${JSON.stringify(rustDiags)}`
+  );
   const singleRsRun = spawnSync(
     binaryPath,
     ["rust", "crates/antidrift-linter/src/main.rs"],

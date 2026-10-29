@@ -1,10 +1,12 @@
 use super::RustDiagnostic;
 use super::expression_shapes::{
     block_mentions_modified, closure_has_field_key_equality, collect_string_literals,
-    detect_fieldwise_clone_rebuild, detect_result_sum_erasure_match, first_closure_param_name,
-    is_multi_tier_exists_find, receiver_is_outer_collection,
+    detect_fieldwise_clone_rebuild, first_closure_param_name, is_multi_tier_exists_find,
+    outcome_arm, receiver_is_outer_collection,
 };
 use super::syn_kernel::{call_path_ends_with, extract_pat_ident};
+use antidrift_kernel::outcome_shape::{OutcomeArm, find_sum_to_product_pair};
+use antidrift_kernel::relational_scan::{is_inner_linear_scan_method, is_outer_traversal_method};
 use antidrift_kernel::runtime_lifecycle::{
     has_hold_open_resource, is_inline_hold_open_script, is_script_binding_name,
 };
@@ -13,8 +15,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Arm, Expr, ExprCall, ExprForLoop, ExprIf, ExprLit, ExprMatch, ExprMethodCall, ExprStruct,
-    ImplItemFn, ItemFn, Lit, Local, Pat,
+    Arm, Expr, ExprCall, ExprForLoop, ExprIf, ExprLit, ExprMethodCall, ExprStruct, ImplItemFn,
+    ItemFn, Lit, Local, Pat,
 };
 
 pub(super) fn check_corpus_smells(
@@ -24,13 +26,13 @@ pub(super) fn check_corpus_smells(
 ) {
     let mut visitor = CorpusSmellVisitor {
         rel_path,
-        in_async_fn: false,
         fn_has_mtime_check: false,
         script_context: false,
         error_bindings: FxHashSet::default(),
         error_string_bindings: FxHashSet::default(),
         local_string_lists: FxHashMap::default(),
         outer_loop_params: Vec::new(),
+        outcome_arms: Vec::new(),
         diagnostics,
     };
     visitor.visit_file(ast);
@@ -38,13 +40,13 @@ pub(super) fn check_corpus_smells(
 
 struct CorpusSmellVisitor<'a> {
     rel_path: &'a str,
-    in_async_fn: bool,
     fn_has_mtime_check: bool,
     script_context: bool,
     error_bindings: FxHashSet<String>,
     error_string_bindings: FxHashSet<String>,
     local_string_lists: FxHashMap<String, Vec<String>>,
     outer_loop_params: Vec<String>,
+    outcome_arms: Vec<(OutcomeArm, Span)>,
     diagnostics: &'a mut Vec<RustDiagnostic>,
 }
 
@@ -58,24 +60,51 @@ impl CorpusSmellVisitor<'_> {
         ));
     }
 
-    fn visit_fn_scope(&mut self, is_async: bool, has_mtime: bool, body: impl FnOnce(&mut Self)) {
+    fn visit_fn_scope(&mut self, has_mtime: bool, body: impl FnOnce(&mut Self)) {
         let prev = (
-            self.in_async_fn,
             self.fn_has_mtime_check,
             std::mem::take(&mut self.error_bindings),
             std::mem::take(&mut self.error_string_bindings),
             std::mem::take(&mut self.local_string_lists),
+            std::mem::take(&mut self.outcome_arms),
         );
-        self.in_async_fn = is_async;
         self.fn_has_mtime_check = has_mtime;
         body(self);
+        self.report_sum_to_product_arms();
         (
-            self.in_async_fn,
             self.fn_has_mtime_check,
             self.error_bindings,
             self.error_string_bindings,
             self.local_string_lists,
+            self.outcome_arms,
         ) = prev;
+    }
+
+    fn report_sum_to_product_arms(&mut self) {
+        let arms: Vec<OutcomeArm> = self
+            .outcome_arms
+            .iter()
+            .map(|(arm, _)| arm.clone())
+            .collect();
+        let Some((ok_index, err_index)) = find_sum_to_product_pair(&arms) else {
+            return;
+        };
+        let ok_line = self.outcome_arms[ok_index].1.start().line.max(1);
+        let (err_arm, err_span) = &self.outcome_arms[err_index];
+        let record = err_arm
+            .shape
+            .split('{')
+            .next()
+            .unwrap_or_default()
+            .to_owned();
+        self.push(
+            *err_span,
+            "rust/no-contract-appeasement-projection",
+            format!(
+                "Success and failure arms (lines {ok_line} and {}) both build '{record}' with complementary flag and error fields; return a typed outcome enum or Result instead of a product bag.",
+                err_span.start().line.max(1)
+            ),
+        );
     }
 
     fn check_error_string_branch(&mut self, expr: &Expr) {
@@ -92,14 +121,14 @@ impl CorpusSmellVisitor<'_> {
 impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
     fn visit_item_fn(&mut self, node: &'ast ItemFn) {
         let has_mtime = block_mentions_modified(&node.block);
-        self.visit_fn_scope(node.sig.asyncness.is_some(), has_mtime, |this| {
+        self.visit_fn_scope(has_mtime, |this| {
             visit::visit_item_fn(this, node);
         });
     }
 
     fn visit_impl_item_fn(&mut self, node: &'ast ImplItemFn) {
         let has_mtime = block_mentions_modified(&node.block);
-        self.visit_fn_scope(node.sig.asyncness.is_some(), has_mtime, |this| {
+        self.visit_fn_scope(has_mtime, |this| {
             visit::visit_impl_item_fn(this, node);
         });
     }
@@ -169,19 +198,6 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
         self.error_bindings = prev_err;
     }
 
-    fn visit_expr_match(&mut self, node: &'ast ExprMatch) {
-        if let Some(struct_name) = detect_result_sum_erasure_match(node) {
-            self.push(
-                node.match_token.span,
-                "rust/no-contract-appeasement-projection",
-                format!(
-                    "Match erases Result Ok/Err arms into correlated boolean/Option fields on '{struct_name}'; keep a typed outcome enum or Result instead of a product bag."
-                ),
-            );
-        }
-        visit::visit_expr_match(self, node);
-    }
-
     fn visit_expr_for_loop(&mut self, node: &'ast ExprForLoop) {
         let pushed = extract_pat_ident(&node.pat).map(|(name, _)| name);
         if let Some(ref name) = pushed {
@@ -212,19 +228,8 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
                 "First-match '.find(|p| p.exists())' spans multiple build output tiers (debug/release/dist) without comparing modification times; sort candidates by metadata().modified() so stale build tiers do not shadow newer builds.",
             );
         }
-        if self.in_async_fn && is_sync_command_wait(&method, &node.receiver) {
-            self.push(
-                node.method.span(),
-                "rust/no-blocking-in-async",
-                format!(
-                    "Synchronous std::process::Command '.{method}()' inside async fn blocks the executor thread; use an async process runner or spawn_blocking."
-                ),
-            );
-        }
-        if matches!(
-            method.as_str(),
-            "map" | "filter" | "filter_map" | "flat_map" | "for_each"
-        ) && let Some(Expr::Closure(closure)) = node.args.first()
+        if is_outer_traversal_method(&method)
+            && let Some(Expr::Closure(closure)) = node.args.first()
             && let Some(param_name) = first_closure_param_name(closure)
         {
             self.outer_loop_params.push(param_name);
@@ -232,7 +237,7 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
             self.outer_loop_params.pop();
             return;
         }
-        if matches!(method.as_str(), "find" | "position" | "any")
+        if is_inner_linear_scan_method(&method)
             && !self.outer_loop_params.is_empty()
             && let Some(Expr::Closure(closure)) = node.args.first()
             && let Some(inner_param) = first_closure_param_name(closure)
@@ -257,13 +262,6 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
     }
 
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
-        if self.in_async_fn && is_std_thread_sleep_call(node) {
-            self.push(
-                node.func.span(),
-                "rust/no-blocking-in-async",
-                "Blocking 'std::thread::sleep' inside async fn stalls the async executor; await an async timer or lifecycle signal instead.".to_owned(),
-            );
-        }
         let previous = self.script_context;
         self.script_context |= call_path_ends_with(node, &["Command", "new"]);
         visit::visit_expr_call(self, node);
@@ -285,6 +283,9 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
     }
 
     fn visit_expr_struct(&mut self, node: &'ast ExprStruct) {
+        if let Some(arm) = outcome_arm(node) {
+            self.outcome_arms.push((arm, node.path.span()));
+        }
         if let Some(src_ident) = detect_fieldwise_clone_rebuild(node)
             && let Some(seg) = node.path.segments.last()
         {
@@ -399,23 +400,4 @@ fn is_fs_read_to_string_sentinel(node: &ExprMethodCall) -> bool {
                 && is_empty_string_expr(&node.args[0]))
             || (node.method == "unwrap_or_else"
                 && matches!(node.args.first(), Some(Expr::Closure(c)) if is_empty_string_expr(&c.body))))
-}
-
-fn is_std_thread_sleep_call(call: &ExprCall) -> bool {
-    call_path_ends_with(call, &["thread", "sleep"])
-}
-
-fn is_sync_command_wait(method: &str, receiver: &Expr) -> bool {
-    matches!(method, "output" | "status" | "wait") && expr_mentions_std_command(receiver)
-}
-
-fn expr_mentions_std_command(expr: &Expr) -> bool {
-    match expr {
-        Expr::MethodCall(mc) => expr_mentions_std_command(&mc.receiver),
-        Expr::Call(call) => {
-            call_path_ends_with(call, &["Command", "new"])
-                && matches!(&*call.func, Expr::Path(p) if !p.path.segments.iter().any(|s| s.ident == "tokio" || s.ident == "async_process"))
-        }
-        _ => false,
-    }
 }

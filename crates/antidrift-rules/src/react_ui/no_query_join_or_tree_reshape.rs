@@ -5,6 +5,7 @@ use antidrift_kernel::jsx::{
 use antidrift_kernel::local_binding::{
     Binding, binding_pattern_identifiers, for_each_resolved_reference, resolve_lexical_binding,
 };
+use antidrift_kernel::relational_scan::{is_inner_linear_scan_method, is_outer_traversal_method};
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::tsrs_kernel::{
     callee_name, is_declaration_file, is_function_like, is_generated_file, is_test_file,
@@ -26,8 +27,6 @@ const REACTIVE_SOURCE_HOOKS: [&str; 7] = [
     "useAtomValue",
     "useStore",
 ];
-const ITERATION_METHODS: [&str; 4] = ["map", "filter", "flatMap", "reduce"];
-const LOOKUP_METHODS: [&str; 5] = ["find", "filter", "some", "every", "includes"];
 const NESTED_PROJECTION_METHODS: [&str; 2] = ["flatMap", "map"];
 const FLATTEN_DEPTH: f64 = 2.0;
 
@@ -268,7 +267,7 @@ impl RenderScan<'_> {
             .first()
             .copied()
             .filter(|&arg| is_function_like(arg));
-        if ITERATION_METHODS.contains(&method)
+        if is_outer_traversal_method(method)
             && let Some(callback) = callback
             && self.is_nested_lookup_join(receiver, callback)
         {
@@ -290,7 +289,7 @@ impl RenderScan<'_> {
         };
         any_descendant(body, true, &mut |node| {
             method_call(node).is_some_and(|(inner_receiver, inner_method)| {
-                LOOKUP_METHODS.contains(&inner_method)
+                is_inner_linear_scan_method(inner_method)
                     && self
                         .reactive_sources_of(inner_receiver)
                         .iter()

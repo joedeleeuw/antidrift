@@ -1,10 +1,14 @@
 use super::syn_kernel::extract_pat_ident;
+use antidrift_kernel::outcome_shape::{
+    OutcomeArm, is_outcome_error_field, is_outcome_flag_field, outcome_shape_key,
+};
+use antidrift_kernel::relational_scan::is_cross_param_key_pair;
 use antidrift_kernel::runtime_lifecycle::spans_multiple_artifact_tiers;
 use rustc_hash::FxHashMap;
 use syn::visit::{self, Visit};
 use syn::{
-    BinOp, Expr, ExprBinary, ExprClosure, ExprField, ExprLit, ExprMatch, ExprMethodCall,
-    ExprStruct, Lit, Member, Pat,
+    BinOp, Expr, ExprBinary, ExprClosure, ExprField, ExprLit, ExprMethodCall, ExprStruct, Lit,
+    Member,
 };
 
 pub(super) fn first_closure_param_name(closure: &ExprClosure) -> Option<String> {
@@ -24,16 +28,17 @@ fn root_ident_of(expr: &Expr) -> Option<String> {
     }
 }
 
-fn is_param_field_access(expr: &Expr, param: &str) -> bool {
+fn field_access_root(expr: &Expr) -> Option<String> {
     match expr {
-        Expr::Field(ExprField { base, .. }) => {
-            matches!(&**base, Expr::Path(ep) if ep.path.is_ident(param))
-        }
-        Expr::Reference(er) => is_param_field_access(&er.expr, param),
+        Expr::Field(ExprField { base, .. }) => match &**base {
+            Expr::Path(ep) => ep.path.get_ident().map(ToString::to_string),
+            _ => None,
+        },
+        Expr::Reference(er) => field_access_root(&er.expr),
         Expr::MethodCall(mc) if mc.method == "as_str" && mc.args.is_empty() => {
-            is_param_field_access(&mc.receiver, param)
+            field_access_root(&mc.receiver)
         }
-        _ => false,
+        _ => None,
     }
 }
 
@@ -49,10 +54,12 @@ pub(super) fn closure_has_field_key_equality(
             right,
             ..
         }) => {
-            (is_param_field_access(left, outer_param) && is_param_field_access(right, inner_param))
-                || (is_param_field_access(left, inner_param)
-                    && is_param_field_access(right, outer_param))
-                || closure_has_field_key_equality(left, outer_param, inner_param)
+            is_cross_param_key_pair(
+                field_access_root(left).as_deref(),
+                field_access_root(right).as_deref(),
+                outer_param,
+                inner_param,
+            ) || closure_has_field_key_equality(left, outer_param, inner_param)
                 || closure_has_field_key_equality(right, outer_param, inner_param)
         }
         Expr::Binary(bin) => {
@@ -67,61 +74,46 @@ pub(super) fn closure_has_field_key_equality(
     }
 }
 
-pub(super) fn detect_result_sum_erasure_match(node: &ExprMatch) -> Option<String> {
-    if node.arms.len() != 2 {
+pub(super) fn outcome_arm(node: &ExprStruct) -> Option<OutcomeArm> {
+    if node.rest.is_some() {
         return None;
     }
-    let (mut ok_struct, mut err_struct) = (None, None);
-    for arm in &node.arms {
-        let Pat::TupleStruct(ts) = &arm.pat else {
+    let record = node.path.segments.last()?.ident.to_string();
+    let (mut flag, mut error_present) = (None, None);
+    let mut names = Vec::with_capacity(node.fields.len());
+    for field in &node.fields {
+        let Member::Named(ident) = &field.member else {
             return None;
         };
-        let variant = ts.path.segments.last()?.ident.to_string();
-        let struct_expr = extract_arm_struct_expr(&arm.body)?;
-        if variant == "Ok" {
-            ok_struct = Some(struct_expr);
-        } else if variant == "Err" {
-            err_struct = Some(struct_expr);
+        let name = ident.to_string();
+        if is_outcome_flag_field(&name)
+            && let Expr::Lit(ExprLit {
+                lit: Lit::Bool(literal),
+                ..
+            }) = &field.expr
+        {
+            flag = Some(literal.value);
         }
+        if is_outcome_error_field(&name) {
+            error_present = option_presence(&field.expr);
+        }
+        names.push(name);
     }
-    let (ok_s, err_s) = (ok_struct?, err_struct?);
-    let ok_name = ok_s.path.segments.last()?.ident.to_string();
-    if err_s.path.segments.last()?.ident != ok_name {
-        return None;
-    }
-    (struct_has_bool_field(ok_s, true)
-        && struct_has_bool_field(err_s, false)
-        && struct_has_error_option_field(ok_s, false)
-        && struct_has_error_option_field(err_s, true))
-    .then_some(ok_name)
+    Some(OutcomeArm {
+        shape: outcome_shape_key(&record, names.iter().map(String::as_str)),
+        flag: flag?,
+        error_present: error_present?,
+    })
 }
 
-fn extract_arm_struct_expr(expr: &Expr) -> Option<&ExprStruct> {
+fn option_presence(expr: &Expr) -> Option<bool> {
     match expr {
-        Expr::Struct(es) => Some(es),
-        Expr::Block(b) => match b.block.stmts.last()? {
-            syn::Stmt::Expr(Expr::Struct(es), None) => Some(es),
-            _ => None,
-        },
+        Expr::Path(ep) if ep.path.is_ident("None") => Some(false),
+        Expr::Call(call) => {
+            matches!(&*call.func, Expr::Path(ep) if ep.path.is_ident("Some")).then_some(true)
+        }
         _ => None,
     }
-}
-
-fn struct_has_bool_field(es: &ExprStruct, expected: bool) -> bool {
-    es.fields.iter().any(
-        |f| matches!(&f.expr, Expr::Lit(ExprLit { lit: Lit::Bool(b), .. }) if b.value == expected),
-    )
-}
-
-fn struct_has_error_option_field(es: &ExprStruct, is_some: bool) -> bool {
-    es.fields.iter().any(|f| {
-        matches!(&f.member, Member::Named(id) if id == "error")
-            && if is_some {
-                matches!(&f.expr, Expr::Call(c) if matches!(&*c.func, Expr::Path(ep) if ep.path.is_ident("Some")))
-            } else {
-                matches!(&f.expr, Expr::Path(ep) if ep.path.is_ident("None"))
-            }
-    })
 }
 
 pub(super) fn detect_fieldwise_clone_rebuild(node: &ExprStruct) -> Option<String> {

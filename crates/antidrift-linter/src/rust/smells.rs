@@ -1,4 +1,5 @@
 use super::RustDiagnostic;
+use super::async_effects::check_async_effects;
 use super::corpus_smells::check_corpus_smells;
 use super::syn_kernel::{
     expr_mentions_ident, extract_pat_ident, is_err_wild_pat, is_fs_io_call, is_ok_tuple_pat,
@@ -41,6 +42,7 @@ pub(super) fn check_smells(
     };
     visitor.visit_file(ast);
     check_corpus_smells(rel_path, ast, diagnostics);
+    check_async_effects(rel_path, ast, diagnostics);
 }
 
 struct SmellVisitor<'a> {

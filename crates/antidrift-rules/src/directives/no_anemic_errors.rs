@@ -1,6 +1,7 @@
 use super::anemic_error_fallback::{
-    callee_property_name, check_catch_clause_fallback, check_promise_catch_call_fallback,
-    expr_ident_name, is_error_member_read,
+    callee_property_name, check_catch_clause_fallback, check_decode_catch_to_nullable,
+    check_decode_to_nullable_expression, check_promise_catch_call_fallback, expr_ident_name,
+    is_error_member_read,
 };
 use antidrift_kernel::rule_scope::RuleScope;
 use antidrift_kernel::tsrs_kernel::{
@@ -59,6 +60,8 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
     Listener::Enter(Kind::ThrowStatement),
     Listener::Enter(Kind::ReturnStatement),
+    Listener::Enter(Kind::BinaryExpression),
+    Listener::Enter(Kind::ConditionalExpression),
 ];
 
 impl Rule for NoAnemicErrors {
@@ -89,6 +92,9 @@ impl RuleVisitor for Visitor {
         match node.kind() {
             Kind::CatchClause => {
                 check_catch_clause_fallback(ctx, node);
+                if !self.is_test {
+                    check_decode_catch_to_nullable(ctx, node);
+                }
                 if !self.is_test
                     && let Some(param_name) = catch_clause_param_name(node)
                 {
@@ -115,6 +121,9 @@ impl RuleVisitor for Visitor {
             }
             Kind::ReturnStatement if !self.is_test => {
                 check_return_statement(ctx, node);
+            }
+            Kind::BinaryExpression | Kind::ConditionalExpression if !self.is_test => {
+                check_decode_to_nullable_expression(ctx, node);
             }
             _ => {}
         }

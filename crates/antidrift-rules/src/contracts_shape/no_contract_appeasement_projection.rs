@@ -1,3 +1,4 @@
+use antidrift_kernel::outcome_shape::find_sum_to_product_pair;
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_symbol_origin, symbol_at_node};
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{projection, tsrs_kernel};
@@ -58,6 +59,15 @@ fn build_constant_return_field_message(
         "constantReturnField",
         format!(
             "Return contract '{contract_name}' declares '{field_name}' as boolean, but every return branch in this module hardcodes '{field_name}: {constant_literal}'; compute the real value per branch or remove the dead contract field."
+        ),
+    )
+}
+
+fn build_outcome_flag_erasure_message(ok_line: usize, err_line: usize) -> RuleMessage {
+    RuleMessage::new(
+        "outcomeFlagErasure",
+        format!(
+            "Success and failure returns (lines {ok_line} and {err_line}) build the same object with complementary flag and error fields; return a discriminated union so consumers never read a nullable error behind a boolean flag."
         ),
     )
 }
@@ -339,6 +349,49 @@ fn report_end_of_file(
             ctx.report_node(obj_node, build_sum_to_product_erasure_message(&disc));
         }
     }
+    let mut seen = FxHashSet::default();
+    for &(fn_node, _) in candidates {
+        if seen.insert(fn_node) {
+            report_outcome_flag_erasure(ctx, fn_node);
+        }
+    }
+}
+
+fn return_branches(expr: P<Node>, out: &mut Vec<P<Node>>) {
+    let unwrapped = tsrs_kernel::unwrap_expression(expr);
+    if unwrapped.kind() == Kind::ConditionalExpression {
+        let cond = unwrapped.as_conditional_expression();
+        return_branches(cond.when_true(), out);
+        return_branches(cond.when_false(), out);
+        return;
+    }
+    out.push(unwrapped);
+}
+
+fn report_outcome_flag_erasure(ctx: &mut Ctx, fn_node: P<Node>) {
+    let mut returns = Vec::new();
+    for expr in tsrs_kernel::collect_return_expressions(tsrs_kernel::function_body_node(fn_node)) {
+        return_branches(expr, &mut returns);
+    }
+    let arms: Vec<(_, P<Node>)> = returns
+        .into_iter()
+        .filter_map(|node| projection::outcome_arm(node).map(|arm| (arm, node)))
+        .collect();
+    let shapes: Vec<_> = arms.iter().map(|(arm, _)| arm.clone()).collect();
+    let Some((ok_index, err_index)) = find_sum_to_product_pair(&shapes) else {
+        return;
+    };
+    let ok_line = line_of(ctx, arms[ok_index].1);
+    let err_line = line_of(ctx, arms[err_index].1);
+    ctx.report_node(
+        arms[err_index].1,
+        build_outcome_flag_erasure_message(ok_line, err_line),
+    );
+}
+
+fn line_of(ctx: &Ctx, node: P<Node>) -> usize {
+    let (start, _) = tsrs_kernel::node_range(ctx.file, node);
+    ctx.file.text()[..start].matches('\n').count() + 1
 }
 
 impl RuleVisitor for Visitor {

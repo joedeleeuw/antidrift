@@ -124,7 +124,7 @@ export function parseArgs(argv) {
   return parsed;
 }
 
-export async function diffScopedAdapters({
+export function diffScopedAdapters({
   base = process.env.ANTIDRIFT_BASE_REF ?? "HEAD",
   head = "HEAD",
   cwd = process.cwd(),
@@ -199,6 +199,6 @@ export async function diffScopedAdapters({
   return summary;
 }
 
-export async function diffScopedAdaptersCommand(argv) {
+export function diffScopedAdaptersCommand(argv) {
   return diffScopedAdapters(parseArgs(argv));
 }

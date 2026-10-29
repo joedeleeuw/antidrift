@@ -23,4 +23,4 @@ pub use contract_projection::is_contract_appeasement_projection;
 pub use inline_parse::{
     InlineParseReshapeClassification, InlineParseReshapeKind, classify_inline_parse_reshape,
 };
-pub use sum_erasure::find_sum_to_product_erasure;
+pub use sum_erasure::{find_sum_to_product_erasure, outcome_arm};
