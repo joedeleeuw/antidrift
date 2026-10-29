@@ -1,0 +1,19 @@
+{
+  "name": "@joedeleeuw/antidrift-linter-darwin-x64",
+  "version": "0.20.0",
+  "license": "MIT",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "antidrift-linter",
+  "files": [
+    "antidrift-linter"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

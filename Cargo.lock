@@ -26,6 +26,7 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
+ "thiserror",
  "tsrs_ast",
  "tsrs_checker",
  "tsrs_compiler",

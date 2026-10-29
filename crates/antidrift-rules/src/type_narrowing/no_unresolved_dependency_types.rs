@@ -84,12 +84,22 @@ fn is_package_installed(start_dir: &Path, pkg_name: &str) -> bool {
     false
 }
 
-fn load_manifest_info(file_path: &Path) -> Option<ManifestInfo> {
-    let manifest_path = find_nearest_package_json(file_path)?;
-    let package_dir = manifest_path.parent()?;
-    let Ok(content) = std::fs::read_to_string(&manifest_path) else {
-        return None;
+fn load_manifest_info(
+    file_path: &Path,
+) -> Result<Option<ManifestInfo>, antidrift_kernel::error::KernelError> {
+    let Some(manifest_path) = find_nearest_package_json(file_path) else {
+        return Ok(None);
     };
+    let Some(package_dir) = manifest_path.parent() else {
+        return Ok(None);
+    };
+    let content = std::fs::read_to_string(&manifest_path).map_err(|source| {
+        antidrift_kernel::error::KernelError::Io {
+            operation: "read",
+            path: manifest_path.clone(),
+            source,
+        }
+    })?;
     let manifest = parse_package_json_manifest(&content)?;
     let mut declared = Vec::new();
     let mut seen = FxHashSet::default();
@@ -119,11 +129,11 @@ fn load_manifest_info(file_path: &Path) -> Option<ManifestInfo> {
             missing_by_name.entry(dep.clone()).or_insert(dep);
         }
     }
-    Some(ManifestInfo {
+    Ok(Some(ManifestInfo {
         manifest_label: "package.json".to_owned(),
         missing_by_name,
         installed_by_name,
-    })
+    }))
 }
 
 fn has_script_subpath(subpath: &str) -> bool {
@@ -177,8 +187,16 @@ fn check_node(ctx: &mut Ctx, node: P<Node>) {
     };
     let file_name = ctx.file.file_name().to_owned();
     let file_path = Path::new(&file_name);
-    let Some(manifest_info) = load_manifest_info(file_path) else {
-        return;
+    let manifest_info = match load_manifest_info(file_path) {
+        Ok(Some(manifest_info)) => manifest_info,
+        Ok(None) => return,
+        Err(error) => {
+            ctx.report_node(
+                specifier_node,
+                RuleMessage::new("invalidPackageJson", error.to_string()),
+            );
+            return;
+        }
     };
     if let Some(pkg_name) = manifest_info.missing_by_name.get(&imported) {
         ctx.report_node(

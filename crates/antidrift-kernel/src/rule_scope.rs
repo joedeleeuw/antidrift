@@ -1,3 +1,4 @@
+use crate::error::KernelError;
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
@@ -28,9 +29,9 @@ pub fn decode_scoped<T: ScopedOptions>(
     rule_name: &str,
     raw: Option<&Value>,
 ) -> Result<(T, RuleScope), String> {
-    let options = decode_rule_options::<T>(rule_name, raw)?;
+    let options = decode_rule_options::<T>(rule_name, raw).map_err(String::from)?;
     options.validate(rule_name)?;
-    let scope = RuleScope::from_scope_options(rule_name, &options.scope())?;
+    let scope = RuleScope::from_scope_options(rule_name, &options.scope()).map_err(String::from)?;
     Ok((options, scope))
 }
 
@@ -61,7 +62,7 @@ pub fn in_scope(scope: &RuleScope, ctx: &Ctx, inferred_scope: Option<fn(&str) ->
 pub fn decode_rule_options<T: DeserializeOwned + Default>(
     rule_name: &str,
     options: Option<&Value>,
-) -> Result<T, String> {
+) -> Result<T, KernelError> {
     let Some(raw) = options else {
         return Ok(T::default());
     };
@@ -80,8 +81,10 @@ pub fn decode_rule_options<T: DeserializeOwned + Default>(
         }
         None => raw,
     };
-    serde_json::from_value::<T>(target.clone())
-        .map_err(|err| format!("invalid options for {rule_name}: {err}"))
+    serde_json::from_value::<T>(target.clone()).map_err(|source| KernelError::JsonDecode {
+        location: format!("invalid options for {rule_name}"),
+        source,
+    })
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -103,12 +106,12 @@ impl RuleScope {
         exclude_files: None,
     };
 
-    pub fn from_options(rule_name: &str, options: Option<&Value>) -> Result<Self, String> {
+    pub fn from_options(rule_name: &str, options: Option<&Value>) -> Result<Self, KernelError> {
         let parsed = decode_rule_options::<ScopeOptions>(rule_name, options)?;
         Self::from_scope_options(rule_name, &parsed)
     }
 
-    pub fn from_scope_options(rule_name: &str, parsed: &ScopeOptions) -> Result<Self, String> {
+    pub fn from_scope_options(rule_name: &str, parsed: &ScopeOptions) -> Result<Self, KernelError> {
         let files = match &parsed.files {
             Some(patterns) => Some(compile_glob_set(rule_name, "files", patterns)?),
             None => None,
@@ -156,16 +159,24 @@ impl RuleScope {
     }
 }
 
-fn compile_glob_set(rule_name: &str, field: &str, patterns: &[String]) -> Result<GlobSet, String> {
+fn compile_glob_set(
+    rule_name: &str,
+    field: &str,
+    patterns: &[String],
+) -> Result<GlobSet, KernelError> {
     let mut builder = GlobSetBuilder::new();
     for pattern in patterns {
         let glob = GlobBuilder::new(pattern)
             .literal_separator(true)
             .build()
-            .map_err(|err| format!("invalid glob '{pattern}' in {field} for {rule_name}: {err}"))?;
+            .map_err(|source| KernelError::GlobCompile {
+                context: format!("invalid glob '{pattern}' in {field} for {rule_name}"),
+                source,
+            })?;
         builder.add(glob);
     }
-    builder
-        .build()
-        .map_err(|err| format!("failed to compile {field} globs for {rule_name}: {err}"))
+    builder.build().map_err(|source| KernelError::GlobCompile {
+        context: format!("failed to compile {field} globs for {rule_name}"),
+        source,
+    })
 }

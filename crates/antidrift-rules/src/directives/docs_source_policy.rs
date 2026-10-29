@@ -94,13 +94,22 @@ impl RuleVisitor for Visitor {
         if self.enabled { LISTENERS } else { &[] }
     }
 
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
+    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
         let default_opts = DocsSourcePolicyOptions::default();
         let opts = self.rule.options.as_ref().unwrap_or(&default_opts);
         let file_name = ctx.file.file_name().to_owned();
         let dependencies: BTreeSet<String> = match &opts.dependencies {
             Some(list) => list.iter().cloned().collect(),
-            None => load_nearest_package_dependencies(&file_name),
+            None => match load_nearest_package_dependencies(&file_name) {
+                Ok(dependencies) => dependencies,
+                Err(error) => {
+                    ctx.report_node(
+                        node,
+                        RuleMessage::new("invalidPackageJson", error.to_string()),
+                    );
+                    return;
+                }
+            },
         };
         let now_ms = opts
             .now
@@ -122,15 +131,17 @@ impl RuleVisitor for Visitor {
     }
 }
 
-fn load_nearest_package_dependencies(file_path: &str) -> BTreeSet<String> {
-    load_nearest_package_json_manifest(Path::new(file_path))
-        .and_then(|manifest| {
-            manifest
-                .sections
-                .get("dependencies")
-                .map(|entries| entries.iter().map(|entry| entry.key.clone()).collect())
-        })
-        .unwrap_or_default()
+fn load_nearest_package_dependencies(
+    file_path: &str,
+) -> Result<BTreeSet<String>, antidrift_kernel::error::KernelError> {
+    let Some(manifest) = load_nearest_package_json_manifest(Path::new(file_path))? else {
+        return Ok(BTreeSet::new());
+    };
+    Ok(manifest
+        .sections
+        .get("dependencies")
+        .map(|entries| entries.iter().map(|entry| entry.key.clone()).collect())
+        .unwrap_or_default())
 }
 
 fn evaluate_policy(

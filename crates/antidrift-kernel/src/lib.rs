@@ -2,6 +2,7 @@ pub mod boundary;
 pub mod callgraph;
 pub mod diagnostic;
 pub mod directives;
+pub mod error;
 pub mod imports;
 pub mod json_manifest;
 pub mod jsx;

@@ -76,7 +76,7 @@
   },
   "scripts": {
     "build": "node scripts/build.ts",
-    "prepack": "pnpm run build"
+    "prepack": "pnpm run build && node scripts/stage-linter-binary.mjs ../../target/release/antidrift-linter bin/antidrift-linter"
   },
   "files": [
     "CHANGELOG.md",
@@ -85,12 +85,21 @@
     "licenses",
     "README.md",
     "ast-grep",
+    "bin/antidrift-linter",
     "dist"
   ],
   "dependencies": {
     "oxlint": "1.89.0",
     "yaml": "^2.6.1",
     "zod": "^3.24.1"
+  },
+  "optionalDependencies": {
+    "@joedeleeuw/antidrift-linter-darwin-arm64": "0.20.0",
+    "@joedeleeuw/antidrift-linter-darwin-x64": "0.20.0",
+    "@joedeleeuw/antidrift-linter-linux-arm64-gnu": "0.20.0",
+    "@joedeleeuw/antidrift-linter-linux-x64-gnu": "0.20.0",
+    "@joedeleeuw/antidrift-linter-win32-arm64-msvc": "0.20.0",
+    "@joedeleeuw/antidrift-linter-win32-x64-msvc": "0.20.0"
   },
   "peerDependencies": {
     "typescript": ">=5 <6.1"

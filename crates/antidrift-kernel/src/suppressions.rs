@@ -1,4 +1,5 @@
 use crate::diagnostic::RuleDiagnostic;
+use crate::error::KernelError;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -19,23 +20,36 @@ pub struct SuppressionsTable {
 }
 
 impl SuppressionsTable {
-    pub fn load(path: &Path) -> Result<Self, String> {
+    pub fn load(path: &Path) -> Result<Self, KernelError> {
         if !path.exists() {
             return Ok(Self::default());
         }
-        let raw = fs::read_to_string(path)
-            .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
-        let entries: SuppressionsMap = serde_json::from_str(&raw)
-            .map_err(|err| format!("failed to parse {}: {err}", path.display()))?;
+        let raw = fs::read_to_string(path).map_err(|source| KernelError::Io {
+            operation: "read",
+            path: path.to_path_buf(),
+            source,
+        })?;
+        let entries: SuppressionsMap =
+            serde_json::from_str(&raw).map_err(|source| KernelError::JsonDecode {
+                location: path.display().to_string(),
+                source,
+            })?;
         Ok(Self { entries })
     }
 
-    pub fn save(&self, path: &Path) -> Result<(), String> {
-        let mut serialized = serde_json::to_string_pretty(&self.entries)
-            .map_err(|err| format!("failed to serialize suppressions: {err}"))?;
+    pub fn save(&self, path: &Path) -> Result<(), KernelError> {
+        let mut serialized = serde_json::to_string_pretty(&self.entries).map_err(|source| {
+            KernelError::JsonEncode {
+                location: path.display().to_string(),
+                source,
+            }
+        })?;
         serialized.push('\n');
-        fs::write(path, serialized)
-            .map_err(|err| format!("failed to write {}: {err}", path.display()))
+        fs::write(path, serialized).map_err(|source| KernelError::Io {
+            operation: "write",
+            path: path.to_path_buf(),
+            source,
+        })
     }
 
     #[must_use]
