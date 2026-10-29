@@ -111,7 +111,8 @@ impl<'ast> Visit<'ast> for DecodeToOptionVisitor<'_> {
         if matches!(
             method_name.as_str(),
             "ok" | "unwrap_or" | "unwrap_or_default" | "unwrap_or_else"
-        ) && let Some((decode_call, callee_label)) = extract_serde_decode_call(&node.receiver)
+        ) && !(method_name == "unwrap_or_else" && closure_arg_diverges(&node.args))
+            && let Some((decode_call, callee_label)) = extract_serde_decode_call(&node.receiver)
             && !self.is_exempt(decode_call)
         {
             self.push(
@@ -212,27 +213,64 @@ fn is_ok_tuple_pat(pat: &Pat) -> bool {
     )
 }
 
+fn closure_arg_diverges(args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>) -> bool {
+    let Some(Expr::Closure(closure)) = args.first() else {
+        return false;
+    };
+    expr_diverges(&closure.body)
+}
+
+fn expr_diverges(expr: &Expr) -> bool {
+    match expr {
+        Expr::Macro(mac) => mac.mac.path.segments.last().is_some_and(|seg| {
+            seg.ident == "panic" || seg.ident == "unreachable" || seg.ident == "todo"
+        }),
+        Expr::Return(_) | Expr::Break(_) | Expr::Continue(_) => true,
+        Expr::Block(block) => block.block.stmts.last().is_some_and(|stmt| match stmt {
+            syn::Stmt::Expr(e, _) => expr_diverges(e),
+            syn::Stmt::Macro(m) => m.mac.path.segments.last().is_some_and(|seg| {
+                seg.ident == "panic" || seg.ident == "unreachable" || seg.ident == "todo"
+            }),
+            _ => false,
+        }),
+        _ => false,
+    }
+}
+
 fn is_serde_call(call: &ExprCall, name: &str) -> bool {
     let Expr::Path(callee) = &*call.func else {
         return false;
     };
-    callee
-        .path
-        .segments
-        .last()
-        .is_some_and(|seg| seg.ident == name)
+    let segs: Vec<&syn::Ident> = callee.path.segments.iter().map(|s| &s.ident).collect();
+    let Some(&last) = segs.last() else {
+        return false;
+    };
+    if *last != name {
+        return false;
+    }
+    if name == "to_value" || name == "from_value" {
+        return true;
+    }
+    segs.len() >= 2 && {
+        let crate_seg = segs[segs.len() - 2];
+        *crate_seg == "serde_json"
+            || *crate_seg == "yaml_serde"
+            || *crate_seg == "serde_yaml"
+            || *crate_seg == "toml"
+    }
 }
 
 fn is_serde_serializer_arg(expr: &Expr, names: &[&str]) -> bool {
     match expr {
         Expr::Reference(r) => is_serde_serializer_arg(&r.expr, names),
+        Expr::Paren(p) => is_serde_serializer_arg(&p.expr, names),
         Expr::Try(expr_try) => is_serde_serializer_arg(&expr_try.expr, names),
         Expr::MethodCall(call)
-            if (call.method == "unwrap"
-                || call.method == "expect"
+            if ((call.method == "unwrap"
                 || call.method == "as_str"
                 || call.method == "as_bytes")
-                && call.args.is_empty() =>
+                && call.args.is_empty())
+                || (call.method == "expect" && call.args.len() == 1) =>
         {
             is_serde_serializer_arg(&call.receiver, names)
         }

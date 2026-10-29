@@ -138,18 +138,15 @@ impl NoIdentitySchemaTransform {
         if unwrapped.kind() == Kind::ObjectLiteralExpression {
             return Some(unwrapped);
         }
-        (unwrapped.kind() == Kind::CallExpression)
-            .then(|| {
-                unwrapped
-                    .as_call_expression()
-                    .arguments()
-                    .nodes()
-                    .iter()
-                    .copied()
-                    .map(tsrs_kernel::unwrap_expression)
-                    .find(|arg| arg.kind() == Kind::ObjectLiteralExpression)
-            })
-            .flatten()
+        if unwrapped.kind() == Kind::CallExpression
+            && let &[only_arg] = unwrapped.as_call_expression().arguments().nodes()
+        {
+            let arg = tsrs_kernel::unwrap_expression(only_arg);
+            if arg.kind() == Kind::ObjectLiteralExpression {
+                return Some(arg);
+            }
+        }
+        None
     }
 
     fn keys_from_identifier_param(param_name: &str, obj: P<Node>) -> Option<FxHashSet<String>> {

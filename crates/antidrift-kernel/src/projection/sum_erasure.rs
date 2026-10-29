@@ -66,7 +66,7 @@ fn find_local_initializer(scope_root: P<Node>, target_ident: &str) -> Option<P<N
     found
 }
 
-fn extract_discriminant_comparison(node: P<Node>) -> Option<&'static str> {
+fn extract_discriminant_comparison(node: P<Node>) -> Option<(&'static str, &'static str)> {
     let unwrapped = tsrs_kernel::unwrap_expression(node);
     if unwrapped.kind() == Kind::BinaryExpression {
         let bin = unwrapped.as_binary_expression();
@@ -91,8 +91,9 @@ fn extract_discriminant_comparison(node: P<Node>) -> Option<&'static str> {
                 && let Some(prop_name) =
                     tsrs_kernel::property_name_text(side.as_property_access_expression().name())
                 && is_discriminant_property_name(prop_name)
+                && let Some(root_ident) = tsrs_kernel::member_chain_root_identifier(side)
             {
-                return Some(prop_name);
+                return Some((root_ident, prop_name));
             }
         }
     }
@@ -119,9 +120,15 @@ pub fn find_sum_to_product_erasure(obj_node: P<Node>) -> Option<String> {
     let mut has_error_field = false;
     let mut values = Vec::with_capacity(props.len());
     for &prop in props {
+        if prop.kind() == Kind::SpreadAssignment {
+            return None;
+        }
         let Some((name, val)) = property_name_and_value(prop) else {
             continue;
         };
+        if is_discriminant_property_name(name) {
+            return None;
+        }
         if LIFECYCLE_BOOL_FIELDS.contains(&name)
             && !matches!(val.kind(), Kind::TrueKeyword | Kind::FalseKeyword)
         {
@@ -137,13 +144,13 @@ pub fn find_sum_to_product_erasure(obj_node: P<Node>) -> Option<String> {
     }
     let scope_root = tsrs_kernel::enclosing_function(obj_node);
     for val in values {
-        if let Some(disc) = extract_discriminant_comparison(val) {
+        if let Some((_root, disc)) = extract_discriminant_comparison(val) {
             return Some(disc.to_owned());
         }
         if ast::is_identifier(val)
             && let Some(root) = scope_root
             && let Some(init) = find_local_initializer(root, val.as_identifier().text())
-            && let Some(disc) = extract_discriminant_comparison(init)
+            && let Some((_root, disc)) = extract_discriminant_comparison(init)
         {
             return Some(disc.to_owned());
         }

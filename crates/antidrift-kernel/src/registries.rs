@@ -51,10 +51,13 @@ pub struct PolicyRegistries {
 
 impl PolicyRegistries {
     pub fn load_from_repo(repo_root: &Path) -> Result<Self, KernelError> {
-        let registries_dir = repo_root.join("policy").join("registries");
-        if !registries_dir.is_dir() {
+        let Some(registries_dir) = repo_root
+            .ancestors()
+            .map(|ancestor| ancestor.join("policy").join("registries"))
+            .find(|candidate| candidate.is_dir())
+        else {
             return Ok(Self::default());
-        }
+        };
         let mut registries = Self::default();
         let entries = fs::read_dir(&registries_dir).map_err(|source| KernelError::Io {
             operation: "read directory",

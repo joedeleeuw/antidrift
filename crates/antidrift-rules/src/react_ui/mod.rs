@@ -19,6 +19,7 @@ pub mod no_query_join_or_tree_reshape;
 pub mod no_raw_foreground_opacity;
 pub mod no_unformatted_number;
 pub mod no_unstable_render_default_collection;
+mod process_lifecycle_loa;
 pub mod require_detached_label_shape;
 pub mod require_dir_on_rendered_name;
 pub mod require_effect_deps;

@@ -109,15 +109,30 @@ fn classify_contract_target(
     }
 }
 
-fn is_delegating_call_return(expr: P<Node>) -> bool {
+fn is_delegating_call_return(expr: P<Node>, entries: &[FunctionContractEntry]) -> bool {
+    if entries.len() < 2 {
+        return false;
+    }
     let mut current = tsrs_kernel::unwrap_expression(expr);
     if current.kind() == Kind::AwaitExpression {
         current = tsrs_kernel::unwrap_expression(current.as_await_expression().expression());
     }
-    current.kind() == Kind::CallExpression
+    if current.kind() != Kind::CallExpression {
+        return false;
+    }
+    let Some(callee) = tsrs_kernel::callee_name(current) else {
+        return false;
+    };
+    entries
+        .iter()
+        .any(|entry| candidate_function_name(entry.fn_node, entry.candidate_node) == Some(callee))
 }
 
-fn collect_object_literals_from_return_expr(expr: P<Node>, out: &mut Vec<P<Node>>) -> bool {
+fn collect_object_literals_from_return_expr(
+    expr: P<Node>,
+    entries: &[FunctionContractEntry],
+    out: &mut Vec<P<Node>>,
+) -> bool {
     let unwrapped = tsrs_kernel::unwrap_expression(expr);
     if ast::is_object_literal_expression(unwrapped) {
         out.push(unwrapped);
@@ -125,10 +140,10 @@ fn collect_object_literals_from_return_expr(expr: P<Node>, out: &mut Vec<P<Node>
     }
     if ast::is_conditional_expression(unwrapped) {
         let cond = unwrapped.as_conditional_expression();
-        return collect_object_literals_from_return_expr(cond.when_true(), out)
-            && collect_object_literals_from_return_expr(cond.when_false(), out);
+        return collect_object_literals_from_return_expr(cond.when_true(), entries, out)
+            && collect_object_literals_from_return_expr(cond.when_false(), entries, out);
     }
-    is_delegating_call_return(unwrapped)
+    is_delegating_call_return(unwrapped, entries)
 }
 
 fn has_bare_return_statement(node: P<Node>) -> bool {
@@ -213,7 +228,7 @@ fn collect_group_return_sites(
         }
         let mut obj_nodes = Vec::new();
         for ret_expr in return_exprs {
-            if !collect_object_literals_from_return_expr(ret_expr, &mut obj_nodes) {
+            if !collect_object_literals_from_return_expr(ret_expr, entries, &mut obj_nodes) {
                 return None;
             }
         }

@@ -1,4 +1,3 @@
-use antidrift_kernel::jsx::function_returns_jsx;
 use antidrift_kernel::local_binding::{Binding, declared_bindings, for_each_resolved_reference};
 use antidrift_kernel::tsrs_kernel::{
     callee_name, is_function_like, member_chain_root_identifier, property_name_text,
@@ -173,13 +172,11 @@ fn receiver_chain_parts(node: P<Node>) -> Option<(&'static str, Vec<&'static str
     ast::is_identifier(root).then(|| (root.as_identifier().text(), members))
 }
 
-fn has_inner_key_lookup(node: P<Node>, outer_receiver: P<Node>, outer_param: &str) -> bool {
+fn has_inner_key_lookup(node: P<Node>, outer_param: &str) -> bool {
     if let Some((inner_receiver, inner_method)) = method_receiver_and_name(node)
         && INNER_LOOKUP_METHODS.contains(&inner_method)
-        && let Some((inner_root, inner_members)) = receiver_chain_parts(inner_receiver)
+        && let Some((inner_root, _)) = receiver_chain_parts(inner_receiver)
         && inner_root != outer_param
-        && receiver_chain_parts(outer_receiver)
-            .is_none_or(|outer_parts| outer_parts != (inner_root, inner_members))
         && let Some(&inner_cb) = node.as_call_expression().arguments().nodes().first()
         && is_function_like(inner_cb)
         && let Some(inner_param) = callback_item_param(inner_method, inner_cb)
@@ -191,7 +188,7 @@ fn has_inner_key_lookup(node: P<Node>, outer_receiver: P<Node>, outer_param: &st
     }
     let mut found = false;
     node.for_each_child(&mut |child| {
-        if !is_function_like(child) && has_inner_key_lookup(child, outer_receiver, outer_param) {
+        if !is_function_like(child) && has_inner_key_lookup(child, outer_param) {
             found = true;
             return true;
         }
@@ -204,14 +201,13 @@ fn has_inner_key_lookup(node: P<Node>, outer_receiver: P<Node>, outer_param: &st
 pub fn relational_key_join_calls(body: P<Node>) -> Vec<P<Node>> {
     let mut out = Vec::new();
     fn walk(node: P<Node>, out: &mut Vec<P<Node>>) {
-        if let Some((outer_receiver, outer_method)) = method_receiver_and_name(node)
+        if let Some((_, outer_method)) = method_receiver_and_name(node)
             && OUTER_JOIN_METHODS.contains(&outer_method)
             && let Some(&outer_cb) = node.as_call_expression().arguments().nodes().first()
             && is_function_like(outer_cb)
-            && !function_returns_jsx(outer_cb)
             && let Some(outer_param) = callback_item_param(outer_method, outer_cb)
             && let Some(outer_body) = outer_cb.body()
-            && has_inner_key_lookup(outer_body, outer_receiver, outer_param)
+            && has_inner_key_lookup(outer_body, outer_param)
         {
             out.push(node);
         }

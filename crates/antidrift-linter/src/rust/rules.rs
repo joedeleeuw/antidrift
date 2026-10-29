@@ -345,7 +345,7 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
                     node.method.span(),
                     "rust/no-untyped-config-probe",
                     format!(
-                        "Untyped JSON probe '.{}()' outside boundary decoder; deserialize once via decode_rule_options.",
+                        "Untyped JSON probe '.{}()' outside boundary decoder; deserialize once into a typed struct at the boundary.",
                         node.method
                     ),
                 );
@@ -355,7 +355,7 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
                 self.push(
                     node.method.span(),
                     "rust/no-untyped-config-probe",
-                    "Untyped string-key JSON config probe outside boundary decoder; deserialize once via decode_rule_options.".to_owned(),
+                    "Untyped string-key JSON config probe outside boundary decoder; deserialize once into a typed struct at the boundary.".to_owned(),
                 );
             }
         }
@@ -421,55 +421,58 @@ fn is_banned_test_attribute(attr: &Attribute) -> bool {
 }
 
 fn token_stream_contains_test(tokens: proc_macro2::TokenStream) -> bool {
+    let mut neg = false;
     tokens.into_iter().any(|tree| match tree {
-        proc_macro2::TokenTree::Ident(ident) => ident == "test",
-        proc_macro2::TokenTree::Group(group) => token_stream_contains_test(group.stream()),
-        _ => false,
+        proc_macro2::TokenTree::Ident(id) => {
+            let hit = id == "test" && !neg;
+            neg = id == "not";
+            hit
+        }
+        proc_macro2::TokenTree::Group(g) => {
+            let hit = !neg && token_stream_contains_test(g.stream());
+            neg = false;
+            hit
+        }
+        _ => {
+            neg = false;
+            false
+        }
     })
 }
 
 fn derives_deserialize(attrs: &[Attribute]) -> bool {
-    for attr in attrs {
-        if !attr.path().is_ident("derive") {
-            continue;
-        }
-        let mut found = false;
-        let parsed = attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("Deserialize")
-                || path_ends_with(&meta.path, &["serde", "Deserialize"])
-            {
-                found = true;
-            }
-            Ok(())
-        });
-        if parsed.is_ok() && found {
-            return true;
-        }
-    }
-    false
+    attrs
+        .iter()
+        .filter(|a| a.path().is_ident("derive"))
+        .any(|attr| {
+            let mut found = false;
+            attr.parse_nested_meta(|meta| {
+                found |= meta.path.is_ident("Deserialize")
+                    || path_ends_with(&meta.path, &["serde", "Deserialize"]);
+                Ok(())
+            })
+            .is_ok()
+                && found
+        })
 }
 
 fn has_serde_deny_unknown_fields(attrs: &[Attribute]) -> bool {
-    for attr in attrs {
-        if !attr.path().is_ident("serde") {
-            continue;
-        }
-        let mut found = false;
-        let parsed = attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("deny_unknown_fields") {
-                found = true;
-            }
-            if meta.input.peek(syn::token::Eq) {
-                meta.input.parse::<syn::Token![=]>()?;
-                meta.input.parse::<Expr>()?;
-            }
-            Ok(())
-        });
-        if parsed.is_ok() && found {
-            return true;
-        }
-    }
-    false
+    attrs
+        .iter()
+        .filter(|a| a.path().is_ident("serde"))
+        .any(|attr| {
+            let mut found = false;
+            attr.parse_nested_meta(|meta| {
+                found |= meta.path.is_ident("deny_unknown_fields");
+                if meta.input.peek(syn::token::Eq) {
+                    meta.input.parse::<syn::Token![=]>()?;
+                    meta.input.parse::<Expr>()?;
+                }
+                Ok(())
+            })
+            .is_ok()
+                && found
+        })
 }
 
 fn is_string_or_str_type(ty: &Type) -> bool {

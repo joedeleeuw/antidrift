@@ -1,4 +1,5 @@
 mod boundary_decode;
+mod corpus_smells;
 mod rules;
 mod smells;
 mod struct_shapes;
@@ -21,12 +22,26 @@ pub(crate) struct RustDiagnostic {
 pub(crate) fn run_rust_cli(raw_args: &[String]) -> Result<i32, String> {
     let mut json_output = false;
     let mut roots = Vec::new();
-    for arg in raw_args {
+    let mut iter = raw_args.iter();
+    while let Some(arg) = iter.next() {
         if arg == "--help" || arg == "-h" {
-            println!("Usage: antidrift-linter rust [--json] [paths...]");
+            println!(
+                "Usage: antidrift-linter rust [--json] [--format human|stylish|json] [paths...]"
+            );
             return Ok(0);
         } else if arg == "--json" {
             json_output = true;
+        } else if arg == "--format" {
+            let fmt = iter.next().ok_or("missing value for --format")?;
+            match fmt.as_str() {
+                "json" => json_output = true,
+                "human" | "stylish" => json_output = false,
+                other => {
+                    return Err(format!(
+                        "unsupported format '{other}' for `rust` (expected human, stylish, or json)"
+                    ));
+                }
+            }
         } else if let Some(flag) = arg.strip_prefix('-') {
             return Err(format!("unknown `rust` flag: -{flag}"));
         } else {

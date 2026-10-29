@@ -148,28 +148,55 @@ pub fn zod_transform_call_parts(
     }
     let call = call_node.as_call_expression();
     let args = call.arguments().nodes();
-    if args.len() != 1 || !ast::is_property_access_expression(call.expression()) {
-        return None;
-    }
-    let prop = call.expression().as_property_access_expression();
-    let name_node = prop.name();
-    if !ast::is_identifier(name_node) || name_node.as_identifier().text() != "transform" {
+    if args.len() != 1 {
         return None;
     }
     let cb = args[0];
     if !matches!(cb.kind(), Kind::ArrowFunction | Kind::FunctionExpression) {
         return None;
     }
-    if !is_zod_method(checker, name_node)
-        && !is_valibot_method(checker, name_node)
-        && !is_effect_schema_method(checker, name_node)
-    {
-        return None;
+    let callee = call.expression();
+    if ast::is_property_access_expression(callee) {
+        let prop = callee.as_property_access_expression();
+        let name_node = prop.name();
+        if !ast::is_identifier(name_node) || name_node.as_identifier().text() != "transform" {
+            return None;
+        }
+        if !is_zod_method(checker, name_node)
+            && !is_valibot_method(checker, name_node)
+            && !is_effect_schema_method(checker, name_node)
+        {
+            return None;
+        }
+        if let Some(parent) = call_node.parent()
+            && ast::is_call_expression(parent)
+            && let Some(&first_pipe_arg) = parent.as_call_expression().arguments().nodes().first()
+            && first_pipe_arg != call_node
+        {
+            return Some(ZodTransformCall {
+                receiver: first_pipe_arg,
+                callback: cb,
+            });
+        }
+        return Some(ZodTransformCall {
+            receiver: prop.expression(),
+            callback: cb,
+        });
     }
-    Some(ZodTransformCall {
-        receiver: prop.expression(),
-        callback: cb,
-    })
+    if ast::is_identifier(callee)
+        && callee.as_identifier().text() == "transform"
+        && (is_valibot_method(checker, callee) || is_effect_schema_method(checker, callee))
+        && let Some(parent) = call_node.parent()
+        && ast::is_call_expression(parent)
+        && let Some(&first_pipe_arg) = parent.as_call_expression().arguments().nodes().first()
+        && first_pipe_arg != call_node
+    {
+        return Some(ZodTransformCall {
+            receiver: first_pipe_arg,
+            callback: cb,
+        });
+    }
+    None
 }
 
 fn closed_type_property_names(checker: &mut Checker, input_type: P<Type>) -> Vec<String> {

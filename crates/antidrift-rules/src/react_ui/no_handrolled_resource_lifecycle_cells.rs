@@ -1,3 +1,4 @@
+use super::process_lifecycle_loa::check_process_lifecycle_loa;
 use super::shadow_state_mirror::{
     AbortGuard, SHADOW_STATE_MIRROR_MESSAGE, classify_object_literal_writes, if_statement_guards,
     is_guarded, non_computed_member, shadow_state_mirrors,
@@ -59,6 +60,7 @@ impl Rule for NoHandrolledResourceLifecycleCells {
                 RuleMessage::new("shadowStateMirror", SHADOW_STATE_MIRROR_MESSAGE),
             );
         }
+        check_process_lifecycle_loa(ctx.file, &traversal.imports, ctx);
         Box::new(EmptyVisitor)
     }
 }

@@ -247,7 +247,7 @@ fn has_serde_or_repr_c(attrs: &[Attribute]) -> bool {
 }
 
 fn has_deserialize_or_repr_c(attrs: &[Attribute]) -> bool {
-    has_derive_or_repr_c(attrs, &["Deserialize", "Default"])
+    has_derive_or_repr_c(attrs, &["Deserialize", "Serialize", "Default"])
 }
 
 fn has_derive_or_repr_c(attrs: &[Attribute], traits: &[&str]) -> bool {

@@ -80,6 +80,7 @@ where
 {
     match arg {
         "--fix" => parsed.fix = true,
+        "--json" => parsed.format = OutputFormat::Json,
         "--prune-suppressions" => parsed.prune_suppressions = true,
         "--report-unused-disable-directives" => parsed.report_unused_directives = true,
         "--list-rules" => *list_rules = true,

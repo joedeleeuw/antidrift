@@ -59,10 +59,43 @@ fn is_prop_or_hook_derived(initial: P<Node>, scope: &ComponentScope) -> bool {
     if inner.kind() != Kind::PropertyAccessExpression {
         return false;
     }
-    let root = unwrap_expression(inner.as_property_access_expression().expression());
+    let access = inner.as_property_access_expression();
+    let prop = access.name();
+    if ast::is_identifier(prop) {
+        let prop_text = prop.as_identifier().text();
+        if prop_text.starts_with("get")
+            && prop_text
+                .as_bytes()
+                .get(3)
+                .is_some_and(u8::is_ascii_uppercase)
+        {
+            return false;
+        }
+    }
+    let root = unwrap_expression(access.expression());
     ast::is_identifier(root) && {
         let root_name = root.as_identifier().text();
         scope.params.contains(root_name) || scope.hook_results.contains(root_name)
+    }
+}
+
+fn same_mirror_source(left: P<Node>, right: P<Node>) -> bool {
+    let l = unwrap_expression(left);
+    let r = unwrap_expression(right);
+    if l.kind() != r.kind() {
+        return false;
+    }
+    match l.kind() {
+        Kind::Identifier => l.as_identifier().text() == r.as_identifier().text(),
+        Kind::PropertyAccessExpression => {
+            let la = l.as_property_access_expression();
+            let ra = r.as_property_access_expression();
+            ast::is_identifier(la.name())
+                && ast::is_identifier(ra.name())
+                && la.name().as_identifier().text() == ra.name().as_identifier().text()
+                && same_mirror_source(la.expression(), ra.expression())
+        }
+        _ => false,
     }
 }
 
@@ -120,8 +153,8 @@ fn is_inside_effect(reference: P<Node>, component: P<Node>, imports: &FileImport
         if ancestor == component {
             return false;
         }
-        if is_function_like(ancestor) && is_effect_callback(ancestor, imports) {
-            return true;
+        if is_function_like(ancestor) {
+            return is_effect_callback(ancestor, imports);
         }
         cursor = ancestor.parent();
     }
@@ -142,6 +175,7 @@ fn is_effect_only_mirror(
     component: P<Node>,
     body: P<Node>,
     setter: P<Node>,
+    initial: P<Node>,
     imports: &FileImports,
 ) -> bool {
     let mut references = Vec::new();
@@ -151,11 +185,21 @@ fn is_effect_only_mirror(
         if !is_inside_effect(reference, component, imports) {
             return false;
         }
-        let is_call = reference.parent().is_some_and(|parent| {
-            parent.kind() == Kind::CallExpression
-                && parent.as_call_expression().expression() == reference
-        });
-        effect_calls += usize::from(is_call);
+        let Some(parent) = reference.parent() else {
+            return false;
+        };
+        if parent.kind() != Kind::CallExpression
+            || parent.as_call_expression().expression() != reference
+        {
+            return false;
+        }
+        let Some(&arg) = parent.as_call_expression().arguments().nodes().first() else {
+            return false;
+        };
+        if !same_mirror_source(arg, initial) {
+            return false;
+        }
+        effect_calls += 1;
     }
     effect_calls >= 1
 }
@@ -181,7 +225,7 @@ fn check_component(component: P<Node>, imports: &FileImports, reports: &mut Vec<
             if let Some((state_call, setter)) = state_pair_setter(decl, imports)
                 && let Some(&initial) = state_call.as_call_expression().arguments().nodes().first()
                 && is_prop_or_hook_derived(initial, &scope)
-                && is_effect_only_mirror(component, body, setter, imports)
+                && is_effect_only_mirror(component, body, setter, initial, imports)
             {
                 reports.push(state_call);
                 continue;
@@ -311,7 +355,11 @@ pub(super) fn classify_object_literal_writes(
             out.push((prop_name, write_class));
         }
     }
-    Some(out)
+    (out.len() >= 2
+        && out
+            .iter()
+            .any(|(_, c)| matches!(c, WriteClass::TrueConst | WriteClass::FalseConst)))
+    .then_some(out)
 }
 
 pub(super) fn non_computed_member(expression: P<Node>, target: &str) -> Option<P<Node>> {

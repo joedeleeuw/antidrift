@@ -1,5 +1,6 @@
 use super::RustDiagnostic;
 use super::boundary_decode::is_serde_roundtrip_call;
+use super::corpus_smells::check_corpus_smells;
 use antidrift_rules::type_narrowing::no_compat_names::is_compat_name;
 use proc_macro2::Span;
 use std::path::Path;
@@ -37,6 +38,7 @@ pub(super) fn check_smells(
         diagnostics,
     };
     visitor.visit_file(ast);
+    check_corpus_smells(rel_path, ast, diagnostics);
 }
 
 struct SmellVisitor<'a> {
@@ -112,10 +114,13 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
     fn visit_item_struct(&mut self, node: &'ast ItemStruct) {
         let struct_name = node.ident.to_string();
         self.check_ident_name(&struct_name, node.ident.span());
-        for ident in node.fields.iter().filter_map(|field| field.ident.as_ref()) {
+        for field in &node.fields {
+            let Some(ident) = &field.ident else {
+                continue;
+            };
             let field_name = ident.to_string();
             self.check_ident_name(&field_name, ident.span());
-            if field_name.starts_with('_') {
+            if field_name.starts_with('_') && !is_raii_or_marker_field(&field_name, &field.ty) {
                 self.push(
                     ident.span(),
                     "rust/no-let-underscore-suppression",
@@ -441,6 +446,31 @@ fn is_str_lit(expr: &Expr) -> bool {
     )
 }
 
+fn is_raii_or_marker_field(field_name: &str, ty: &syn::Type) -> bool {
+    matches!(
+        field_name,
+        "_guard" | "_lock" | "_permit" | "_marker" | "_phantom" | "_thread_bound" | "_drop"
+    ) || matches!(ty, syn::Type::Path(tp) if tp.path.segments.iter().any(|seg| {
+        let s = seg.ident.to_string();
+        matches!(s.as_str(), "PhantomData" | "Retention" | "TempDir" | "NamedTempFile")
+            || s.ends_with("Guard")
+            || s.ends_with("Permit")
+    }))
+}
+
+fn is_serde_adapter_param(ty: &syn::Type) -> bool {
+    match ty {
+        syn::Type::Path(tp) => tp.path.segments.last().is_some_and(|seg| {
+            matches!(
+                seg.ident.to_string().as_str(),
+                "Serializer" | "Deserializer" | "D" | "S"
+            )
+        }),
+        syn::Type::Reference(tr) => is_serde_adapter_param(&tr.elem),
+        _ => false,
+    }
+}
+
 fn detect_passthrough_wrapper(item_fn: &ItemFn) -> Option<String> {
     if item_fn.sig.inputs.is_empty() {
         return None;
@@ -450,19 +480,21 @@ fn detect_passthrough_wrapper(item_fn: &ItemFn) -> Option<String> {
         let FnArg::Typed(pat_type) = input else {
             return None;
         };
-        let (name, _) = extract_pat_ident(&pat_type.pat)?;
-        param_names.push(name);
+        if !item_fn.sig.generics.params.is_empty() && is_serde_adapter_param(&pat_type.ty) {
+            return None;
+        }
+        param_names.push(extract_pat_ident(&pat_type.pat)?.0);
     }
-    let meaningful_stmts: Vec<&Stmt> = item_fn
+    let meaningful: Vec<&Stmt> = item_fn
         .block
         .stmts
         .iter()
-        .filter(|stmt| !matches!(stmt, Stmt::Local(local) if is_wild_pat(&local.pat)))
+        .filter(|s| !matches!(s, Stmt::Local(l) if is_wild_pat(&l.pat)))
         .collect();
-    if meaningful_stmts.len() != 1 {
+    if meaningful.len() != 1 {
         return None;
     }
-    let expr = match meaningful_stmts[0] {
+    let expr = match meaningful[0] {
         Stmt::Expr(expr, None) => expr,
         Stmt::Expr(Expr::Return(ret), _) => ret.expr.as_deref()?,
         _ => return None,
@@ -470,32 +502,25 @@ fn detect_passthrough_wrapper(item_fn: &ItemFn) -> Option<String> {
     let Expr::Call(ExprCall { func, args, .. }) = expr else {
         return None;
     };
-    if args.len() != param_names.len() {
-        return None;
-    }
     let Expr::Path(callee_path) = &**func else {
         return None;
     };
-    for (arg, expected) in args.iter().zip(param_names.iter()) {
-        let Expr::Path(arg_path) = arg else {
-            return None;
-        };
-        if !arg_path.path.is_ident(expected) {
-            return None;
-        }
+    if args.len() != param_names.len()
+        || !args
+            .iter()
+            .zip(&param_names)
+            .all(|(arg, exp)| matches!(arg, Expr::Path(p) if p.path.is_ident(exp)))
+    {
+        return None;
     }
     let segments: Vec<String> = callee_path
         .path
         .segments
         .iter()
-        .map(|seg| seg.ident.to_string())
+        .map(|s| s.ident.to_string())
         .collect();
-    if segments.last().is_some_and(|last| {
-        last.chars()
-            .next()
-            .is_some_and(|ch| ch.is_ascii_uppercase())
-    }) {
-        return None;
-    }
-    Some(segments.join("::"))
+    (!segments
+        .last()
+        .is_some_and(|l| l.as_bytes().first().is_some_and(u8::is_ascii_uppercase)))
+    .then(|| segments.join("::"))
 }

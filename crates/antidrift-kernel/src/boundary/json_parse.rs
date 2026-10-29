@@ -83,6 +83,19 @@ fn is_family_callback_parameter(param_decl: P<Node>) -> bool {
     false
 }
 
+fn is_direct_json_stringify_expr(node: P<Node>) -> bool {
+    let unwrapped = tsrs_kernel::unwrap_expression(node);
+    if is_json_stringify_call(unwrapped) {
+        return true;
+    }
+    if unwrapped.kind() == Kind::ConditionalExpression {
+        let cond = unwrapped.as_conditional_expression();
+        return is_direct_json_stringify_expr(cond.when_true())
+            || is_direct_json_stringify_expr(cond.when_false());
+    }
+    false
+}
+
 pub fn is_json_stringify_roundtrip(checker: &mut Checker, call_node: P<Node>) -> bool {
     if !is_json_parse_call(call_node) {
         return false;
@@ -104,7 +117,7 @@ pub fn is_json_stringify_roundtrip(checker: &mut Checker, call_node: P<Node>) ->
             && decl
                 .as_variable_declaration()
                 .initializer()
-                .is_some_and(contains_json_stringify)
+                .is_some_and(is_direct_json_stringify_expr)
         {
             return true;
         }

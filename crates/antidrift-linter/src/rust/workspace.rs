@@ -13,38 +13,62 @@ pub(super) fn check_workspace_root(
     root: &Path,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) -> Result<usize, String> {
-    let crate_dirs = discover_crate_dirs(root)?;
+    let clean_root = normalize_lexical_path(root);
+    let root_ref = if clean_root.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        clean_root.as_path()
+    };
+    let crate_dirs = discover_crate_dirs(root_ref)?;
     let mut total_files = 0usize;
     for crate_dir in crate_dirs {
-        total_files += check_crate_dir(root, &crate_dir, diagnostics)?;
+        total_files += check_crate_dir(root_ref, &crate_dir, diagnostics)?;
     }
     Ok(total_files)
 }
 
 fn discover_crate_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
-    if root.join("Cargo.toml").is_file() && root.join("src").is_dir() {
-        return Ok(vec![root.to_path_buf()]);
-    }
-    let crates_parent = if root.join("crates").is_dir() {
-        root.join("crates")
-    } else {
-        root.to_path_buf()
-    };
     let mut dirs = Vec::new();
-    if crates_parent.is_dir() {
-        for entry in fs::read_dir(&crates_parent)
-            .map_err(|err| format!("failed to read {}: {err}", crates_parent.display()))?
-        {
-            let path = entry
-                .map_err(|err| format!("failed to read directory entry: {err}"))?
-                .path();
-            if path.is_dir() && path.join("Cargo.toml").is_file() {
-                dirs.push(path);
-            }
-        }
-        dirs.sort();
-    }
+    collect_crate_dirs_recursive(root, &mut dirs)?;
+    dirs.sort();
+    dirs.dedup();
     Ok(dirs)
+}
+
+fn collect_crate_dirs_recursive(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
+    if dir.join("Cargo.toml").is_file() && dir.join("src").is_dir() {
+        out.push(dir.to_path_buf());
+    }
+    let entries =
+        fs::read_dir(dir).map_err(|err| format!("failed to read {}: {err}", dir.display()))?;
+    for entry in entries {
+        let path = entry
+            .map_err(|err| format!("failed to read directory entry: {err}"))?
+            .path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if matches!(
+            name,
+            ".git"
+                | "target"
+                | "node_modules"
+                | "src"
+                | "tests"
+                | "benches"
+                | "examples"
+                | "vendor"
+                | "dist"
+        ) || name.starts_with('.')
+        {
+            continue;
+        }
+        collect_crate_dirs_recursive(&path, out)?;
+    }
+    Ok(())
 }
 
 fn check_crate_dir(
@@ -60,7 +84,7 @@ fn check_crate_dir(
         check_cargo_manifest(&manifest_rel, crate_dir, &manifest_text, diagnostics);
     }
 
-    let src_dir = crate_dir.join("src");
+    let src_dir = normalize_lexical_path(&crate_dir.join("src"));
     if !src_dir.is_dir() {
         return Ok(0);
     }
@@ -113,7 +137,7 @@ fn collect_rs_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
         if path.is_dir() {
             collect_rs_files(&path, out)?;
         } else if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            out.push(path);
+            out.push(normalize_lexical_path(&path));
         }
     }
     Ok(())
@@ -133,6 +157,13 @@ fn check_orphan_modules(
             roots.push(candidate);
         }
     }
+    for file_path in rs_files {
+        if let Ok(rel) = file_path.strip_prefix(src_dir)
+            && rel.starts_with("bin")
+        {
+            roots.push(file_path.clone());
+        }
+    }
     if roots.is_empty() {
         return;
     }
@@ -149,9 +180,13 @@ fn check_orphan_modules(
         let Some(ast) = parsed_files.get(&current) else {
             continue;
         };
+        let file_dir = current
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf();
         let search_dir = module_search_dir(&current);
         let mut declared = Vec::new();
-        collect_external_mods(&ast.items, &search_dir, &mut declared);
+        collect_external_mods(&ast.items, &file_dir, &search_dir, &mut declared);
         for target in declared {
             if reachable.insert(target.clone()) {
                 queue.push_back(target);
@@ -190,35 +225,62 @@ fn module_search_dir(file_path: &Path) -> PathBuf {
     }
 }
 
-fn collect_external_mods(items: &[Item], base_dir: &Path, out: &mut Vec<PathBuf>) {
+fn normalize_lexical_path(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for comp in path.components() {
+        match comp {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    if out.as_os_str().is_empty() {
+        PathBuf::from(".")
+    } else {
+        out
+    }
+}
+
+fn collect_external_mods(items: &[Item], file_dir: &Path, base_dir: &Path, out: &mut Vec<PathBuf>) {
     for item in items {
         let Item::Mod(item_mod) = item else {
             continue;
         };
         if let Some((_, inline_items)) = &item_mod.content {
-            let inline_dir = base_dir.join(item_mod.ident.to_string());
-            collect_external_mods(inline_items, &inline_dir, out);
+            let inline_dir = if let Some(custom) = extract_path_attr(&item_mod.attrs) {
+                normalize_lexical_path(&file_dir.join(custom))
+            } else {
+                base_dir.join(item_mod.ident.to_string())
+            };
+            collect_external_mods(inline_items, file_dir, &inline_dir, out);
             continue;
         }
-        if let Some(resolved) = resolve_external_mod(item_mod, base_dir) {
+        if let Some(resolved) = resolve_external_mod(item_mod, file_dir, base_dir) {
             out.push(resolved);
         }
     }
 }
 
-fn resolve_external_mod(item_mod: &ItemMod, base_dir: &Path) -> Option<PathBuf> {
+fn resolve_external_mod(item_mod: &ItemMod, file_dir: &Path, base_dir: &Path) -> Option<PathBuf> {
     if let Some(custom_path) = extract_path_attr(&item_mod.attrs) {
-        let candidate = base_dir.join(custom_path);
-        if candidate.is_file() {
-            return Some(candidate);
+        for base in [file_dir, base_dir] {
+            let candidate = normalize_lexical_path(&base.join(&custom_path));
+            if candidate.is_file() {
+                return Some(candidate);
+            }
         }
     }
     let name = item_mod.ident.to_string();
     [
         base_dir.join(format!("{name}.rs")),
-        base_dir.join(name).join("mod.rs"),
+        base_dir.join(&name).join("mod.rs"),
+        file_dir.join(format!("{name}.rs")),
+        file_dir.join(name).join("mod.rs"),
     ]
     .into_iter()
+    .map(|p| normalize_lexical_path(&p))
     .find(|p| p.is_file())
 }
 

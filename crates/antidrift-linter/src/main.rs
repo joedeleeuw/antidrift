@@ -75,22 +75,21 @@ fn main() -> ExitCode {
             }
         };
     }
-    if matches!(
-        raw_vec.first().map(String::as_str),
-        Some("--version" | "version" | "-V")
-    ) {
+    if raw_vec.iter().any(|arg| {
+        matches!(arg.as_str(), "--version" | "-V") || (raw_vec.len() == 1 && arg == "version")
+    }) {
         println!(
             "antidrift-linter {} (tsgolint headless protocol v2)",
             env!("CARGO_PKG_VERSION")
         );
         return ExitCode::SUCCESS;
     }
-    if matches!(
-        raw_vec.first().map(String::as_str),
-        Some("--help" | "-h" | "help")
-    ) {
+    if raw_vec
+        .iter()
+        .any(|arg| matches!(arg.as_str(), "--help" | "-h") || (raw_vec.len() == 1 && arg == "help"))
+    {
         println!(
-            "Usage:\n  antidrift-linter [--format human|json|sarif] [--fix] [--list-rules] [paths...]\n  antidrift-linter rust [--json] [paths...]\n  antidrift-linter headless"
+            "Usage:\n  antidrift-linter [--format human|stylish|json|sarif] [--json] [--fix] [--list-rules]\n                   [--batch-json <spec>] [--suppress-rule <id>] [--prune-suppressions]\n                   [--suppressions-location <path>] [--report-unused-disable-directives] [paths...]\n  antidrift-linter rust [--json] [--format human|stylish|json] [paths...]\n  antidrift-linter headless"
         );
         return ExitCode::SUCCESS;
     }

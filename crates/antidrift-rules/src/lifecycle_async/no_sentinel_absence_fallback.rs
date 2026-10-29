@@ -48,7 +48,11 @@ impl NoSentinelAbsenceFallback {
     }
 }
 
-const LISTENERS: &[Listener] = &[Listener::Enter(Kind::BinaryExpression)];
+const LISTENERS: &[Listener] = &[
+    Listener::Enter(Kind::BinaryExpression),
+    Listener::Enter(Kind::CatchClause),
+    Listener::Enter(Kind::CallExpression),
+];
 
 impl Rule for NoSentinelAbsenceFallback {
     fn name(&self) -> &'static str {
@@ -75,6 +79,30 @@ impl RuleVisitor for Visitor {
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+        if node.kind() == Kind::CatchClause {
+            if let Some(empty_ret) = catch_clause_empty_string_sentinel(node) {
+                ctx.report_node(
+                    empty_ret,
+                    RuleMessage::new(
+                        "catchSentinelReturn",
+                        "This catch branch collapses a failure or missing-resource error into \"\", erasing the distinction between absence and an empty string. Return null/undefined or a typed result union instead.",
+                    ),
+                );
+            }
+            return;
+        }
+        if node.kind() == Kind::CallExpression {
+            if let Some(empty_ret) = promise_catch_empty_string_sentinel(node) {
+                ctx.report_node(
+                    empty_ret,
+                    RuleMessage::new(
+                        "catchSentinelReturn",
+                        "This .catch() handler collapses a rejected promise into \"\", erasing the distinction between absence and an empty string. Return null/undefined or a typed result union instead.",
+                    ),
+                );
+            }
+            return;
+        }
         if !self.member_sentinels || is_direct_jsx_text_expression(node) {
             return;
         }
@@ -212,5 +240,90 @@ fn string_literal(expression: P<Node>) -> Option<&'static str> {
         Kind::StringLiteral => Some(inner.as_string_literal().text()),
         Kind::NoSubstitutionTemplateLiteral => Some(inner.text()),
         _ => None,
+    }
+}
+
+fn find_empty_string_return(node: P<Node>) -> Option<P<Node>> {
+    if node.kind() == Kind::ReturnStatement {
+        let expr = node.as_return_statement().expression()?;
+        return string_literal(expr).filter(|s| s.is_empty()).map(|_| node);
+    }
+    let mut found = None;
+    node.for_each_child(&mut |child| {
+        if found.is_none()
+            && !matches!(
+                child.kind(),
+                Kind::FunctionDeclaration
+                    | Kind::FunctionExpression
+                    | Kind::ArrowFunction
+                    | Kind::MethodDeclaration
+            )
+        {
+            found = find_empty_string_return(child);
+        }
+        found.is_some()
+    });
+    found
+}
+
+fn block_has_non_empty_return(node: P<Node>) -> bool {
+    if node.kind() == Kind::ReturnStatement {
+        return node
+            .as_return_statement()
+            .expression()
+            .is_some_and(|expr| string_literal(expr) != Some(""));
+    }
+    let mut found = false;
+    node.for_each_child(&mut |child| {
+        if !found
+            && !matches!(
+                child.kind(),
+                Kind::FunctionDeclaration
+                    | Kind::FunctionExpression
+                    | Kind::ArrowFunction
+                    | Kind::MethodDeclaration
+            )
+        {
+            found = block_has_non_empty_return(child);
+        }
+        found
+    });
+    found
+}
+
+fn catch_clause_empty_string_sentinel(catch_node: P<Node>) -> Option<P<Node>> {
+    let try_stmt = catch_node
+        .parent()
+        .filter(|p| p.kind() == Kind::TryStatement)?;
+    if !block_has_non_empty_return(try_stmt.as_try_statement().try_block()) {
+        return None;
+    }
+    find_empty_string_return(catch_node.as_catch_clause().block())
+}
+
+fn promise_catch_empty_string_sentinel(call_node: P<Node>) -> Option<P<Node>> {
+    let call = call_node.as_call_expression();
+    let callee = unwrap_expression(call.expression());
+    if callee.kind() != Kind::PropertyAccessExpression {
+        return None;
+    }
+    let prop = callee.as_property_access_expression();
+    let name = prop.name();
+    if name.kind() != Kind::Identifier || name.as_identifier().text() != "catch" {
+        return None;
+    }
+    let &handler = call.arguments().nodes().first()?;
+    let handler = unwrap_expression(handler);
+    if !matches!(
+        handler.kind(),
+        Kind::ArrowFunction | Kind::FunctionExpression
+    ) {
+        return None;
+    }
+    let body = handler.body()?;
+    if body.kind() == Kind::Block {
+        find_empty_string_return(body)
+    } else {
+        string_literal(body).filter(|s| s.is_empty()).map(|_| body)
     }
 }

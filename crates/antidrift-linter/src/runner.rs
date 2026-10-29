@@ -28,7 +28,25 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
     tsrs_checker::links::set_sparse_id_pages(true);
     let cwd = std::env::current_dir()
         .map_err(|err| format!("failed to read current directory: {err}"))?;
-    let registries = PolicyRegistries::load_from_repo(&cwd)?;
+    let registry_base = args
+        .paths
+        .first()
+        .map(|p| {
+            if p.is_absolute() {
+                p.clone()
+            } else {
+                cwd.join(p)
+            }
+        })
+        .and_then(|p| {
+            if p.is_file() {
+                p.parent().map(Path::to_path_buf)
+            } else {
+                Some(p)
+            }
+        })
+        .unwrap_or_else(|| cwd.clone());
+    let registries = PolicyRegistries::load_from_repo(&registry_base)?;
     let files = collect_lintable_files(&args.paths, &cwd)?;
     if files.is_empty() {
         return handle_suppressions_and_format(args, &BTreeMap::new());
