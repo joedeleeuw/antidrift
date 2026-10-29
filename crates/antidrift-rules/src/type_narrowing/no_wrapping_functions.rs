@@ -149,11 +149,48 @@ fn scan_call_body(node: P<Node>, checker: &mut Checker, state: &mut BodyUseScan)
     });
 }
 
+struct BodyForwarding {
+    has_bound_literal: bool,
+    has_preceding_effect: bool,
+}
+
+enum WrapperVerdict {
+    AddedSemantics,
+    UnusedHop,
+    Hop(usize),
+}
+
+fn classify_wrapper(
+    forwarding: &BodyForwarding,
+    audit: &RefAudit,
+    exported: bool,
+    reexported_or_entry: bool,
+) -> WrapperVerdict {
+    if audit.has_identity_ref
+        || (forwarding.has_bound_literal && audit.caller_files.len() >= 2)
+        || (forwarding.has_preceding_effect && audit.has_non_immutable_arg)
+        || (exported && reexported_or_entry)
+    {
+        return WrapperVerdict::AddedSemantics;
+    }
+    let total_refs = audit.non_test_refs + audit.test_refs;
+    let calls = audit.call_count.min(total_refs);
+    if calls == 0 {
+        if exported {
+            WrapperVerdict::AddedSemantics
+        } else {
+            WrapperVerdict::UnusedHop
+        }
+    } else {
+        WrapperVerdict::Hop(calls)
+    }
+}
+
 fn parameters_match_in_order(
     fn_node: P<Node>,
     call_node: P<Node>,
     checker: &mut Checker,
-) -> Option<(bool, bool)> {
+) -> Option<BodyForwarding> {
     let params = fn_node.parameters();
     let mut param_symbols = Vec::with_capacity(params.len());
     for &param in params {
@@ -178,7 +215,10 @@ fn parameters_match_in_order(
             return None;
         }
     }
-    Some((scan.has_bound_literal, scan.has_preceding_effect))
+    Some(BodyForwarding {
+        has_bound_literal: scan.has_bound_literal,
+        has_preceding_effect: scan.has_preceding_effect,
+    })
 }
 
 #[derive(Default)]
@@ -341,19 +381,13 @@ fn check_candidate(ctx: &mut Ctx, fn_node: P<Node>, name_ident: P<Node>, decl: P
             return;
         }
     }
-    let Some((has_bound_literal, has_preceding_effect)) =
+    let Some(forwarding) =
         parameters_match_in_order(candidate.function_node, candidate.call_node, ctx.checker)
     else {
         return;
     };
     let name = candidate.name_node.as_identifier().text();
     let audit = audit_program_references(ctx.program, ctx.checker, sym, name);
-    if audit.has_identity_ref
-        || (has_bound_literal && audit.caller_files.len() >= 2)
-        || (has_preceding_effect && audit.has_non_immutable_arg)
-    {
-        return;
-    }
     let package_entry = match provenance::is_package_entry_file(ctx.file.file_name()) {
         Ok(package_entry) => package_entry,
         Err(error) => {
@@ -365,36 +399,34 @@ fn check_candidate(ctx: &mut Ctx, fn_node: P<Node>, name_ident: P<Node>, decl: P
         }
     };
     let exported = is_exported_declaration(candidate.declaration) || audit.has_export_specifier;
-    if exported && (is_reexported_in_program(ctx.program, ctx.checker, ctx.file) || package_entry) {
-        return;
-    }
-    let total_refs = audit.non_test_refs + audit.test_refs;
-    let calls = audit.call_count.min(total_refs);
+    let reexported_or_entry =
+        exported && (is_reexported_in_program(ctx.program, ctx.checker, ctx.file) || package_entry);
     let callee = tsrs_kernel::node_text(ctx.file, candidate.callee_node);
-    if exported && calls == 0 {
-        return;
-    }
-    if calls == 0 {
-        ctx.report_node(
-            candidate.name_node,
-            RuleMessage::new(
-                "unusedHop",
-                format!(
-                    "'{name}' is a hop to '{callee}' with no call site; deleting it type-checks. Delete '{name}'."
+    match classify_wrapper(&forwarding, &audit, exported, reexported_or_entry) {
+        WrapperVerdict::AddedSemantics => {}
+        WrapperVerdict::UnusedHop => {
+            ctx.report_node(
+                candidate.name_node,
+                RuleMessage::new(
+                    "unusedHop",
+                    format!(
+                        "'{name}' is a hop to '{callee}' with no call site; deleting it type-checks. Delete '{name}'."
+                    ),
                 ),
-            ),
-        );
-        return;
+            );
+        }
+        WrapperVerdict::Hop(calls) => {
+            ctx.report_node(
+                candidate.name_node,
+                RuleMessage::new(
+                    "hop",
+                    format!(
+                        "'{name}' is a hop to '{callee}': inlining it at its {calls} call site(s) type-checks and keeps each call's type, bindings and evaluation order. Call the owner directly and delete '{name}'."
+                    ),
+                ),
+            );
+        }
     }
-    ctx.report_node(
-        candidate.name_node,
-        RuleMessage::new(
-            "hop",
-            format!(
-                "'{name}' is a hop to '{callee}': inlining it at its {calls} call site(s) type-checks and keeps each call's type, bindings and evaluation order. Call the owner directly and delete '{name}'."
-            ),
-        ),
-    );
 }
 
 pub struct NoWrappingFunctions {

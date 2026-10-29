@@ -14,66 +14,42 @@ pub struct OwnedUnion {
     pub values: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct DomainRegistry {
+struct DomainFile {
     #[serde(default)]
-    pub canonical_entities: BTreeMap<String, String>,
+    #[expect(
+        dead_code,
+        reason = "validated at YAML boundary via deny_unknown_fields"
+    )]
+    canonical_entities: BTreeMap<String, String>,
     #[serde(default)]
-    pub statuses: BTreeMap<String, OwnedUnion>,
+    statuses: BTreeMap<String, OwnedUnion>,
     #[serde(default)]
-    pub roles: Option<OwnedUnion>,
+    #[expect(
+        dead_code,
+        reason = "validated at YAML boundary via deny_unknown_fields"
+    )]
+    roles: Option<OwnedUnion>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ApprovedGateway {
-    pub wrapper: String,
+struct BoundariesFile {
     #[serde(default)]
-    pub banned_direct_imports: Vec<String>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct GatewaysRegistry {
+    #[expect(
+        dead_code,
+        reason = "validated at YAML boundary via deny_unknown_fields"
+    )]
+    server_boundary_globs: Vec<String>,
     #[serde(default)]
-    pub approved_gateways: BTreeMap<String, ApprovedGateway>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct GeneratedSourceEntry {
-    pub generated: String,
-    #[serde(default)]
-    pub wrapper: String,
-    #[serde(default)]
-    pub banned_direct_imports: Vec<String>,
-    #[serde(default)]
-    pub message: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct GeneratedRegistry {
-    #[serde(default)]
-    pub generated_sources: BTreeMap<String, GeneratedSourceEntry>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct BoundariesRegistry {
-    #[serde(default)]
-    pub server_boundary_globs: Vec<String>,
-    #[serde(default)]
-    pub required_calls: BTreeMap<String, Vec<String>>,
+    required_calls: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct PolicyRegistries {
-    pub boundaries: BoundariesRegistry,
-    pub domain: DomainRegistry,
-    pub gateways: GatewaysRegistry,
-    pub generated: GeneratedRegistry,
+    pub required_calls: BTreeMap<String, Vec<String>>,
+    pub statuses: BTreeMap<String, OwnedUnion>,
 }
 
 impl PolicyRegistries {
@@ -106,21 +82,17 @@ impl PolicyRegistries {
             })?;
             match stem {
                 "boundaries" => {
-                    registries.boundaries = decode_yaml_registry(&path, "boundaries", &text)?;
+                    let parsed: BoundariesFile = decode_yaml_registry(&path, "boundaries", &text)?;
+                    registries.required_calls = parsed.required_calls;
                 }
                 "domain" => {
-                    registries.domain = decode_yaml_registry(&path, "domain", &text)?;
-                }
-                "gateways" => {
-                    registries.gateways = decode_yaml_registry(&path, "gateways", &text)?;
-                }
-                "generated" => {
-                    registries.generated = decode_yaml_registry(&path, "generated", &text)?;
+                    let parsed: DomainFile = decode_yaml_registry(&path, "domain", &text)?;
+                    registries.statuses = parsed.statuses;
                 }
                 _ => {
                     let _: serde::de::IgnoredAny =
                         yaml_serde::from_str(&text).map_err(|source| KernelError::YamlDecode {
-                            key: "unknown".to_owned(),
+                            key: stem.to_owned(),
                             path: path.clone(),
                             source,
                         })?;

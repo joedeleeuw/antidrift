@@ -113,7 +113,7 @@ fn append_default_rules(
     rule_cache: &mut FxHashMap<String, &'static dyn Rule>,
     registries: &PolicyRegistries,
 ) -> Result<(), String> {
-    if let Some(authz_calls) = registries.boundaries.required_calls.get("authorization") {
+    if let Some(authz_calls) = registries.required_calls.get("authorization") {
         let opts = json!([{ "authzFunctions": authz_calls }]);
         if let Some(rule) =
             resolve_cached_rule(rule_cache, "antidrift/require-authz-check", Some(&opts))?
@@ -121,8 +121,8 @@ fn append_default_rules(
             push_unique_rule(config_rules, rule);
         }
     }
-    if !registries.domain.statuses.is_empty() {
-        let opts = json!([{ "statuses": registries.domain.statuses }]);
+    if !registries.statuses.is_empty() {
+        let opts = json!([{ "statuses": registries.statuses }]);
         if let Some(rule) = resolve_cached_rule(
             rule_cache,
             "antidrift/no-redeclared-owned-union",
