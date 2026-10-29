@@ -1268,6 +1268,7 @@ try {
       '    let _ = val["k"].as_str();',
       '    let _ = h.ident.to_string() == "foo";',
       '    if let Ok(text) = std::fs::read_to_string("foo.txt") { let _ = text.len(); }',
+      "    let _ = h.ident.to_string().parse::<u32>();",
       "    match legacy_adapter(&h.ident) {",
       "        Ok(_) => true,",
       "        Err(_) => false,",
@@ -1341,6 +1342,7 @@ try {
     "rust/no-silent-result-discard",
     "rust/require-rule-scope",
     "rust/no-structural-type-fork",
+    "rust/no-value-roundtrip",
   ]) {
     assert.ok(
       reportedRuleIds.has(expectedRuleId),

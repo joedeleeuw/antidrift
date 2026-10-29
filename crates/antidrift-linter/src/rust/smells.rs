@@ -187,7 +187,26 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
                 "Do not allocate '.to_string().as_str()' on 'syn::Ident'; compare 'ident == \"...\"' directly.".to_owned(),
             );
         }
+        if node.method == "parse" && node.args.is_empty() && is_to_string_call(&node.receiver) {
+            self.push(
+                node.method.span(),
+                "rust/no-value-roundtrip",
+                "Do not round-trip a value through '.to_string().parse()'; convert or pass the typed value directly.".to_owned(),
+            );
+        }
         visit::visit_expr_method_call(self, node);
+    }
+
+    fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+        if is_serde_call(node, "from_value") && node.args.first().is_some_and(is_serde_to_value_arg)
+        {
+            self.push(
+                node.func.span(),
+                "rust/no-value-roundtrip",
+                "Do not round-trip through 'to_value(...)' and 'from_value(...)'; construct or convert the target type directly.".to_owned(),
+            );
+        }
+        visit::visit_expr_call(self, node);
     }
 
     fn visit_expr_binary(&mut self, node: &'ast ExprBinary) {
@@ -406,6 +425,34 @@ fn ident_to_string_call_span(expr: &Expr) -> Option<Span> {
 
 fn is_ident_to_string_call(expr: &Expr) -> bool {
     ident_to_string_call_span(expr).is_some()
+}
+
+fn is_to_string_call(expr: &Expr) -> bool {
+    matches!(expr, Expr::MethodCall(call) if call.method == "to_string" && call.args.is_empty())
+}
+
+fn is_serde_call(call: &ExprCall, name: &str) -> bool {
+    let Expr::Path(callee) = &*call.func else {
+        return false;
+    };
+    callee
+        .path
+        .segments
+        .last()
+        .is_some_and(|seg| seg.ident == name)
+}
+
+fn is_serde_to_value_arg(expr: &Expr) -> bool {
+    match expr {
+        Expr::Try(expr_try) => is_serde_to_value_arg(&expr_try.expr),
+        Expr::MethodCall(call)
+            if (call.method == "unwrap" || call.method == "expect") && call.args.is_empty() =>
+        {
+            is_serde_to_value_arg(&call.receiver)
+        }
+        Expr::Call(call) => is_serde_call(call, "to_value"),
+        _ => false,
+    }
 }
 
 fn is_str_lit(expr: &Expr) -> bool {

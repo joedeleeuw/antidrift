@@ -11,9 +11,8 @@ const THROW_ASSERTION_MATCHERS: &[&str] = &["toThrow", "toThrowError"];
 
 #[derive(Clone, Copy, Debug)]
 pub struct ZodTransformCall {
-    pub call_node: P<Node>,
-    pub receiver_node: P<Node>,
-    pub callback_node: P<Node>,
+    pub receiver: P<Node>,
+    pub callback: P<Node>,
 }
 
 fn is_expect_call(node: P<Node>) -> bool {
@@ -165,9 +164,8 @@ pub fn zod_transform_call_parts(
         return None;
     }
     Some(ZodTransformCall {
-        call_node,
-        receiver_node: prop.expression(),
-        callback_node: cb,
+        receiver: prop.expression(),
+        callback: cb,
     })
 }
 

@@ -30,15 +30,6 @@ fn build_explicit_type_arguments_on_owned_api_message() -> RuleMessage {
     )
 }
 
-fn root_identifier(node: P<Node>) -> Option<P<Node>> {
-    let mut current = tsrs_kernel::unwrap_expression(node);
-    while current.kind() == Kind::PropertyAccessExpression {
-        current =
-            tsrs_kernel::unwrap_expression(current.as_property_access_expression().expression());
-    }
-    (current.kind() == Kind::Identifier).then_some(current)
-}
-
 fn find_enclosing_import_declaration(node: P<Node>) -> Option<P<Node>> {
     let mut current = Some(node);
     while let Some(candidate) = current {
@@ -104,7 +95,7 @@ fn is_convex_hook_call(checker: &mut Checker, call_node: P<Node>) -> bool {
     let Some(&arg0) = call.arguments().nodes().first() else {
         return false;
     };
-    let Some(root_ident) = root_identifier(arg0) else {
+    let Some(root_ident) = tsrs_kernel::member_chain_root_node(arg0) else {
         return false;
     };
     is_imported_from_convex_generated_api(checker, root_ident)

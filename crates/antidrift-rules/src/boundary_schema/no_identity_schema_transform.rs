@@ -49,7 +49,7 @@ impl RuleVisitor for Visitor {
         let Some(parts) = boundary::zod_transform_call_parts(node, ctx.checker) else {
             return;
         };
-        if NoIdentitySchemaTransform::is_direct_identity_callback(parts.callback_node) {
+        if NoIdentitySchemaTransform::is_direct_identity_callback(parts.callback) {
             ctx.report_node(
                 node,
                 RuleMessage::new(
@@ -59,13 +59,11 @@ impl RuleVisitor for Visitor {
             );
             return;
         }
-        let Some(returned_keys) =
-            NoIdentitySchemaTransform::returned_identity_keys(parts.callback_node)
+        let Some(returned_keys) = NoIdentitySchemaTransform::returned_identity_keys(parts.callback)
         else {
             return;
         };
-        let input_keys =
-            boundary::closed_zod_transform_input_keys(parts.receiver_node, ctx.checker);
+        let input_keys = boundary::closed_zod_transform_input_keys(parts.receiver, ctx.checker);
         if input_keys.is_empty() || input_keys.len() != returned_keys.len() {
             return;
         }
@@ -73,7 +71,7 @@ impl RuleVisitor for Visitor {
             return;
         }
         ctx.report_node(
-            parts.callback_node,
+            parts.callback,
             RuleMessage::new(
                 "no-identity-schema-transform",
                 "This Zod transform returns its input unchanged. Remove the identity transform and infer the schema output directly.",

@@ -33,21 +33,58 @@ fn path_matches_dir_or_stem(normalized: &str, segments: &[&str]) -> bool {
     segments.contains(&last)
 }
 
+const GENERATED_DIRS: &[&str] = &[
+    "__generated__",
+    "generated",
+    "_generated",
+    "gen",
+    "dist",
+    "build",
+    ".next",
+];
+const BOUNDARY_SEGMENTS: &[&str] = &[
+    "route",
+    "routes",
+    "controller",
+    "controllers",
+    "handler",
+    "handlers",
+    "adapter",
+    "adapters",
+    "gateway",
+    "gateways",
+    "client",
+    "clients",
+    "parser",
+    "parsers",
+    "decoder",
+    "decoders",
+    "boundaries",
+    "boundary",
+    "api",
+    "rpc",
+    "trpc",
+    "orpc",
+    "webhook",
+    "ingest",
+    "cli",
+];
+const DOMAIN_SEGMENTS: &[&str] = &[
+    "domain",
+    "model",
+    "models",
+    "entities",
+    "core",
+    "contract",
+    "contracts",
+    "schema",
+    "schemas",
+];
+
 #[must_use]
 pub fn is_generated_file(file_path: &str, source_text: &str) -> bool {
     let normalized = normalize_path(file_path);
-    if path_has_dir_segment(
-        &normalized,
-        &[
-            "__generated__",
-            "generated",
-            "_generated",
-            "gen",
-            "dist",
-            "build",
-            ".next",
-        ],
-    ) {
+    if path_has_dir_segment(&normalized, GENERATED_DIRS) {
         return true;
     }
     if let Some(stem) = strip_script_ext(&normalized)
@@ -96,57 +133,13 @@ pub fn is_authored_source_file(sf: P<SourceFile>) -> bool {
 #[must_use]
 pub fn is_boundary_file(file_path: &str) -> bool {
     let normalized = normalize_path(file_path);
-    has_script_ext(&normalized)
-        && path_matches_dir_or_stem(
-            &normalized,
-            &[
-                "route",
-                "routes",
-                "controller",
-                "controllers",
-                "handler",
-                "handlers",
-                "adapter",
-                "adapters",
-                "gateway",
-                "gateways",
-                "client",
-                "clients",
-                "parser",
-                "parsers",
-                "decoder",
-                "decoders",
-                "boundaries",
-                "boundary",
-                "api",
-                "rpc",
-                "trpc",
-                "orpc",
-                "webhook",
-                "ingest",
-                "cli",
-            ],
-        )
+    has_script_ext(&normalized) && path_matches_dir_or_stem(&normalized, BOUNDARY_SEGMENTS)
 }
 
 #[must_use]
 pub fn is_domain_file(file_path: &str) -> bool {
     let normalized = normalize_path(file_path);
-    has_script_ext(&normalized)
-        && path_matches_dir_or_stem(
-            &normalized,
-            &[
-                "domain",
-                "model",
-                "models",
-                "entities",
-                "core",
-                "contract",
-                "contracts",
-                "schema",
-                "schemas",
-            ],
-        )
+    has_script_ext(&normalized) && path_matches_dir_or_stem(&normalized, DOMAIN_SEGMENTS)
 }
 
 #[must_use]
@@ -327,6 +320,25 @@ pub fn static_member_chain(node: P<Node>) -> Option<(P<Node>, Vec<&'static str>)
 }
 
 #[must_use]
+pub fn member_object(node: P<Node>) -> Option<P<Node>> {
+    let inner = unwrap_expression(node);
+    match inner.kind() {
+        Kind::PropertyAccessExpression => Some(inner.as_property_access_expression().expression()),
+        Kind::ElementAccessExpression => Some(inner.as_element_access_expression().expression()),
+        _ => None,
+    }
+}
+
+#[must_use]
+pub fn member_chain_root_node(node: P<Node>) -> Option<P<Node>> {
+    let mut current = unwrap_expression(node);
+    while let Some(obj) = member_object(current) {
+        current = unwrap_expression(obj);
+    }
+    ast::is_identifier(current).then_some(current)
+}
+
+#[must_use]
 pub fn member_chain_root_identifier(node: P<Node>) -> Option<&'static str> {
     let (root, _) = static_member_chain(node)?;
     ast::is_identifier(root).then(|| root.as_identifier().text())
@@ -354,11 +366,8 @@ pub fn terminal_member_name(node: P<Node>) -> Option<&'static str> {
                     .as_element_access_expression()
                     .argument_expression(),
             );
-            if ast::is_string_literal(arg) || ast::is_no_substitution_template_literal(arg) {
-                Some(arg.text())
-            } else {
-                None
-            }
+            (ast::is_string_literal(arg) || ast::is_no_substitution_template_literal(arg))
+                .then(|| arg.text())
         }
         _ => None,
     }
@@ -366,14 +375,11 @@ pub fn terminal_member_name(node: P<Node>) -> Option<&'static str> {
 
 #[must_use]
 pub fn is_undefined_or_void_expression(node: Option<P<Node>>) -> bool {
-    let Some(expr) = node else {
-        return true;
-    };
-    let unwrapped = unwrap_expression(expr);
-    if ast::is_identifier(unwrapped) && unwrapped.as_identifier().text() == "undefined" {
-        return true;
-    }
-    ast::is_void_expression(unwrapped)
+    node.is_none_or(|expr| {
+        let unwrapped = unwrap_expression(expr);
+        (ast::is_identifier(unwrapped) && unwrapped.as_identifier().text() == "undefined")
+            || ast::is_void_expression(unwrapped)
+    })
 }
 
 #[must_use]

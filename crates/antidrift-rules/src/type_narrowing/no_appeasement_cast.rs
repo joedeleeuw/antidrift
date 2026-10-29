@@ -29,20 +29,6 @@ fn is_double_cast_chain(node: P<Node>, operand: P<Node>) -> bool {
     false
 }
 
-fn operand_root_identifier(operand: P<Node>) -> Option<P<Node>> {
-    let mut current = tsrs_kernel::unwrap_expression(operand);
-    while current.kind() == Kind::PropertyAccessExpression
-        || current.kind() == Kind::ElementAccessExpression
-    {
-        current = if current.kind() == Kind::PropertyAccessExpression {
-            tsrs_kernel::unwrap_expression(current.as_property_access_expression().expression())
-        } else {
-            tsrs_kernel::unwrap_expression(current.as_element_access_expression().expression())
-        };
-    }
-    ast::is_identifier(current).then_some(current)
-}
-
 fn symbol_aliases_symbol(checker: &mut Checker, sym: P<Symbol>, target_sym: P<Symbol>) -> bool {
     let Some(decl) = sym.value_declaration() else {
         return false;
@@ -75,7 +61,7 @@ fn is_type_predicate_subject(checker: &mut Checker, node: P<Node>, operand: P<No
     let Some(pred_sym) = checker.get_symbol_at_location_exported(pred_param) else {
         return false;
     };
-    let Some(root_ident) = operand_root_identifier(operand) else {
+    let Some(root_ident) = tsrs_kernel::member_chain_root_node(operand) else {
         return false;
     };
     let Some(op_sym) = checker.get_symbol_at_location_exported(root_ident) else {

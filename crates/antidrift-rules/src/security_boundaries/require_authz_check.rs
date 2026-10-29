@@ -148,7 +148,10 @@ impl Visitor {
         if member_identifier(node) != Some("params") {
             return;
         }
-        let obj = ast::skip_parentheses(member_object(node));
+        let Some(raw_obj) = antidrift_kernel::tsrs_kernel::member_object(node) else {
+            return;
+        };
+        let obj = ast::skip_parentheses(raw_obj);
         if ast::is_identifier(obj)
             && ["req", "request", "ctx", "context", "event"].contains(&obj.as_identifier().text())
         {
@@ -168,14 +171,6 @@ impl Visitor {
         {
             frame.saw_authz = true;
         }
-    }
-}
-
-fn member_object(node: P<Node>) -> P<Node> {
-    match node.kind() {
-        Kind::PropertyAccessExpression => node.as_property_access_expression().expression(),
-        Kind::ElementAccessExpression => node.as_element_access_expression().expression(),
-        _ => node,
     }
 }
 

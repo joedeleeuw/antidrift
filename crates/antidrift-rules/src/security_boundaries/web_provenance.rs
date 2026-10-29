@@ -1,7 +1,9 @@
 pub(super) use antidrift_kernel::local_binding::{
     Binding, const_binding_initializer, is_binding_mutated, resolve_lexical_binding,
 };
-pub(super) use antidrift_kernel::tsrs_kernel::unwrap_expression;
+pub(super) use antidrift_kernel::tsrs_kernel::{
+    member_object as kernel_member_object, unwrap_expression,
+};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -49,11 +51,7 @@ pub(super) fn member_expression(expression: P<Node>) -> Option<P<Node>> {
 }
 
 pub(super) fn member_object(member: P<Node>) -> P<Node> {
-    match member.kind() {
-        Kind::PropertyAccessExpression => member.as_property_access_expression().expression(),
-        Kind::ElementAccessExpression => member.as_element_access_expression().expression(),
-        _ => member,
-    }
+    kernel_member_object(member).unwrap_or(member)
 }
 
 pub(super) fn static_property_name(member: P<Node>) -> Option<&'static str> {

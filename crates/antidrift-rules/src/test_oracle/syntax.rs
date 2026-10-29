@@ -1,6 +1,6 @@
 pub(super) use antidrift_kernel::tsrs_kernel::{
-    Span, call_expression_of, identifier_of, is_test_or_spec_file, numeric_literal_value,
-    unwrap_awaited_expression, unwrap_expression,
+    Span, call_expression_of, identifier_of, is_test_or_spec_file, member_chain_root_node,
+    member_object, numeric_literal_value, unwrap_awaited_expression, unwrap_expression,
 };
 use tsrs_ast::{Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -26,15 +26,6 @@ pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, String)> {
             let access = inner.as_element_access_expression();
             segment(access.argument_expression()).map(|name| (access.expression(), name))
         }
-        _ => None,
-    }
-}
-
-pub(super) fn member_object(expression: P<Node>) -> Option<P<Node>> {
-    let inner = unwrap_expression(expression);
-    match inner.kind() {
-        Kind::PropertyAccessExpression => Some(inner.as_property_access_expression().expression()),
-        Kind::ElementAccessExpression => Some(inner.as_element_access_expression().expression()),
         _ => None,
     }
 }
@@ -102,19 +93,7 @@ pub(super) fn argument(call_node: P<Node>, index: usize) -> Option<P<Node>> {
 }
 
 pub(super) fn root_identifier(expression: P<Node>) -> Option<P<Node>> {
-    let expression = unwrap_awaited_expression(expression);
-    if let Some((object, _)) = member(expression) {
-        return root_identifier(object);
-    }
-    match expression.kind() {
-        Kind::PropertyAccessExpression => {
-            root_identifier(expression.as_property_access_expression().expression())
-        }
-        Kind::ElementAccessExpression => {
-            root_identifier(expression.as_element_access_expression().expression())
-        }
-        _ => identifier_of(expression),
-    }
+    member_chain_root_node(unwrap_awaited_expression(expression))
 }
 
 pub(super) fn literal_container(expression: P<Node>) -> bool {
