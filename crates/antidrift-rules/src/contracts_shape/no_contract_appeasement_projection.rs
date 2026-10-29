@@ -48,6 +48,19 @@ fn build_bag_to_bag_message(parameter_name: &str) -> RuleMessage {
     )
 }
 
+fn build_constant_return_field_message(
+    contract_name: &str,
+    field_name: &str,
+    constant_literal: &str,
+) -> RuleMessage {
+    RuleMessage::new(
+        "constantReturnField",
+        format!(
+            "Return contract '{contract_name}' declares '{field_name}' as boolean, but every return branch in this module hardcodes '{field_name}: {constant_literal}'; compute the real value per branch or remove the dead contract field."
+        ),
+    )
+}
+
 fn has_modifier(node: P<Node>, flags: ModifierFlags) -> bool {
     ast::can_have_modifiers(node) && ast::get_combined_modifier_flags(node).intersects(flags)
 }
@@ -254,27 +267,58 @@ impl Rule for NoContractAppeasementProjection {
         if !self.scope.in_scope(ctx) {
             return Box::new(EmptyVisitor);
         }
-        Box::new(Visitor)
+        Box::new(Visitor {
+            candidates: Vec::new(),
+        })
     }
 }
 
-struct Visitor;
+struct Visitor {
+    candidates: Vec<(P<Node>, P<Node>)>,
+}
 
-const LISTENERS: [Listener; 5] = [
+const LISTENERS: [Listener; 6] = [
     Listener::Enter(Kind::FunctionDeclaration),
     Listener::Enter(Kind::VariableDeclaration),
     Listener::Enter(Kind::MethodDeclaration),
     Listener::Enter(Kind::PropertyDeclaration),
     Listener::Enter(Kind::PropertyAssignment),
+    Listener::Exit(Kind::EndOfFile),
 ];
+
+fn report_constant_return_fields(ctx: &mut Ctx, candidates: &[(P<Node>, P<Node>)]) {
+    let file_name = ctx.file.file_name();
+    if tsrs_kernel::is_test_file(file_name)
+        || tsrs_kernel::is_generated_file(file_name, ctx.file.text())
+    {
+        return;
+    }
+    for violation in
+        projection::find_constant_return_field_violations(candidates, ctx.file, ctx.checker)
+    {
+        ctx.report_node(
+            violation.report_node,
+            build_constant_return_field_message(
+                &violation.contract_name,
+                &violation.field_name,
+                violation.constant_literal,
+            ),
+        );
+    }
+}
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
         &LISTENERS
     }
 
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    fn visit(&mut self, ctx: &mut Ctx, listener: Listener, node: P<Node>) {
+        if matches!(listener, Listener::Exit(Kind::EndOfFile)) {
+            report_constant_return_fields(ctx, &self.candidates);
+            return;
+        }
         if let Some(fn_node) = tsrs_kernel::function_node_from_declaration(node) {
+            self.candidates.push((fn_node, node));
             check_function_candidate(ctx, fn_node, node);
         }
     }

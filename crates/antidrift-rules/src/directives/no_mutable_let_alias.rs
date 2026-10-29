@@ -195,7 +195,7 @@ fn single_const_decl(stmt: P<Node>) -> Option<(P<Node>, &'static str, P<Node>)> 
     let decl = decl_node.as_variable_declaration();
     let name_node = decl.name();
     let init = unwrap_expression(decl.initializer()?);
-    ast::is_identifier(name_node).then_some((*decl_node, name_node.as_identifier().text(), init))
+    ast::is_identifier(name_node).then(|| (*decl_node, name_node.as_identifier().text(), init))
 }
 
 fn extract_const_ident_alias(stmt: P<Node>) -> Option<(P<Node>, &'static str, &'static str)> {

@@ -1,5 +1,6 @@
 pub mod bag_reshaper;
 pub mod bag_state;
+pub mod constant_return_field;
 pub mod contract_projection;
 pub mod inline_parse;
 
@@ -13,6 +14,9 @@ pub use bag_state::{
     inspect_object_literal_bag_projection, inspect_object_literal_bag_projection_with_options,
     is_bag_member_chain, is_bag_object_reference, is_empty_object_fallback, is_nullish_expression,
     is_pure_bag_condition, is_static_scalar_literal,
+};
+pub use constant_return_field::{
+    ConstantReturnFieldViolation, find_constant_return_field_violations,
 };
 pub use contract_projection::is_contract_appeasement_projection;
 pub use inline_parse::{

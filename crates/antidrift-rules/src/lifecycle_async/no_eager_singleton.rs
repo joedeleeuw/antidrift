@@ -81,11 +81,22 @@ impl Rule for NoEagerSingleton {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        let in_default_script_root =
+            !self.scope.has_explicit_files() && is_script_or_worker_entry(ctx.file.file_name());
         Box::new(Visitor {
             rule: self,
-            enabled: self.scope.in_scope(ctx),
+            enabled: !in_default_script_root && self.scope.in_scope(ctx),
         })
     }
+}
+
+fn is_script_or_worker_entry(file_name: &str) -> bool {
+    let norm = file_name.replace('\\', "/");
+    norm.contains("/scripts/")
+        || norm.starts_with("scripts/")
+        || norm.contains("/bin/")
+        || norm.starts_with("bin/")
+        || norm.contains("worker-process.")
 }
 
 struct Visitor {

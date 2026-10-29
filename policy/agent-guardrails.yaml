@@ -225,6 +225,14 @@ clusters:
         severity: error
         detector: unicorn-js/prefer-switch
         message: Declare the case space first with a typed table, a discriminated union or an exhaustive switch.
+      - id: simplicity/no-branch-tree # G9 nested subject-coupled if/else trees and negated discriminant scatter.
+        severity: error
+        detector: antidrift:no-branch-tree
+        message: Flatten nested branch trees into early guard clauses, a switch, or a typed case table.
+      - id: simplicity/no-mutable-let-alias # G8 mutable let bindings that are immediately overwritten by a const alias or re-aliased into a const after settlement.
+        severity: error
+        detector: antidrift:no-mutable-let-alias
+        message: Bind the settled value directly to a single const instead of staging or re-aliasing a mutable let.
       - id: provenance/no-host-path-literal # S4 /home/<user>/ and /Users/<user>/ literals outside tests.
         severity: error
         detector: antidrift:no-host-path-literal
@@ -466,6 +474,26 @@ clusters:
         severity: error
         detector: antidrift-linter:rust/no-silent-result-discard
         message: Do not silently discard Result errors via Err(_) match arms or if let Ok(...) filesystem reads.
+      - id: rust/no-structural-type-fork
+        severity: error
+        detector: antidrift-linter:rust/no-structural-type-fork
+        message: Share or import one owned struct instead of duplicating an identical 3+ field struct shape.
+      - id: rust/no-value-roundtrip
+        severity: error
+        detector: antidrift-linter:rust/no-value-roundtrip
+        message: Convert or construct typed values directly instead of round-tripping through to_string().parse() or to_value/from_value.
+      - id: rust/no-decode-to-option
+        severity: error
+        detector: antidrift-linter:rust/no-decode-to-option
+        message: Propagate or report boundary serde decode failures explicitly instead of collapsing them via .ok() or unwrap_or.
+      - id: rust/no-constant-return-field
+        severity: error
+        detector: antidrift-linter:rust/no-constant-return-field
+        message: Delete dead struct fields initialized to the same constant across all construction sites and never mutated.
+      - id: rust/no-redundant-owner-prefix
+        severity: error
+        detector: antidrift-linter:rust/no-redundant-owner-prefix
+        message: Drop redundant leading owner-stem prefixes when every field of a non-serde struct repeats the struct stem.
 
   - id: agent-instructions # Natural-language guidance should be generated and linted.
     owner: developer-experience # DX owns multi-agent instruction consistency.

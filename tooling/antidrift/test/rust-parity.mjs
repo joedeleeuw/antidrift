@@ -1020,21 +1020,9 @@ const headlessProbes = [
       type BindingHolder = { phase: "claimed" | "reserved" | "released"; unitRecovery: boolean };
       declare function readBinding(): BindingHolder | "unbound" | undefined;
       declare function readClean(): BindingHolder | undefined;
-      export function checkDualSentinel() {
-        const holder = readBinding();
-        if (!holder || holder === "unbound") return false;
-        return holder.unitRecovery;
-      }
-      export function checkPositiveDualSentinel() {
-        const holder = readBinding();
-        if (holder && holder !== "unbound") return holder.unitRecovery;
-        return false;
-      }
-      export function checkSingleEmptyRepresentation() {
-        const holder = readClean();
-        if (!holder) return false;
-        return holder.unitRecovery;
-      }
+      export function checkDualSentinel() { const holder = readBinding(); if (!holder || holder === "unbound") return false; return holder.unitRecovery; }
+      export function checkPositiveDualSentinel() { const holder = readBinding(); if (holder && holder !== "unbound") return holder.unitRecovery; return false; }
+      export function checkSingleEmptyRepresentation() { const holder = readClean(); if (!holder) return false; return holder.unitRecovery; }
     `,
     expectedCount: 2,
   },
@@ -1052,9 +1040,7 @@ const headlessProbes = [
         if (holder && holder !== "unbound") {
           if (holder.phase !== "released" && foreign(holder)) throw new Error("foreign binding owns port authority");
           if (holder.phase !== "claimed") await write("reserved", foreign(holder) ? false : holder.unitRecovery);
-        } else {
-          await write("reserved", false);
-        }
+        } else { await write("reserved", false); }
       }
     `,
     expectedCount: 2,
@@ -1069,11 +1055,7 @@ const headlessProbes = [
       export async function acquireClean(holder: Holder) {
         if (holder.phase === "unbound") { await write("reserved", false); return; }
         if (holder.foreign && holder.phase !== "released") throw new Error("foreign binding owns port authority");
-        switch (holder.phase) {
-          case "claimed": return;
-          case "reserved":
-          case "released": await write("reserved", holder.foreign ? false : holder.unitRecovery); return;
-        }
+        switch (holder.phase) { case "claimed": return; case "reserved": case "released": await write("reserved", holder.foreign ? false : holder.unitRecovery); return; }
       }
     `,
     expectedCount: 0,
@@ -1086,21 +1068,15 @@ const headlessProbes = [
       declare function runStatus(): Promise<{ paths: { configPath: string } }>;
       declare function readOwner(id: string): string | undefined;
       export function settleOwner(id: string, fallback: string) {
-        let owner = readOwner(id);
-        if (!owner) owner = fallback;
-        const userId = owner;
-        return () => userId.trim();
+        let owner = readOwner(id); if (!owner) owner = fallback;
+        const userId = owner; return () => userId.trim();
       }
       export async function verifyHub() {
         let paths: { configPath: string } | undefined;
         try {
-          const uninstalled = await runStatus();
-          const foreignPaths = uninstalled.paths;
-          paths = foreignPaths;
+          const uninstalled = await runStatus(); const foreignPaths = uninstalled.paths; paths = foreignPaths;
           if (!foreignPaths.configPath) throw new Error("missing configPath");
-        } finally {
-          if (paths) paths.configPath.trim();
-        }
+        } finally { if (paths) paths.configPath.trim(); }
       }
     `,
     expectedCount: 2,
@@ -1111,29 +1087,53 @@ const headlessProbes = [
     file: "tooling/antidrift/src/__probe_mutable_let_alias_clean.ts",
     source: `
       export function rotateToken(next: string) {
-        let current = "initial";
-        if (next.length > 0) current = next;
-        const previous = current;
-        current = "rotated";
-        return { previous, current };
+        let current = "initial"; if (next.length > 0) current = next;
+        const previous = current; current = "rotated"; return { previous, current };
       }
       export function sumItems(items: number[]) {
-        let total = 0;
-        for (const item of items) total += item;
-        const finalTotal = total;
-        return finalTotal * 2;
+        let total = 0; for (const item of items) total += item;
+        const finalTotal = total; return finalTotal * 2;
       }
       export async function runCancellable(work: (signal: AbortSignal) => Promise<void>) {
         let activeAbort: AbortController | null = null;
         if (!activeAbort) {
-          const abort = new AbortController();
-          activeAbort = abort;
-          await work(abort.signal);
-          if (activeAbort === abort) activeAbort = null;
+          const abort = new AbortController(); activeAbort = abort;
+          await work(abort.signal); if (activeAbort === abort) activeAbort = null;
         }
       }
     `,
     expectedCount: 0,
+  },
+  {
+    name: "no-contract-appeasement-projection (constantReturnField on non-union contract vs sibling producer and union)",
+    rule: "antidrift/no-contract-appeasement-projection",
+    file: "tooling/antidrift/src/__probe_constant_return_field.ts",
+    source: `
+      export interface MachineReview { root: string; count: number; truncated: boolean; }
+      export function reviewForProject(root: string, items: string[]): MachineReview {
+        if (items.length === 0) return { root, count: 0, truncated: false };
+        return { root, count: items.length, truncated: false };
+      }
+      export interface TimelinePage { rows: string[]; reset: boolean; }
+      export function fetchAfter(rows: string[]): TimelinePage {
+        if (rows.length === 0) return { rows: [], reset: false };
+        return { rows, reset: false };
+      }
+      export function fetchReset(rows: string[]): TimelinePage {
+        return { rows, reset: true };
+      }
+    `,
+    expectedCount: 1,
+  },
+  {
+    name: "no-structural-type-fork (all-fields redundantOwnerPrefix reported while sibling-disambiguated fields stay clean)",
+    rule: "antidrift/no-structural-type-fork",
+    file: "tooling/antidrift/src/__probe_redundant_owner_prefix.ts",
+    source: `
+      export interface ProjectDescriptor { projectId: string; projectKey: string; projectDisplayName: string; }
+      export interface BusinessInfo { businessZipCode: string; personalZipCode: string; ownerName: string; }
+    `,
+    expectedCount: 1,
   },
 ];
 
@@ -1387,6 +1387,7 @@ try {
       "    legacy_adapter(input)",
       "}",
       "pub struct Holder { pub ident: String }",
+      "pub struct ProjectMeta { pub project_id: String, pub project_key: String }",
       "pub struct StatusEnvelope { pub ok: bool, pub count: usize }",
       "pub fn make_envelope_a(n: usize) -> StatusEnvelope {",
       "    StatusEnvelope { ok: true, count: n }",
@@ -1476,6 +1477,7 @@ try {
     "rust/no-value-roundtrip",
     "rust/no-decode-to-option",
     "rust/no-constant-return-field",
+    "rust/no-redundant-owner-prefix",
   ]) {
     assert.ok(
       reportedRuleIds.has(expectedRuleId),

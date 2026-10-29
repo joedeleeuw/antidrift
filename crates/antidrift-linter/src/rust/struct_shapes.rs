@@ -83,6 +83,7 @@ pub(super) fn check_constant_return_fields(
         for item in &ast.items {
             if let Item::Struct(item_struct) = item {
                 collect_struct_candidate(&rel_path, item_struct, &mut candidates);
+                check_redundant_owner_prefix(&rel_path, item_struct, diagnostics);
             }
         }
     }
@@ -182,7 +183,74 @@ fn collect_struct_candidate(
     }
 }
 
+fn check_redundant_owner_prefix(
+    rel_path: &str,
+    item_struct: &ItemStruct,
+    diagnostics: &mut Vec<RustDiagnostic>,
+) {
+    if has_serde_or_repr_c(&item_struct.attrs) {
+        return;
+    }
+    let Fields::Named(named) = &item_struct.fields else {
+        return;
+    };
+    if named.named.len() < 2 {
+        return;
+    }
+    let struct_name = item_struct.ident.to_string();
+    let Some(stem) = leading_compound_stem(&struct_name) else {
+        return;
+    };
+    let prefix = format!("{stem}_");
+    let all_prefixed = named.named.iter().all(|field| {
+        field.ident.as_ref().is_some_and(|ident| {
+            ident
+                .to_string()
+                .strip_prefix(&prefix)
+                .is_some_and(|rest| !rest.is_empty())
+        })
+    });
+    if all_prefixed {
+        diagnostics.push(RustDiagnostic {
+            file: rel_path.to_owned(),
+            line: item_struct.ident.span().start().line.max(1),
+            rule_id: "rust/no-redundant-owner-prefix",
+            message: format!(
+                "Struct '{struct_name}' prefixes all {} fields with '{prefix}'; drop the redundant owner prefix from field names.",
+                named.named.len()
+            ),
+        });
+    }
+}
+
+fn leading_compound_stem(name: &str) -> Option<String> {
+    let mut chars = name.chars();
+    let first = chars.next()?;
+    if !first.is_ascii_uppercase() {
+        return None;
+    }
+    let mut stem = String::from(first.to_ascii_lowercase());
+    for ch in chars {
+        if ch.is_ascii_uppercase() {
+            return (stem.len() >= 3).then_some(stem);
+        }
+        if !ch.is_ascii_alphanumeric() {
+            return None;
+        }
+        stem.push(ch);
+    }
+    None
+}
+
+fn has_serde_or_repr_c(attrs: &[Attribute]) -> bool {
+    has_derive_or_repr_c(attrs, &["Deserialize", "Serialize"])
+}
+
 fn has_deserialize_or_repr_c(attrs: &[Attribute]) -> bool {
+    has_derive_or_repr_c(attrs, &["Deserialize", "Default"])
+}
+
+fn has_derive_or_repr_c(attrs: &[Attribute], traits: &[&str]) -> bool {
     for attr in attrs {
         if attr.path().is_ident("repr") {
             return true;
@@ -196,7 +264,7 @@ fn has_deserialize_or_repr_c(attrs: &[Attribute]) -> bool {
                 .path
                 .segments
                 .last()
-                .is_some_and(|seg| seg.ident == "Deserialize" || seg.ident == "Default")
+                .is_some_and(|seg| traits.iter().any(|name| seg.ident == *name))
             {
                 excluded = true;
             }
