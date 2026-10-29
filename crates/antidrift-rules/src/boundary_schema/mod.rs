@@ -1,3 +1,4 @@
+pub mod no_external_decode_in_tsx;
 pub mod no_identity_schema_transform;
 pub mod no_redundant_zod_parse;
 pub mod no_schema_validator_transcoding;
@@ -11,14 +12,21 @@ use antidrift_kernel::rule_scope::decode_rule_options;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn Rule> {
+pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
     vec![
         &unknown_input_must_be_decoded::DEFAULT_RULE,
-        &no_unsafe_deserialize::DEFAULT_RULE,
+        &no_external_decode_in_tsx::DEFAULT_RULE,
         &no_redundant_zod_parse::DEFAULT_RULE,
         &no_identity_schema_transform::DEFAULT_RULE,
         &no_schema_validator_transcoding::DEFAULT_RULE,
         &require_convex_return_validator::DEFAULT_RULE,
+    ]
+}
+
+#[must_use]
+pub fn script_default_rules() -> Vec<&'static dyn Rule> {
+    vec![
+        &no_unsafe_deserialize::DEFAULT_RULE,
         &no_sql_string_concat::DEFAULT_RULE,
     ]
 }
@@ -33,6 +41,9 @@ pub fn create_rule(
                 unknown_input_must_be_decoded::UnknownInputMustBeDecoded::from_options(options)?,
             )))
         }
+        no_external_decode_in_tsx::RULE_NAME | "no-external-decode-in-tsx" => Ok(Some(Box::new(
+            no_external_decode_in_tsx::NoExternalDecodeInTsx::from_options(options)?,
+        ))),
         no_unsafe_deserialize::RULE_NAME | "no-unsafe-deserialize" => Ok(Some(Box::new(
             no_unsafe_deserialize::NoUnsafeDeserialize::from_options(options)?,
         ))),

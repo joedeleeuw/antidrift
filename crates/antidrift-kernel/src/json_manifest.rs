@@ -72,3 +72,21 @@ pub fn package_entrypoint_paths(pkg_path: &Path) -> Option<Vec<String>> {
     }
     Some(entries)
 }
+
+#[must_use]
+pub fn load_nearest_package_json_manifest(file_path: &Path) -> Option<PackageJsonManifest> {
+    let mut current = file_path.parent();
+    while let Some(dir) = current {
+        let candidate = dir.join("package.json");
+        if candidate.is_file() {
+            let Ok(text) = std::fs::read_to_string(&candidate) else {
+                return None;
+            };
+            if let Some(manifest) = parse_package_json_manifest(&text) {
+                return Some(manifest);
+            }
+        }
+        current = dir.parent();
+    }
+    None
+}

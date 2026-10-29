@@ -19,14 +19,18 @@ mod web_provenance;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn Rule> {
+pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
+    vec![&no_redeclared_owned_union::DEFAULT_RULE]
+}
+
+#[must_use]
+pub fn script_default_rules() -> Vec<&'static dyn Rule> {
     vec![
         &confine_owner::DEFAULT_RULE,
         &no_auth_token_in_web_storage::DEFAULT_RULE,
         &no_bun_api_in_shared::DEFAULT_RULE,
         &no_path_prefix_containment::DEFAULT_RULE,
         &no_raw_filename_write::DEFAULT_RULE,
-        &no_redeclared_owned_union::DEFAULT_RULE,
         &no_relative_cross_package_imports::DEFAULT_RULE,
         &no_unlisted_external_imports::DEFAULT_RULE,
         &no_unsafe_inner_html::DEFAULT_RULE,

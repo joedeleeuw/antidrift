@@ -49,20 +49,30 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
     let (programs, mut unmatched) = env.group_files_by_tsconfig(&normalized_files);
     let mut diagnostics_by_file: BTreeMap<String, Vec<RuleDiagnostic>> = BTreeMap::new();
     for (config_file_name, config_files) in &programs {
-        match env.run_configured_program(config_file_name, config_files, true) {
-            Ok(bound) => {
-                collect_missing_bound_files(&bound.source_files, config_files, &mut unmatched);
-                lint_bound_program(
-                    &bound,
-                    &active_rules,
-                    &script_rules,
-                    &cwd_norm,
-                    args,
-                    &mut diagnostics_by_file,
-                )?;
-            }
-            Err(_) => unmatched.extend(config_files.iter().cloned()),
-        }
+        let bound = env
+            .run_configured_program(config_file_name, config_files, true)
+            .map_err(|diags| {
+                let messages: Vec<String> = diags
+                    .into_iter()
+                    .map(|diag| {
+                        format!(
+                            "{}: {}",
+                            diag.file_path.as_deref().unwrap_or(config_file_name),
+                            diag.message.description
+                        )
+                    })
+                    .collect();
+                format!("failed to load {config_file_name}: {}", messages.join("; "))
+            })?;
+        collect_missing_bound_files(&bound.source_files, config_files, &mut unmatched);
+        lint_bound_program(
+            &bound,
+            &active_rules,
+            &script_rules,
+            &cwd_norm,
+            args,
+            &mut diagnostics_by_file,
+        )?;
     }
     if !unmatched.is_empty() {
         let bound = env.build_inferred_program(&unmatched);

@@ -50,7 +50,15 @@ use require_stable_snapshot::RequireStableSnapshot;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn Rule> {
+pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
+    vec![
+        &no_impure_render_call::DEFAULT_RULE,
+        &no_query_envelope_leak::DEFAULT_RULE,
+    ]
+}
+
+#[must_use]
+pub fn script_default_rules() -> Vec<&'static dyn Rule> {
     vec![
         &icon_button_requires_tooltip::DEFAULT_RULE,
         &no_adhoc_loader::DEFAULT_RULE,
@@ -62,12 +70,10 @@ pub fn rules() -> Vec<&'static dyn Rule> {
         &no_duplicated_conditional_classnames::DEFAULT_RULE,
         &no_handrolled_resource_lifecycle_cells::DEFAULT_RULE,
         &no_hookless_use_function::DEFAULT_RULE,
-        &no_impure_render_call::DEFAULT_RULE,
         &no_inline_style_colors::DEFAULT_RULE,
         &no_omitted_prop_respread::DEFAULT_RULE,
         &no_physical_properties::DEFAULT_RULE,
         &no_portal_under_interactive_ancestor::DEFAULT_RULE,
-        &no_query_envelope_leak::DEFAULT_RULE,
         &no_raw_foreground_opacity::DEFAULT_RULE,
         &no_unformatted_number::DEFAULT_RULE,
         &no_unstable_render_default_collection::DEFAULT_RULE,

@@ -684,6 +684,23 @@ const headlessProbes = [
     `,
     expectedCount: 0,
   },
+  {
+    name: "no-external-decode-in-tsx (flags wire JSON.parse in TSX while allowing component-local useState form validation)",
+    rule: "antidrift/no-external-decode-in-tsx",
+    file: "tooling/antidrift/src/__probe_external_decode.tsx",
+    source: `
+      import { useState } from "react";
+      import { z } from "zod";
+      const FormSchema = z.object({ name: z.string() });
+      export function ProfileView({ wirePayload }: { wirePayload: string }) {
+        const [draftName] = useState("");
+        const parsedWire = JSON.parse(wirePayload);
+        const validLocal = FormSchema.safeParse({ name: draftName });
+        return <div>{String(Boolean(parsedWire && validLocal.success))}</div>;
+      }
+    `,
+    expectedCount: 1,
+  },
 ];
 
 const sharedHelperFiles = {
@@ -923,7 +940,12 @@ try {
       "pub struct Holder { pub ident: String }",
       "pub fn compare_ident(h: &Holder, val: &serde_json::Value) -> bool {",
       '    let _ = val["k"].as_str();',
-      '    h.ident.to_string() == "foo"',
+      '    let _ = h.ident.to_string() == "foo";',
+      '    if let Ok(text) = std::fs::read_to_string("foo.txt") { let _ = text.len(); }',
+      "    match legacy_adapter(&h.ident) {",
+      "        Ok(_) => true,",
+      "        Err(_) => false,",
+      "    }",
       "}",
       "#[cfg(all(test))]",
       "mod inline_tests {}",
@@ -932,6 +954,34 @@ try {
   );
   writeFileSync(join(kernelSrc, "orphan_file.rs"), "pub fn unused() {}\n");
   writeFileSync(join(kernelSrc, "bad_helpers.rs"), "pub fn helper() {}\n");
+  const rulesSrc = join(tempWorkspace, "crates/antidrift-rules/src");
+  mkdirSync(rulesSrc, { recursive: true });
+  writeFileSync(
+    join(tempWorkspace, "crates/antidrift-rules/Cargo.toml"),
+    [
+      "[package]",
+      'name = "antidrift-rules"',
+      'version = "0.20.0"',
+      "",
+      "[lib]",
+      'path = "src/lib.rs"',
+      "test = false",
+      "doctest = false",
+      "",
+      "[lints]",
+      "workspace = true",
+      "",
+    ].join("\n")
+  );
+  writeFileSync(
+    join(rulesSrc, "lib.rs"),
+    [
+      "pub struct ScopelessRule;",
+      "pub trait Rule {}",
+      "impl Rule for ScopelessRule {}",
+      "",
+    ].join("\n")
+  );
 
   const rustSubcmd = spawnSync(binaryPath, ["rust", "--json", tempWorkspace], {
     cwd: repoRoot,
@@ -962,6 +1012,8 @@ try {
     "rust/no-ident-to-string-compare",
     "rust/no-untyped-config-probe",
     "rust/no-inline-tests",
+    "rust/no-silent-result-discard",
+    "rust/require-rule-scope",
   ]) {
     assert.ok(
       reportedRuleIds.has(expectedRuleId),

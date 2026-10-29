@@ -45,8 +45,19 @@ fn push_entries(
 }
 
 static RULE_CATALOG: LazyLock<Vec<RuleCatalogEntry>> = LazyLock::new(|| {
-    let mut entries = Vec::with_capacity(82);
-    push_entries(&mut entries, boundary_schema::rules(), true, true);
+    let mut entries = Vec::with_capacity(88);
+    push_entries(
+        &mut entries,
+        boundary_schema::typescript_only_rules(),
+        true,
+        true,
+    );
+    push_entries(
+        &mut entries,
+        boundary_schema::script_default_rules(),
+        true,
+        false,
+    );
     push_entries(&mut entries, contracts_shape::rules(), true, true);
     push_entries(
         &mut entries,
@@ -68,8 +79,20 @@ static RULE_CATALOG: LazyLock<Vec<RuleCatalogEntry>> = LazyLock::new(|| {
     );
     push_entries(&mut entries, directives::rules(), true, false);
     push_entries(&mut entries, lifecycle_async::rules(), true, false);
-    push_entries(&mut entries, react_ui::rules(), true, false);
-    push_entries(&mut entries, security_boundaries::rules(), true, false);
+    push_entries(&mut entries, react_ui::typescript_only_rules(), true, true);
+    push_entries(&mut entries, react_ui::script_default_rules(), true, false);
+    push_entries(
+        &mut entries,
+        security_boundaries::typescript_only_rules(),
+        true,
+        true,
+    );
+    push_entries(
+        &mut entries,
+        security_boundaries::script_default_rules(),
+        true,
+        false,
+    );
     push_entries(&mut entries, test_oracle::rules(), true, false);
     entries
 });

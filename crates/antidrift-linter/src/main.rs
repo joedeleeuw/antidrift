@@ -22,9 +22,41 @@ fn run_headless_thread(rest: Vec<String>) -> ExitCode {
         Ok(handle) => match handle.join() {
             Ok(0) => ExitCode::SUCCESS,
             Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
-            Err(_) => ExitCode::from(1),
+            Err(panic_payload) => {
+                eprintln!("antidrift-linter headless thread panicked: {panic_payload:?}");
+                ExitCode::from(1)
+            }
         },
-        Err(_) => ExitCode::from(1),
+        Err(err) => {
+            eprintln!("antidrift-linter: failed to spawn headless thread: {err}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn run_batch_thread(spec: String) -> ExitCode {
+    let spawned = std::thread::Builder::new()
+        .stack_size(256 << 20)
+        .spawn(move || run_batch_json(&spec));
+    match spawned {
+        Ok(handle) => match handle.join() {
+            Ok(Ok(json_output)) => {
+                println!("{json_output}");
+                ExitCode::SUCCESS
+            }
+            Ok(Err(err)) => {
+                eprintln!("antidrift-linter: {err}");
+                ExitCode::from(2)
+            }
+            Err(panic_payload) => {
+                eprintln!("antidrift-linter batch thread panicked: {panic_payload:?}");
+                ExitCode::from(2)
+            }
+        },
+        Err(err) => {
+            eprintln!("antidrift-linter: {err}");
+            ExitCode::from(2)
+        }
     }
 }
 
@@ -82,27 +114,7 @@ fn main() -> ExitCode {
     }
 
     if let Some(batch_spec) = &args.batch_json {
-        let spec = batch_spec.clone();
-        let spawned = std::thread::Builder::new()
-            .stack_size(256 << 20)
-            .spawn(move || run_batch_json(&spec));
-        return match spawned {
-            Ok(handle) => match handle.join() {
-                Ok(Ok(json_output)) => {
-                    println!("{json_output}");
-                    ExitCode::SUCCESS
-                }
-                Ok(Err(err)) => {
-                    eprintln!("antidrift-linter: {err}");
-                    ExitCode::from(2)
-                }
-                Err(_) => ExitCode::from(2),
-            },
-            Err(err) => {
-                eprintln!("antidrift-linter: {err}");
-                ExitCode::from(2)
-            }
-        };
+        return run_batch_thread(batch_spec.clone());
     }
 
     match run_workspace(&args) {

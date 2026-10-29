@@ -2,10 +2,12 @@ use super::RustDiagnostic;
 use antidrift_rules::type_narrowing::no_compat_names::is_compat_name;
 use proc_macro2::Span;
 use std::path::Path;
+use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    BinOp, Expr, ExprBinary, ExprCall, ExprClosure, ExprField, ExprLit, ExprMethodCall, ExprPath,
-    FnArg, ItemEnum, ItemFn, ItemStruct, ItemType, Lit, Member, Pat, Stmt,
+    Arm, BinOp, Expr, ExprBinary, ExprCall, ExprClosure, ExprField, ExprLet, ExprLit,
+    ExprMethodCall, ExprPath, FnArg, ItemEnum, ItemFn, ItemStruct, ItemType, Lit, Member, Pat,
+    Stmt,
 };
 
 pub(super) fn check_smells(
@@ -207,6 +209,72 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
         }
         visit::visit_expr_binary(self, node);
     }
+
+    fn visit_arm(&mut self, node: &'ast Arm) {
+        if node.guard.is_none() && is_err_wild_pat(&node.pat) {
+            self.push(
+                node.pat.span(),
+                "rust/no-silent-result-discard",
+                "'Err(_) => ...' discards the underlying error value; bind the error and propagate or report it explicitly.".to_owned(),
+            );
+        }
+        visit::visit_arm(self, node);
+    }
+
+    fn visit_expr_let(&mut self, node: &'ast ExprLet) {
+        if is_ok_tuple_pat(&node.pat) && is_fs_io_call(&node.expr) {
+            self.push(
+                node.pat.span(),
+                "rust/no-silent-result-discard",
+                "'if let Ok(...) = fs::...' silently ignores filesystem I/O failures; propagate or handle the I/O error explicitly.".to_owned(),
+            );
+        }
+        visit::visit_expr_let(self, node);
+    }
+}
+
+fn is_err_wild_pat(pat: &Pat) -> bool {
+    let Pat::TupleStruct(tuple) = pat else {
+        return false;
+    };
+    tuple
+        .path
+        .segments
+        .last()
+        .is_some_and(|seg| seg.ident == "Err")
+        && tuple.elems.len() == 1
+        && is_wild_pat(&tuple.elems[0])
+}
+
+fn is_ok_tuple_pat(pat: &Pat) -> bool {
+    let Pat::TupleStruct(tuple) = pat else {
+        return false;
+    };
+    tuple
+        .path
+        .segments
+        .last()
+        .is_some_and(|seg| seg.ident == "Ok")
+}
+
+fn is_fs_io_call(expr: &Expr) -> bool {
+    let Expr::Call(ExprCall { func, .. }) = expr else {
+        return false;
+    };
+    let Expr::Path(callee) = &**func else {
+        return false;
+    };
+    let segments: Vec<&syn::Ident> = callee.path.segments.iter().map(|s| &s.ident).collect();
+    let Some(last) = segments.last() else {
+        return false;
+    };
+    segments.len() >= 2
+        && *segments[segments.len() - 2] == "fs"
+        && (**last == "read_to_string"
+            || **last == "read"
+            || **last == "write"
+            || **last == "read_dir"
+            || **last == "metadata")
 }
 
 fn has_banned_lifecycle_token(name: &str) -> bool {

@@ -5,7 +5,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
-use syn::{Attribute, Expr, ExprLit, Item, ItemMod, Lit, Meta};
+use syn::{Attribute, Expr, ExprLit, Item, ItemMod, Lit, Meta, Type};
 
 pub(super) fn check_workspace_root(
     root: &Path,
@@ -74,6 +74,7 @@ fn check_crate_dir(
         match syn::parse_file(&source) {
             Ok(ast) => {
                 check_syn_ast(&rel_path, file_path, &ast, diagnostics);
+                check_rule_scope_ownership(&rel_path, &ast, diagnostics);
                 parsed_files.insert(file_path.clone(), ast);
             }
             Err(err) => {
@@ -368,4 +369,73 @@ fn parse_toml_sections(text: &str) -> Vec<TomlSection> {
 fn relative_display(root: &Path, path: &Path) -> String {
     let rel = path.strip_prefix(root).unwrap_or(path);
     rel.to_string_lossy().replace('\\', "/")
+}
+
+fn check_rule_scope_ownership(
+    rel_path: &str,
+    ast: &syn::File,
+    diagnostics: &mut Vec<RustDiagnostic>,
+) {
+    if !rel_path.starts_with("crates/antidrift-rules/src/") {
+        return;
+    }
+    let mut structs_with_scope: FxHashSet<String> = FxHashSet::default();
+    let mut all_structs: FxHashSet<String> = FxHashSet::default();
+    for item in &ast.items {
+        let Item::Struct(item_struct) = item else {
+            continue;
+        };
+        let name = item_struct.ident.to_string();
+        all_structs.insert(name.clone());
+        if item_struct
+            .fields
+            .iter()
+            .any(|field| is_rule_scope_type(&field.ty))
+        {
+            structs_with_scope.insert(name);
+        }
+    }
+    for item in &ast.items {
+        let Item::Impl(item_impl) = item else {
+            continue;
+        };
+        let Some((_, trait_path, _)) = &item_impl.trait_ else {
+            continue;
+        };
+        if !trait_path
+            .segments
+            .last()
+            .is_some_and(|seg| seg.ident == "Rule")
+        {
+            continue;
+        }
+        let Type::Path(self_path) = &*item_impl.self_ty else {
+            continue;
+        };
+        let Some(last_seg) = self_path.path.segments.last() else {
+            continue;
+        };
+        let struct_name = last_seg.ident.to_string();
+        if all_structs.contains(&struct_name) && !structs_with_scope.contains(&struct_name) {
+            diagnostics.push(RustDiagnostic {
+                file: rel_path.to_owned(),
+                line: last_seg.ident.span().start().line.max(1),
+                rule_id: "rust/require-rule-scope",
+                message: format!(
+                    "Rule struct '{struct_name}' implements 'Rule' without a 'RuleScope' field; embed 'scope: RuleScope', expose 'from_options', and check 'in_scope' during visitor creation."
+                ),
+            });
+        }
+    }
+}
+
+fn is_rule_scope_type(ty: &Type) -> bool {
+    let Type::Path(type_path) = ty else {
+        return false;
+    };
+    type_path
+        .path
+        .segments
+        .last()
+        .is_some_and(|seg| seg.ident == "RuleScope")
 }

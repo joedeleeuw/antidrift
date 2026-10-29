@@ -181,6 +181,41 @@ rules:
       target: semantic-ast,
       note: "TypeChecker symbol and module provenance proves a project-local module owns an Effect service tag or layer and reports direct constructor/factory imports outside Layer wiring.",
     }
+  antidrift/no-external-decode-in-tsx:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "TypeChecker-backed boundary rule for global JSON.parse and schema validation calls in TSX modules; preserves component-local useState form validation.",
+    }
+  antidrift/no-hookless-use-function:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "Program-wide AST and platform-split sibling check proving a use[A-Z]* function invokes zero React hooks.",
+    }
+  antidrift/no-unstable-render-default-collection:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "Render-path AST proof for unstable default parameter collections and inline nullish/logical fallback collections in non-async components and hooks.",
+    }
+  antidrift/no-query-envelope-leak:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "TypeChecker symbol and structural envelope proof preventing raw UseQueryResult/UseMutationResult bags from leaking into helpers or composite hook return objects.",
+    }
+  antidrift/no-impure-render-call:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "TypeChecker 1-hop declaration and default-parameter proof catching synchronous wall-clock and PRNG calls inside non-async React render paths.",
+    }
 
 # Behaviors the taxonomy reveals we do not have blocking coverage for yet. Some need a missing
 # bucket; others, like diff-scope-creep, now have an inventory spine but still need promotion

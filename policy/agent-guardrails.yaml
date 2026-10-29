@@ -48,6 +48,22 @@ clusters:
         severity: error
         detector: effectHookCalledWithoutDependencyArray
         message: Pass a dependency array to useEffect/useLayoutEffect ([] or the real dependencies); a missing array runs the effect on every render.
+      - id: react/no-hookless-use-function
+        severity: error
+        detector: antidrift:no-hookless-use-function
+        message: Rename non-hook utilities so they do not start with use[A-Z], preventing unnecessary React Compiler hook memoization.
+      - id: react/no-unstable-render-default-collection
+        severity: error
+        detector: antidrift:no-unstable-render-default-collection
+        message: Hoist empty fallback collections to module-level constants instead of allocating fresh [], {}, Map, or Set instances in render.
+      - id: react/no-query-envelope-leak
+        severity: error
+        detector: antidrift:no-query-envelope-leak
+        message: Project narrow data/status fields at the query boundary instead of passing or returning raw query result envelopes.
+      - id: react/no-impure-render-call
+        severity: error
+        detector: antidrift:no-impure-render-call
+        message: Do not call wall-clock or random helpers directly during synchronous React render.
 
   - id: type-contract-shape # Agents appease TypeScript locally unless type ownership is enforced.
     owner: types-platform # The type platform owner controls when explicit contracts belong at boundaries.
@@ -134,6 +150,10 @@ clusters:
         severity: error
         detector: clientCodeReadsProcessEnv
         message: Use explicit public config.
+      - id: boundary/no-external-decode-in-tsx
+        severity: error
+        detector: antidrift:no-external-decode-in-tsx
+        message: Decode wire or persisted payloads in a non-view boundary owner and pass typed projections into TSX view modules.
 
   - id: domain-model-drift # Agents invent parallel names and shapes for the same business concept.
     owner: domain-platform # Domain owners control canonical entities, statuses, and roles.
@@ -418,6 +438,14 @@ clusters:
         severity: error
         detector: antidrift-linter:rust/target-manifest-policy
         message: Keep test = false and doctest = false on all workspace Cargo targets.
+      - id: rust/require-rule-scope
+        severity: error
+        detector: antidrift-linter:rust/require-rule-scope
+        message: Every Rule implementation in antidrift-rules must embed a RuleScope field and enforce in_scope.
+      - id: rust/no-silent-result-discard
+        severity: error
+        detector: antidrift-linter:rust/no-silent-result-discard
+        message: Do not silently discard Result errors via Err(_) match arms or if let Ok(...) filesystem reads.
 
   - id: agent-instructions # Natural-language guidance should be generated and linted.
     owner: developer-experience # DX owns multi-agent instruction consistency.

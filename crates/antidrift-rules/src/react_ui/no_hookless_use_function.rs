@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::Path;
 
 use antidrift_kernel::jsx::is_hook_name;
@@ -277,50 +276,14 @@ fn source_node_defines_hook_with_call(node: P<Node>, target_name: &str) -> bool 
     found
 }
 
-fn source_text_calls_hook(source_text: &str, target_name: &str) -> bool {
-    if !source_text.contains(target_name) {
-        return false;
-    }
-    source_text.match_indices("use").any(|(idx, _)| {
-        let before_ok = idx == 0
-            || !source_text.as_bytes()[idx - 1].is_ascii_alphanumeric()
-                && source_text.as_bytes()[idx - 1] != b'_';
-        if !before_ok {
-            return false;
-        }
-        let rest = &source_text[idx..];
-        let ident_len = rest
-            .bytes()
-            .take_while(|b| b.is_ascii_alphanumeric() || *b == b'_')
-            .count();
-        let ident = &rest[..ident_len];
-        if ident == target_name || !is_hook_name(ident) {
-            return false;
-        }
-        let after = rest[ident_len..].trim_start();
-        after.starts_with('(') || after.starts_with('<')
-    })
-}
-
 fn has_sibling_calling_hook(ctx: &Ctx, target_name: &str) -> bool {
     let candidates = candidate_sibling_paths(ctx.file.file_name());
     if candidates.is_empty() {
         return false;
     }
-    for &sf in ctx.program.get_source_files() {
+    ctx.program.get_source_files().iter().any(|&sf| {
         let sf_path = normalize_path(sf.file_name());
-        if candidates.iter().any(|cand| cand == &sf_path)
+        candidates.iter().any(|cand| cand == &sf_path)
             && source_file_defines_hook_with_call(sf, target_name)
-        {
-            return true;
-        }
-    }
-    for cand in &candidates {
-        if let Ok(text) = fs::read_to_string(cand)
-            && source_text_calls_hook(&text, target_name)
-        {
-            return true;
-        }
-    }
-    false
+    })
 }

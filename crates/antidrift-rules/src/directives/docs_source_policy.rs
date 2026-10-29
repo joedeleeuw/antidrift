@@ -1,8 +1,7 @@
-use antidrift_kernel::json_manifest::parse_package_json_manifest;
+use antidrift_kernel::json_manifest::load_nearest_package_json_manifest;
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
 use std::path::Path;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -124,22 +123,14 @@ impl RuleVisitor for Visitor {
 }
 
 fn load_nearest_package_dependencies(file_path: &str) -> BTreeSet<String> {
-    let mut current = Path::new(file_path).parent();
-    while let Some(dir) = current {
-        let candidate = dir.join("package.json");
-        if candidate.is_file()
-            && let Ok(text) = fs::read_to_string(&candidate)
-            && let Some(manifest) = parse_package_json_manifest(&text)
-        {
-            return manifest
+    load_nearest_package_json_manifest(Path::new(file_path))
+        .and_then(|manifest| {
+            manifest
                 .sections
                 .get("dependencies")
                 .map(|entries| entries.iter().map(|entry| entry.key.clone()).collect())
-                .unwrap_or_default();
-        }
-        current = dir.parent();
-    }
-    BTreeSet::new()
+        })
+        .unwrap_or_default()
 }
 
 fn evaluate_policy(
