@@ -1,4 +1,5 @@
 use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::tsrs_kernel::is_test_or_spec_file;
 use tsrs_ast::{Kind, ModifierFlags, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -42,7 +43,7 @@ impl Rule for NoDefaultExportInDomain {
             self.scope.matches(&filename, cwd) && is_domain_file(&filename)
         };
         let enabled = in_scope
-            && !is_test_filename(&filename)
+            && !is_test_or_spec_file(&filename)
             && !is_migration_file(&filename)
             && !is_generated_or_declaration_module(&filename);
         Box::new(Visitor { enabled })
@@ -84,16 +85,6 @@ pub(super) fn is_domain_file(filename: &str) -> bool {
         || filename.starts_with("model/")
         || filename.contains("/domain/")
         || filename.contains("/model/")
-}
-
-pub(super) fn is_test_filename(filename: &str) -> bool {
-    let base = filename.rsplit('/').next().unwrap_or(filename);
-    if has_middle_tag(base, &["test", "spec"]) {
-        return true;
-    }
-    filename
-        .split('/')
-        .any(|seg| matches!(seg, "test" | "tests" | "__tests__"))
 }
 
 pub(super) fn is_fixture_or_docs_file(filename: &str) -> bool {

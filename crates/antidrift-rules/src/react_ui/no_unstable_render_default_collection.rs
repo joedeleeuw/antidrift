@@ -1,4 +1,6 @@
-use antidrift_kernel::jsx::{is_hook_name, is_pascal_case_name, react_function_name};
+use antidrift_kernel::jsx::{
+    is_event_handler_name, is_hook_name, is_pascal_case_name, react_function_name,
+};
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
 use antidrift_kernel::tsrs_kernel::{is_function_like, property_name_text, unwrap_expression};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
@@ -279,18 +281,6 @@ fn is_timer_or_async_callback(candidate: P<Node>) -> bool {
         }
         _ => false,
     }
-}
-
-fn is_event_handler_name(name: &str) -> bool {
-    let rest = name
-        .strip_prefix("on")
-        .or_else(|| name.strip_prefix("handle"));
-    rest.is_some_and(|suffix| {
-        suffix
-            .chars()
-            .next()
-            .is_some_and(|ch| ch.is_ascii_uppercase())
-    })
 }
 
 fn is_event_handler_callback(candidate: P<Node>) -> bool {

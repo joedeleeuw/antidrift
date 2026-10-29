@@ -1,7 +1,7 @@
-use super::no_placeholder_tests::is_test_filename;
 use super::repo_state_path::source_file_read_call_name;
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::tsrs_kernel::is_test_or_spec_file;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -85,7 +85,7 @@ impl Rule for NoRepoStateMirrorAssertion {
             && (normalized_path.is_empty()
                 || normalized_path == "<input>"
                 || normalized_path == "<text>"
-                || is_test_filename(&normalized_path));
+                || is_test_or_spec_file(&normalized_path));
         let tainted_imports = if in_scope {
             collect_tainted_imports(ctx.file.statements().nodes(), &self.sources)
         } else {

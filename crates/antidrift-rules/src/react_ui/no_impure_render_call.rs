@@ -1,5 +1,5 @@
 use antidrift_kernel::jsx::{
-    is_component_or_hook_function, plain_attribute_name, react_function_name,
+    is_component_or_hook_function, is_event_handler_name, plain_attribute_name, react_function_name,
 };
 use antidrift_kernel::provenance::{symbol_at_node, symbol_declarations};
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
@@ -284,13 +284,6 @@ fn find_impure_expression_in_tree(root: P<Node>) -> Option<&'static str> {
         false
     });
     found
-}
-
-fn is_event_handler_name(name: &str) -> bool {
-    name.strip_prefix("on")
-        .or_else(|| name.strip_prefix("handle"))
-        .and_then(|rest| rest.chars().next())
-        .is_some_and(|ch| ch.is_ascii_uppercase())
 }
 
 fn callee_simple_name(callee: P<Node>) -> Option<&'static str> {

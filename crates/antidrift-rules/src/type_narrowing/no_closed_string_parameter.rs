@@ -8,7 +8,13 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-closed-string-parameter";
 
-const BOUNDARY_MARKERS: &[&str] = &["process.argv", "URLSearchParams", "req.query", "headers"];
+const BOUNDARY_IDENTIFIERS: &[&str] = &[
+    "URLSearchParams",
+    "Headers",
+    "IncomingHttpHeaders",
+    "headers",
+];
+const BOUNDARY_PROPERTIES: &[&str] = &["argv", "query", "headers"];
 
 pub struct NoClosedStringParameter {
     scope: RuleScope,
@@ -91,15 +97,35 @@ fn is_heritage_class_member(fn_node: P<Node>) -> bool {
         })
 }
 
-fn is_boundary_decoder(ctx: &Ctx, fn_node: P<Node>) -> bool {
+fn contains_boundary_ast_node(node: P<Node>) -> bool {
+    match node.kind() {
+        Kind::Identifier => BOUNDARY_IDENTIFIERS.contains(&node.as_identifier().text()),
+        Kind::PropertyAccessExpression => {
+            tsrs_kernel::property_name_text(node.as_property_access_expression().name())
+                .is_some_and(|prop| BOUNDARY_PROPERTIES.contains(&prop))
+        }
+        _ => {
+            let mut found = false;
+            node.for_each_child(&mut |child| {
+                if contains_boundary_ast_node(child) {
+                    found = true;
+                    return true;
+                }
+                false
+            });
+            found
+        }
+    }
+}
+
+fn is_boundary_decoder(fn_node: P<Node>) -> bool {
     let accepts_unknown = fn_node.parameters().iter().any(|&param| {
         param
             .as_parameter_declaration()
             .type_()
             .is_some_and(|type_node| type_node.kind() == Kind::UnknownKeyword)
     });
-    let text = tsrs_kernel::node_text(ctx.file, fn_node);
-    accepts_unknown || BOUNDARY_MARKERS.iter().any(|marker| text.contains(marker))
+    accepts_unknown || contains_boundary_ast_node(fn_node)
 }
 
 fn string_literal_count(node: P<Node>) -> usize {
@@ -263,7 +289,7 @@ fn check_closed_string_parameters(ctx: &mut Ctx, fn_node: P<Node>) {
     let Some(body) = fn_node.body() else {
         return;
     };
-    if is_heritage_class_member(fn_node) || is_boundary_decoder(ctx, fn_node) {
+    if is_heritage_class_member(fn_node) || is_boundary_decoder(fn_node) {
         return;
     }
     for &param in fn_node.parameters() {

@@ -467,6 +467,14 @@ pub fn is_pascal_case_name(name: &str) -> bool {
         .is_some_and(|ch| ch.is_ascii_uppercase())
 }
 
+#[must_use]
+pub fn is_event_handler_name(name: &str) -> bool {
+    name.strip_prefix("on")
+        .or_else(|| name.strip_prefix("handle"))
+        .and_then(|rest| rest.chars().next())
+        .is_some_and(|ch| ch.is_ascii_uppercase())
+}
+
 fn is_react_hoc_call(call: P<Node>) -> bool {
     let callee = unwrap_expression(call.as_call_expression().expression());
     match callee.kind() {

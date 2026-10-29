@@ -2,7 +2,7 @@ use antidrift_kernel::jsx::{has_plain_attribute, plain_attribute_name, plain_ele
 use antidrift_kernel::rule_scope::{
     RuleScope, ScopeOptions, ScopedOptions, decode_scoped, in_scope, require_non_empty,
 };
-use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
+use antidrift_kernel::tsrs_kernel::{is_test_or_spec_file, unwrap_parentheses};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -27,7 +27,6 @@ const NON_DISPLAY_ATTRIBUTES: [&str; 11] = [
     "form",
     "dir",
 ];
-const TEST_SUFFIXES: [&str; 2] = [".test.", ".spec."];
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
@@ -76,7 +75,7 @@ impl Rule for NoUnformattedNumber {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let enabled = in_scope(&self.scope, ctx, None);
-        let test_file = is_test_filename(ctx.file.file_name());
+        let test_file = is_test_or_spec_file(ctx.file.file_name());
         Box::new(Visitor {
             rule: self,
             enabled,
@@ -197,16 +196,6 @@ fn is_numeric_template(expression: P<Node>) -> bool {
             .nodes()
             .iter()
             .any(|&span| is_numeric_expression(span.as_template_span().expression()))
-}
-
-fn is_test_filename(file_path: &str) -> bool {
-    TEST_SUFFIXES.iter().any(|marker| {
-        file_path.rfind(marker).is_some_and(|index| {
-            let extension = &file_path[index + marker.len()..];
-            let extension = extension.strip_prefix(['c', 'm']).unwrap_or(extension);
-            matches!(extension, "js" | "jsx" | "ts" | "tsx")
-        })
-    })
 }
 
 fn is_test_output_element(container: P<Node>) -> bool {

@@ -1,4 +1,5 @@
 use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::tsrs_kernel::is_test_or_spec_file;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -31,7 +32,7 @@ impl Rule for NoPlaceholderTests {
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let cwd = ctx.program.host().get_current_directory();
         let filename = ctx.file.file_name().replace('\\', "/");
-        let enabled = self.scope.matches(&filename, cwd) && is_test_filename(&filename);
+        let enabled = self.scope.matches(&filename, cwd) && is_test_or_spec_file(&filename);
         Box::new(Visitor { enabled })
     }
 }
@@ -137,32 +138,4 @@ fn contains_word_pair(haystack: &str, first: &str, second: &str) -> bool {
 
 fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
-}
-
-pub(super) fn is_test_filename(filename: &str) -> bool {
-    for ext in [
-        ".test.ts",
-        ".test.tsx",
-        ".test.js",
-        ".test.jsx",
-        ".test.mts",
-        ".test.cts",
-        ".test.mjs",
-        ".test.cjs",
-        ".spec.ts",
-        ".spec.tsx",
-        ".spec.js",
-        ".spec.jsx",
-        ".spec.mts",
-        ".spec.cts",
-        ".spec.mjs",
-        ".spec.cjs",
-    ] {
-        if filename.ends_with(ext) {
-            return true;
-        }
-    }
-    filename
-        .split('/')
-        .any(|seg| matches!(seg, "test" | "tests" | "__tests__"))
 }

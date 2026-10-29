@@ -67,28 +67,22 @@ pub fn is_generated_file(file_path: &str, source_text: &str) -> bool {
 }
 
 #[must_use]
-pub fn is_test_file(file_path: &str) -> bool {
+pub fn is_test_or_spec_file(file_path: &str) -> bool {
     let normalized = normalize_path(file_path);
-    if path_has_dir_segment(
-        &normalized,
-        &[
-            "test",
-            "tests",
-            "__tests__",
-            "__mocks__",
-            "fixtures",
-            "__fixtures__",
-        ],
-    ) {
+    path_has_dir_segment(&normalized, &["test", "tests", "__tests__"])
+        || strip_script_ext(&normalized)
+            .is_some_and(|stem| stem.ends_with(".test") || stem.ends_with(".spec"))
+}
+
+#[must_use]
+pub fn is_test_file(file_path: &str) -> bool {
+    if is_test_or_spec_file(file_path) {
         return true;
     }
-    let Some(stem) = strip_script_ext(&normalized) else {
-        return false;
-    };
-    stem.ends_with(".test")
-        || stem.ends_with(".spec")
-        || stem.ends_with(".fixture")
-        || stem.ends_with(".mock")
+    let normalized = normalize_path(file_path);
+    path_has_dir_segment(&normalized, &["__mocks__", "fixtures", "__fixtures__"])
+        || strip_script_ext(&normalized)
+            .is_some_and(|stem| stem.ends_with(".fixture") || stem.ends_with(".mock"))
 }
 
 #[must_use]

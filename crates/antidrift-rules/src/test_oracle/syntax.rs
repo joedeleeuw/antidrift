@@ -1,5 +1,5 @@
 pub(super) use antidrift_kernel::tsrs_kernel::{
-    Span, call_expression_of as call, identifier_of as identifier,
+    Span, call_expression_of as call, identifier_of as identifier, is_test_or_spec_file,
     numeric_literal_value as numeric_value, unwrap_awaited_expression as awaited,
     unwrap_expression as unwrap,
 };
@@ -153,34 +153,7 @@ pub(super) fn expression_key(sf: P<SourceFile>, expression: P<Node>) -> (i32, i3
 }
 
 pub(super) fn is_test_file(filename: &str) -> bool {
-    filename.is_empty() || matches!(filename, "<input>" | "<text>") || explicit_test_file(filename)
-}
-
-pub(super) fn explicit_test_file(filename: &str) -> bool {
-    let normalized = filename.replace('\\', "/");
-    if normalized
-        .split('/')
-        .rev()
-        .skip(1)
-        .any(|part| matches!(part, "test" | "tests" | "__tests__"))
-    {
-        return true;
-    }
-    let Some((stem, extension)) = normalized.rsplit_once('.') else {
-        return false;
-    };
-    matches!(
-        extension,
-        "js" | "jsx"
-            | "ts"
-            | "tsx"
-            | "mjs"
-            | "mjsx"
-            | "mts"
-            | "mtsx"
-            | "cjs"
-            | "cjsx"
-            | "cts"
-            | "ctsx"
-    ) && (stem.ends_with(".test") || stem.ends_with(".spec"))
+    filename.is_empty()
+        || matches!(filename, "<input>" | "<text>")
+        || is_test_or_spec_file(filename)
 }

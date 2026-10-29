@@ -10,14 +10,9 @@ pub const RULE_NAME: &str = "antidrift/no-argument-mutation-side-effect";
 const ACCUMULATOR_NAMES: &[&str] = &[
     "cache",
     "memo",
-    "ctx",
-    "context",
-    "store",
-    "state",
     "headers",
     "res",
     "response",
-    "target",
     "out",
     "acc",
     "accumulator",
@@ -213,25 +208,28 @@ fn classify_write(
     }
 }
 
-#[derive(Default)]
-struct WriteScan {
-    mutated: bool,
-    reassigned: bool,
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ParamWriteState {
+    Unwritten,
+    MutatedInPlace,
+    Reassigned,
 }
 
 fn scan_writes(
     checker: &mut Checker,
     node: P<Node>,
     param_symbol: P<Symbol>,
-    scan: &mut WriteScan,
+    state: &mut ParamWriteState,
 ) {
     match classify_write(checker, node, param_symbol) {
-        Some(ParamWrite::Reassignment) => scan.reassigned = true,
-        Some(ParamWrite::Mutation) => scan.mutated = true,
-        None => {}
+        Some(ParamWrite::Reassignment) => *state = ParamWriteState::Reassigned,
+        Some(ParamWrite::Mutation) if *state == ParamWriteState::Unwritten => {
+            *state = ParamWriteState::MutatedInPlace;
+        }
+        Some(ParamWrite::Mutation) | None => {}
     }
     node.for_each_child(&mut |child| {
-        scan_writes(checker, child, param_symbol, scan);
+        scan_writes(checker, child, param_symbol, state);
         false
     });
 }
@@ -262,9 +260,9 @@ fn check_function(ctx: &mut Ctx, fn_node: P<Node>) {
         let Some(param_symbol) = ctx.checker.get_symbol_at_location_exported(name) else {
             continue;
         };
-        let mut scan = WriteScan::default();
-        scan_writes(ctx.checker, body, param_symbol, &mut scan);
-        if scan.reassigned || !scan.mutated {
+        let mut state = ParamWriteState::Unwritten;
+        scan_writes(ctx.checker, body, param_symbol, &mut state);
+        if state != ParamWriteState::MutatedInPlace {
             continue;
         }
         let text = name.as_identifier().text();
