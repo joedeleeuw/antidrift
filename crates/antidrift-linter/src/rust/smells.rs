@@ -1,6 +1,7 @@
 use super::RustDiagnostic;
-use super::boundary_decode::is_serde_roundtrip_call;
 use super::corpus_smells::check_corpus_smells;
+use super::syn_kernel::{expr_mentions_ident, extract_pat_ident, is_ok_tuple_pat, is_wild_pat};
+use super::value_flow::check_value_flow;
 use antidrift_rules::type_narrowing::no_compat_names::is_compat_name;
 use proc_macro2::Span;
 use std::path::Path;
@@ -8,8 +9,7 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
     Arm, BinOp, Expr, ExprBinary, ExprCall, ExprClosure, ExprField, ExprLet, ExprLit,
-    ExprMethodCall, ExprPath, FnArg, ItemEnum, ItemFn, ItemStruct, ItemType, Lit, Member, Pat,
-    Stmt,
+    ExprMethodCall, FnArg, ItemEnum, ItemFn, ItemStruct, ItemType, Lit, Member, Pat, Stmt,
 };
 
 pub(super) fn check_smells(
@@ -39,6 +39,7 @@ pub(super) fn check_smells(
     };
     visitor.visit_file(ast);
     check_corpus_smells(rel_path, ast, diagnostics);
+    check_value_flow(rel_path, path, ast, diagnostics);
 }
 
 struct SmellVisitor<'a> {
@@ -203,17 +204,6 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
         visit::visit_expr_method_call(self, node);
     }
 
-    fn visit_expr_call(&mut self, node: &'ast ExprCall) {
-        if is_serde_roundtrip_call(node) {
-            self.push(
-                node.func.span(),
-                "rust/no-value-roundtrip",
-                "Do not round-trip through 'to_value(...)' and 'from_value(...)'; construct or convert the target type directly.".to_owned(),
-            );
-        }
-        visit::visit_expr_call(self, node);
-    }
-
     fn visit_expr_binary(&mut self, node: &'ast ExprBinary) {
         if matches!(node.op, BinOp::Eq(_) | BinOp::Ne(_)) {
             let span = if is_str_lit(&node.right) {
@@ -270,17 +260,6 @@ fn is_err_wild_pat(pat: &Pat) -> bool {
         && is_wild_pat(&tuple.elems[0])
 }
 
-fn is_ok_tuple_pat(pat: &Pat) -> bool {
-    let Pat::TupleStruct(tuple) = pat else {
-        return false;
-    };
-    tuple
-        .path
-        .segments
-        .last()
-        .is_some_and(|seg| seg.ident == "Ok")
-}
-
 fn is_fs_io_call(expr: &Expr) -> bool {
     let Expr::Call(ExprCall { func, .. }) = expr else {
         return false;
@@ -323,14 +302,6 @@ fn has_numbered_prefix(lower: &str, prefix: &str) -> bool {
     false
 }
 
-fn extract_pat_ident(pat: &Pat) -> Option<(String, Span)> {
-    match pat {
-        Pat::Ident(pat_ident) => Some((pat_ident.ident.to_string(), pat_ident.ident.span())),
-        Pat::Type(pat_type) => extract_pat_ident(&pat_type.pat),
-        _ => None,
-    }
-}
-
 fn discards_closure_error_param(closure: &ExprClosure) -> bool {
     if closure.inputs.len() != 1 {
         return false;
@@ -343,45 +314,6 @@ fn discards_closure_error_param(closure: &ExprClosure) -> bool {
         return false;
     };
     !expr_mentions_ident(&closure.body, &param_name)
-}
-
-fn is_wild_pat(pat: &Pat) -> bool {
-    match pat {
-        Pat::Wild(_) => true,
-        Pat::Type(pat_type) => is_wild_pat(&pat_type.pat),
-        _ => false,
-    }
-}
-
-struct IdentMentionVisitor<'a> {
-    target: &'a str,
-    found: bool,
-}
-
-impl<'ast> Visit<'ast> for IdentMentionVisitor<'_> {
-    fn visit_expr_path(&mut self, node: &'ast ExprPath) {
-        if node.path.is_ident(self.target) {
-            self.found = true;
-            return;
-        }
-        visit::visit_expr_path(self, node);
-    }
-
-    fn visit_macro(&mut self, node: &'ast syn::Macro) {
-        if node.tokens.to_string().contains(self.target) {
-            self.found = true;
-        }
-        visit::visit_macro(self, node);
-    }
-}
-
-fn expr_mentions_ident(expr: &Expr, target: &str) -> bool {
-    let mut visitor = IdentMentionVisitor {
-        target,
-        found: false,
-    };
-    visitor.visit_expr(expr);
-    visitor.found
 }
 
 fn is_suppressed_binding_expr(expr: &Expr) -> bool {

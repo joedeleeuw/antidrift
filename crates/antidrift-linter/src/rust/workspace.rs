@@ -1,13 +1,17 @@
 use super::RustDiagnostic;
 use super::boundary_decode::check_decode_to_option;
+use super::cargo_manifest::{check_cargo_manifest, parse_toml_sections};
+use super::constant_fields::check_constant_return_fields;
+use super::module_graph::{declared_modules, normalize_lexical_path};
 use super::rules::check_syn_ast;
-use super::struct_shapes::{check_constant_return_fields, check_structural_type_forks};
+use super::struct_index::StructIndex;
+use super::struct_shapes::check_structural_type_forks;
 use super::syntax::check_file_surface;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
-use syn::{Attribute, Expr, ExprLit, Item, ItemMod, Lit, Meta, Type};
+use syn::{Item, Type};
 
 pub(super) fn check_workspace_root(
     root: &Path,
@@ -19,6 +23,19 @@ pub(super) fn check_workspace_root(
     } else {
         clean_root.as_path()
     };
+    if root_ref.is_file()
+        && root_ref
+            .extension()
+            .is_some_and(|extension| extension == "rs")
+    {
+        let enclosing = root_ref
+            .ancestors()
+            .skip(1)
+            .find(|directory| directory.join("Cargo.toml").is_file());
+        let display_root = enclosing.unwrap_or_else(|| root_ref.parent().unwrap_or(Path::new(".")));
+        check_source_file(display_root, root_ref, diagnostics)?;
+        return Ok(1);
+    }
     let crate_dirs = discover_crate_dirs(root_ref)?;
     let mut total_files = 0usize;
     for crate_dir in crate_dirs {
@@ -36,7 +53,7 @@ fn discover_crate_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
 }
 
 fn collect_crate_dirs_recursive(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
-    if dir.join("Cargo.toml").is_file() && dir.join("src").is_dir() {
+    if dir.join("Cargo.toml").is_file() {
         out.push(dir.to_path_buf());
     }
     let entries =
@@ -77,55 +94,101 @@ fn check_crate_dir(
     diagnostics: &mut Vec<RustDiagnostic>,
 ) -> Result<usize, String> {
     let manifest_path = crate_dir.join("Cargo.toml");
-    if manifest_path.is_file() {
-        let manifest_rel = relative_display(workspace_root, &manifest_path);
-        let manifest_text = fs::read_to_string(&manifest_path)
-            .map_err(|err| format!("failed to read {}: {err}", manifest_path.display()))?;
-        check_cargo_manifest(&manifest_rel, crate_dir, &manifest_text, diagnostics);
-    }
-
-    let src_dir = normalize_lexical_path(&crate_dir.join("src"));
-    if !src_dir.is_dir() {
+    let manifest_rel = relative_display(workspace_root, &manifest_path);
+    let manifest_text = fs::read_to_string(&manifest_path)
+        .map_err(|err| format!("failed to read {}: {err}", manifest_path.display()))?;
+    let sections = parse_toml_sections(&manifest_text);
+    if !sections.iter().any(|section| section.header == "[package]") {
         return Ok(0);
     }
+    check_cargo_manifest(&manifest_rel, crate_dir, &sections, diagnostics);
+    let src_dir = normalize_lexical_path(&crate_dir.join("src"));
     let mut rs_files = Vec::new();
-    collect_rs_files(&src_dir, &mut rs_files)?;
-    rs_files.sort();
-
-    let mut parsed_files: FxHashMap<PathBuf, syn::File> = FxHashMap::default();
-    for file_path in &rs_files {
-        let rel_path = relative_display(workspace_root, file_path);
-        let source = fs::read_to_string(file_path)
-            .map_err(|err| format!("failed to read {}: {err}", file_path.display()))?;
-        check_file_surface(&rel_path, file_path, &source, diagnostics);
-        match syn::parse_file(&source) {
-            Ok(ast) => {
-                check_syn_ast(&rel_path, file_path, &ast, diagnostics);
-                check_decode_to_option(&rel_path, &ast, diagnostics);
-                check_rule_scope_ownership(&rel_path, &ast, diagnostics);
-                parsed_files.insert(file_path.clone(), ast);
+    if src_dir.is_dir() {
+        collect_rs_files(&src_dir, &mut rs_files)?;
+    }
+    let mut target_roots = Vec::new();
+    for section in &sections {
+        if matches!(section.header.as_str(), "[lib]" | "[[bin]]")
+            && let Some(target_path) = section.kv.get("path")
+        {
+            let relative = target_path.trim_matches(['\'', '"']);
+            let target = normalize_lexical_path(&crate_dir.join(relative));
+            if !target.is_file() {
+                return Err(format!(
+                    "{}: target path '{}' is not a file; point [lib].path or [[bin]].path at an existing Rust source file",
+                    manifest_path.display(),
+                    relative
+                ));
             }
-            Err(err) => {
-                diagnostics.push(RustDiagnostic {
-                    file: rel_path,
-                    line: err.span().start().line.max(1),
-                    rule_id: "rust/syntax-error",
-                    message: format!("Failed to parse Rust source: {err}"),
-                });
-            }
+            rs_files.push(target.clone());
+            target_roots.push(target);
         }
     }
+    rs_files.sort();
+    rs_files.dedup();
+
+    let mut parsed_files = FxHashMap::default();
+    let mut pending: VecDeque<_> = rs_files.into_iter().collect();
+    let mut visited = FxHashSet::default();
+    while let Some(file) = pending.pop_front() {
+        if !visited.insert(file.clone()) {
+            continue;
+        }
+        if let Some(ast) = check_source_file(workspace_root, &file, diagnostics)? {
+            pending.extend(declared_modules(&file, target_roots.contains(&file), &ast));
+            parsed_files.insert(file, ast);
+        }
+    }
+    let mut rs_files: Vec<_> = visited.into_iter().collect();
+    rs_files.sort();
 
     check_orphan_modules(
         workspace_root,
         &src_dir,
         &rs_files,
         &parsed_files,
+        target_roots,
         diagnostics,
     );
-    check_structural_type_forks(workspace_root, &rs_files, &parsed_files, diagnostics);
-    check_constant_return_fields(workspace_root, &rs_files, &parsed_files, diagnostics);
+    let index = StructIndex::new(&rs_files, &parsed_files);
+    check_structural_type_forks(workspace_root, &index, diagnostics);
+    check_constant_return_fields(
+        workspace_root,
+        &index,
+        &rs_files,
+        &parsed_files,
+        diagnostics,
+    );
     Ok(rs_files.len())
+}
+
+fn check_source_file(
+    workspace_root: &Path,
+    file_path: &Path,
+    diagnostics: &mut Vec<RustDiagnostic>,
+) -> Result<Option<syn::File>, String> {
+    let rel_path = relative_display(workspace_root, file_path);
+    let source = fs::read_to_string(file_path)
+        .map_err(|err| format!("failed to read {}: {err}", file_path.display()))?;
+    check_file_surface(&rel_path, file_path, &source, diagnostics);
+    match syn::parse_file(&source) {
+        Ok(ast) => {
+            check_syn_ast(&rel_path, file_path, &ast, diagnostics);
+            check_decode_to_option(&rel_path, &ast, diagnostics);
+            check_rule_scope_ownership(&rel_path, &ast, diagnostics);
+            return Ok(Some(ast));
+        }
+        Err(err) => {
+            diagnostics.push(RustDiagnostic {
+                file: rel_path,
+                line: err.span().start().line.max(1),
+                rule_id: "rust/syntax-error",
+                message: format!("Failed to parse Rust source: {err}"),
+            });
+        }
+    }
+    Ok(None)
 }
 
 fn collect_rs_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
@@ -134,7 +197,15 @@ fn collect_rs_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
     for entry in entries {
         let entry = entry.map_err(|err| format!("failed to read directory entry: {err}"))?;
         let path = entry.path();
-        if path.is_dir() {
+        if path.is_dir()
+            && !path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| {
+                    name.starts_with('.')
+                        || ["target", "node_modules", "vendor", "dist"].contains(&name)
+                })
+        {
             collect_rs_files(&path, out)?;
         } else if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
             out.push(normalize_lexical_path(&path));
@@ -148,9 +219,9 @@ fn check_orphan_modules(
     src_dir: &Path,
     rs_files: &[PathBuf],
     parsed_files: &FxHashMap<PathBuf, syn::File>,
+    mut roots: Vec<PathBuf>,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
-    let mut roots = Vec::new();
     for root_name in ["lib.rs", "main.rs"] {
         let candidate = src_dir.join(root_name);
         if parsed_files.contains_key(&candidate) {
@@ -170,6 +241,7 @@ fn check_orphan_modules(
 
     let mut reachable: FxHashSet<PathBuf> = FxHashSet::default();
     let mut queue: VecDeque<PathBuf> = VecDeque::new();
+    let target_roots: FxHashSet<_> = roots.iter().cloned().collect();
     for root in roots {
         if reachable.insert(root.clone()) {
             queue.push_back(root);
@@ -180,13 +252,7 @@ fn check_orphan_modules(
         let Some(ast) = parsed_files.get(&current) else {
             continue;
         };
-        let file_dir = current
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .to_path_buf();
-        let search_dir = module_search_dir(&current);
-        let mut declared = Vec::new();
-        collect_external_mods(&ast.items, &file_dir, &search_dir, &mut declared);
+        let declared = declared_modules(&current, target_roots.contains(&current), ast);
         for target in declared {
             if reachable.insert(target.clone()) {
                 queue.push_back(target);
@@ -202,223 +268,13 @@ fn check_orphan_modules(
                 line: 1,
                 rule_id: "rust/no-orphan-module",
                 message:
-                    "Rust source file is not reachable from any Cargo target root (lib.rs or main.rs); wire `mod` or delete the orphan file.".to_owned(),
+                    "Rust source file is not reachable from any Cargo target root (including manifest target paths); wire `mod` or delete the orphan file.".to_owned(),
             });
         }
     }
 }
 
-fn module_search_dir(file_path: &Path) -> PathBuf {
-    let parent = file_path.parent().unwrap_or_else(|| Path::new("."));
-    let file_name = file_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("");
-    if matches!(file_name, "lib.rs" | "main.rs" | "mod.rs") {
-        parent.to_path_buf()
-    } else {
-        let stem = file_path
-            .file_stem()
-            .and_then(|name| name.to_str())
-            .unwrap_or("");
-        parent.join(stem)
-    }
-}
-
-fn normalize_lexical_path(path: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for comp in path.components() {
-        match comp {
-            std::path::Component::CurDir => {}
-            std::path::Component::ParentDir => {
-                out.pop();
-            }
-            other => out.push(other.as_os_str()),
-        }
-    }
-    if out.as_os_str().is_empty() {
-        PathBuf::from(".")
-    } else {
-        out
-    }
-}
-
-fn collect_external_mods(items: &[Item], file_dir: &Path, base_dir: &Path, out: &mut Vec<PathBuf>) {
-    for item in items {
-        let Item::Mod(item_mod) = item else {
-            continue;
-        };
-        if let Some((_, inline_items)) = &item_mod.content {
-            let inline_dir = if let Some(custom) = extract_path_attr(&item_mod.attrs) {
-                normalize_lexical_path(&file_dir.join(custom))
-            } else {
-                base_dir.join(item_mod.ident.to_string())
-            };
-            collect_external_mods(inline_items, file_dir, &inline_dir, out);
-            continue;
-        }
-        if let Some(resolved) = resolve_external_mod(item_mod, file_dir, base_dir) {
-            out.push(resolved);
-        }
-    }
-}
-
-fn resolve_external_mod(item_mod: &ItemMod, file_dir: &Path, base_dir: &Path) -> Option<PathBuf> {
-    if let Some(custom_path) = extract_path_attr(&item_mod.attrs) {
-        for base in [file_dir, base_dir] {
-            let candidate = normalize_lexical_path(&base.join(&custom_path));
-            if candidate.is_file() {
-                return Some(candidate);
-            }
-        }
-    }
-    let name = item_mod.ident.to_string();
-    [
-        base_dir.join(format!("{name}.rs")),
-        base_dir.join(&name).join("mod.rs"),
-        file_dir.join(format!("{name}.rs")),
-        file_dir.join(name).join("mod.rs"),
-    ]
-    .into_iter()
-    .map(|p| normalize_lexical_path(&p))
-    .find(|p| p.is_file())
-}
-
-fn extract_path_attr(attrs: &[Attribute]) -> Option<String> {
-    attrs.iter().find_map(|attr| {
-        if !attr.path().is_ident("path") {
-            return None;
-        }
-        let Meta::NameValue(nv) = &attr.meta else {
-            return None;
-        };
-        let Expr::Lit(ExprLit {
-            lit: Lit::Str(s), ..
-        }) = &nv.value
-        else {
-            return None;
-        };
-        Some(s.value())
-    })
-}
-
-fn check_cargo_manifest(
-    manifest_rel: &str,
-    crate_dir: &Path,
-    manifest_text: &str,
-    diagnostics: &mut Vec<RustDiagnostic>,
-) {
-    let sections = parse_toml_sections(manifest_text);
-    let has_workspace_lints = sections
-        .iter()
-        .any(|sec| sec.header == "[lints]" && sec.kv.get("workspace") == Some(&"true".to_owned()));
-    if !has_workspace_lints {
-        diagnostics.push(RustDiagnostic {
-            file: manifest_rel.to_owned(),
-            line: 1,
-            rule_id: "rust/target-manifest-policy",
-            message: "Crate Cargo.toml must inherit `[lints] workspace = true`.".to_owned(),
-        });
-    }
-
-    for sec in &sections {
-        if matches!(sec.header.as_str(), "[lib]" | "[[bin]]") {
-            if sec.kv.get("test") != Some(&"false".to_owned()) {
-                diagnostics.push(RustDiagnostic {
-                    file: manifest_rel.to_owned(),
-                    line: sec.line,
-                    rule_id: "rust/target-manifest-policy",
-                    message: format!("Section {} must set `test = false`.", sec.header),
-                });
-            }
-            if sec.kv.get("doctest") != Some(&"false".to_owned()) {
-                diagnostics.push(RustDiagnostic {
-                    file: manifest_rel.to_owned(),
-                    line: sec.line,
-                    rule_id: "rust/target-manifest-policy",
-                    message: format!("Section {} must set `doctest = false`.", sec.header),
-                });
-            }
-        }
-    }
-
-    let crate_name = crate_dir
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("");
-    for sec in &sections {
-        if sec.header == "[dependencies]" {
-            check_dependency_dag(manifest_rel, crate_name, sec, diagnostics);
-        }
-    }
-}
-
-fn check_dependency_dag(
-    manifest_rel: &str,
-    crate_name: &str,
-    sec: &TomlSection,
-    diagnostics: &mut Vec<RustDiagnostic>,
-) {
-    if crate_name == "antidrift-kernel" {
-        for forbidden in ["antidrift-rules", "antidrift-linter"] {
-            if sec.kv.contains_key(forbidden) {
-                diagnostics.push(RustDiagnostic {
-                    file: manifest_rel.to_owned(),
-                    line: sec.line,
-                    rule_id: "rust/target-manifest-policy",
-                    message: format!("antidrift-kernel cannot depend on {forbidden}."),
-                });
-            }
-        }
-    } else if crate_name == "antidrift-rules" && sec.kv.contains_key("antidrift-linter") {
-        diagnostics.push(RustDiagnostic {
-            file: manifest_rel.to_owned(),
-            line: sec.line,
-            rule_id: "rust/target-manifest-policy",
-            message: "antidrift-rules cannot depend on antidrift-linter.".to_owned(),
-        });
-    }
-}
-
-struct TomlSection {
-    header: String,
-    line: usize,
-    kv: FxHashMap<String, String>,
-}
-
-fn parse_toml_sections(text: &str) -> Vec<TomlSection> {
-    let mut sections = Vec::new();
-    let mut current = TomlSection {
-        header: String::new(),
-        line: 1,
-        kv: FxHashMap::default(),
-    };
-    for (idx, raw_line) in text.lines().enumerate() {
-        let trimmed = raw_line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        if trimmed.starts_with('[') && trimmed.ends_with(']') {
-            if !current.header.is_empty() {
-                sections.push(current);
-            }
-            current = TomlSection {
-                header: trimmed.to_owned(),
-                line: idx + 1,
-                kv: FxHashMap::default(),
-            };
-        } else if let Some((raw_key, raw_val)) = trimmed.split_once('=') {
-            let key = raw_key.trim().split('.').next().unwrap_or("").trim();
-            current.kv.insert(key.to_owned(), raw_val.trim().to_owned());
-        }
-    }
-    if !current.header.is_empty() {
-        sections.push(current);
-    }
-    sections
-}
-
-fn relative_display(root: &Path, path: &Path) -> String {
+pub(super) fn relative_display(root: &Path, path: &Path) -> String {
     let rel = path.strip_prefix(root).unwrap_or(path);
     rel.to_string_lossy().replace('\\', "/")
 }

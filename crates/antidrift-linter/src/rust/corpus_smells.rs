@@ -1,11 +1,16 @@
 use super::RustDiagnostic;
+use super::expression_shapes::{
+    closure_has_field_key_equality, detect_fieldwise_clone_rebuild,
+    detect_result_sum_erasure_match, first_closure_param_name, receiver_is_outer_collection,
+};
+use super::syn_kernel::{call_path_ends_with, extract_pat_ident};
 use proc_macro2::Span;
 use rustc_hash::FxHashSet;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Arm, BinOp, Expr, ExprBinary, ExprCall, ExprClosure, ExprField, ExprForLoop, ExprIf, ExprLit,
-    ExprMatch, ExprMethodCall, ExprStruct, ImplItemFn, ItemFn, Lit, Local, Member, Pat,
+    Arm, Expr, ExprCall, ExprForLoop, ExprIf, ExprLit, ExprMatch, ExprMethodCall, ExprStruct,
+    ImplItemFn, ItemFn, Lit, Local, Pat,
 };
 
 pub(super) fn check_corpus_smells(
@@ -16,6 +21,7 @@ pub(super) fn check_corpus_smells(
     let mut visitor = CorpusSmellVisitor {
         rel_path,
         in_async_fn: false,
+        script_context: false,
         error_bindings: FxHashSet::default(),
         error_string_bindings: FxHashSet::default(),
         outer_loop_params: Vec::new(),
@@ -27,6 +33,7 @@ pub(super) fn check_corpus_smells(
 struct CorpusSmellVisitor<'a> {
     rel_path: &'a str,
     in_async_fn: bool,
+    script_context: bool,
     error_bindings: FxHashSet<String>,
     error_string_bindings: FxHashSet<String>,
     outer_loop_params: Vec<String>,
@@ -98,7 +105,7 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
     }
 
     fn visit_local(&mut self, node: &'ast Local) {
-        if let Some(local_ident) = extract_pat_ident_name(&node.pat)
+        if let Some(local_ident) = extract_pat_ident(&node.pat).map(|(name, _)| name)
             && let Some(init) = &node.init
             && is_error_to_string_expr(
                 &init.expr,
@@ -108,7 +115,25 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
         {
             self.error_string_bindings.insert(local_ident);
         }
+        let previous = self.script_context;
+        self.script_context =
+            extract_pat_ident(&node.pat).is_some_and(|(name, _)| is_script_binding(&name));
         visit::visit_local(self, node);
+        self.script_context = previous;
+    }
+
+    fn visit_item_const(&mut self, node: &'ast syn::ItemConst) {
+        let previous = self.script_context;
+        self.script_context = is_script_binding(&node.ident.to_string());
+        visit::visit_item_const(self, node);
+        self.script_context = previous;
+    }
+
+    fn visit_item_static(&mut self, node: &'ast syn::ItemStatic) {
+        let previous = self.script_context;
+        self.script_context = is_script_binding(&node.ident.to_string());
+        visit::visit_item_static(self, node);
+        self.script_context = previous;
     }
 
     fn visit_expr_if(&mut self, node: &'ast ExprIf) {
@@ -137,7 +162,7 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
     }
 
     fn visit_expr_for_loop(&mut self, node: &'ast ExprForLoop) {
-        let pushed = extract_pat_ident_name(&node.pat);
+        let pushed = extract_pat_ident(&node.pat).map(|(name, _)| name);
         if let Some(ref name) = pushed {
             self.outer_loop_params.push(name.clone());
         }
@@ -194,7 +219,10 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
                 ),
             );
         }
+        let previous = self.script_context;
+        self.script_context |= node.method == "arg" || node.method == "args";
         visit::visit_expr_method_call(self, node);
+        self.script_context = previous;
     }
 
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
@@ -205,12 +233,16 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
                 "Blocking 'std::thread::sleep' inside async fn stalls the async executor; await an async timer or lifecycle signal instead.".to_owned(),
             );
         }
+        let previous = self.script_context;
+        self.script_context |= call_path_ends_with(node, &["Command", "new"]);
         visit::visit_expr_call(self, node);
+        self.script_context = previous;
     }
 
     fn visit_expr_lit(&mut self, node: &'ast ExprLit) {
         if let Lit::Str(lit_str) = &node.lit
             && is_inline_hold_open_script(&lit_str.value())
+            && (self.script_context || has_resource_hold(&lit_str.value()))
         {
             self.push(
                 node.span(),
@@ -238,21 +270,12 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
     }
 }
 
-fn extract_pat_ident_name(pat: &Pat) -> Option<String> {
-    match pat {
-        Pat::Ident(pat_ident) => Some(pat_ident.ident.to_string()),
-        Pat::Reference(pat_ref) => extract_pat_ident_name(&pat_ref.pat),
-        Pat::Type(pat_type) => extract_pat_ident_name(&pat_type.pat),
-        _ => None,
-    }
-}
-
 fn extract_err_binding_ident(pat: &Pat) -> Option<String> {
     match pat {
         Pat::TupleStruct(ts)
             if ts.elems.len() == 1 && ts.path.segments.last().is_some_and(|s| s.ident == "Err") =>
         {
-            extract_pat_ident_name(&ts.elems[0])
+            extract_pat_ident(&ts.elems[0]).map(|(name, _)| name)
         }
         _ => None,
     }
@@ -318,16 +341,8 @@ fn expr_tests_error_string(
     }
 }
 
-fn call_path_ends_with(call: &ExprCall, penult: &str, last: &str) -> bool {
-    let Expr::Path(callee) = &*call.func else {
-        return false;
-    };
-    let segs: Vec<_> = callee.path.segments.iter().map(|s| &s.ident).collect();
-    segs.len() >= 2 && *segs[segs.len() - 2] == penult && *segs[segs.len() - 1] == last
-}
-
 fn is_fs_read_to_string_call(expr: &Expr) -> bool {
-    matches!(expr, Expr::Call(call) if call_path_ends_with(call, "fs", "read_to_string"))
+    matches!(expr, Expr::Call(call) if call_path_ends_with(call, &["fs", "read_to_string"]))
 }
 
 fn is_empty_string_expr(expr: &Expr) -> bool {
@@ -335,7 +350,7 @@ fn is_empty_string_expr(expr: &Expr) -> bool {
         Expr::Lit(ExprLit {
             lit: Lit::Str(s), ..
         }) => s.value().is_empty(),
-        Expr::Call(call) => call.args.is_empty() && call_path_ends_with(call, "String", "new"),
+        Expr::Call(call) => call.args.is_empty() && call_path_ends_with(call, &["String", "new"]),
         Expr::MethodCall(c)
             if (c.method == "to_string" || c.method == "to_owned") && c.args.is_empty() =>
         {
@@ -356,7 +371,7 @@ fn is_fs_read_to_string_sentinel(node: &ExprMethodCall) -> bool {
 }
 
 fn is_std_thread_sleep_call(call: &ExprCall) -> bool {
-    call_path_ends_with(call, "thread", "sleep")
+    call_path_ends_with(call, &["thread", "sleep"])
 }
 
 fn is_sync_command_wait(method: &str, receiver: &Expr) -> bool {
@@ -367,7 +382,7 @@ fn expr_mentions_std_command(expr: &Expr) -> bool {
     match expr {
         Expr::MethodCall(mc) => expr_mentions_std_command(&mc.receiver),
         Expr::Call(call) => {
-            call_path_ends_with(call, "Command", "new")
+            call_path_ends_with(call, &["Command", "new"])
                 && matches!(&*call.func, Expr::Path(p) if !p.path.segments.iter().any(|s| s.ident == "tokio" || s.ident == "async_process"))
         }
         _ => false,
@@ -375,158 +390,20 @@ fn expr_mentions_std_command(expr: &Expr) -> bool {
 }
 
 fn is_inline_hold_open_script(text: &str) -> bool {
-    (text.contains("print(") || text.contains("stdout.write"))
+    (text.contains("print(") || text.contains("stdout.write") || has_resource_hold(text))
         && (text.contains("time.sleep(") || text.contains("setInterval("))
         && !text.contains("stdin")
 }
 
-fn first_closure_param_name(closure: &ExprClosure) -> Option<String> {
-    extract_pat_ident_name(closure.inputs.first()?)
+fn is_script_binding(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    [
+        "script", "cmd", "command", "code", "holder", "listener", "occupant",
+    ]
+    .iter()
+    .any(|part| lower.contains(part))
 }
 
-fn receiver_is_outer_collection(expr: &Expr, outer_params: &[String]) -> bool {
-    matches!(expr, Expr::MethodCall(mc) if (mc.method == "iter" || mc.method == "values") && root_ident_of(&mc.receiver).is_some_and(|r| !outer_params.contains(&r)))
-}
-
-fn root_ident_of(expr: &Expr) -> Option<String> {
-    match expr {
-        Expr::Path(ep) => ep.path.get_ident().map(ToString::to_string),
-        Expr::Field(ef) => root_ident_of(&ef.base),
-        Expr::Reference(er) => root_ident_of(&er.expr),
-        _ => None,
-    }
-}
-
-fn is_param_field_access(expr: &Expr, param: &str) -> bool {
-    match expr {
-        Expr::Field(ExprField { base, .. }) => {
-            matches!(&**base, Expr::Path(ep) if ep.path.is_ident(param))
-        }
-        Expr::Reference(er) => is_param_field_access(&er.expr, param),
-        Expr::MethodCall(mc) if mc.method == "as_str" && mc.args.is_empty() => {
-            is_param_field_access(&mc.receiver, param)
-        }
-        _ => false,
-    }
-}
-
-fn closure_has_field_key_equality(expr: &Expr, outer_param: &str, inner_param: &str) -> bool {
-    match expr {
-        Expr::Binary(ExprBinary {
-            left,
-            op: BinOp::Eq(_),
-            right,
-            ..
-        }) => {
-            (is_param_field_access(left, outer_param) && is_param_field_access(right, inner_param))
-                || (is_param_field_access(left, inner_param)
-                    && is_param_field_access(right, outer_param))
-                || closure_has_field_key_equality(left, outer_param, inner_param)
-                || closure_has_field_key_equality(right, outer_param, inner_param)
-        }
-        Expr::Binary(bin) => {
-            closure_has_field_key_equality(&bin.left, outer_param, inner_param)
-                || closure_has_field_key_equality(&bin.right, outer_param, inner_param)
-        }
-        Expr::Block(b) => b.block.stmts.iter().any(|stmt| match stmt {
-            syn::Stmt::Expr(e, _) => closure_has_field_key_equality(e, outer_param, inner_param),
-            _ => false,
-        }),
-        _ => false,
-    }
-}
-
-fn detect_result_sum_erasure_match(node: &ExprMatch) -> Option<String> {
-    if node.arms.len() != 2 {
-        return None;
-    }
-    let (mut ok_struct, mut err_struct) = (None, None);
-    for arm in &node.arms {
-        let Pat::TupleStruct(ts) = &arm.pat else {
-            return None;
-        };
-        let variant = ts.path.segments.last()?.ident.to_string();
-        let struct_expr = extract_arm_struct_expr(&arm.body)?;
-        if variant == "Ok" {
-            ok_struct = Some(struct_expr);
-        } else if variant == "Err" {
-            err_struct = Some(struct_expr);
-        }
-    }
-    let (ok_s, err_s) = (ok_struct?, err_struct?);
-    let ok_name = ok_s.path.segments.last()?.ident.to_string();
-    if err_s.path.segments.last()?.ident != ok_name {
-        return None;
-    }
-    (struct_has_bool_field(ok_s, true)
-        && struct_has_bool_field(err_s, false)
-        && struct_has_error_option_field(ok_s, false)
-        && struct_has_error_option_field(err_s, true))
-    .then_some(ok_name)
-}
-
-fn extract_arm_struct_expr(expr: &Expr) -> Option<&ExprStruct> {
-    match expr {
-        Expr::Struct(es) => Some(es),
-        Expr::Block(b) => match b.block.stmts.last()? {
-            syn::Stmt::Expr(Expr::Struct(es), None) => Some(es),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-fn struct_has_bool_field(es: &ExprStruct, expected: bool) -> bool {
-    es.fields.iter().any(
-        |f| matches!(&f.expr, Expr::Lit(ExprLit { lit: Lit::Bool(b), .. }) if b.value == expected),
-    )
-}
-
-fn struct_has_error_option_field(es: &ExprStruct, is_some: bool) -> bool {
-    es.fields.iter().any(|f| {
-        matches!(&f.member, Member::Named(id) if id == "error")
-            && if is_some {
-                matches!(&f.expr, Expr::Call(c) if matches!(&*c.func, Expr::Path(ep) if ep.path.is_ident("Some")))
-            } else {
-                matches!(&f.expr, Expr::Path(ep) if ep.path.is_ident("None"))
-            }
-    })
-}
-
-fn detect_fieldwise_clone_rebuild(node: &ExprStruct) -> Option<String> {
-    if node.rest.is_some() || node.fields.len() < 3 {
-        return None;
-    }
-    let (mut source_ident, mut clone_count) = (None, 0usize);
-    for field in &node.fields {
-        let Member::Named(field_ident) = &field.member else {
-            return None;
-        };
-        let (base_ident, accessed_field, is_cloned) = extract_field_copy_or_clone(&field.expr)?;
-        if *field_ident != accessed_field
-            || source_ident.as_ref().is_some_and(|ex| ex != &base_ident)
-        {
-            return None;
-        }
-        source_ident = Some(base_ident);
-        clone_count += usize::from(is_cloned);
-    }
-    (clone_count >= 2).then_some(source_ident?)
-}
-
-fn extract_field_copy_or_clone(expr: &Expr) -> Option<(String, String, bool)> {
-    match expr {
-        Expr::MethodCall(mc) if mc.method == "clone" && mc.args.is_empty() => {
-            extract_field_copy_or_clone(&mc.receiver).map(|(b, f, _)| (b, f, true))
-        }
-        Expr::Field(ExprField {
-            base,
-            member: Member::Named(f),
-            ..
-        }) => match &**base {
-            Expr::Path(ep) => Some((ep.path.get_ident()?.to_string(), f.to_string(), false)),
-            _ => None,
-        },
-        _ => None,
-    }
+fn has_resource_hold(text: &str) -> bool {
+    (text.contains("fcntl.flock") || text.contains("socket.bind")) && text.contains("time.sleep")
 }

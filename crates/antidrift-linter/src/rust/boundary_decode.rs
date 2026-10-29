@@ -1,4 +1,5 @@
 use super::RustDiagnostic;
+use super::syn_kernel::is_ok_tuple_pat;
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
@@ -205,14 +206,6 @@ fn arg_mentions_line_or_chunk(expr: &Expr) -> bool {
     }
 }
 
-fn is_ok_tuple_pat(pat: &Pat) -> bool {
-    matches!(
-        pat,
-        Pat::TupleStruct(tuple)
-            if tuple.path.segments.last().is_some_and(|seg| seg.ident == "Ok")
-    )
-}
-
 fn closure_arg_diverges(args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>) -> bool {
     let Some(Expr::Closure(closure)) = args.first() else {
         return false;
@@ -235,57 +228,4 @@ fn expr_diverges(expr: &Expr) -> bool {
         }),
         _ => false,
     }
-}
-
-fn is_serde_call(call: &ExprCall, name: &str) -> bool {
-    let Expr::Path(callee) = &*call.func else {
-        return false;
-    };
-    let segs: Vec<&syn::Ident> = callee.path.segments.iter().map(|s| &s.ident).collect();
-    let Some(&last) = segs.last() else {
-        return false;
-    };
-    if *last != name {
-        return false;
-    }
-    if name == "to_value" || name == "from_value" {
-        return true;
-    }
-    segs.len() >= 2 && {
-        let crate_seg = segs[segs.len() - 2];
-        *crate_seg == "serde_json"
-            || *crate_seg == "yaml_serde"
-            || *crate_seg == "serde_yaml"
-            || *crate_seg == "toml"
-    }
-}
-
-fn is_serde_serializer_arg(expr: &Expr, names: &[&str]) -> bool {
-    match expr {
-        Expr::Reference(r) => is_serde_serializer_arg(&r.expr, names),
-        Expr::Paren(p) => is_serde_serializer_arg(&p.expr, names),
-        Expr::Try(expr_try) => is_serde_serializer_arg(&expr_try.expr, names),
-        Expr::MethodCall(call)
-            if ((call.method == "unwrap"
-                || call.method == "as_str"
-                || call.method == "as_bytes")
-                && call.args.is_empty())
-                || (call.method == "expect" && call.args.len() == 1) =>
-        {
-            is_serde_serializer_arg(&call.receiver, names)
-        }
-        Expr::Call(call) => names.iter().any(|name| is_serde_call(call, name)),
-        _ => false,
-    }
-}
-
-pub(super) fn is_serde_roundtrip_call(call: &ExprCall) -> bool {
-    let Some(arg) = call.args.first() else {
-        return false;
-    };
-    (is_serde_call(call, "from_value") && is_serde_serializer_arg(arg, &["to_value"]))
-        || (is_serde_call(call, "from_str")
-            && is_serde_serializer_arg(arg, &["to_string", "to_string_pretty"]))
-        || (is_serde_call(call, "from_slice")
-            && is_serde_serializer_arg(arg, &["to_vec", "to_vec_pretty"]))
 }

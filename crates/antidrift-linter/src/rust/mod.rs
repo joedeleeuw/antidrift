@@ -1,9 +1,17 @@
 mod boundary_decode;
+mod cargo_manifest;
+mod constant_fields;
 mod corpus_smells;
+mod expression_shapes;
+mod module_graph;
 mod rules;
 mod smells;
+mod struct_index;
 mod struct_shapes;
+mod syn_kernel;
 mod syntax;
+mod value_flow;
+mod value_origin;
 mod workspace;
 
 use serde::Serialize;
