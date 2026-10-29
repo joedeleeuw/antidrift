@@ -1022,23 +1022,17 @@ const headlessProbes = [
       declare function readClean(): BindingHolder | undefined;
       export function checkDualSentinel() {
         const holder = readBinding();
-        if (!holder || holder === "unbound") {
-          return false;
-        }
+        if (!holder || holder === "unbound") return false;
         return holder.unitRecovery;
       }
       export function checkPositiveDualSentinel() {
         const holder = readBinding();
-        if (holder && holder !== "unbound") {
-          return holder.unitRecovery;
-        }
+        if (holder && holder !== "unbound") return holder.unitRecovery;
         return false;
       }
       export function checkSingleEmptyRepresentation() {
         const holder = readClean();
-        if (!holder) {
-          return false;
-        }
+        if (!holder) return false;
         return holder.unitRecovery;
       }
     `,
@@ -1056,12 +1050,8 @@ const headlessProbes = [
       export async function acquirePort() {
         const holder = await readHubPortBinding();
         if (holder && holder !== "unbound") {
-          if (holder.phase !== "released" && foreign(holder)) {
-            throw new Error("foreign binding owns port authority");
-          }
-          if (holder.phase !== "claimed") {
-            await write("reserved", foreign(holder) ? false : holder.unitRecovery);
-          }
+          if (holder.phase !== "released" && foreign(holder)) throw new Error("foreign binding owns port authority");
+          if (holder.phase !== "claimed") await write("reserved", foreign(holder) ? false : holder.unitRecovery);
         } else {
           await write("reserved", false);
         }
@@ -1074,25 +1064,72 @@ const headlessProbes = [
     rule: "antidrift/no-branch-tree",
     file: "tooling/antidrift/src/__probe_branch_tree_clean.ts",
     source: `
-      type Holder =
-        | { phase: "unbound" }
-        | { phase: "claimed" | "reserved" | "released"; foreign: boolean; unitRecovery: boolean };
+      type Holder = { phase: "unbound" } | { phase: "claimed" | "reserved" | "released"; foreign: boolean; unitRecovery: boolean };
       declare function write(phase: string, recovery: boolean): Promise<void>;
       export async function acquireClean(holder: Holder) {
-        if (holder.phase === "unbound") {
-          await write("reserved", false);
-          return;
-        }
-        if (holder.foreign && holder.phase !== "released") {
-          throw new Error("foreign binding owns port authority");
-        }
+        if (holder.phase === "unbound") { await write("reserved", false); return; }
+        if (holder.foreign && holder.phase !== "released") throw new Error("foreign binding owns port authority");
         switch (holder.phase) {
-          case "claimed":
-            return;
+          case "claimed": return;
           case "reserved":
-          case "released":
-            await write("reserved", holder.foreign ? false : holder.unitRecovery);
-            return;
+          case "released": await write("reserved", holder.foreign ? false : holder.unitRecovery); return;
+        }
+      }
+    `,
+    expectedCount: 0,
+  },
+  {
+    name: "no-mutable-let-alias (settled let-to-const closure alias and staged const-to-let assignment reported)",
+    rule: "antidrift/no-mutable-let-alias",
+    file: "tooling/antidrift/src/__probe_mutable_let_alias_bad.ts",
+    source: `
+      declare function runStatus(): Promise<{ paths: { configPath: string } }>;
+      declare function readOwner(id: string): string | undefined;
+      export function settleOwner(id: string, fallback: string) {
+        let owner = readOwner(id);
+        if (!owner) owner = fallback;
+        const userId = owner;
+        return () => userId.trim();
+      }
+      export async function verifyHub() {
+        let paths: { configPath: string } | undefined;
+        try {
+          const uninstalled = await runStatus();
+          const foreignPaths = uninstalled.paths;
+          paths = foreignPaths;
+          if (!foreignPaths.configPath) throw new Error("missing configPath");
+        } finally {
+          if (paths) paths.configPath.trim();
+        }
+      }
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-mutable-let-alias (pre-mutation snapshot, loop accumulator, and cancellation token stay clean)",
+    rule: "antidrift/no-mutable-let-alias",
+    file: "tooling/antidrift/src/__probe_mutable_let_alias_clean.ts",
+    source: `
+      export function rotateToken(next: string) {
+        let current = "initial";
+        if (next.length > 0) current = next;
+        const previous = current;
+        current = "rotated";
+        return { previous, current };
+      }
+      export function sumItems(items: number[]) {
+        let total = 0;
+        for (const item of items) total += item;
+        const finalTotal = total;
+        return finalTotal * 2;
+      }
+      export async function runCancellable(work: (signal: AbortSignal) => Promise<void>) {
+        let activeAbort: AbortController | null = null;
+        if (!activeAbort) {
+          const abort = new AbortController();
+          activeAbort = abort;
+          await work(abort.signal);
+          if (activeAbort === abort) activeAbort = null;
         }
       }
     `,

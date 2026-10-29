@@ -7,6 +7,7 @@ pub mod no_dated_comments;
 pub mod no_debug_residue_filenames;
 pub mod no_default_export_in_domain;
 pub mod no_host_path_literal;
+pub mod no_mutable_let_alias;
 pub mod no_partial_record_satisfies;
 pub mod no_reexport_only_module;
 pub mod no_todo_without_issue;
@@ -27,6 +28,7 @@ pub fn rules() -> Vec<&'static dyn Rule> {
         &no_debug_residue_filenames::DEFAULT_RULE,
         &no_default_export_in_domain::DEFAULT_RULE,
         &no_host_path_literal::DEFAULT_RULE,
+        &no_mutable_let_alias::DEFAULT_RULE,
         &no_partial_record_satisfies::DEFAULT_RULE,
         &no_reexport_only_module::DEFAULT_RULE,
         &no_todo_without_issue::DEFAULT_RULE,
@@ -64,6 +66,9 @@ pub fn create_rule(
         )),
         no_host_path_literal::RULE_NAME | "no-host-path-literal" => Ok(Some(Box::new(
             no_host_path_literal::NoHostPathLiteral::from_options(options)?,
+        ))),
+        no_mutable_let_alias::RULE_NAME | "no-mutable-let-alias" => Ok(Some(Box::new(
+            no_mutable_let_alias::NoMutableLetAlias::from_options(options)?,
         ))),
         no_partial_record_satisfies::RULE_NAME | "no-partial-record-satisfies" => Ok(Some(
             Box::new(no_partial_record_satisfies::NoPartialRecordSatisfies::from_options(options)?),
