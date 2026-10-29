@@ -1,4 +1,5 @@
 use antidrift_kernel::imports::FileImports;
+use antidrift_kernel::runtime_lifecycle::is_inline_hold_open_script;
 use antidrift_kernel::tsrs_kernel::{
     callee_name, is_function_like, property_name_text, unwrap_expression,
 };
@@ -28,7 +29,7 @@ fn check_inline_hold_open_scripts(node: P<Node>, ctx: &mut Ctx) {
             && name.as_identifier().text().ends_with("Script")
             && let Some(init) = decl.initializer().map(unwrap_expression)
             && let Some(text) = literal_text(init)
-            && is_hold_open_or_raw_socket_script(text)
+            && is_inline_hold_open_script(text)
         {
             ctx.report_node(
                 init,
@@ -51,18 +52,6 @@ fn literal_text(node: P<Node>) -> Option<&'static str> {
         Kind::NoSubstitutionTemplateLiteral => Some(node.text()),
         _ => None,
     }
-}
-
-fn is_hold_open_or_raw_socket_script(text: &str) -> bool {
-    let has_ready_signal =
-        text.contains("print(") || text.contains("stdout.write") || text.contains("console.log(");
-    let has_hold_open_timer =
-        text.contains("time.sleep(") || text.contains("setInterval(") || text.contains("\nsleep ");
-    let has_stdin_lifetime = text.contains("stdin");
-    if has_ready_signal && has_hold_open_timer && !has_stdin_lifetime {
-        return true;
-    }
-    text.contains("socket.socket(") && text.contains(".bind(") && text.contains("while True:")
 }
 
 fn has_owned_process_helper_import(root: P<Node>) -> bool {

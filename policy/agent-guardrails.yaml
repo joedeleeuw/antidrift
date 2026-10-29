@@ -494,6 +494,18 @@ clusters:
         severity: error
         detector: antidrift-linter:rust/no-redundant-owner-prefix
         message: Drop redundant leading owner-stem prefixes when every field of a non-serde struct repeats the struct stem.
+      - id: rust/no-blocking-in-async
+        severity: error
+        detector: antidrift-linter:rust/no-blocking-in-async
+        message: Do not block async executors with std::thread::sleep, synchronous std::process::Command waits, or inline sleep hold-open scripts.
+      - id: rust/no-query-join-or-tree-reshape
+        severity: error
+        detector: antidrift-linter:rust/no-query-join-or-tree-reshape
+        message: Pre-index inner collections into a HashMap or BTreeMap before iterating instead of running nested .find() equijoins.
+      - id: rust/no-contract-appeasement-projection
+        severity: error
+        detector: antidrift-linter:rust/no-contract-appeasement-projection
+        message: Preserve Result sum types and owned struct values instead of flattening Ok/Err into product envelopes or cloning 2+ fields into a parallel struct.
 
   - id: agent-instructions # Natural-language guidance should be generated and linted.
     owner: developer-experience # DX owns multi-agent instruction consistency.

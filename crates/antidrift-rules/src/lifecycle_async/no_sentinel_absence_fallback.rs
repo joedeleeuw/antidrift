@@ -1,6 +1,7 @@
 use super::syntax::unwrap_expression;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
-use antidrift_kernel::tsrs_kernel::node_text;
+use antidrift_kernel::runtime_lifecycle::{has_mtime_ordering_text, spans_multiple_artifact_tiers};
+use antidrift_kernel::tsrs_kernel::{is_function_like, node_text};
 use serde::Deserialize;
 use tsrs_ast::{Kind, Node};
 use tsrs_checker::{Checker, TypeFlags};
@@ -98,6 +99,16 @@ impl RuleVisitor for Visitor {
                     RuleMessage::new(
                         "catchSentinelReturn",
                         "This .catch() handler collapses a rejected promise into \"\", erasing the distinction between absence and an empty string. Return null/undefined or a typed result union instead.",
+                    ),
+                );
+                return;
+            }
+            if is_multi_tier_artifact_find(ctx, node) {
+                ctx.report_node(
+                    node,
+                    RuleMessage::new(
+                        "multiTierArtifactFallback",
+                        "First-match existsSync lookup spans multiple build output tiers (debug/release/dist) without comparing mtime; sort existing local candidates by mtimeMs descending so stale build tiers do not shadow newer builds.",
                     ),
                 );
             }
@@ -326,4 +337,85 @@ fn promise_catch_empty_string_sentinel(call_node: P<Node>) -> Option<P<Node>> {
     } else {
         string_literal(body).filter(|s| s.is_empty()).map(|_| body)
     }
+}
+
+fn is_multi_tier_artifact_find(ctx: &Ctx, call_node: P<Node>) -> bool {
+    let call = call_node.as_call_expression();
+    let callee = unwrap_expression(call.expression());
+    if callee.kind() != Kind::PropertyAccessExpression {
+        return false;
+    }
+    let prop = callee.as_property_access_expression();
+    if prop.name().kind() != Kind::Identifier || prop.name().as_identifier().text() != "find" {
+        return false;
+    }
+    let Some(&pred) = call.arguments().nodes().first() else {
+        return false;
+    };
+    if !node_text(ctx.file, pred).contains("existsSync") {
+        return false;
+    }
+    let scope_node = enclosing_scope_node(call_node);
+    if has_mtime_ordering_text(node_text(ctx.file, scope_node)) {
+        return false;
+    }
+    let receiver = unwrap_expression(prop.expression());
+    let mut elements = Vec::new();
+    collect_candidate_array_texts(ctx, receiver, scope_node, &mut elements);
+    spans_multiple_artifact_tiers(elements.iter().copied())
+}
+
+fn enclosing_scope_node(mut node: P<Node>) -> P<Node> {
+    while let Some(parent) = node.parent() {
+        if is_function_like(parent) || parent.kind() == Kind::SourceFile {
+            return parent;
+        }
+        node = parent;
+    }
+    node
+}
+
+fn collect_candidate_array_texts<'a>(
+    ctx: &'a Ctx,
+    expr: P<Node>,
+    scope_node: P<Node>,
+    out: &mut Vec<&'a str>,
+) {
+    let inner = unwrap_expression(expr);
+    if inner.kind() == Kind::ArrayLiteralExpression {
+        for &elem in inner.as_array_literal_expression().elements().nodes() {
+            if elem.kind() == Kind::SpreadElement {
+                collect_candidate_array_texts(
+                    ctx,
+                    elem.as_spread_element().expression(),
+                    scope_node,
+                    out,
+                );
+            } else {
+                out.push(node_text(ctx.file, elem));
+            }
+        }
+    } else if inner.kind() == Kind::Identifier {
+        let target_name = inner.as_identifier().text();
+        if let Some(init) = find_local_initializer(scope_node, target_name) {
+            collect_candidate_array_texts(ctx, init, scope_node, out);
+        }
+    }
+}
+
+fn find_local_initializer(root: P<Node>, name: &str) -> Option<P<Node>> {
+    if root.kind() == Kind::VariableDeclaration {
+        let decl = root.as_variable_declaration();
+        if decl.name().kind() == Kind::Identifier && decl.name().as_identifier().text() == name {
+            return decl.initializer();
+        }
+    }
+    let mut found = None;
+    root.for_each_child(&mut |child| {
+        if found.is_none() {
+            found = find_local_initializer(child, name);
+        }
+        found.is_some()
+    });
+    found
 }

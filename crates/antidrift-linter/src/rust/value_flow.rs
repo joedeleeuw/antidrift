@@ -1,4 +1,5 @@
 use super::RustDiagnostic;
+use super::struct_index::{StructIndex, file_scope};
 use super::value_origin::{
     Bindings, Origin, Representation, UNTYPED_VALUE_METHODS, has_value_evidence,
     is_string_key_probe, is_value_path, is_value_type, peel_expr, serde_representation,
@@ -12,6 +13,7 @@ use syn::{Expr, ExprCall, ExprMethodCall, FnArg, Item, Pat, Signature, Type};
 pub(super) fn check_value_flow(
     rel_path: &str,
     path: &Path,
+    index: Option<&StructIndex<'_>>,
     ast: &syn::File,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
@@ -22,6 +24,8 @@ pub(super) fn check_value_flow(
     ValueFlow {
         rel_path,
         boundary,
+        index,
+        scope: file_scope(path),
         bindings: Bindings::default(),
         module_items: &ast.items,
         self_fields: FxHashSet::default(),
@@ -33,6 +37,8 @@ pub(super) fn check_value_flow(
 struct ValueFlow<'a, 'ast> {
     rel_path: &'a str,
     boundary: bool,
+    index: Option<&'a StructIndex<'ast>>,
+    scope: Vec<String>,
     bindings: Bindings,
     module_items: &'ast [Item],
     self_fields: FxHashSet<String>,
@@ -51,7 +57,7 @@ impl ValueFlow<'_, '_> {
                     return Origin::Serialized(representation);
                 }
                 if serde_representation(call, false).is_some()
-                    || matches!(&*call.func, Expr::Path(path) if is_value_path(&path.path))
+                    || matches!(&*call.func, Expr::Path(path) if is_value_path(&path.path) || self.index.is_some_and(|idx| idx.resolves_to_untyped_fn(&self.scope, &path.path)))
                 {
                     return Origin::Untyped;
                 }
@@ -78,6 +84,9 @@ impl ValueFlow<'_, '_> {
                 if UNTYPED_VALUE_METHODS
                     .iter()
                     .any(|method| call.method == *method)
+                    || self
+                        .index
+                        .is_some_and(|idx| idx.is_untyped_method(&call.method.to_string()))
                 {
                     return Origin::Untyped;
                 }
@@ -126,7 +135,9 @@ impl<'ast> Visit<'ast> for ValueFlow<'_, 'ast> {
         if let Some((_, items)) = &node.content {
             self.module_items = items;
         }
+        self.scope.push(node.ident.to_string());
         visit::visit_item_mod(self, node);
+        self.scope.pop();
         self.module_items = previous;
     }
 

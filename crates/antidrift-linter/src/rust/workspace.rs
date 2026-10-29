@@ -7,6 +7,7 @@ use super::rules::check_syn_ast;
 use super::struct_index::StructIndex;
 use super::struct_shapes::check_structural_type_forks;
 use super::syntax::check_file_surface;
+use super::value_flow::check_value_flow;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::VecDeque;
 use std::fs;
@@ -49,7 +50,10 @@ pub(super) fn check_workspace_root(
             return Ok(1);
         }
         let display_root = root_ref.parent().unwrap_or(Path::new("."));
-        check_source_file(display_root, root_ref, diagnostics)?;
+        if let Some(ast) = check_source_file(display_root, root_ref, diagnostics)? {
+            let rel_path = relative_display(display_root, root_ref);
+            check_value_flow(&rel_path, root_ref, None, &ast, diagnostics);
+        }
         return Ok(1);
     }
     let crate_dirs = discover_crate_dirs(root_ref)?;
@@ -168,6 +172,12 @@ fn check_crate_dir(
         diagnostics,
     );
     let index = StructIndex::new(&rs_files, &parsed_files);
+    for file in &rs_files {
+        if let Some(ast) = parsed_files.get(file) {
+            let rel_path = relative_display(workspace_root, file);
+            check_value_flow(&rel_path, file, Some(&index), ast, diagnostics);
+        }
+    }
     check_structural_type_forks(workspace_root, &index, diagnostics);
     check_constant_return_fields(
         workspace_root,

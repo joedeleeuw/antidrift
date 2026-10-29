@@ -191,3 +191,36 @@ pub(super) fn has_derive_or_repr(attrs: &[Attribute], traits: &[&str]) -> bool {
     }
     false
 }
+
+pub(super) fn is_err_wild_pat(pat: &Pat) -> bool {
+    let Pat::TupleStruct(tuple) = pat else {
+        return false;
+    };
+    tuple
+        .path
+        .segments
+        .last()
+        .is_some_and(|seg| seg.ident == "Err")
+        && tuple.elems.len() == 1
+        && is_wild_pat(&tuple.elems[0])
+}
+
+pub(super) fn is_fs_io_call(expr: &Expr) -> bool {
+    let Expr::Call(ExprCall { func, .. }) = expr else {
+        return false;
+    };
+    let Expr::Path(callee) = &**func else {
+        return false;
+    };
+    let segments: Vec<&syn::Ident> = callee.path.segments.iter().map(|s| &s.ident).collect();
+    let Some(last) = segments.last() else {
+        return false;
+    };
+    segments.len() >= 2
+        && *segments[segments.len() - 2] == "fs"
+        && (**last == "read_to_string"
+            || **last == "read"
+            || **last == "write"
+            || **last == "read_dir"
+            || **last == "metadata")
+}

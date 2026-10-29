@@ -1,11 +1,15 @@
 use super::RustDiagnostic;
 use super::expression_shapes::{
-    closure_has_field_key_equality, detect_fieldwise_clone_rebuild,
-    detect_result_sum_erasure_match, first_closure_param_name, receiver_is_outer_collection,
+    block_mentions_modified, closure_has_field_key_equality, collect_string_literals,
+    detect_fieldwise_clone_rebuild, detect_result_sum_erasure_match, first_closure_param_name,
+    is_multi_tier_exists_find, receiver_is_outer_collection,
 };
 use super::syn_kernel::{call_path_ends_with, extract_pat_ident};
+use antidrift_kernel::runtime_lifecycle::{
+    has_hold_open_resource, is_inline_hold_open_script, is_script_binding_name,
+};
 use proc_macro2::Span;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
@@ -21,9 +25,11 @@ pub(super) fn check_corpus_smells(
     let mut visitor = CorpusSmellVisitor {
         rel_path,
         in_async_fn: false,
+        fn_has_mtime_check: false,
         script_context: false,
         error_bindings: FxHashSet::default(),
         error_string_bindings: FxHashSet::default(),
+        local_string_lists: FxHashMap::default(),
         outer_loop_params: Vec::new(),
         diagnostics,
     };
@@ -33,9 +39,11 @@ pub(super) fn check_corpus_smells(
 struct CorpusSmellVisitor<'a> {
     rel_path: &'a str,
     in_async_fn: bool,
+    fn_has_mtime_check: bool,
     script_context: bool,
     error_bindings: FxHashSet<String>,
     error_string_bindings: FxHashSet<String>,
+    local_string_lists: FxHashMap<String, Vec<String>>,
     outer_loop_params: Vec<String>,
     diagnostics: &'a mut Vec<RustDiagnostic>,
 }
@@ -50,18 +58,23 @@ impl CorpusSmellVisitor<'_> {
         ));
     }
 
-    fn visit_fn_scope(&mut self, is_async: bool, body: impl FnOnce(&mut Self)) {
+    fn visit_fn_scope(&mut self, is_async: bool, has_mtime: bool, body: impl FnOnce(&mut Self)) {
         let prev = (
             self.in_async_fn,
+            self.fn_has_mtime_check,
             std::mem::take(&mut self.error_bindings),
             std::mem::take(&mut self.error_string_bindings),
+            std::mem::take(&mut self.local_string_lists),
         );
         self.in_async_fn = is_async;
+        self.fn_has_mtime_check = has_mtime;
         body(self);
         (
             self.in_async_fn,
+            self.fn_has_mtime_check,
             self.error_bindings,
             self.error_string_bindings,
+            self.local_string_lists,
         ) = prev;
     }
 
@@ -78,13 +91,15 @@ impl CorpusSmellVisitor<'_> {
 
 impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
     fn visit_item_fn(&mut self, node: &'ast ItemFn) {
-        self.visit_fn_scope(node.sig.asyncness.is_some(), |this| {
+        let has_mtime = block_mentions_modified(&node.block);
+        self.visit_fn_scope(node.sig.asyncness.is_some(), has_mtime, |this| {
             visit::visit_item_fn(this, node);
         });
     }
 
     fn visit_impl_item_fn(&mut self, node: &'ast ImplItemFn) {
-        self.visit_fn_scope(node.sig.asyncness.is_some(), |this| {
+        let has_mtime = block_mentions_modified(&node.block);
+        self.visit_fn_scope(node.sig.asyncness.is_some(), has_mtime, |this| {
             visit::visit_impl_item_fn(this, node);
         });
     }
@@ -107,31 +122,37 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
     fn visit_local(&mut self, node: &'ast Local) {
         if let Some(local_ident) = extract_pat_ident(&node.pat).map(|(name, _)| name)
             && let Some(init) = &node.init
-            && is_error_to_string_expr(
+        {
+            if is_error_to_string_expr(
                 &init.expr,
                 &self.error_bindings,
                 &self.error_string_bindings,
-            )
-        {
-            self.error_string_bindings.insert(local_ident);
+            ) {
+                self.error_string_bindings.insert(local_ident.clone());
+            }
+            let mut lits = Vec::new();
+            collect_string_literals(&init.expr, &mut lits);
+            if lits.len() >= 2 {
+                self.local_string_lists.insert(local_ident, lits);
+            }
         }
         let previous = self.script_context;
         self.script_context =
-            extract_pat_ident(&node.pat).is_some_and(|(name, _)| is_script_binding(&name));
+            extract_pat_ident(&node.pat).is_some_and(|(name, _)| is_script_binding_name(&name));
         visit::visit_local(self, node);
         self.script_context = previous;
     }
 
     fn visit_item_const(&mut self, node: &'ast syn::ItemConst) {
         let previous = self.script_context;
-        self.script_context = is_script_binding(&node.ident.to_string());
+        self.script_context = is_script_binding_name(&node.ident.to_string());
         visit::visit_item_const(self, node);
         self.script_context = previous;
     }
 
     fn visit_item_static(&mut self, node: &'ast syn::ItemStatic) {
         let previous = self.script_context;
-        self.script_context = is_script_binding(&node.ident.to_string());
+        self.script_context = is_script_binding_name(&node.ident.to_string());
         visit::visit_item_static(self, node);
         self.script_context = previous;
     }
@@ -152,7 +173,7 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
         if let Some(struct_name) = detect_result_sum_erasure_match(node) {
             self.push(
                 node.match_token.span,
-                "rust/no-constant-return-field",
+                "rust/no-contract-appeasement-projection",
                 format!(
                     "Match erases Result Ok/Err arms into correlated boolean/Option fields on '{struct_name}'; keep a typed outcome enum or Result instead of a product bag."
                 ),
@@ -181,10 +202,20 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
                 "fs::read_to_string failure is collapsed into \"\" via fallback, erasing the distinction between missing file and empty file; propagate the io::Error or return Option<String>.".to_owned(),
             );
         }
+        if method == "find"
+            && !self.fn_has_mtime_check
+            && is_multi_tier_exists_find(node, &self.local_string_lists)
+        {
+            self.push(
+                node.method.span(),
+                "rust/no-silent-result-discard",
+                "First-match '.find(|p| p.exists())' spans multiple build output tiers (debug/release/dist) without comparing modification times; sort candidates by metadata().modified() so stale build tiers do not shadow newer builds.",
+            );
+        }
         if self.in_async_fn && is_sync_command_wait(&method, &node.receiver) {
             self.push(
                 node.method.span(),
-                "rust/no-wrapping-functions",
+                "rust/no-blocking-in-async",
                 format!(
                     "Synchronous std::process::Command '.{method}()' inside async fn blocks the executor thread; use an async process runner or spawn_blocking."
                 ),
@@ -213,7 +244,7 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
         {
             self.push(
                 node.method.span(),
-                "rust/no-value-roundtrip",
+                "rust/no-query-join-or-tree-reshape",
                 format!(
                     "Nested '.{method}(...)' performs an O(N*M) linear key lookup inside an outer traversal; pre-index the lookup collection by key."
                 ),
@@ -229,7 +260,7 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
         if self.in_async_fn && is_std_thread_sleep_call(node) {
             self.push(
                 node.func.span(),
-                "rust/no-wrapping-functions",
+                "rust/no-blocking-in-async",
                 "Blocking 'std::thread::sleep' inside async fn stalls the async executor; await an async timer or lifecycle signal instead.".to_owned(),
             );
         }
@@ -242,11 +273,11 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
     fn visit_expr_lit(&mut self, node: &'ast ExprLit) {
         if let Lit::Str(lit_str) = &node.lit
             && is_inline_hold_open_script(&lit_str.value())
-            && (self.script_context || has_resource_hold(&lit_str.value()))
+            && (self.script_context || has_hold_open_resource(&lit_str.value()))
         {
             self.push(
                 node.span(),
-                "rust/no-wrapping-functions",
+                "rust/no-blocking-in-async",
                 "Inline child script uses a wall-clock sleep hold-open timer instead of parent-bound stdin EOF lifetime control.",
             );
         }
@@ -259,7 +290,7 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
         {
             self.push(
                 node.path.span(),
-                "rust/no-value-roundtrip",
+                "rust/no-contract-appeasement-projection",
                 format!(
                     "Struct '{}' is rebuilt field-by-field via '.clone()' from '{src_ident}'; call '{src_ident}.clone()' directly.",
                     seg.ident
@@ -387,23 +418,4 @@ fn expr_mentions_std_command(expr: &Expr) -> bool {
         }
         _ => false,
     }
-}
-
-fn is_inline_hold_open_script(text: &str) -> bool {
-    (text.contains("print(") || text.contains("stdout.write") || has_resource_hold(text))
-        && (text.contains("time.sleep(") || text.contains("setInterval("))
-        && !text.contains("stdin")
-}
-
-fn is_script_binding(name: &str) -> bool {
-    let lower = name.to_ascii_lowercase();
-    [
-        "script", "cmd", "command", "code", "holder", "listener", "occupant",
-    ]
-    .iter()
-    .any(|part| lower.contains(part))
-}
-
-fn has_resource_hold(text: &str) -> bool {
-    (text.contains("fcntl.flock") || text.contains("socket.bind")) && text.contains("time.sleep")
 }

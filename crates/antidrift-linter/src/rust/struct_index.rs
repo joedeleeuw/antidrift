@@ -1,7 +1,8 @@
-use rustc_hash::FxHashMap;
+use super::value_origin::is_value_type;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use syn::{Item, ItemStruct, Type};
+use syn::{ImplItem, Item, ItemStruct, ReturnType, Type};
 
 pub(super) struct StructDefinition<'a> {
     pub(super) file: &'a Path,
@@ -11,6 +12,8 @@ pub(super) struct StructDefinition<'a> {
 pub(super) struct StructIndex<'a> {
     pub(super) definitions: BTreeMap<Vec<String>, StructDefinition<'a>>,
     imports: BTreeMap<Vec<String>, Vec<String>>,
+    untyped_functions: FxHashSet<Vec<String>>,
+    untyped_methods: FxHashSet<String>,
 }
 
 impl<'a> StructIndex<'a> {
@@ -18,6 +21,8 @@ impl<'a> StructIndex<'a> {
         let mut index = Self {
             definitions: BTreeMap::new(),
             imports: BTreeMap::new(),
+            untyped_functions: FxHashSet::default(),
+            untyped_methods: FxHashSet::default(),
         };
         for file in files {
             if let Some(ast) = parsed.get(file) {
@@ -36,6 +41,12 @@ impl<'a> StructIndex<'a> {
                     self.definitions
                         .insert(key, StructDefinition { file, structure });
                 }
+                Item::Fn(item_fn) if return_type_is_untyped(&item_fn.sig.output) => {
+                    let mut key = scope.to_vec();
+                    key.push(item_fn.sig.ident.to_string());
+                    self.untyped_functions.insert(key);
+                }
+                Item::Impl(item_impl) => self.collect_impl(scope, item_impl),
                 Item::Mod(syn::ItemMod {
                     ident,
                     content: Some((_, items)),
@@ -47,6 +58,28 @@ impl<'a> StructIndex<'a> {
                 }
                 Item::Use(import) => self.collect_import(scope, &import.tree, &[]),
                 _ => {}
+            }
+        }
+    }
+
+    fn collect_impl(&mut self, scope: &[String], item_impl: &syn::ItemImpl) {
+        let owner_ident = type_path(&item_impl.self_ty)
+            .and_then(|p| p.segments.last())
+            .map(|seg| seg.ident.to_string());
+        for impl_item in &item_impl.items {
+            let ImplItem::Fn(method) = impl_item else {
+                continue;
+            };
+            if !return_type_is_untyped(&method.sig.output) {
+                continue;
+            }
+            let method_name = method.sig.ident.to_string();
+            self.untyped_methods.insert(method_name.clone());
+            if let Some(ref owner) = owner_ident {
+                let mut key = scope.to_vec();
+                key.push(owner.clone());
+                key.push(method_name);
+                self.untyped_functions.insert(key);
             }
         }
     }
@@ -109,6 +142,43 @@ impl<'a> StructIndex<'a> {
             }
         }
         None
+    }
+
+    pub(super) fn resolves_to_untyped_fn(&self, scope: &[String], path: &syn::Path) -> bool {
+        let segments: Vec<_> = path
+            .segments
+            .iter()
+            .map(|segment| segment.ident.to_string())
+            .collect();
+        let candidate = qualify(scope, &segments);
+        if self.untyped_functions.contains(&candidate) {
+            return true;
+        }
+        for prefix_len in (1..=candidate.len()).rev() {
+            if let Some(imported) = self.imports.get(&candidate[..prefix_len]) {
+                let mut resolved = qualify(&candidate[..prefix_len - 1], imported);
+                resolved.extend_from_slice(&candidate[prefix_len..]);
+                return self.untyped_functions.contains(&resolved);
+            }
+        }
+        if segments.len() == 1 {
+            return self
+                .untyped_functions
+                .iter()
+                .any(|key| key.last() == segments.last());
+        }
+        false
+    }
+
+    pub(super) fn is_untyped_method(&self, method_name: &str) -> bool {
+        self.untyped_methods.contains(method_name)
+    }
+}
+
+fn return_type_is_untyped(output: &ReturnType) -> bool {
+    match output {
+        ReturnType::Default => false,
+        ReturnType::Type(_, ty) => is_value_type(ty),
     }
 }
 

@@ -11,6 +11,7 @@ pub mod projection;
 pub mod provenance;
 pub mod registries;
 pub mod rule_scope;
+pub mod runtime_lifecycle;
 pub mod shape;
 pub mod span_index;
 pub mod suppressions;

@@ -543,6 +543,20 @@ export function buildBoundaryProbes(sourceWorkspace, join) {
       expectedCount: 0,
     },
     {
+      id: "sentinel-fallback:multi-tier-artifact-invalid",
+      rule: "antidrift/no-sentinel-absence-fallback",
+      sourceText:
+        'import { existsSync } from "node:fs";\nexport function findBinary() { const candidates = ["dist/bin/tool", "target/release/tool", "target/debug/tool"]; return candidates.find((p) => existsSync(p)); }\n',
+      expectedCount: 1,
+    },
+    {
+      id: "sentinel-fallback:multi-tier-artifact-mtime-clean",
+      rule: "antidrift/no-sentinel-absence-fallback",
+      sourceText:
+        'import { existsSync, statSync } from "node:fs";\nexport function findBinary() { const candidates = ["target/release/tool", "target/debug/tool"].filter((p) => existsSync(p)); candidates.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs); return candidates.find((p) => existsSync(p)); }\n',
+      expectedCount: 0,
+    },
+    {
       id: "repo-state-mirror:invalid",
       rule: "antidrift/no-repo-state-mirror-assertion",
       sourceText:

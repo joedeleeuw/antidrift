@@ -1,7 +1,10 @@
 use super::syn_kernel::extract_pat_ident;
+use antidrift_kernel::runtime_lifecycle::spans_multiple_artifact_tiers;
+use rustc_hash::FxHashMap;
+use syn::visit::{self, Visit};
 use syn::{
-    BinOp, Expr, ExprBinary, ExprClosure, ExprField, ExprLit, ExprMatch, ExprStruct, Lit, Member,
-    Pat,
+    BinOp, Expr, ExprBinary, ExprClosure, ExprField, ExprLit, ExprMatch, ExprMethodCall,
+    ExprStruct, Lit, Member, Pat,
 };
 
 pub(super) fn first_closure_param_name(closure: &ExprClosure) -> Option<String> {
@@ -157,4 +160,94 @@ fn extract_field_copy_or_clone(expr: &Expr) -> Option<(String, String, bool)> {
         },
         _ => None,
     }
+}
+
+pub(super) fn is_multi_tier_exists_find(
+    node: &ExprMethodCall,
+    local_lists: &FxHashMap<String, Vec<String>>,
+) -> bool {
+    let Some(Expr::Closure(closure)) = node.args.first() else {
+        return false;
+    };
+    if !expr_calls_path_exists(&closure.body) {
+        return false;
+    }
+    let mut candidates = Vec::new();
+    collect_receiver_candidates(&node.receiver, local_lists, &mut candidates);
+    spans_multiple_artifact_tiers(candidates.iter().map(String::as_str))
+}
+
+fn expr_calls_path_exists(expr: &Expr) -> bool {
+    match expr {
+        Expr::MethodCall(call) => {
+            call.method == "exists"
+                || call.method == "is_file"
+                || expr_calls_path_exists(&call.receiver)
+                || call.args.iter().any(expr_calls_path_exists)
+        }
+        Expr::Block(b) => b.block.stmts.iter().any(|s| match s {
+            syn::Stmt::Expr(e, _) => expr_calls_path_exists(e),
+            _ => false,
+        }),
+        _ => false,
+    }
+}
+
+fn collect_receiver_candidates(
+    expr: &Expr,
+    local_lists: &FxHashMap<String, Vec<String>>,
+    out: &mut Vec<String>,
+) {
+    match expr {
+        Expr::MethodCall(call) => collect_receiver_candidates(&call.receiver, local_lists, out),
+        Expr::Path(ep) => {
+            if let Some(ident) = ep.path.get_ident()
+                && let Some(list) = local_lists.get(&ident.to_string())
+            {
+                out.extend(list.iter().cloned());
+            }
+        }
+        other => collect_string_literals(other, out),
+    }
+}
+
+pub(super) fn collect_string_literals(expr: &Expr, out: &mut Vec<String>) {
+    match expr {
+        Expr::Lit(ExprLit {
+            lit: Lit::Str(s), ..
+        }) => out.push(s.value()),
+        Expr::Array(arr) => {
+            for elem in &arr.elems {
+                collect_string_literals(elem, out);
+            }
+        }
+        Expr::Reference(r) => collect_string_literals(&r.expr, out),
+        Expr::MethodCall(mc) => {
+            collect_string_literals(&mc.receiver, out);
+            for arg in &mc.args {
+                collect_string_literals(arg, out);
+            }
+        }
+        Expr::Call(call) => {
+            for arg in &call.args {
+                collect_string_literals(arg, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+pub(super) fn block_mentions_modified(block: &syn::Block) -> bool {
+    struct ModifiedFinder(bool);
+    impl<'ast> Visit<'ast> for ModifiedFinder {
+        fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
+            if node.method == "modified" || node.method == "metadata" {
+                self.0 = true;
+            }
+            visit::visit_expr_method_call(self, node);
+        }
+    }
+    let mut finder = ModifiedFinder(false);
+    finder.visit_block(block);
+    finder.0
 }

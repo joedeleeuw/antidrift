@@ -994,12 +994,12 @@ try {
   );
   writeFileSync(
     join(kernelSrc, "boundary.rs"),
-    "pub struct BoundaryItem;\npub struct WindowBounds { pub x: i32, pub y: i32, pub width: u32 }\n"
+    "pub struct BoundaryItem;\npub struct WindowBounds { pub x: i32, pub y: i32, pub width: u32 }\npub fn load_raw_manifest() -> serde_json::Value { serde_json::Value::Null }\n"
   );
   writeFileSync(
     join(kernelSrc, "provenance.rs"),
     [
-      "use crate::{ boundary::BoundaryItem };",
+      "use crate::{ boundary::BoundaryItem, boundary::load_raw_manifest };",
       "use serde::Deserialize;",
       "use std::collections::HashMap;",
       "// forbidden inline comment",
@@ -1015,26 +1015,31 @@ try {
       "pub struct Holder { pub ident: String }",
       "pub struct ProjectMeta { pub project_id: String, pub project_key: String }",
       "pub struct StatusEnvelope { pub ok: bool, pub count: usize }",
+      "pub struct OutcomeBag { pub ok: bool, pub count: usize, pub error: Option<String> }",
       "pub fn make_envelope_a(n: usize) -> StatusEnvelope { StatusEnvelope { ok: true, count: n } }",
       "pub fn make_envelope_b(n: usize) -> StatusEnvelope { StatusEnvelope { ok: true, count: n + 1 } }",
       "pub fn compare_ident(h: &Holder, val: &serde_json::Value) -> bool {",
       '    let _ = val["k"].as_str();',
+      "    let from_helper = load_raw_manifest();",
+      '    let _ = from_helper.get("nested").and_then(|v| v.as_u64());',
       '    let _ = h.ident.to_string() == "foo";',
       '    if let Ok(text) = std::fs::read_to_string("foo.txt") { let _ = text.len(); }',
       '    let _ = std::fs::read_to_string("bar.txt").unwrap_or_default();',
+      '    let bins = ["dist/bin/tool", "target/release/tool", "target/debug/tool"];',
+      "    let _ = bins.iter().find(|p| std::path::Path::new(p).exists());",
       "    let raw_json = serde_json::to_string(&h.ident).unwrap();",
       "    let _ = serde_json::from_str::<LooseConfig>(&raw_json);",
       "    let _ = h.ident.to_string().parse::<u32>();",
       "    let _ = serde_json::from_str::<LooseConfig>(&h.ident).ok();",
       "    match legacy_adapter(&h.ident) { Ok(_) => true, Err(_) => false }",
       "}",
-      "pub async fn bad_async_sleep(err: &str, xs: &[Holder], ys: &[Holder]) -> (Option<usize>, Option<String>) {",
+      "pub async fn bad_async_sleep(err: &str, xs: &[Holder], ys: &[Holder]) -> OutcomeBag {",
       "    std::thread::sleep(std::time::Duration::from_millis(10));",
       '    let _ = err.to_string().contains("not found");',
       "    let _ = xs.iter().map(|x| ys.iter().find(|y| y.ident == x.ident)).count();",
-      "    let rebuilt = Holder { ident: xs[0].ident.clone() };",
-      "    let _ = rebuilt.ident.len();",
-      "    match legacy_adapter(err) { Ok(v) => (Some(v), None), Err(e) => (None, Some(e)) }",
+      "    let cloned = Holder { ident: xs[0].ident.clone() };",
+      "    let _ = cloned.ident.len();",
+      "    match legacy_adapter(err) { Ok(v) => OutcomeBag { ok: true, count: v, error: None }, Err(e) => OutcomeBag { ok: false, count: 0, error: Some(e) } }",
       "}",
       "#[cfg(all(test))]\nmod inline_tests {}",
       "",
@@ -1090,6 +1095,9 @@ try {
     "rust/no-constant-return-field",
     "rust/no-redundant-owner-prefix",
     "rust/no-hollow-module",
+    "rust/no-blocking-in-async",
+    "rust/no-query-join-or-tree-reshape",
+    "rust/no-contract-appeasement-projection",
   ]) {
     assert.ok(
       reportedRuleIds.has(expectedRuleId),
@@ -1101,6 +1109,8 @@ try {
     "Do not serialize and deserialize the same value",
     "Blocking 'std::thread::sleep' inside async fn",
     "Nested '.find(...)' performs an O(N*M)",
+    "spans multiple build output tiers",
+    "Untyped config probe '.as_u64()'",
   ]) {
     assert.equal(
       rustDiags.filter((diag) => String(diag.message).includes(expectedMessage))
