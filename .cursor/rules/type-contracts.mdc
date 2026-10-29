@@ -1,0 +1,9 @@
+---
+description: Prevent local TypeScript appeasement patterns.
+globs: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"]
+alwaysApply: true
+---
+
+This file is generated from `policy/agent-guardrails.yaml`. Do not edit it directly.
+
+Do not create typed selector wrappers, one-use aliases, inline structural contracts, or unsafe cast chains.

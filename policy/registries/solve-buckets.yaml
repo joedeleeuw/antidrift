@@ -244,6 +244,13 @@ rules:
       target: semantic-ast,
       note: "Module-scope void functions whose TypeChecker-resolved data-bag parameter (type literal, Record, Map or method-free interface) is written through a member assignment or Map.set without a local rebind.",
     }
+  antidrift/no-query-join-or-tree-reshape:
+    {
+      current: semantic-ast,
+      fit: proven,
+      target: semantic-ast,
+      note: "Lexical-binding provenance proof over a single function: render-body joins of two or more distinct reactive query/store roots, two-level tree flattening over query/prop sources, and three mutually independent serial awaits.",
+    }
 
 # Behaviors the taxonomy reveals we do not have blocking coverage for yet. Some need a missing
 # bucket; others, like diff-scope-creep, now have an inventory spine but still need promotion

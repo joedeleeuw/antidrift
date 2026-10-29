@@ -11,16 +11,17 @@ import { resolveNativeLinterBinary } from "../policy/oxlint.mjs";
 
 const CODE_FILE_RE = /\.(?:js|mjs|cjs|ts|tsx|mts|cts)$/u;
 
-const LinterJsonOutput = z.array(
+const LinterFileResults = z.array(
   z.object({
     filePath: z.string(),
     messages: z.array(
       z.object({
-        ruleId: z.string(),
+        ruleId: z.string().nullable().optional(),
+        line: z.number().optional(),
+        column: z.number().optional(),
         severity: z.number(),
         message: z.string(),
-        line: z.number(),
-        column: z.number(),
+        fatal: z.boolean().optional(),
       })
     ),
   })
@@ -189,7 +190,7 @@ export async function diffScopedAdapters({
       if (linterRun.error) throw linterRun.error;
       const rawJson = (linterRun.stdout ?? "").trim();
       results =
-        rawJson.length > 0 ? LinterJsonOutput.parse(JSON.parse(rawJson)) : [];
+        rawJson.length > 0 ? LinterFileResults.parse(JSON.parse(rawJson)) : [];
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

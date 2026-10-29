@@ -1,0 +1,9 @@
+---
+description: Protect generated policy artifacts from direct edits.
+globs: ["AGENTS.md", "CLAUDE.md", ".cursor/rules/*.mdc", ".claude/settings.json", ".codex/hooks.json", ".github/copilot-instructions.md"]
+alwaysApply: true
+---
+
+This file is generated from `policy/agent-guardrails.yaml`. Do not edit it directly.
+
+Edit the source policy and run `pnpm policy:generate`.

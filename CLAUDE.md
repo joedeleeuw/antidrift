@@ -4,9 +4,9 @@ This file is generated from `policy/agent-guardrails.yaml`. Do not edit it direc
 
 Treat hooks and deterministic checks as authoritative. Fix code instead of weakening policy.
 
-## Required checks
+## Stop condition
 
-Run `pnpm policy:verify-session` before pushing.
+Run `pnpm policy:verify-session` before stopping.
 
 ## Rule clusters
 
@@ -19,11 +19,11 @@ Run `pnpm policy:verify-session` before pushing.
 - **generated-type-drift** (types-platform): gen/require-import-from-generated
 - **authorization-control-drift** (security): auth/no-boundaryless-route, auth/no-client-only-authorization, auth/require-authz-check
 - **error-handling** (reliability): errors/preserve-caught-error, errors/no-anemic-errors
-- **directive-smells** (engineering-productivity): arch/no-pass-through-parameters, compat/no-compat-names, simplicity/no-nested-ternary, simplicity/no-else-if-chain, provenance/no-host-path-literal, provenance/no-dated-comments, arch/no-hypothetical-seam, arch/no-reexport-only-module, ts/no-closed-string-parameter, simplicity/no-argument-mutation-side-effect
+- **directive-smells** (engineering-productivity): naming/no-vague-names, arch/no-pass-through-parameters, compat/no-compat-names, simplicity/no-nested-ternary, simplicity/no-else-if-chain, provenance/no-host-path-literal, provenance/no-dated-comments, arch/no-hypothetical-seam, arch/no-reexport-only-module, ts/no-closed-string-parameter, simplicity/no-argument-mutation-side-effect
 - **test-integrity** (quality): test/no-only-or-skip, test/no-conditional-expect, test/no-test-without-assertion
 - **design-system** (design-system): ui/no-raw-tailwind-color, ui/no-hover-translate-card, ui/no-generic-ai-copy
 - **observability-drift** (reliability): obs/async-boundary-requires-context, obs/no-fire-and-forget-without-tracking
-- **performance-resource-drift** (performance): perf/no-await-in-loop-with-io, perf/no-async-array-method, perf/no-unbounded-promise-all, perf/require-timeout-for-network-call, perf/no-redundant-validation
+- **performance-resource-drift** (performance): perf/no-await-in-loop-with-io, perf/no-async-array-method, perf/no-unbounded-promise-all, perf/require-timeout-for-network-call, perf/no-redundant-validation, perf/no-query-join-or-tree-reshape
 - **injection-and-secret-drift** (security): sec/no-hardcoded-secret, sec/no-sql-string-concat, sec/no-unsafe-deserialize
 - **agent-ops** (developer-experience): agent/block-generated-policy-edits, agent/lint-after-edit, agent/require-checks-before-push
 - **quality-gate-drift** (developer-experience): policy/no-check-weakening-without-policy-task, policy/no-inline-disable-without-ticket

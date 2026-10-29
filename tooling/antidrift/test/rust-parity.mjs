@@ -261,7 +261,7 @@ const rawBatchOutput = execFileSync(binaryPath, ["--batch-json", "-"], {
   maxBuffer: 32 * 1024 * 1024,
 });
 
-const batchResults = JSON.parse(rawBatchOutput);
+const batchResults = JSON.parse(String(rawBatchOutput));
 assert.equal(batchResults.length, batchInputs.length);
 
 for (const outcome of batchResults) {
@@ -277,8 +277,15 @@ for (const outcome of batchResults) {
   }
 }
 
-function parseHeadlessOutput(output) {
-  const buf = Buffer.from(output);
+function runHeadlessProbe(payload, extraEnv = {}) {
+  const proc = spawnSync(binaryPath, ["headless"], {
+    cwd: repoRoot,
+    input: Buffer.from(JSON.stringify(payload), "utf8"),
+    env: { ...process.env, ...extraEnv },
+    maxBuffer: 32 * 1024 * 1024,
+    encoding: "buffer",
+  });
+  const buf = proc.stdout;
   const diagnostics = [];
   let offset = 0;
   while (offset + 5 <= buf.length) {
@@ -294,23 +301,12 @@ function parseHeadlessOutput(output) {
       throw new Error(`Headless protocol error: ${payloadText}`);
     }
   }
-  return diagnostics;
-}
-
-function runHeadlessProbe(payload, extraEnv = {}) {
-  const proc = spawnSync(binaryPath, ["headless"], {
-    cwd: repoRoot,
-    input: Buffer.from(JSON.stringify(payload), "utf8"),
-    env: { ...process.env, ...extraEnv },
-    maxBuffer: 32 * 1024 * 1024,
-  });
-  const parsed = parseHeadlessOutput(proc.stdout ?? Buffer.alloc(0));
   if (proc.status !== 0) {
     throw new Error(
       `Headless process exited with ${proc.status}: ${(proc.stderr ?? Buffer.alloc(0)).toString("utf8")}`
     );
   }
-  return parsed;
+  return diagnostics;
 }
 
 const probeFileA = resolve(repoRoot, "tooling/antidrift/src/__probe_a.ts");
@@ -887,6 +883,115 @@ const headlessProbes = [
     `,
     expectedCount: 0,
   },
+  {
+    name: "no-query-join-or-tree-reshape (multiQueryRenderJoin: spread of two queries and nested machines.find lookup in render)",
+    rule: "antidrift/no-query-join-or-tree-reshape",
+    file: "tooling/antidrift/src/__probe_query_join_feed.tsx",
+    source: `
+      declare function useQuery<T>(options: { queryKey: string[] }): { data: T | undefined };
+      type Message = { id: string; machineId: string; createdAt: number };
+      type Generation = { id: string; machineId: string; createdAt: number };
+      type Machine = { id: string; name: string };
+      export function ConversationFeed() {
+        const { data: messages = [] } = useQuery<Message[]>({ queryKey: ["messages"] });
+        const generations = useQuery<Generation[]>({ queryKey: ["generations"] }).data ?? [];
+        const machinesQuery = useQuery<Machine[]>({ queryKey: ["machines"] });
+        const machines = machinesQuery.data ?? [];
+        const timeline = [...messages, ...generations].sort((a, b) => a.createdAt - b.createdAt);
+        const rows = timeline.map((entry) => ({
+          ...entry,
+          machine: machines.find((machine) => machine.id === entry.machineId),
+        }));
+        return <ul>{rows.map((row) => <li key={row.id}>{row.machine?.name}</li>)}</ul>;
+      }
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-query-join-or-tree-reshape (renderTreeFlattenReshape: nested and chained flatMap over a prop tree in render)",
+    rule: "antidrift/no-query-join-or-tree-reshape",
+    file: "tooling/antidrift/src/__probe_tree_flatten.tsx",
+    source: `
+      type Line = { id: string; text: string };
+      type Hunk = { id: string; lines: Line[] };
+      type DiffFile = { path: string; hunks: Hunk[] };
+      export function DiffView({ files }: { files: DiffFile[] }) {
+        const lines = files.flatMap((file) => file.hunks.flatMap((hunk) => hunk.lines));
+        const chained = files.flatMap((file) => file.hunks).flatMap((hunk) => hunk.lines);
+        return <pre>{lines.length + chained.length}</pre>;
+      }
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-query-join-or-tree-reshape (sequentialAsyncWaterfall: three independent runGit reads awaited serially)",
+    rule: "antidrift/no-query-join-or-tree-reshape",
+    file: "tooling/antidrift/src/__probe_await_waterfall.ts",
+    source: `
+      declare function runGit(cwd: string, args: string[]): Promise<string>;
+      export async function inspectRepository(cwd: string) {
+        const refs = await runGit(cwd, ["show-ref"]);
+        const head = await runGit(cwd, ["rev-parse", "HEAD"]);
+        const status = await runGit(cwd, ["status", "--porcelain"]);
+        return { refs, head, status };
+      }
+    `,
+    expectedCount: 1,
+  },
+  {
+    name: "no-query-join-or-tree-reshape (dependent awaits, Promise.all, mutations, scalar selection in JSX map, one-level and memoized flattens stay clean)",
+    rule: "antidrift/no-query-join-or-tree-reshape",
+    file: "tooling/antidrift/src/__probe_query_join_clean.tsx",
+    source: `
+      import { useMemo } from "react";
+      declare function runGit(cwd: string, args: string[]): Promise<string>;
+      declare function createBranch(cwd: string): Promise<string>;
+      declare function setUpstream(cwd: string): Promise<string>;
+      declare function pushBranch(cwd: string): Promise<string>;
+      declare function useQuery<T>(options: { queryKey: string[] }): { data: T | undefined };
+      type Item = { id: string; label: string; children: { id: string; leaves: string[] }[] };
+      export async function inspectDependent(cwd: string) {
+        const root = await runGit(cwd, ["rev-parse", "--show-toplevel"]);
+        const status = await runGit(root, ["status"]);
+        const branch = await runGit(root, ["branch"]);
+        return { status, branch };
+      }
+      export async function inspectBatched(cwd: string) {
+        const [refs, head, status] = await Promise.all([
+          runGit(cwd, ["show-ref"]),
+          runGit(cwd, ["rev-parse"]),
+          runGit(cwd, ["status"]),
+        ]);
+        return { refs, head, status };
+      }
+      export async function publishBranch(cwd: string) {
+        const created = await createBranch(cwd);
+        const tracked = await setUpstream(cwd);
+        const pushed = await pushBranch(cwd);
+        return { created, tracked, pushed };
+      }
+      export function SelectableList() {
+        const { data: items = [] } = useQuery<Item[]>({ queryKey: ["items"] });
+        const { data: selected } = useQuery<Item>({ queryKey: ["selected"] });
+        const others = items.filter((item) => item.id !== selected?.id);
+        const children = items.flatMap((item) => item.children);
+        const flattened = items.flat();
+        const leaves = useMemo(
+          () => items.flatMap((item) => item.children.flatMap((child) => child.leaves)),
+          [items]
+        );
+        return (
+          <ul>
+            {items.map((item) => (
+              <li key={item.id} data-active={item.id === selected?.id}>{item.label}</li>
+            ))}
+            {others.length + children.length + flattened.length + leaves.length}
+          </ul>
+        );
+      }
+    `,
+    expectedCount: 0,
+  },
 ];
 
 const sharedHelperFiles = {
@@ -1185,7 +1290,7 @@ try {
     1,
     `Expected antidrift-linter rust to exit 1 on violations, got ${rustSubcmd.status}: ${rustSubcmd.stderr}`
   );
-  const rustDiags = JSON.parse(rustSubcmd.stdout);
+  const rustDiags = JSON.parse(String(rustSubcmd.stdout ?? ""));
   const reportedRuleIds = new Set(rustDiags.map((diag) => diag.ruleId));
   for (const expectedRuleId of [
     "rust/target-manifest-policy",

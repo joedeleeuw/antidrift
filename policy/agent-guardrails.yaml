@@ -318,6 +318,10 @@ clusters:
         severity: error
         detector: zodSchemaReparsesOwnValidatedOutput
         message: Validate once at the boundary and pass the parsed value inward; do not re-parse with the same schema.
+      - id: perf/no-query-join-or-tree-reshape # Agents join several reactive query/store collections, flatten nested trees during render, and await independent reads serially.
+        severity: error
+        detector: antidrift:no-query-join-or-tree-reshape
+        message: Move multi-query joins and multi-level tree flattening to the query select, store, or producer boundary; batch independent awaits with Promise.all.
 
   - id: injection-and-secret-drift # Agents leak secrets and build injection sinks when generating data-access and config code. Distinct from data-lifecycle-drift (migration/fixture alignment).
     owner: security # Security owns secret handling, query construction, and deserialization policy.
