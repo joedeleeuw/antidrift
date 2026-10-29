@@ -37,10 +37,6 @@ struct DomainFile {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BoundariesFile {
     #[serde(default)]
-    #[expect(
-        dead_code,
-        reason = "validated at YAML boundary via deny_unknown_fields"
-    )]
     server_boundary_globs: Vec<String>,
     #[serde(default)]
     required_calls: BTreeMap<String, Vec<String>>,
@@ -48,6 +44,7 @@ struct BoundariesFile {
 
 #[derive(Debug, Clone, Default)]
 pub struct PolicyRegistries {
+    pub server_boundary_globs: Vec<String>,
     pub required_calls: BTreeMap<String, Vec<String>>,
     pub statuses: BTreeMap<String, OwnedUnion>,
 }
@@ -83,6 +80,7 @@ impl PolicyRegistries {
             match stem {
                 "boundaries" => {
                     let parsed: BoundariesFile = decode_yaml_registry(&path, "boundaries", &text)?;
+                    registries.server_boundary_globs = parsed.server_boundary_globs;
                     registries.required_calls = parsed.required_calls;
                 }
                 "domain" => {

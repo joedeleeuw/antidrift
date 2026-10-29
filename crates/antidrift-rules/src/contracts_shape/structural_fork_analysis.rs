@@ -1,3 +1,4 @@
+use antidrift_kernel::directives::split_identifier_words;
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_source_file_origin};
 use antidrift_kernel::{shape, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, NodeFlags, SourceFile};
@@ -362,33 +363,12 @@ fn exported_owner_member_names(
     (names.len() >= 2).then(|| (alias.name().as_identifier().text().to_owned(), names))
 }
 
-fn identifier_words(name: &str) -> Vec<String> {
-    let mut words = Vec::new();
-    let mut current = String::new();
-    for ch in name.chars() {
-        if !ch.is_alphanumeric() {
-            if !current.is_empty() {
-                words.push(std::mem::take(&mut current));
-            }
-            continue;
-        }
-        if ch.is_uppercase() && !current.is_empty() {
-            words.push(std::mem::take(&mut current));
-        }
-        current.push(ch.to_ascii_lowercase());
-    }
-    if !current.is_empty() {
-        words.push(current);
-    }
-    words
-}
-
 fn shares_identifier_stem(left: &str, right: &str) -> bool {
     if left == right {
         return true;
     }
-    let left_words = identifier_words(left);
-    let right_words = identifier_words(right);
+    let left_words = split_identifier_words(left);
+    let right_words = split_identifier_words(right);
     left_words
         .iter()
         .any(|lw| lw.len() >= 3 && right_words.iter().any(|rw| rw == lw))
@@ -402,6 +382,17 @@ fn has_exact_same_property_types(
 ) -> bool {
     let cand_type = checker.get_type_at_location(cand_node);
     let owner_type = checker.get_type_at_location(owner_node);
+    if cand_type == owner_type
+        || owner_type
+            .symbol()
+            .is_some_and(|sym| sym.declarations().contains(&cand_node))
+        || owner_type
+            .alias()
+            .and_then(|alias| alias.symbol())
+            .is_some_and(|sym| sym.declarations().contains(&cand_node))
+    {
+        return false;
+    }
     prop_names.iter().all(|name| {
         let Some(cand_sym) = checker.get_property_of_type_exported(cand_type, name) else {
             return false;

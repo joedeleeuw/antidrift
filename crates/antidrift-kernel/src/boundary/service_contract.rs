@@ -1,6 +1,6 @@
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, ClassDeclaration, Kind, Node, SourceFile, Symbol};
-use tsrs_checker::{Checker, ObjectFlags, SignatureKind, Type};
+use tsrs_checker::{Checker, ObjectFlags, Signature, SignatureKind, Type};
 use tsrs_core::P;
 
 use crate::{provenance, shape};
@@ -28,16 +28,9 @@ pub struct ServiceProvenance {
 #[derive(Default)]
 struct ServiceTagInspection {
     service_shapes: Vec<P<Type>>,
+    tag_symbols: FxHashSet<P<Symbol>>,
     wired_set: FxHashSet<P<Symbol>>,
     wired_list: Vec<P<Symbol>>,
-}
-
-impl ServiceTagInspection {
-    fn record_wired(&mut self, sym: P<Symbol>) {
-        if self.wired_set.insert(sym) {
-            self.wired_list.push(sym);
-        }
-    }
 }
 
 struct LayerUsageTracker {
@@ -55,40 +48,28 @@ fn callee_namespace_and_method(expr: P<Node>) -> Option<(&'static str, &'static 
             return Some((pa.expression().as_identifier().text(), pa.name().text()));
         }
     }
-    if ast::is_identifier(expr) {
-        return Some(("", expr.as_identifier().text()));
-    }
-    None
+    ast::is_identifier(expr).then(|| ("", expr.as_identifier().text()))
 }
 
 fn is_service_tag_call(node: P<Node>) -> bool {
     if !ast::is_call_expression(node) {
         return false;
     }
-    let call = node.as_call_expression();
-    if let Some((ns, method)) = callee_namespace_and_method(call.expression()) {
-        let is_factory = SERVICE_TAG_FACTORIES.contains(&method);
-        let is_ns = SERVICE_TAG_NAMESPACES.contains(&ns);
-        if is_factory && (ns.is_empty() || is_ns) {
-            return true;
-        }
+    let expr = node.as_call_expression().expression();
+    if let Some((ns, method)) = callee_namespace_and_method(expr)
+        && SERVICE_TAG_FACTORIES.contains(&method)
+        && (ns.is_empty() || SERVICE_TAG_NAMESPACES.contains(&ns))
+    {
+        return true;
     }
-    if ast::is_call_expression(call.expression()) {
-        return is_service_tag_call(call.expression());
-    }
-    false
+    ast::is_call_expression(expr) && is_service_tag_call(expr)
 }
 
 #[must_use]
 pub fn is_layer_construction_call(node: P<Node>) -> bool {
-    if !ast::is_call_expression(node) {
-        return false;
-    }
-    let Some((ns, method)) = callee_namespace_and_method(node.as_call_expression().expression())
-    else {
-        return false;
-    };
-    ns == "Layer" && LAYER_FACTORY_METHODS.contains(&method)
+    ast::is_call_expression(node)
+        && callee_namespace_and_method(node.as_call_expression().expression())
+            .is_some_and(|(ns, method)| ns == "Layer" && LAYER_FACTORY_METHODS.contains(&method))
 }
 
 fn extract_service_shape_type_from_tag_call(
@@ -99,19 +80,13 @@ fn extract_service_shape_type_from_tag_call(
         return None;
     }
     let type_args = call_node.type_arguments();
-    if !type_args.is_empty() {
-        let shape_node = if type_args.len() >= 2 {
-            type_args[1]
-        } else {
-            type_args[0]
-        };
+    if let Some(&shape_node) = type_args.get(1).or_else(|| type_args.first()) {
         return Some(checker.get_type_from_type_node_exported(shape_node));
     }
     let expr = call_node.as_call_expression().expression();
-    if ast::is_call_expression(expr) {
-        return extract_service_shape_type_from_tag_call(checker, expr);
-    }
-    None
+    ast::is_call_expression(expr)
+        .then(|| extract_service_shape_type_from_tag_call(checker, expr))
+        .flatten()
 }
 
 fn is_symbol_declared_in_source_file(sym: P<Symbol>, sf: P<SourceFile>) -> bool {
@@ -129,8 +104,9 @@ fn collect_referenced_local_symbols(
     if ast::is_identifier(current_node)
         && let Some(resolved) = provenance::symbol_at_node(checker, current_node)
         && is_symbol_declared_in_source_file(resolved, sf)
+        && inspection.wired_set.insert(resolved)
     {
-        inspection.record_wired(resolved);
+        inspection.wired_list.push(resolved);
     }
     current_node.for_each_child(&mut |child| {
         collect_referenced_local_symbols(checker, child, sf, inspection);
@@ -138,27 +114,59 @@ fn collect_referenced_local_symbols(
     });
 }
 
+fn inspect_service_config_object(
+    checker: &mut Checker,
+    obj: P<Node>,
+    sf: P<SourceFile>,
+    inspection: &mut ServiceTagInspection,
+) {
+    for &prop in obj.as_object_literal_expression().properties().nodes() {
+        if !prop
+            .name()
+            .and_then(crate::tsrs_kernel::property_name_text)
+            .is_some_and(|n| matches!(n, "effect" | "scoped" | "sync" | "succeed"))
+        {
+            continue;
+        }
+        let val = if ast::is_property_assignment(prop) {
+            prop.as_property_assignment().initializer()
+        } else {
+            prop
+        };
+        collect_referenced_local_symbols(checker, val, sf, inspection);
+        let val_type = checker.get_type_at_location(val);
+        let candidate_type = checker
+            .get_signatures_of_type(val_type, SignatureKind::Call)
+            .first()
+            .map_or(val_type, |&sig| checker.get_return_type_of_signature(sig));
+        inspection
+            .service_shapes
+            .push(extract_effect_success_type(checker, candidate_type).unwrap_or(candidate_type));
+    }
+}
+
 fn inspect_heritage_type_node(
     checker: &mut Checker,
     type_node: P<Node>,
     sf: P<SourceFile>,
     inspection: &mut ServiceTagInspection,
-) {
+) -> bool {
     if !ast::is_expression_with_type_arguments(type_node) {
-        return;
+        return false;
     }
     let expr = type_node.as_expression_with_type_arguments().expression();
     if !ast::is_call_expression(expr) || !is_service_tag_call(expr) {
-        return;
+        return false;
     }
     if let Some(shape_type) = extract_service_shape_type_from_tag_call(checker, expr) {
         inspection.service_shapes.push(shape_type);
     }
     for &arg in expr.as_call_expression().arguments().nodes() {
         if ast::is_object_literal_expression(arg) {
-            collect_referenced_local_symbols(checker, arg, sf, inspection);
+            inspect_service_config_object(checker, arg, sf, inspection);
         }
     }
+    true
 }
 
 fn inspect_class_service_tags(
@@ -170,12 +178,24 @@ fn inspect_class_service_tags(
     let Some(clauses) = cls.heritage_clauses() else {
         return;
     };
+    let mut is_tag = false;
     for &clause_node in clauses.nodes() {
-        let hc = clause_node.as_heritage_clause();
-        for &type_node in hc.types().nodes() {
-            inspect_heritage_type_node(checker, type_node, sf, inspection);
+        for &type_node in clause_node.as_heritage_clause().types().nodes() {
+            is_tag |= inspect_heritage_type_node(checker, type_node, sf, inspection);
         }
     }
+    if is_tag
+        && let Some(name) = cls.name()
+        && let Some(sym) = provenance::symbol_at_node(checker, name)
+    {
+        inspection.tag_symbols.insert(sym);
+    }
+}
+
+fn service_shape_from_wiring_tag(checker: &mut Checker, service_tag: P<Node>) -> Option<P<Type>> {
+    let tag_type = checker.get_type_at_location(service_tag);
+    let prop = checker.get_property_of_type(tag_type, "Service")?;
+    checker.get_type_of_symbol_at_location(prop, Some(service_tag))
 }
 
 fn inspect_layer_call_arguments(
@@ -187,6 +207,14 @@ fn inspect_layer_call_arguments(
     let args = call_node.as_call_expression().arguments().nodes();
     if args.is_empty() {
         return;
+    }
+    if args.len() >= 2 {
+        if let Some(sym) = provenance::symbol_at_node(checker, args[0]) {
+            inspection.tag_symbols.insert(sym);
+        }
+        if let Some(shape_type) = service_shape_from_wiring_tag(checker, args[0]) {
+            inspection.service_shapes.push(shape_type);
+        }
     }
     let provider_args = if args.len() >= 2 { &args[1..] } else { args };
     for &arg in provider_args {
@@ -208,9 +236,13 @@ fn visit_service_tag_node(
             let vd = node.as_variable_declaration();
             if let Some(init) = vd.initializer()
                 && is_service_tag_call(init)
-                && let Some(shape_type) = extract_service_shape_type_from_tag_call(checker, init)
             {
-                inspection.service_shapes.push(shape_type);
+                if let Some(sym) = provenance::symbol_at_node(checker, vd.name()) {
+                    inspection.tag_symbols.insert(sym);
+                }
+                if let Some(shape_type) = extract_service_shape_type_from_tag_call(checker, init) {
+                    inspection.service_shapes.push(shape_type);
+                }
             }
         }
         Kind::CallExpression if is_layer_construction_call(node) => {
@@ -310,6 +342,57 @@ fn is_service_tag_or_layer_declaration(decl: P<Node>) -> bool {
     false
 }
 
+fn consumes_service_tag(
+    checker: &mut Checker,
+    node: P<Node>,
+    tag_symbols: &FxHashSet<P<Symbol>>,
+) -> bool {
+    if ast::is_identifier(node)
+        && provenance::symbol_at_node(checker, node).is_some_and(|s| tag_symbols.contains(&s))
+    {
+        let is_of = node.parent().is_some_and(|p| {
+            ast::is_property_access_expression(p)
+                && p.as_property_access_expression().expression() == node
+                && p.as_property_access_expression().name().text() == "of"
+        });
+        if !is_of {
+            return true;
+        }
+    }
+    let mut found = false;
+    node.for_each_child(&mut |child| {
+        if !found && consumes_service_tag(checker, child, tag_symbols) {
+            found = true;
+        }
+        false
+    });
+    found
+}
+
+fn matches_service_shape(
+    checker: &mut Checker,
+    candidate: P<Type>,
+    service_shape: P<Type>,
+) -> bool {
+    !checker.get_properties_of_type(candidate).is_empty()
+        && !checker.get_properties_of_type(service_shape).is_empty()
+        && (shape::same_type(checker, candidate, service_shape)
+            || checker.is_type_assignable_to(candidate, service_shape))
+}
+
+fn signature_takes_shape(
+    checker: &mut Checker,
+    sig: P<Signature>,
+    decl: P<Node>,
+    service_shape: P<Type>,
+) -> bool {
+    sig.parameters().iter().any(|&p| {
+        checker
+            .get_type_of_symbol_at_location(p, Some(decl))
+            .is_some_and(|pt| matches_service_shape(checker, pt, service_shape))
+    })
+}
+
 fn is_service_constructor_candidate(
     checker: &mut Checker,
     sf: P<SourceFile>,
@@ -322,30 +405,25 @@ fn is_service_constructor_candidate(
     else {
         return false;
     };
-    if ast::get_source_file_of_node(decl) != Some(sf) || is_service_tag_or_layer_declaration(decl) {
+    if ast::get_source_file_of_node(decl) != Some(sf)
+        || is_service_tag_or_layer_declaration(decl)
+        || (!inspection.wired_set.contains(&candidate_symbol)
+            && consumes_service_tag(checker, decl, &inspection.tag_symbols))
+    {
         return false;
     }
     let Some(symbol_type) = checker.get_type_of_symbol_at_location(candidate_symbol, Some(decl))
     else {
         return false;
     };
-    let call_signatures = checker.get_signatures_of_type(symbol_type, SignatureKind::Call);
-    if call_signatures.is_empty() {
-        return false;
-    }
-    if inspection.wired_set.contains(&candidate_symbol) {
-        return true;
-    }
-    for &sig in call_signatures {
+    for &sig in checker.get_signatures_of_type(symbol_type, SignatureKind::Call) {
         let return_type = checker.get_return_type_of_signature(sig);
         let unwrapped = extract_effect_success_type(checker, return_type).unwrap_or(return_type);
-        if checker.get_properties_of_type(unwrapped).is_empty() {
-            continue;
-        }
-        for &service_shape in &inspection.service_shapes {
-            if shape::same_type(checker, unwrapped, service_shape) {
-                return true;
-            }
+        if inspection.service_shapes.iter().any(|&s| {
+            !signature_takes_shape(checker, sig, decl, s)
+                && matches_service_shape(checker, unwrapped, s)
+        }) {
+            return true;
         }
     }
     false
@@ -363,20 +441,15 @@ pub fn service_contract_provenance(
     if !provenance_result.has_service_contract {
         return provenance_result;
     }
-    let mut seen_candidates = FxHashSet::default();
-    let mut candidate_list = Vec::new();
-    for &sym in &inspection.wired_list {
-        if seen_candidates.insert(sym) {
-            candidate_list.push(sym);
-        }
-    }
-    for exp in collect_module_export_symbols(checker, module_symbol) {
-        if seen_candidates.insert(exp) {
-            candidate_list.push(exp);
-        }
-    }
-    for candidate in candidate_list {
-        if is_service_constructor_candidate(checker, sf, candidate, &inspection) {
+    for candidate in inspection
+        .wired_list
+        .iter()
+        .copied()
+        .chain(collect_module_export_symbols(checker, module_symbol))
+    {
+        if !provenance_result.constructor_symbols.contains(&candidate)
+            && is_service_constructor_candidate(checker, sf, candidate, &inspection)
+        {
             provenance_result.constructor_symbols.insert(candidate);
         }
     }

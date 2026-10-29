@@ -153,6 +153,7 @@ fn has_script_subpath(subpath: &str) -> bool {
 fn module_resolves(
     ctx: &mut Ctx,
     file_path: &Path,
+    resolver: &ts_resolver::TsDeclarationResolver,
     specifier_node: P<Node>,
     specifier_text: &str,
     is_require_call: bool,
@@ -167,71 +168,10 @@ fn module_resolves(
     let Some(containing_dir) = file_path.parent() else {
         return false;
     };
-    let tsconfig = ts_resolver::TsDeclarationResolver::discover_governing_tsconfig(file_path);
-    let resolver = ts_resolver::TsDeclarationResolver::new(tsconfig);
     let mode = ts_resolver::TsDeclarationResolver::mode_for_file(file_path, is_require_call);
     resolver
         .resolve_declaration(containing_dir, specifier_text, mode)
         .is_some()
-}
-
-fn check_node(ctx: &mut Ctx, node: P<Node>) {
-    let Some((specifier_node, is_require_call)) = extract_module_specifier(node) else {
-        return;
-    };
-    let specifier_text = specifier_node.text();
-    let Some(imported) = ts_resolver::bare_package_name(specifier_text) else {
-        return;
-    };
-    let file_name = ctx.file.file_name().to_owned();
-    let file_path = Path::new(&file_name);
-    let resolution = match load_dependency_resolution(file_path) {
-        Ok(Some(resolution)) => resolution,
-        Ok(None) => return,
-        Err(error) => {
-            ctx.report_node(
-                specifier_node,
-                RuleMessage::new("invalidPackageJson", error.to_string()),
-            );
-            return;
-        }
-    };
-    if let Some(pkg_name) = resolution.missing_by_name.get(&imported) {
-        ctx.report_node(
-            specifier_node,
-            RuleMessage::new(
-                "uninstalledImport",
-                format!(
-                    "{pkg_name} is declared in package.json but not installed, so its exported types are not compared with first-party types."
-                ),
-            ),
-        );
-        return;
-    }
-    let Some(pkg_name) = resolution.installed_by_name.get(&imported) else {
-        return;
-    };
-    let subpath = &specifier_text[imported.len()..];
-    if !has_script_subpath(subpath)
-        || module_resolves(
-            ctx,
-            file_path,
-            specifier_node,
-            specifier_text,
-            is_require_call,
-        )
-    {
-        return;
-    }
-    ctx.report_node(
-        specifier_node,
-        RuleMessage::new(
-            "unresolvedImport",
-            format!(
-                "{pkg_name} is installed but '{specifier_text}' does not resolve to type declarations, so its exported types are not compared with first-party types."
-            ),
-        ),
-    );
 }
 
 pub struct NoUnresolvedDependencyTypes {
@@ -270,11 +210,27 @@ impl Rule for NoUnresolvedDependencyTypes {
         if !self.scope.in_scope(ctx) {
             return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
         }
-        Box::new(Visitor)
+        let file_path = PathBuf::from(ctx.file.file_name());
+        let resolution = match load_dependency_resolution(&file_path) {
+            Ok(Some(res)) => Ok(res),
+            Ok(None) => return Box::new(antidrift_kernel::rule_scope::EmptyVisitor),
+            Err(err) => Err(err.to_string()),
+        };
+        let tsconfig = ts_resolver::TsDeclarationResolver::discover_governing_tsconfig(&file_path);
+        let resolver = ts_resolver::TsDeclarationResolver::new(tsconfig);
+        Box::new(Visitor {
+            file_path,
+            resolution,
+            resolver,
+        })
     }
 }
 
-struct Visitor;
+struct Visitor {
+    file_path: PathBuf,
+    resolution: Result<DependencyResolution, String>,
+    resolver: ts_resolver::TsDeclarationResolver,
+}
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
@@ -282,6 +238,59 @@ impl RuleVisitor for Visitor {
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        check_node(ctx, node);
+        let Some((specifier_node, is_require_call)) = extract_module_specifier(node) else {
+            return;
+        };
+        let specifier_text = specifier_node.text();
+        let Some(imported) = ts_resolver::bare_package_name(specifier_text) else {
+            return;
+        };
+        let resolution = match &self.resolution {
+            Ok(resolution) => resolution,
+            Err(error) => {
+                ctx.report_node(
+                    specifier_node,
+                    RuleMessage::new("invalidPackageJson", error.clone()),
+                );
+                return;
+            }
+        };
+        if let Some(pkg_name) = resolution.missing_by_name.get(&imported) {
+            ctx.report_node(
+                specifier_node,
+                RuleMessage::new(
+                    "uninstalledImport",
+                    format!(
+                        "{pkg_name} is declared in package.json but not installed, so its exported types are not compared with first-party types."
+                    ),
+                ),
+            );
+            return;
+        }
+        let Some(pkg_name) = resolution.installed_by_name.get(&imported) else {
+            return;
+        };
+        let subpath = &specifier_text[imported.len()..];
+        if !has_script_subpath(subpath)
+            || module_resolves(
+                ctx,
+                &self.file_path,
+                &self.resolver,
+                specifier_node,
+                specifier_text,
+                is_require_call,
+            )
+        {
+            return;
+        }
+        ctx.report_node(
+            specifier_node,
+            RuleMessage::new(
+                "unresolvedImport",
+                format!(
+                    "{pkg_name} is installed but '{specifier_text}' does not resolve to type declarations, so its exported types are not compared with first-party types."
+                ),
+            ),
+        );
     }
 }

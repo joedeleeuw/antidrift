@@ -1,5 +1,6 @@
 use antidrift_kernel::callgraph;
 use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::tsrs_kernel;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -47,7 +48,10 @@ impl Rule for NoPassThroughParameters {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let cwd = ctx.program.host().get_current_directory();
-        let enabled = self.scope.matches(ctx.file.file_name(), cwd);
+        let file_name = ctx.file.file_name();
+        let enabled = self.scope.matches(file_name, cwd)
+            && (self.scope.has_explicit_files()
+                || !tsrs_kernel::is_generated_file(file_name, ctx.file.text()));
         Box::new(Visitor { enabled })
     }
 }

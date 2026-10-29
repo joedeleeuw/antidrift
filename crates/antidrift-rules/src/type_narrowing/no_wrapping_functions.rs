@@ -220,15 +220,10 @@ fn classify_wrapper(
         return WrapperVerdict::AddedSemantics;
     }
     let total_refs = audit.non_test_refs + audit.test_refs;
-    let calls = audit.call_count.min(total_refs);
-    if calls == 0 {
-        if exported {
-            WrapperVerdict::AddedSemantics
-        } else {
-            WrapperVerdict::UnusedHop
-        }
-    } else {
-        WrapperVerdict::Hop(calls)
+    match (audit.call_count.min(total_refs), exported) {
+        (0, true) => WrapperVerdict::AddedSemantics,
+        (0, false) => WrapperVerdict::UnusedHop,
+        (calls, _) => WrapperVerdict::Hop(calls),
     }
 }
 
@@ -493,7 +488,10 @@ impl Rule for NoWrappingFunctions {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let cwd = ctx.program.host().get_current_directory();
-        let enabled = self.scope.matches(ctx.file.file_name(), cwd);
+        let file_name = ctx.file.file_name();
+        let enabled = self.scope.matches(file_name, cwd)
+            && (self.scope.has_explicit_files()
+                || !tsrs_kernel::is_generated_file(file_name, ctx.file.text()));
         Box::new(Visitor { enabled })
     }
 }

@@ -118,7 +118,14 @@ fn append_default_rules(
     registries: &PolicyRegistries,
 ) -> Result<(), String> {
     if let Some(authz_calls) = registries.required_calls.get("authorization") {
-        let opts = json!([{ "authzFunctions": authz_calls }]);
+        let opts = if registries.server_boundary_globs.is_empty() {
+            json!([{ "authzFunctions": authz_calls }])
+        } else {
+            json!([{
+                "authzFunctions": authz_calls,
+                "files": registries.server_boundary_globs,
+            }])
+        };
         if let Some(rule) =
             resolve_cached_rule(rule_cache, "antidrift/require-authz-check", Some(&opts))?
         {

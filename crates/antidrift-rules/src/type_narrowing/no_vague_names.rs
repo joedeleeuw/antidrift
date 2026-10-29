@@ -77,7 +77,22 @@ const FILLER_PREFIXES: &[&str] = &["my", "the", "some", "temp", "tmp"];
 
 fn is_exempt_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
-    if lower == "formdata" || lower == "imagedata" {
+    if matches!(
+        lower.as_str(),
+        "formdata"
+            | "imagedata"
+            | "defaultvalue"
+            | "initialvalue"
+            | "tovalue"
+            | "fromvalue"
+            | "currentvalue"
+            | "previousvalue"
+            | "prevvalue"
+            | "nextvalue"
+            | "returnvalue"
+            | "modelvalue"
+            | "rawvalue"
+    ) {
         return true;
     }
     ["temp_", "temp", "tmp_", "tmp"].iter().any(|prefix| {
@@ -287,7 +302,16 @@ fn check_binding_node(ctx: &mut Ctx, node: Option<P<Node>>) {
     };
     match curr.kind() {
         Kind::Identifier => check_ident(ctx, Some(curr)),
-        Kind::Parameter | Kind::BindingElement => check_binding_node(ctx, curr.name()),
+        Kind::Parameter => check_binding_node(ctx, curr.name()),
+        Kind::BindingElement => {
+            let is_object_shorthand = curr
+                .parent()
+                .is_some_and(|p| p.kind() == Kind::ObjectBindingPattern)
+                && curr.as_binding_element().property_name().is_none();
+            if !is_object_shorthand {
+                check_binding_node(ctx, curr.name());
+            }
+        }
         Kind::ObjectBindingPattern | Kind::ArrayBindingPattern => {
             for &elem in curr.as_binding_pattern().elements().nodes() {
                 check_binding_node(ctx, Some(elem));

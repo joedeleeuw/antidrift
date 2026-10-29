@@ -408,13 +408,18 @@ const headlessProbes = [
     expectedCount: 1,
   },
   {
-    name: "no-vague-names (import alias filler suffix & type declaration filler suffix)",
+    name: "no-vague-names (import alias, type suffix, and rename report while shorthand destructuring and value-role compounds stay clean)",
     rule: "antidrift/no-vague-names",
     source: `
       import { type PlanViewRow as PlanViewRowType, User as UserIcon } from "./nonexistent-module-for-probe.js";
       export type AccountData = { id: string; row?: PlanViewRowType; icon?: typeof UserIcon };
+      export function animate({ data, toValue, initialValue }: { data: number; toValue: number; initialValue: number }) {
+        const defaultValue = toValue + initialValue + data;
+        const { prop: item } = { prop: defaultValue };
+        return item;
+      }
     `,
-    expectedCount: 2,
+    expectedCount: 3,
   },
   {
     name: "no-unformatted-number (checker-typed number outside NUMERIC_WORDS)",
@@ -527,14 +532,20 @@ const headlessProbes = [
     expectedCount: 0,
   },
   {
-    name: "no-sql-string-concat (English prose with update and set stays clean)",
+    name: "no-sql-string-concat (external SQL tag provenance stays clean while .unsafe() and local lookalikes report)",
     rule: "antidrift/no-sql-string-concat",
     source: `
-      export function describeAction(name: string) {
+      import * as SqlClient from "effect/sql/SqlClient";
+      export function* describeAction(name: string) {
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql\`SELECT id FROM users WHERE id = \${name}\`;
+        yield* sql\`SELECT id FROM users WHERE \${sql.unsafe(name)}\`;
+        const localSql = (s: TemplateStringsArray, ...v: unknown[]) => "";
+        localSql\`SELECT id FROM users WHERE id = \${name}\`;
         return "Please update your profile before you set " + name;
       }
     `,
-    expectedCount: 0,
+    expectedCount: 2,
   },
   {
     name: "require-query-key-factory (QueryClient getQueryData, prefetchQuery, and SWR mutate reported)",
@@ -1126,12 +1137,26 @@ const headlessProbes = [
     expectedCount: 1,
   },
   {
-    name: "no-structural-type-fork (all-fields redundantOwnerPrefix reported while sibling-disambiguated fields stay clean)",
+    name: "no-structural-type-fork (all-fields redundantOwnerPrefix reported while sibling-disambiguated fields and derived ReturnType aliases stay clean)",
     rule: "antidrift/no-structural-type-fork",
     file: "tooling/antidrift/src/__probe_redundant_owner_prefix.ts",
     source: `
       export interface ProjectDescriptor { projectId: string; projectKey: string; projectDisplayName: string; }
       export interface BusinessInfo { businessZipCode: string; personalZipCode: string; ownerName: string; }
+      export type DerivedBusinessResult = Awaited<ReturnType<() => Promise<BusinessInfo>>>;
+    `,
+    expectedCount: 1,
+  },
+  {
+    name: "no-service-constructor-imports (flags imported service constructor while helper and tag-consuming accessor stay clean)",
+    rule: "antidrift/no-service-constructor-imports",
+    file: "tooling/antidrift/src/__probe_service_consumer.ts",
+    source: `
+      import { makeUsersRepo, parseUserId, requireUsersScope, refineUsersScope } from "./__probe_helpers.js";
+      export function runHandler(raw: string) {
+        const repo = makeUsersRepo();
+        return { repo, id: parseUserId(raw), req: requireUsersScope, ref: refineUsersScope };
+      }
     `,
     expectedCount: 1,
   },
@@ -1139,12 +1164,19 @@ const headlessProbes = [
 
 const sharedHelperFiles = {
   [resolve(repoRoot, "tooling/antidrift/src/__probe_helpers.ts")]: `
-    export function relativeAge(updatedAt: number, now = Date.now()): number {
-      return now - updatedAt;
-    }
-    export function formatNow(): number {
-      return Date.now();
-    }
+    declare const Context: {
+      Tag: (id: string) => <Self, Shape>() => { new (): Self; of: (s: Shape) => Shape; pipe: (...fns: unknown[]) => unknown };
+    };
+    declare const Layer: { succeed: <T, S>(tag: T, s: S) => unknown };
+    export interface UsersRepoShape { findById(id: string): string; count(): number }
+    export class UsersRepo extends Context.Tag("UsersRepo")<UsersRepo, UsersRepoShape>() {}
+    export const parseUserId = (raw: string): string => raw.trim();
+    export const makeUsersRepo = (): UsersRepoShape => ({ findById: (id) => parseUserId(id), count: () => 1 });
+    export const requireUsersScope = (): UsersRepoShape => { void UsersRepo.pipe(); return { findById: (id) => id, count: () => 0 }; };
+    export const refineUsersScope = (scope: UsersRepoShape): UsersRepoShape => scope;
+    export const UsersRepoLive = Layer.succeed(UsersRepo, makeUsersRepo());
+    export function relativeAge(updatedAt: number, now = Date.now()): number { return now - updatedAt; }
+    export function formatNow(): number { return Date.now(); }
   `,
   [resolve(repoRoot, "tooling/antidrift/src/__probe_seam_fakes.mock.ts")]: `
     import type { Ticker } from "./__probe_seam_multi.js";
@@ -1332,19 +1364,7 @@ try {
   mkdirSync(kernelSrc, { recursive: true });
   writeFileSync(
     join(tempWorkspace, "crates/antidrift-kernel/Cargo.toml"),
-    [
-      "[package]",
-      'name = "antidrift-kernel"',
-      'version = "0.20.0"',
-      "",
-      "[lib]",
-      'path = "src/lib.rs"',
-      "test = false",
-      "",
-      "[lints]",
-      "workspace = true",
-      "",
-    ].join("\n")
+    '[package]\nname = "antidrift-kernel"\nversion = "0.20.0"\n\n[lib]\npath = "src/lib.rs"\ntest = false\n\n[lints]\nworkspace = true\n'
   );
   writeFileSync(
     join(kernelSrc, "lib.rs"),
@@ -1352,62 +1372,38 @@ try {
   );
   writeFileSync(
     join(kernelSrc, "boundary.rs"),
-    [
-      "pub struct BoundaryItem;",
-      "pub struct WindowBounds { pub x: i32, pub y: i32, pub width: u32 }",
-      "",
-    ].join("\n")
+    "pub struct BoundaryItem;\npub struct WindowBounds { pub x: i32, pub y: i32, pub width: u32 }\n"
   );
   writeFileSync(
     join(kernelSrc, "provenance.rs"),
     [
-      "use crate::{",
-      "    boundary::BoundaryItem,",
-      "};",
+      "use crate::{ boundary::BoundaryItem };",
       "use serde::Deserialize;",
       "use std::collections::HashMap;",
       "// forbidden inline comment",
       "pub struct FrameBounds { pub x: i32, pub y: i32, pub width: u32 }",
       "#[derive(Deserialize)]",
-      "pub struct LooseConfig {",
-      "    pub kind: String,",
-      "    pub exclude_files: Vec<String>,",
-      "    pub seen: HashMap<String, bool>,",
-      "    pub item: Option<BoundaryItem>,",
-      "}",
-      "pub fn decode_rule_options(name: &str) -> Result<usize, String> {",
-      "    Ok(name.len())",
-      "}",
+      "pub struct LooseConfig { pub kind: String, pub exclude_files: Vec<String>, pub seen: HashMap<String, bool>, pub item: Option<BoundaryItem> }",
+      "pub fn decode_rule_options(name: &str) -> Result<usize, String> { Ok(name.len()) }",
       "pub fn legacy_adapter(input: &str) -> Result<usize, String> {",
       "    decode_rule_options(input)?;",
       '    input.parse::<usize>().map_err(|_| "parse failed".to_string())',
       "}",
-      "pub fn hop_wrapper(input: &str) -> Result<usize, String> {",
-      "    let _ = input;",
-      "    legacy_adapter(input)",
-      "}",
+      "pub fn hop_wrapper(input: &str) -> Result<usize, String> { let _ = input; legacy_adapter(input) }",
       "pub struct Holder { pub ident: String }",
       "pub struct ProjectMeta { pub project_id: String, pub project_key: String }",
       "pub struct StatusEnvelope { pub ok: bool, pub count: usize }",
-      "pub fn make_envelope_a(n: usize) -> StatusEnvelope {",
-      "    StatusEnvelope { ok: true, count: n }",
-      "}",
-      "pub fn make_envelope_b(n: usize) -> StatusEnvelope {",
-      "    StatusEnvelope { ok: true, count: n + 1 }",
-      "}",
+      "pub fn make_envelope_a(n: usize) -> StatusEnvelope { StatusEnvelope { ok: true, count: n } }",
+      "pub fn make_envelope_b(n: usize) -> StatusEnvelope { StatusEnvelope { ok: true, count: n + 1 } }",
       "pub fn compare_ident(h: &Holder, val: &serde_json::Value) -> bool {",
       '    let _ = val["k"].as_str();',
       '    let _ = h.ident.to_string() == "foo";',
       '    if let Ok(text) = std::fs::read_to_string("foo.txt") { let _ = text.len(); }',
       "    let _ = h.ident.to_string().parse::<u32>();",
       "    let _ = serde_json::from_str::<LooseConfig>(&h.ident).ok();",
-      "    match legacy_adapter(&h.ident) {",
-      "        Ok(_) => true,",
-      "        Err(_) => false,",
-      "    }",
+      "    match legacy_adapter(&h.ident) { Ok(_) => true, Err(_) => false }",
       "}",
-      "#[cfg(all(test))]",
-      "mod inline_tests {}",
+      "#[cfg(all(test))]\nmod inline_tests {}",
       "",
     ].join("\n")
   );
@@ -1417,29 +1413,11 @@ try {
   mkdirSync(rulesSrc, { recursive: true });
   writeFileSync(
     join(tempWorkspace, "crates/antidrift-rules/Cargo.toml"),
-    [
-      "[package]",
-      'name = "antidrift-rules"',
-      'version = "0.20.0"',
-      "",
-      "[lib]",
-      'path = "src/lib.rs"',
-      "test = false",
-      "doctest = false",
-      "",
-      "[lints]",
-      "workspace = true",
-      "",
-    ].join("\n")
+    '[package]\nname = "antidrift-rules"\nversion = "0.20.0"\n\n[lib]\npath = "src/lib.rs"\ntest = false\ndoctest = false\n\n[lints]\nworkspace = true\n'
   );
   writeFileSync(
     join(rulesSrc, "lib.rs"),
-    [
-      "pub struct ScopelessRule;",
-      "pub trait Rule {}",
-      "impl Rule for ScopelessRule {}",
-      "",
-    ].join("\n")
+    "pub struct ScopelessRule;\npub trait Rule {}\nimpl Rule for ScopelessRule {}\n"
   );
 
   const rustSubcmd = spawnSync(binaryPath, ["rust", "--json", tempWorkspace], {
