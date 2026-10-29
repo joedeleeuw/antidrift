@@ -15,7 +15,6 @@ const governance = createGovernanceOxlintConfig({
 });
 const tooling = createToolingConfig({
   repoRoot: import.meta.dirname,
-  enforceNoDerivedStateEffects: true,
 });
 const nativePlugins = ["eslint", "import", "oxc", "react", "unicorn"] as const;
 const toolingBaseRules = Object.fromEntries(
@@ -75,6 +74,8 @@ export default defineConfig({
     ...governance.rules,
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
+    "react/no-deriving-state-in-effects": "error",
+    "react/purity": "error",
     "react/button-has-type": "error",
     "react/checked-requires-onchange-or-readonly": "error",
     "react/iframe-missing-sandbox": "error",

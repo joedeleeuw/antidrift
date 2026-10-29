@@ -1,7 +1,10 @@
 use crate::local_binding::{
     Binding, binding_for_declarator, collect_binding_references, is_write_reference,
 };
-use crate::tsrs_kernel::{is_function_like, node_range, unwrap_parentheses};
+use crate::tsrs_kernel::{
+    function_name, is_function_like, node_range, property_name_text, unwrap_expression,
+    unwrap_parentheses,
+};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -445,4 +448,65 @@ fn statement_returns_jsx(statement: P<Node>, locals: &FxHashSet<&'static str>) -
         }
         _ => false,
     }
+}
+
+#[must_use]
+pub fn is_hook_name(name: &str) -> bool {
+    name == "use"
+        || name.strip_prefix("use").is_some_and(|rest| {
+            rest.chars()
+                .next()
+                .is_some_and(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit())
+        })
+}
+
+#[must_use]
+pub fn is_pascal_case_name(name: &str) -> bool {
+    name.chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_uppercase())
+}
+
+fn is_react_hoc_call(call: P<Node>) -> bool {
+    let callee = unwrap_expression(call.as_call_expression().expression());
+    match callee.kind() {
+        Kind::Identifier => matches!(callee.as_identifier().text(), "memo" | "forwardRef"),
+        Kind::PropertyAccessExpression => {
+            let access = callee.as_property_access_expression();
+            ast::is_identifier(access.expression())
+                && access.expression().as_identifier().text() == "React"
+                && matches!(
+                    property_name_text(access.name()),
+                    Some("memo" | "forwardRef")
+                )
+        }
+        _ => false,
+    }
+}
+
+#[must_use]
+pub fn react_function_name(node: P<Node>) -> Option<&'static str> {
+    if let Some(name) = function_name(node) {
+        return Some(name);
+    }
+    let parent = node.parent()?;
+    if parent.kind() == Kind::CallExpression
+        && is_react_hoc_call(parent)
+        && let Some(grand) = parent.parent()
+        && grand.kind() == Kind::VariableDeclaration
+        && let Some(name_node) = grand.name()
+        && let Some(text) = property_name_text(name_node)
+    {
+        return Some(text);
+    }
+    if parent.kind() == Kind::ExportAssignment {
+        return Some("DefaultExportComponent");
+    }
+    None
+}
+
+#[must_use]
+pub fn is_component_or_hook_function(node: P<Node>) -> bool {
+    react_function_name(node).is_some_and(|name| is_pascal_case_name(name) || is_hook_name(name))
+        || expression_contains_jsx(node)
 }

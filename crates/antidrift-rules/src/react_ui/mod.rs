@@ -7,12 +7,16 @@ pub mod no_dialog_trigger_menu_item;
 pub mod no_disabled_tooltip_trigger;
 pub mod no_duplicated_conditional_classnames;
 pub mod no_handrolled_resource_lifecycle_cells;
+pub mod no_hookless_use_function;
+pub mod no_impure_render_call;
 pub mod no_inline_style_colors;
 pub mod no_omitted_prop_respread;
 pub mod no_physical_properties;
 pub mod no_portal_under_interactive_ancestor;
+pub mod no_query_envelope_leak;
 pub mod no_raw_foreground_opacity;
 pub mod no_unformatted_number;
+pub mod no_unstable_render_default_collection;
 pub mod require_detached_label_shape;
 pub mod require_dir_on_rendered_name;
 pub mod require_effect_deps;
@@ -28,12 +32,16 @@ use no_dialog_trigger_menu_item::NoDialogTriggerMenuItem;
 use no_disabled_tooltip_trigger::NoDisabledTooltipTrigger;
 use no_duplicated_conditional_classnames::NoDuplicatedConditionalClassnames;
 use no_handrolled_resource_lifecycle_cells::NoHandrolledResourceLifecycleCells;
+use no_hookless_use_function::NoHooklessUseFunction;
+use no_impure_render_call::NoImpureRenderCall;
 use no_inline_style_colors::NoInlineStyleColors;
 use no_omitted_prop_respread::NoOmittedPropRespread;
 use no_physical_properties::NoPhysicalProperties;
 use no_portal_under_interactive_ancestor::NoPortalUnderInteractiveAncestor;
+use no_query_envelope_leak::NoQueryEnvelopeLeak;
 use no_raw_foreground_opacity::NoRawForegroundOpacity;
 use no_unformatted_number::NoUnformattedNumber;
+use no_unstable_render_default_collection::NoUnstableRenderDefaultCollection;
 use require_detached_label_shape::RequireDetachedLabelShape;
 use require_dir_on_rendered_name::RequireDirOnRenderedName;
 use require_effect_deps::RequireEffectDeps;
@@ -53,12 +61,16 @@ pub fn rules() -> Vec<&'static dyn Rule> {
         &no_disabled_tooltip_trigger::DEFAULT_RULE,
         &no_duplicated_conditional_classnames::DEFAULT_RULE,
         &no_handrolled_resource_lifecycle_cells::DEFAULT_RULE,
+        &no_hookless_use_function::DEFAULT_RULE,
+        &no_impure_render_call::DEFAULT_RULE,
         &no_inline_style_colors::DEFAULT_RULE,
         &no_omitted_prop_respread::DEFAULT_RULE,
         &no_physical_properties::DEFAULT_RULE,
         &no_portal_under_interactive_ancestor::DEFAULT_RULE,
+        &no_query_envelope_leak::DEFAULT_RULE,
         &no_raw_foreground_opacity::DEFAULT_RULE,
         &no_unformatted_number::DEFAULT_RULE,
+        &no_unstable_render_default_collection::DEFAULT_RULE,
         &require_detached_label_shape::DEFAULT_RULE,
         &require_dir_on_rendered_name::DEFAULT_RULE,
         &require_effect_deps::DEFAULT_RULE,
@@ -91,14 +103,20 @@ pub fn create_rule(
         "no-handrolled-resource-lifecycle-cells" => {
             boxed(NoHandrolledResourceLifecycleCells::from_options(options))
         }
+        "no-hookless-use-function" => boxed(NoHooklessUseFunction::from_options(options)),
+        "no-impure-render-call" => boxed(NoImpureRenderCall::from_options(options)),
         "no-inline-style-colors" => boxed(NoInlineStyleColors::from_options(options)),
         "no-omitted-prop-respread" => boxed(NoOmittedPropRespread::from_options(options)),
         "no-physical-properties" => boxed(NoPhysicalProperties::from_options(options)),
         "no-portal-under-interactive-ancestor" => {
             boxed(NoPortalUnderInteractiveAncestor::from_options(options))
         }
+        "no-query-envelope-leak" => boxed(NoQueryEnvelopeLeak::from_options(options)),
         "no-raw-foreground-opacity" => boxed(NoRawForegroundOpacity::from_options(options)),
         "no-unformatted-number" => boxed(NoUnformattedNumber::from_options(options)),
+        "no-unstable-render-default-collection" => {
+            boxed(NoUnstableRenderDefaultCollection::from_options(options))
+        }
         "require-detached-label-shape" => boxed(RequireDetachedLabelShape::from_options(options)),
         "require-dir-on-rendered-name" => boxed(RequireDirOnRenderedName::from_options(options)),
         "require-effect-deps" => boxed(RequireEffectDeps::from_options(options)),

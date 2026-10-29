@@ -525,21 +525,211 @@ const headlessProbes = [
     `,
     expectedCount: 3,
   },
+  {
+    name: "require-stable-snapshot (local getSnapshot binding, unstable selector, and reactive primitive in render)",
+    rule: "antidrift/require-stable-snapshot",
+    file: "tooling/antidrift/src/__probe_snapshot_bad.tsx",
+    source: `
+      import { useSyncExternalStore } from "react";
+      declare function useStore<T>(store: unknown, selector: (s: { a: number }) => T, eq?: unknown): T;
+      declare class QueryClient {}
+      const getSnap = () => ({ val: 1 });
+      export function App({ subscribe, store }: { subscribe: () => () => void; store: unknown }) {
+        useSyncExternalStore(subscribe, getSnap);
+        useStore(store, (s) => ({ a: s.a }));
+        const client = new QueryClient();
+        return <div>{String(Boolean(client))}</div>;
+      }
+    `,
+    expectedCount: 3,
+  },
+  {
+    name: "require-stable-snapshot (equality comparator and Next.js async Server Component stay clean)",
+    rule: "antidrift/require-stable-snapshot",
+    file: "tooling/antidrift/src/__probe_snapshot_good.tsx",
+    source: `
+      declare function useStore<T>(store: unknown, selector: (s: { a: number }) => T, eq?: unknown): T;
+      declare const shallow: unknown;
+      declare class QueryClient { prefetchQuery(): Promise<void>; }
+      export function ClientView({ store }: { store: unknown }) {
+        const slice = useStore(store, (s) => ({ a: s.a }), shallow);
+        return <div>{slice.a}</div>;
+      }
+      export default async function ServerPage() {
+        const queryClient = new QueryClient();
+        await queryClient.prefetchQuery();
+        return <div />;
+      }
+    `,
+    expectedCount: 0,
+  },
+  {
+    name: "no-hookless-use-function (platform sibling .web.ts stub with .native.ts hook stays clean)",
+    rule: "antidrift/no-hookless-use-function",
+    file: "tooling/antidrift/src/__probe_use_platform.web.ts",
+    source: `
+      export function useNativeBiometrics() {
+        return;
+      }
+    `,
+    expectedCount: 0,
+  },
+  {
+    name: "no-unstable-render-default-collection (component default prop and hook inline fallback reported)",
+    rule: "antidrift/no-unstable-render-default-collection",
+    file: "tooling/antidrift/src/__probe_default_coll.tsx",
+    source: `
+      export function ModelList({ items = [], filter = new Map() }: { items?: string[]; filter?: Map<string, string> }) {
+        return <div>{items.length + filter.size}</div>;
+      }
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-query-envelope-leak (opaque helper argument and composite hook return reported)",
+    rule: "antidrift/no-query-envelope-leak",
+    file: "tooling/antidrift/src/__probe_query_leak_bad.tsx",
+    source: `
+      type UseQueryResult<T> = {
+        data: T | undefined;
+        error: Error | null;
+        status: "pending" | "error" | "success";
+        fetchStatus: "fetching" | "paused" | "idle";
+        isLoading: boolean;
+        isPending: boolean;
+        isSuccess: boolean;
+        isError: boolean;
+        refetch: () => Promise<unknown>;
+      };
+      declare function useQuery<T>(): UseQueryResult<T>;
+      function computeState(q: UseQueryResult<string[]>) {
+        return { items: q.data ?? [], ready: q.isSuccess };
+      }
+      export function useModels() {
+        const query = useQuery<string[]>();
+        return { query, items: query.data ?? [] };
+      }
+      export function ModelsView() {
+        const query = useQuery<string[]>();
+        const items = computeState(query);
+        return <div>{items.length}</div>;
+      }
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-query-envelope-leak (direct query return and unpacked fields stay clean)",
+    rule: "antidrift/no-query-envelope-leak",
+    file: "tooling/antidrift/src/__probe_query_leak_good.tsx",
+    source: `
+      type UseQueryResult<T> = {
+        data: T | undefined;
+        error: Error | null;
+        status: "pending" | "error" | "success";
+        fetchStatus: "fetching" | "paused" | "idle";
+        isLoading: boolean;
+        isPending: boolean;
+        isSuccess: boolean;
+        isError: boolean;
+        refetch: () => Promise<unknown>;
+      };
+      declare function useQuery<T>(): UseQueryResult<T>;
+      export function useDirectModels() {
+        const query = useQuery<string[]>();
+        return query;
+      }
+      export function useUnpackedModels() {
+        const query = useQuery<string[]>();
+        return { data: query.data, isLoading: query.isLoading };
+      }
+    `,
+    expectedCount: 0,
+  },
+  {
+    name: "no-impure-render-call (direct call, default param, cross-module omitted default, and 1-hop helper reported)",
+    rule: "antidrift/no-impure-render-call",
+    file: "tooling/antidrift/src/__probe_impure_bad.tsx",
+    source: `
+      import { formatNow, relativeAge } from "./__probe_helpers.js";
+      export function ClockView({ timestamp = Date.now(), updatedAt }: { timestamp?: number; updatedAt: number }) {
+        const direct = Math.random();
+        const age = relativeAge(updatedAt);
+        const formatted = formatNow();
+        return <div>{timestamp + direct + age + formatted}</div>;
+      }
+    `,
+    expectedCount: 4,
+  },
+  {
+    name: "no-impure-render-call (useState lazy init, explicit now arg, and async Next.js Server Component stay clean)",
+    rule: "antidrift/no-impure-render-call",
+    file: "tooling/antidrift/src/__probe_impure_good.tsx",
+    source: `
+      import { useState, useEffect } from "react";
+      import { relativeAge } from "./__probe_helpers.js";
+      export function CleanClockView({ updatedAt, currentNow }: { updatedAt: number; currentNow: number }) {
+        const [mountedAt] = useState(() => Date.now());
+        useEffect(() => {
+          const tick = Date.now();
+          void tick;
+        }, []);
+        const age = relativeAge(updatedAt, currentNow);
+        return <button onClick={() => console.log(Date.now())}>{mountedAt + age}</button>;
+      }
+      export default async function NextServerPage() {
+        const requestStartedAt = Date.now();
+        const requestId = crypto.randomUUID();
+        return <div>{requestStartedAt}:{requestId}</div>;
+      }
+    `,
+    expectedCount: 0,
+  },
 ];
 
-for (const probe of headlessProbes) {
-  const diags = runHeadlessProbe({
-    version: 2,
-    configs: [
-      {
-        file_paths: [probeFileA],
-        rules: [{ name: probe.rule }],
-      },
-    ],
-    source_overrides: {
-      [probeFileA]: probe.source,
-    },
+const sharedHelperFiles = {
+  [resolve(repoRoot, "tooling/antidrift/src/__probe_helpers.ts")]: `
+    export function relativeAge(updatedAt: number, now = Date.now()): number {
+      return now - updatedAt;
+    }
+    export function formatNow(): number {
+      return Date.now();
+    }
+  `,
+  [resolve(repoRoot, "tooling/antidrift/src/__probe_use_platform.native.ts")]: `
+    import { useState } from "react";
+    export function useNativeBiometrics() {
+      const [supported] = useState(true);
+      return { supported };
+    }
+  `,
+};
+
+const combinedConfigs = Object.keys(sharedHelperFiles).map((filePath) => ({
+  file_paths: [filePath],
+  rules: [],
+}));
+const combinedOverrides = { ...sharedHelperFiles };
+const probeFiles = headlessProbes.map((probe, idx) => {
+  const filePath = probe.file
+    ? resolve(repoRoot, probe.file)
+    : resolve(repoRoot, `tooling/antidrift/src/__probe_case_${idx}.ts`);
+  combinedConfigs.push({
+    file_paths: [filePath],
+    rules: [{ name: probe.rule }],
   });
+  combinedOverrides[filePath] = probe.source;
+  return filePath;
+});
+
+const allProbeDiags = runHeadlessProbe({
+  version: 2,
+  configs: combinedConfigs,
+  source_overrides: combinedOverrides,
+});
+
+for (const [idx, probe] of headlessProbes.entries()) {
+  const filePath = probeFiles[idx];
+  const diags = allProbeDiags.filter((diag) => diag.file_path === filePath);
   assert.equal(
     diags.length,
     probe.expectedCount,

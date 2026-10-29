@@ -286,7 +286,7 @@ export const portableCases = [
     invalid:
       'import { useSyncExternalStore } from "react"; useSyncExternalStore(subscribe, () => ({ value: store.value }));',
     valid:
-      'import { useSyncExternalStore } from "react"; useSyncExternalStore(subscribe, () => store.snapshot);',
+      'import { useSyncExternalStore, useState, useMemo } from "react"; useSyncExternalStore(subscribe, () => store.snapshot); function MyComponent() { const [ctx] = useState(() => createContext()); const client = useMemo(() => new QueryClient(), []); const dateStr = new Date().toLocaleString(); return null; }',
   },
   {
     name: "require-stream-reader-disposal",
@@ -330,5 +330,19 @@ export const portableCases = [
     name: "no-host-path-literal",
     invalid: 'const root = "/Users/alice/code/app";',
     valid: 'const root = "/var/tmp/app";',
+  },
+  {
+    name: "no-hookless-use-function",
+    invalid:
+      "export function useDocumentTitle(title: string) { document.title = title; }",
+    valid:
+      'import { useEffect } from "react"; export function useDocumentTitle(title: string) { useEffect(() => { document.title = title; }, [title]); } export const useArrowHook = () => { useEffect(() => {}, []); };',
+  },
+  {
+    name: "no-unstable-render-default-collection",
+    invalid:
+      'import { useState } from "react"; export function useModelDirectory(usable) { const [s] = useState(); return buildModelDirectory(usable?.service ?? []); }',
+    valid:
+      'import { useState } from "react"; const EMPTY = []; export function useModelDirectory(usable) { const [s] = useState(); function handleClick() { const x = usable?.service ?? []; } return <button onClick={() => { const y = usable?.service ?? []; }} />; }',
   },
 ];
