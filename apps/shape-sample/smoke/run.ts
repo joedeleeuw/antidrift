@@ -133,6 +133,30 @@ step(
   }
 );
 
+step("publication withholds other owners' patches", async () => {
+  const seed = await addTodo({ listId: "list_3", title: "ada seed" });
+  const patches = todosByList("list_3");
+  const first = await patches.next();
+  check(
+    !first.done &&
+      first.value.kind === "added" &&
+      first.value.todo.id === seed.id,
+    `snapshot missing ada's todo: ${JSON.stringify(first)}`
+  );
+  const pending = patches.next();
+  viewer = bob;
+  const hidden = await addTodo({ listId: "list_3", title: "bob private" });
+  await completeTodo(hidden.id);
+  viewer = ada;
+  const mine = await addTodo({ listId: "list_3", title: "ada second" });
+  const next = await pending;
+  check(
+    !next.done && next.value.kind === "added" && next.value.todo.id === mine.id,
+    `ada received another owner's patch: ${JSON.stringify(next)}`
+  );
+  await patches.return(undefined);
+});
+
 step(
   "client view model renders the optimistic patch, then the server's",
   async () => {

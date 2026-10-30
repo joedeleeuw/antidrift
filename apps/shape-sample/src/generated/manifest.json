@@ -58,7 +58,9 @@
           }
         }
       ],
-      "injected": ["session"],
+      "injected": [
+        "session"
+      ],
       "result": {
         "kind": "object",
         "fields": [
@@ -174,7 +176,9 @@
           }
         }
       ],
-      "injected": ["session"],
+      "injected": [
+        "session"
+      ],
       "result": {
         "kind": "object",
         "fields": [
@@ -292,7 +296,10 @@
           }
         }
       ],
-      "injected": ["session", "abortSignal"],
+      "injected": [
+        "session",
+        "abortSignal"
+      ],
       "yields": {
         "kind": "union",
         "variants": [
@@ -481,7 +488,9 @@
     {
       "pattern": "/todos/[id]",
       "file": "routes/todos/[id]/route.ts",
-      "verbs": ["GET"]
+      "verbs": [
+        "GET"
+      ]
     }
   ]
 }

@@ -1408,9 +1408,10 @@ assert.deepEqual(sampleSmoke.stdout.trim().split("\n"), [
   "ok   malformed wire input fails at the boundary and names the field",
   "ok   completeTodo enforces ownership through the injected session",
   "ok   publication streams typed patches and stops when the client stops",
+  "ok   publication withholds other owners' patches",
   "ok   client view model renders the optimistic patch, then the server's",
   "ok   route GET /todos/[id] serves JSON and refuses other owners",
-  "6/6 steps passed",
+  "7/7 steps passed",
 ]);
 
 console.log(
