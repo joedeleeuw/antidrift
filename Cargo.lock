@@ -74,7 +74,6 @@ dependencies = [
  "napi",
  "napi-build",
  "napi-derive",
- "rustc-hash",
 ]
 
 [[package]]

@@ -89,7 +89,7 @@ pub(crate) fn run_derive(args: &[String]) -> Result<i32, String> {
         .collect();
     let cwd_norm = tspath::normalize_slashes(&cwd.to_string_lossy());
     let fs: Arc<dyn FS> = Arc::new(bundled::wrap_fs(cachedvfs::from(Arc::new(osvfs::fs()))));
-    let env = ProgramBuilderEnv::new(fs, &cwd_norm);
+    let mut env = ProgramBuilderEnv::new(fs, &cwd_norm);
     let (programs, unmatched) = env.group_files_by_tsconfig(&normalized);
     if !unmatched.is_empty() {
         return Err(format!(
@@ -100,7 +100,7 @@ pub(crate) fn run_derive(args: &[String]) -> Result<i32, String> {
     let mut report = DeriveReport::default();
     for (config_file_name, config_files) in &programs {
         let bound = env
-            .run_configured_program(config_file_name, config_files, true)
+            .configured_program(config_file_name, config_files, true)
             .map_err(|diags| {
                 let messages: Vec<String> = diags
                     .into_iter()

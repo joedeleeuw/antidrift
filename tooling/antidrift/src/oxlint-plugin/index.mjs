@@ -3,6 +3,7 @@ import { loadNativeAddon } from "../policy/oxlint.mjs";
 const RULE_PREFIX = "antidrift/";
 
 const addon = loadNativeAddon();
+process.env.ANTIDRIFT_ENGINE = addon.engineEndpoint();
 
 const currentFile = { filename: "", findings: [] };
 

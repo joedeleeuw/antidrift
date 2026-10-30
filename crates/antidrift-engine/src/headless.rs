@@ -1,25 +1,19 @@
-use std::collections::BTreeMap;
+use std::env::VarError;
 use std::io::{Read, Write};
 
-use antidrift_kernel::directives::is_inline_disabled;
-use antidrift_kernel::registries::PolicyRegistries;
-use antidrift_rules::{create_rule, default_rules, is_typescript_only_rule, lookup_default_rule};
 use rustc_hash::FxHashMap;
-use serde_json::json;
-use tsrs_ast::SourceFile;
-use tsrs_compiler::Program;
-use tsrs_core::P;
+use serde::{Deserialize, Serialize};
 use tsrs_core::tspath;
-use tsrslint::linter::{Options, lint_files};
+use tsrslint::linter::Options;
 use tsrslint::protocol::{
     self, Diagnostic, MessageType, Payload, deserialize_payload, write_error_message, write_message,
 };
-use tsrslint::rule::{ReportedDiagnostic, Rule};
-use tsrslint::rules;
 
 use crate::headless_host::{
     ProgramBuilderEnv, base_fs, collect_missing_bound_files, filter_suppressed_diagnostics,
 };
+use crate::relay;
+use crate::rule_plan::{build_config_rule_plan, lint_program_files};
 
 fn apply_debug_flag(raw: &str, opts: &mut Options) -> Result<(), String> {
     for part in raw.split(',') {
@@ -71,306 +65,249 @@ fn parse_headless_flags(args: &[String]) -> Result<Options, String> {
     Ok(opts)
 }
 
-fn has_non_empty_options(options: Option<&serde_json::Value>) -> bool {
-    match options {
-        None | Some(serde_json::Value::Null) => false,
-        Some(serde_json::Value::Array(items)) => {
-            items.first().is_some_and(|first| !first.is_null())
-        }
-        Some(_) => true,
-    }
+fn env_flag(name: &str, enabled: &str) -> bool {
+    std::env::var(name).is_ok_and(|value| value == enabled)
 }
 
-pub(crate) fn instantiate_rule(
-    name: &str,
-    options: Option<&serde_json::Value>,
-) -> Result<Option<&'static dyn Rule>, String> {
-    if !has_non_empty_options(options)
-        && let Some(default_rule) = lookup_default_rule(name)
-    {
-        return Ok(Some(default_rule));
-    }
-    if let Some(custom) = create_rule(name, options)? {
-        return Ok(Some(Box::leak(custom)));
-    }
-    let created = rules::create_rule(name, options)?;
-    Ok(Some(Box::leak(created)))
-}
-
-struct ConfigRulePlan {
-    rules_by_config: Vec<Vec<&'static dyn Rule>>,
-    file_to_config: FxHashMap<String, usize>,
-    inject_defaults: bool,
-}
-
-pub(crate) fn push_unique_rule(
-    config_rules: &mut Vec<&'static dyn Rule>,
-    candidate: &'static dyn Rule,
-) {
-    if !config_rules
+fn requested_files(payload: &Payload) -> Vec<String> {
+    payload
+        .configs
         .iter()
-        .any(|existing| existing.name() == candidate.name())
-    {
-        config_rules.push(candidate);
-    }
+        .flat_map(|config| &config.file_paths)
+        .map(|file_path| tspath::normalize_slashes(file_path))
+        .collect()
 }
 
-fn append_default_rules(
-    config_rules: &mut Vec<&'static dyn Rule>,
-    rule_cache: &mut FxHashMap<String, &'static dyn Rule>,
-    registries: &PolicyRegistries,
-) -> Result<(), String> {
-    if let Some(authz_calls) = registries.required_calls.get("authorization") {
-        let opts = if registries.server_boundary_globs.is_empty() {
-            json!([{ "authzFunctions": authz_calls }])
-        } else {
-            json!([{
-                "authzFunctions": authz_calls,
-                "files": registries.server_boundary_globs,
-            }])
+fn encode(diagnostics: &[Diagnostic]) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    for diag in diagnostics {
+        write_message(&mut bytes, MessageType::Diagnostic, diag)
+            .map_err(|err| format!("error writing diagnostic: {err}"))?;
+    }
+    Ok(bytes)
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct HeadlessRequest {
+    pub(crate) cwd: String,
+    args: Vec<String>,
+    payload: String,
+    inject_defaults: bool,
+    suppress_program_diagnostics: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Leftovers {
+    grouped: Vec<String>,
+    inferred: Vec<String>,
+}
+
+pub(crate) enum RelayReply {
+    Served {
+        output: Vec<u8>,
+        leftovers: Leftovers,
+    },
+    Failure(String),
+}
+
+impl HeadlessRequest {
+    fn from_process(args: &[String]) -> Result<Self, String> {
+        let cwd = std::env::current_dir()
+            .map_err(|err| format!("error getting current directory: {err}"))?;
+        let mut payload = String::new();
+        std::io::stdin()
+            .read_to_string(&mut payload)
+            .map_err(|err| format!("error reading from stdin: {err}"))?;
+        Ok(Self {
+            cwd: tspath::normalize_path(&cwd.to_string_lossy()),
+            args: args.to_vec(),
+            payload,
+            inject_defaults: env_flag("ANTIDRIFT_TSGOLINT_DEFAULTS", "1")
+                && !env_flag("ANTIDRIFT_DISABLE_TYPED_RULES", "1"),
+            suppress_program_diagnostics: env_flag(
+                "OXLINT_TSGOLINT_DANGEROUSLY_SUPPRESS_PROGRAM_DIAGNOSTICS",
+                "true",
+            ),
+        })
+    }
+
+    fn parse(&self) -> Result<(Options, Payload), String> {
+        let opts = parse_headless_flags(&self.args)
+            .map_err(|err| format!("error parsing options: {err}"))?;
+        let payload = deserialize_payload(self.payload.as_bytes())
+            .map_err(|err| format!("error parsing config: {err}"))?;
+        Ok((opts, payload))
+    }
+
+    pub(crate) fn serve_cached(&self, shared: Option<&ProgramBuilderEnv>) -> RelayReply {
+        match self.cached_output(shared) {
+            Ok((output, leftovers)) => RelayReply::Served { output, leftovers },
+            Err(message) => RelayReply::Failure(message),
+        }
+    }
+
+    fn cached_output(
+        &self,
+        shared: Option<&ProgramBuilderEnv>,
+    ) -> Result<(Vec<u8>, Leftovers), String> {
+        let (opts, payload) = self.parse()?;
+        let files = requested_files(&payload);
+        let Some(env) = shared.filter(|_| {
+            payload
+                .source_overrides
+                .as_ref()
+                .is_none_or(FxHashMap::is_empty)
+        }) else {
+            return Ok((
+                Vec::new(),
+                Leftovers {
+                    grouped: files,
+                    inferred: Vec::new(),
+                },
+            ));
         };
-        if let Some(rule) =
-            resolve_cached_rule(rule_cache, "antidrift/require-authz-check", Some(&opts))?
-        {
-            push_unique_rule(config_rules, rule);
-        }
-    }
-    if !registries.statuses.is_empty() {
-        let opts = json!([{ "statuses": registries.statuses }]);
-        if let Some(rule) = resolve_cached_rule(
-            rule_cache,
-            "antidrift/no-redeclared-owned-union",
-            Some(&opts),
-        )? {
-            push_unique_rule(config_rules, rule);
-        }
-    }
-    for custom_rule in default_rules() {
-        push_unique_rule(config_rules, custom_rule);
-    }
-    Ok(())
-}
-
-pub(crate) fn default_workspace_rules(
-    registries: &PolicyRegistries,
-) -> Result<Vec<&'static dyn Rule>, String> {
-    let mut config_rules = Vec::new();
-    let mut rule_cache = FxHashMap::default();
-    append_default_rules(&mut config_rules, &mut rule_cache, registries)?;
-    Ok(config_rules)
-}
-
-pub(crate) fn resolve_cached_rule(
-    rule_cache: &mut FxHashMap<String, &'static dyn Rule>,
-    name: &str,
-    options: Option<&serde_json::Value>,
-) -> Result<Option<&'static dyn Rule>, String> {
-    let key = format!(
-        "{name}\u{0}{}",
-        options.map(ToString::to_string).unwrap_or_default()
-    );
-    if let Some(&cached) = rule_cache.get(&key) {
-        return Ok(Some(cached));
-    }
-    let Some(created) = instantiate_rule(name, options)? else {
-        return Ok(None);
-    };
-    rule_cache.insert(key, created);
-    Ok(Some(created))
-}
-
-fn build_config_rule_plan(payload: &Payload, cwd: &str) -> Result<ConfigRulePlan, String> {
-    let inject_defaults = std::env::var("ANTIDRIFT_TSGOLINT_DEFAULTS").is_ok_and(|val| val == "1")
-        && !std::env::var("ANTIDRIFT_DISABLE_TYPED_RULES").is_ok_and(|val| val == "1");
-    let registries = if inject_defaults {
-        PolicyRegistries::load_from_repo(std::path::Path::new(cwd))?
-    } else {
-        PolicyRegistries::default()
-    };
-    let mut rule_cache: FxHashMap<String, &'static dyn Rule> = FxHashMap::default();
-    let mut rules_by_config: Vec<Vec<&'static dyn Rule>> =
-        Vec::with_capacity(payload.configs.len());
-    let mut file_to_config: FxHashMap<String, usize> = FxHashMap::default();
-    for (config_idx, config) in payload.configs.iter().enumerate() {
-        let mut config_rules: Vec<&'static dyn Rule> = Vec::new();
-        for rule_spec in &config.rules {
-            if let Some(leaked) =
-                resolve_cached_rule(&mut rule_cache, &rule_spec.name, rule_spec.options.as_ref())?
-            {
-                push_unique_rule(&mut config_rules, leaked);
+        tsrs_checker::links::set_sparse_id_pages(true);
+        let plan = build_config_rule_plan(&payload, &self.cwd, self.inject_defaults)
+            .map_err(|err| format!("error running linter: {err}"))?;
+        let (programs, unmatched) = env.group_files_by_tsconfig(&files);
+        let mut leftovers = Leftovers {
+            grouped: Vec::new(),
+            inferred: unmatched,
+        };
+        let mut diagnostics: Vec<Diagnostic> = Vec::new();
+        for (config_file_name, config_files) in &programs {
+            match env.current_program(
+                config_file_name,
+                config_files,
+                self.suppress_program_diagnostics,
+            ) {
+                None => leftovers.grouped.extend(config_files.iter().cloned()),
+                Some(Ok(bound)) => {
+                    collect_missing_bound_files(
+                        &bound.source_files,
+                        config_files,
+                        &mut leftovers.inferred,
+                    );
+                    lint_program_files(
+                        bound.program,
+                        &bound.source_files,
+                        &plan,
+                        &opts,
+                        &mut diagnostics,
+                    );
+                }
+                Some(Err(config_diags)) => diagnostics.extend(config_diags),
             }
         }
-        if inject_defaults {
-            append_default_rules(&mut config_rules, &mut rule_cache, &registries)?;
-        }
-        for file_path in &config.file_paths {
-            file_to_config.insert(tspath::normalize_slashes(file_path), config_idx);
-        }
-        rules_by_config.push(config_rules);
+        let diagnostics = filter_suppressed_diagnostics(&self.cwd, diagnostics)
+            .map_err(|err| format!("error running linter: {err}"))?;
+        Ok((encode(&diagnostics)?, leftovers))
     }
-    Ok(ConfigRulePlan {
-        rules_by_config,
-        file_to_config,
-        inject_defaults,
-    })
-}
 
-fn to_protocol_diagnostic(reported: &ReportedDiagnostic) -> Diagnostic {
-    let mut proto = reported.to_protocol();
-    if reported.rule_name.starts_with("antidrift/") {
-        proto.kind = 1;
-        proto.rule = None;
-        reported.rule_name.clone_into(&mut proto.message.id);
-    }
-    proto
-}
-
-fn lint_program_files(
-    program: &'static Program,
-    source_files: &[P<SourceFile>],
-    plan: &ConfigRulePlan,
-    opts: &Options,
-    out_diags: &mut Vec<Diagnostic>,
-) {
-    let mut groups: BTreeMap<(usize, u8), Vec<P<SourceFile>>> = BTreeMap::new();
-    for &sf in source_files {
-        let name = sf.file_name();
-        let normalized = tspath::normalize_slashes(name);
-        let Some(&config_idx) = plan.file_to_config.get(&normalized) else {
-            continue;
-        };
-        let bucket = u8::from(plan.inject_defaults && tspath::has_js_file_extension(name));
-        groups.entry((config_idx, bucket)).or_default().push(sf);
-    }
-    for ((config_idx, bucket), files) in groups {
-        let Some(base_rules) = plan.rules_by_config.get(config_idx) else {
-            continue;
-        };
-        let active_rules: Vec<&'static dyn Rule> = if bucket == 1 {
-            base_rules
-                .iter()
-                .copied()
-                .filter(|rule| !is_typescript_only_rule(rule.name()))
-                .collect()
-        } else {
-            base_rules.clone()
-        };
-        if active_rules.is_empty() {
-            continue;
+    fn finish(&self, served: Vec<u8>, leftovers: Option<Leftovers>) -> Result<Vec<u8>, String> {
+        let (opts, payload) = self.parse()?;
+        let leftovers = leftovers.unwrap_or_else(|| Leftovers {
+            grouped: requested_files(&payload),
+            inferred: Vec::new(),
+        });
+        tsrs_checker::links::set_sparse_id_pages(true);
+        let mut env = ProgramBuilderEnv::new(base_fs(&payload), &self.cwd);
+        let diagnostics = self
+            .local_diagnostics(&mut env, &payload, &opts, leftovers)
+            .map_err(|err| format!("error running linter: {err}"))?;
+        let mut output = served;
+        output.extend(encode(&diagnostics)?);
+        if opts.debug_timings {
+            let empty_timings = protocol::TimingPayload { rules: Vec::new() };
+            write_message(&mut output, MessageType::Timing, &empty_timings)
+                .map_err(|err| format!("error writing timings: {err}"))?;
         }
-        for item in &lint_files(program, &files, &active_rules, opts) {
-            if item.rule_name.starts_with("antidrift/")
-                && is_inline_disabled(item.file.text(), item.pos, item.end, item.rule_name)
-            {
-                continue;
+        Ok(output)
+    }
+
+    fn local_diagnostics(
+        &self,
+        env: &mut ProgramBuilderEnv,
+        payload: &Payload,
+        opts: &Options,
+        leftovers: Leftovers,
+    ) -> Result<Vec<Diagnostic>, String> {
+        let plan = build_config_rule_plan(payload, &self.cwd, self.inject_defaults)?;
+        let (programs, unmatched) = env.group_files_by_tsconfig(&leftovers.grouped);
+        let mut inferred = leftovers.inferred;
+        inferred.extend(unmatched);
+        let mut diagnostics: Vec<Diagnostic> = Vec::new();
+        for (config_file_name, config_files) in &programs {
+            match env.configured_program(
+                config_file_name,
+                config_files,
+                self.suppress_program_diagnostics,
+            ) {
+                Ok(bound) => {
+                    collect_missing_bound_files(&bound.source_files, config_files, &mut inferred);
+                    lint_program_files(
+                        bound.program,
+                        &bound.source_files,
+                        &plan,
+                        opts,
+                        &mut diagnostics,
+                    );
+                }
+                Err(config_diags) => diagnostics.extend(config_diags),
             }
-            out_diags.push(to_protocol_diagnostic(item));
         }
+        if !inferred.is_empty() {
+            let bound = env.inferred_program(&inferred);
+            lint_program_files(
+                bound.program,
+                &bound.source_files,
+                &plan,
+                opts,
+                &mut diagnostics,
+            );
+        }
+        filter_suppressed_diagnostics(&self.cwd, diagnostics)
     }
 }
 
-pub(crate) fn execute_payload(
-    payload: &Payload,
-    cwd: &str,
-    opts: &Options,
-) -> Result<Vec<Diagnostic>, String> {
-    tsrs_checker::links::set_sparse_id_pages(true);
-    let env = ProgramBuilderEnv::new(base_fs(payload), cwd);
-    let plan = build_config_rule_plan(payload, cwd)?;
-    let mut requested_files: Vec<String> = Vec::new();
-    for config in &payload.configs {
-        for file_path in &config.file_paths {
-            requested_files.push(tspath::normalize_slashes(file_path));
-        }
-    }
-    let (programs, mut unmatched) = env.group_files_by_tsconfig(&requested_files);
-    let suppress_program_diagnostics =
-        std::env::var("OXLINT_TSGOLINT_DANGEROUSLY_SUPPRESS_PROGRAM_DIAGNOSTICS")
-            .is_ok_and(|val| val == "true");
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
-    for (config_file_name, config_files) in &programs {
-        match env.run_configured_program(
-            config_file_name,
-            config_files,
-            suppress_program_diagnostics,
-        ) {
-            Ok(bound) => {
-                collect_missing_bound_files(&bound.source_files, config_files, &mut unmatched);
-                lint_program_files(
-                    bound.program,
-                    &bound.source_files,
-                    &plan,
-                    opts,
-                    &mut diagnostics,
-                );
+fn route(args: &[String]) -> Result<Vec<u8>, String> {
+    let request = HeadlessRequest::from_process(args)?;
+    match std::env::var("ANTIDRIFT_ENGINE") {
+        Ok(endpoint) => {
+            let reply = relay::relay(&endpoint, &request).map_err(|err| {
+                format!(
+                    "the antidrift engine relay named by ANTIDRIFT_ENGINE ({endpoint}) failed: {err}"
+                )
+            })?;
+            match reply {
+                RelayReply::Served { output, leftovers } => request.finish(output, Some(leftovers)),
+                RelayReply::Failure(message) => Err(message),
             }
-            Err(config_diags) => diagnostics.extend(config_diags),
         }
+        Err(VarError::NotPresent) => request.finish(Vec::new(), None),
+        Err(VarError::NotUnicode(raw)) => Err(format!(
+            "ANTIDRIFT_ENGINE must name the antidrift engine relay as ADDRESS/TOKEN, got {}",
+            raw.to_string_lossy()
+        )),
     }
-    if !unmatched.is_empty() {
-        let bound = env.build_inferred_program(&unmatched);
-        lint_program_files(
-            bound.program,
-            &bound.source_files,
-            &plan,
-            opts,
-            &mut diagnostics,
-        );
-    }
-    filter_suppressed_diagnostics(cwd, diagnostics)
 }
 
 pub(crate) fn run_headless(args: &[String]) -> i32 {
-    let opts = match parse_headless_flags(args) {
-        Ok(parsed) => parsed,
-        Err(err) => {
-            write_error_message(&format!("error parsing options: {err}"));
-            return 1;
-        }
-    };
-    let cwd = match std::env::current_dir() {
-        Ok(dir) => tspath::normalize_path(&dir.to_string_lossy()),
-        Err(err) => {
-            write_error_message(&format!("error getting current directory: {err}"));
-            return 1;
-        }
-    };
-    let mut input_bytes = Vec::new();
-    if let Err(err) = std::io::stdin().read_to_end(&mut input_bytes) {
-        write_error_message(&format!("error reading from stdin: {err}"));
-        return 1;
-    }
-    let payload = match deserialize_payload(&input_bytes) {
-        Ok(parsed) => parsed,
-        Err(err) => {
-            write_error_message(&format!("error parsing config: {err}"));
-            return 1;
-        }
-    };
-    match execute_payload(&payload, &cwd, &opts) {
-        Ok(diagnostics) => {
-            let mut writer = std::io::BufWriter::with_capacity(4096 * 64, std::io::stdout());
-            for diag in &diagnostics {
-                if let Err(err) = write_message(&mut writer, MessageType::Diagnostic, diag) {
-                    write_error_message(&format!("error writing diagnostic: {err}"));
-                    return 1;
-                }
-            }
-            if opts.debug_timings {
-                let empty_timings = protocol::TimingPayload { rules: Vec::new() };
-                if let Err(err) = write_message(&mut writer, MessageType::Timing, &empty_timings) {
-                    write_error_message(&format!("error writing timings: {err}"));
-                    return 1;
-                }
-            }
-            if let Err(err) = writer.flush() {
+    match route(args) {
+        Ok(bytes) => {
+            let written = std::io::stdout()
+                .write_all(&bytes)
+                .and_then(|()| std::io::stdout().flush());
+            if let Err(err) = written {
                 write_error_message(&format!("error flushing output: {err}"));
                 return 1;
             }
             0
         }
-        Err(err) => {
-            write_error_message(&format!("error running linter: {err}"));
+        Err(message) => {
+            write_error_message(&message);
             1
         }
     }

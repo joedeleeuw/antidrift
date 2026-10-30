@@ -15,7 +15,6 @@ doctest = false
 antidrift-engine.workspace = true
 napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"
-rustc-hash.workspace = true
 
 [build-dependencies]
 napi-build = "2"

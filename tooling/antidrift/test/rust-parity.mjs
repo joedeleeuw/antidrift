@@ -1015,4 +1015,4 @@ console.log(
   `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path, project-root, derive, line-cap & rust linter smokes verified)`
 );
 
-proveOxlintPluginBridge(repoRoot);
+proveOxlintPluginBridge(repoRoot, binaryPath);

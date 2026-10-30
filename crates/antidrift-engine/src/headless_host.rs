@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -13,6 +15,16 @@ use tsrslint::protocol::{Diagnostic, Message, Payload, Range};
 use tsrslint::tsconfig::{ExtendedConfigCache, ParseHost, TsConfigResolver};
 
 pub(crate) type DeclarationCache = Mutex<FxHashMap<SourceFileParseOptions, P<SourceFile>>>;
+
+static PROGRAMS_BUILT: AtomicU32 = AtomicU32::new(0);
+static PROGRAMS_REUSED: AtomicU32 = AtomicU32::new(0);
+
+pub(crate) fn program_counts() -> (u32, u32) {
+    (
+        PROGRAMS_BUILT.load(Ordering::Relaxed),
+        PROGRAMS_REUSED.load(Ordering::Relaxed),
+    )
+}
 
 struct ProgramExtCache(&'static ExtendedConfigCache);
 
@@ -197,12 +209,133 @@ pub(crate) struct BoundProgram {
     pub(crate) source_files: Vec<P<SourceFile>>,
 }
 
-pub(crate) struct ProgramBuilderEnv {
+struct CachedProgram {
+    program: &'static Program,
+    diagnostics: Vec<Diagnostic>,
+}
+
+struct ProgramFactory {
     cwd: String,
     fs: Arc<dyn FS>,
     ext_cache: &'static ExtendedConfigCache,
     declarations: &'static DeclarationCache,
     resolver: TsConfigResolver,
+}
+
+impl ProgramFactory {
+    fn configured(&self, config_file_name: &str) -> Result<CachedProgram, Vec<Diagnostic>> {
+        let parsed = self.resolver.load(config_file_name);
+        let config = match parsed.config {
+            Some(config) if parsed.errors.is_empty() => config,
+            _ => {
+                return Err(parsed
+                    .errors
+                    .iter()
+                    .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
+                    .collect());
+            }
+        };
+        let config_errors: Vec<Diagnostic> = config
+            .errors
+            .iter()
+            .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
+            .collect();
+        let compiler_host =
+            build_shared_host(&self.cwd, &self.fs, self.ext_cache, self.declarations);
+        let mut popts = ProgramOptions::new(config, compiler_host);
+        popts.use_source_of_project_reference = true;
+        popts.single_threaded = Tristate::False;
+        let program = new_program(popts);
+        PROGRAMS_BUILT.fetch_add(1, Ordering::Relaxed);
+        let diagnostics = if config_errors.is_empty() {
+            program
+                .get_program_diagnostics()
+                .iter()
+                .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
+                .collect()
+        } else {
+            config_errors
+        };
+        program.bind_source_files();
+        Ok(CachedProgram {
+            program,
+            diagnostics,
+        })
+    }
+
+    fn inferred(&self, unmatched: &[String]) -> &'static Program {
+        let compiler_host =
+            build_shared_host(&self.cwd, &self.fs, self.ext_cache, self.declarations);
+        let config = P::new(tsrs_tsoptions::new_parsed_command_line(
+            P::new(inferred_compiler_options()),
+            unmatched.to_vec(),
+            Vec::new(),
+            tspath::ComparePathsOptions {
+                use_case_sensitive_file_names: self.fs.use_case_sensitive_file_names(),
+                current_directory: self.cwd.clone(),
+            },
+        ));
+        let mut popts = ProgramOptions::new(config, compiler_host);
+        popts.single_threaded = Tristate::False;
+        let program = new_program(popts);
+        PROGRAMS_BUILT.fetch_add(1, Ordering::Relaxed);
+        program.bind_source_files();
+        program
+    }
+
+    fn report(
+        &self,
+        cached: &CachedProgram,
+        config_file_name: &str,
+        config_files: &[String],
+        suppress_program_diagnostics: bool,
+    ) -> Result<BoundProgram, Vec<Diagnostic>> {
+        if !suppress_program_diagnostics && !cached.diagnostics.is_empty() {
+            return Err(cached.diagnostics.clone());
+        }
+        Ok(self.bind(
+            cached.program,
+            &tspath::get_directory_path(config_file_name),
+            config_files,
+        ))
+    }
+
+    fn bind(&self, program: &'static Program, base_dir: &str, files: &[String]) -> BoundProgram {
+        let use_case = self.fs.use_case_sensitive_file_names();
+        let wanted: FxHashSet<Path> = files
+            .iter()
+            .map(|file| tspath::to_path(file, base_dir, use_case))
+            .collect();
+        let source_files: Vec<P<SourceFile>> = program
+            .source_files()
+            .iter()
+            .copied()
+            .filter(|sf| wanted.contains(sf.path()))
+            .collect();
+        BoundProgram {
+            program,
+            source_files,
+        }
+    }
+}
+
+fn matches_disk(program: &Program) -> bool {
+    let disk = osvfs::fs();
+    program
+        .source_files()
+        .iter()
+        .filter(|sf| {
+            !program.is_lib_file(**sf) && !program.is_source_file_from_external_library(**sf)
+        })
+        .all(|sf| {
+            disk.read_file(sf.file_name())
+                .is_some_and(|text| text == sf.text())
+        })
+}
+
+pub(crate) struct ProgramBuilderEnv {
+    factory: ProgramFactory,
+    configured: FxHashMap<String, CachedProgram>,
 }
 
 impl ProgramBuilderEnv {
@@ -215,11 +348,14 @@ impl ProgramBuilderEnv {
         let declarations: &'static DeclarationCache = Box::leak(Box::default());
         let resolver = TsConfigResolver::new(host, ext_cache);
         Self {
-            cwd: cwd.to_owned(),
-            fs,
-            ext_cache,
-            declarations,
-            resolver,
+            factory: ProgramFactory {
+                cwd: cwd.to_owned(),
+                fs,
+                ext_cache,
+                declarations,
+                resolver,
+            },
+            configured: FxHashMap::default(),
         }
     }
 
@@ -227,7 +363,7 @@ impl ProgramBuilderEnv {
         &self,
         files: &[String],
     ) -> (Vec<(String, Vec<String>)>, Vec<String>) {
-        let assignment = self.resolver.resolve_all(files);
+        let assignment = self.factory.resolver.resolve_all(files);
         let mut programs: Vec<(String, Vec<String>)> = Vec::new();
         let mut program_index: FxHashMap<String, usize> = FxHashMap::default();
         let mut unmatched: Vec<String> = Vec::new();
@@ -245,121 +381,46 @@ impl ProgramBuilderEnv {
         (programs, unmatched)
     }
 
-    pub(crate) fn run_configured_program(
-        &self,
+    pub(crate) fn configured_program(
+        &mut self,
         config_file_name: &str,
         config_files: &[String],
         suppress_program_diagnostics: bool,
     ) -> Result<BoundProgram, Vec<Diagnostic>> {
-        let parsed = self.resolver.load(config_file_name);
-        let Some(config) = parsed.config else {
-            return Err(parsed
-                .errors
-                .iter()
-                .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
-                .collect());
+        let cached = match self.configured.entry(config_file_name.to_owned()) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => entry.insert(self.factory.configured(config_file_name)?),
         };
-        if !parsed.errors.is_empty() {
-            return Err(parsed
-                .errors
-                .iter()
-                .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
-                .collect());
-        }
-        if !config.errors.is_empty() && !suppress_program_diagnostics {
-            return Err(config
-                .errors
-                .iter()
-                .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
-                .collect());
-        }
-        let dir = tspath::get_directory_path(config_file_name);
-        let compiler_host =
-            build_shared_host(&self.cwd, &self.fs, self.ext_cache, self.declarations);
-        let mut popts = ProgramOptions::new(config, compiler_host);
-        popts.use_source_of_project_reference = true;
-        popts.single_threaded = Tristate::False;
-        let program = new_program(popts);
-        let program_diags = program.get_program_diagnostics();
-        if !program_diags.is_empty() && !suppress_program_diagnostics {
-            return Err(program_diags
-                .iter()
-                .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
-                .collect());
-        }
-        program.bind_source_files();
-        let use_case = self.fs.use_case_sensitive_file_names();
-        let wanted: FxHashSet<Path> = config_files
-            .iter()
-            .map(|file| tspath::to_path(file, &dir, use_case))
-            .collect();
-        let source_files: Vec<P<SourceFile>> = program
-            .source_files()
-            .iter()
-            .copied()
-            .filter(|sf| wanted.contains(sf.path()))
-            .collect();
-        Ok(BoundProgram {
-            program,
-            source_files,
-        })
+        self.factory.report(
+            cached,
+            config_file_name,
+            config_files,
+            suppress_program_diagnostics,
+        )
     }
 
-    pub(crate) fn bind_existing(
+    pub(crate) fn current_program(
         &self,
-        program: &'static Program,
         config_file_name: &str,
         config_files: &[String],
-    ) -> BoundProgram {
-        let dir = tspath::get_directory_path(config_file_name);
-        let use_case = self.fs.use_case_sensitive_file_names();
-        let wanted: FxHashSet<Path> = config_files
-            .iter()
-            .map(|file| tspath::to_path(file, &dir, use_case))
-            .collect();
-        let source_files: Vec<P<SourceFile>> = program
-            .source_files()
-            .iter()
-            .copied()
-            .filter(|sf| wanted.contains(sf.path()))
-            .collect();
-        BoundProgram {
-            program,
-            source_files,
-        }
+        suppress_program_diagnostics: bool,
+    ) -> Option<Result<BoundProgram, Vec<Diagnostic>>> {
+        let cached = self
+            .configured
+            .get(config_file_name)
+            .filter(|cached| matches_disk(cached.program))?;
+        PROGRAMS_REUSED.fetch_add(1, Ordering::Relaxed);
+        Some(self.factory.report(
+            cached,
+            config_file_name,
+            config_files,
+            suppress_program_diagnostics,
+        ))
     }
 
-    pub(crate) fn build_inferred_program(&self, unmatched: &[String]) -> BoundProgram {
-        let compiler_host =
-            build_shared_host(&self.cwd, &self.fs, self.ext_cache, self.declarations);
-        let use_case = self.fs.use_case_sensitive_file_names();
-        let config = P::new(tsrs_tsoptions::new_parsed_command_line(
-            P::new(inferred_compiler_options()),
-            unmatched.to_vec(),
-            Vec::new(),
-            tspath::ComparePathsOptions {
-                use_case_sensitive_file_names: use_case,
-                current_directory: self.cwd.clone(),
-            },
-        ));
-        let mut popts = ProgramOptions::new(config, compiler_host);
-        popts.single_threaded = Tristate::False;
-        let program = new_program(popts);
-        program.bind_source_files();
-        let wanted: FxHashSet<Path> = unmatched
-            .iter()
-            .map(|file| tspath::to_path(file, &self.cwd, use_case))
-            .collect();
-        let source_files: Vec<P<SourceFile>> = program
-            .source_files()
-            .iter()
-            .copied()
-            .filter(|sf| wanted.contains(sf.path()))
-            .collect();
-        BoundProgram {
-            program,
-            source_files,
-        }
+    pub(crate) fn inferred_program(&self, unmatched: &[String]) -> BoundProgram {
+        let program = self.factory.inferred(unmatched);
+        self.factory.bind(program, &self.factory.cwd, unmatched)
     }
 }
 

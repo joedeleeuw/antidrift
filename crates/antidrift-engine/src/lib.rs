@@ -6,8 +6,11 @@ mod derive;
 mod format;
 mod headless;
 mod headless_host;
+mod relay;
+mod rule_plan;
 mod runner;
 mod rust;
+pub mod service;
 pub mod session;
 
 use antidrift_rules::all_rules;

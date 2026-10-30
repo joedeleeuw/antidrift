@@ -21,8 +21,8 @@ use tsrslint::rule::{ReportedDiagnostic, Rule};
 use crate::batch::reported_to_rule_diagnostic;
 use crate::cli::CliArgs;
 use crate::format::format_diagnostics;
-use crate::headless::default_workspace_rules;
 use crate::headless_host::{BoundProgram, ProgramBuilderEnv, collect_missing_bound_files};
+use crate::rule_plan::default_workspace_rules;
 
 pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
     tsrs_checker::links::set_sparse_id_pages(true);
@@ -59,7 +59,7 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
         .collect();
     let cwd_norm = tspath::normalize_slashes(&cwd.to_string_lossy());
     let fs: Arc<dyn FS> = Arc::new(bundled::wrap_fs(cachedvfs::from(Arc::new(osvfs::fs()))));
-    let env = ProgramBuilderEnv::new(fs, &cwd_norm);
+    let mut env = ProgramBuilderEnv::new(fs, &cwd_norm);
     let normalized_files: Vec<String> = files
         .iter()
         .map(|path| tspath::normalize_slashes(&path.to_string_lossy()))
@@ -68,7 +68,7 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
     let mut diagnostics_by_file: BTreeMap<String, Vec<RuleDiagnostic>> = BTreeMap::new();
     for (config_file_name, config_files) in &programs {
         let bound = env
-            .run_configured_program(config_file_name, config_files, true)
+            .configured_program(config_file_name, config_files, true)
             .map_err(|diags| {
                 let messages: Vec<String> = diags
                     .into_iter()
@@ -93,7 +93,7 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
         )?;
     }
     if !unmatched.is_empty() {
-        let bound = env.build_inferred_program(&unmatched);
+        let bound = env.inferred_program(&unmatched);
         lint_bound_program(
             &bound,
             &active_rules,
