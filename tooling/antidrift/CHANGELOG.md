@@ -1,5 +1,9 @@
 # changelog
 
+## Unreleased
+
+- Build the release `antidrift-linter` with thin LTO and 16 codegen units (`strip = "symbols"` unchanged), replacing fat LTO with one codegen unit. A clean release build drops from about 127s to 47s; diagnostics are byte-identical on an 864-file corpus, the binary grows from 19.95 MB to 24.56 MB, and corpus CPU time rises about 4%.
+
 ## 0.20.0
 
 - Migrate all 83 `antidrift/*` rules (20 TypeChecker-backed rules and 63 portable AST rules) into the native Rust `antidrift-linter` engine (`crates/antidrift-kernel`, `crates/antidrift-rules`, `crates/antidrift-linter`) built on `tsrs_ast`, `tsrs_compiler`, `tsrs_checker`, `tsrslint`, and `oxc_resolver`. Delete the legacy JS/TS ESLint plugin (`src/eslint-plugin/`), Oxlint JS plugin (`src/oxlint-plugin/`), and JS semantic adapters (`src/semantic-adapters/`).
