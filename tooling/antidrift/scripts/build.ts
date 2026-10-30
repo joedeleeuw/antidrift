@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,21 +29,14 @@ cpSync(sourceDirectory, outputDirectory, {
 });
 
 const sourceBinary = resolve(repoRoot, "target/release/antidrift-linter");
-if (!existsSync(sourceBinary)) {
-  execFileSync(
-    "cargo",
-    ["build", "--release", "--locked", "-p", "antidrift-linter"],
-    {
-      cwd: repoRoot,
-      stdio: "inherit",
-    }
-  );
-}
-if (!existsSync(sourceBinary)) {
-  throw new Error(
-    `Missing release antidrift-linter binary at ${sourceBinary}; run cargo build --release --locked -p antidrift-linter first.`
-  );
-}
+execFileSync(
+  "cargo",
+  ["build", "--release", "--locked", "-p", "antidrift-linter"],
+  {
+    cwd: repoRoot,
+    stdio: "inherit",
+  }
+);
 const binDirectory = resolve(outputDirectory, "bin");
 const targetBinary = resolve(binDirectory, "antidrift-linter");
 mkdirSync(binDirectory, { recursive: true });
