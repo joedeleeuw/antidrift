@@ -3,7 +3,7 @@ use super::anemic_error_fallback::{
     check_decode_to_nullable_expression, check_promise_catch_call_fallback, expr_ident_name,
     is_error_member_read,
 };
-use antidrift_kernel::file_role::is_test_or_spec_file;
+use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
 use antidrift_kernel::rule_scope::RuleScope;
 use antidrift_kernel::tsrs_kernel::{
     property_name_text, unwrap_awaited_expression, unwrap_expression,
@@ -74,7 +74,7 @@ impl Rule for NoAnemicErrors {
         let cwd = ctx.program.host().get_current_directory();
         let filename = ctx.file.file_name().replace('\\', "/");
         let enabled = self.scope.matches(&filename, cwd);
-        let is_test = is_test_or_spec_file(&filename);
+        let is_test = is_test_or_spec_file(&ProjectPath::of(ctx.program, &filename));
         Box::new(Visitor { enabled, is_test })
     }
 }

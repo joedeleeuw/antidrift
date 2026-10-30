@@ -1,4 +1,5 @@
 use crate::error::KernelError;
+use crate::file_role::{self, ProjectPath};
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
@@ -49,13 +50,14 @@ pub fn require_non_empty(
 }
 
 #[must_use]
-pub fn in_scope(scope: &RuleScope, ctx: &Ctx, inferred_scope: Option<fn(&str) -> bool>) -> bool {
-    let filename = tspath::normalize_slashes(ctx.file.file_name());
-    let matches_inferred = if scope.has_explicit_files() {
-        true
-    } else {
-        inferred_scope.is_none_or(|predicate| predicate(&filename))
-    };
+pub fn in_scope(
+    scope: &RuleScope,
+    ctx: &Ctx,
+    inferred_scope: Option<fn(&ProjectPath) -> bool>,
+) -> bool {
+    let matches_inferred = scope.has_explicit_files()
+        || inferred_scope
+            .is_none_or(|predicate| predicate(&ProjectPath::of(ctx.program, ctx.file.file_name())));
     scope.in_scope(ctx) && matches_inferred
 }
 
@@ -134,6 +136,21 @@ impl RuleScope {
     #[must_use]
     pub const fn has_explicit_files(&self) -> bool {
         self.files.is_some()
+    }
+
+    #[must_use]
+    pub fn skips_generated(&self, path: &ProjectPath, source_text: &str) -> bool {
+        !self.has_explicit_files() && file_role::is_generated_file(path, source_text)
+    }
+
+    #[must_use]
+    pub fn admits_authored_source(&self, ctx: &Ctx) -> bool {
+        let file_name = ctx.file.file_name();
+        let path = ProjectPath::of(ctx.program, file_name);
+        self.in_scope(ctx)
+            && !file_role::is_declaration_file(file_name)
+            && !file_role::is_test_file(&path)
+            && !self.skips_generated(&path, ctx.file.text())
     }
 
     #[must_use]

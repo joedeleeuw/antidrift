@@ -57,7 +57,9 @@ impl Rule for NoNonindependentTestOracle {
         let cwd = ctx.program.host().get_current_directory();
         let file_name = ctx.file.file_name();
         let enabled = self.scope.matches(file_name, cwd);
-        let test_file = enabled && syntax::is_test_file(file_name);
+        let path = syntax::ProjectPath::of(ctx.program, file_name);
+        let test_file = enabled && syntax::is_test_file(&path);
+        let spec_file = syntax::is_test_or_spec_file(&path);
         let blocks = if test_file {
             block::collect_blocks(&bindings::Oracle { sf: ctx.file })
         } else {
@@ -66,6 +68,7 @@ impl Rule for NoNonindependentTestOracle {
         Box::new(Visitor {
             enabled,
             test_file,
+            spec_file,
             blocks,
         })
     }
@@ -74,6 +77,7 @@ impl Rule for NoNonindependentTestOracle {
 struct Visitor {
     enabled: bool,
     test_file: bool,
+    spec_file: bool,
     blocks: FxHashMap<P<Node>, block::BlockFacts>,
 }
 
@@ -93,9 +97,7 @@ impl RuleVisitor for Visitor {
                     ctx.report_node(target, RuleMessage::new(id, message));
                 }
             }
-            Kind::ForOfStatement
-                if static_properties::is_echo(node, &oracle, ctx.file.file_name()) =>
-            {
+            Kind::ForOfStatement if self.spec_file && static_properties::is_echo(node, &oracle) => {
                 let (id, message) = Finding::StaticPropertyEcho.details();
                 ctx.report_node(node, RuleMessage::new(id, message));
             }

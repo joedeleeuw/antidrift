@@ -246,33 +246,28 @@ fn is_cross_boundary_domain_mapper(ctx: &mut Ctx, function: P<Node>, candidate: 
     ) && return_origin == DeclarationOrigin::LocalDomain
 }
 
-fn check_function_candidate(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>) -> bool {
-    let file_name = ctx.file.file_name();
-    if !file_role::is_test_file(file_name)
-        && !file_role::is_generated_file(file_name, ctx.file.text())
-        && let Some(classification) =
-            projection::classify_bag_reshaper(function, candidate, ctx.checker, ctx.file)
-    {
-        match classification {
-            projection::BagReshaperClassification::BagToContract {
-                parameter_name,
-                target_contract,
-            } => {
-                if !is_cross_boundary_domain_mapper(ctx, function, candidate) {
-                    ctx.report_node(
-                        candidate,
-                        build_bag_to_contract_message(&parameter_name, &target_contract),
-                    );
-                    return true;
-                }
+fn report_bag_reshaper(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>) -> Option<bool> {
+    match projection::classify_bag_reshaper(function, candidate, ctx.checker, ctx.file)? {
+        projection::BagReshaperClassification::BagToContract {
+            parameter_name,
+            target_contract,
+        } => {
+            if is_cross_boundary_domain_mapper(ctx, function, candidate) {
+                return Some(false);
             }
-            projection::BagReshaperClassification::BagToBag { parameter_name } => {
-                ctx.report_node(candidate, build_bag_to_bag_message(&parameter_name));
-                return true;
-            }
+            ctx.report_node(
+                candidate,
+                build_bag_to_contract_message(&parameter_name, &target_contract),
+            );
         }
-        return false;
+        projection::BagReshaperClassification::BagToBag { parameter_name } => {
+            ctx.report_node(candidate, build_bag_to_bag_message(&parameter_name));
+        }
     }
+    Some(true)
+}
+
+fn report_appeasement_projection(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>) -> bool {
     if is_exported_boundary(candidate, ctx.file) {
         return false;
     }
@@ -292,10 +287,13 @@ impl Rule for NoContractAppeasementProjection {
         if !self.scope.in_scope(ctx) {
             return Box::new(EmptyVisitor);
         }
+        let path = file_role::ProjectPath::of(ctx.program, ctx.file.file_name());
         Box::new(Visitor {
             candidates: Vec::new(),
             object_literals: Vec::new(),
             reported_functions: FxHashSet::default(),
+            authored_file: !file_role::is_test_file(&path)
+                && !self.scope.skips_generated(&path, ctx.file.text()),
         })
     }
 }
@@ -304,6 +302,7 @@ struct Visitor {
     candidates: Vec<(P<Node>, P<Node>)>,
     object_literals: Vec<P<Node>>,
     reported_functions: FxHashSet<P<Node>>,
+    authored_file: bool,
 }
 
 const LISTENERS: [Listener; 7] = [
@@ -322,12 +321,6 @@ fn report_end_of_file(
     object_literals: &[P<Node>],
     reported_functions: &FxHashSet<P<Node>>,
 ) {
-    let file_name = ctx.file.file_name();
-    if file_role::is_test_file(file_name)
-        || file_role::is_generated_file(file_name, ctx.file.text())
-    {
-        return;
-    }
     for violation in
         projection::find_constant_return_field_violations(candidates, ctx.file, ctx.checker)
     {
@@ -402,6 +395,9 @@ impl RuleVisitor for Visitor {
 
     fn visit(&mut self, ctx: &mut Ctx, listener: Listener, node: P<Node>) {
         if matches!(listener, Listener::Exit(Kind::EndOfFile)) {
+            if !self.authored_file {
+                return;
+            }
             report_end_of_file(
                 ctx,
                 &self.candidates,
@@ -416,7 +412,12 @@ impl RuleVisitor for Visitor {
         }
         if let Some(fn_node) = tsrs_kernel::function_node_from_declaration(node) {
             self.candidates.push((fn_node, node));
-            if check_function_candidate(ctx, fn_node, node) {
+            let reported = self
+                .authored_file
+                .then(|| report_bag_reshaper(ctx, fn_node, node))
+                .flatten()
+                .unwrap_or_else(|| report_appeasement_projection(ctx, fn_node, node));
+            if reported {
                 self.reported_functions.insert(fn_node);
             }
         }

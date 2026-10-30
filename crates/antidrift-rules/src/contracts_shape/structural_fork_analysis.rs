@@ -199,7 +199,9 @@ fn find_matching_exported_owner(
 ) -> Option<String> {
     let cand_exported = has_modifier(cand_node, ModifierFlags::Export);
     for &sf in ctx.program.get_source_files() {
-        if sf == ctx.file || file_role::is_test_file(sf.file_name()) {
+        if sf == ctx.file
+            || file_role::is_test_file(&file_role::ProjectPath::of(ctx.program, sf.file_name()))
+        {
             continue;
         }
         let origin = classify_source_file_origin(ctx.program, sf, Some(ctx.file));
@@ -239,7 +241,7 @@ pub fn check_structural_fork_declaration(ctx: &mut Ctx, node: P<Node>) {
     let file_name = ctx.file.file_name();
     let file_origin = classify_source_file_origin(ctx.program, ctx.file, None);
     if file_role::is_declaration_file(file_name)
-        || file_role::is_test_file(file_name)
+        || file_role::is_test_file(&file_role::ProjectPath::of(ctx.program, file_name))
         || matches!(
             file_origin,
             DeclarationOrigin::DefaultLib

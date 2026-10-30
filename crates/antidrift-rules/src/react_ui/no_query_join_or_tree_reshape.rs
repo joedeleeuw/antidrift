@@ -1,5 +1,4 @@
 use super::await_waterfall::{independent_await_runs, relational_key_join_calls};
-use antidrift_kernel::file_role::{is_declaration_file, is_generated_file, is_test_file};
 use antidrift_kernel::jsx::{
     function_returns_jsx, is_component_or_hook_function, react_function_name,
 };
@@ -59,14 +58,7 @@ impl Rule for NoQueryJoinOrTreeReshape {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
-        let file_name = ctx.file.file_name();
-        if is_test_file(file_name)
-            || is_declaration_file(file_name)
-            || is_generated_file(file_name, ctx.file.text())
-        {
+        if !self.scope.admits_authored_source(ctx) {
             return Box::new(EmptyVisitor);
         }
         Box::new(Visitor)

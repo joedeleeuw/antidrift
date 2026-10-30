@@ -1,4 +1,3 @@
-use antidrift_kernel::file_role;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, Symbol};
@@ -41,7 +40,7 @@ impl Rule for NoArgumentMutationSideEffect {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) || !file_role::is_authored_source_file(ctx.file) {
+        if !self.scope.admits_authored_source(ctx) {
             return Box::new(EmptyVisitor);
         }
         for &stmt in ctx.file.statements().nodes() {

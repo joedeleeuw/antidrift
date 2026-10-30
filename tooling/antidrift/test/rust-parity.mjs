@@ -113,7 +113,9 @@ for (const { expectedCount, filename, ...probe } of boundaryProbes) {
 
 const rawBatchOutput = execFileSync(binaryPath, ["--batch-json", "-"], {
   cwd: repoRoot,
-  input: JSON.stringify(batchInputs),
+  input: JSON.stringify(
+    batchInputs.map((input) => ({ cwd: sourceWorkspace, ...input }))
+  ),
   encoding: "utf8",
   maxBuffer: 32 * 1024 * 1024,
 });
@@ -1230,6 +1232,60 @@ try {
   rmSync(tempWorkspace, { recursive: true, force: true });
 }
 
+const projectRootWorkspace = mkdtempSync(
+  join(tmpdir(), "antidrift-project-root-")
+);
+try {
+  const hopFindingsUnder = (parentDir) => {
+    const repoDir = join(projectRootWorkspace, parentDir, "repo");
+    mkdirSync(join(repoDir, "src"), { recursive: true });
+    writeFileSync(
+      join(repoDir, "tsconfig.json"),
+      '{ "compilerOptions": { "strict": true, "module": "esnext", "target": "es2022", "moduleResolution": "bundler" }, "include": ["src"] }\n'
+    );
+    writeFileSync(
+      join(repoDir, "package.json"),
+      '{ "name": "project-root-probe", "version": "0.0.0", "type": "module", "private": true }\n'
+    );
+    writeFileSync(
+      join(repoDir, "src/owner.ts"),
+      "export function loadAccount(accountId: string): string {\n  return accountId.toUpperCase();\n}\n"
+    );
+    writeFileSync(
+      join(repoDir, "src/hop.ts"),
+      'import { loadAccount } from "./owner";\n\nfunction fetchAccount(accountId: string): string {\n  return loadAccount(accountId);\n}\n\nexport function render(accountId: string): string {\n  return fetchAccount(accountId);\n}\n'
+    );
+    const run = spawnSync(binaryPath, ["--format", "json", "src"], {
+      cwd: repoDir,
+      encoding: "utf8",
+    });
+    return JSON.parse(String(run.stdout ?? "[]"))
+      .flatMap((entry) =>
+        entry.messages.map(
+          (message) =>
+            `${entry.filePath.split("/").pop()}:${message.line} ${message.ruleId}`
+        )
+      )
+      .sort();
+  };
+  const plainFindings = hopFindingsUnder("plain");
+  assert.deepEqual(plainFindings, [
+    "hop.ts:3 antidrift/no-pass-through-parameters",
+    "hop.ts:3 antidrift/no-wrapping-functions",
+    "hop.ts:7 antidrift/no-pass-through-parameters",
+    "owner.ts:1 antidrift/no-wrapping-functions",
+  ]);
+  for (const ancestor of ["build", "dist", "gen", "tests", "fixtures"]) {
+    assert.deepEqual(
+      hopFindingsUnder(ancestor),
+      plainFindings,
+      `A repository under a '${ancestor}' directory must lint like any other: file roles come from the path below the working directory`
+    );
+  }
+} finally {
+  rmSync(projectRootWorkspace, { recursive: true, force: true });
+}
+
 console.log(
-  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path & rust linter smokes verified)`
+  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path, project-root & rust linter smokes verified)`
 );

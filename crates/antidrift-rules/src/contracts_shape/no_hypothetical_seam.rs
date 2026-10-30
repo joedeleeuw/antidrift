@@ -62,7 +62,7 @@ impl Rule for NoHypotheticalSeam {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) || !file_role::is_authored_source_file(ctx.file) {
+        if !self.scope.admits_authored_source(ctx) {
             return Box::new(EmptyVisitor);
         }
         match provenance::is_package_entry_file(ctx.file.file_name()) {

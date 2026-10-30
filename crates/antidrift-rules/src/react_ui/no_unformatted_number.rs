@@ -1,4 +1,4 @@
-use antidrift_kernel::file_role::is_test_or_spec_file;
+use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
 use antidrift_kernel::jsx::{has_plain_attribute, plain_attribute_name, plain_element_name};
 use antidrift_kernel::rule_scope::{
     RuleScope, ScopeOptions, ScopedOptions, decode_scoped, in_scope, require_non_empty,
@@ -77,7 +77,7 @@ impl Rule for NoUnformattedNumber {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let enabled = in_scope(&self.scope, ctx, None);
-        let test_file = is_test_or_spec_file(ctx.file.file_name());
+        let test_file = is_test_or_spec_file(&ProjectPath::of(ctx.program, ctx.file.file_name()));
         Box::new(Visitor {
             rule: self,
             enabled,

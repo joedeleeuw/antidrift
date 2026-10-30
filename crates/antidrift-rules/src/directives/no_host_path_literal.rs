@@ -1,6 +1,5 @@
-use antidrift_kernel::file_role::is_test_file;
+use antidrift_kernel::file_role::{ProjectPath, is_test_file};
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, in_scope};
-use antidrift_kernel::tsrs_kernel::normalize_path;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::{P, tspath};
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -66,18 +65,18 @@ impl RuleVisitor for Visitor {
     }
 }
 
-fn is_non_exempt_host_path_file(file_path: &str) -> bool {
-    if is_test_file(file_path) {
+fn is_non_exempt_host_path_file(path: &ProjectPath) -> bool {
+    if is_test_file(path) {
         return false;
     }
-    let normalized = normalize_path(file_path);
+    let normalized = path.as_str();
     if normalized
         .split('/')
         .any(|segment| matches!(segment, "example" | "examples" | "e2e"))
     {
         return false;
     }
-    let stem = tspath::remove_file_extension(&normalized);
+    let stem = tspath::remove_file_extension(normalized);
     !stem.ends_with(".stories")
 }
 

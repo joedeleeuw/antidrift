@@ -1,3 +1,4 @@
+use antidrift_kernel::file_role::ProjectPath;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
 use tsrs_ast::{self as ast, Kind, Node};
@@ -77,8 +78,8 @@ impl RuleVisitor for Visitor {
     }
 }
 
-fn shared_file(filename: &str) -> bool {
-    filename.starts_with("shared/") || filename.contains("/shared/")
+fn shared_file(path: &ProjectPath) -> bool {
+    path.as_str().starts_with("shared/") || path.as_str().contains("/shared/")
 }
 
 fn unbound_bun(expression: P<Node>) -> bool {

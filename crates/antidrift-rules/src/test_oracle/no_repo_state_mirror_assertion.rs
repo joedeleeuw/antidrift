@@ -1,6 +1,6 @@
 use super::repo_state_imports::collect_tainted_imports;
 use super::repo_state_taint::{literal_keyed_source_call, taint_root_name};
-use antidrift_kernel::file_role::is_test_or_spec_file;
+use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
@@ -81,11 +81,9 @@ impl Rule for NoRepoStateMirrorAssertion {
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let cwd = ctx.program.host().get_current_directory();
         let normalized_path = ctx.file.file_name().replace('\\', "/");
+        let path = ProjectPath::of(ctx.program, &normalized_path);
         let in_scope = self.scope.matches(&normalized_path, cwd)
-            && (normalized_path.is_empty()
-                || normalized_path == "<input>"
-                || normalized_path == "<text>"
-                || is_test_or_spec_file(&normalized_path));
+            && (matches!(path.as_str(), "" | "<input>" | "<text>") || is_test_or_spec_file(&path));
         let tainted_imports = if in_scope {
             collect_tainted_imports(ctx.file.statements().nodes(), &self.sources)
         } else {

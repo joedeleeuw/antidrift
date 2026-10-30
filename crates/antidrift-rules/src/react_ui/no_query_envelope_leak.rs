@@ -1,4 +1,4 @@
-use antidrift_kernel::file_role::is_test_file;
+use antidrift_kernel::file_role::{ProjectPath, is_test_file};
 use antidrift_kernel::jsx::{
     is_component_or_hook_function, is_hook_name, is_pascal_case_name, react_function_name,
 };
@@ -79,7 +79,8 @@ impl Rule for NoQueryEnvelopeLeak {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let active = in_scope(&self.scope, ctx, None) && !is_test_file(ctx.file.file_name());
+        let active = in_scope(&self.scope, ctx, None)
+            && !is_test_file(&ProjectPath::of(ctx.program, ctx.file.file_name()));
         Box::new(Visitor { active })
     }
 }

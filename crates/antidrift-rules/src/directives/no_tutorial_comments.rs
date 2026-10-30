@@ -1,6 +1,6 @@
 use super::no_default_export_in_domain::is_fixture_or_docs_file;
 use antidrift_kernel::directives::{scan_source_comments, split_identifier_words};
-use antidrift_kernel::file_role::is_test_or_spec_file;
+use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -53,9 +53,10 @@ impl Rule for NoTutorialComments {
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let cwd = ctx.program.host().get_current_directory();
         let filename = ctx.file.file_name().replace('\\', "/");
+        let path = ProjectPath::of(ctx.program, &filename);
         let enabled = self.scope.matches(&filename, cwd)
-            && !is_test_or_spec_file(&filename)
-            && !is_fixture_or_docs_file(&filename);
+            && !is_test_or_spec_file(&path)
+            && !is_fixture_or_docs_file(path.as_str());
         Box::new(Visitor { enabled })
     }
 }

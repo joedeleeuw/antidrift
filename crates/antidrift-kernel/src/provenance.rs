@@ -190,7 +190,8 @@ pub fn classify_source_file_origin(
     {
         return DeclarationOrigin::NodeModules;
     }
-    if file_role::is_generated_file(&file_name, decl_file.text()) {
+    let project_path = file_role::ProjectPath::of(program, &file_name);
+    if file_role::is_generated_file(&project_path, decl_file.text()) {
         return DeclarationOrigin::Generated;
     }
     if let Some(curr) = current_file
@@ -198,10 +199,10 @@ pub fn classify_source_file_origin(
     {
         return DeclarationOrigin::SameFile;
     }
-    if file_role::is_domain_file(&file_name) {
+    if file_role::is_domain_file(&project_path) {
         return DeclarationOrigin::LocalDomain;
     }
-    if file_role::is_boundary_file(&file_name) {
+    if file_role::is_boundary_file(&project_path) {
         return DeclarationOrigin::LocalBoundary;
     }
     DeclarationOrigin::WorkspaceOther

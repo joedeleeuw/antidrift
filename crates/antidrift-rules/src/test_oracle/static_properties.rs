@@ -1,8 +1,7 @@
 use super::assertions::test_callee;
 use super::bindings::Oracle;
 use super::syntax::{
-    argument, call_expression_of, identifier_of, is_test_or_spec_file, literal, static_member,
-    unwrap_expression,
+    argument, call_expression_of, identifier_of, literal, static_member, unwrap_expression,
 };
 use antidrift_kernel::local_binding::{Binding, binding_for_declarator, resolve_lexical_binding};
 use tsrs_ast::{self as ast, Kind, Node};
@@ -139,8 +138,8 @@ fn inside_test(statement: P<Node>) -> bool {
     test_callee(parent.as_call_expression().expression(), false)
 }
 
-pub(super) fn is_echo(statement: P<Node>, oracle: &Oracle, filename: &str) -> bool {
-    if !is_test_or_spec_file(filename) || !inside_test(statement) {
+pub(super) fn is_echo(statement: P<Node>, oracle: &Oracle) -> bool {
+    if !inside_test(statement) {
         return false;
     }
     let for_of = statement.as_for_in_or_of_statement();

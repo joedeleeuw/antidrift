@@ -1,4 +1,4 @@
-pub(super) use antidrift_kernel::file_role::is_test_or_spec_file;
+pub(super) use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
 pub(super) use antidrift_kernel::tsrs_kernel::{
     Span, call_expression_of, identifier_of, member_chain_root_node, member_object,
     numeric_literal_value, unwrap_awaited_expression, unwrap_expression,
@@ -131,8 +131,6 @@ pub(super) fn expression_key(sf: P<SourceFile>, expression: P<Node>) -> (i32, i3
     (span.start, span.end)
 }
 
-pub(super) fn is_test_file(filename: &str) -> bool {
-    filename.is_empty()
-        || matches!(filename, "<input>" | "<text>")
-        || is_test_or_spec_file(filename)
+pub(super) fn is_test_file(path: &ProjectPath) -> bool {
+    matches!(path.as_str(), "" | "<input>" | "<text>") || is_test_or_spec_file(path)
 }

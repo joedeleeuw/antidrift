@@ -1,4 +1,5 @@
 use super::syntax::is_function_like;
+use antidrift_kernel::file_role::ProjectPath;
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
@@ -81,8 +82,8 @@ impl Rule for NoEagerSingleton {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let in_default_script_root =
-            !self.scope.has_explicit_files() && is_script_or_worker_entry(ctx.file.file_name());
+        let in_default_script_root = !self.scope.has_explicit_files()
+            && is_script_or_worker_entry(&ProjectPath::of(ctx.program, ctx.file.file_name()));
         Box::new(Visitor {
             rule: self,
             enabled: !in_default_script_root && self.scope.in_scope(ctx),
@@ -90,8 +91,8 @@ impl Rule for NoEagerSingleton {
     }
 }
 
-fn is_script_or_worker_entry(file_name: &str) -> bool {
-    let norm = file_name.replace('\\', "/");
+fn is_script_or_worker_entry(path: &ProjectPath) -> bool {
+    let norm = path.as_str();
     norm.contains("/scripts/")
         || norm.starts_with("scripts/")
         || norm.contains("/bin/")

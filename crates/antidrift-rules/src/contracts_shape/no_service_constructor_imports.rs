@@ -136,7 +136,10 @@ fn resolve_module_symbol(ctx: &mut Ctx, module_specifier: P<Node>) -> Option<P<S
 }
 
 fn check_import_declaration(ctx: &mut Ctx, import: P<Node>) {
-    if file_role::is_test_file(ctx.file.file_name()) {
+    if file_role::is_test_file(&file_role::ProjectPath::of(
+        ctx.program,
+        ctx.file.file_name(),
+    )) {
         return;
     }
     let import_decl = import.as_import_declaration();

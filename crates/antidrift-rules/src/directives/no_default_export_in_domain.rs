@@ -1,4 +1,4 @@
-use antidrift_kernel::file_role::is_test_or_spec_file;
+use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, ModifierFlags, Node};
 use tsrs_core::P;
@@ -37,15 +37,16 @@ impl Rule for NoDefaultExportInDomain {
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let cwd = ctx.program.host().get_current_directory();
         let filename = ctx.file.file_name().replace('\\', "/");
+        let path = ProjectPath::of(ctx.program, &filename);
         let in_scope = if self.scope.has_explicit_files() {
             self.scope.matches(&filename, cwd)
         } else {
-            self.scope.matches(&filename, cwd) && is_domain_file(&filename)
+            self.scope.matches(&filename, cwd) && is_domain_file(path.as_str())
         };
         let enabled = in_scope
-            && !is_test_or_spec_file(&filename)
-            && !is_migration_file(&filename)
-            && !is_generated_or_declaration_module(&filename);
+            && !is_test_or_spec_file(&path)
+            && !is_migration_file(path.as_str())
+            && !is_generated_or_declaration_module(path.as_str());
         Box::new(Visitor { enabled })
     }
 }

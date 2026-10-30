@@ -83,11 +83,19 @@ pub(crate) fn run_batch_json(source_spec: &str) -> Result<String, String> {
 fn evaluate_single_case(case: &BatchCaseInput) -> Result<BatchCaseOutput, String> {
     let rule_set = build_case_rules(case)?;
     let normalized_file = tspath::normalize_slashes(&case.filename);
-    let dir = case
-        .cwd
-        .as_deref()
-        .map(tspath::normalize_slashes)
-        .unwrap_or_else(|| tspath::get_directory_path(&normalized_file));
+    let dir = match case.cwd.as_deref() {
+        Some(cwd) => tspath::normalize_slashes(cwd),
+        None => tspath::normalize_slashes(
+            &std::env::current_dir()
+                .map_err(|err| {
+                    format!(
+                        "batch case '{}': cannot read the working directory: {err}",
+                        case.id
+                    )
+                })?
+                .to_string_lossy(),
+        ),
+    };
     let diagnostics = lint_source_file(
         &normalized_file,
         &case.source_text,

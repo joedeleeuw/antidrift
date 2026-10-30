@@ -301,8 +301,10 @@ impl Rule for NoWrappingFunctions {
         let cwd = ctx.program.host().get_current_directory();
         let file_name = ctx.file.file_name();
         let enabled = self.scope.matches(file_name, cwd)
-            && (self.scope.has_explicit_files()
-                || !file_role::is_generated_file(file_name, ctx.file.text()));
+            && !self.scope.skips_generated(
+                &file_role::ProjectPath::of(ctx.program, file_name),
+                ctx.file.text(),
+            );
         Box::new(Visitor { enabled })
     }
 }
