@@ -6,7 +6,7 @@ Regular linters check syntax and a handful of correctness rules. They don't noti
 
 antidrift writes those patterns down as deterministic rules so the machine catches them instead of you.
 
-All 83 `antidrift/*` rules run in a single native Rust engine (`antidrift-linter`, built on `tsrs_ast`, `tsrs_compiler`, `tsrs_checker`, and `tsrslint`) invoked through `antidrift oxlint`. Generic TypeScript and maintained third-party rules belong to `@joedeleeuw/typescript-tooling`; consumers choose their broader React, Vitest, import-style, and repository-boundary baselines.
+All 98 `antidrift/*` rules run in a single native Rust engine (`antidrift-linter`, built on `tsrs_ast`, `tsrs_compiler`, `tsrs_checker`, and `tsrslint`) invoked through `antidrift oxlint`. Generic TypeScript and maintained third-party rules belong to `@joedeleeuw/typescript-tooling`; consumers choose their broader React, Vitest, import-style, and repository-boundary baselines.
 
 Antidrift's custom rules concentrate on contract ownership, boundary decoding, independent test oracles, resource lifecycles, and framework-specific proof. React, Convex, Effect, TanStack, and Bun integrations are not repository-specific. Naming, comment, layout, token, and architecture conventions are consumer policy; configure their scopes rather than treating them as universal correctness.
 
@@ -66,7 +66,12 @@ const tooling = createConfig({ repoRoot: import.meta.dirname });
 
 export default {
   ...tooling,
-  rules: { ...tooling.rules, ...governance.rules, "max-lines": "off" },
+  rules: {
+    ...tooling.rules,
+    ...governance.rules,
+    "max-lines": "off",
+    "max-lines-per-function": "off",
+  },
   ignorePatterns: [
     ...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns]),
   ],

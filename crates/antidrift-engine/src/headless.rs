@@ -103,7 +103,10 @@ struct ConfigRulePlan {
     inject_defaults: bool,
 }
 
-fn push_unique_rule(config_rules: &mut Vec<&'static dyn Rule>, candidate: &'static dyn Rule) {
+pub(crate) fn push_unique_rule(
+    config_rules: &mut Vec<&'static dyn Rule>,
+    candidate: &'static dyn Rule,
+) {
     if !config_rules
         .iter()
         .any(|existing| existing.name() == candidate.name())

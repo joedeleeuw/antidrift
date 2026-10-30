@@ -13,9 +13,9 @@ use tsrslint::linter::{Options, lint_files};
 use tsrslint::rule::Rule;
 
 use crate::batch::reported_to_rule_diagnostic;
-use crate::headless::default_workspace_rules;
+use crate::headless::{default_workspace_rules, push_unique_rule};
 use crate::headless_host::{BoundProgram, ProgramBuilderEnv, collect_missing_bound_files};
-use crate::runner::collect_lintable_files;
+use crate::runner::{collect_lintable_files, is_supported_file};
 
 #[derive(Clone)]
 pub struct Finding {
@@ -39,7 +39,10 @@ impl Session {
     pub fn new(cwd: &str) -> Result<Self, String> {
         tsrs_checker::links::set_sparse_id_pages(true);
         let registries = PolicyRegistries::load_from_repo(Path::new(cwd))?;
-        let rules = default_workspace_rules(&registries)?;
+        let mut rules = default_workspace_rules(&registries)?;
+        for rule in antidrift_rules::all_rules() {
+            push_unique_rule(&mut rules, rule);
+        }
         let script_rules = rules
             .iter()
             .copied()
@@ -65,6 +68,9 @@ impl Session {
     }
 
     pub fn lint_file(&mut self, file_path: &str) -> Result<Vec<Finding>, String> {
+        if !is_supported_file(Path::new(file_path)) {
+            return Ok(Vec::new());
+        }
         let normalized = tspath::normalize_slashes(file_path);
         if !self.workspace_linted {
             let files = collect_lintable_files(&[PathBuf::from(&self.cwd)], Path::new(&self.cwd))?;

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [policy-change] `createGovernanceOxlintConfig` sets only keys antidrift owns: `ignorePatterns`, `overrides` and `rules`, which holds `no-restricted-imports` only when governance import rules are configured. It no longer sets `categories`, `plugins`, `jsPlugins` or `options` (`denyWarnings`, `reportUnusedDisableDirectives`), and no longer turns off `max-lines` and `max-lines-per-function`; adopters choose those in their own config, as the README composition shows.
 - Build the release `antidrift-linter` with thin LTO and 16 codegen units (`strip = "symbols"` unchanged), replacing fat LTO with one codegen unit. A clean release build drops from about 127s to 47s; diagnostics are byte-identical on an 864-file corpus, the binary grows from 19.95 MB to 24.56 MB, and corpus CPU time rises about 4%.
 
 ## 0.20.0

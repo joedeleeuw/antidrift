@@ -233,7 +233,7 @@ pub(crate) fn collect_lintable_files(
     Ok(collected)
 }
 
-fn is_supported_file(path: &Path) -> bool {
+pub(crate) fn is_supported_file(path: &Path) -> bool {
     let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
         return false;
     };

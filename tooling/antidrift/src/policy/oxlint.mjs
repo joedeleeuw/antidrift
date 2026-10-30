@@ -60,7 +60,7 @@ const NATIVE_ARTIFACTS = {
       "../bin/antidrift-linter",
       "dist/bin/antidrift-linter",
     ],
-    packageFile: "antidrift-linter",
+    packageSubpath: "",
   },
   addon: {
     env: "ANTIDRIFT_NAPI_ADDON",
@@ -69,7 +69,7 @@ const NATIVE_ARTIFACTS = {
       `target/release/${ADDON_LIBRARY_NAMES[process.platform]}`,
     ],
     staged: ["dist/bin/antidrift.node"],
-    packageFile: "antidrift.node",
+    packageSubpath: "/antidrift.node",
   },
 };
 
@@ -94,7 +94,7 @@ function platformArtifactPackages(artifact) {
   try {
     return [
       require.resolve(
-        `@joedeleeuw/antidrift-linter-${platformKey}/${artifact.packageFile}`
+        `@joedeleeuw/antidrift-linter-${platformKey}${artifact.packageSubpath}`
       ),
     ];
   } catch (error) {

@@ -123,10 +123,14 @@ function proveIdleDirective(repoRoot, project) {
 }
 
 export function proveOxlintPluginBridge(repoRoot) {
-  execFileSync("cargo", ["build", "-p", "antidrift-napi", "--quiet"], {
-    cwd: repoRoot,
-    stdio: "inherit",
-  });
+  execFileSync(
+    "cargo",
+    ["build", "--locked", "-p", "antidrift-napi", "--quiet"],
+    {
+      cwd: repoRoot,
+      stdio: "inherit",
+    }
+  );
   const project = writeProject();
   try {
     proveConfiguredLevels(repoRoot, project);
