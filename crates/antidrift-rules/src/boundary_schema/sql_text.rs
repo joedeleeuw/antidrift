@@ -1,4 +1,6 @@
-use antidrift_kernel::tsrs_kernel::cooked_text;
+use std::borrow::Cow;
+
+use antidrift_kernel::tsrs_kernel::cooked_text_lossy;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 
@@ -67,21 +69,18 @@ pub(super) fn is_static_string(node: P<Node>) -> bool {
     )
 }
 
-pub(super) fn static_string_text(node: P<Node>) -> Option<String> {
-    is_static_string(node)
-        .then_some(node)
-        .and_then(cooked_text)
-        .map(str::to_owned)
+pub(super) fn static_string_text(node: P<Node>) -> Option<Cow<'static, str>> {
+    is_static_string(node).then(|| cooked_text_lossy(node))
 }
 
-pub(super) fn combined_template_text(template_node: P<Node>) -> Option<String> {
+pub(super) fn combined_template_text(template_node: P<Node>) -> String {
     let template = template_node.as_template_expression();
-    let mut out = String::from(cooked_text(template.head)?);
+    let mut out = cooked_text_lossy(template.head).into_owned();
     for &span in template.template_spans.nodes() {
         out.push(' ');
-        out.push_str(cooked_text(span.as_template_span().literal)?);
+        out.push_str(&cooked_text_lossy(span.as_template_span().literal));
     }
-    Some(out)
+    out
 }
 
 pub(super) fn is_sql_statement(text: &str) -> bool {

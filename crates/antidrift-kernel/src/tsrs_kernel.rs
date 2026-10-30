@@ -1,4 +1,6 @@
+use std::borrow::Cow;
 pub use tsrs_ast::skip_parentheses as unwrap_parentheses;
+
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 pub use tsrs_core::tspath::normalize_slashes as normalize_path;
@@ -383,13 +385,24 @@ pub fn numeric_literal_value(expression: P<Node>) -> Option<f64> {
 #[must_use]
 #[expect(
     clippy::disallowed_methods,
-    reason = "cooked_text is the one reader of tsrs cooked text; it validates the WTF-8 bytes tsrs stores for lone-surrogate escapes before any caller decodes chars"
+    reason = "cooked_text is the exact reader of tsrs cooked text; it validates the WTF-8 bytes tsrs stores for lone-surrogate escapes before any caller decodes chars"
 )]
 pub fn cooked_text(node: P<Node>) -> Option<&'static str> {
-    let cooked = node.text();
-    std::str::from_utf8(cooked.as_bytes())
-        .is_ok()
-        .then_some(cooked)
+    decodable_text(node.text())
+}
+
+#[must_use]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "cooked_text_lossy is the classifying reader of tsrs cooked text; it replaces the WTF-8 bytes tsrs stores for lone-surrogate escapes with U+FFFD so a classifier still sees the surrounding text"
+)]
+pub fn cooked_text_lossy(node: P<Node>) -> Cow<'static, str> {
+    String::from_utf8_lossy(node.text().as_bytes())
+}
+
+#[must_use]
+pub fn decodable_text(text: &str) -> Option<&str> {
+    std::str::from_utf8(text.as_bytes()).is_ok().then_some(text)
 }
 
 #[must_use]

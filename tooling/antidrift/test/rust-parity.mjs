@@ -235,6 +235,9 @@ const loneSurrogateSource = [
   'export function fail() { throw new Error("\\uD83D"); }',
   'export function View() { return <div className={"text-foreground/50 \\uD83D"} title="\\uDBFF">{"\\uD800"}</div>; }',
   'export function Valid() { return <div className="text-foreground/50">ok</div>; }',
+  "declare const userInput: string;",
+  'export const concatQuery = "SELECT * FROM users WHERE name = \'\\uD83D" + userInput + "\'";',
+  "export const templateQuery = `SELECT * FROM users WHERE name = '${userInput}' -- \\uD83D`;",
 ].join("\n");
 const loneSurrogateDiags = runHeadlessProbe({
   version: 2,
@@ -252,6 +255,13 @@ assert.deepEqual(
     .map((diag) => diag.range.pos),
   [loneSurrogateSource.indexOf('"text-foreground/50">ok')],
   `Lone-surrogate literals must lint without aborting and leave the valid className reported, got ${JSON.stringify(loneSurrogateDiags)}`
+);
+assert.equal(
+  loneSurrogateDiags.filter(
+    (diag) => diag.message.id === "antidrift/no-sql-string-concat"
+  ).length,
+  2,
+  `A lone surrogate in a SQL fragment must not hide the dynamic input, got ${JSON.stringify(loneSurrogateDiags)}`
 );
 
 const sqlDefaultDiags = runHeadlessProbe(
@@ -888,6 +898,10 @@ try {
       "export function GET(): Response {\n  return Response.json([]);\n}\n",
     "src/shared/asyncShared.ts":
       "export async function asyncShared(): Promise<number> {\n  return Promise.resolve(1);\n}\n",
+    "src/methods/surrogateKey.ts":
+      'export async function surrogateKey(input: { "x\\uD83D": string }): Promise<string> {\n  return Promise.resolve(input["x\\uD83D"]);\n}\n',
+    "src/methods/surrogateLiteral.ts":
+      'export async function surrogateLiteral(): Promise<"\\uD83D"> {\n  return "\\uD83D";\n}\n',
     "src/client/leaky.ts":
       'import { listTodos } from "../server/store";\n\nexport function leak(): Promise<number> {\n  return listTodos("any").then((todos) => todos.length);\n}\n',
   };
@@ -915,12 +929,22 @@ try {
       "methods/callbacky.ts method-param-not-wire",
       "methods/optionalArg.ts method-param-not-wire",
       "methods/renamed.ts method-export-name",
+      "methods/surrogateKey.ts method-param-not-wire",
+      "methods/surrogateLiteral.ts method-result-not-wire",
       "methods/syncMethod.ts method-must-be-async",
       "methods/voidResult.ts method-result-not-wire",
       "routes/lists/route.ts route-must-be-async",
       "shared/asyncShared.ts shared-must-be-sync",
     ]
   );
+  const strictUtf8 = new TextDecoder("utf-8", { fatal: true });
+  for (const name of generatedFiles) {
+    assert.doesNotThrow(
+      () =>
+        strictUtf8.decode(readFileSync(join(copyRoot, "src/generated", name))),
+      `derive must write ${name} as valid UTF-8`
+    );
+  }
   for (const name of ["wire.ts", "client.ts", "server.ts"]) {
     assert.equal(
       readFileSync(join(copyRoot, "src/generated", name), "utf8"),

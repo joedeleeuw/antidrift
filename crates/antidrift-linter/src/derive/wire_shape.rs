@@ -1,4 +1,5 @@
 use antidrift_kernel::shape::{has_string_or_number_index_signature, is_true_literal_type};
+use antidrift_kernel::tsrs_kernel::decodable_text;
 use serde::Serialize;
 use tsrs_ast::SymbolFlags;
 use tsrs_checker::{Checker, LiteralValue, ObjectFlags, SignatureKind, Type, TypeFlags};
@@ -115,9 +116,17 @@ fn literal_shape(
     path: &str,
 ) -> Result<WireShape, ShapeProblem> {
     match typ.as_literal_type().value() {
-        Some(LiteralValue::String(text)) => Ok(WireShape::Literal {
-            value: WireLiteral::Text(text.to_owned()),
-        }),
+        Some(LiteralValue::String(text)) => decodable_text(text)
+            .map(|text| WireShape::Literal {
+                value: WireLiteral::Text(text.to_owned()),
+            })
+            .ok_or_else(|| {
+                ShapeProblem::at(
+                    path,
+                    "is a string literal holding a lone surrogate, which cannot cross the wire"
+                        .to_owned(),
+                )
+            }),
         Some(LiteralValue::Number(_)) => {
             let printed = checker.type_to_string_exported(typ);
             printed
@@ -281,8 +290,15 @@ fn object_shape(
     }
     let mut fields = Vec::new();
     for &property in checker.get_properties_of_type(typ) {
+        let Some(name) = decodable_text(property.name()) else {
+            return Err(ShapeProblem::at(
+                path,
+                "has a property name holding a lone surrogate, which cannot cross the wire"
+                    .to_owned(),
+            ));
+        };
         let optional = property.flags().contains(SymbolFlags::Optional);
-        let field_path = format!("{path}.{}", property.name());
+        let field_path = format!("{path}.{name}");
         let declared = checker.get_type_of_symbol(property);
         let shape = if optional {
             optional_shape(checker, declared, &field_path, depth + 1)?
@@ -290,7 +306,7 @@ fn object_shape(
             shape_of(checker, declared, &field_path, depth + 1)?
         };
         fields.push(WireField {
-            name: property.name().to_owned(),
+            name: name.to_owned(),
             optional,
             shape,
         });

@@ -5,7 +5,7 @@ use super::sql_text::{
 };
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions};
 use antidrift_kernel::tsrs_kernel;
-use antidrift_kernel::tsrs_kernel::cooked_text;
+use antidrift_kernel::tsrs_kernel::cooked_text_lossy;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::Checker;
@@ -145,7 +145,7 @@ impl NoSqlStringConcat {
                 .template_spans
                 .nodes()
                 .is_empty()
-            && combined_template_text(node).is_some_and(|text| is_sql_statement(&text))
+            && is_sql_statement(&combined_template_text(node))
             && self.has_unsafe_sql_interpolation(node, ctx.checker)
         {
             ctx.report_node(node, RuleMessage::new("no-sql-string-concat", MESSAGE));
@@ -164,7 +164,7 @@ impl NoSqlStringConcat {
         }
         if self.is_trusted_sql_template_tag(tagged.tag, ctx.checker) {
             self.report_unsafe_raw_fragments(spans, ctx);
-        } else if combined_template_text(template).is_some_and(|text| is_sql_statement(&text))
+        } else if is_sql_statement(&combined_template_text(template))
             && self.has_unsafe_sql_interpolation(template, ctx.checker)
         {
             ctx.report_node(node, RuleMessage::new("no-sql-string-concat", MESSAGE));
@@ -176,19 +176,17 @@ impl NoSqlStringConcat {
         let spans = template.template_spans.nodes();
         spans.iter().enumerate().any(|(idx, &span_node)| {
             let before = if idx == 0 {
-                cooked_text(template.head)
+                cooked_text_lossy(template.head)
             } else {
-                cooked_text(spans[idx - 1].as_template_span().literal)
+                cooked_text_lossy(spans[idx - 1].as_template_span().literal)
             };
             let span = span_node.as_template_span();
-            let (Some(before), Some(after)) = (before, cooked_text(span.literal)) else {
-                return false;
-            };
+            let after = cooked_text_lossy(span.literal);
             let expr = tsrs_kernel::unwrap_expression(span.expression);
             let safe = is_static_string(expr)
                 || (self.is_trusted_identifier_member(expr, checker)
-                    && is_sql_identifier_context(before, after));
-            !safe && is_sql_interpolation_context(before, after)
+                    && is_sql_identifier_context(&before, &after));
+            !safe && is_sql_interpolation_context(&before, &after)
         })
     }
 
