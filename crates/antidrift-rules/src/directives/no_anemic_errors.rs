@@ -6,7 +6,7 @@ use super::anemic_error_fallback::{
 use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
 use antidrift_kernel::rule_scope::RuleScope;
 use antidrift_kernel::tsrs_kernel::{
-    property_name_text, unwrap_awaited_expression, unwrap_expression,
+    cooked_text, property_name_text, unwrap_awaited_expression, unwrap_expression,
 };
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -293,9 +293,9 @@ fn check_throw_statement(ctx: &mut Ctx, throw_node: P<Node>, active_catch_param:
     let unwrapped_first = unwrap_expression(first_arg);
     if ctor_name == "Error"
         && unwrapped_first.kind() == Kind::StringLiteral
-        && is_vague_error_message(unwrapped_first.as_string_literal().text())
+        && let Some(message) = cooked_text(unwrapped_first)
+        && is_vague_error_message(message)
     {
-        let message = unwrapped_first.as_string_literal().text();
         ctx.report_node(
             throw_node,
             RuleMessage::new(
@@ -342,16 +342,12 @@ fn is_bare_caught_error_message(expr: P<Node>, error_name: &str) -> bool {
         }
         Kind::TemplateExpression => {
             let tpl = target.as_template_expression();
-            let head_empty = tpl.head().as_template_head().text().trim().is_empty();
+            let head_empty = cooked_text(tpl.head()).is_some_and(|head| head.trim().is_empty());
             let spans = tpl.template_spans().nodes();
             head_empty
                 && spans.len() == 1
-                && spans[0]
-                    .as_template_span()
-                    .literal()
-                    .text()
-                    .trim()
-                    .is_empty()
+                && cooked_text(spans[0].as_template_span().literal())
+                    .is_some_and(|tail| tail.trim().is_empty())
                 && is_bare_caught_error_message(
                     spans[0].as_template_span().expression(),
                     error_name,
@@ -390,7 +386,7 @@ fn is_anemic_return_object(obj: P<Node>) -> bool {
         }
         if key_name == Some("error")
             && val.kind() == Kind::StringLiteral
-            && is_vague_error_message(val.as_string_literal().text())
+            && cooked_text(val).is_some_and(is_vague_error_message)
         {
             has_vague_error = true;
         }

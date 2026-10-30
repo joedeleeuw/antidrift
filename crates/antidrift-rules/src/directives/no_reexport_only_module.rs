@@ -1,4 +1,5 @@
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -70,6 +71,9 @@ impl ModuleShape {
         let Some(clause) = decl.import_clause() else {
             return false;
         };
+        let Some(specifier) = cooked_text(decl.module_specifier()) else {
+            return false;
+        };
         let import_clause = clause.as_import_clause();
         if let Some(default_name) = import_clause.name() {
             self.imported.insert(default_name.as_identifier().text());
@@ -93,7 +97,7 @@ impl ModuleShape {
             }
             Some(_) => return false,
         }
-        self.specifiers.push(decl.module_specifier().text());
+        self.specifiers.push(specifier);
         true
     }
 
@@ -117,10 +121,13 @@ impl ModuleShape {
             Kind::ExportDeclaration => {
                 let decl = stmt.as_export_declaration();
                 match decl.module_specifier() {
-                    Some(specifier) => {
-                        self.specifiers.push(specifier.text());
-                        true
-                    }
+                    Some(specifier) => match cooked_text(specifier) {
+                        Some(text) => {
+                            self.specifiers.push(text);
+                            true
+                        }
+                        None => false,
+                    },
                     None => self.record_local_exports(decl.export_clause()),
                 }
             }

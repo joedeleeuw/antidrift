@@ -1,4 +1,5 @@
 use super::no_repo_state_mirror_assertion::RepoStateSourceOption;
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashMap;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -29,7 +30,9 @@ fn collect_from_import_decl(
     if !ast::is_string_literal(spec_lit) {
         return;
     }
-    let module_specifier = spec_lit.as_string_literal().text();
+    let Some(module_specifier) = cooked_text(spec_lit) else {
+        return;
+    };
     let Some(clause_node) = import_decl.import_clause() else {
         return;
     };

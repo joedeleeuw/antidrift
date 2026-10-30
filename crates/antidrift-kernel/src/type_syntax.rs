@@ -1,3 +1,4 @@
+use crate::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile, SymbolFlags};
 use tsrs_core::P;
@@ -150,7 +151,7 @@ pub fn type_reference_name(type_name: P<Node>) -> Option<String> {
 pub fn property_key_name(key: P<Node>) -> Option<String> {
     match key.kind() {
         Kind::Identifier => Some(key.as_identifier().text().to_owned()),
-        Kind::StringLiteral => Some(key.as_string_literal().text().to_owned()),
+        Kind::StringLiteral => cooked_text(key).map(str::to_owned),
         _ => None,
     }
 }
@@ -164,7 +165,7 @@ pub fn literal_keys_of(type_node: Option<P<Node>>) -> Vec<String> {
         Kind::LiteralType => {
             let lit = node.as_literal_type_node().literal();
             if lit.kind() == Kind::StringLiteral {
-                vec![lit.as_string_literal().text().to_owned()]
+                cooked_text(lit).map(str::to_owned).into_iter().collect()
             } else {
                 Vec::new()
             }

@@ -1,3 +1,4 @@
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 
@@ -59,22 +60,28 @@ pub(super) fn normalized_sql_context(text: &str) -> String {
         .join(" ")
 }
 
-pub(super) fn static_string_text(node: P<Node>) -> Option<String> {
+pub(super) fn is_static_string(node: P<Node>) -> bool {
     matches!(
         node.kind(),
         Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral
     )
-    .then(|| node.text().to_owned())
 }
 
-pub(super) fn combined_template_text(template_node: P<Node>) -> String {
+pub(super) fn static_string_text(node: P<Node>) -> Option<String> {
+    is_static_string(node)
+        .then_some(node)
+        .and_then(cooked_text)
+        .map(str::to_owned)
+}
+
+pub(super) fn combined_template_text(template_node: P<Node>) -> Option<String> {
     let template = template_node.as_template_expression();
-    let mut out = String::from(template.head.text());
+    let mut out = String::from(cooked_text(template.head)?);
     for &span in template.template_spans.nodes() {
         out.push(' ');
-        out.push_str(span.as_template_span().literal.text());
+        out.push_str(cooked_text(span.as_template_span().literal)?);
     }
-    out
+    Some(out)
 }
 
 pub(super) fn is_sql_statement(text: &str) -> bool {

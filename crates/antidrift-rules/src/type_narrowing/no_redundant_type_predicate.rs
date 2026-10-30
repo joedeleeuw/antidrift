@@ -1,3 +1,4 @@
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::{Checker, Signature, Type, TypeFlags};
 use tsrs_core::P;
@@ -123,7 +124,8 @@ fn check_equality_sides(side: P<Node>, other: P<Node>, param_name: &str) -> Opti
     if side.kind() == Kind::TypeOfExpression
         && is_param_ident(side.as_type_of_expression().expression(), param_name)
         && ast::is_string_literal(other)
-        && let Some(target) = TypeofTarget::from_literal(other.as_string_literal().text())
+        && let Some(literal) = cooked_text(other)
+        && let Some(target) = TypeofTarget::from_literal(literal)
     {
         return Some(NativeCheck::TypeOf(target));
     }

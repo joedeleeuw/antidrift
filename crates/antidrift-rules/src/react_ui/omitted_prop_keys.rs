@@ -1,4 +1,4 @@
-use antidrift_kernel::tsrs_kernel::node_text;
+use antidrift_kernel::tsrs_kernel::{cooked_text, node_text};
 use antidrift_kernel::type_syntax::{
     LocalTypeAliases, ReferenceKind, as_reference, intersect_all, is_empty_union_branch,
     property_key_name, type_reference_name,
@@ -38,9 +38,11 @@ fn type_signature(aliases: &LocalTypeAliases, type_node: Option<P<Node>>) -> Str
         Kind::LiteralType => {
             let lit = type_node.as_literal_type_node().literal();
             match lit.kind() {
-                Kind::StringLiteral => serde_json::to_string(lit.as_string_literal().text())
-                    .unwrap_or_else(|_| "null".to_owned()),
-                Kind::NumericLiteral => lit.text().to_owned(),
+                Kind::StringLiteral => cooked_text(lit).map_or_else(
+                    || "null".to_owned(),
+                    |text| serde_json::to_string(text).unwrap_or_else(|_| "null".to_owned()),
+                ),
+                Kind::NumericLiteral => lit.as_numeric_literal().text().to_owned(),
                 Kind::TrueKeyword => "true".to_owned(),
                 Kind::FalseKeyword => "false".to_owned(),
                 _ => "null".to_owned(),

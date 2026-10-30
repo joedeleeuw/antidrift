@@ -220,6 +220,40 @@ for (const [idx, probe] of headlessProbes.entries()) {
   );
 }
 
+const loneSurrogateFile = resolve(
+  repoRoot,
+  "tooling/antidrift/src/__probe_lone_surrogate.tsx"
+);
+const loneSurrogateSource = [
+  'export const lone = "a\\uD83D";',
+  "export const tail = 'b\\uDE00 c';",
+  "export const plain = `x\\uD83D y`;",
+  "export const spans = `h\\uD83D ${lone} m\\uDE00 ${tail} t\\uD800`;",
+  'export const keyed = { "\\uD83D": 1, ["\\uDE00"]: 2 };',
+  'export const picked = keyed["\\uD83D"];',
+  'export function guard(value: unknown) { return typeof value === "\\uD83D"; }',
+  'export function fail() { throw new Error("\\uD83D"); }',
+  'export function View() { return <div className={"text-foreground/50 \\uD83D"} title="\\uDBFF">{"\\uD800"}</div>; }',
+  'export function Valid() { return <div className="text-foreground/50">ok</div>; }',
+].join("\n");
+const loneSurrogateDiags = runHeadlessProbe({
+  version: 2,
+  configs: [
+    {
+      file_paths: [loneSurrogateFile],
+      rules: [...registeredRules].map((name) => ({ name })),
+    },
+  ],
+  source_overrides: { [loneSurrogateFile]: loneSurrogateSource },
+});
+assert.deepEqual(
+  loneSurrogateDiags
+    .filter((diag) => diag.message.id === "antidrift/no-raw-foreground-opacity")
+    .map((diag) => diag.range.pos),
+  [loneSurrogateSource.indexOf('"text-foreground/50">ok')],
+  `Lone-surrogate literals must lint without aborting and leave the valid className reported, got ${JSON.stringify(loneSurrogateDiags)}`
+);
+
 const sqlDefaultDiags = runHeadlessProbe(
   {
     version: 2,

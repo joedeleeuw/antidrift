@@ -2,7 +2,7 @@ use antidrift_kernel::local_binding::{
     Binding, enclosing_variable_declaration, resolve_lexical_binding,
 };
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
-use antidrift_kernel::tsrs_kernel::unwrap_expression;
+use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -78,7 +78,7 @@ impl RuleVisitor for Visitor {
 fn static_key_name(key: P<Node>) -> Option<&'static str> {
     match key.kind() {
         Kind::Identifier => Some(key.as_identifier().text()),
-        Kind::StringLiteral => Some(key.as_string_literal().text()),
+        Kind::StringLiteral => cooked_text(key),
         _ => None,
     }
 }

@@ -5,6 +5,7 @@ use super::syntax::{
 };
 use antidrift_kernel::local_binding::is_identifier_reference_position;
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -233,7 +234,7 @@ fn network_kind(callee: P<Node>, api_module: Option<&str>) -> Option<NetworkKind
         if node.kind() == Kind::ImportDeclaration {
             let module_spec = node.as_import_declaration().module_specifier();
             return (ast::is_string_literal(module_spec)
-                && api_module == Some(module_spec.as_string_literal().text()))
+                && cooked_text(module_spec).is_some_and(|module| api_module == Some(module)))
             .then_some(NetworkKind::Eden);
         }
         cursor = node.parent();

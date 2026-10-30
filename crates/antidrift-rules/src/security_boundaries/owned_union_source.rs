@@ -1,7 +1,7 @@
 use antidrift_kernel::local_binding::{
     Binding, is_const_variable_declaration, lookup_scope_binding, resolve_lexical_binding,
 };
-use antidrift_kernel::tsrs_kernel::{is_const_assertion, numeric_literal_value};
+use antidrift_kernel::tsrs_kernel::{cooked_text, is_const_assertion, numeric_literal_value};
 use rustc_hash::FxHashSet;
 use std::collections::{BTreeMap, BTreeSet};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -24,9 +24,9 @@ pub(super) struct ExportedArray {
 
 pub(super) fn literal_expression(expression: P<Node>) -> Option<OwnedLiteral> {
     match expression.kind() {
-        Kind::StringLiteral => Some(OwnedLiteral::Text(
-            expression.as_string_literal().text().to_owned(),
-        )),
+        Kind::StringLiteral => {
+            cooked_text(expression).map(|text| OwnedLiteral::Text(text.to_owned()))
+        }
         Kind::NumericLiteral => numeric_literal_value(expression).map(number_literal),
         Kind::PrefixUnaryExpression => {
             let unary = expression.as_prefix_unary_expression();
@@ -165,7 +165,7 @@ fn collect_export_declaration(statement: P<Node>, exports: &mut Vec<(String, Str
 fn module_export_name(node: P<Node>) -> Option<&'static str> {
     match node.kind() {
         Kind::Identifier => Some(node.as_identifier().text()),
-        Kind::StringLiteral => Some(node.as_string_literal().text()),
+        Kind::StringLiteral => cooked_text(node),
         _ => None,
     }
 }
@@ -239,7 +239,7 @@ pub(super) fn convex_bindings(sf: P<SourceFile>) -> FxHashSet<Binding> {
         }
         let import = statement.as_import_declaration();
         let spec = import.module_specifier();
-        if !ast::is_string_literal(spec) || spec.as_string_literal().text() != "convex/values" {
+        if !ast::is_string_literal(spec) || cooked_text(spec) != Some("convex/values") {
             continue;
         }
         let Some(clause_node) = import.import_clause() else {
@@ -336,7 +336,7 @@ pub(super) fn call_site(node: P<Node>) -> Option<String> {
                 let prop = ancestor.as_property_assignment().name();
                 let name = match prop.kind() {
                     Kind::Identifier => Some(prop.as_identifier().text()),
-                    Kind::StringLiteral => Some(prop.as_string_literal().text()),
+                    Kind::StringLiteral => cooked_text(prop),
                     _ => None,
                 }?;
                 segments.push(name.to_owned());

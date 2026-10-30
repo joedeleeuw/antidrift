@@ -1,5 +1,6 @@
 use antidrift_kernel::file_role;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{boundary, provenance};
 use tsrs_ast::{Kind, Node, SourceFile, Symbol};
 use tsrs_core::P;
@@ -147,6 +148,9 @@ fn check_import_declaration(ctx: &mut Ctx, import: P<Node>) {
     if module_specifier.kind() != Kind::StringLiteral {
         return;
     }
+    let Some(module_text) = cooked_text(module_specifier) else {
+        return;
+    };
     let Some(target_file) = provenance::resolve_imported_source_file(ctx.checker, module_specifier)
     else {
         return;
@@ -159,7 +163,6 @@ fn check_import_declaration(ctx: &mut Ctx, import: P<Node>) {
     if !prov.has_service_contract || prov.constructor_symbols.is_empty() {
         return;
     }
-    let module_text = module_specifier.as_string_literal().text();
     for binding in collect_import_bindings(import_decl.import_clause()) {
         check_import_binding(ctx, import, module_text, &prov, &binding);
     }

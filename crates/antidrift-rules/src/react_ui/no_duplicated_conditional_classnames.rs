@@ -1,6 +1,6 @@
 use antidrift_kernel::jsx::attribute_name;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
-use antidrift_kernel::tsrs_kernel::{is_function_like, unwrap_expression};
+use antidrift_kernel::tsrs_kernel::{cooked_text, is_function_like, unwrap_expression};
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -206,8 +206,10 @@ fn callee_name(callee: P<Node>) -> &'static str {
         }
         Kind::ElementAccessExpression => {
             let arg = callee.as_element_access_expression().argument_expression();
-            if arg.kind() == Kind::StringLiteral {
-                arg.as_string_literal().text()
+            if arg.kind() == Kind::StringLiteral
+                && let Some(name) = cooked_text(arg)
+            {
+                name
             } else {
                 ""
             }
@@ -238,8 +240,7 @@ fn is_class_helper_argument(node: P<Node>, options: &ClassnameOptions) -> bool {
 fn static_string(expression: P<Node>) -> Option<&'static str> {
     let inner = unwrap_expression(expression);
     match inner.kind() {
-        Kind::StringLiteral => Some(inner.as_string_literal().text()),
-        Kind::NoSubstitutionTemplateLiteral => Some(inner.text()),
+        Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral => cooked_text(inner),
         _ => None,
     }
 }

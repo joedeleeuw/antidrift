@@ -1,3 +1,4 @@
+use crate::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, BinaryExpression, Kind, Node};
 use tsrs_core::P;
 
@@ -13,7 +14,7 @@ fn same_simple_expr(left: P<Node>, right: P<Node>) -> bool {
         Kind::Identifier => left_node.as_identifier().text() == right_node.as_identifier().text(),
         Kind::ThisKeyword | Kind::SuperKeyword => true,
         Kind::StringLiteral | Kind::NumericLiteral | Kind::NoSubstitutionTemplateLiteral => {
-            left_node.text() == right_node.text()
+            cooked_text(left_node).is_some_and(|left| cooked_text(right_node) == Some(left))
         }
         Kind::PropertyAccessExpression => {
             let left_pa = left_node.as_property_access_expression();
@@ -42,13 +43,13 @@ fn same_simple_expr(left: P<Node>, right: P<Node>) -> bool {
 fn typeof_string_operand(left: P<Node>, right: P<Node>) -> Option<P<Node>> {
     if left.kind() == Kind::TypeOfExpression
         && ast::is_string_literal(right)
-        && right.as_string_literal().text() == "string"
+        && cooked_text(right) == Some("string")
     {
         return Some(left.as_type_of_expression().expression());
     }
     if right.kind() == Kind::TypeOfExpression
         && ast::is_string_literal(left)
-        && left.as_string_literal().text() == "string"
+        && cooked_text(left) == Some("string")
     {
         return Some(right.as_type_of_expression().expression());
     }

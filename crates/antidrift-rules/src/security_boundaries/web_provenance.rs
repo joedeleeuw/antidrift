@@ -2,7 +2,7 @@ pub(super) use antidrift_kernel::local_binding::{
     Binding, const_binding_initializer, is_binding_mutated, resolve_lexical_binding,
 };
 pub(super) use antidrift_kernel::tsrs_kernel::{
-    member_object as kernel_member_object, unwrap_expression,
+    cooked_text, member_object as kernel_member_object, unwrap_expression,
 };
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -25,7 +25,7 @@ pub(super) enum AliasStability {
 pub(super) fn property_name(key: P<Node>) -> Option<&'static str> {
     match key.kind() {
         Kind::Identifier => Some(key.as_identifier().text()),
-        Kind::StringLiteral => Some(key.as_string_literal().text()),
+        Kind::StringLiteral => cooked_text(key),
         _ => None,
     }
 }
@@ -69,8 +69,9 @@ pub(super) fn static_string(
 ) -> Option<String> {
     let inner = unwrap_expression(expression);
     match inner.kind() {
-        Kind::StringLiteral => Some(inner.as_string_literal().text().to_owned()),
-        Kind::NoSubstitutionTemplateLiteral => Some(inner.text().to_owned()),
+        Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral => {
+            cooked_text(inner).map(str::to_owned)
+        }
         Kind::BinaryExpression => {
             let bin = inner.as_binary_expression();
             if bin.operator_token().kind() != Kind::PlusToken {
@@ -151,7 +152,12 @@ fn matches_import(
             let node = spec.property_name().unwrap_or_else(|| spec.name());
             match node.kind() {
                 Kind::Identifier => node.as_identifier().text(),
-                Kind::StringLiteral => node.as_string_literal().text(),
+                Kind::StringLiteral => {
+                    let Some(name) = cooked_text(node) else {
+                        return false;
+                    };
+                    name
+                }
                 _ => return false,
             }
         }
@@ -164,7 +170,7 @@ fn matches_import(
         if ancestor.kind() == Kind::ImportDeclaration {
             let spec = ancestor.as_import_declaration().module_specifier();
             return ast::is_string_literal(spec)
-                && owner.module == spec.as_string_literal().text()
+                && cooked_text(spec).is_some_and(|module| owner.module == module)
                 && owner.export == imported;
         }
         cursor = ancestor.parent();

@@ -1,5 +1,6 @@
 use super::web_provenance::property_name;
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options, in_scope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use std::collections::BTreeSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -125,7 +126,9 @@ impl RuleVisitor for Visitor {
 fn inspect_import(ctx: &mut Ctx, import_node: P<Node>, headers_module: Option<&str>, owner: &str) {
     let import = import_node.as_import_declaration();
     let spec = import.module_specifier();
-    if !ast::is_string_literal(spec) || headers_module != Some(spec.as_string_literal().text()) {
+    if !ast::is_string_literal(spec)
+        || !cooked_text(spec).is_some_and(|module| headers_module == Some(module))
+    {
         return;
     }
     let Some(clause) = import.import_clause() else {
@@ -259,11 +262,8 @@ fn attachment_disposition(headers: P<Node>) -> bool {
         return false;
     };
     match disposition.kind() {
-        Kind::StringLiteral => disposition
-            .as_string_literal()
-            .text()
-            .to_lowercase()
-            .starts_with("attachment;"),
+        Kind::StringLiteral => cooked_text(disposition)
+            .is_some_and(|text| text.to_lowercase().starts_with("attachment;")),
         Kind::CallExpression => {
             let callee = disposition.as_call_expression().expression();
             ast::is_identifier(callee) && callee.as_identifier().text() == "contentDisposition"
@@ -289,8 +289,7 @@ fn explicit_security_headers(headers: P<Node>) -> bool {
             "content-disposition" => content_disposition = true,
             "x-content-type-options" => {
                 let val = assign.initializer();
-                nosniff = val.kind() == Kind::StringLiteral
-                    && val.as_string_literal().text() == "nosniff";
+                nosniff = val.kind() == Kind::StringLiteral && cooked_text(val) == Some("nosniff");
             }
             _ => {}
         }

@@ -1,6 +1,7 @@
 use super::web_provenance::{ImportedOwner, imported_owner};
 use antidrift_kernel::jsx::element_tag_name;
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options, in_scope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -91,16 +92,18 @@ impl RuleVisitor for Visitor {
 
 fn safe_attribute(sf: P<SourceFile>, attribute: P<Node>, sanitizers: &[ImportedOwner]) -> bool {
     match attribute.kind() {
-        Kind::StringLiteral => safe_prefix(attribute.as_string_literal().text()),
+        Kind::StringLiteral => cooked_text(attribute).is_some_and(safe_prefix),
         Kind::JsxExpression => {
             attribute
                 .as_jsx_expression()
                 .expression()
                 .is_some_and(|expression| match expression.kind() {
-                    Kind::StringLiteral => safe_prefix(expression.as_string_literal().text()),
-                    Kind::NoSubstitutionTemplateLiteral => safe_prefix(expression.text()),
+                    Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral => {
+                        cooked_text(expression).is_some_and(safe_prefix)
+                    }
                     Kind::TemplateExpression => {
-                        safe_prefix(expression.as_template_expression().head().text())
+                        cooked_text(expression.as_template_expression().head())
+                            .is_some_and(safe_prefix)
                     }
                     Kind::CallExpression => {
                         imported_owner(sf, expression.as_call_expression().expression(), sanitizers)

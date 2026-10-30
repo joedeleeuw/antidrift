@@ -1,3 +1,4 @@
+use crate::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::{Checker, Type, TypeFlags};
 use tsrs_core::P;
@@ -100,7 +101,7 @@ fn has_use_server_directive(statements: &[P<Node>]) -> bool {
         if !ast::is_string_literal(expr) {
             return false;
         }
-        if expr.as_string_literal().text() == "use server" {
+        if cooked_text(expr) == Some("use server") {
             return true;
         }
     }

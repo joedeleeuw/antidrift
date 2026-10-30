@@ -2,7 +2,7 @@ use super::syntax::{Span, identifier_of, unwrap_expression};
 use antidrift_kernel::local_binding::{
     enclosing_variable_declaration, is_const_variable_declaration, resolve_lexical_binding,
 };
-use antidrift_kernel::tsrs_kernel::is_function_like;
+use antidrift_kernel::tsrs_kernel::{cooked_text, is_function_like};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 
@@ -163,7 +163,7 @@ impl Oracle {
                 let imported_node = spec.property_name().or_else(|| binding.decl.name())?;
                 match imported_node.kind() {
                     Kind::Identifier => Some(imported_node.as_identifier().text()),
-                    Kind::StringLiteral => Some(imported_node.as_string_literal().text()),
+                    Kind::StringLiteral => cooked_text(imported_node),
                     _ => return None,
                 }
             }
@@ -176,7 +176,9 @@ impl Oracle {
             if ancestor.kind() == Kind::ImportDeclaration {
                 let spec = ancestor.as_import_declaration().module_specifier();
                 return ast::is_string_literal(spec)
-                    .then(|| (spec.as_string_literal().text(), imported));
+                    .then_some(spec)
+                    .and_then(cooked_text)
+                    .map(|source| (source, imported));
             }
             if ancestor == root {
                 break;

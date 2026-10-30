@@ -1,10 +1,11 @@
 use super::sql_tag_provenance::{enclosing_import_module_name, has_external_sql_tag_provenance};
 use super::sql_text::{
     combined_template_text, is_sql_identifier_context, is_sql_interpolation_context,
-    is_sql_statement, static_string_text,
+    is_sql_statement, is_static_string, static_string_text,
 };
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions};
 use antidrift_kernel::tsrs_kernel;
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::Checker;
@@ -120,10 +121,16 @@ impl NoSqlStringConcat {
         if bin.operator_token().kind() != Kind::PlusToken {
             return;
         }
-        let left = static_string_text(tsrs_kernel::unwrap_expression(bin.left()));
-        let right = static_string_text(tsrs_kernel::unwrap_expression(bin.right()));
-        if (left.as_deref().is_some_and(is_sql_statement) && right.is_none())
-            || (right.as_deref().is_some_and(is_sql_statement) && left.is_none())
+        let left = tsrs_kernel::unwrap_expression(bin.left());
+        let right = tsrs_kernel::unwrap_expression(bin.right());
+        if (static_string_text(left)
+            .as_deref()
+            .is_some_and(is_sql_statement)
+            && !is_static_string(right))
+            || (static_string_text(right)
+                .as_deref()
+                .is_some_and(is_sql_statement)
+                && !is_static_string(left))
         {
             ctx.report_node(node, RuleMessage::new("no-sql-string-concat", MESSAGE));
         }
@@ -138,7 +145,7 @@ impl NoSqlStringConcat {
                 .template_spans
                 .nodes()
                 .is_empty()
-            && is_sql_statement(&combined_template_text(node))
+            && combined_template_text(node).is_some_and(|text| is_sql_statement(&text))
             && self.has_unsafe_sql_interpolation(node, ctx.checker)
         {
             ctx.report_node(node, RuleMessage::new("no-sql-string-concat", MESSAGE));
@@ -157,7 +164,7 @@ impl NoSqlStringConcat {
         }
         if self.is_trusted_sql_template_tag(tagged.tag, ctx.checker) {
             self.report_unsafe_raw_fragments(spans, ctx);
-        } else if is_sql_statement(&combined_template_text(template))
+        } else if combined_template_text(template).is_some_and(|text| is_sql_statement(&text))
             && self.has_unsafe_sql_interpolation(template, ctx.checker)
         {
             ctx.report_node(node, RuleMessage::new("no-sql-string-concat", MESSAGE));
@@ -169,14 +176,16 @@ impl NoSqlStringConcat {
         let spans = template.template_spans.nodes();
         spans.iter().enumerate().any(|(idx, &span_node)| {
             let before = if idx == 0 {
-                template.head.text()
+                cooked_text(template.head)
             } else {
-                spans[idx - 1].as_template_span().literal.text()
+                cooked_text(spans[idx - 1].as_template_span().literal)
             };
             let span = span_node.as_template_span();
-            let after = span.literal.text();
+            let (Some(before), Some(after)) = (before, cooked_text(span.literal)) else {
+                return false;
+            };
             let expr = tsrs_kernel::unwrap_expression(span.expression);
-            let safe = static_string_text(expr).is_some()
+            let safe = is_static_string(expr)
                 || (self.is_trusted_identifier_member(expr, checker)
                     && is_sql_identifier_context(before, after));
             !safe && is_sql_interpolation_context(before, after)
@@ -331,6 +340,6 @@ impl NoSqlStringConcat {
                 .arguments()
                 .nodes()
                 .iter()
-                .any(|&arg| static_string_text(tsrs_kernel::unwrap_expression(arg)).is_none())
+                .any(|&arg| !is_static_string(tsrs_kernel::unwrap_expression(arg)))
     }
 }

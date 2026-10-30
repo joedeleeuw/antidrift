@@ -1,6 +1,6 @@
 use antidrift_kernel::local_binding::{Binding, is_binding_mutated, resolve_lexical_binding};
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
-use antidrift_kernel::tsrs_kernel::{numeric_literal_value, unwrap_expression};
+use antidrift_kernel::tsrs_kernel::{cooked_text, numeric_literal_value, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -96,7 +96,7 @@ impl PathProvenance {
             (Kind::Identifier, Kind::Identifier) => resolve_lexical_binding(left)
                 .is_some_and(|symbol| resolve_lexical_binding(right) == Some(symbol)),
             (Kind::StringLiteral, Kind::StringLiteral) => {
-                left.as_string_literal().text() == right.as_string_literal().text()
+                cooked_text(left).is_some_and(|text| cooked_text(right) == Some(text))
             }
             _ => false,
         }
@@ -134,7 +134,12 @@ fn push_imported_part(binding: Binding, parts: &mut Vec<&'static str>) -> bool {
             let imported = spec.property_name().unwrap_or_else(|| spec.name());
             match imported.kind() {
                 Kind::Identifier => parts.push(imported.as_identifier().text()),
-                Kind::StringLiteral => parts.push(imported.as_string_literal().text()),
+                Kind::StringLiteral => {
+                    let Some(part) = cooked_text(imported) else {
+                        return false;
+                    };
+                    parts.push(part);
+                }
                 _ => return false,
             }
             true
@@ -149,7 +154,9 @@ fn enclosing_import_source(node: P<Node>) -> Option<&'static str> {
     while let Some(ancestor) = cursor {
         if ancestor.kind() == Kind::ImportDeclaration {
             let spec = ancestor.as_import_declaration().module_specifier();
-            return ast::is_string_literal(spec).then(|| spec.as_string_literal().text());
+            return ast::is_string_literal(spec)
+                .then_some(spec)
+                .and_then(cooked_text);
         }
         cursor = ancestor.parent();
     }
@@ -169,7 +176,7 @@ fn member_parts(expression: P<Node>) -> Option<(P<Node>, &'static str)> {
             let arg = access.argument_expression();
             let prop = match arg.kind() {
                 Kind::Identifier => Some(arg.as_identifier().text()),
-                Kind::StringLiteral => Some(arg.as_string_literal().text()),
+                Kind::StringLiteral => cooked_text(arg),
                 _ => None,
             }?;
             Some((access.expression(), prop))
@@ -225,15 +232,16 @@ fn zero_start(expression: P<Node>, provenance: &PathProvenance) -> bool {
 fn separator(expression: P<Node>, provenance: &PathProvenance) -> bool {
     let expression = provenance.stable(expression);
     (expression.kind() == Kind::StringLiteral
-        && matches!(expression.as_string_literal().text(), "/" | "\\"))
+        && matches!(cooked_text(expression), Some("/" | "\\")))
         || path_api(expression, "sep")
 }
 
 fn separator_suffix(expression: P<Node>, provenance: &PathProvenance) -> bool {
     let stable = provenance.stable(expression);
     match stable.kind() {
-        Kind::StringLiteral => stable.as_string_literal().text().ends_with(['/', '\\']),
-        Kind::NoSubstitutionTemplateLiteral => stable.text().ends_with(['/', '\\']),
+        Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral => {
+            cooked_text(stable).is_some_and(|text| text.ends_with(['/', '\\']))
+        }
         Kind::ConditionalExpression => conditional_suffix(stable, provenance),
         Kind::BinaryExpression => {
             let bin = stable.as_binary_expression();
@@ -245,7 +253,9 @@ fn separator_suffix(expression: P<Node>, provenance: &PathProvenance) -> bool {
                 return false;
             };
             let last_span = last_span_node.as_template_span();
-            let trailing = last_span.literal().text();
+            let Some(trailing) = cooked_text(last_span.literal()) else {
+                return false;
+            };
             trailing.ends_with(['/', '\\'])
                 || (trailing.is_empty() && separator(last_span.expression(), provenance))
         }

@@ -1,5 +1,6 @@
 use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
 use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -86,7 +87,7 @@ fn is_empty_or_placeholder_body(body: P<Node>) -> bool {
         if stmt.kind() == Kind::ExpressionStatement {
             let expr = stmt.as_expression_statement().expression();
             if expr.kind() == Kind::StringLiteral {
-                return has_placeholder_word(expr.as_string_literal().text());
+                return cooked_text(expr).is_some_and(has_placeholder_word);
             }
         }
     }

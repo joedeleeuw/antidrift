@@ -2,7 +2,7 @@ use crate::jsx::plain_attribute_name;
 use crate::local_binding::{
     Binding, binding_for_declarator, collect_binding_references, is_write_reference,
 };
-use crate::tsrs_kernel::node_range;
+use crate::tsrs_kernel::{cooked_text, node_range};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -26,10 +26,9 @@ fn collect_fragments(sf: P<SourceFile>, node: P<Node>, out: &mut Vec<StringFragm
     let src = sf.text();
     match node.kind() {
         Kind::StringLiteral => {
-            out.push(StringFragment {
-                node,
-                text: node.as_string_literal().text(),
-            });
+            if let Some(text) = cooked_text(node) {
+                out.push(StringFragment { node, text });
+            }
         }
         Kind::NoSubstitutionTemplateLiteral | Kind::TemplateTail => {
             let (start, end) = node_range(sf, node);
@@ -68,7 +67,7 @@ pub fn class_fragments(sf: P<SourceFile>) -> Vec<StringFragment> {
 fn is_class_property_key(key: P<Node>) -> bool {
     match key.kind() {
         Kind::Identifier => key.as_identifier().text() == "className",
-        Kind::StringLiteral => key.as_string_literal().text() == "className",
+        Kind::StringLiteral => cooked_text(key) == Some("className"),
         _ => false,
     }
 }

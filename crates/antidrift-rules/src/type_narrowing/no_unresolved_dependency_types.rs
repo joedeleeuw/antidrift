@@ -1,3 +1,4 @@
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use std::path::{Path, PathBuf};
 
 use antidrift_kernel::json_manifest::parse_package_json_manifest;
@@ -241,7 +242,9 @@ impl RuleVisitor for Visitor {
         let Some((specifier_node, is_require_call)) = extract_module_specifier(node) else {
             return;
         };
-        let specifier_text = specifier_node.text();
+        let Some(specifier_text) = cooked_text(specifier_node) else {
+            return;
+        };
         let Some(imported) = ts_resolver::bare_package_name(specifier_text) else {
             return;
         };

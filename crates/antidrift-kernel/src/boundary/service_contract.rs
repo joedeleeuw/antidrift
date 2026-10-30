@@ -1,3 +1,4 @@
+use crate::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Node, SourceFile, Symbol};
 use tsrs_checker::{Checker, Signature, SignatureKind, Type};
@@ -75,7 +76,7 @@ fn consumes_service_tag(
         let is_of = node.parent().is_some_and(|p| {
             ast::is_property_access_expression(p)
                 && p.as_property_access_expression().expression() == node
-                && p.as_property_access_expression().name().text() == "of"
+                && cooked_text(p.as_property_access_expression().name()) == Some("of")
         });
         if !is_of {
             return true;

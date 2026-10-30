@@ -1,3 +1,4 @@
+use crate::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 
@@ -164,7 +165,7 @@ pub fn find_sum_to_product_erasure(obj_node: P<Node>) -> Option<String> {
 
 fn is_absent_error_value(value: P<Node>) -> bool {
     is_nullish_expression(value)
-        || (ast::is_string_literal(value) && value.as_string_literal().text().is_empty())
+        || (ast::is_string_literal(value) && cooked_text(value).is_some_and(str::is_empty))
 }
 
 #[must_use]

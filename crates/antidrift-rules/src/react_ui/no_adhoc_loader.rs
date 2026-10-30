@@ -2,7 +2,7 @@ use antidrift_kernel::jsx::{opening_tag_name_node, plain_attribute_name, plain_e
 use antidrift_kernel::rule_scope::{
     RuleScope, ScopeOptions, ScopedOptions, decode_scoped, in_scope, require_non_empty,
 };
-use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
+use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_parentheses};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -182,13 +182,12 @@ fn element_name(node: P<Node>) -> Option<&'static str> {
 fn expression_strings(expression: P<Node>, out: &mut Vec<&'static str>) {
     let inner = unwrap_parentheses(expression);
     match inner.kind() {
-        Kind::StringLiteral => out.push(inner.as_string_literal().text()),
-        Kind::NoSubstitutionTemplateLiteral => out.push(inner.text()),
+        Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral => out.extend(cooked_text(inner)),
         Kind::TemplateExpression => {
             let tpl = inner.as_template_expression();
-            out.push(tpl.head().text());
+            out.extend(cooked_text(tpl.head()));
             for &span in tpl.template_spans().nodes() {
-                out.push(span.as_template_span().literal().text());
+                out.extend(cooked_text(span.as_template_span().literal()));
             }
         }
         Kind::CallExpression => {
@@ -223,7 +222,7 @@ fn attribute_strings(attribute: P<Node>) -> Vec<&'static str> {
         return out;
     };
     match init.kind() {
-        Kind::StringLiteral => out.push(init.as_string_literal().text()),
+        Kind::StringLiteral => out.extend(cooked_text(init)),
         Kind::JsxExpression => {
             if let Some(expr) = init.as_jsx_expression().expression() {
                 expression_strings(expr, &mut out);

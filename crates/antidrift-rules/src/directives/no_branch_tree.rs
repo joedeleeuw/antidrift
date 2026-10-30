@@ -1,5 +1,7 @@
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
-use antidrift_kernel::tsrs_kernel::{node_text, unwrap_awaited_expression, unwrap_expression};
+use antidrift_kernel::tsrs_kernel::{
+    cooked_text, node_text, unwrap_awaited_expression, unwrap_expression,
+};
 use rustc_hash::FxHashSet;
 use std::collections::BTreeMap;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -416,15 +418,15 @@ fn collect_negated_prop_comparisons(
     }
     let left = unwrap_expression(bin.left());
     let right = unwrap_expression(bin.right());
-    if left.kind() == Kind::PropertyAccessExpression && right.kind() == Kind::StringLiteral {
-        out.push((
-            node_text(sf, left).trim().to_owned(),
-            right.as_string_literal().text(),
-        ));
-    } else if right.kind() == Kind::PropertyAccessExpression && left.kind() == Kind::StringLiteral {
-        out.push((
-            node_text(sf, right).trim().to_owned(),
-            left.as_string_literal().text(),
-        ));
+    if left.kind() == Kind::PropertyAccessExpression
+        && right.kind() == Kind::StringLiteral
+        && let Some(literal) = cooked_text(right)
+    {
+        out.push((node_text(sf, left).trim().to_owned(), literal));
+    } else if right.kind() == Kind::PropertyAccessExpression
+        && left.kind() == Kind::StringLiteral
+        && let Some(literal) = cooked_text(left)
+    {
+        out.push((node_text(sf, right).trim().to_owned(), literal));
     }
 }

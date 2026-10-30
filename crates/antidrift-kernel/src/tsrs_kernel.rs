@@ -98,7 +98,7 @@ pub fn property_name_text(name: P<Node>) -> Option<&'static str> {
             Some(name.as_private_identifier().text().trim_start_matches('#'))
         }
         Kind::StringLiteral | Kind::NumericLiteral | Kind::NoSubstitutionTemplateLiteral => {
-            Some(name.text())
+            cooked_text(name)
         }
         Kind::ComputedPropertyName => {
             let expr = unwrap_expression(name.as_computed_property_name().expression());
@@ -106,7 +106,7 @@ pub fn property_name_text(name: P<Node>) -> Option<&'static str> {
                 || ast::is_numeric_literal(expr)
                 || ast::is_no_substitution_template_literal(expr)
             {
-                Some(expr.text())
+                cooked_text(expr)
             } else {
                 None
             }
@@ -167,7 +167,7 @@ pub fn static_member_chain(node: P<Node>) -> Option<(P<Node>, Vec<&'static str>)
                 {
                     return None;
                 }
-                members.push(arg.text());
+                members.push(cooked_text(arg)?);
                 current = unwrap_expression(elem.expression());
             }
             _ => {
@@ -229,7 +229,8 @@ pub fn terminal_member_name(node: P<Node>) -> Option<&'static str> {
                     .argument_expression(),
             );
             (ast::is_string_literal(arg) || ast::is_no_substitution_template_literal(arg))
-                .then(|| arg.text())
+                .then_some(arg)
+                .and_then(cooked_text)
         }
         _ => None,
     }
@@ -249,9 +250,9 @@ pub fn expression_literal_key(node: P<Node>) -> Option<String> {
     let unwrapped = unwrap_expression(node);
     match unwrapped.kind() {
         Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral => {
-            Some(format!("string:{}", unwrapped.text()))
+            cooked_text(unwrapped).map(|text| format!("string:{text}"))
         }
-        Kind::NumericLiteral => Some(format!("number:{}", unwrapped.text())),
+        Kind::NumericLiteral => Some(format!("number:{}", unwrapped.as_numeric_literal().text())),
         Kind::TrueKeyword => Some("boolean:true".to_owned()),
         Kind::FalseKeyword => Some("boolean:false".to_owned()),
         Kind::NullKeyword => Some("object:null".to_owned()),
@@ -377,6 +378,18 @@ pub fn numeric_literal_value(expression: P<Node>) -> Option<f64> {
         return None;
     };
     Some(value)
+}
+
+#[must_use]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "cooked_text is the one reader of tsrs cooked text; it validates the WTF-8 bytes tsrs stores for lone-surrogate escapes before any caller decodes chars"
+)]
+pub fn cooked_text(node: P<Node>) -> Option<&'static str> {
+    let cooked = node.text();
+    std::str::from_utf8(cooked.as_bytes())
+        .is_ok()
+        .then_some(cooked)
 }
 
 #[must_use]

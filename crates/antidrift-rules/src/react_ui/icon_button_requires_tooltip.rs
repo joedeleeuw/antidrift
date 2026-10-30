@@ -5,7 +5,7 @@ use antidrift_kernel::jsx::{
 use antidrift_kernel::rule_scope::{
     RuleScope, ScopeOptions, ScopedOptions, decode_scoped, in_scope,
 };
-use antidrift_kernel::tsrs_kernel::{unwrap_expression, unwrap_parentheses};
+use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression, unwrap_parentheses};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -185,7 +185,7 @@ fn child_has_visible_text(child: P<Node>) -> bool {
 fn expression_has_visible_text(expression: P<Node>) -> bool {
     let inner = unwrap_expression(expression);
     match inner.kind() {
-        Kind::StringLiteral => has_letter_or_number(inner.as_string_literal().text()),
+        Kind::StringLiteral => cooked_text(inner).is_none_or(has_letter_or_number),
         Kind::CallExpression | Kind::NoSubstitutionTemplateLiteral | Kind::TemplateExpression => {
             true
         }

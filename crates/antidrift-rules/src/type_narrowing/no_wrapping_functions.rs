@@ -2,6 +2,7 @@ use super::call_forwarding::{BodyForwarding, is_literal_kind, parameters_match_i
 use antidrift_kernel::callgraph::{IdentifierRef, ProgramSymbolIndex};
 use antidrift_kernel::file_role;
 use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{callgraph, provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile, Symbol};
@@ -150,7 +151,7 @@ fn audit_reference(reference: IdentifierRef, checker: &mut Checker, audit: &mut 
     if let Some(exp) = parent
         && ast::is_export_specifier(exp)
     {
-        if exp.as_export_specifier().name().text() == "default" {
+        if cooked_text(exp.as_export_specifier().name()) == Some("default") {
             audit.has_identity_ref = true;
         } else {
             audit.has_export_specifier = true;

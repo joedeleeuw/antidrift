@@ -6,6 +6,7 @@ use super::syntax::{
 use antidrift_kernel::local_binding::{
     Binding, collect_binding_references, is_identifier_reference_position, resolve_lexical_binding,
 };
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -33,9 +34,9 @@ fn identity(
     }
     match expression.kind() {
         Kind::Identifier => identity(oracle.initializer(expression, true)?, oracle, &seen),
-        Kind::StringLiteral => Some(Identity::String(
-            expression.as_string_literal().text().to_owned(),
-        )),
+        Kind::StringLiteral => {
+            cooked_text(expression).map(|text| Identity::String(text.to_owned()))
+        }
         Kind::NumericLiteral => Some(Identity::Number(
             numeric_literal_value(expression)?.to_bits(),
         )),
@@ -43,7 +44,11 @@ fn identity(
         Kind::FalseKeyword => Some(Identity::Boolean(false)),
         Kind::NullKeyword => Some(Identity::Null),
         Kind::BigIntLiteral => Some(Identity::BigInt(
-            expression.text().trim_end_matches('n').to_owned(),
+            expression
+                .as_big_int_literal()
+                .text()
+                .trim_end_matches('n')
+                .to_owned(),
         )),
         Kind::PrefixUnaryExpression => {
             let unary = expression.as_prefix_unary_expression();

@@ -1,5 +1,6 @@
 use super::bindings::Oracle;
 use super::syntax::{literal_container, numeric_literal_value, object_property, unwrap_expression};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashMap;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -17,7 +18,7 @@ pub(super) fn resolve(expression: P<Node>, oracle: &Oracle, depth: usize) -> Opt
 
 pub(super) fn template_text(expression: P<Node>) -> Option<String> {
     if expression.kind() == Kind::NoSubstitutionTemplateLiteral {
-        return Some(expression.text().to_owned());
+        return cooked_text(expression).map(str::to_owned);
     }
     None
 }
@@ -88,7 +89,7 @@ pub(super) fn equal(left: P<Node>, right: P<Node>, depth: usize) -> bool {
     let right = unwrap_expression(right);
     match (left.kind(), right.kind()) {
         (Kind::StringLiteral, Kind::StringLiteral) => {
-            left.as_string_literal().text() == right.as_string_literal().text()
+            cooked_text(left).is_some_and(|text| cooked_text(right) == Some(text))
         }
         (Kind::NumericLiteral, Kind::NumericLiteral) => numeric_literal_value(left)
             .zip(numeric_literal_value(right))
@@ -96,7 +97,9 @@ pub(super) fn equal(left: P<Node>, right: P<Node>, depth: usize) -> bool {
         (Kind::TrueKeyword, Kind::TrueKeyword)
         | (Kind::FalseKeyword, Kind::FalseKeyword)
         | (Kind::NullKeyword, Kind::NullKeyword) => true,
-        (Kind::BigIntLiteral, Kind::BigIntLiteral) => left.text() == right.text(),
+        (Kind::BigIntLiteral, Kind::BigIntLiteral) => {
+            left.as_big_int_literal().text() == right.as_big_int_literal().text()
+        }
         (Kind::Identifier, Kind::Identifier) => {
             left.as_identifier().text() == right.as_identifier().text()
         }
@@ -155,12 +158,16 @@ pub(super) fn vacuous(expression: P<Node>, truthy: bool) -> bool {
         | Kind::ArrayLiteralExpression
         | Kind::RegularExpressionLiteral
         | Kind::TrueKeyword => true,
-        Kind::StringLiteral => !truthy || !expression.as_string_literal().text().is_empty(),
+        Kind::StringLiteral => {
+            !truthy || cooked_text(expression).is_some_and(|text| !text.is_empty())
+        }
         Kind::NumericLiteral => {
             !truthy || numeric_literal_value(expression).is_some_and(|val| val != 0.0)
         }
         Kind::FalseKeyword | Kind::NullKeyword => !truthy,
-        Kind::BigIntLiteral => !truthy || !matches!(expression.text(), "0" | "0n"),
+        Kind::BigIntLiteral => {
+            !truthy || !matches!(expression.as_big_int_literal().text(), "0" | "0n")
+        }
         Kind::NoSubstitutionTemplateLiteral => {
             !truthy || template_text(expression).is_some_and(|text| !text.is_empty())
         }

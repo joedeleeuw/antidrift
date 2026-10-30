@@ -5,6 +5,7 @@ use super::union_owners::union_owners;
 use antidrift_kernel::local_binding::Binding;
 use antidrift_kernel::registries::OwnedUnion;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -193,7 +194,7 @@ fn status_report(
     if literal.kind() != Kind::StringLiteral {
         return None;
     }
-    let text = literal.as_string_literal().text();
+    let text = cooked_text(literal)?;
     let (_, entry) = statuses.iter().find(|(name, entry)| {
         entry.values.iter().any(|candidate| candidate == text) && status_context(node, name)
     })?;
@@ -246,7 +247,7 @@ fn property_context(property_sig: P<Node>, key: &str) -> bool {
         .map(|prop| match prop.kind() {
             Kind::Identifier => prop.as_identifier().text(),
             Kind::PrivateIdentifier => prop.as_private_identifier().text(),
-            Kind::StringLiteral => prop.as_string_literal().text(),
+            Kind::StringLiteral => cooked_text(prop).unwrap_or(""),
             _ => "",
         })
         .unwrap_or("");

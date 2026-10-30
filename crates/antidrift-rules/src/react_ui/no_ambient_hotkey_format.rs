@@ -1,4 +1,5 @@
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -50,7 +51,7 @@ impl RuleVisitor for Visitor {
         let decl = node.as_import_declaration();
         let spec = decl.module_specifier();
         if !ast::is_string_literal(spec)
-            || !HOTKEY_MODULES.contains(&spec.as_string_literal().text())
+            || !cooked_text(spec).is_some_and(|module| HOTKEY_MODULES.contains(&module))
         {
             return;
         }
@@ -87,9 +88,9 @@ fn is_ambient_specifier(specifier: P<Node>) -> bool {
     let spec = specifier.as_import_specifier();
     let imported = spec.property_name().unwrap_or_else(|| spec.name());
     let name = match imported.kind() {
-        Kind::Identifier => imported.as_identifier().text(),
-        Kind::StringLiteral => imported.as_string_literal().text(),
-        _ => return false,
+        Kind::Identifier => Some(imported.as_identifier().text()),
+        Kind::StringLiteral => cooked_text(imported),
+        _ => None,
     };
-    AMBIENT_EXPORTS.contains(&name)
+    name.is_some_and(|name| AMBIENT_EXPORTS.contains(&name))
 }

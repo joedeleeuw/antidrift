@@ -1,7 +1,7 @@
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::runtime_lifecycle::is_inline_hold_open_script;
 use antidrift_kernel::tsrs_kernel::{
-    callee_name, is_function_like, property_name_text, unwrap_expression,
+    callee_name, cooked_text, is_function_like, property_name_text, unwrap_expression,
 };
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags, SourceFile};
@@ -48,8 +48,7 @@ fn check_inline_hold_open_scripts(node: P<Node>, ctx: &mut Ctx) {
 
 fn literal_text(node: P<Node>) -> Option<&'static str> {
     match node.kind() {
-        Kind::StringLiteral => Some(node.as_string_literal().text()),
-        Kind::NoSubstitutionTemplateLiteral => Some(node.text()),
+        Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral => cooked_text(node),
         _ => None,
     }
 }
@@ -65,7 +64,9 @@ fn has_owned_process_helper_import(root: P<Node>) -> bool {
         if !ast::is_string_literal(spec) {
             return false;
         }
-        let module_name = spec.as_string_literal().text();
+        let Some(module_name) = cooked_text(spec) else {
+            return false;
+        };
         if RAW_PROCESS_MODULES.contains(&module_name) || module_name.starts_with("node:") {
             return false;
         }

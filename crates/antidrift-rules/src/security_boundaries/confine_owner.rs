@@ -1,4 +1,5 @@
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options, in_scope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -175,8 +176,10 @@ impl RuleVisitor for Visitor {
         match node.kind() {
             Kind::ImportDeclaration => {
                 let spec = node.as_import_declaration().module_specifier();
-                if ast::is_string_literal(spec) {
-                    self.inspect_import(ctx, spec.as_string_literal().text(), node);
+                if ast::is_string_literal(spec)
+                    && let Some(source) = cooked_text(spec)
+                {
+                    self.inspect_import(ctx, source, node);
                 }
             }
             Kind::CallExpression => {
@@ -200,8 +203,10 @@ impl Visitor {
             return;
         };
         let inner = ast::skip_parentheses(first);
-        if ast::is_string_literal(inner) {
-            self.inspect_import(ctx, inner.as_string_literal().text(), node);
+        if ast::is_string_literal(inner)
+            && let Some(source) = cooked_text(inner)
+        {
+            self.inspect_import(ctx, source, node);
         }
     }
 

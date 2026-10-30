@@ -1,4 +1,5 @@
 use crate::ts_resolver::ResolutionMode;
+use crate::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use std::collections::BTreeMap;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -134,7 +135,9 @@ fn collect_import_declaration_bindings(
     if !ast::is_string_literal(spec) {
         return;
     }
-    let module_specifier = spec.as_string_literal().text();
+    let Some(module_specifier) = cooked_text(spec) else {
+        return;
+    };
     let Some(clause_node) = import_decl.import_clause() else {
         return;
     };
@@ -186,7 +189,7 @@ fn collect_import_declaration_bindings(
                     .property_name()
                     .and_then(|prop| match prop.kind() {
                         Kind::Identifier => Some(prop.as_identifier().text()),
-                        Kind::StringLiteral => Some(prop.as_string_literal().text()),
+                        Kind::StringLiteral => cooked_text(prop),
                         _ => None,
                     })
                     .unwrap_or(local_text);
@@ -222,8 +225,11 @@ pub fn extract_module_import(node: P<Node>) -> Option<ModuleImport> {
         Kind::CallExpression => extract_from_call_expression(node),
         Kind::ExternalModuleReference => {
             let expr = node.as_external_module_reference().expression();
-            ast::is_string_literal(expr).then(|| ModuleImport {
-                source: expr.as_string_literal().text(),
+            let source = ast::is_string_literal(expr)
+                .then_some(expr)
+                .and_then(cooked_text)?;
+            Some(ModuleImport {
+                source,
                 node,
                 specifier_node: expr,
                 type_only: false,
@@ -236,8 +242,11 @@ pub fn extract_module_import(node: P<Node>) -> Option<ModuleImport> {
                 return None;
             }
             let lit = arg.as_literal_type_node().literal();
-            ast::is_string_literal(lit).then(|| ModuleImport {
-                source: lit.as_string_literal().text(),
+            let source = ast::is_string_literal(lit)
+                .then_some(lit)
+                .and_then(cooked_text)?;
+            Some(ModuleImport {
+                source,
                 node,
                 specifier_node: lit,
                 type_only: true,
@@ -275,7 +284,7 @@ fn extract_from_import_declaration(node: P<Node>) -> Option<ModuleImport> {
             })
     });
     Some(ModuleImport {
-        source: spec.as_string_literal().text(),
+        source: cooked_text(spec)?,
         node,
         specifier_node: spec,
         type_only,
@@ -300,7 +309,7 @@ fn extract_from_export_declaration(node: P<Node>) -> Option<ModuleImport> {
             })
     });
     Some(ModuleImport {
-        source: spec.as_string_literal().text(),
+        source: cooked_text(spec)?,
         node,
         specifier_node: spec,
         type_only: decl.is_type_only() || clause_all_type,
@@ -315,8 +324,11 @@ fn extract_from_call_expression(node: P<Node>) -> Option<ModuleImport> {
         return None;
     }
     let first = *call.arguments().nodes().first()?;
-    ast::is_string_literal(first).then(|| ModuleImport {
-        source: first.as_string_literal().text(),
+    let source = ast::is_string_literal(first)
+        .then_some(first)
+        .and_then(cooked_text)?;
+    Some(ModuleImport {
+        source,
         node,
         specifier_node: first,
         type_only: false,
@@ -339,7 +351,10 @@ fn attribute_resolution_mode(attributes_node: Option<P<Node>>) -> Option<Resolut
         };
         let key = match name_node.kind() {
             Kind::Identifier => name_node.as_identifier().text(),
-            Kind::StringLiteral => name_node.as_string_literal().text(),
+            Kind::StringLiteral => match cooked_text(name_node) {
+                Some(key) => key,
+                None => continue,
+            },
             _ => continue,
         };
         if key != "resolution-mode" {
@@ -349,9 +364,9 @@ fn attribute_resolution_mode(attributes_node: Option<P<Node>>) -> Option<Resolut
         if !ast::is_string_literal(val) {
             continue;
         }
-        return match val.as_string_literal().text() {
-            "import" => Some(ResolutionMode::Import),
-            "require" => Some(ResolutionMode::Require),
+        return match cooked_text(val) {
+            Some("import") => Some(ResolutionMode::Import),
+            Some("require") => Some(ResolutionMode::Require),
             _ => None,
         };
     }

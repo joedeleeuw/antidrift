@@ -1,6 +1,7 @@
 use antidrift_kernel::file_role::ProjectPath;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -53,10 +54,9 @@ impl RuleVisitor for Visitor {
         let violation = match node.kind() {
             Kind::ImportDeclaration => {
                 let spec = node.as_import_declaration().module_specifier();
-                ast::is_string_literal(spec) && {
-                    let source = spec.as_string_literal().text();
-                    source == "bun" || source.starts_with("bun:")
-                }
+                ast::is_string_literal(spec)
+                    && cooked_text(spec)
+                        .is_some_and(|source| source == "bun" || source.starts_with("bun:"))
             }
             Kind::PropertyAccessExpression => {
                 unbound_bun(node.as_property_access_expression().expression())

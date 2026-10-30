@@ -2,7 +2,7 @@ use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::jsx::function_returns_jsx;
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
-use antidrift_kernel::tsrs_kernel::unwrap_expression;
+use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -125,7 +125,9 @@ fn is_non_react_jsx_file(sf: P<SourceFile>) -> bool {
         if !ast::is_string_literal(spec) {
             continue;
         }
-        let source = spec.as_string_literal().text();
+        let Some(source) = cooked_text(spec) else {
+            continue;
+        };
         if NON_REACT_JSX_SOURCES
             .iter()
             .any(|root| is_module_or_subpath(source, root))

@@ -6,6 +6,7 @@ use super::syntax::{
     argument, call_expression_of, identifier_of, numeric_literal_value, object_property,
     static_member, unwrap_awaited_expression,
 };
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 
@@ -31,12 +32,18 @@ pub(super) fn resolve(
     }
     let expression = unwrap_awaited_expression(expression);
     let shape = match expression.kind() {
-        Kind::StringLiteral => Shape::String(expression.as_string_literal().text().to_owned()),
+        Kind::StringLiteral => Shape::String(cooked_text(expression)?.to_owned()),
         Kind::NumericLiteral => Shape::Number(numeric_literal_value(expression)?.to_bits()),
         Kind::TrueKeyword => Shape::Boolean(true),
         Kind::FalseKeyword => Shape::Boolean(false),
         Kind::NullKeyword => Shape::Null,
-        Kind::BigIntLiteral => Shape::BigInt(expression.text().trim_end_matches('n').to_owned()),
+        Kind::BigIntLiteral => Shape::BigInt(
+            expression
+                .as_big_int_literal()
+                .text()
+                .trim_end_matches('n')
+                .to_owned(),
+        ),
         Kind::NoSubstitutionTemplateLiteral => Shape::String(template_text(expression)?),
         Kind::ArrayLiteralExpression => Shape::Array(
             expression

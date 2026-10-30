@@ -1,4 +1,5 @@
 use antidrift_kernel::tsrs_kernel;
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::Checker;
 use tsrs_core::P;
@@ -110,7 +111,10 @@ pub(super) fn enclosing_import_module_name(node: P<Node>) -> Option<String> {
     while let Some(curr) = current {
         if curr.kind() == Kind::ImportDeclaration {
             let spec = curr.as_import_declaration().module_specifier();
-            return ast::is_string_literal(spec).then(|| spec.text().to_owned());
+            return ast::is_string_literal(spec)
+                .then_some(spec)
+                .and_then(cooked_text)
+                .map(str::to_owned);
         }
         current = curr.parent();
     }

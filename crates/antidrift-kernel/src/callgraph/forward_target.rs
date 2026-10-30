@@ -1,3 +1,4 @@
+use crate::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_checker::Checker;
 use tsrs_core::P;
@@ -95,7 +96,7 @@ fn is_imported_first_party_declaration(decl: P<Node>, callee: P<Node>, root: P<N
     if !ast::is_string_literal(spec_node) {
         return false;
     }
-    is_first_party_specifier(spec_node.as_string_literal().text())
+    cooked_text(spec_node).is_some_and(is_first_party_specifier)
         && (callee == root || decl.kind() == Kind::NamespaceImport)
 }
 

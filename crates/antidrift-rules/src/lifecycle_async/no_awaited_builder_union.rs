@@ -1,6 +1,7 @@
 use super::syntax::{Span, member, unwrap_expression, unwrap_parentheses};
 use antidrift_kernel::directives::scan_source_comments;
 use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -137,7 +138,7 @@ fn describe_chain(expression: P<Node>) -> Option<BuilderChain> {
                 let computed = current.as_element_access_expression();
                 let arg = unwrap_expression(computed.argument_expression());
                 let property = if arg.kind() == Kind::NoSubstitutionTemplateLiteral {
-                    Some(arg.text().to_owned())
+                    cooked_text(arg).map(str::to_owned)
                 } else {
                     member(current).map(|(_, name)| name.to_owned())
                 };

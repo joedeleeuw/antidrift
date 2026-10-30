@@ -1,6 +1,7 @@
 use super::vague_name_lexicon::{duplicate_context_word, vague_reason};
 use antidrift_kernel::rule_scope::RuleScope;
 use antidrift_kernel::tsrs_kernel;
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::Type;
 use tsrs_core::P;
@@ -157,8 +158,10 @@ fn check_duplicate_context(ctx: &mut Ctx, name_node: Option<P<Node>>, report_nod
     };
     let name = if ast::is_identifier(target) {
         target.as_identifier().text()
-    } else if ast::is_string_literal(target) {
-        target.as_string_literal().text()
+    } else if ast::is_string_literal(target)
+        && let Some(literal) = cooked_text(target)
+    {
+        literal
     } else {
         return;
     };

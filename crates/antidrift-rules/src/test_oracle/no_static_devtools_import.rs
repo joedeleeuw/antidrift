@@ -1,4 +1,5 @@
 use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -77,7 +78,9 @@ impl RuleVisitor for Visitor {
         if !ast::is_string_literal(spec) {
             return;
         }
-        let source = spec.as_string_literal().text();
+        let Some(source) = cooked_text(spec) else {
+            return;
+        };
         if DEVTOOLS_PACKAGES.contains(&source) {
             ctx.report_node(
                 node,

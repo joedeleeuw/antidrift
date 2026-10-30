@@ -1,6 +1,7 @@
 use antidrift_kernel::directives::split_identifier_words;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use antidrift_kernel::tsrs_kernel;
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, SourceFile};
@@ -176,7 +177,7 @@ fn extract_ts_property_field(sf: P<SourceFile>, member: P<Node>) -> Option<Field
     let name_node = prop.name();
     let name = match name_node.kind() {
         Kind::Identifier => name_node.as_identifier().text(),
-        Kind::StringLiteral => name_node.as_string_literal().text(),
+        Kind::StringLiteral => cooked_text(name_node)?,
         _ => return None,
     };
     let type_node = prop.type_()?;
@@ -226,7 +227,7 @@ fn extract_zod_property_field(sf: P<SourceFile>, prop: P<Node>) -> Option<FieldE
     let pa = prop.as_property_assignment();
     let name = match pa.name().kind() {
         Kind::Identifier => pa.name().as_identifier().text(),
-        Kind::StringLiteral => pa.name().as_string_literal().text(),
+        Kind::StringLiteral => cooked_text(pa.name())?,
         _ => return None,
     };
     let val_text = normalize_ws(tsrs_kernel::node_text(sf, pa.initializer()));

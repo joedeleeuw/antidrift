@@ -1,4 +1,5 @@
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -191,7 +192,7 @@ fn member_identifier(node: P<Node>) -> Option<&'static str> {
             if ast::is_identifier(arg) {
                 Some(arg.as_identifier().text())
             } else if ast::is_string_literal(arg) {
-                Some(arg.as_string_literal().text())
+                cooked_text(arg)
             } else {
                 None
             }

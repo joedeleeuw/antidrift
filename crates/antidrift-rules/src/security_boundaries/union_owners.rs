@@ -4,6 +4,7 @@ use super::package_ownership::absolute_filename;
 use super::package_resolution::resolver_with_mode;
 use antidrift_kernel::local_binding::Binding;
 use antidrift_kernel::ts_resolver::ResolutionMode;
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use oxc_resolver::{ResolveError, Resolver};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -48,6 +49,9 @@ pub(super) fn union_owners(
         if !ast::is_string_literal(spec) {
             continue;
         }
+        let Some(source) = cooked_text(spec) else {
+            continue;
+        };
         if resolver.is_none() {
             resolver = Some(resolver_with_mode(
                 Path::new(filename),
@@ -55,13 +59,7 @@ pub(super) fn union_owners(
             )?);
         }
         if let Some(resolver) = &resolver {
-            let arrays = imported_arrays(
-                filename,
-                spec.as_string_literal().text(),
-                resolver,
-                program,
-                &mut cache,
-            )?;
+            let arrays = imported_arrays(filename, source, resolver, program, &mut cache)?;
             add_import_owners(clause_node, arrays, &mut owners);
         }
     }
@@ -150,7 +148,7 @@ fn add_named_import_specifier_owners(
         .property_name()
         .and_then(|prop| match prop.kind() {
             Kind::Identifier => Some(prop.as_identifier().text()),
-            Kind::StringLiteral => Some(prop.as_string_literal().text()),
+            Kind::StringLiteral => cooked_text(prop),
             _ => None,
         })
         .unwrap_or(local_text);

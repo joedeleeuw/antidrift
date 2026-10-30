@@ -1,5 +1,6 @@
 use super::no_repo_state_mirror_assertion::unwrap_expr;
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -56,29 +57,28 @@ pub(super) fn source_file_read_call_name(call_node: P<Node>) -> Option<String> {
 fn collect_static_path_segments(expr: P<Node>, visited: &mut FxHashSet<Binding>) -> Vec<String> {
     let inner = unwrap_expr(expr);
     match inner.kind() {
-        Kind::StringLiteral => vec![inner.as_string_literal().text().to_owned()],
-        Kind::NoSubstitutionTemplateLiteral => {
-            let text = inner.text();
-            if text.is_empty() {
-                Vec::new()
-            } else {
-                vec![text.to_owned()]
-            }
-        }
+        Kind::StringLiteral => cooked_text(inner).map(str::to_owned).into_iter().collect(),
+        Kind::NoSubstitutionTemplateLiteral => cooked_text(inner)
+            .filter(|text| !text.is_empty())
+            .map(str::to_owned)
+            .into_iter()
+            .collect(),
         Kind::TemplateExpression => {
             let tpl = inner.as_template_expression();
             let mut out = Vec::new();
-            let head = tpl.head().text();
-            if !head.is_empty() {
-                out.push(head.to_owned());
-            }
+            out.extend(
+                cooked_text(tpl.head())
+                    .filter(|head| !head.is_empty())
+                    .map(str::to_owned),
+            );
             for &span_node in tpl.template_spans().nodes() {
                 let span = span_node.as_template_span();
                 out.extend(collect_static_path_segments(span.expression(), visited));
-                let tail = span.literal().text();
-                if !tail.is_empty() {
-                    out.push(tail.to_owned());
-                }
+                out.extend(
+                    cooked_text(span.literal())
+                        .filter(|tail| !tail.is_empty())
+                        .map(str::to_owned),
+                );
             }
             out
         }

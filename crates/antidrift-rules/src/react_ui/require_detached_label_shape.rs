@@ -1,4 +1,5 @@
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -55,7 +56,7 @@ impl RuleVisitor for Visitor {
         match call.arguments().nodes().get(1) {
             None => ctx.report_node(node, RuleMessage::new("missingLabel", MISSING_LABEL)),
             Some(&label) if label.kind() == Kind::StringLiteral => {
-                if !is_label_shape(label.as_string_literal().text()) {
+                if cooked_text(label).is_some_and(|text| !is_label_shape(text)) {
                     ctx.report_node(label, RuleMessage::new("badLabelShape", BAD_LABEL_SHAPE));
                 }
             }

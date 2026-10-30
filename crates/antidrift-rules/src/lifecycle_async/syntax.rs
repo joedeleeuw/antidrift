@@ -5,7 +5,7 @@ pub(super) use antidrift_kernel::local_binding::{
     resolve_lexical_binding,
 };
 pub(super) use antidrift_kernel::tsrs_kernel::{
-    Span, call_expression_of, identifier_of, is_function_like, unwrap_expression,
+    Span, call_expression_of, cooked_text, identifier_of, is_function_like, unwrap_expression,
     unwrap_parentheses,
 };
 use tsrs_ast::{self as ast, Kind, Node};
@@ -30,7 +30,7 @@ pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, &'static str)> {
             let access = inner.as_element_access_expression();
             let arg = unwrap_expression(access.argument_expression());
             if ast::is_string_literal(arg) {
-                Some((access.expression(), arg.as_string_literal().text()))
+                cooked_text(arg).map(|text| (access.expression(), text))
             } else {
                 None
             }
@@ -60,12 +60,12 @@ pub(super) fn identifier_member(expression: P<Node>) -> Option<(P<Node>, &'stati
 pub(super) fn property_name(key: P<Node>) -> Option<&'static str> {
     match key.kind() {
         Kind::Identifier => Some(key.as_identifier().text()),
-        Kind::StringLiteral => Some(key.as_string_literal().text()),
+        Kind::StringLiteral => cooked_text(key),
         Kind::ComputedPropertyName => {
             let expr = unwrap_parentheses(key.as_computed_property_name().expression());
             match expr.kind() {
                 Kind::Identifier => Some(expr.as_identifier().text()),
-                Kind::StringLiteral => Some(expr.as_string_literal().text()),
+                Kind::StringLiteral => cooked_text(expr),
                 _ => None,
             }
         }

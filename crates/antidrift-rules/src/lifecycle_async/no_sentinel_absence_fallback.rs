@@ -1,7 +1,7 @@
 use super::syntax::unwrap_expression;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
 use antidrift_kernel::runtime_lifecycle::{has_mtime_ordering_text, spans_multiple_artifact_tiers};
-use antidrift_kernel::tsrs_kernel::{is_function_like, node_text};
+use antidrift_kernel::tsrs_kernel::{cooked_text, is_function_like, node_text};
 use serde::Deserialize;
 use tsrs_ast::{Kind, Node};
 use tsrs_checker::{Checker, TypeFlags};
@@ -248,8 +248,7 @@ fn is_direct_jsx_text_expression(node: P<Node>) -> bool {
 fn string_literal(expression: P<Node>) -> Option<&'static str> {
     let inner = unwrap_expression(expression);
     match inner.kind() {
-        Kind::StringLiteral => Some(inner.as_string_literal().text()),
-        Kind::NoSubstitutionTemplateLiteral => Some(inner.text()),
+        Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral => cooked_text(inner),
         _ => None,
     }
 }

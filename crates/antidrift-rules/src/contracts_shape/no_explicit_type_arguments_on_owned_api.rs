@@ -1,4 +1,5 @@
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use tsrs_ast::{Kind, Node};
 use tsrs_checker::{Checker, SignatureKind, Type, TypeFlags};
@@ -53,10 +54,7 @@ fn is_convex_generated_api_import_decl(decl: P<Node>) -> bool {
     };
     let specifier = import_decl.as_import_declaration().module_specifier();
     specifier.kind() == Kind::StringLiteral
-        && specifier
-            .as_string_literal()
-            .text()
-            .ends_with("convex/_generated/api")
+        && cooked_text(specifier).is_some_and(|text| text.ends_with("convex/_generated/api"))
 }
 
 fn is_imported_from_convex_generated_api(checker: &mut Checker, ident_node: P<Node>) -> bool {

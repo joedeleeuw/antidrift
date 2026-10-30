@@ -4,6 +4,7 @@ use super::web_provenance::{
 };
 use antidrift_kernel::local_binding::Binding;
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node, SourceFile};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -115,7 +116,9 @@ fn safe_features(features: Option<P<Node>>) -> bool {
     if features.kind() != Kind::StringLiteral {
         return false;
     }
-    let text = features.as_string_literal().text();
+    let Some(text) = cooked_text(features) else {
+        return false;
+    };
     ["noopener", "noreferrer"].iter().all(|required| {
         text.split(',').any(|segment| {
             segment

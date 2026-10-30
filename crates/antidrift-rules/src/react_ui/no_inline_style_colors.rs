@@ -1,6 +1,6 @@
 use antidrift_kernel::jsx::{attribute_initializer_expression, plain_attribute_name};
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
-use antidrift_kernel::tsrs_kernel::{unwrap_expression, unwrap_parentheses};
+use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression, unwrap_parentheses};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -95,8 +95,7 @@ impl RuleVisitor for Visitor {
 fn static_style_value(value: P<Node>) -> Option<&'static str> {
     let inner = unwrap_parentheses(value);
     match inner.kind() {
-        Kind::StringLiteral => Some(inner.as_string_literal().text()),
-        Kind::NoSubstitutionTemplateLiteral => Some(inner.text()),
+        Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral => cooked_text(inner),
         _ => None,
     }
 }
@@ -104,7 +103,7 @@ fn static_style_value(value: P<Node>) -> Option<&'static str> {
 fn property_label(key: P<Node>) -> &'static str {
     match key.kind() {
         Kind::Identifier => key.as_identifier().text(),
-        Kind::StringLiteral => key.as_string_literal().text(),
+        Kind::StringLiteral => cooked_text(key).unwrap_or("?"),
         _ => "?",
     }
 }

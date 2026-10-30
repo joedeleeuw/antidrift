@@ -1,5 +1,6 @@
 use crate::tsrs_kernel::{
-    function_name, is_function_like, property_name_text, unwrap_expression, unwrap_parentheses,
+    cooked_text, function_name, is_function_like, property_name_text, unwrap_expression,
+    unwrap_parentheses,
 };
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -160,11 +161,11 @@ pub fn static_attribute_string(attribute: P<Node>) -> Option<&'static str> {
     }
     let init = attribute.as_jsx_attribute().initializer()?;
     match init.kind() {
-        Kind::StringLiteral => Some(init.as_string_literal().text()),
+        Kind::StringLiteral => cooked_text(init),
         Kind::JsxExpression => {
             let expr = unwrap_parentheses(init.as_jsx_expression().expression()?);
             if expr.kind() == Kind::StringLiteral {
-                Some(expr.as_string_literal().text())
+                cooked_text(expr)
             } else {
                 None
             }

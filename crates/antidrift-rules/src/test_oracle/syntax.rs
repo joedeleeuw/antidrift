@@ -1,6 +1,6 @@
 pub(super) use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
 pub(super) use antidrift_kernel::tsrs_kernel::{
-    Span, call_expression_of, identifier_of, member_chain_root_node, member_object,
+    Span, call_expression_of, cooked_text, identifier_of, member_chain_root_node, member_object,
     numeric_literal_value, unwrap_awaited_expression, unwrap_expression,
 };
 use tsrs_ast::{Kind, Node, SourceFile};
@@ -42,7 +42,7 @@ pub(super) fn static_member(expression: P<Node>) -> Option<(P<Node>, String)> {
 
 pub(super) fn segment(expression: P<Node>) -> Option<String> {
     match expression.kind() {
-        Kind::StringLiteral => Some(expression.as_string_literal().text().to_owned()),
+        Kind::StringLiteral => cooked_text(expression).map(str::to_owned),
         Kind::NumericLiteral => numeric_literal_value(expression).map(|val| val.to_string()),
         _ => None,
     }
@@ -70,12 +70,12 @@ pub(super) fn object_property(prop: P<Node>) -> Option<(String, P<Node>, bool)> 
 pub(super) fn property_name(key: P<Node>, computed: bool) -> Option<String> {
     match key.kind() {
         Kind::Identifier if !computed => Some(key.as_identifier().text().to_owned()),
-        Kind::StringLiteral => Some(key.as_string_literal().text().to_owned()),
+        Kind::StringLiteral => cooked_text(key).map(str::to_owned),
         Kind::NumericLiteral => numeric_literal_value(key).map(|val| val.to_string()),
         Kind::ComputedPropertyName => {
             let inner = key.as_computed_property_name().expression();
             match inner.kind() {
-                Kind::StringLiteral => Some(inner.as_string_literal().text().to_owned()),
+                Kind::StringLiteral => cooked_text(inner).map(str::to_owned),
                 Kind::NumericLiteral => numeric_literal_value(inner).map(|val| val.to_string()),
                 _ => None,
             }

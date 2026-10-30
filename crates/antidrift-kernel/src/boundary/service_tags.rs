@@ -1,3 +1,4 @@
+use crate::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, ClassDeclaration, Kind, Node, SourceFile, Symbol};
 use tsrs_checker::{Checker, ObjectFlags, SignatureKind, Type};
@@ -31,7 +32,10 @@ fn callee_namespace_and_method(expr: P<Node>) -> Option<(&'static str, &'static 
     if ast::is_property_access_expression(expr) {
         let pa = expr.as_property_access_expression();
         if ast::is_identifier(pa.expression()) {
-            return Some((pa.expression().as_identifier().text(), pa.name().text()));
+            return Some((
+                pa.expression().as_identifier().text(),
+                cooked_text(pa.name())?,
+            ));
         }
     }
     ast::is_identifier(expr).then(|| ("", expr.as_identifier().text()))

@@ -1,5 +1,6 @@
 use antidrift_kernel::file_role::{ProjectPath, is_test_file};
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, in_scope};
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::{P, tspath};
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -48,10 +49,14 @@ impl RuleVisitor for Visitor {
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        let text = match node.kind() {
-            Kind::StringLiteral => node.as_string_literal().text(),
-            Kind::NoSubstitutionTemplateLiteral => node.text(),
-            _ => return,
+        if !matches!(
+            node.kind(),
+            Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral
+        ) {
+            return;
+        }
+        let Some(text) = cooked_text(node) else {
+            return;
         };
         if is_host_path_literal(text) {
             ctx.report_node(

@@ -1,3 +1,4 @@
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{boundary, provenance, shape, tsrs_kernel};
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
@@ -285,10 +286,9 @@ fn check_call_property_probes(call_node: P<Node>, state: &mut BodyScanState) {
     else {
         return;
     };
-    let key = tsrs_kernel::unwrap_expression(key_node)
-        .as_string_literal()
-        .text()
-        .to_owned();
+    let Some(key) = cooked_text(tsrs_kernel::unwrap_expression(key_node)).map(str::to_owned) else {
+        return;
+    };
     for &arg in args {
         if arg != key_node
             && arg.kind() != Kind::SpreadElement

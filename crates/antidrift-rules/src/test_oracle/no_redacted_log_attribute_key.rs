@@ -1,4 +1,5 @@
 use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -117,7 +118,7 @@ fn extract_property_name(prop: P<Node>) -> Option<&'static str> {
     };
     match key.kind() {
         Kind::Identifier => Some(key.as_identifier().text()),
-        Kind::StringLiteral => Some(key.as_string_literal().text()),
+        Kind::StringLiteral => cooked_text(key),
         _ => None,
     }
 }
