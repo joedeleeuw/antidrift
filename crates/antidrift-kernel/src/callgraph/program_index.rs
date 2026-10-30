@@ -86,10 +86,8 @@ impl ProgramSymbolIndex {
             let mut scan = FileScan {
                 index: &mut index,
                 file: sf,
-                is_test_file: file_role::is_test_file(&file_role::ProjectPath::of(
-                    program,
-                    sf.file_name(),
-                )),
+                is_test_file: file_role::ProjectPath::of(program, sf.file_name())
+                    .has_any_role(file_role::TEST_ROLES),
             };
             scan.walk(sf.as_node());
         }

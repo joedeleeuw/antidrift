@@ -1,4 +1,4 @@
-use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
+use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::rule_scope::RuleScope;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -34,7 +34,7 @@ impl Rule for NoPlaceholderTests {
         let cwd = ctx.program.host().get_current_directory();
         let filename = ctx.file.file_name().replace('\\', "/");
         let enabled = self.scope.matches(&filename, cwd)
-            && is_test_or_spec_file(&ProjectPath::of(ctx.program, &filename));
+            && ProjectPath::of(ctx.program, &filename).has_role(FileRole::TestOrSpec);
         Box::new(Visitor { enabled })
     }
 }

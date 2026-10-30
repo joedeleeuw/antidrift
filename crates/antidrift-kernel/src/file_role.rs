@@ -58,6 +58,117 @@ const DOMAIN_SEGMENTS: &[&str] = &[
     "schemas",
 ];
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FileRole {
+    TestOrSpec,
+    TestSupport,
+    Docs,
+    Example,
+    EndToEnd,
+    Story,
+    Boundary,
+    Domain,
+    ScriptEntry,
+    Shared,
+}
+
+pub const TEST_ROLES: &[FileRole] = &[FileRole::TestOrSpec, FileRole::TestSupport];
+
+struct RolePattern {
+    dirs: &'static [&'static str],
+    stems: &'static [&'static str],
+    stem_suffixes: &'static [&'static str],
+    script_only: bool,
+}
+
+const NO_PATTERN: RolePattern = RolePattern {
+    dirs: &[],
+    stems: &[],
+    stem_suffixes: &[],
+    script_only: false,
+};
+
+const GENERATED_PATHS: RolePattern = RolePattern {
+    dirs: GENERATED_DIRS,
+    stem_suffixes: GENERATED_STEM_SUFFIXES,
+    ..NO_PATTERN
+};
+
+impl FileRole {
+    const fn pattern(self) -> RolePattern {
+        match self {
+            Self::TestOrSpec => RolePattern {
+                dirs: &["test", "tests", "__tests__"],
+                stem_suffixes: &[".test", ".spec"],
+                ..NO_PATTERN
+            },
+            Self::TestSupport => RolePattern {
+                dirs: &["__mocks__", "fixtures", "__fixtures__"],
+                stem_suffixes: &[".fixture", ".mock", ".stub"],
+                ..NO_PATTERN
+            },
+            Self::Docs => RolePattern {
+                dirs: &["docs"],
+                ..NO_PATTERN
+            },
+            Self::Example => RolePattern {
+                dirs: &["example", "examples"],
+                ..NO_PATTERN
+            },
+            Self::EndToEnd => RolePattern {
+                dirs: &["e2e"],
+                ..NO_PATTERN
+            },
+            Self::Story => RolePattern {
+                stem_suffixes: &[".stories"],
+                ..NO_PATTERN
+            },
+            Self::Boundary => RolePattern {
+                dirs: BOUNDARY_SEGMENTS,
+                stems: BOUNDARY_SEGMENTS,
+                script_only: true,
+                ..NO_PATTERN
+            },
+            Self::Domain => RolePattern {
+                dirs: DOMAIN_SEGMENTS,
+                stems: DOMAIN_SEGMENTS,
+                script_only: true,
+                ..NO_PATTERN
+            },
+            Self::ScriptEntry => RolePattern {
+                dirs: &["scripts", "bin"],
+                stem_suffixes: &["worker-process"],
+                ..NO_PATTERN
+            },
+            Self::Shared => RolePattern {
+                dirs: &["shared"],
+                ..NO_PATTERN
+            },
+        }
+    }
+}
+
+impl RolePattern {
+    fn matches(&self, path: &ProjectPath) -> bool {
+        let stem = strip_script_ext(&path.0);
+        if self.script_only && stem.is_none() {
+            return false;
+        }
+        let dirs = path.0.rsplit_once('/').map_or("", |(dirs, _)| dirs);
+        dirs.split('/').any(|part| self.dirs.contains(&part))
+            || stem.is_some_and(|stem| self.matches_stem(stem))
+    }
+
+    fn matches_stem(&self, stem: &str) -> bool {
+        let name = stem.rsplit('/').next().unwrap_or(stem);
+        self.stems.contains(&name)
+            || self
+                .stem_suffixes
+                .iter()
+                .any(|suffix| stem.ends_with(suffix))
+    }
+}
+
 pub struct ProjectPath(String);
 
 impl ProjectPath {
@@ -73,6 +184,16 @@ impl ProjectPath {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    #[must_use]
+    pub fn has_role(&self, role: FileRole) -> bool {
+        role.pattern().matches(self)
+    }
+
+    #[must_use]
+    pub fn has_any_role(&self, roles: &[FileRole]) -> bool {
+        roles.iter().any(|&role| self.has_role(role))
+    }
 }
 
 #[must_use]
@@ -80,33 +201,9 @@ pub fn is_declaration_file(file_path: &str) -> bool {
     tspath::is_declaration_file_name(&tspath::normalize_slashes(file_path))
 }
 
-fn has_script_ext(file_path: &str) -> bool {
-    tspath::has_ts_file_extension(file_path) || tspath::has_js_file_extension(file_path)
-}
-
 fn strip_script_ext(file_path: &str) -> Option<&str> {
-    has_script_ext(file_path).then(|| tspath::remove_file_extension(file_path))
-}
-
-fn path_has_dir_segment(path: &ProjectPath, segments: &[&str]) -> bool {
-    let dirs = path.0.rsplit_once('/').map_or("", |(dirs, _)| dirs);
-    dirs.split('/').any(|part| segments.contains(&part))
-}
-
-fn stem_has_suffix(path: &ProjectPath, suffixes: &[&str]) -> bool {
-    strip_script_ext(&path.0)
-        .is_some_and(|stem| suffixes.iter().any(|suffix| stem.ends_with(suffix)))
-}
-
-fn path_matches_dir_or_stem(path: &ProjectPath, segments: &[&str]) -> bool {
-    if path_has_dir_segment(path, segments) {
-        return true;
-    }
-    let Some(stem) = strip_script_ext(&path.0) else {
-        return false;
-    };
-    let last = stem.rsplit('/').next().unwrap_or(stem);
-    segments.contains(&last)
+    (tspath::has_ts_file_extension(file_path) || tspath::has_js_file_extension(file_path))
+        .then(|| tspath::remove_file_extension(file_path))
 }
 
 fn leading_comment_text(source_text: &str) -> String {
@@ -132,35 +229,11 @@ fn leading_comment_text(source_text: &str) -> String {
 
 #[must_use]
 pub fn is_generated_file(path: &ProjectPath, source_text: &str) -> bool {
-    if path_has_dir_segment(path, GENERATED_DIRS) || stem_has_suffix(path, GENERATED_STEM_SUFFIXES)
-    {
+    if GENERATED_PATHS.matches(path) {
         return true;
     }
     let header = leading_comment_text(source_text);
     GENERATED_HEADER_MARKERS
         .iter()
         .any(|marker| header.contains(marker))
-}
-
-#[must_use]
-pub fn is_test_or_spec_file(path: &ProjectPath) -> bool {
-    path_has_dir_segment(path, &["test", "tests", "__tests__"])
-        || stem_has_suffix(path, &[".test", ".spec"])
-}
-
-#[must_use]
-pub fn is_test_file(path: &ProjectPath) -> bool {
-    is_test_or_spec_file(path)
-        || path_has_dir_segment(path, &["__mocks__", "fixtures", "__fixtures__"])
-        || stem_has_suffix(path, &[".fixture", ".mock"])
-}
-
-#[must_use]
-pub fn is_boundary_file(path: &ProjectPath) -> bool {
-    has_script_ext(&path.0) && path_matches_dir_or_stem(path, BOUNDARY_SEGMENTS)
-}
-
-#[must_use]
-pub fn is_domain_file(path: &ProjectPath) -> bool {
-    has_script_ext(&path.0) && path_matches_dir_or_stem(path, DOMAIN_SEGMENTS)
 }

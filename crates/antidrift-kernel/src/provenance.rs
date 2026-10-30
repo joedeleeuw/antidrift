@@ -199,10 +199,10 @@ pub fn classify_source_file_origin(
     {
         return DeclarationOrigin::SameFile;
     }
-    if file_role::is_domain_file(&project_path) {
+    if project_path.has_role(file_role::FileRole::Domain) {
         return DeclarationOrigin::LocalDomain;
     }
-    if file_role::is_boundary_file(&project_path) {
+    if project_path.has_role(file_role::FileRole::Boundary) {
         return DeclarationOrigin::LocalBoundary;
     }
     DeclarationOrigin::WorkspaceOther

@@ -1,4 +1,4 @@
-use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
+use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, ModifierFlags, Node};
 use tsrs_core::P;
@@ -44,7 +44,7 @@ impl Rule for NoDefaultExportInDomain {
             self.scope.matches(&filename, cwd) && is_domain_file(path.as_str())
         };
         let enabled = in_scope
-            && !is_test_or_spec_file(&path)
+            && !path.has_role(FileRole::TestOrSpec)
             && !is_migration_file(path.as_str())
             && !is_generated_or_declaration_module(path.as_str());
         Box::new(Visitor { enabled })
@@ -81,27 +81,11 @@ impl RuleVisitor for Visitor {
     }
 }
 
-pub(super) fn is_domain_file(filename: &str) -> bool {
+fn is_domain_file(filename: &str) -> bool {
     filename.starts_with("domain/")
         || filename.starts_with("model/")
         || filename.contains("/domain/")
         || filename.contains("/model/")
-}
-
-pub(super) fn is_fixture_or_docs_file(filename: &str) -> bool {
-    let base = filename.rsplit('/').next().unwrap_or(filename);
-    if has_middle_tag(base, &["fixture", "mock", "stub"]) {
-        return true;
-    }
-    let segments: Vec<&str> = filename.split('/').collect();
-    if segments.len() >= 2 {
-        for seg in &segments[..segments.len() - 1] {
-            if matches!(*seg, "__fixtures__" | "__mocks__" | "docs" | "fixtures") {
-                return true;
-            }
-        }
-    }
-    false
 }
 
 fn is_migration_file(filename: &str) -> bool {

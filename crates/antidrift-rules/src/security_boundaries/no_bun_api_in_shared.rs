@@ -1,4 +1,4 @@
-use antidrift_kernel::file_role::ProjectPath;
+use antidrift_kernel::file_role::FileRole;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
 use antidrift_kernel::tsrs_kernel::cooked_text;
@@ -36,7 +36,11 @@ impl Rule for NoBunApiInShared {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, Some(shared_file));
+        let enabled = in_scope(
+            &self.scope,
+            ctx,
+            Some(|path| path.has_role(FileRole::Shared)),
+        );
         Box::new(Visitor { enabled })
     }
 }
@@ -76,10 +80,6 @@ impl RuleVisitor for Visitor {
             );
         }
     }
-}
-
-fn shared_file(path: &ProjectPath) -> bool {
-    path.as_str().starts_with("shared/") || path.as_str().contains("/shared/")
 }
 
 fn unbound_bun(expression: P<Node>) -> bool {

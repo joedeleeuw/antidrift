@@ -292,7 +292,7 @@ impl Rule for NoContractAppeasementProjection {
             candidates: Vec::new(),
             object_literals: Vec::new(),
             reported_functions: FxHashSet::default(),
-            authored_file: !file_role::is_test_file(&path)
+            authored_file: !path.has_any_role(file_role::TEST_ROLES)
                 && !self.scope.skips_generated(&path, ctx.file.text()),
         })
     }

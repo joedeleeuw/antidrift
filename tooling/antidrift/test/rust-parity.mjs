@@ -15,8 +15,8 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
+import { buildBoundaryProbes } from "./boundary-probes.mjs";
 import {
-  buildBoundaryProbes,
   buildSharedHelperFiles,
   coreHeadlessProbes,
   portableCases,

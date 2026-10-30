@@ -19,6 +19,7 @@ mod syntax;
 mod validator_assertions;
 mod validators;
 
+use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::rule_scope::RuleScope;
 use rustc_hash::FxHashMap;
 use tsrs_ast::{Kind, Node};
@@ -57,9 +58,9 @@ impl Rule for NoNonindependentTestOracle {
         let cwd = ctx.program.host().get_current_directory();
         let file_name = ctx.file.file_name();
         let enabled = self.scope.matches(file_name, cwd);
-        let path = syntax::ProjectPath::of(ctx.program, file_name);
+        let path = ProjectPath::of(ctx.program, file_name);
         let test_file = enabled && syntax::is_test_file(&path);
-        let spec_file = syntax::is_test_or_spec_file(&path);
+        let spec_file = path.has_role(FileRole::TestOrSpec);
         let blocks = if test_file {
             block::collect_blocks(&bindings::Oracle { sf: ctx.file })
         } else {

@@ -1,11 +1,19 @@
-use antidrift_kernel::file_role::{ProjectPath, is_test_file};
+use antidrift_kernel::file_role::FileRole;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, in_scope};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node};
-use tsrs_core::{P, tspath};
+use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-host-path-literal";
+
+const EXEMPT_ROLES: &[FileRole] = &[
+    FileRole::TestOrSpec,
+    FileRole::TestSupport,
+    FileRole::Example,
+    FileRole::EndToEnd,
+    FileRole::Story,
+];
 
 pub struct NoHostPathLiteral {
     scope: RuleScope,
@@ -36,7 +44,11 @@ impl Rule for NoHostPathLiteral {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !in_scope(&self.scope, ctx, Some(is_non_exempt_host_path_file)) {
+        if !in_scope(
+            &self.scope,
+            ctx,
+            Some(|path| !path.has_any_role(EXEMPT_ROLES)),
+        ) {
             return Box::new(EmptyVisitor);
         }
         Box::new(Visitor)
@@ -68,21 +80,6 @@ impl RuleVisitor for Visitor {
             );
         }
     }
-}
-
-fn is_non_exempt_host_path_file(path: &ProjectPath) -> bool {
-    if is_test_file(path) {
-        return false;
-    }
-    let normalized = path.as_str();
-    if normalized
-        .split('/')
-        .any(|segment| matches!(segment, "example" | "examples" | "e2e"))
-    {
-        return false;
-    }
-    let stem = tspath::remove_file_extension(normalized);
-    !stem.ends_with(".stories")
 }
 
 fn is_host_path_literal(text: &str) -> bool {

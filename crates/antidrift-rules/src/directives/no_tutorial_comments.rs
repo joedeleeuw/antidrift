@@ -1,12 +1,13 @@
-use super::no_default_export_in_domain::is_fixture_or_docs_file;
 use antidrift_kernel::directives::{scan_source_comments, split_identifier_words};
-use antidrift_kernel::file_role::{ProjectPath, is_test_or_spec_file};
+use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::rule_scope::RuleScope;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-tutorial-comments";
+
+const EXEMPT_ROLES: &[FileRole] = &[FileRole::TestOrSpec, FileRole::TestSupport, FileRole::Docs];
 
 const LEAD_WORDS: &[&str] = &["this", "here", "we"];
 const VERB_WORDS: &[&str] = &[
@@ -54,9 +55,7 @@ impl Rule for NoTutorialComments {
         let cwd = ctx.program.host().get_current_directory();
         let filename = ctx.file.file_name().replace('\\', "/");
         let path = ProjectPath::of(ctx.program, &filename);
-        let enabled = self.scope.matches(&filename, cwd)
-            && !is_test_or_spec_file(&path)
-            && !is_fixture_or_docs_file(path.as_str());
+        let enabled = self.scope.matches(&filename, cwd) && !path.has_any_role(EXEMPT_ROLES);
         Box::new(Visitor { enabled })
     }
 }

@@ -149,7 +149,7 @@ impl RuleScope {
         let path = ProjectPath::of(ctx.program, file_name);
         self.in_scope(ctx)
             && !file_role::is_declaration_file(file_name)
-            && !file_role::is_test_file(&path)
+            && !path.has_any_role(file_role::TEST_ROLES)
             && !self.skips_generated(&path, ctx.file.text())
     }
 

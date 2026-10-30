@@ -1,7 +1,7 @@
 use super::render_scope::{
     find_calling_render_function, find_enclosing_render_function, is_exempt_function_scope,
 };
-use antidrift_kernel::file_role::{ProjectPath, is_test_file};
+use antidrift_kernel::file_role::{ProjectPath, TEST_ROLES};
 use antidrift_kernel::jsx::{is_component_or_hook_function, react_function_name};
 use antidrift_kernel::provenance::{symbol_at_node, symbol_declarations};
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
@@ -47,7 +47,7 @@ impl Rule for NoImpureRenderCall {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         let active = in_scope(&self.scope, ctx, None)
-            && !is_test_file(&ProjectPath::of(ctx.program, ctx.file.file_name()));
+            && !ProjectPath::of(ctx.program, ctx.file.file_name()).has_any_role(TEST_ROLES);
         Box::new(Visitor { active })
     }
 }
