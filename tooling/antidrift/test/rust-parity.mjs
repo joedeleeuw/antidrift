@@ -841,6 +841,29 @@ try {
       `A repository under a '${ancestor}' directory must lint like any other: file roles come from the path below the working directory`
     );
   }
+  const monorepoDir = join(projectRootWorkspace, "monorepo");
+  const sharedPackageDir = join(monorepoDir, "packages/shared");
+  mkdirSync(join(sharedPackageDir, "src"), { recursive: true });
+  writeFileSync(
+    join(sharedPackageDir, "tsconfig.json"),
+    '{ "compilerOptions": { "strict": true, "module": "esnext", "target": "es2022", "moduleResolution": "bundler", "types": [] }, "include": ["src"] }\n'
+  );
+  writeFileSync(
+    join(sharedPackageDir, "src/io.ts"),
+    "export function readIt(path: string) {\n  return Bun.file(path).text();\n}\n"
+  );
+  const packageRun = spawnSync(
+    binaryPath,
+    ["--format", "json", "packages/shared/src/io.ts"],
+    { cwd: monorepoDir, encoding: "utf8" }
+  );
+  assert.deepEqual(
+    JSON.parse(String(packageRun.stdout ?? "[]")).flatMap((entry) =>
+      entry.messages.map((message) => message.ruleId)
+    ),
+    ["antidrift/no-bun-api-in-shared"],
+    "A file under a package tsconfig keeps the roles of the directories above it: file roles come from the path below the run's working directory"
+  );
 } finally {
   rmSync(projectRootWorkspace, { recursive: true, force: true });
 }
