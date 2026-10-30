@@ -1,4 +1,5 @@
 mod contracts;
+mod decoders;
 mod emit;
 mod layout;
 mod route_contracts;
