@@ -1,0 +1,15 @@
+{
+  "name": "@agent-guardrails/shape-sample",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "derive": "antidrift-linter derive .",
+    "smoke": "tsx smoke/run.ts"
+  },
+  "devDependencies": {
+    "tsx": "catalog:core",
+    "typescript": "catalog:core"
+  }
+}

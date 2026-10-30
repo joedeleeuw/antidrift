@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1286,6 +1294,125 @@ try {
   rmSync(projectRootWorkspace, { recursive: true, force: true });
 }
 
+const deriveWorkspace = mkdtempSync(join(tmpdir(), "antidrift-derive-"));
+try {
+  const sampleRoot = resolve(repoRoot, "apps/shape-sample");
+  const copyRoot = join(deriveWorkspace, "apps/shape-sample");
+  cpSync(
+    resolve(repoRoot, "tsconfig.base.json"),
+    join(deriveWorkspace, "tsconfig.base.json")
+  );
+  symlinkSync(
+    resolve(repoRoot, "node_modules"),
+    join(deriveWorkspace, "node_modules"),
+    "dir"
+  );
+  cpSync(sampleRoot, copyRoot, {
+    recursive: true,
+    filter: (source) =>
+      !source.includes("node_modules") && !source.includes("/src/generated"),
+  });
+  const generatedFiles = [
+    "wire.ts",
+    "client.ts",
+    "server.ts",
+    "manifest.json",
+    "derive-report.json",
+  ];
+  const cleanRun = spawnSync(binaryPath, ["derive", copyRoot], {
+    encoding: "utf8",
+  });
+  assert.equal(
+    cleanRun.status,
+    0,
+    `derive failed on the clean sample: ${cleanRun.stdout}${cleanRun.stderr}`
+  );
+  for (const name of generatedFiles) {
+    assert.equal(
+      readFileSync(join(copyRoot, "src/generated", name), "utf8"),
+      readFileSync(join(sampleRoot, "src/generated", name), "utf8"),
+      `apps/shape-sample/src/generated/${name} is stale; run antidrift-linter derive apps/shape-sample`
+    );
+  }
+  const plantedViolations = {
+    "src/methods/callbacky.ts":
+      'import type { Session } from "../shared/session";\n\nexport async function callbacky(input: { label: string; onDone: () => void }, session: Session): Promise<string> {\n  input.onDone();\n  return Promise.resolve(session.userId);\n}\n',
+    "src/methods/renamed.ts":
+      'export async function somethingElse(): Promise<string> {\n  return Promise.resolve("renamed");\n}\n',
+    "src/methods/syncMethod.ts":
+      "export function syncMethod(label: string): string {\n  return label.toUpperCase();\n}\n",
+    "src/methods/voidResult.ts":
+      "export async function voidResult(): Promise<void> {\n  await Promise.resolve();\n}\n",
+    "src/methods/optionalArg.ts":
+      "export async function optionalArg(todoId: string, note?: string): Promise<string> {\n  return Promise.resolve(note ?? todoId);\n}\n",
+    "src/routes/lists/route.ts":
+      "export function GET(): Response {\n  return Response.json([]);\n}\n",
+    "src/shared/asyncShared.ts":
+      "export async function asyncShared(): Promise<number> {\n  return Promise.resolve(1);\n}\n",
+    "src/client/leaky.ts":
+      'import { listTodos } from "../server/store";\n\nexport function leak(): Promise<number> {\n  return listTodos("any").then((todos) => todos.length);\n}\n',
+  };
+  for (const [file, source] of Object.entries(plantedViolations)) {
+    mkdirSync(dirname(join(copyRoot, file)), { recursive: true });
+    writeFileSync(join(copyRoot, file), source);
+  }
+  const plantedRun = spawnSync(binaryPath, ["derive", copyRoot], {
+    encoding: "utf8",
+  });
+  assert.equal(
+    plantedRun.status,
+    1,
+    `derive must exit 1 on violations: ${plantedRun.stdout}${plantedRun.stderr}`
+  );
+  const plantedReport = JSON.parse(
+    readFileSync(join(copyRoot, "src/generated/derive-report.json"), "utf8")
+  );
+  assert.deepEqual(
+    plantedReport.diagnostics
+      .map((diagnostic) => `${diagnostic.file} ${diagnostic.rule}`)
+      .sort(),
+    [
+      "client/leaky.ts client-reaches-server",
+      "methods/callbacky.ts method-param-not-wire",
+      "methods/optionalArg.ts method-param-not-wire",
+      "methods/renamed.ts method-export-name",
+      "methods/syncMethod.ts method-must-be-async",
+      "methods/voidResult.ts method-result-not-wire",
+      "routes/lists/route.ts route-must-be-async",
+      "shared/asyncShared.ts shared-must-be-sync",
+    ]
+  );
+  for (const name of ["wire.ts", "client.ts", "server.ts"]) {
+    assert.equal(
+      readFileSync(join(copyRoot, "src/generated", name), "utf8"),
+      readFileSync(join(sampleRoot, "src/generated", name), "utf8"),
+      `planted violations must not change the derived ${name}`
+    );
+  }
+} finally {
+  rmSync(deriveWorkspace, { recursive: true, force: true });
+}
+
+const sampleSmoke = spawnSync(
+  resolve(repoRoot, "node_modules/.bin/tsx"),
+  ["apps/shape-sample/smoke/run.ts"],
+  { cwd: repoRoot, encoding: "utf8" }
+);
+assert.equal(
+  sampleSmoke.status,
+  0,
+  `shape-sample smoke failed: ${sampleSmoke.stdout}${sampleSmoke.stderr}`
+);
+assert.deepEqual(sampleSmoke.stdout.trim().split("\n"), [
+  "ok   addTodo round-trips through derived decoders, Date included",
+  "ok   malformed wire input fails at the boundary and names the field",
+  "ok   completeTodo enforces ownership through the injected session",
+  "ok   publication streams typed patches and stops when the client stops",
+  "ok   client view model renders the optimistic patch, then the server's",
+  "ok   route GET /todos/[id] serves JSON and refuses other owners",
+  "6/6 steps passed",
+]);
+
 console.log(
-  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path, project-root & rust linter smokes verified)`
+  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path, project-root, derive & rust linter smokes verified)`
 );

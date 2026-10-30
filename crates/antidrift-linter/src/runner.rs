@@ -199,7 +199,10 @@ fn handle_suppressions_and_format(
     Ok(0)
 }
 
-fn collect_lintable_files(paths: &[PathBuf], cwd: &Path) -> Result<Vec<PathBuf>, String> {
+pub(crate) fn collect_lintable_files(
+    paths: &[PathBuf],
+    cwd: &Path,
+) -> Result<Vec<PathBuf>, String> {
     let mut collected = Vec::new();
     for root in paths {
         let full = if root.is_absolute() {

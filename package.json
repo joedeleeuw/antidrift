@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
-    "typecheck": "tsc -b --pretty false && tsc -p tooling/antidrift --pretty false",
+    "typecheck": "tsc -b --pretty false && tsc -p tooling/antidrift --pretty false && tsc -p apps/shape-sample --pretty false",
     "lint": "pnpm lint:rust && pnpm lint:oxlint && pnpm lint:boundaries && pnpm lint:exports",
     "lint:rust": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo run --quiet -p antidrift-linter -- rust . --deny-warnings",
     "parity:rust": "node tooling/antidrift/test/rust-parity.mjs",

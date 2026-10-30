@@ -1,5 +1,6 @@
 mod batch;
 mod cli;
+mod derive;
 mod format;
 mod headless;
 mod headless_host;
@@ -9,6 +10,7 @@ mod rust;
 use antidrift_rules::all_rules;
 use batch::run_batch_json;
 use cli::{CliAction, parse_cli_args};
+use derive::run_derive;
 use runner::run_workspace;
 use rust::run_rust_cli;
 use rustc_hash::FxHashSet;
@@ -60,10 +62,37 @@ fn run_batch_thread(spec: String) -> ExitCode {
     }
 }
 
+fn run_derive_thread(rest: Vec<String>) -> ExitCode {
+    let spawned = std::thread::Builder::new()
+        .stack_size(512 << 20)
+        .spawn(move || run_derive(&rest));
+    match spawned {
+        Ok(handle) => match handle.join() {
+            Ok(Ok(0)) => ExitCode::SUCCESS,
+            Ok(Ok(code)) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
+            Ok(Err(err)) => {
+                eprintln!("antidrift-linter derive: {err}");
+                ExitCode::from(2)
+            }
+            Err(panic_payload) => {
+                eprintln!("antidrift-linter derive thread panicked: {panic_payload:?}");
+                ExitCode::from(2)
+            }
+        },
+        Err(err) => {
+            eprintln!("antidrift-linter: {err}");
+            ExitCode::from(2)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let raw_vec: Vec<String> = std::env::args().skip(1).collect();
     if raw_vec.first().map(String::as_str) == Some("headless") {
         return run_headless_thread(raw_vec[1..].to_vec());
+    }
+    if raw_vec.first().map(String::as_str) == Some("derive") {
+        return run_derive_thread(raw_vec[1..].to_vec());
     }
     if raw_vec.first().map(String::as_str) == Some("rust") {
         return match run_rust_cli(&raw_vec[1..]) {
@@ -89,7 +118,7 @@ fn main() -> ExitCode {
         .any(|arg| matches!(arg.as_str(), "--help" | "-h") || (raw_vec.len() == 1 && arg == "help"))
     {
         println!(
-            "Usage:\n  antidrift-linter [--format human|stylish|json|sarif] [--json] [--fix] [--list-rules]\n                   [--batch-json <spec>] [--suppress-rule <id>] [--prune-suppressions]\n                   [--suppressions-location <path>] [--report-unused-disable-directives] [paths...]\n  antidrift-linter rust [--json] [--format human|stylish|json] [paths...]\n  antidrift-linter headless"
+            "Usage:\n  antidrift-linter [--format human|stylish|json|sarif] [--json] [--fix] [--list-rules]\n                   [--batch-json <spec>] [--suppress-rule <id>] [--prune-suppressions]\n                   [--suppressions-location <path>] [--report-unused-disable-directives] [paths...]\n  antidrift-linter rust [--json] [--format human|stylish|json] [paths...]\n  antidrift-linter derive <package-root>\n  antidrift-linter headless"
         );
         return ExitCode::SUCCESS;
     }

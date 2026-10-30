@@ -1,0 +1,487 @@
+{
+  "methods": [
+    {
+      "name": "addTodo",
+      "file": "methods/addTodo.ts",
+      "params": [
+        {
+          "name": "input",
+          "shape": {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "listId",
+                "optional": false,
+                "shape": {
+                  "kind": "string"
+                }
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "shape": {
+                  "kind": "string"
+                }
+              },
+              {
+                "name": "tags",
+                "optional": true,
+                "shape": {
+                  "kind": "array",
+                  "items": {
+                    "kind": "string"
+                  }
+                }
+              },
+              {
+                "name": "note",
+                "optional": true,
+                "shape": {
+                  "kind": "string"
+                }
+              },
+              {
+                "name": "priority",
+                "optional": true,
+                "shape": {
+                  "kind": "number"
+                }
+              },
+              {
+                "name": "dueAt",
+                "optional": true,
+                "shape": {
+                  "kind": "date"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "injected": ["session"],
+      "result": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "optional": false,
+            "shape": {
+              "kind": "string"
+            }
+          },
+          {
+            "name": "listId",
+            "optional": false,
+            "shape": {
+              "kind": "string"
+            }
+          },
+          {
+            "name": "ownerId",
+            "optional": false,
+            "shape": {
+              "kind": "string"
+            }
+          },
+          {
+            "name": "title",
+            "optional": false,
+            "shape": {
+              "kind": "string"
+            }
+          },
+          {
+            "name": "status",
+            "optional": false,
+            "shape": {
+              "kind": "union",
+              "variants": [
+                {
+                  "kind": "literal",
+                  "value": "done"
+                },
+                {
+                  "kind": "literal",
+                  "value": "open"
+                }
+              ]
+            }
+          },
+          {
+            "name": "createdAt",
+            "optional": false,
+            "shape": {
+              "kind": "date"
+            }
+          },
+          {
+            "name": "dueAt",
+            "optional": false,
+            "shape": {
+              "kind": "union",
+              "variants": [
+                {
+                  "kind": "null"
+                },
+                {
+                  "kind": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "priority",
+            "optional": false,
+            "shape": {
+              "kind": "number"
+            }
+          },
+          {
+            "name": "pinned",
+            "optional": false,
+            "shape": {
+              "kind": "boolean"
+            }
+          },
+          {
+            "name": "tags",
+            "optional": false,
+            "shape": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            }
+          },
+          {
+            "name": "note",
+            "optional": true,
+            "shape": {
+              "kind": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "completeTodo",
+      "file": "methods/completeTodo.ts",
+      "params": [
+        {
+          "name": "todoId",
+          "shape": {
+            "kind": "string"
+          }
+        }
+      ],
+      "injected": ["session"],
+      "result": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "optional": false,
+            "shape": {
+              "kind": "string"
+            }
+          },
+          {
+            "name": "listId",
+            "optional": false,
+            "shape": {
+              "kind": "string"
+            }
+          },
+          {
+            "name": "ownerId",
+            "optional": false,
+            "shape": {
+              "kind": "string"
+            }
+          },
+          {
+            "name": "title",
+            "optional": false,
+            "shape": {
+              "kind": "string"
+            }
+          },
+          {
+            "name": "status",
+            "optional": false,
+            "shape": {
+              "kind": "union",
+              "variants": [
+                {
+                  "kind": "literal",
+                  "value": "done"
+                },
+                {
+                  "kind": "literal",
+                  "value": "open"
+                }
+              ]
+            }
+          },
+          {
+            "name": "createdAt",
+            "optional": false,
+            "shape": {
+              "kind": "date"
+            }
+          },
+          {
+            "name": "dueAt",
+            "optional": false,
+            "shape": {
+              "kind": "union",
+              "variants": [
+                {
+                  "kind": "null"
+                },
+                {
+                  "kind": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "priority",
+            "optional": false,
+            "shape": {
+              "kind": "number"
+            }
+          },
+          {
+            "name": "pinned",
+            "optional": false,
+            "shape": {
+              "kind": "boolean"
+            }
+          },
+          {
+            "name": "tags",
+            "optional": false,
+            "shape": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            }
+          },
+          {
+            "name": "note",
+            "optional": true,
+            "shape": {
+              "kind": "string"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "publications": [
+    {
+      "name": "todosByList",
+      "file": "pubs/todosByList.ts",
+      "params": [
+        {
+          "name": "listId",
+          "shape": {
+            "kind": "string"
+          }
+        }
+      ],
+      "injected": ["session", "abortSignal"],
+      "yields": {
+        "kind": "union",
+        "variants": [
+          {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "kind",
+                "optional": false,
+                "shape": {
+                  "kind": "literal",
+                  "value": "added"
+                }
+              },
+              {
+                "name": "todo",
+                "optional": false,
+                "shape": {
+                  "kind": "object",
+                  "fields": [
+                    {
+                      "name": "id",
+                      "optional": false,
+                      "shape": {
+                        "kind": "string"
+                      }
+                    },
+                    {
+                      "name": "listId",
+                      "optional": false,
+                      "shape": {
+                        "kind": "string"
+                      }
+                    },
+                    {
+                      "name": "ownerId",
+                      "optional": false,
+                      "shape": {
+                        "kind": "string"
+                      }
+                    },
+                    {
+                      "name": "title",
+                      "optional": false,
+                      "shape": {
+                        "kind": "string"
+                      }
+                    },
+                    {
+                      "name": "status",
+                      "optional": false,
+                      "shape": {
+                        "kind": "union",
+                        "variants": [
+                          {
+                            "kind": "literal",
+                            "value": "done"
+                          },
+                          {
+                            "kind": "literal",
+                            "value": "open"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "name": "createdAt",
+                      "optional": false,
+                      "shape": {
+                        "kind": "date"
+                      }
+                    },
+                    {
+                      "name": "dueAt",
+                      "optional": false,
+                      "shape": {
+                        "kind": "union",
+                        "variants": [
+                          {
+                            "kind": "null"
+                          },
+                          {
+                            "kind": "date"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "name": "priority",
+                      "optional": false,
+                      "shape": {
+                        "kind": "number"
+                      }
+                    },
+                    {
+                      "name": "pinned",
+                      "optional": false,
+                      "shape": {
+                        "kind": "boolean"
+                      }
+                    },
+                    {
+                      "name": "tags",
+                      "optional": false,
+                      "shape": {
+                        "kind": "array",
+                        "items": {
+                          "kind": "string"
+                        }
+                      }
+                    },
+                    {
+                      "name": "note",
+                      "optional": true,
+                      "shape": {
+                        "kind": "string"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "kind",
+                "optional": false,
+                "shape": {
+                  "kind": "literal",
+                  "value": "changed"
+                }
+              },
+              {
+                "name": "id",
+                "optional": false,
+                "shape": {
+                  "kind": "string"
+                }
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "shape": {
+                  "kind": "union",
+                  "variants": [
+                    {
+                      "kind": "literal",
+                      "value": "done"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "open"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "kind",
+                "optional": false,
+                "shape": {
+                  "kind": "literal",
+                  "value": "removed"
+                }
+              },
+              {
+                "name": "id",
+                "optional": false,
+                "shape": {
+                  "kind": "string"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "/todos/[id]",
+      "file": "routes/todos/[id]/route.ts",
+      "verbs": ["GET"]
+    }
+  ]
+}

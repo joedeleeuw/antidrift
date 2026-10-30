@@ -114,6 +114,15 @@ importers:
         specifier: catalog:core
         version: 6.0.3
 
+  apps/shape-sample:
+    devDependencies:
+      tsx:
+        specifier: catalog:core
+        version: 4.22.3
+      typescript:
+        specifier: catalog:core
+        version: 6.0.3
+
   apps/web:
     dependencies:
       "@agent-guardrails/contracts":
