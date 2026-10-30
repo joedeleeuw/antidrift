@@ -42,28 +42,61 @@ const OXLINT_USAGE =
     "Runs the unified Oxlint + native Rust antidrift-linter (tsrs) gate.",
   ].join("\n") + "\n";
 
-function localLinterCandidates(cwd) {
+const ADDON_LIBRARY_NAMES = {
+  darwin: "libantidrift_napi.dylib",
+  linux: "libantidrift_napi.so",
+  win32: "antidrift_napi.dll",
+};
+
+const NATIVE_ARTIFACTS = {
+  linter: {
+    env: "ANTIDRIFT_LINTER_BIN",
+    builds: [
+      "target/debug/antidrift-linter",
+      "target/release/antidrift-linter",
+    ],
+    staged: [
+      "bin/antidrift-linter",
+      "../bin/antidrift-linter",
+      "dist/bin/antidrift-linter",
+    ],
+    packageFile: "antidrift-linter",
+  },
+  addon: {
+    env: "ANTIDRIFT_NAPI_ADDON",
+    builds: [
+      `target/debug/${ADDON_LIBRARY_NAMES[process.platform]}`,
+      `target/release/${ADDON_LIBRARY_NAMES[process.platform]}`,
+    ],
+    staged: ["dist/bin/antidrift.node"],
+    packageFile: "antidrift.node",
+  },
+};
+
+function localArtifactCandidates(artifact, cwd) {
   const localCandidates = [
-    resolve(cwd, "target/debug/antidrift-linter"),
-    resolve(repoRoot, "target/debug/antidrift-linter"),
-    resolve(cwd, "target/release/antidrift-linter"),
-    resolve(repoRoot, "target/release/antidrift-linter"),
-    resolve(moduleRoot, "bin/antidrift-linter"),
-    resolve(moduleRoot, "../bin/antidrift-linter"),
-    resolve(moduleRoot, "dist/bin/antidrift-linter"),
+    ...artifact.builds.flatMap((build) => [
+      resolve(cwd, build),
+      resolve(repoRoot, build),
+    ]),
+    ...artifact.staged.map((staged) => resolve(moduleRoot, staged)),
   ].filter((candidate) => existsSync(candidate));
   return localCandidates.sort(
     (left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs
   );
 }
 
-function platformLinterPackages() {
+function platformArtifactPackages(artifact) {
   const platformKey =
     LINTER_PLATFORM_KEYS[`${process.platform}-${process.arch}`];
   if (!platformKey) return [];
   const require = createRequire(import.meta.url);
   try {
-    return [require.resolve(`@joedeleeuw/antidrift-linter-${platformKey}`)];
+    return [
+      require.resolve(
+        `@joedeleeuw/antidrift-linter-${platformKey}/${artifact.packageFile}`
+      ),
+    ];
   } catch (error) {
     if (
       !(error instanceof Error) ||
@@ -76,19 +109,34 @@ function platformLinterPackages() {
   }
 }
 
-export function resolveNativeLinterBinary(cwd = process.cwd()) {
-  if (process.env.ANTIDRIFT_LINTER_BIN) {
-    return process.env.ANTIDRIFT_LINTER_BIN;
+function resolveNativeArtifact(artifact, cwd) {
+  if (process.env[artifact.env]) {
+    return process.env[artifact.env];
   }
-  const candidates = [
-    ...localLinterCandidates(cwd),
-    ...platformLinterPackages(),
-  ];
-  const found = candidates.find((candidate) => existsSync(candidate));
+  return [
+    ...localArtifactCandidates(artifact, cwd),
+    ...platformArtifactPackages(artifact),
+  ].find((candidate) => existsSync(candidate));
+}
+
+export function resolveNativeLinterBinary(cwd = process.cwd()) {
+  const found = resolveNativeArtifact(NATIVE_ARTIFACTS.linter, cwd);
   if (found && (statSync(found).mode & 0o111) === 0) {
     chmodSync(found, 0o755);
   }
   return found;
+}
+
+export function loadNativeAddon(cwd = process.cwd()) {
+  const addonPath = resolveNativeArtifact(NATIVE_ARTIFACTS.addon, cwd);
+  if (!addonPath) {
+    throw new Error(
+      `Missing the antidrift Oxlint addon for ${process.platform}-${process.arch}; build crates/antidrift-napi or install the matching @joedeleeuw/antidrift-linter platform package.`
+    );
+  }
+  const addonModule = { exports: {} };
+  process.dlopen(addonModule, addonPath);
+  return addonModule.exports;
 }
 
 function defaultTargets() {

@@ -22,6 +22,7 @@ import {
   portableCases,
 } from "./portable-cases.mjs";
 import { headlessRuleProbes } from "./headless-rule-probes.mjs";
+import { proveOxlintPluginBridge } from "./oxlint-plugin-bridge.mjs";
 import { loadPolicy } from "../src/policy/generate-policy-artifacts.mjs";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -981,3 +982,5 @@ assert.deepEqual(sampleSmoke.stdout.trim().split("\n"), [
 console.log(
   `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path, project-root, derive, line-cap & rust linter smokes verified)`
 );
+
+proveOxlintPluginBridge(repoRoot);

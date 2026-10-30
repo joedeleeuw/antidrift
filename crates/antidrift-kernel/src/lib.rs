@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 pub mod async_effects;
 pub mod boundary;
 pub mod callgraph;

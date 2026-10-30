@@ -180,18 +180,18 @@ impl AstRuleVisitor<'_> {
         if let Some(crate_name) = self.crate_name {
             let root = segments[0].as_str();
             if crate_name == "antidrift-kernel"
-                && matches!(root, "antidrift_rules" | "antidrift_linter")
+                && matches!(root, "antidrift_rules" | "antidrift_engine")
             {
                 self.push(
                     span,
                     "rust/no-layer-violation",
                     format!("antidrift-kernel cannot depend on {root}."),
                 );
-            } else if crate_name == "antidrift-rules" && root == "antidrift_linter" {
+            } else if crate_name == "antidrift-rules" && root == "antidrift_engine" {
                 self.push(
                     span,
                     "rust/no-layer-violation",
-                    "antidrift-rules cannot depend on antidrift_linter.".to_owned(),
+                    "antidrift-rules cannot depend on antidrift_engine.".to_owned(),
                 );
             }
         }

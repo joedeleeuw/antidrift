@@ -3,7 +3,9 @@ resolver = "2"
 members = [
   "crates/antidrift-kernel",
   "crates/antidrift-rules",
+  "crates/antidrift-engine",
   "crates/antidrift-linter",
+  "crates/antidrift-napi",
 ]
 
 [workspace.package]
@@ -14,6 +16,7 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+antidrift-engine = { path = "crates/antidrift-engine" }
 antidrift-kernel = { path = "crates/antidrift-kernel" }
 antidrift-rules = { path = "crates/antidrift-rules" }
 globset = "0.4.18"
@@ -47,7 +50,7 @@ lto = "thin"
 strip = "symbols"
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
 dead_code = "deny"
 let_underscore_drop = "deny"
 redundant_lifetimes = "deny"

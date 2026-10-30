@@ -68,7 +68,7 @@ fn check_dependency_dag(
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
     if crate_name == "antidrift-kernel" {
-        for forbidden in ["antidrift-rules", "antidrift-linter"] {
+        for forbidden in ["antidrift-rules", "antidrift-engine"] {
             if sec
                 .kv
                 .keys()
@@ -86,13 +86,13 @@ fn check_dependency_dag(
         && sec
             .kv
             .keys()
-            .any(|key| key.split('.').next() == Some("antidrift-linter"))
+            .any(|key| key.split('.').next() == Some("antidrift-engine"))
     {
         diagnostics.push(RustDiagnostic::error(
             manifest_rel.to_owned(),
             sec.line,
             "rust/target-manifest-policy",
-            "antidrift-rules cannot depend on antidrift-linter.".to_owned(),
+            "antidrift-rules cannot depend on antidrift-engine.".to_owned(),
         ));
     }
 }

@@ -4,7 +4,7 @@ A native Rust TypeScript/JavaScript semantic linter (`antidrift-linter`, built o
 
 ## What is included
 
-- **Single-pass native Rust rule engine (`crates/antidrift-kernel`, `crates/antidrift-rules`, `crates/antidrift-linter`):** All 83 `antidrift/*` rules run in a single unified pass over `tsrs` (`tsrs_ast`, `tsrs_compiler`, `tsrs_checker`, and `tsrslint`), invoked automatically by `antidrift oxlint` via `OXLINT_TSGOLINT_PATH`.
+- **Single-pass native Rust rule engine (`crates/antidrift-kernel`, `crates/antidrift-rules`, `crates/antidrift-engine`):** All 83 `antidrift/*` rules run in a single unified pass over `tsrs` (`tsrs_ast`, `tsrs_compiler`, `tsrs_checker`, and `tsrslint`), invoked automatically by `antidrift oxlint` via `OXLINT_TSGOLINT_PATH`.
 - **Rust self-governance (`antidrift-linter rust`):** Enforces crate/kernel DAG layering, file-size budgets (`<= 500` non-blank lines), strict `serde` decoding (`deny_unknown_fields`), no stringly-typed enums, no boolean maps, no anemic errors, no compatibility shims, and no pass-through wrapper functions across the Rust workspace.
 - **Declarative policy & registries (`policy/agent-guardrails.yaml`, `policy/registries/*.yaml`):** Generates `AGENTS.md`, `CLAUDE.md`, Claude hooks, Codex hooks, and Copilot instructions from a single source of truth.
 - **Packed consumer verification (`pnpm package:verify`):** Packs `@joedeleeuw/antidrift` and verifies installation, `tsc` under `Bundler` and `NodeNext`, runtime imports, and live `antidrift oxlint` enforcement in an isolated consumer monorepo.
@@ -14,7 +14,9 @@ A native Rust TypeScript/JavaScript semantic linter (`antidrift-linter`, built o
 ```txt
 crates/antidrift-kernel          Shared tsrs AST, TypeChecker, boundary, projection, shape, and callgraph kernel
 crates/antidrift-rules           All 83 native Rust antidrift/* rules across 8 rule families
-crates/antidrift-linter          CLI + tsgolint headless binary + native syn Rust self-linter
+crates/antidrift-engine          CLI, tsgolint headless host, engine session and native syn Rust self-linter
+crates/antidrift-linter          antidrift-linter binary over antidrift-engine
+crates/antidrift-napi            Node addon over the engine session, loaded by the Oxlint plugin
 tooling/antidrift                @joedeleeuw/antidrift npm package (Oxlint config, policy CLI, brand kit)
 apps/web                         React sample app exercising UI/domain/client boundaries
 packages/domain                  Canonical domain roles, statuses, and entities

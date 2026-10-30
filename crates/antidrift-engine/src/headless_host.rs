@@ -304,6 +304,30 @@ impl ProgramBuilderEnv {
         })
     }
 
+    pub(crate) fn bind_existing(
+        &self,
+        program: &'static Program,
+        config_file_name: &str,
+        config_files: &[String],
+    ) -> BoundProgram {
+        let dir = tspath::get_directory_path(config_file_name);
+        let use_case = self.fs.use_case_sensitive_file_names();
+        let wanted: FxHashSet<Path> = config_files
+            .iter()
+            .map(|file| tspath::to_path(file, &dir, use_case))
+            .collect();
+        let source_files: Vec<P<SourceFile>> = program
+            .source_files()
+            .iter()
+            .copied()
+            .filter(|sf| wanted.contains(sf.path()))
+            .collect();
+        BoundProgram {
+            program,
+            source_files,
+        }
+    }
+
     pub(crate) fn build_inferred_program(&self, unmatched: &[String]) -> BoundProgram {
         let compiler_host =
             build_shared_host(&self.cwd, &self.fs, self.ext_cache, self.declarations);

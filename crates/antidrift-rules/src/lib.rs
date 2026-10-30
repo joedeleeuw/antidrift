@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 pub mod boundary_schema;
 pub mod contracts_shape;
 pub mod directives;

@@ -77,7 +77,6 @@ try {
   }
   const forbiddenPrefixes = [
     "package/dist/eslint-plugin/",
-    "package/dist/oxlint-plugin/",
     "package/dist/semantic-adapters/",
     "package/dist/eslint-config/",
     "package/dist/oxlint-config/eslint-builtins.mjs",
