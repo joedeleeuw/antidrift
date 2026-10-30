@@ -24,6 +24,8 @@ pnpm add -D @joedeleeuw/antidrift typescript
 
 The default `antidrift-linter` ruleset also enforces shared AGENT.md directives recorded in `policy/agent-guardrails.yaml`: `antidrift/no-anemic-errors` (G7), `antidrift/no-dated-comments` (S5), `antidrift/no-host-path-literal` (S4), `antidrift/no-pass-through-parameters` (G22), and `antidrift/no-compat-names` (G5) (`antidrift/no-vague-names` for G21 remains registered for explicit opt-in). G8 maps to native `no-nested-ternary`, owned by `@joedeleeuw/typescript-tooling`. G9 maps to `unicorn-js/prefer-switch` there.
 
+Size caps come from one kernel table shared with the Rust self-lint. `antidrift/max-module-lines` warns above 1,200 lines and errors above 1,500, `antidrift/max-function-lines` warns above 40 and errors above 50, and `antidrift/max-component-lines` warns above 150 and errors above 180 for PascalCase functions that render JSX. Blank and comment lines count. Describe-style suite callbacks are containers, so they are exempt; `it` and `test` bodies are not. Generated-looking file names get no exemption; declare codegen output in `policy/registries/generated.yaml` to exclude it. The governance config turns off Oxlint `max-lines` and `max-lines-per-function` so each size has one owner. Oxlint reports every antidrift diagnostic at error, so with `denyWarnings` the warn tier blocks the same way `--deny-warnings` does for the Rust self-lint.
+
 The default ruleset also enforces these rules at error:
 
 - G15 test independence: `antidrift/no-nonindependent-test-oracle`

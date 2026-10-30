@@ -321,7 +321,7 @@ try {
 
   const repositoryDiagnostics = lintOxlintRepository().diagnostics ?? [];
   const moduleSizeDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) => code === "eslint(max-lines)"
+    ({ code }) => code === "typescript(antidrift/max-module-lines)"
   );
   const oversizedFiles = moduleSizeDiagnostics
     .map(({ filename }) => filename)
@@ -341,7 +341,7 @@ try {
     JSON.stringify(oversizedFiles) !== JSON.stringify(expectedOversizedFiles)
   ) {
     fail(
-      `default packed Oxlint config should report max-lines for ordinary code even when generated-looking names are undeclared, got: ${JSON.stringify(moduleSizeDiagnostics)}`
+      `default packed Oxlint config should report antidrift/max-module-lines for ordinary code even when generated-looking names are undeclared, got: ${JSON.stringify(moduleSizeDiagnostics)}`
     );
   }
   const asyncRepositoryDiagnostics = repositoryDiagnostics.filter(
@@ -393,12 +393,18 @@ try {
     );
   }
 
-  const precedenceRuleIds = oxlintRuleIds(
-    lintOxlint("oversized-root.ts", "oxlint.precedence.config.mjs")
+  const composedRuleIds = oxlintRuleIds(
+    lintOxlint("precedence-proof.ts", "oxlint.config.mjs")
   );
-  if (precedenceRuleIds.includes("eslint/max-lines")) {
+  const precedenceRuleIds = oxlintRuleIds(
+    lintOxlint("precedence-proof.ts", "oxlint.precedence.config.mjs")
+  );
+  if (
+    !composedRuleIds.includes("eslint/no-nested-ternary") ||
+    precedenceRuleIds.includes("eslint/no-nested-ternary")
+  ) {
     fail(
-      `consumer rules composed after tooling and governance must win, got: ${JSON.stringify(precedenceRuleIds)}`
+      `consumer rules composed after tooling and governance must win, got: ${JSON.stringify({ composedRuleIds, precedenceRuleIds })}`
     );
   }
 

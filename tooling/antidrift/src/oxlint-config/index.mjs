@@ -240,40 +240,47 @@ const governanceOptions = {
   reportUnusedDisableDirectives: "error",
 };
 
+const rulesOwnedByNativeLineCaps = {
+  "max-lines": "off",
+  "max-lines-per-function": "off",
+};
+
+function governanceRules(restrictedImportPatterns) {
+  if (restrictedImportPatterns.length === 0) {
+    return { ...rulesOwnedByNativeLineCaps };
+  }
+  return {
+    ...rulesOwnedByNativeLineCaps,
+    "no-restricted-imports": restrictedImportsRule(restrictedImportPatterns),
+  };
+}
+
 export function createGovernanceOxlintConfig({
   repoRoot = process.cwd(),
   policyDir = "policy",
 } = {}) {
   const registries = loadRegistriesSync(resolve(repoRoot, policyDir));
-  const generatedIgnores = generatedIgnorePatterns(registries, repoRoot);
   const generatedPatterns = generatedImportPatterns(registries);
   const reactNativePolicy = reactNativePolicyFor(registries.reactNative);
   const otherPatterns = [
     ...generatedPatterns,
     ...gatewayImportPatterns(registries),
   ];
-  const restrictedImportPatterns = [
-    ...otherPatterns,
-    ...touchableImportPatterns(reactNativePolicy),
-  ];
-  const rules = {};
-  if (restrictedImportPatterns.length > 0) {
-    rules["no-restricted-imports"] = restrictedImportsRule(
-      restrictedImportPatterns
-    );
-  }
 
   return defineConfig({
     categories: disabledCategories,
     ignorePatterns: [
       ...governanceIgnorePatterns,
-      ...generatedIgnores,
+      ...generatedIgnorePatterns(registries, repoRoot),
       ...declarationIgnorePatterns,
     ],
     jsPlugins: [],
     options: governanceOptions,
     plugins: ["eslint", "typescript"],
-    rules,
+    rules: governanceRules([
+      ...otherPatterns,
+      ...touchableImportPatterns(reactNativePolicy),
+    ]),
     overrides: [
       ...gatewayWrapperOverrides(registries, generatedPatterns),
       ...touchableOwnerOverrides(reactNativePolicy, otherPatterns),

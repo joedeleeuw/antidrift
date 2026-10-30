@@ -9,6 +9,7 @@ pub mod file_role;
 pub mod imports;
 pub mod json_manifest;
 pub mod jsx;
+pub mod line_caps;
 pub mod local_binding;
 pub mod outcome_shape;
 pub mod projection;

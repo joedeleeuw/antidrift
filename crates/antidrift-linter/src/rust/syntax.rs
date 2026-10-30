@@ -1,8 +1,6 @@
 use super::RustDiagnostic;
+use antidrift_kernel::line_caps::CappedUnit;
 use std::path::Path;
-
-const WARN_NON_BLANK_LINES: usize = 425;
-const MAX_NON_BLANK_LINES: usize = 500;
 
 const BANNED_EXACT_FILENAMES: &[&str] = &[
     "common.rs",
@@ -47,28 +45,15 @@ fn check_grab_bag_filename(rel_path: &str, path: &Path, diagnostics: &mut Vec<Ru
 }
 
 fn check_max_lines(rel_path: &str, source: &str, diagnostics: &mut Vec<RustDiagnostic>) {
-    let non_blank_lines = source
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .count();
-    if non_blank_lines > MAX_NON_BLANK_LINES {
-        diagnostics.push(RustDiagnostic::error(
-            rel_path.to_owned(),
-            1,
-            "rust/max-file-lines",
-            format!(
-                "File has {non_blank_lines} non-blank lines (max {MAX_NON_BLANK_LINES}); split along a domain seam."
-            ),
-        ));
-    } else if non_blank_lines > WARN_NON_BLANK_LINES {
-        diagnostics.push(RustDiagnostic::warn(
-            rel_path.to_owned(),
-            1,
-            "rust/max-file-lines",
-            format!(
-                "File has {non_blank_lines} non-blank lines (warn threshold {WARN_NON_BLANK_LINES}, max {MAX_NON_BLANK_LINES}); split along a domain seam before reaching the ceiling."
-            ),
-        ));
+    let cap = CappedUnit::RustFile.cap();
+    if let Some(finding) = cap.judge("File", source) {
+        diagnostics.push(RustDiagnostic {
+            file: rel_path.to_owned(),
+            line: 1,
+            rule_id: cap.rule_id,
+            severity: finding.tier.severity(),
+            message: finding.message,
+        });
     }
 }
 

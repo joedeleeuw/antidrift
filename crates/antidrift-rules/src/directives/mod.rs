@@ -2,6 +2,7 @@ mod alias_usage_scan;
 mod anemic_error_fallback;
 mod classifier_schema;
 pub mod docs_source_policy;
+pub mod line_caps;
 pub mod no_anemic_errors;
 pub mod no_as_never;
 pub mod no_branch_tree;
@@ -23,6 +24,9 @@ use tsrslint::rule::Rule;
 pub fn rules() -> Vec<&'static dyn Rule> {
     vec![
         &docs_source_policy::DEFAULT_RULE,
+        &line_caps::MODULE_RULE,
+        &line_caps::FUNCTION_RULE,
+        &line_caps::COMPONENT_RULE,
         &no_anemic_errors::DEFAULT_RULE,
         &no_as_never::DEFAULT_RULE,
         &no_branch_tree::DEFAULT_RULE,
@@ -44,6 +48,9 @@ pub fn create_rule(
     name: &str,
     options: Option<&serde_json::Value>,
 ) -> Result<Option<Box<dyn Rule>>, String> {
+    if let Some(rule) = line_caps::create_rule(name, options)? {
+        return Ok(Some(rule));
+    }
     match name {
         docs_source_policy::RULE_NAME | "docs-source-policy" => Ok(Some(Box::new(
             docs_source_policy::DocsSourcePolicy::from_options(options)?,

@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use antidrift_kernel::diagnostic::{RuleDiagnostic, RuleFix, Severity, TextEdit, apply_fixes};
 use antidrift_kernel::directives::{DirectiveSet, effective_token_start};
+use antidrift_kernel::line_caps::tiered_severity;
 use antidrift_kernel::span_index::LineIndex;
 use antidrift_rules::{create_rule, lookup_default_rule};
 use rayon::prelude::*;
@@ -120,10 +121,11 @@ pub(crate) fn reported_to_rule_diagnostic(
 ) -> RuleDiagnostic {
     let start = effective_token_start(source_text, item.pos, item.end);
     let end = u32::try_from(item.end.max(0)).unwrap_or(start);
-    let severity = severities
+    let configured = severities
         .get(item.rule_name)
         .copied()
         .unwrap_or(Severity::Error);
+    let severity = tiered_severity(item.rule_name, item.message.id, configured);
     let fix = item
         .fixes
         .as_ref()

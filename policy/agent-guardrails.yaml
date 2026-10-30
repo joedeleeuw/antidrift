@@ -98,16 +98,16 @@ clusters:
         message: Inline or name a real domain concept.
       - id: arch/max-function-lines # Long functions hide generated complexity.
         severity: error
-        detector: functionLinesGt:50,warnAt:40
-        message: Split by responsibility rather than arbitrary wrappers (warn above 40 lines, error above 50 lines).
+        detector: antidrift:max-function-lines,warnAt:40,max:50
+        message: Split by responsibility rather than arbitrary wrappers (warn above 40 lines, error above 50 lines; blank and comment lines count, describe-style suite callbacks are containers and exempt).
       - id: arch/max-component-lines # Large components mix data, state, render, and effects.
         severity: error
-        detector: reactComponentLinesGt:180,warnAt:150
-        message: Split container, view, and state/resource boundaries (warn above 150 lines, error above 180 lines).
+        detector: antidrift:max-component-lines,warnAt:150,max:180
+        message: Split container, view, and state/resource boundaries (warn above 150 lines, error above 180 lines for PascalCase functions that render JSX).
       - id: arch/max-module-lines # Oversized modules accumulate unrelated responsibilities and defeat local ownership.
         severity: error
-        detector: oxlint:max-lines,warnAt:1200,max:1500,skipBlankLines:false,skipComments:false
-        message: Split modules over 1,500 lines by owned responsibility (warn above 1,200 lines before reaching the ceiling).
+        detector: antidrift:max-module-lines,warnAt:1200,max:1500
+        message: Split modules over 1,500 lines by owned responsibility (warn above 1,200 lines before reaching the ceiling; blank and comment lines count).
       - id: react/max-component-props # Large prop bags make component API combinations hard to reason about.
         severity: error
         detector: locallyOwnedReactComponentPropsGt:12

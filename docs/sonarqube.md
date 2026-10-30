@@ -81,7 +81,7 @@ Small additive gap matrix:
 | ---------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | React correctness            | Oxlint React and React Compiler plugins    | Do not add native Sonar React rules while local Oxlint owns the equivalent check.                                                       | None recorded; `S6441` overlaps React nested-component checks. |
 | Local complexity budget      | `antidrift oxlint`                         | Keep native Sonar cognitive complexity and duplication metrics active; they are not duplicates of local cyclomatic/depth/params checks. | Exact Sonar S3776 behavior is server-side only.                |
-| Module size                  | Oxlint `max-lines`                         | Exclude `S104` as an exact local duplicate; Sonar still owns portfolio metrics and server-side quality gates.                           | None for JavaScript and TypeScript modules.                    |
+| Module size                  | `antidrift/max-module-lines`               | Exclude `S104` as an exact local duplicate; Sonar still owns portfolio metrics and server-side quality gates.                           | None for JavaScript and TypeScript modules.                    |
 | Accessibility                | None; `jsx-a11y` is not shipped.           | Keep native Sonar accessibility keys through `accessibility-without-jsx-a11y`.                                                          | Maintained UI accessibility scanning.                          |
 | Antidrift-specific contracts | `antidrift/*` imported as external issues. | Report imported findings, but do not rebrand native Sonar rules.                                                                        | Repo-specific and agent-specific semantics.                    |
 
@@ -89,7 +89,7 @@ Native Sonar rules intentionally excluded as exact local duplicates:
 
 | Sonar rule                                                                              | Local owner                                   |
 | --------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `S104` Files should not have too many lines of code                                     | Oxlint `max-lines`                            |
+| `S104` Files should not have too many lines of code                                     | `antidrift/max-module-lines`                  |
 | `S6477` JSX list components should have a key property                                  | `react/jsx-key`                               |
 | `S6478` React components should not be nested                                           | `react/no-unstable-nested-components`         |
 | `S6479` JSX list components should not use array indexes as key                         | `react/no-array-index-key`                    |

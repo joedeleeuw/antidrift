@@ -40,16 +40,6 @@ impl RustDiagnostic {
             message,
         }
     }
-
-    pub(super) fn warn(file: String, line: usize, rule_id: &'static str, message: String) -> Self {
-        Self {
-            file,
-            line,
-            rule_id,
-            severity: Severity::Warn,
-            message,
-        }
-    }
 }
 
 pub(crate) fn run_rust_cli(raw_args: &[String]) -> Result<i32, String> {
