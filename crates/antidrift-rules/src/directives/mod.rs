@@ -1,3 +1,4 @@
+mod alias_usage_scan;
 mod anemic_error_fallback;
 pub mod docs_source_policy;
 pub mod no_anemic_errors;

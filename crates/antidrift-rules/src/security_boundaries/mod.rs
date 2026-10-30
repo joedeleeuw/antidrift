@@ -14,6 +14,7 @@ mod package_resolution;
 pub mod require_authz_check;
 pub mod require_safe_window_open;
 pub mod require_secure_document_response;
+mod union_owners;
 mod web_provenance;
 
 use tsrslint::rule::Rule;

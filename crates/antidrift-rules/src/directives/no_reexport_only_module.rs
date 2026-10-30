@@ -1,3 +1,4 @@
+use antidrift_kernel::file_role;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
@@ -30,7 +31,7 @@ impl Rule for NoReexportOnlyModule {
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         if !self.scope.in_scope(ctx)
-            || !tsrs_kernel::is_authored_source_file(ctx.file)
+            || !file_role::is_authored_source_file(ctx.file)
             || is_tool_config_file(ctx.file.file_name())
         {
             return Box::new(EmptyVisitor);

@@ -1,8 +1,9 @@
+use antidrift_kernel::file_role::is_test_or_spec_file;
 use antidrift_kernel::jsx::{has_plain_attribute, plain_attribute_name, plain_element_name};
 use antidrift_kernel::rule_scope::{
     RuleScope, ScopeOptions, ScopedOptions, decode_scoped, in_scope, require_non_empty,
 };
-use antidrift_kernel::tsrs_kernel::{is_test_or_spec_file, unwrap_parentheses};
+use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::TypeFlags;

@@ -5,7 +5,9 @@ pub mod no_nullable_positional_tuple;
 pub mod no_service_constructor_imports;
 pub mod no_structural_type_fork;
 pub mod react_max_component_props;
+pub mod redundant_local_return;
 pub mod structural_fork_analysis;
+mod test_only_seam;
 
 use tsrslint::rule::Rule;
 

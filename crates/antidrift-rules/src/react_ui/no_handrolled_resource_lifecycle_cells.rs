@@ -1,13 +1,14 @@
+use super::abort_guards::{if_statement_guards, is_guarded, non_computed_member};
+use super::lifecycle_state_frame::{ArgumentClass, StateFrame, WriteClass};
 use super::process_lifecycle_loa::check_process_lifecycle_loa;
 use super::shadow_state_mirror::{
-    AbortGuard, SHADOW_STATE_MIRROR_MESSAGE, classify_object_literal_writes, if_statement_guards,
-    is_guarded, non_computed_member, shadow_state_mirrors,
+    SHADOW_STATE_MIRROR_MESSAGE, classify_object_literal_writes, shadow_state_mirrors,
 };
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::tsrs_kernel::{static_member_chain, unwrap_expression};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
@@ -62,154 +63,6 @@ impl Rule for NoHandrolledResourceLifecycleCells {
         }
         check_process_lifecycle_loa(ctx.file, &traversal.imports, ctx);
         Box::new(EmptyVisitor)
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) enum WriteClass {
-    TrueConst,
-    FalseConst,
-    NullConst,
-    Awaited,
-    CaughtError,
-}
-
-enum ArgumentClass {
-    Updater,
-    Other,
-    Recorded(WriteClass),
-}
-
-#[derive(Default)]
-struct FrameCells {
-    setters: FxHashSet<&'static str>,
-    cell_of: FxHashMap<&'static str, &'static str>,
-    awaited_names: FxHashSet<&'static str>,
-    writes: Vec<(&'static str, FxHashSet<WriteClass>)>,
-    is_transition: bool,
-    source_member_setters: Vec<&'static str>,
-    catch_setters: Vec<&'static str>,
-    updater_setters: FxHashSet<&'static str>,
-    abort_controllers: FxHashSet<&'static str>,
-    abort_controller_refs: FxHashSet<&'static str>,
-    abort_guards: Vec<AbortGuard>,
-    abort_guarded_setters: FxHashSet<&'static str>,
-}
-
-pub(super) struct StateFrame {
-    node: P<Node>,
-    cells: FrameCells,
-}
-
-impl StateFrame {
-    fn new(node: P<Node>) -> Self {
-        let mut cells = FrameCells::default();
-        for &param in node.parameters() {
-            let name = param.as_parameter_declaration().name();
-            if ast::is_identifier(name) && matches!(name.as_identifier().text(), "set" | "setState")
-            {
-                cells.setters.insert(name.as_identifier().text());
-            }
-        }
-        Self { node, cells }
-    }
-
-    pub(super) fn has_abort_controller(&self, name: &str) -> bool {
-        self.cells.abort_controllers.contains(name)
-    }
-
-    pub(super) fn has_abort_controller_ref(&self, name: &str) -> bool {
-        self.cells.abort_controller_refs.contains(name)
-    }
-
-    fn record_write(&mut self, setter: &'static str, class: WriteClass) {
-        if let Some((_, classes)) = self.cells.writes.iter_mut().find(|(n, _)| *n == setter) {
-            classes.insert(class);
-        } else {
-            self.cells
-                .writes
-                .push((setter, FxHashSet::from_iter([class])));
-        }
-    }
-
-    fn merge_parent_writes(&mut self, parent: &Self) {
-        if self.cells.catch_setters.is_empty()
-            || !self
-                .cells
-                .writes
-                .iter()
-                .any(|(_, c)| c.contains(&WriteClass::FalseConst))
-        {
-            return;
-        }
-        for (setter, parent_classes) in &parent.cells.writes {
-            if let Some((_, classes)) = self.cells.writes.iter_mut().find(|(n, _)| n == setter) {
-                classes.extend(parent_classes.clone());
-            } else {
-                self.cells.writes.push((*setter, parent_classes.clone()));
-            }
-        }
-    }
-
-    fn record_object_writes(
-        &mut self,
-        prop_writes: Vec<(&'static str, WriteClass)>,
-        guarded: bool,
-        in_catch: bool,
-    ) {
-        for (prop_name, write_class) in prop_writes {
-            self.cells.setters.insert(prop_name);
-            self.record_write(prop_name, write_class);
-            if guarded {
-                self.cells.abort_guarded_setters.insert(prop_name);
-            }
-            if in_catch
-                && write_class == WriteClass::CaughtError
-                && !self.cells.catch_setters.contains(&prop_name)
-            {
-                self.cells.catch_setters.push(prop_name);
-            }
-        }
-    }
-
-    fn lifecycle_payload_cell(&self, owned: &FxHashSet<&'static str>) -> Option<&'static str> {
-        if self
-            .cells
-            .updater_setters
-            .iter()
-            .any(|setter| owned.contains(setter))
-        {
-            return None;
-        }
-        let entries: Vec<&(&'static str, FxHashSet<WriteClass>)> = self
-            .cells
-            .writes
-            .iter()
-            .filter(|(setter, _)| owned.contains(setter))
-            .collect();
-        let bool_cell = entries.iter().find_map(|(setter, classes)| {
-            (classes.contains(&WriteClass::TrueConst) && classes.contains(&WriteClass::FalseConst))
-                .then_some(*setter)
-        })?;
-        let error_cell = self
-            .cells
-            .catch_setters
-            .iter()
-            .copied()
-            .find(|name| *name != bool_cell && owned.contains(name))?;
-        let blocked = [bool_cell, error_cell];
-        entries
-            .iter()
-            .find_map(|(name, classes)| {
-                (!blocked.contains(name) && classes.contains(&WriteClass::Awaited)).then_some(*name)
-            })
-            .or_else(|| {
-                self.cells
-                    .source_member_setters
-                    .iter()
-                    .copied()
-                    .find(|setter| owned.contains(setter) && !blocked.contains(setter))
-            })
     }
 }
 

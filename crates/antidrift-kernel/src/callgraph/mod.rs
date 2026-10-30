@@ -1,4 +1,6 @@
 pub mod delegation;
+mod file_scan;
+mod forward_target;
 pub mod passthrough;
 pub mod program_index;
 

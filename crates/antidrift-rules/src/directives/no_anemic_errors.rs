@@ -3,9 +3,10 @@ use super::anemic_error_fallback::{
     check_decode_to_nullable_expression, check_promise_catch_call_fallback, expr_ident_name,
     is_error_member_read,
 };
+use antidrift_kernel::file_role::is_test_or_spec_file;
 use antidrift_kernel::rule_scope::RuleScope;
 use antidrift_kernel::tsrs_kernel::{
-    is_test_or_spec_file, property_name_text, unwrap_awaited_expression, unwrap_expression,
+    property_name_text, unwrap_awaited_expression, unwrap_expression,
 };
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;

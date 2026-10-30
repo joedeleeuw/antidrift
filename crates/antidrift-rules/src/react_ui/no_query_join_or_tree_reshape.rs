@@ -1,4 +1,5 @@
 use super::await_waterfall::{independent_await_runs, relational_key_join_calls};
+use antidrift_kernel::file_role::{is_declaration_file, is_generated_file, is_test_file};
 use antidrift_kernel::jsx::{
     function_returns_jsx, is_component_or_hook_function, react_function_name,
 };
@@ -8,8 +9,7 @@ use antidrift_kernel::local_binding::{
 use antidrift_kernel::relational_scan::{is_inner_linear_scan_method, is_outer_traversal_method};
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::tsrs_kernel::{
-    callee_name, is_declaration_file, is_function_like, is_generated_file, is_test_file,
-    numeric_literal_value, property_name_text, unwrap_expression,
+    callee_name, is_function_like, numeric_literal_value, property_name_text, unwrap_expression,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};

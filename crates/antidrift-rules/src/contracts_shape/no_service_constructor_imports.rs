@@ -1,5 +1,6 @@
+use antidrift_kernel::file_role;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
-use antidrift_kernel::{boundary, provenance, tsrs_kernel};
+use antidrift_kernel::{boundary, provenance};
 use tsrs_ast::{Kind, Node, SourceFile, Symbol};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -82,7 +83,7 @@ fn collect_import_bindings(import_clause: Option<P<Node>>) -> Vec<ImportBinding>
 }
 
 fn is_valid_service_target_file(ctx: &Ctx, target_file: P<SourceFile>) -> bool {
-    if target_file == ctx.file || tsrs_kernel::is_declaration_file(target_file.file_name()) {
+    if target_file == ctx.file || file_role::is_declaration_file(target_file.file_name()) {
         return false;
     }
     let origin = provenance::classify_source_file_origin(ctx.program, target_file, Some(ctx.file));
@@ -135,7 +136,7 @@ fn resolve_module_symbol(ctx: &mut Ctx, module_specifier: P<Node>) -> Option<P<S
 }
 
 fn check_import_declaration(ctx: &mut Ctx, import: P<Node>) {
-    if tsrs_kernel::is_test_file(ctx.file.file_name()) {
+    if file_role::is_test_file(ctx.file.file_name()) {
         return;
     }
     let import_decl = import.as_import_declaration();

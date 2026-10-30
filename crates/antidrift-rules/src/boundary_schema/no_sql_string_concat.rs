@@ -1,3 +1,8 @@
+use super::sql_tag_provenance::{enclosing_import_module_name, has_external_sql_tag_provenance};
+use super::sql_text::{
+    combined_template_text, is_sql_identifier_context, is_sql_interpolation_context,
+    is_sql_statement, static_string_text,
+};
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions};
 use antidrift_kernel::tsrs_kernel;
 use serde::Deserialize;
@@ -15,15 +20,6 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::TemplateExpression),
     Listener::Enter(Kind::TaggedTemplateExpression),
 ];
-
-const BEFORE_KEYWORDS: &str =
-    "FROM|JOIN|UPDATE|INTO|TABLE|WHERE|AND|OR|IN|VALUES|SET|ON|LIKE|ORDER BY|GROUP BY|PARTITION BY";
-
-const AFTER_KEYWORDS: &str =
-    "AND|OR|WHERE|FROM|JOIN|ORDER BY|GROUP BY|PARTITION BY|LIMIT|OFFSET|HAVING|SET|VALUES|IN";
-
-const IDENTIFIER_CONTEXT_KEYWORDS: &str =
-    "ORDER BY|GROUP BY|PARTITION BY|FROM|JOIN|UPDATE|INTO|TABLE";
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
@@ -124,10 +120,10 @@ impl NoSqlStringConcat {
         if bin.operator_token().kind() != Kind::PlusToken {
             return;
         }
-        let left = Self::static_string_text(tsrs_kernel::unwrap_expression(bin.left()));
-        let right = Self::static_string_text(tsrs_kernel::unwrap_expression(bin.right()));
-        if (left.as_deref().is_some_and(Self::is_sql_statement) && right.is_none())
-            || (right.as_deref().is_some_and(Self::is_sql_statement) && left.is_none())
+        let left = static_string_text(tsrs_kernel::unwrap_expression(bin.left()));
+        let right = static_string_text(tsrs_kernel::unwrap_expression(bin.right()));
+        if (left.as_deref().is_some_and(is_sql_statement) && right.is_none())
+            || (right.as_deref().is_some_and(is_sql_statement) && left.is_none())
         {
             ctx.report_node(node, RuleMessage::new("no-sql-string-concat", MESSAGE));
         }
@@ -142,7 +138,7 @@ impl NoSqlStringConcat {
                 .template_spans
                 .nodes()
                 .is_empty()
-            && Self::is_sql_statement(&Self::combined_template_text(node))
+            && is_sql_statement(&combined_template_text(node))
             && self.has_unsafe_sql_interpolation(node, ctx.checker)
         {
             ctx.report_node(node, RuleMessage::new("no-sql-string-concat", MESSAGE));
@@ -161,7 +157,7 @@ impl NoSqlStringConcat {
         }
         if self.is_trusted_sql_template_tag(tagged.tag, ctx.checker) {
             self.report_unsafe_raw_fragments(spans, ctx);
-        } else if Self::is_sql_statement(&Self::combined_template_text(template))
+        } else if is_sql_statement(&combined_template_text(template))
             && self.has_unsafe_sql_interpolation(template, ctx.checker)
         {
             ctx.report_node(node, RuleMessage::new("no-sql-string-concat", MESSAGE));
@@ -180,10 +176,10 @@ impl NoSqlStringConcat {
             let span = span_node.as_template_span();
             let after = span.literal.text();
             let expr = tsrs_kernel::unwrap_expression(span.expression);
-            let safe = Self::static_string_text(expr).is_some()
+            let safe = static_string_text(expr).is_some()
                 || (self.is_trusted_identifier_member(expr, checker)
-                    && Self::is_sql_identifier_context(before, after));
-            !safe && Self::is_sql_interpolation_context(before, after)
+                    && is_sql_identifier_context(before, after));
+            !safe && is_sql_interpolation_context(before, after)
         })
     }
 
@@ -207,55 +203,6 @@ impl NoSqlStringConcat {
             .safe_identifier_members
             .iter()
             .any(|spec| spec.member == member_name && spec.type_name == owner_name)
-    }
-
-    fn is_sql_identifier_context(before: &str, after: &str) -> bool {
-        let norm_before = Self::normalized_sql_context(before);
-        IDENTIFIER_CONTEXT_KEYWORDS
-            .split('|')
-            .any(|kw| norm_before == kw || norm_before.ends_with(&format!(" {kw}")))
-            || after.trim_start().starts_with('=')
-    }
-
-    fn is_sql_interpolation_context(before: &str, after: &str) -> bool {
-        let trimmed_before = before
-            .trim_end()
-            .strip_suffix(['\'', '"', '`'])
-            .map_or_else(|| before.trim_end(), str::trim_end);
-        let norm_before = Self::normalized_sql_context(trimmed_before);
-        let ends_kw = BEFORE_KEYWORDS.split('|').any(|kw| {
-            norm_before == kw
-                || norm_before.ends_with(&format!(" {kw}"))
-                || norm_before.ends_with(&format!(" {kw} ("))
-        });
-        let has_stmt_ctx = norm_before.split_whitespace().any(|tok| {
-            matches!(
-                tok,
-                "SELECT" | "FROM" | "JOIN" | "WHERE" | "VALUES" | "UPDATE" | "INSERT" | "DELETE"
-            )
-        });
-        let ends_op = has_stmt_ctx
-            && ["=", "(", ","]
-                .iter()
-                .any(|op| trimmed_before.ends_with(op));
-        let trimmed_after = after
-            .trim_start()
-            .strip_prefix(['\'', '"', '`'])
-            .map_or_else(|| after.trim_start(), str::trim_start);
-        let norm_after = Self::normalized_sql_context(trimmed_after);
-        let starts_kw = norm_after.starts_with(')')
-            || norm_after.starts_with(',')
-            || AFTER_KEYWORDS
-                .split('|')
-                .any(|kw| norm_after == kw || norm_after.starts_with(&format!("{kw} ")));
-        ends_kw || ends_op || starts_kw
-    }
-
-    fn normalized_sql_context(text: &str) -> String {
-        text.split_whitespace()
-            .map(str::to_ascii_uppercase)
-            .collect::<Vec<_>>()
-            .join(" ")
     }
 
     fn report_unsafe_raw_fragments(&self, spans: &[P<Node>], ctx: &mut Ctx) {
@@ -384,157 +331,6 @@ impl NoSqlStringConcat {
                 .arguments()
                 .nodes()
                 .iter()
-                .any(|&arg| Self::static_string_text(tsrs_kernel::unwrap_expression(arg)).is_none())
+                .any(|&arg| static_string_text(tsrs_kernel::unwrap_expression(arg)).is_none())
     }
-
-    fn static_string_text(node: P<Node>) -> Option<String> {
-        matches!(
-            node.kind(),
-            Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral
-        )
-        .then(|| node.text().to_owned())
-    }
-
-    fn combined_template_text(template_node: P<Node>) -> String {
-        let template = template_node.as_template_expression();
-        let mut out = String::from(template.head.text());
-        for &span in template.template_spans.nodes() {
-            out.push(' ');
-            out.push_str(span.as_template_span().literal.text());
-        }
-        out
-    }
-
-    fn is_sql_statement(text: &str) -> bool {
-        let tokens: Vec<String> = text
-            .split(|ch: char| !ch.is_ascii_alphabetic())
-            .filter(|word| !word.is_empty())
-            .map(str::to_ascii_lowercase)
-            .collect();
-        let Some(first) = tokens.first().map(String::as_str) else {
-            return false;
-        };
-        let adj = |a: &str, b: &str| tokens.windows(2).any(|w| w[0] == a && w[1] == b);
-        (matches!(first, "select" | "with")
-            && tokens
-                .iter()
-                .position(|tok| tok == "select")
-                .is_some_and(|pos| tokens[pos + 1..].iter().any(|tok| tok == "from")))
-            || (first == "update" && tokens.iter().skip(2).take(2).any(|tok| tok == "set"))
-            || (matches!(first, "insert" | "replace") && adj(first, "into"))
-            || (first == "delete" && adj("delete", "from"))
-            || ["create", "alter", "drop"]
-                .iter()
-                .any(|op| adj(op, "table"))
-    }
-}
-
-fn identifier_has_external_provenance(ident: P<Node>, checker: &mut Checker, depth: u8) -> bool {
-    let Some(sym) = checker.get_symbol_at_location_exported(ident) else {
-        return false;
-    };
-    sym.declarations().iter().any(|&d| {
-        is_external_declaration(d)
-            || decl_origin_node(d)
-                .is_some_and(|n| has_external_sql_tag_provenance(n, checker, depth + 1))
-    })
-}
-
-fn has_external_sql_tag_provenance(node: P<Node>, checker: &mut Checker, depth: u8) -> bool {
-    if depth > 4 {
-        return false;
-    }
-    let unwrapped = tsrs_kernel::unwrap_expression(node);
-    match unwrapped.kind() {
-        Kind::Identifier => identifier_has_external_provenance(unwrapped, checker, depth),
-        Kind::TypeReference => {
-            let tn = unwrapped.as_type_reference_node().type_name();
-            let id = if ast::is_qualified_name(tn) {
-                tn.as_qualified_name().left()
-            } else {
-                tn
-            };
-            has_external_sql_tag_provenance(id, checker, depth + 1)
-        }
-        Kind::YieldExpression => unwrapped
-            .as_yield_expression()
-            .expression()
-            .is_some_and(|e| has_external_sql_tag_provenance(e, checker, depth + 1)),
-        Kind::CallExpression => has_external_sql_tag_provenance(
-            unwrapped.as_call_expression().expression(),
-            checker,
-            depth + 1,
-        ),
-        Kind::ThisKeyword => enclosing_class_extends_external(unwrapped, checker, depth),
-        Kind::PropertyAccessExpression => {
-            let prop = unwrapped.as_property_access_expression();
-            let name = prop.name();
-            ast::is_identifier(name)
-                && !matches!(name.as_identifier().text(), "raw" | "unsafe")
-                && has_external_sql_tag_provenance(prop.expression(), checker, depth + 1)
-        }
-        _ => false,
-    }
-}
-
-fn decl_origin_node(decl: P<Node>) -> Option<P<Node>> {
-    match decl.kind() {
-        Kind::VariableDeclaration => decl.as_variable_declaration().initializer(),
-        Kind::Parameter => decl.as_parameter_declaration().type_(),
-        _ => None,
-    }
-}
-
-fn enclosing_class(mut current: Option<P<Node>>) -> Option<P<Node>> {
-    while let Some(curr) = current {
-        if curr.kind() == Kind::ClassDeclaration {
-            return Some(curr);
-        }
-        current = curr.parent();
-    }
-    None
-}
-
-fn enclosing_class_extends_external(node: P<Node>, checker: &mut Checker, depth: u8) -> bool {
-    let Some(cls) = enclosing_class(node.parent()) else {
-        return false;
-    };
-    let Some(clauses) = cls.as_class_declaration().heritage_clauses() else {
-        return false;
-    };
-    clauses
-        .nodes()
-        .iter()
-        .flat_map(|&c| c.as_heritage_clause().types().nodes())
-        .any(|&ty| {
-            ast::is_expression_with_type_arguments(ty)
-                && has_external_sql_tag_provenance(
-                    ty.as_expression_with_type_arguments().expression(),
-                    checker,
-                    depth + 1,
-                )
-        })
-}
-
-fn is_external_declaration(decl: P<Node>) -> bool {
-    (matches!(
-        decl.kind(),
-        Kind::ImportSpecifier | Kind::NamespaceImport | Kind::ImportClause
-    ) && enclosing_import_module_name(decl)
-        .is_some_and(|m| !m.starts_with('.') && !m.starts_with('/')))
-        || ast::get_source_file_of_node(decl).is_some_and(|sf| {
-            tsrs_kernel::normalize_path(sf.file_name()).contains("/node_modules/")
-        })
-}
-
-fn enclosing_import_module_name(node: P<Node>) -> Option<String> {
-    let mut current = node.parent();
-    while let Some(curr) = current {
-        if curr.kind() == Kind::ImportDeclaration {
-            let spec = curr.as_import_declaration().module_specifier();
-            return ast::is_string_literal(spec).then(|| spec.text().to_owned());
-        }
-        current = curr.parent();
-    }
-    None
 }

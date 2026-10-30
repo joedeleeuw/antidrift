@@ -1,4 +1,5 @@
 use antidrift_kernel::callgraph::ProgramSymbolIndex;
+use antidrift_kernel::file_role;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
@@ -45,7 +46,7 @@ impl Rule for NoClosedStringParameter {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) || !tsrs_kernel::is_authored_source_file(ctx.file) {
+        if !self.scope.in_scope(ctx) || !file_role::is_authored_source_file(ctx.file) {
             return Box::new(EmptyVisitor);
         }
         Box::new(Visitor)

@@ -1,3 +1,4 @@
+mod call_forwarding;
 pub mod erasure_analysis;
 pub mod no_appeasement_cast;
 pub mod no_appeasement_erasure;
@@ -11,6 +12,7 @@ pub mod no_unresolved_dependency_types;
 pub mod no_vague_names;
 pub mod no_wrapping_functions;
 pub mod predicate_scan;
+mod vague_name_lexicon;
 
 use tsrslint::rule::Rule;
 

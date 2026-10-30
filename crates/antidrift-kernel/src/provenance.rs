@@ -6,6 +6,7 @@ use tsrs_core::P;
 use tsrs_core::tspath;
 use tsrslint::utils::is_source_file_default_library;
 
+use crate::file_role;
 use crate::json_manifest::package_entrypoint_paths;
 use crate::tsrs_kernel;
 
@@ -189,7 +190,7 @@ pub fn classify_source_file_origin(
     {
         return DeclarationOrigin::NodeModules;
     }
-    if tsrs_kernel::is_generated_file(&file_name, decl_file.text()) {
+    if file_role::is_generated_file(&file_name, decl_file.text()) {
         return DeclarationOrigin::Generated;
     }
     if let Some(curr) = current_file
@@ -197,10 +198,10 @@ pub fn classify_source_file_origin(
     {
         return DeclarationOrigin::SameFile;
     }
-    if tsrs_kernel::is_domain_file(&file_name) {
+    if file_role::is_domain_file(&file_name) {
         return DeclarationOrigin::LocalDomain;
     }
-    if tsrs_kernel::is_boundary_file(&file_name) {
+    if file_role::is_boundary_file(&file_name) {
         return DeclarationOrigin::LocalBoundary;
     }
     DeclarationOrigin::WorkspaceOther

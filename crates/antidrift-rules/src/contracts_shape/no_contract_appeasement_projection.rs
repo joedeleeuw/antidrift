@@ -1,3 +1,4 @@
+use antidrift_kernel::file_role;
 use antidrift_kernel::outcome_shape::find_sum_to_product_pair;
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_symbol_origin, symbol_at_node};
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
@@ -247,8 +248,8 @@ fn is_cross_boundary_domain_mapper(ctx: &mut Ctx, function: P<Node>, candidate: 
 
 fn check_function_candidate(ctx: &mut Ctx, function: P<Node>, candidate: P<Node>) -> bool {
     let file_name = ctx.file.file_name();
-    if !tsrs_kernel::is_test_file(file_name)
-        && !tsrs_kernel::is_generated_file(file_name, ctx.file.text())
+    if !file_role::is_test_file(file_name)
+        && !file_role::is_generated_file(file_name, ctx.file.text())
         && let Some(classification) =
             projection::classify_bag_reshaper(function, candidate, ctx.checker, ctx.file)
     {
@@ -322,8 +323,8 @@ fn report_end_of_file(
     reported_functions: &FxHashSet<P<Node>>,
 ) {
     let file_name = ctx.file.file_name();
-    if tsrs_kernel::is_test_file(file_name)
-        || tsrs_kernel::is_generated_file(file_name, ctx.file.text())
+    if file_role::is_test_file(file_name)
+        || file_role::is_generated_file(file_name, ctx.file.text())
     {
         return;
     }

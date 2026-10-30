@@ -5,6 +5,8 @@ pub mod no_schema_validator_transcoding;
 pub mod no_sql_string_concat;
 pub mod no_unsafe_deserialize;
 pub mod require_convex_return_validator;
+mod sql_tag_provenance;
+mod sql_text;
 pub mod unknown_input_must_be_decoded;
 pub mod unknown_input_probe;
 

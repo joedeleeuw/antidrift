@@ -1,5 +1,5 @@
+use antidrift_kernel::file_role::is_test_or_spec_file;
 use antidrift_kernel::rule_scope::RuleScope;
-use antidrift_kernel::tsrs_kernel::is_test_or_spec_file;
 use tsrs_ast::{Kind, ModifierFlags, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};

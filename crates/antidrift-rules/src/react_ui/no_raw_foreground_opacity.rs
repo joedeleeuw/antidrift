@@ -1,5 +1,5 @@
-use antidrift_kernel::jsx::string_fragments;
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::string_fragments::string_fragments;
 use tsrs_ast::Node;
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};

@@ -1,3 +1,4 @@
+use antidrift_kernel::file_role::is_test_file;
 use antidrift_kernel::jsx::{
     is_component_or_hook_function, is_hook_name, is_pascal_case_name, react_function_name,
 };
@@ -8,7 +9,7 @@ use antidrift_kernel::provenance::{
 use antidrift_kernel::rule_scope::{RuleScope, in_scope};
 use antidrift_kernel::tsrs_kernel::{
     collect_return_expressions, enclosing_function, function_node_from_declaration,
-    is_function_like, is_test_file, normalize_path, property_name_text, unwrap_expression,
+    is_function_like, normalize_path, property_name_text, unwrap_expression,
 };
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, Symbol};

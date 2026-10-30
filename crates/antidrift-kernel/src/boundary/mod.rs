@@ -3,6 +3,8 @@ pub mod json_parse;
 pub mod schema;
 pub mod schema_context;
 pub mod service_contract;
+pub mod service_tags;
+mod string_guard;
 
 pub use convex::{
     contains_convex_any, convex_validator_method, is_convex_registrar_call,
@@ -22,6 +24,6 @@ pub use schema_context::{
     is_throw_assertion_callback_parse, zod_transform_call_parts,
 };
 pub use service_contract::{
-    ServiceProvenance, is_layer_construction_call, is_only_used_in_layer_construction,
-    service_contract_provenance,
+    ServiceProvenance, is_only_used_in_layer_construction, service_contract_provenance,
 };
+pub use service_tags::is_layer_construction_call;

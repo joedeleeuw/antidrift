@@ -1,5 +1,6 @@
+use antidrift_kernel::file_role::is_test_file;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, in_scope};
-use antidrift_kernel::tsrs_kernel::{is_test_file, normalize_path};
+use antidrift_kernel::tsrs_kernel::normalize_path;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::{P, tspath};
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};

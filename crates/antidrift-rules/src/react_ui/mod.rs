@@ -1,5 +1,7 @@
+mod abort_guards;
 pub mod await_waterfall;
 pub mod icon_button_requires_tooltip;
+mod lifecycle_state_frame;
 pub mod no_adhoc_loader;
 pub mod no_ambient_hotkey_format;
 pub mod no_calling_components_as_functions;
@@ -19,7 +21,10 @@ pub mod no_query_join_or_tree_reshape;
 pub mod no_raw_foreground_opacity;
 pub mod no_unformatted_number;
 pub mod no_unstable_render_default_collection;
+mod omitted_prop_keys;
 mod process_lifecycle_loa;
+mod render_body_primitives;
+mod render_scope;
 pub mod require_detached_label_shape;
 pub mod require_dir_on_rendered_name;
 pub mod require_effect_deps;

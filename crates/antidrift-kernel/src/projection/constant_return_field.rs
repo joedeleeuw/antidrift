@@ -4,7 +4,7 @@ use tsrs_checker::{Checker, Type, TypeFlags};
 use tsrs_core::P;
 use tsrslint::utils::{is_intersection_type, is_object_type, is_type_flag_set, is_union_type};
 
-use crate::{shape, tsrs_kernel};
+use crate::{shape, tsrs_kernel, type_syntax};
 
 pub struct ConstantReturnFieldViolation {
     pub report_node: P<Node>,
@@ -78,7 +78,7 @@ fn classify_contract_target(
     let contract_type_node = unwrap_return_contract_type_node(raw_ret);
     match contract_type_node.kind() {
         Kind::TypeReference => {
-            let name = shape::type_reference_name(
+            let name = type_syntax::type_reference_name(
                 contract_type_node.as_type_reference_node().type_name(),
             )?;
             Some((
@@ -178,7 +178,7 @@ fn parse_object_return_site(sf: P<SourceFile>, obj_node: P<Node>) -> Option<Obje
         match prop.kind() {
             Kind::PropertyAssignment => {
                 let pa = prop.as_property_assignment();
-                let key = shape::property_key_name(pa.name())?;
+                let key = type_syntax::property_key_name(pa.name())?;
                 let init = tsrs_kernel::unwrap_expression(pa.initializer());
                 let raw_text = tsrs_kernel::node_text(sf, init).trim().to_owned();
                 let bool_lit = match init.kind() {

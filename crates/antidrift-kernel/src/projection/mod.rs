@@ -1,3 +1,5 @@
+pub mod bag_parameter;
+pub mod bag_projection;
 pub mod bag_reshaper;
 pub mod bag_state;
 pub mod constant_return_field;
@@ -5,15 +7,18 @@ pub mod contract_projection;
 pub mod inline_parse;
 pub mod sum_erasure;
 
-pub use bag_reshaper::{
-    BagReshaperClassification, classify_bag_reshaper, collect_binding_pattern_symbols,
-    collect_return_expressions_from_expression, collect_statement_return_expressions,
-    resolve_bag_parameter,
+pub use bag_parameter::{
+    collect_binding_pattern_symbols, collect_return_expressions_from_expression,
+    collect_statement_return_expressions, resolve_bag_parameter,
 };
+pub use bag_projection::{
+    BagProjectionOptions, inspect_object_literal_bag_projection,
+    inspect_object_literal_bag_projection_with_options,
+};
+pub use bag_reshaper::{BagReshaperClassification, classify_bag_reshaper};
 pub use bag_state::{
-    BagProjectionOptions, BagState, BagValueCheck, inspect_bag_value_expression,
-    inspect_object_literal_bag_projection, inspect_object_literal_bag_projection_with_options,
-    is_bag_member_chain, is_bag_object_reference, is_empty_object_fallback, is_nullish_expression,
+    BagState, BagValueCheck, inspect_bag_value_expression, is_bag_member_chain,
+    is_bag_object_reference, is_empty_object_fallback, is_nullish_expression,
     is_pure_bag_condition, is_static_scalar_literal,
 };
 pub use constant_return_field::{

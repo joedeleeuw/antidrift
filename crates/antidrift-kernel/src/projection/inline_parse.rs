@@ -3,9 +3,10 @@ use tsrs_ast::{self as ast, ConditionalExpression, Kind, Node, Symbol};
 use tsrs_checker::Checker;
 use tsrs_core::P;
 
+use crate::projection::bag_projection::inspect_object_literal_bag_projection;
 use crate::projection::bag_state::{
-    BagState, inspect_bag_value_expression, inspect_object_literal_bag_projection,
-    is_bag_object_reference, is_pure_bag_condition, is_static_scalar_literal,
+    BagState, inspect_bag_value_expression, is_bag_object_reference, is_pure_bag_condition,
+    is_static_scalar_literal,
 };
 use crate::{provenance, tsrs_kernel};
 

@@ -1,6 +1,7 @@
+pub(super) use antidrift_kernel::file_role::is_test_or_spec_file;
 pub(super) use antidrift_kernel::tsrs_kernel::{
-    Span, call_expression_of, identifier_of, is_test_or_spec_file, member_chain_root_node,
-    member_object, numeric_literal_value, unwrap_awaited_expression, unwrap_expression,
+    Span, call_expression_of, identifier_of, member_chain_root_node, member_object,
+    numeric_literal_value, unwrap_awaited_expression, unwrap_expression,
 };
 use tsrs_ast::{Kind, Node, SourceFile};
 use tsrs_core::P;
