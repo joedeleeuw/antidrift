@@ -71,34 +71,25 @@ export function changedFilesBetween({ base, head, cwd }) {
     ],
     cwd
   );
-  const entries = [];
-  for (const line of raw.split("\n")) {
-    if (line.trim().length === 0) continue;
-    const parts = line.split("\t");
-    const letter = parts[0][0];
-    const operation = STATUS_OPERATION[letter];
-    if (operation === undefined) {
-      throw new Error(
-        `unsupported git status "${parts[0]}" for path ${parts[1] ?? ""} in ${cwd}`
-      );
-    }
-    if (letter === "R" || letter === "C") {
-      entries.push({
-        status: parts[0],
-        operation,
-        path: parts[2],
-        oldPath: parts[1],
-      });
-    } else {
-      entries.push({
-        status: parts[0],
-        operation,
-        path: parts[1],
-        oldPath: null,
-      });
-    }
+  return raw
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => parseNameStatusLine(line, cwd));
+}
+
+function parseNameStatusLine(line, cwd) {
+  const parts = line.split("\t");
+  const letter = parts[0][0];
+  const operation = STATUS_OPERATION[letter];
+  if (operation === undefined) {
+    throw new Error(
+      `unsupported git status "${parts[0]}" for path ${parts[1] ?? ""} in ${cwd}`
+    );
   }
-  return entries;
+  if (letter === "R" || letter === "C") {
+    return { status: parts[0], operation, path: parts[2], oldPath: parts[1] };
+  }
+  return { status: parts[0], operation, path: parts[1], oldPath: null };
 }
 
 export function patchHunksBetween({ base, head, cwd }) {

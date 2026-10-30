@@ -9,8 +9,8 @@ import { collectTouchedModuleGraph } from "./module-graph.mjs";
 export const CHANGE_CONTRACT_CLAIM =
   "the diff exceeded the declared scope contract";
 
-function contractStateFor(contractRelativePath, changedFiles) {
-  const match = changedFiles.find(
+function contractStateFor(contractRelativePath, surface) {
+  const match = surface.changedFiles.find(
     (file) =>
       file.path === contractRelativePath ||
       file.oldPath === contractRelativePath
@@ -24,6 +24,64 @@ function moduleGraphConfigured(scope) {
     scope.allowedEntrypoints.length > 0 ||
     typeof scope.maxTouchedModuleRadius === "number"
   );
+}
+
+function contractAt(resolvedContract, { contractPath, base, requireContract }) {
+  if (!existsSync(resolvedContract)) {
+    if (requireContract) {
+      throw new Error(`change contract not found: ${contractPath}`);
+    }
+    return null;
+  }
+  const contract = parseContract(readFileSync(resolvedContract, "utf8"));
+  if (typeof base !== "string" || base.length === 0) {
+    throw new Error(
+      "change-contract: a base ref is required when a contract is present (pass --base or ANTIDRIFT_BASE_REF)"
+    );
+  }
+  return contract;
+}
+
+function missingContractResult() {
+  return {
+    contractState: "missing",
+    claim: CHANGE_CONTRACT_CLAIM,
+    changeContext: null,
+    declaredScope: null,
+    actualChangeSurface: null,
+    violations: [],
+    decision: "inventory",
+  };
+}
+
+function touchedModuleGraphFor(scope, changedFiles, { cwd, head, tsconfig }) {
+  const configured = moduleGraphConfigured(scope);
+  if (configured && scope.allowedEntrypoints.length === 0) {
+    throw new Error(
+      "change-contract: scope.allowedEntrypoints is required when scope.maxTouchedModuleRadius is configured"
+    );
+  }
+  return configured
+    ? collectTouchedModuleGraph({
+        cwd,
+        head,
+        tsconfig,
+        changedFiles,
+        allowedEntrypoints: scope.allowedEntrypoints,
+        maxTouchedModuleRadius: scope.maxTouchedModuleRadius,
+      })
+    : null;
+}
+
+function actualChangeSurfaceOf(surface, touchedModuleGraph) {
+  return {
+    changedFiles: surface.changedFiles,
+    addedExports: surface.addedExports,
+    removedExports: surface.removedExports,
+    addedRuntimeDependencies: surface.addedRuntimeDependencies,
+    addedDevDependencies: surface.addedDevDependencies,
+    touchedModuleGraph,
+  };
 }
 
 /**
@@ -42,28 +100,12 @@ export function runChangeContract({
   const resolvedContract = isAbsolute(contractPath)
     ? contractPath
     : resolve(cwd, contractPath);
-
-  if (!existsSync(resolvedContract)) {
-    if (requireContract) {
-      throw new Error(`change contract not found: ${contractPath}`);
-    }
-    return {
-      contractState: "missing",
-      claim: CHANGE_CONTRACT_CLAIM,
-      changeContext: null,
-      declaredScope: null,
-      actualChangeSurface: null,
-      violations: [],
-      decision: "inventory",
-    };
-  }
-
-  const contract = parseContract(readFileSync(resolvedContract, "utf8"));
-  if (typeof base !== "string" || base.length === 0) {
-    throw new Error(
-      "change-contract: a base ref is required when a contract is present (pass --base or ANTIDRIFT_BASE_REF)"
-    );
-  }
+  const contract = contractAt(resolvedContract, {
+    contractPath,
+    base,
+    requireContract,
+  });
+  if (contract === null) return missingContractResult();
   const surface = collectChangeSurface({
     base,
     head,
@@ -71,43 +113,18 @@ export function runChangeContract({
     includeExports: contract.scope.checkedSurfaces.includes("exports"),
     includePatchHunks: false,
   });
-  const contractState = contractStateFor(
-    relative(cwd, resolvedContract),
-    surface.changedFiles
-  );
   const violations = analyzeChangeScope(contract, surface);
-  if (
-    moduleGraphConfigured(contract.scope) &&
-    contract.scope.allowedEntrypoints.length === 0
-  ) {
-    throw new Error(
-      "change-contract: scope.allowedEntrypoints is required when scope.maxTouchedModuleRadius is configured"
-    );
-  }
-  const touchedModuleGraph = moduleGraphConfigured(contract.scope)
-    ? collectTouchedModuleGraph({
-        cwd,
-        head,
-        tsconfig,
-        changedFiles: surface.changedFiles,
-        allowedEntrypoints: contract.scope.allowedEntrypoints,
-        maxTouchedModuleRadius: contract.scope.maxTouchedModuleRadius,
-      })
-    : null;
-
+  const touchedModuleGraph = touchedModuleGraphFor(
+    contract.scope,
+    surface.changedFiles,
+    { cwd, head, tsconfig }
+  );
   return {
-    contractState,
+    contractState: contractStateFor(relative(cwd, resolvedContract), surface),
     claim: CHANGE_CONTRACT_CLAIM,
     changeContext: { base, head, mergeBase: surface.mergeBase },
     declaredScope: contract.scope,
-    actualChangeSurface: {
-      changedFiles: surface.changedFiles,
-      addedExports: surface.addedExports,
-      removedExports: surface.removedExports,
-      addedRuntimeDependencies: surface.addedRuntimeDependencies,
-      addedDevDependencies: surface.addedDevDependencies,
-      touchedModuleGraph,
-    },
+    actualChangeSurface: actualChangeSurfaceOf(surface, touchedModuleGraph),
     violations,
     decision: "inventory",
   };

@@ -158,6 +158,35 @@ function sourceScriptKind(packagePath) {
   return packagePath.endsWith(".ts") ? ts.ScriptKind.TS : ts.ScriptKind.JS;
 }
 
+function exportNameMismatches(label, entry, importTarget, typesTarget) {
+  const runtimeNames = packageExportedValueNames(
+    readFileSync(importTarget, "utf8"),
+    entry.import,
+    sourceScriptKind(entry.import)
+  );
+  const typeNames = packageExportedValueNames(
+    readFileSync(typesTarget, "utf8"),
+    entry.types,
+    ts.ScriptKind.TS
+  );
+  const errors = [];
+  for (const name of sortedStrings(runtimeNames)) {
+    if (!typeNames.has(name)) {
+      errors.push(
+        `${label}.import runtime export ${name} is missing from types path ${entry.types}`
+      );
+    }
+  }
+  for (const name of sortedStrings(typeNames)) {
+    if (!runtimeNames.has(name)) {
+      errors.push(
+        `${label}.types declaration ${name} is missing from runtime import path ${entry.import}`
+      );
+    }
+  }
+  return errors;
+}
+
 function validateExportEntry(root, exportKey, entry) {
   if (!isRecord(entry)) {
     return [];
@@ -180,31 +209,15 @@ function validateExportEntry(root, exportKey, entry) {
   if (!typesResult.target || !importResult.target) {
     return errors;
   }
-  const runtimeNames = packageExportedValueNames(
-    readFileSync(importResult.target, "utf8"),
-    entry.import,
-    sourceScriptKind(entry.import)
-  );
-  const typeNames = packageExportedValueNames(
-    readFileSync(typesResult.target, "utf8"),
-    entry.types,
-    ts.ScriptKind.TS
-  );
-  for (const name of sortedStrings(runtimeNames)) {
-    if (!typeNames.has(name)) {
-      errors.push(
-        `${label}.import runtime export ${name} is missing from types path ${entry.types}`
-      );
-    }
-  }
-  for (const name of sortedStrings(typeNames)) {
-    if (!runtimeNames.has(name)) {
-      errors.push(
-        `${label}.types declaration ${name} is missing from runtime import path ${entry.import}`
-      );
-    }
-  }
-  return errors;
+  return [
+    ...errors,
+    ...exportNameMismatches(
+      label,
+      entry,
+      importResult.target,
+      typesResult.target
+    ),
+  ];
 }
 
 function validateBinTarget(root, binary, packagePath) {
@@ -264,6 +277,33 @@ function packageBinNames(packageJson) {
   return [];
 }
 
+function readmeExportErrors(readme, packageName, exportsMap) {
+  const expectedSpecifiers = new Set();
+  const errors = [];
+  for (const exportKey of sortedStrings(Object.keys(exportsMap))) {
+    const specifier = packageExportPublicSpecifier(packageName, exportKey);
+    if (specifier) {
+      expectedSpecifiers.add(specifier);
+      if (!readme.includes(`\`${specifier}\``)) {
+        errors.push(
+          `tooling/antidrift/README.md public entry points missing package export: ${specifier}`
+        );
+      }
+    }
+  }
+  const foundSpecifiers = readmeCodeSpans(readme).filter(
+    (span) => span === packageName || span.startsWith(`${packageName}/`)
+  );
+  for (const specifier of foundSpecifiers) {
+    if (!expectedSpecifiers.has(specifier)) {
+      errors.push(
+        `tooling/antidrift/README.md public entry points lists non-exported package specifier: ${specifier}`
+      );
+    }
+  }
+  return errors;
+}
+
 function validateReadmeEntries(root, packageJson) {
   if (typeof packageJson.name !== "string" || packageJson.name.length === 0) {
     return [];
@@ -274,35 +314,9 @@ function validateReadmeEntries(root, packageJson) {
   }
   const readme = readFileSync(target, "utf8");
   const exportsMap = packageJson.exports;
-  const expectedSpecifiers = new Set();
-  const errors = [];
-  if (isRecord(exportsMap)) {
-    for (const exportKey of sortedStrings(Object.keys(exportsMap))) {
-      const specifier = packageExportPublicSpecifier(
-        packageJson.name,
-        exportKey
-      );
-      if (specifier) {
-        expectedSpecifiers.add(specifier);
-        if (!readme.includes(`\`${specifier}\``)) {
-          errors.push(
-            `tooling/antidrift/README.md public entry points missing package export: ${specifier}`
-          );
-        }
-      }
-    }
-    const foundSpecifiers = readmeCodeSpans(readme).filter(
-      (span) =>
-        span === packageJson.name || span.startsWith(`${packageJson.name}/`)
-    );
-    for (const specifier of foundSpecifiers) {
-      if (!expectedSpecifiers.has(specifier)) {
-        errors.push(
-          `tooling/antidrift/README.md public entry points lists non-exported package specifier: ${specifier}`
-        );
-      }
-    }
-  }
+  const errors = isRecord(exportsMap)
+    ? readmeExportErrors(readme, packageJson.name, exportsMap)
+    : [];
   for (const binary of packageBinNames(packageJson)) {
     if (!readme.includes(`\`${binary}\``)) {
       errors.push(

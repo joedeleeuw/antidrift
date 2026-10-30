@@ -208,6 +208,37 @@ function validateModuleRadius(scope, problems) {
   }
 }
 
+const SCOPE_VALIDATORS = Object.freeze([
+  validateUnknownScopeKeys,
+  validateCheckedSurfaces,
+  validateAllowedPaths,
+  validateForbiddenPaths,
+  validateChangeTypes,
+  validateDependencyFields,
+  validateExports,
+  validateEntrypoints,
+  validateOwnerSymbols,
+  validateModuleRadius,
+]);
+
+function normalizedScope(scope) {
+  return Object.freeze({
+    ...scope,
+    checkedSurfaces: frozenStringArray(scope.checkedSurfaces),
+    allowedPaths: frozenStringArray(scope.allowedPaths),
+    forbiddenPaths: frozenStringArray(scope.forbiddenPaths),
+    allowedChangeTypes: frozenStringArray(scope.allowedChangeTypes),
+    allowedExports: frozenAllowedExports(scope.allowedExports),
+    allowedRuntimeDependencies: frozenStringArray(
+      scope.allowedRuntimeDependencies
+    ),
+    allowedDevDependencies: frozenStringArray(scope.allowedDevDependencies),
+    allowedEntrypoints: frozenStringArray(scope.allowedEntrypoints),
+    allowedOwnerSymbols: frozenStringArray(scope.allowedOwnerSymbols),
+    maxTouchedModuleRadius: scope.maxTouchedModuleRadius ?? null,
+  });
+}
+
 /**
  * Validate a raw parsed contract object and return a frozen, normalized contract.
  * Throws ContractValidationError (loud) listing every problem; never returns a partial default.
@@ -227,41 +258,14 @@ export function validateContract(raw) {
   if (raw.schemaVersion !== 1) problems.push("schemaVersion must be 1");
 
   if (isObject(raw.scope)) {
-    validateUnknownScopeKeys(raw.scope, problems);
-    validateCheckedSurfaces(raw.scope, problems);
-    validateAllowedPaths(raw.scope, problems);
-    validateForbiddenPaths(raw.scope, problems);
-    validateChangeTypes(raw.scope, problems);
-    validateDependencyFields(raw.scope, problems);
-    validateExports(raw.scope, problems);
-    validateEntrypoints(raw.scope, problems);
-    validateOwnerSymbols(raw.scope, problems);
-    validateModuleRadius(raw.scope, problems);
+    for (const validate of SCOPE_VALIDATORS) validate(raw.scope, problems);
   } else {
     problems.push("scope is required and must be a mapping");
   }
 
   if (problems.length > 0) throw new ContractValidationError(problems);
 
-  const scope = raw.scope;
-  return Object.freeze({
-    schemaVersion: 1,
-    scope: Object.freeze({
-      ...scope,
-      checkedSurfaces: frozenStringArray(scope.checkedSurfaces),
-      allowedPaths: frozenStringArray(scope.allowedPaths),
-      forbiddenPaths: frozenStringArray(scope.forbiddenPaths),
-      allowedChangeTypes: frozenStringArray(scope.allowedChangeTypes),
-      allowedExports: frozenAllowedExports(scope.allowedExports),
-      allowedRuntimeDependencies: frozenStringArray(
-        scope.allowedRuntimeDependencies
-      ),
-      allowedDevDependencies: frozenStringArray(scope.allowedDevDependencies),
-      allowedEntrypoints: frozenStringArray(scope.allowedEntrypoints),
-      allowedOwnerSymbols: frozenStringArray(scope.allowedOwnerSymbols),
-      maxTouchedModuleRadius: scope.maxTouchedModuleRadius ?? null,
-    }),
-  });
+  return Object.freeze({ schemaVersion: 1, scope: normalizedScope(raw.scope) });
 }
 
 /**

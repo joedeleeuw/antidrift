@@ -54,18 +54,6 @@ function inPatchHunks(entry, patchHunks) {
   return lineInHunks(entry.line, patchHunks[entry.path] ?? []);
 }
 
-function findingFromMessage(cwd, result, message) {
-  return {
-    path: relativePath(cwd, result.filePath),
-    ruleId: message.ruleId,
-    line: message.line,
-    column: message.column,
-    severity: message.severity === 2 ? "error" : "warn",
-    message: message.message,
-    fatal: false,
-  };
-}
-
 function countBy(entries, key) {
   const counts = {};
   for (const entry of entries) {
@@ -124,6 +112,58 @@ export function parseArgs(argv) {
   return parsed;
 }
 
+function lintTargets(root, targets) {
+  const tempDir = mkdtempSync(resolve(tmpdir(), "antidrift-diff-scoped-"));
+  const emptySuppressionsPath = resolve(tempDir, "suppressions.json");
+  writeFileSync(emptySuppressionsPath, "{}\n", "utf8");
+  try {
+    const linterBinary = resolveNativeLinterBinary();
+    const linterRun = spawnSync(
+      linterBinary,
+      [
+        "--format",
+        "json",
+        "--suppressions-location",
+        emptySuppressionsPath,
+        ...targets,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+      }
+    );
+    if (linterRun.error) throw linterRun.error;
+    const rawJson = (linterRun.stdout ?? "").trim();
+    return rawJson.length > 0
+      ? LinterFileResults.parse(JSON.parse(rawJson))
+      : [];
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+function sortedFindings(root, results) {
+  return results
+    .flatMap((result) =>
+      result.messages.map((message) => ({
+        path: relativePath(root, result.filePath),
+        ruleId: message.ruleId,
+        line: message.line,
+        column: message.column,
+        severity: message.severity === 2 ? "error" : "warn",
+        message: message.message,
+        fatal: false,
+      }))
+    )
+    .sort((left, right) =>
+      compareStrings(
+        `${left.path}:${left.line}:${left.column}:${left.ruleId ?? ""}`,
+        `${right.path}:${right.line}:${right.column}:${right.ruleId ?? ""}`
+      )
+    );
+}
+
 export function diffScopedAdapters({
   base = process.env.ANTIDRIFT_BASE_REF ?? "HEAD",
   head = "HEAD",
@@ -135,48 +175,8 @@ export function diffScopedAdapters({
   const root = resolve(cwd);
   const surface = collectChangeSurface({ base, head, cwd: root });
   const targets = codeFiles(surface.changedFiles);
-  let results = [];
-  if (targets.length > 0) {
-    const tempDir = mkdtempSync(resolve(tmpdir(), "antidrift-diff-scoped-"));
-    const emptySuppressionsPath = resolve(tempDir, "suppressions.json");
-    writeFileSync(emptySuppressionsPath, "{}\n", "utf8");
-    try {
-      const linterBinary = resolveNativeLinterBinary();
-      const linterRun = spawnSync(
-        linterBinary,
-        [
-          "--format",
-          "json",
-          "--suppressions-location",
-          emptySuppressionsPath,
-          ...targets,
-        ],
-        {
-          cwd: root,
-          encoding: "utf8",
-          maxBuffer: 64 * 1024 * 1024,
-        }
-      );
-      if (linterRun.error) throw linterRun.error;
-      const rawJson = (linterRun.stdout ?? "").trim();
-      results =
-        rawJson.length > 0 ? LinterFileResults.parse(JSON.parse(rawJson)) : [];
-    } finally {
-      rmSync(tempDir, { recursive: true, force: true });
-    }
-  }
-  const allFindings = results
-    .flatMap((result) =>
-      result.messages.map((message) =>
-        findingFromMessage(root, result, message)
-      )
-    )
-    .sort((left, right) =>
-      compareStrings(
-        `${left.path}:${left.line}:${left.column}:${left.ruleId ?? ""}`,
-        `${right.path}:${right.line}:${right.column}:${right.ruleId ?? ""}`
-      )
-    );
+  const results = targets.length > 0 ? lintTargets(root, targets) : [];
+  const allFindings = sortedFindings(root, results);
   const diffFindings = allFindings.filter((finding) =>
     inPatchHunks(finding, surface.patchHunks)
   );

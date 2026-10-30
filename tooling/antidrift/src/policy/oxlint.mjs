@@ -16,10 +16,33 @@ export function resolveOxlintBinary() {
   return resolve(dirname(packageJsonPath), packageJson.bin.oxlint);
 }
 
-export function resolveNativeLinterBinary(cwd = process.cwd()) {
-  if (process.env.ANTIDRIFT_LINTER_BIN) {
-    return process.env.ANTIDRIFT_LINTER_BIN;
-  }
+const LINTER_PLATFORM_KEYS = {
+  "linux-x64": "linux-x64-gnu",
+  "linux-arm64": "linux-arm64-gnu",
+  "darwin-x64": "darwin-x64",
+  "darwin-arm64": "darwin-arm64",
+  "win32-x64": "win32-x64-msvc",
+  "win32-arm64": "win32-arm64-msvc",
+};
+
+const OXLINT_VALUE_FLAGS = [
+  "--config",
+  "-c",
+  "--format",
+  "-f",
+  "--threads",
+  "--tsconfig",
+  "--ignore-pattern",
+];
+
+const OXLINT_USAGE =
+  [
+    "Usage: antidrift oxlint [paths...] [-- oxlint-options...]",
+    "",
+    "Runs the unified Oxlint + native Rust antidrift-linter (tsrs) gate.",
+  ].join("\n") + "\n";
+
+function localLinterCandidates(cwd) {
   const localCandidates = [
     resolve(cwd, "target/debug/antidrift-linter"),
     resolve(repoRoot, "target/debug/antidrift-linter"),
@@ -29,34 +52,38 @@ export function resolveNativeLinterBinary(cwd = process.cwd()) {
     resolve(moduleRoot, "../bin/antidrift-linter"),
     resolve(moduleRoot, "dist/bin/antidrift-linter"),
   ].filter((candidate) => existsSync(candidate));
-  localCandidates.sort(
+  return localCandidates.sort(
     (left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs
   );
-  const candidates = [...localCandidates];
-  const platformKey = {
-    "linux-x64": "linux-x64-gnu",
-    "linux-arm64": "linux-arm64-gnu",
-    "darwin-x64": "darwin-x64",
-    "darwin-arm64": "darwin-arm64",
-    "win32-x64": "win32-x64-msvc",
-    "win32-arm64": "win32-arm64-msvc",
-  }[`${process.platform}-${process.arch}`];
-  if (platformKey) {
-    const require = createRequire(import.meta.url);
-    try {
-      candidates.push(
-        require.resolve(`@joedeleeuw/antidrift-linter-${platformKey}`)
-      );
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        !("code" in error) ||
-        error.code !== "MODULE_NOT_FOUND"
-      ) {
-        throw error;
-      }
+}
+
+function platformLinterPackages() {
+  const platformKey =
+    LINTER_PLATFORM_KEYS[`${process.platform}-${process.arch}`];
+  if (!platformKey) return [];
+  const require = createRequire(import.meta.url);
+  try {
+    return [require.resolve(`@joedeleeuw/antidrift-linter-${platformKey}`)];
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !("code" in error) ||
+      error.code !== "MODULE_NOT_FOUND"
+    ) {
+      throw error;
     }
+    return [];
   }
+}
+
+export function resolveNativeLinterBinary(cwd = process.cwd()) {
+  if (process.env.ANTIDRIFT_LINTER_BIN) {
+    return process.env.ANTIDRIFT_LINTER_BIN;
+  }
+  const candidates = [
+    ...localLinterCandidates(cwd),
+    ...platformLinterPackages(),
+  ];
   const found = candidates.find((candidate) => existsSync(candidate));
   if (found && (statSync(found).mode & 0o111) === 0) {
     chmodSync(found, 0o755);
@@ -85,18 +112,7 @@ export function parseOxlintArgs(argv, _options = {}) {
     if (arg.startsWith("-")) {
       passthrough.push(arg);
       const next = argv[index + 1];
-      if (
-        [
-          "--config",
-          "-c",
-          "--format",
-          "-f",
-          "--threads",
-          "--tsconfig",
-          "--ignore-pattern",
-        ].includes(arg) &&
-        next
-      ) {
+      if (OXLINT_VALUE_FLAGS.includes(arg) && next) {
         passthrough.push(next);
         index += 1;
       }
@@ -111,6 +127,19 @@ export function parseOxlintArgs(argv, _options = {}) {
   };
 }
 
+function oxlintCommandArgs({ passthrough, targets }) {
+  const typeAwareFlags = passthrough.includes("--type-aware")
+    ? []
+    : ["--type-aware"];
+  return [
+    resolveOxlintBinary(),
+    "--disable-nested-config",
+    ...typeAwareFlags,
+    ...passthrough,
+    ...targets,
+  ];
+}
+
 export function runOxlint({
   argv = [],
   cwd = process.cwd(),
@@ -121,13 +150,7 @@ export function runOxlint({
 } = {}) {
   const parsed = parseOxlintArgs(argv, { cwd });
   if (parsed.help) {
-    stdout.write(
-      [
-        "Usage: antidrift oxlint [paths...] [-- oxlint-options...]",
-        "",
-        "Runs the unified Oxlint + native Rust antidrift-linter (tsrs) gate.",
-      ].join("\n") + "\n"
-    );
+    stdout.write(OXLINT_USAGE);
     return exit(0);
   }
   const tsgolintBinary = resolveNativeLinterBinary(cwd);
@@ -137,16 +160,7 @@ export function runOxlint({
     );
     return exit(1);
   }
-  const typeAwareFlags = parsed.passthrough.includes("--type-aware")
-    ? []
-    : ["--type-aware"];
-  const args = [
-    resolveOxlintBinary(),
-    "--disable-nested-config",
-    ...typeAwareFlags,
-    ...parsed.passthrough,
-    ...parsed.targets,
-  ];
+  const args = oxlintCommandArgs(parsed);
   const env = {
     ...process.env,
     OXLINT_TSGOLINT_PATH: tsgolintBinary,

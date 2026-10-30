@@ -359,9 +359,7 @@ function repoRootFor(repo) {
   return root;
 }
 
-function caseDecision(item, result) {
-  const violations = result.violations;
-  const expectedTypes = new Set(item.expected.violationTypes);
+function missingExpectations(expected, violations) {
   const actualTypes = new Set(violations.map((violation) => violation.type));
   const actualDependencies = new Set(
     violations
@@ -373,15 +371,23 @@ function caseDecision(item, result) {
       .map((violation) => violation.path)
       .filter((path) => typeof path === "string")
   );
-  const missingTypes = [...expectedTypes].filter(
-    (type) => !actualTypes.has(type)
-  );
-  const missingDependencies = (item.expected.dependencies ?? []).filter(
-    (dependency) => !actualDependencies.has(dependency)
-  );
-  const missingPaths = (item.expected.paths ?? []).filter(
-    (path) => !actualPaths.has(path)
-  );
+  return {
+    missingTypes: [...new Set(expected.violationTypes)].filter(
+      (type) => !actualTypes.has(type)
+    ),
+    missingDependencies: (expected.dependencies ?? []).filter(
+      (dependency) => !actualDependencies.has(dependency)
+    ),
+    missingPaths: (expected.paths ?? []).filter(
+      (path) => !actualPaths.has(path)
+    ),
+  };
+}
+
+function caseDecision(item, result) {
+  const violations = result.violations;
+  const { missingTypes, missingDependencies, missingPaths } =
+    missingExpectations(item.expected, violations);
   const unexpectedClean = item.kind === "gold-tp" && violations.length === 0;
   const unexpectedViolation =
     item.kind === "true-negative" && violations.length > 0;
@@ -441,6 +447,28 @@ function writeReport(output, report) {
   writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`);
 }
 
+function evidenceReport(slice, repoRoots, results) {
+  return {
+    schemaVersion: 1,
+    command: "antidrift change-contract-evidence",
+    slice,
+    decision: results.every((result) => result.decision === "pass")
+      ? "pass"
+      : "fail",
+    caseCounts: {
+      total: results.length,
+      goldTp: results.filter((result) => result.kind === "gold-tp").length,
+      trueNegative: results.filter((result) => result.kind === "true-negative")
+        .length,
+      failed: results.filter((result) => result.decision === "fail").length,
+    },
+    repositories: Object.entries(repoRoots)
+      .map(([repo, repoRoot]) => ({ repo, repoRoot }))
+      .sort((left, right) => compareStrings(left.repo, right.repo)),
+    cases: results,
+  };
+}
+
 function changeContractEvidence(parsed) {
   const selected = selectedCases(parsed);
   if (selected.length === 0) {
@@ -456,26 +484,7 @@ function changeContractEvidence(parsed) {
     const results = selected.map((item) =>
       replayCase(item, repoRoots[item.repo], tempRoot)
     );
-    const report = {
-      schemaVersion: 1,
-      command: "antidrift change-contract-evidence",
-      slice: parsed.slice,
-      decision: results.every((result) => result.decision === "pass")
-        ? "pass"
-        : "fail",
-      caseCounts: {
-        total: results.length,
-        goldTp: results.filter((result) => result.kind === "gold-tp").length,
-        trueNegative: results.filter(
-          (result) => result.kind === "true-negative"
-        ).length,
-        failed: results.filter((result) => result.decision === "fail").length,
-      },
-      repositories: Object.entries(repoRoots)
-        .map(([repo, repoRoot]) => ({ repo, repoRoot }))
-        .sort((left, right) => compareStrings(left.repo, right.repo)),
-      cases: results,
-    };
+    const report = evidenceReport(parsed.slice, repoRoots, results);
     if (parsed.output) writeReport(parsed.output, report);
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     return report;

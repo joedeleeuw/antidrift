@@ -61,6 +61,30 @@ function isPathLikeCommand(command) {
   return command.includes("/") || command.includes("\\");
 }
 
+const SHELL_USAGE = [
+  "Usage: antidrift shell [test|--test] [--config <sgconfig.yml>] [--cwd <dir>] [-- <ast-grep args>]",
+  "",
+  "Runs Antidrift's packaged ast-grep shell guardrails against the current project.",
+  "Default mode scans the current project. Test mode validates the packaged rule tests.",
+  "",
+].join("\n");
+
+const AST_GREP_MODE_ARGS = {
+  test: ({ config, passthrough }) => [
+    "test",
+    "--config",
+    config,
+    "--skip-snapshot-tests",
+    ...passthrough,
+  ],
+  scan: ({ config, passthrough }) => [
+    "scan",
+    "--config",
+    config,
+    ...(passthrough.length > 0 ? passthrough : ["."]),
+  ],
+};
+
 export function shellGuardrails({
   argv = [],
   exists = existsSync,
@@ -70,15 +94,7 @@ export function shellGuardrails({
 } = {}) {
   const parsed = parseShellGuardrailsArgs(argv, env);
   if (parsed.help) {
-    stderr.write(
-      [
-        "Usage: antidrift shell [test|--test] [--config <sgconfig.yml>] [--cwd <dir>] [-- <ast-grep args>]",
-        "",
-        "Runs Antidrift's packaged ast-grep shell guardrails against the current project.",
-        "Default mode scans the current project. Test mode validates the packaged rule tests.",
-        "",
-      ].join("\n")
-    );
+    stderr.write(SHELL_USAGE);
     return 0;
   }
 
@@ -92,21 +108,7 @@ export function shellGuardrails({
     return 1;
   }
 
-  const commandArgs =
-    parsed.mode === "test"
-      ? [
-          "test",
-          "--config",
-          parsed.config,
-          "--skip-snapshot-tests",
-          ...parsed.passthrough,
-        ]
-      : [
-          "scan",
-          "--config",
-          parsed.config,
-          ...(parsed.passthrough.length > 0 ? parsed.passthrough : ["."]),
-        ];
+  const commandArgs = AST_GREP_MODE_ARGS[parsed.mode](parsed);
 
   const result = spawn(parsed.astGrepBinary, commandArgs, {
     cwd: parsed.cwd,

@@ -119,6 +119,29 @@ function arrayLiteralStrings(initializer, exportName, label, errors) {
   return values;
 }
 
+function exportedStringValues(target, owner, exportName, label, errors) {
+  const sourceFile = ts.createSourceFile(
+    target,
+    readFileSync(target, "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  );
+  const declaration = findExportedConst(sourceFile, exportName);
+  if (!declaration?.initializer) {
+    errors.push(
+      `${label} valuesExport '${exportName}' was not found in ${owner}.`
+    );
+    return null;
+  }
+  return arrayLiteralStrings(
+    declaration.initializer,
+    exportName,
+    label,
+    errors
+  );
+}
+
 function requireMatchingValueExport(
   root,
   owner,
@@ -138,23 +161,9 @@ function requireMatchingValueExport(
   if (!target || !existsSync(target)) {
     return;
   }
-  const source = readFileSync(target, "utf8");
-  const sourceFile = ts.createSourceFile(
+  const exported = exportedStringValues(
     target,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-  const declaration = findExportedConst(sourceFile, exportName);
-  if (!declaration?.initializer) {
-    errors.push(
-      `${label} valuesExport '${exportName}' was not found in ${owner}.`
-    );
-    return;
-  }
-  const exported = arrayLiteralStrings(
-    declaration.initializer,
+    owner,
     exportName,
     label,
     errors
@@ -308,34 +317,38 @@ function checkGenerated(registry, state) {
       );
       continue;
     }
-    if (typeof entry.generated !== "string" || entry.generated.length === 0) {
-      state.errors.push(
-        `policy/registries/generated.yaml generatedSources.${name}.generated must be a non-empty string.`
-      );
-    } else {
-      requireExistingPath(
-        state.root,
-        entry.generated,
-        `policy/registries/generated.yaml generatedSources.${name}.generated`,
-        state.errors
-      );
-    }
-    if (entry.wrapper !== undefined) {
-      requireExistingPath(
-        state.root,
-        entry.wrapper,
-        `policy/registries/generated.yaml generatedSources.${name}.wrapper`,
-        state.errors
-      );
-    }
-    if (entry.bannedDirectImports !== undefined) {
-      stringArray(
-        entry.bannedDirectImports,
-        `policy/registries/generated.yaml generatedSources.${name}.bannedDirectImports`,
-        state.errors,
-        { allowEmpty: true }
-      );
-    }
+    checkGeneratedSource(name, entry, state);
+  }
+}
+
+function checkGeneratedSource(name, entry, state) {
+  if (typeof entry.generated !== "string" || entry.generated.length === 0) {
+    state.errors.push(
+      `policy/registries/generated.yaml generatedSources.${name}.generated must be a non-empty string.`
+    );
+  } else {
+    requireExistingPath(
+      state.root,
+      entry.generated,
+      `policy/registries/generated.yaml generatedSources.${name}.generated`,
+      state.errors
+    );
+  }
+  if (entry.wrapper !== undefined) {
+    requireExistingPath(
+      state.root,
+      entry.wrapper,
+      `policy/registries/generated.yaml generatedSources.${name}.wrapper`,
+      state.errors
+    );
+  }
+  if (entry.bannedDirectImports !== undefined) {
+    stringArray(
+      entry.bannedDirectImports,
+      `policy/registries/generated.yaml generatedSources.${name}.bannedDirectImports`,
+      state.errors,
+      { allowEmpty: true }
+    );
   }
 }
 

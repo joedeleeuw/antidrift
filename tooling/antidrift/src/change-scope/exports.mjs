@@ -125,11 +125,9 @@ function resolveRelativeSourceModule(moduleName, containingFile, fileNameSet) {
   };
 }
 
-function compilerHostFor({ ref, cwd, fileNames, options }) {
-  const defaultHost = ts.createCompilerHost(options, true);
-  const fileNameSet = new Set(fileNames);
+function gitSourceReader({ ref, cwd, fileNameSet }) {
   const sourceCache = new Map();
-  function sourceTextFor(candidate) {
+  return (candidate) => {
     if (!fileNameSet.has(candidate)) return undefined;
     if (!sourceCache.has(candidate)) {
       const sourceText = gitFileAt({
@@ -145,7 +143,28 @@ function compilerHostFor({ ref, cwd, fileNames, options }) {
       sourceCache.set(candidate, sourceText);
     }
     return sourceCache.get(candidate);
-  }
+  };
+}
+
+function sourceFileGetter(defaultHost, sourceTextFor) {
+  return (candidate, languageVersion, onError, shouldCreateNewSourceFile) => {
+    const sourceText = sourceTextFor(candidate);
+    if (sourceText !== undefined) {
+      return ts.createSourceFile(candidate, sourceText, languageVersion, true);
+    }
+    return defaultHost.getSourceFile(
+      candidate,
+      languageVersion,
+      onError,
+      shouldCreateNewSourceFile
+    );
+  };
+}
+
+function compilerHostFor({ ref, cwd, fileNames, options }) {
+  const defaultHost = ts.createCompilerHost(options, true);
+  const fileNameSet = new Set(fileNames);
+  const sourceTextFor = gitSourceReader({ ref, cwd, fileNameSet });
   return {
     ...defaultHost,
     getCurrentDirectory() {
@@ -169,28 +188,7 @@ function compilerHostFor({ ref, cwd, fileNames, options }) {
             .resolvedModule
       );
     },
-    getSourceFile(
-      candidate,
-      languageVersion,
-      onError,
-      shouldCreateNewSourceFile
-    ) {
-      const sourceText = sourceTextFor(candidate);
-      if (sourceText !== undefined) {
-        return ts.createSourceFile(
-          candidate,
-          sourceText,
-          languageVersion,
-          true
-        );
-      }
-      return defaultHost.getSourceFile(
-        candidate,
-        languageVersion,
-        onError,
-        shouldCreateNewSourceFile
-      );
-    },
+    getSourceFile: sourceFileGetter(defaultHost, sourceTextFor),
   };
 }
 
@@ -370,8 +368,9 @@ function changedTsPaths(changedFiles) {
   return [...paths].sort(compareStrings);
 }
 
-function exportSet(exports) {
-  return new Set(exports.map((entry) => exportKey(entry)));
+function exportsMissingFrom(entries, reference) {
+  const referenceKeys = new Set(reference.map((entry) => exportKey(entry)));
+  return entries.filter((entry) => !referenceKeys.has(exportKey(entry)));
 }
 
 function comparedSourcePaths({
@@ -405,10 +404,8 @@ function comparedSourcePaths({
  * @param {{ base: string, head: string, cwd: string, changedFiles: Array<{ path: string, oldPath: string | null }> }} params
  */
 export function collectExportChanges({ base, head, cwd, changedFiles }) {
-  const addedExports = [];
-  const removedExports = [];
   if (changedTsPaths(changedFiles).length === 0) {
-    return { addedExports, removedExports };
+    return { addedExports: [], removedExports: [] };
   }
   const baseFileNames = gitPathsAt({ ref: base, cwd }).map(fileNameFor);
   const headFileNames = gitPathsAt({ ref: head, cwd }).map(fileNameFor);
@@ -420,6 +417,8 @@ export function collectExportChanges({ base, head, cwd, changedFiles }) {
     baseFileNames,
     headFileNames,
   });
+  const addedExports = [];
+  const removedExports = [];
   for (const path of paths) {
     const before = exportsForSource({
       file: path,
@@ -433,14 +432,8 @@ export function collectExportChanges({ base, head, cwd, changedFiles }) {
       cwd,
       fileNames: headFileNames,
     });
-    const beforeKeys = exportSet(before);
-    const afterKeys = exportSet(after);
-    addedExports.push(
-      ...after.filter((entry) => !beforeKeys.has(exportKey(entry)))
-    );
-    removedExports.push(
-      ...before.filter((entry) => !afterKeys.has(exportKey(entry)))
-    );
+    addedExports.push(...exportsMissingFrom(after, before));
+    removedExports.push(...exportsMissingFrom(before, after));
   }
   return {
     addedExports: addedExports.toSorted(compareExports),
