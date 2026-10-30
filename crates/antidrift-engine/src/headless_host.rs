@@ -274,7 +274,8 @@ impl ProgramBuilderEnv {
                 .collect());
         }
         let dir = tspath::get_directory_path(config_file_name);
-        let compiler_host = build_shared_host(&dir, &self.fs, self.ext_cache, self.declarations);
+        let compiler_host =
+            build_shared_host(&self.cwd, &self.fs, self.ext_cache, self.declarations);
         let mut popts = ProgramOptions::new(config, compiler_host);
         popts.use_source_of_project_reference = true;
         popts.single_threaded = Tristate::False;
