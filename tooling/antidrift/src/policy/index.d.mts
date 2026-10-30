@@ -59,12 +59,6 @@ export function defaultAstGrepBinary(): string;
 export const DEFAULT_AST_GREP_CONFIG: string;
 export function parseShellGuardrailsArgs(argv?: string[]): ShellGuardrailsArgs;
 export function shellGuardrails(options?: PolicyCommandOptions): number;
-export function parseOxlintArgs(
-  argv: string[],
-  options?: {
-    cwd?: string;
-    exists?: (path: string) => boolean;
-  }
-): OxlintArgs;
+export function parseOxlintArgs(argv: string[]): OxlintArgs;
 export function runOxlint(options?: PolicyCommandOptions): number;
 export function verifySession(): void;

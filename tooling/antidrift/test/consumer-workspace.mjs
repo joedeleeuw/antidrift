@@ -237,7 +237,7 @@ const workspaceFiles = {
     "const subpathPolicy = policy satisfies PolicySubpathPolicy;\n" +
     "const artifacts = renderPolicyArtifacts(policy);\n" +
     'const oxlintOptions = { repoRoot: ".", policyDir: "policy" } satisfies AntidriftGovernanceOxlintConfigOptions & OxlintSubpathConfigOptions;\n' +
-    'const oxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false }) satisfies OxlintArgs;\n' +
+    "const oxlintArgs = parseOxlintArgs([]) satisfies OxlintArgs;\n" +
     'const branded = brand("UserId", (value): value is string => typeof value === "string" && value.startsWith("user_"));\n' +
     "\n" +
     "createGovernanceOxlintConfig(oxlintOptions);\n" +
@@ -311,7 +311,7 @@ const workspaceFiles = {
     "    throw new Error(`Missing runtime export: ${name}`);\n" +
     "  }\n" +
     "}\n" +
-    'const runtimeOxlintArgs = parseOxlintArgs([], { cwd: ".", exists: () => false });\n' +
+    "const runtimeOxlintArgs = parseOxlintArgs([]);\n" +
     'if (runtimeOxlintArgs.targets.join(",") !== ".") {\n' +
     '  throw new Error("Missing oxlint policy export behavior");\n' +
     "}\n",

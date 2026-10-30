@@ -194,7 +194,7 @@ function validateExportEntry(root, exportKey, entry) {
   if (typeof entry.types !== "string" || typeof entry.import !== "string") {
     return [];
   }
-  const label = `tooling/antidrift/package.json exports${exportKey}`;
+  const label = `tooling/antidrift/package.json exports[${JSON.stringify(exportKey)}]`;
   const typesResult = validatePackageExportPath(
     root,
     entry.types,

@@ -95,7 +95,7 @@ function defaultTargets() {
   return ["."];
 }
 
-export function parseOxlintArgs(argv, _options = {}) {
+export function parseOxlintArgs(argv) {
   const targets = [];
   const passthrough = [];
   let help = false;
@@ -148,7 +148,7 @@ export function runOxlint({
   stderr = defaultStderr,
   exit = process.exit,
 } = {}) {
-  const parsed = parseOxlintArgs(argv, { cwd });
+  const parsed = parseOxlintArgs(argv);
   if (parsed.help) {
     stdout.write(OXLINT_USAGE);
     return exit(0);
