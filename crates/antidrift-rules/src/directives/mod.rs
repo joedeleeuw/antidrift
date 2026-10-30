@@ -1,5 +1,6 @@
 mod alias_usage_scan;
 mod anemic_error_fallback;
+mod classifier_schema;
 pub mod docs_source_policy;
 pub mod no_anemic_errors;
 pub mod no_as_never;

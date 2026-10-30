@@ -35,3 +35,37 @@ pub fn is_parser_module_path(path: &str) -> bool {
     let lower = path.to_ascii_lowercase();
     PARSER_MODULE_STEMS.iter().any(|stem| lower.contains(stem))
 }
+
+const VALUE_SPACE_SCHEMA_CONSTRUCTORS: &[&str] = &[
+    "string",
+    "number",
+    "boolean",
+    "bigint",
+    "symbol",
+    "null",
+    "undefined",
+    "literal",
+    "enum",
+    "nativeEnum",
+    "picklist",
+];
+
+const KIND_TAGGED_SCHEMA_CONSTRUCTORS: &[&str] = &["discriminatedUnion", "variant"];
+
+const OPTIONALITY_SCHEMA_METHODS: &[&str] =
+    &["optional", "nullable", "nullish", "default", "catch"];
+
+#[must_use]
+pub fn is_value_space_schema_constructor(name: &str) -> bool {
+    VALUE_SPACE_SCHEMA_CONSTRUCTORS.contains(&name)
+}
+
+#[must_use]
+pub fn is_kind_tagged_schema_constructor(name: &str) -> bool {
+    KIND_TAGGED_SCHEMA_CONSTRUCTORS.contains(&name)
+}
+
+#[must_use]
+pub fn is_optionality_schema_method(name: &str) -> bool {
+    OPTIONALITY_SCHEMA_METHODS.contains(&name)
+}

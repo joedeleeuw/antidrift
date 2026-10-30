@@ -1,13 +1,17 @@
+use super::classifier_schema::{is_classifier_schema, schema_receiver};
 use antidrift_kernel::decode_guards::{
     is_line_chunk_identifier, is_parser_module_path, is_sniffer_function_name,
 };
-use antidrift_kernel::local_binding::collect_identifier_references_in_subtree;
+use antidrift_kernel::local_binding::{
+    collect_identifier_references_in_subtree, resolve_binding_source_expression,
+};
 use antidrift_kernel::projection::is_nullish_expression;
 use antidrift_kernel::tsrs_kernel::{
     collect_return_expressions, function_name, is_function_like, member_chain_root_identifier,
-    terminal_member_name, unwrap_awaited_expression, unwrap_expression,
+    member_chain_root_node, terminal_member_name, unwrap_awaited_expression, unwrap_expression,
 };
 use tsrs_ast::{self as ast, Kind, Node};
+use tsrs_checker::Checker;
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, RuleMessage};
 
@@ -214,7 +218,11 @@ fn is_exempt_decode_site(ctx: &Ctx, node: P<Node>) -> bool {
     false
 }
 
-fn safe_decode_data_read(expr: P<Node>) -> Option<String> {
+fn is_classifier_decode(checker: &mut Checker, decode_call: P<Node>) -> bool {
+    schema_receiver(decode_call).is_some_and(|schema| is_classifier_schema(checker, schema))
+}
+
+fn safe_decode_data_read(checker: &mut Checker, expr: P<Node>) -> Option<String> {
     let unwrapped = unwrap_awaited_expression(expr);
     if unwrapped.kind() != Kind::PropertyAccessExpression {
         return None;
@@ -225,7 +233,15 @@ fn safe_decode_data_read(expr: P<Node>) -> Option<String> {
     }
     let call = unwrap_awaited_expression(access.expression());
     let callee = decode_callee(call, SAFE_DECODE_METHODS)?;
-    (!decode_argument_is_line_chunk(call)).then_some(callee)
+    (!decode_argument_is_line_chunk(call) && !is_classifier_decode(checker, call)).then_some(callee)
+}
+
+fn is_classifier_result_binding(checker: &mut Checker, result_root: P<Node>) -> bool {
+    resolve_binding_source_expression(checker, result_root).is_some_and(|source| {
+        let decode_call = unwrap_awaited_expression(source);
+        decode_callee(decode_call, SAFE_DECODE_METHODS).is_some()
+            && is_classifier_decode(checker, decode_call)
+    })
 }
 
 pub(super) fn check_decode_to_nullable_expression(ctx: &mut Ctx, node: P<Node>) {
@@ -237,7 +253,7 @@ pub(super) fn check_decode_to_nullable_expression(ctx: &mut Ctx, node: P<Node>) 
             {
                 return;
             }
-            let Some(callee) = safe_decode_data_read(bin.left()) else {
+            let Some(callee) = safe_decode_data_read(ctx.checker, bin.left()) else {
                 return;
             };
             (callee, "'??' fallback")
@@ -256,9 +272,10 @@ pub(super) fn check_decode_to_nullable_expression(ctx: &mut Ctx, node: P<Node>) 
             if terminal_member_name(success_root) != Some("success") {
                 return;
             }
-            let Some(result_root) = member_chain_root_identifier(success_root) else {
+            let Some(root_node) = member_chain_root_node(success_root) else {
                 return;
             };
+            let result_root = root_node.as_identifier().text();
             let (data_branch, sentinel_branch) = if negated {
                 (cond.when_false(), cond.when_true())
             } else {
@@ -268,6 +285,7 @@ pub(super) fn check_decode_to_nullable_expression(ctx: &mut Ctx, node: P<Node>) 
             if !is_absent_sentinel(sentinel_branch)
                 || terminal_member_name(data) != Some("data")
                 || member_chain_root_identifier(data) != Some(result_root)
+                || is_classifier_result_binding(ctx.checker, root_node)
             {
                 return;
             }
@@ -301,16 +319,17 @@ fn is_returned_value(node: P<Node>) -> bool {
     false
 }
 
-fn find_decode_call(node: P<Node>) -> Option<String> {
+fn find_decode_call(checker: &mut Checker, node: P<Node>) -> Option<String> {
     if let Some(callee) = decode_callee(node, THROWING_DECODE_METHODS)
         && !decode_argument_is_line_chunk(node)
+        && !is_classifier_decode(checker, node)
     {
         return Some(callee);
     }
     let mut found = None;
     node.for_each_child(&mut |child| {
         if found.is_none() && !is_function_like(child) {
-            found = find_decode_call(child);
+            found = find_decode_call(checker, child);
         }
         found.is_some()
     });
@@ -324,7 +343,8 @@ pub(super) fn check_decode_catch_to_nullable(ctx: &mut Ctx, catch_node: P<Node>)
     if try_statement.kind() != Kind::TryStatement {
         return;
     }
-    let Some(callee) = find_decode_call(try_statement.as_try_statement().try_block()) else {
+    let Some(callee) = find_decode_call(ctx.checker, try_statement.as_try_statement().try_block())
+    else {
         return;
     };
     let catch_clause = catch_node.as_catch_clause();

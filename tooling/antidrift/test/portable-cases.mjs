@@ -658,7 +658,7 @@ export function buildSharedHelperFiles(repoRoot, resolve) {
 
 export const coreHeadlessProbes = [
   {
-    name: "no-anemic-errors (decode collapsed to nullable via ??, success ternary, and nullish catch, including raw/text inputs; sniffer, line-chunk, loop, and error-using sites stay clean)",
+    name: "no-anemic-errors (decode collapsed to nullable via ??, success ternary, and nullish catch, including raw/text inputs and a JSON.parse behind a tagged schema; sniffer, line-chunk, loop, error-using, enum, scalar, discriminated-union, and required-literal classifier sites stay clean; an optional literal is not a tag)",
     rule: "antidrift/no-anemic-errors",
     source: `
       declare const schema: { safeParse(x: unknown): { success: boolean; data?: Row }; parse(x: unknown): Row };
@@ -675,8 +675,20 @@ export const coreHeadlessProbes = [
       export function proper(input: unknown) { const r = schema.safeParse(input); if (!r.success) throw new RowDecodeError(r); return r.data; }
       export function caughtUsed(body: string) { try { return JSON.parse(body) as Row; } catch (error) { console.error(error); return null; } }
       class RowDecodeError extends Error { constructor(readonly result: unknown) { super("row decode rejected"); } }
+      declare const z: { string(): Decoder; enum(values: string[]): Decoder; literal(value: string): Decoder; object(shape: Record<string, Decoder>): Decoder; discriminatedUnion(key: string, members: Decoder[]): Decoder };
+      interface Decoder { safeParse(x: unknown): { success: boolean; data?: Row }; parse(x: unknown): Row; optional(): Decoder }
+      const LevelSchema = z.enum(["info", "warn"]);
+      const EventSchema = z.discriminatedUnion("type", [z.object({ type: z.literal("a") })]);
+      const TaggedSchema = z.object({ type: z.literal("response"), id: z.string() });
+      const OptionalTagSchema = z.object({ heartbeat: z.literal("x").optional(), id: z.string() });
+      export function level(input: unknown) { const r = LevelSchema.safeParse(input); return r.success ? r.data : undefined; }
+      export function field(input: Record<string, unknown>) { return z.string().safeParse(input.name).data ?? undefined; }
+      export function eventOf(input: unknown) { return EventSchema.safeParse(input).data ?? null; }
+      export function tagged(input: unknown) { try { return TaggedSchema.parse(input); } catch { return null; } }
+      export function optionalTag(input: unknown) { return OptionalTagSchema.safeParse(input).data ?? null; }
+      export function taggedText(body: string) { try { return TaggedSchema.parse(JSON.parse(body)); } catch { return null; } }
     `,
-    expectedCount: 6,
+    expectedCount: 8,
   },
   {
     name: "no-contract-appeasement-projection (complementary ok/error return bags reported once per function; proper discriminated union stays clean)",
