@@ -63,6 +63,7 @@ export function changedFilesBetween({ base, head, cwd }) {
     [
       "diff",
       "--name-status",
+      "-z",
       "--find-renames",
       "--ignore-submodules=none",
       `--diff-filter=${GIT_DIFF_FILTER}`,
@@ -71,25 +72,34 @@ export function changedFilesBetween({ base, head, cwd }) {
     ],
     cwd
   );
-  return raw
-    .split("\n")
-    .filter((line) => line.trim().length > 0)
-    .map((line) => parseNameStatusLine(line, cwd));
+  return parseNameStatusRecords(raw, cwd);
 }
 
-function parseNameStatusLine(line, cwd) {
-  const parts = line.split("\t");
-  const letter = parts[0][0];
-  const operation = STATUS_OPERATION[letter];
-  if (operation === undefined) {
-    throw new Error(
-      `unsupported git status "${parts[0]}" for path ${parts[1] ?? ""} in ${cwd}`
-    );
+function parseNameStatusRecords(raw, cwd) {
+  const records = raw.split("\0");
+  const changedFiles = [];
+  for (let index = 0; index < records.length - 1; index += 2) {
+    const status = records[index];
+    const path = records[index + 1];
+    const operation = STATUS_OPERATION[status[0]];
+    if (operation === undefined) {
+      throw new Error(
+        `unsupported git status "${status}" for path ${path} in ${cwd}`
+      );
+    }
+    if (status[0] === "R" || status[0] === "C") {
+      changedFiles.push({
+        status,
+        operation,
+        path: records[index + 2],
+        oldPath: path,
+      });
+      index += 1;
+    } else {
+      changedFiles.push({ status, operation, path, oldPath: null });
+    }
   }
-  if (letter === "R" || letter === "C") {
-    return { status: parts[0], operation, path: parts[2], oldPath: parts[1] };
-  }
-  return { status: parts[0], operation, path: parts[1], oldPath: null };
+  return changedFiles;
 }
 
 export function patchHunksBetween({ base, head, cwd }) {
