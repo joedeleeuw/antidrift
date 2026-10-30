@@ -239,8 +239,8 @@ function withHeadTree({ cwd, head }, inspectTree) {
   const temp = mkdtempSync(resolve(tmpdir(), "module-graph-head-"));
   const treeRoot = resolve(temp, "tree");
   const archivePath = resolve(temp, "head.tar");
-  mkdirSync(treeRoot);
   try {
+    mkdirSync(treeRoot);
     gitOrThrow(
       ["archive", "--format=tar", `--output=${archivePath}`, head],
       repoRoot

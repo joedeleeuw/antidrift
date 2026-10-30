@@ -115,8 +115,8 @@ export function parseArgs(argv) {
 function lintTargets(root, targets) {
   const tempDir = mkdtempSync(resolve(tmpdir(), "antidrift-diff-scoped-"));
   const emptySuppressionsPath = resolve(tempDir, "suppressions.json");
-  writeFileSync(emptySuppressionsPath, "{}\n", "utf8");
   try {
+    writeFileSync(emptySuppressionsPath, "{}\n", "utf8");
     const linterBinary = resolveNativeLinterBinary();
     const linterRun = spawnSync(
       linterBinary,
