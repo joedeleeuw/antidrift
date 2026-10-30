@@ -73,8 +73,9 @@ for (const entry of portableCases) {
   if (!batchRuleIds.has(fullRuleId)) {
     continue;
   }
-  const invalidId = `${entry.name}:invalid`;
-  const validId = `${entry.name}:valid`;
+  const caseId = entry.caseId ?? entry.name;
+  const invalidId = `${caseId}:invalid`;
+  const validId = `${caseId}:valid`;
   const invalidFilename = join(
     sourceWorkspace,
     entry.filename ?? "component.tsx"

@@ -59,12 +59,18 @@ impl RuleVisitor for Visitor {
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
         for comment in scan_source_comments(ctx.file.text()) {
-            let text = comment.raw_content;
-            if comment.is_lint_directive || has_tracked_ticket(text) {
+            let text = if comment.is_lint_directive {
+                scannable_directive_text(comment.text)
+            } else {
+                comment.raw_content.to_owned()
+            };
+            if has_tracked_ticket(&text) {
                 continue;
             }
-            let words = split_identifier_words(text);
-            let has_debt = words.iter().any(|w| DEBT_TOKENS.contains(&w.as_str()));
+            let words = split_identifier_words(&text);
+            let has_debt = words.iter().enumerate().any(|(index, word)| {
+                DEBT_TOKENS.contains(&word.as_str()) && !is_negated(&words, index)
+            });
             let has_ai = words.iter().any(|w| AI_TOKENS.contains(&w.as_str()));
             if has_debt && has_ai {
                 ctx.report_range(
@@ -77,10 +83,9 @@ impl RuleVisitor for Visitor {
                 );
                 continue;
             }
-            if let Some(bare_token) = words
-                .iter()
-                .find(|w| matches!(w.as_str(), "todo" | "fixme" | "hack"))
-            {
+            if let Some((_, bare_token)) = words.iter().enumerate().find(|(index, word)| {
+                matches!(word.as_str(), "todo" | "fixme" | "hack") && !is_negated(&words, *index)
+            }) {
                 let upper = bare_token.to_ascii_uppercase();
                 ctx.report_range(
                     comment.pos,
@@ -95,6 +100,34 @@ impl RuleVisitor for Visitor {
             }
         }
     }
+}
+
+fn scannable_directive_text(text: &str) -> String {
+    let (rule_list, description) = text.split_once("--").unwrap_or((text, ""));
+    let tokens = rule_list
+        .split(|ch: char| ch == ',' || ch.is_whitespace())
+        .filter(|token| !token.is_empty())
+        .enumerate()
+        .filter(|(index, token)| *index > 0 && !is_rule_id(token))
+        .map(|(_, token)| token)
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("{tokens} {description}")
+}
+
+fn is_rule_id(token: &str) -> bool {
+    token.bytes().all(|byte| {
+        byte.is_ascii_lowercase()
+            || byte.is_ascii_digit()
+            || matches!(byte, b'@' | b'/' | b'-' | b'_')
+    })
+}
+
+fn is_negated(words: &[String], index: usize) -> bool {
+    if index >= 1 && words[index - 1] == "not" {
+        return true;
+    }
+    index >= 2 && words[index - 2] == "not" && words[index - 1] == "a"
 }
 
 fn has_tracked_ticket(text: &str) -> bool {

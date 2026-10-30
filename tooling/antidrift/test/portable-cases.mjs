@@ -31,6 +31,19 @@ export const portableCases = [
       "// TODO(APP-42): confirm remote audio track rendering\n// The generator owns this mapping.\n// oxlint-disable-next-line antidrift/no-todo-without-issue -- the directive names the rule, not a TODO\nstart();",
   },
   {
+    name: "no-todo-without-issue",
+    caseId: "no-todo-without-issue-directive-description",
+    invalid:
+      "// eslint-disable-next-line no-console -- TODO fix retry handling\nstart();",
+    valid: "start();",
+  },
+  {
+    name: "no-todo-without-issue",
+    caseId: "no-todo-without-issue-directive-prose",
+    invalid: "// eslint-disable is a TODO workaround\nstart();",
+    valid: "start();",
+  },
+  {
     name: "no-default-export-in-domain",
     filename: "domain/entity.ts",
     invalid: "export default class Entity {}",
