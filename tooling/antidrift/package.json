@@ -76,7 +76,7 @@
   },
   "scripts": {
     "build": "node scripts/build.ts",
-    "prepack": "pnpm run build && node scripts/stage-linter-binary.mjs ../../target/release/antidrift-linter bin/antidrift-linter"
+    "prepack": "pnpm run build"
   },
   "files": [
     "CHANGELOG.md",
@@ -85,7 +85,6 @@
     "licenses",
     "README.md",
     "ast-grep",
-    "bin/antidrift-linter",
     "dist"
   ],
   "dependencies": {

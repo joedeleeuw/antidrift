@@ -2,6 +2,11 @@
   "name": "@joedeleeuw/antidrift-linter-linux-arm64-gnu",
   "version": "0.20.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joedeleeuw/antidrift.git",
+    "directory": "tooling/antidrift/npm/linux-arm64-gnu"
+  },
   "os": [
     "linux"
   ],
@@ -13,7 +18,8 @@
   ],
   "main": "antidrift-linter",
   "files": [
-    "antidrift-linter"
+    "antidrift-linter",
+    "antidrift.node"
   ],
   "publishConfig": {
     "access": "public",

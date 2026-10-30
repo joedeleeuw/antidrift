@@ -1,8 +1,10 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -11,6 +13,10 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  ADDON_PACKAGE_PATH,
+  LINTER_PLATFORM_KEYS,
+} from "../src/policy/oxlint.mjs";
 import { proveAdoptionPresets } from "./consumer-adoption.mjs";
 import { scaffoldConsumerWorkspace } from "./consumer-workspace.mjs";
 
@@ -66,7 +72,6 @@ try {
     run("tar", ["-tzf", tarball], work).trim().split("\n")
   );
   for (const required of [
-    "package/dist/bin/antidrift-linter",
     "package/NOTICE",
     "package/licenses/Apache-2.0.txt",
     "package/licenses/Rika-Labs-MIT.txt",
@@ -76,6 +81,8 @@ try {
     }
   }
   const forbiddenPrefixes = [
+    "package/dist/bin/",
+    "package/bin/",
     "package/dist/eslint-plugin/",
     "package/dist/semantic-adapters/",
     "package/dist/eslint-config/",
@@ -87,9 +94,54 @@ try {
     forbiddenPrefixes.some((prefix) => entry.startsWith(prefix))
   );
   if (shippedForbidden.length > 0) {
-    fail(
-      `tarball must not ship legacy JS plugins or test files: ${shippedForbidden.join(", ")}`
-    );
+    fail(`tarball contains forbidden entries: ${shippedForbidden.join(", ")}`);
+  }
+
+  const hostPlatform = `${process.platform}-${process.arch}`;
+  const platformKey = LINTER_PLATFORM_KEYS[hostPlatform];
+  if (!platformKey) fail(`Unsupported host platform: ${hostPlatform}`);
+  const platformPackageDirectory = join(work, "platform-package");
+  run(
+    process.execPath,
+    [
+      join(pkgDir, "scripts/stage-platform-package.mjs"),
+      platformKey,
+      platformPackageDirectory,
+    ],
+    pkgDir
+  );
+  const platformManifest = JSON.parse(
+    readFileSync(join(platformPackageDirectory, "package.json"), "utf8")
+  );
+  const platformPackageName = platformManifest.name;
+  const platformPack = join(work, "platform-pack");
+  mkdirSync(platformPack);
+  run(
+    pnpmBinary,
+    ["pack", "--pack-destination", platformPack],
+    platformPackageDirectory
+  );
+  const platformTarballs = readdirSync(platformPack).filter((name) =>
+    name.endsWith(".tgz")
+  );
+  if (platformTarballs.length !== 1) {
+    fail("platform pack must produce exactly one tarball");
+  }
+  const platformTarball = join(platformPack, platformTarballs[0]);
+  const platformTarballContents = run(
+    "tar",
+    ["-tzf", platformTarball],
+    work
+  ).trim();
+  console.log(`  platform tarball contents:\n${platformTarballContents}`);
+  const platformPackedFiles = new Set(platformTarballContents.split("\n"));
+  for (const required of [
+    `package/${ADDON_PACKAGE_PATH}`,
+    `package/${platformManifest.main}`,
+  ]) {
+    if (!platformPackedFiles.has(required)) {
+      fail(`platform tarball missing required artifact: ${required}`);
+    }
   }
 
   console.log("2/6  scaffolding a consumer pnpm workspace ...");
@@ -114,7 +166,13 @@ try {
     }
     toolingTarball = join(toolingPack, packed[0]);
   }
-  scaffoldConsumerWorkspace({ file, tarball, toolingTarball });
+  scaffoldConsumerWorkspace({
+    file,
+    tarball,
+    toolingTarball,
+    platformPackageName,
+    platformTarball,
+  });
 
   console.log("3/6  installing the tarball into the consumer ...");
   runInherit(
@@ -133,6 +191,103 @@ try {
   console.log(
     "4/6  linting consumer files through shipped and opt-in configs ..."
   );
+
+  function runPackedOxlint() {
+    const completed = spawnSync(
+      pnpmBinary,
+      [
+        "exec",
+        "oxlint",
+        "portable-proofs/addon.ts",
+        "--format",
+        "json",
+        "--config",
+        "oxlint.addon.config.json",
+        "--tsconfig",
+        "tsconfig.bundler.json",
+      ],
+      {
+        cwd: work,
+        encoding: "utf8",
+        timeout: 300_000,
+        killSignal: "SIGKILL",
+        maxBuffer: 64 * 1024 * 1024,
+      }
+    );
+    if (completed.error) throw completed.error;
+    return completed;
+  }
+
+  const platformLockReference = `tarball: file:platform-pack/${platformTarballs[0]}`;
+  if (
+    !readFileSync(join(work, "pnpm-lock.yaml"), "utf8").includes(
+      platformLockReference
+    )
+  ) {
+    fail(
+      `pnpm did not install the local platform override: ${platformLockReference}`
+    );
+  }
+  const consumerRequire = createRequire(join(work, "package.json"));
+  const installedPackageRoot = dirname(
+    consumerRequire.resolve("@joedeleeuw/antidrift/package.json")
+  );
+  const installedParentRequire = createRequire(
+    join(installedPackageRoot, "package.json")
+  );
+  const installedPlatformPackageRoot = dirname(
+    realpathSync(
+      installedParentRequire.resolve(`${platformPackageName}/package.json`)
+    )
+  );
+  console.log(`  local platform package: ${installedPlatformPackageRoot}`);
+  const installedAddon = join(installedPlatformPackageRoot, ADDON_PACKAGE_PATH);
+  file(
+    "oxlint.addon.config.json",
+    JSON.stringify({
+      jsPlugins: [join(installedPackageRoot, "dist/oxlint-plugin/index.mjs")],
+      categories: { correctness: "off" },
+      rules: { "antidrift/no-as-never": "warn" },
+    })
+  );
+  file(
+    "portable-proofs/addon.ts",
+    "export const castAway = (value: unknown) => value as never;\n"
+  );
+  const packedAddonRun = runPackedOxlint();
+  if (packedAddonRun.status !== 0) {
+    fail(
+      `packed Oxlint plugin must exit 0 for a warning: ${packedAddonRun.stdout}${packedAddonRun.stderr}`
+    );
+  }
+  const addonFinding = JSON.parse(packedAddonRun.stdout).diagnostics?.find(
+    ({ code, severity }) =>
+      code === "antidrift(no-as-never)" && severity === "warning"
+  );
+  if (!addonFinding) {
+    fail(
+      `packed Oxlint plugin must report antidrift/no-as-never as a warning: ${packedAddonRun.stdout}`
+    );
+  }
+  console.log(
+    `  packed plugin finding: ${addonFinding.code} (${addonFinding.severity}) ${addonFinding.message}`
+  );
+
+  rmSync(installedAddon);
+  const missingAddonRun = runPackedOxlint();
+  const missingAddonOutput = `${missingAddonRun.stdout}${missingAddonRun.stderr}`;
+  const expectedMissingAddon = `Missing the antidrift Oxlint addon for ${process.platform}-${process.arch}`;
+  if (
+    missingAddonRun.status === 0 ||
+    !missingAddonOutput.includes(expectedMissingAddon)
+  ) {
+    fail(
+      `removing the packed addon must fail with ${expectedMissingAddon}: ${missingAddonOutput}`
+    );
+  }
+  console.log(`  missing addon failure: ${expectedMissingAddon}`);
+  rmSync(join(work, "portable-proofs/addon.ts"));
+  rmSync(join(work, "oxlint.addon.config.json"));
 
   function lintOxlint(relFile, config) {
     try {

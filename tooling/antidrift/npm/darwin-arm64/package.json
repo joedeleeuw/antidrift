@@ -2,6 +2,11 @@
   "name": "@joedeleeuw/antidrift-linter-darwin-arm64",
   "version": "0.20.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joedeleeuw/antidrift.git",
+    "directory": "tooling/antidrift/npm/darwin-arm64"
+  },
   "os": [
     "darwin"
   ],
@@ -10,7 +15,8 @@
   ],
   "main": "antidrift-linter",
   "files": [
-    "antidrift-linter"
+    "antidrift-linter",
+    "antidrift.node"
   ],
   "publishConfig": {
     "access": "public",

@@ -23,7 +23,7 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: pnpm install --frozen-lockfile
-      - run: cargo build --release --locked -p antidrift-linter
+      - run: cargo build --release --locked -p antidrift-linter -p antidrift-napi
       - run: pnpm check:ci
       - uses: actions/upload-artifact@v4
         if: always()

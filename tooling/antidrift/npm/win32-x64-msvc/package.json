@@ -2,6 +2,11 @@
   "name": "@joedeleeuw/antidrift-linter-win32-x64-msvc",
   "version": "0.20.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joedeleeuw/antidrift.git",
+    "directory": "tooling/antidrift/npm/win32-x64-msvc"
+  },
   "os": [
     "win32"
   ],
@@ -10,7 +15,8 @@
   ],
   "main": "antidrift-linter.exe",
   "files": [
-    "antidrift-linter.exe"
+    "antidrift-linter.exe",
+    "antidrift.node"
   ],
   "publishConfig": {
     "access": "public",

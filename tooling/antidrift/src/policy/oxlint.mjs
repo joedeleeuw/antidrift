@@ -16,7 +16,7 @@ export function resolveOxlintBinary() {
   return resolve(dirname(packageJsonPath), packageJson.bin.oxlint);
 }
 
-const LINTER_PLATFORM_KEYS = {
+export const LINTER_PLATFORM_KEYS = {
   "linux-x64": "linux-x64-gnu",
   "linux-arm64": "linux-arm64-gnu",
   "darwin-x64": "darwin-x64",
@@ -42,11 +42,13 @@ const OXLINT_USAGE =
     "Runs the unified Oxlint + native Rust antidrift-linter (tsrs) gate.",
   ].join("\n") + "\n";
 
-const ADDON_LIBRARY_NAMES = {
+export const ADDON_LIBRARY_NAMES = {
   darwin: "libantidrift_napi.dylib",
   linux: "libantidrift_napi.so",
   win32: "antidrift_napi.dll",
 };
+
+export const ADDON_PACKAGE_PATH = "antidrift.node";
 
 const NATIVE_ARTIFACTS = {
   linter: {
@@ -54,11 +56,6 @@ const NATIVE_ARTIFACTS = {
     builds: [
       "target/debug/antidrift-linter",
       "target/release/antidrift-linter",
-    ],
-    staged: [
-      "bin/antidrift-linter",
-      "../bin/antidrift-linter",
-      "dist/bin/antidrift-linter",
     ],
     packageSubpath: "",
   },
@@ -68,19 +65,14 @@ const NATIVE_ARTIFACTS = {
       `target/debug/${ADDON_LIBRARY_NAMES[process.platform]}`,
       `target/release/${ADDON_LIBRARY_NAMES[process.platform]}`,
     ],
-    staged: ["dist/bin/antidrift.node"],
-    packageSubpath: "/antidrift.node",
+    packageSubpath: `/${ADDON_PACKAGE_PATH}`,
   },
 };
 
 function localArtifactCandidates(artifact, cwd) {
-  const localCandidates = [
-    ...artifact.builds.flatMap((build) => [
-      resolve(cwd, build),
-      resolve(repoRoot, build),
-    ]),
-    ...artifact.staged.map((staged) => resolve(moduleRoot, staged)),
-  ].filter((candidate) => existsSync(candidate));
+  const localCandidates = artifact.builds
+    .flatMap((build) => [resolve(cwd, build), resolve(repoRoot, build)])
+    .filter((candidate) => existsSync(candidate));
   return localCandidates.sort(
     (left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs
   );

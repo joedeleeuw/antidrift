@@ -19,22 +19,16 @@ jobs:
         include:
           - runner: ubuntu-latest
             package: linux-x64-gnu
-            binary: antidrift-linter
           - runner: ubuntu-24.04-arm
             package: linux-arm64-gnu
-            binary: antidrift-linter
           - runner: macos-15-intel
             package: darwin-x64
-            binary: antidrift-linter
           - runner: macos-14
             package: darwin-arm64
-            binary: antidrift-linter
           - runner: windows-latest
             package: win32-x64-msvc
-            binary: antidrift-linter.exe
           - runner: windows-11-arm
             package: win32-arm64-msvc
-            binary: antidrift-linter.exe
     steps:
       - uses: actions/checkout@v6
 
@@ -63,13 +57,13 @@ jobs:
             exit 1
           fi
 
-      - run: cargo build --release --locked -p antidrift-linter
+      - run: cargo build --release --locked -p antidrift-linter -p antidrift-napi
 
-      - name: Stage platform binary
-        run: node tooling/antidrift/scripts/stage-linter-binary.mjs "target/release/${{ matrix.binary }}" "tooling/antidrift/npm/${{ matrix.package }}/${{ matrix.binary }}"
+      - name: Stage platform package
+        run: node tooling/antidrift/scripts/stage-platform-package.mjs "${{ matrix.package }}" "${{ runner.temp }}/platform-package"
 
       - name: Publish platform package
-        run: npm publish "./tooling/antidrift/npm/${{ matrix.package }}" --access public
+        run: npm publish "${{ runner.temp }}/platform-package" --access public
 
   publish:
     if: startsWith(github.event.release.tag_name, 'antidrift-v')
@@ -99,7 +93,7 @@ jobs:
       - run: npm install -g npm@latest
       - run: node --version && npm --version && pnpm --version && cargo --version
       - run: pnpm install --frozen-lockfile
-      - run: cargo build --release --locked -p antidrift-linter
+      - run: cargo build --release --locked -p antidrift-linter -p antidrift-napi
 
       - name: Verify release tag matches package version
         env:

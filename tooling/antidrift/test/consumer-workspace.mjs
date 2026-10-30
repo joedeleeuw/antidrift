@@ -17,7 +17,6 @@ const baseCompilerOptions = {
 };
 
 const workspaceFiles = {
-  "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
   "policy/registries/generated.yaml":
     "generatedSources:\n" +
     "  appGenerated:\n" +
@@ -314,7 +313,18 @@ const workspaceFiles = {
     "}\n",
 };
 
-export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
+export function scaffoldConsumerWorkspace({
+  file,
+  tarball,
+  toolingTarball,
+  platformPackageName,
+  platformTarball,
+}) {
+  file(
+    "pnpm-workspace.yaml",
+    "packages:\n  - packages/*\noverrides:\n" +
+      `  ${JSON.stringify(platformPackageName)}: ${JSON.stringify(`file:${platformTarball}`)}\n`
+  );
   file(
     "package.json",
     JSON.stringify(
@@ -322,6 +332,7 @@ export function scaffoldConsumerWorkspace({ file, tarball, toolingTarball }) {
         name: "antidrift-consumer-fixture",
         private: true,
         type: "module",
+        packageManager: "pnpm@11.9.0",
         devDependencies: {
           "@joedeleeuw/antidrift": `file:${tarball}`,
           "@joedeleeuw/typescript-tooling": `file:${toolingTarball}`,
