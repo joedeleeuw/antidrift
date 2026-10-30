@@ -1,6 +1,8 @@
 const SNIFFER_PREFIXES: &[&str] = &["try", "sniff", "probe", "extract", "detect", "maybe"];
 
-const LINE_CHUNK_IDENTIFIERS: &[&str] = &["line", "raw", "text", "chunk", "candidate", "trimmed"];
+const LINE_CHUNK_IDENTIFIERS: &[&str] = &["line", "chunk", "candidate", "trimmed"];
+
+const SNIFFED_TEXT_IDENTIFIERS: &[&str] = &["raw", "text"];
 
 const PARSER_MODULE_STEMS: &[&str] = &["parser", "grammar", "tool_call", "toolcall", "tool-call"];
 
@@ -21,6 +23,11 @@ pub fn is_sniffer_function_name(name: &str) -> bool {
 #[must_use]
 pub fn is_line_chunk_identifier(name: &str) -> bool {
     LINE_CHUNK_IDENTIFIERS.contains(&name)
+}
+
+#[must_use]
+pub fn is_sniffed_text_identifier(name: &str) -> bool {
+    SNIFFED_TEXT_IDENTIFIERS.contains(&name)
 }
 
 #[must_use]

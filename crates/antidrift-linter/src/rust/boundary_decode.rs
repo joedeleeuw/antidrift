@@ -1,7 +1,8 @@
 use super::RustDiagnostic;
 use super::syn_kernel::is_ok_tuple_pat;
 use antidrift_kernel::decode_guards::{
-    is_line_chunk_identifier, is_parser_module_path, is_sniffer_function_name,
+    is_line_chunk_identifier, is_parser_module_path, is_sniffed_text_identifier,
+    is_sniffer_function_name,
 };
 use proc_macro2::Span;
 use syn::spanned::Spanned;
@@ -149,10 +150,14 @@ fn is_sniffer_signature(
                     if matches!(
                         &*pat_type.pat,
                         Pat::Ident(pat_ident)
-                            if is_line_chunk_identifier(&pat_ident.ident.to_string())
+                            if is_sniffed_input_name(&pat_ident.ident.to_string())
                     )
             )
         })
+}
+
+fn is_sniffed_input_name(name: &str) -> bool {
+    is_line_chunk_identifier(name) || is_sniffed_text_identifier(name)
 }
 
 fn receiver_is_line_or_split_iter(expr: &Expr) -> bool {
@@ -198,7 +203,7 @@ fn arg_mentions_line_or_chunk(expr: &Expr) -> bool {
             .path
             .segments
             .last()
-            .is_some_and(|seg| is_line_chunk_identifier(&seg.ident.to_string())),
+            .is_some_and(|seg| is_sniffed_input_name(&seg.ident.to_string())),
         _ => false,
     }
 }

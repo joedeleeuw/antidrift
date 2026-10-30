@@ -1053,6 +1053,9 @@ try {
       "pub fn branch_bag(flag: bool, h: &Holder) -> OutcomeBag {",
       "    if flag { OutcomeBag { ok: true, count: 1, error: None } } else { OutcomeBag { ok: false, count: 0, error: Some(h.ident.clone()) } }",
       "}",
+      "pub fn sniff_text(text: &str) -> Option<LooseConfig> {",
+      "    serde_json::from_str(text).ok()",
+      "}",
       "#[cfg(all(test))]\nmod inline_tests {}",
       "",
     ].join("\n")
@@ -1138,6 +1141,12 @@ try {
     ).length,
     2,
     `Expected the match and if/else outcome bags to each report once, got ${JSON.stringify(rustDiags)}`
+  );
+  assert.equal(
+    rustDiags.filter((diag) => diag.ruleId === "rust/no-decode-to-option")
+      .length,
+    1,
+    `Expected one decode-to-option report for the .ok() discard and none for the sniffed text input, got ${JSON.stringify(rustDiags)}`
   );
   const singleRsRun = spawnSync(
     binaryPath,

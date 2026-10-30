@@ -658,7 +658,7 @@ export function buildSharedHelperFiles(repoRoot, resolve) {
 
 export const coreHeadlessProbes = [
   {
-    name: "no-anemic-errors (decode collapsed to nullable via ??, success ternary, and nullish catch; sniffer, line-chunk, loop, and error-using sites stay clean)",
+    name: "no-anemic-errors (decode collapsed to nullable via ??, success ternary, and nullish catch, including raw/text inputs; sniffer, line-chunk, loop, and error-using sites stay clean)",
     rule: "antidrift/no-anemic-errors",
     source: `
       declare const schema: { safeParse(x: unknown): { success: boolean; data?: Row }; parse(x: unknown): Row };
@@ -667,6 +667,8 @@ export const coreHeadlessProbes = [
       export function viaConditional(input: unknown) { const r = schema.safeParse(input); return r.success ? r.data : undefined; }
       export function viaCatch(body: string) { try { return JSON.parse(body) as Row; } catch { return null; } }
       export function viaSchemaCatch(input: unknown) { try { return schema.parse(input); } catch { return undefined; } }
+      export function parseJson(text: string): unknown { try { return JSON.parse(text); } catch { return undefined; } }
+      export function fromRaw(raw: string) { return schema.safeParse(JSON.parse(raw)).data ?? null; }
       export function tryParseRow(input: unknown) { return schema.safeParse(input).data ?? null; }
       export function perLine(lines: string[]) { for (const entry of lines) { const v = schema.safeParse(entry).data ?? null; void v; } }
       export function chunkParam(line: string) { return schema.safeParse(line).data ?? null; }
@@ -674,7 +676,7 @@ export const coreHeadlessProbes = [
       export function caughtUsed(body: string) { try { return JSON.parse(body) as Row; } catch (error) { console.error(error); return null; } }
       class RowDecodeError extends Error { constructor(readonly result: unknown) { super("row decode rejected"); } }
     `,
-    expectedCount: 4,
+    expectedCount: 6,
   },
   {
     name: "no-contract-appeasement-projection (complementary ok/error return bags reported once per function; proper discriminated union stays clean)",
