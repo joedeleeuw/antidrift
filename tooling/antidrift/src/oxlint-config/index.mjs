@@ -211,16 +211,6 @@ function applicationExclusionOverrides(otherPatterns) {
   ];
 }
 
-const disabledCategories = {
-  correctness: "off",
-  nursery: "off",
-  pedantic: "off",
-  perf: "off",
-  restriction: "off",
-  style: "off",
-  suspicious: "off",
-};
-
 const governanceIgnorePatterns = [
   "**/node_modules/**",
   "**/dist/**",
@@ -235,22 +225,11 @@ const declarationIgnorePatterns = [
   "**/*.tsbuildinfo",
 ];
 
-const governanceOptions = {
-  denyWarnings: true,
-  reportUnusedDisableDirectives: "error",
-};
-
-const rulesOwnedByNativeLineCaps = {
-  "max-lines": "off",
-  "max-lines-per-function": "off",
-};
-
 function governanceRules(restrictedImportPatterns) {
   if (restrictedImportPatterns.length === 0) {
-    return { ...rulesOwnedByNativeLineCaps };
+    return {};
   }
   return {
-    ...rulesOwnedByNativeLineCaps,
     "no-restricted-imports": restrictedImportsRule(restrictedImportPatterns),
   };
 }
@@ -268,15 +247,11 @@ export function createGovernanceOxlintConfig({
   ];
 
   return defineConfig({
-    categories: disabledCategories,
     ignorePatterns: [
       ...governanceIgnorePatterns,
       ...generatedIgnorePatterns(registries, repoRoot),
       ...declarationIgnorePatterns,
     ],
-    jsPlugins: [],
-    options: governanceOptions,
-    plugins: ["eslint", "typescript"],
     rules: governanceRules([
       ...otherPatterns,
       ...touchableImportPatterns(reactNativePolicy),

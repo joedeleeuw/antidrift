@@ -29,9 +29,8 @@ const typescriptRules = {
 
 export default defineConfig({
   ...tooling,
-  ...governance,
   categories: {
-    ...governance.categories,
+    ...tooling.categories,
     correctness: "error",
   },
   env: {
@@ -45,7 +44,6 @@ export default defineConfig({
     ]),
   ],
   jsPlugins: [
-    ...(governance.jsPlugins ?? []),
     ...(tooling.jsPlugins ?? []),
     {
       name: "boundaries",
@@ -54,7 +52,6 @@ export default defineConfig({
   ],
   options: {
     ...tooling.options,
-    ...governance.options,
     typeAware: true,
   },
   plugins: [...nativePlugins],
@@ -72,6 +69,8 @@ export default defineConfig({
   rules: {
     ...toolingBaseRules,
     ...governance.rules,
+    "max-lines": "off",
+    "max-lines-per-function": "off",
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
     "react/no-deriving-state-in-effects": "error",

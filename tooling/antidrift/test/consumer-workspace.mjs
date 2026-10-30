@@ -63,11 +63,8 @@ const workspaceFiles = {
     "const governance = createGovernanceOxlintConfig({ repoRoot: import.meta.dirname });\n" +
     "const tooling = createConfig({ repoRoot: import.meta.dirname, typeAware: false });\n" +
     "export default {\n" +
-    "  ...tooling, ...governance,\n" +
-    "  rules: { ...tooling.rules, ...governance.rules },\n" +
-    "  jsPlugins: [...governance.jsPlugins, ...tooling.jsPlugins],\n" +
-    "  plugins: [...new Set([...governance.plugins, ...tooling.plugins])],\n" +
-    "  options: { ...tooling.options, ...governance.options },\n" +
+    "  ...tooling,\n" +
+    '  rules: { ...tooling.rules, ...governance.rules, "max-lines": "off" },\n' +
     "  ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])],\n" +
     "  overrides: [...(tooling.overrides ?? []), ...governance.overrides],\n" +
     "};\n",
@@ -98,7 +95,7 @@ const workspaceFiles = {
     "const repoRoot = resolve(import.meta.dirname, '..');\n" +
     "const governance = createGovernanceOxlintConfig({ repoRoot });\n" +
     "const tooling = createConfig({ repoRoot, typeAware: false, enforceNoPropertyDefaultFallbacks: true, propertyDefaultAllowedFiles: ['portable-proofs/allowed-fallback.ts'] });\n" +
-    "export default { ...tooling, ...governance, rules: { ...tooling.rules, ...governance.rules }, jsPlugins: [...governance.jsPlugins, ...tooling.jsPlugins], plugins: [...new Set([...governance.plugins, ...tooling.plugins])], options: { ...tooling.options, ...governance.options }, ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])], overrides: [...(tooling.overrides ?? []), ...governance.overrides] };\n",
+    'export default { ...tooling, rules: { ...tooling.rules, ...governance.rules, "max-lines": "off" }, ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])], overrides: [...(tooling.overrides ?? []), ...governance.overrides] };\n',
   "portable-proofs/fallback.ts":
     "export function labels(row: { state?: string; count?: number }) {\n" +
     '  return { state: row?.state ?? "unknown", template: row?.state ?? `unknown`, count: row.count ?? 0 };\n' +
