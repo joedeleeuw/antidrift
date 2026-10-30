@@ -60,7 +60,7 @@ impl RuleVisitor for Visitor {
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
         for comment in scan_source_comments(ctx.file.text()) {
             let text = comment.raw_content;
-            if has_tracked_ticket(text) {
+            if comment.is_lint_directive || has_tracked_ticket(text) {
                 continue;
             }
             let words = split_identifier_words(text);

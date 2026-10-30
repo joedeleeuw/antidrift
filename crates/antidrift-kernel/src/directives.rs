@@ -240,6 +240,7 @@ pub struct ScannedComment<'a> {
     pub end: i32,
     pub line: usize,
     pub is_block: bool,
+    pub is_lint_directive: bool,
     pub raw_content: &'a str,
     pub text: &'a str,
 }
@@ -286,6 +287,7 @@ fn scan_comments_until_line(source_text: &str, max_line: usize) -> Vec<ScannedCo
                         end: to_pos_i32(idx),
                         line,
                         is_block: false,
+                        is_lint_directive: parse_directive_text(raw_content.trim()).is_some(),
                         raw_content,
                         text: raw_content.trim(),
                     });
@@ -303,6 +305,7 @@ fn scan_comments_until_line(source_text: &str, max_line: usize) -> Vec<ScannedCo
                         end: to_pos_i32(next_idx),
                         line,
                         is_block: true,
+                        is_lint_directive: parse_directive_text(raw_content.trim()).is_some(),
                         raw_content,
                         text: raw_content.trim(),
                     });

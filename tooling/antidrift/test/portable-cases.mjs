@@ -28,7 +28,7 @@ export const portableCases = [
     invalid:
       "// TODO clean up AI generated workaround\n// TODO(verify): confirm remote audio track rendering\nstart();",
     valid:
-      "// TODO(APP-42): confirm remote audio track rendering\n// The generator owns this mapping.\nstart();",
+      "// TODO(APP-42): confirm remote audio track rendering\n// The generator owns this mapping.\n// oxlint-disable-next-line antidrift/no-todo-without-issue -- the directive names the rule, not a TODO\nstart();",
   },
   {
     name: "no-default-export-in-domain",
