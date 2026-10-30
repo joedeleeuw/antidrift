@@ -904,6 +904,10 @@ try {
       'export async function surrogateKey(input: { "x\\uD83D": string }): Promise<string> {\n  return Promise.resolve(input["x\\uD83D"]);\n}\n',
     "src/methods/surrogateLiteral.ts":
       'export async function surrogateLiteral(): Promise<"\\uD83D"> {\n  return "\\uD83D";\n}\n',
+    "src/methods/overlap.ts":
+      "export async function overlap(id: string): Promise<{ id: string } | { id: string; detail: number }> {\n  return Promise.resolve({ id, detail: 7 });\n}\n",
+    "src/methods/dateOrText.ts":
+      "export async function dateOrText(): Promise<string | Date> {\n  return Promise.resolve(new Date(0));\n}\n",
     "src/client/leaky.ts":
       'import { listTodos } from "../server/store";\n\nexport function leak(): Promise<number> {\n  return listTodos("any").then((todos) => todos.length);\n}\n',
   };
@@ -929,7 +933,9 @@ try {
     [
       "client/leaky.ts client-reaches-server",
       "methods/callbacky.ts method-param-not-wire",
+      "methods/dateOrText.ts method-result-not-wire",
       "methods/optionalArg.ts method-param-not-wire",
+      "methods/overlap.ts method-result-not-wire",
       "methods/renamed.ts method-export-name",
       "methods/surrogateKey.ts method-param-not-wire",
       "methods/surrogateLiteral.ts method-result-not-wire",

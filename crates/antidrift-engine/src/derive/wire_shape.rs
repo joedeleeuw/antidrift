@@ -19,7 +19,7 @@ pub(crate) enum WireShape {
     Union { variants: Vec<WireShape> },
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub(crate) enum WireLiteral {
     Text(String),
@@ -219,8 +219,69 @@ fn members_shape(
             "has no value JSON can carry".to_owned(),
         )),
         1 => Ok(variants.swap_remove(0)),
-        _ => Ok(WireShape::Union { variants }),
+        _ => overlap_reason(&variants).map_or_else(
+            || Ok(WireShape::Union { variants }),
+            |reason| Err(ShapeProblem::at(path, reason)),
+        ),
     }
+}
+
+fn overlap_reason(variants: &[WireShape]) -> Option<String> {
+    let objects: Vec<&[WireField]> = variants
+        .iter()
+        .filter_map(|variant| match variant {
+            WireShape::Object { fields } => Some(fields.as_slice()),
+            _ => None,
+        })
+        .collect();
+    if objects.len() > 1 && !has_discriminant(&objects) {
+        return Some(
+            "has object variants that no required literal field tells apart; add a discriminant such as `kind: \"a\"`"
+                .to_owned(),
+        );
+    }
+    let carries_text = variants.iter().any(|variant| {
+        matches!(
+            variant,
+            WireShape::String
+                | WireShape::Literal {
+                    value: WireLiteral::Text(_)
+                }
+        )
+    });
+    let carries_date = variants
+        .iter()
+        .any(|variant| matches!(variant, WireShape::Date));
+    (carries_text && carries_date)
+        .then(|| "mixes string and Date, which share one wire form".to_owned())
+}
+
+fn has_discriminant(objects: &[&[WireField]]) -> bool {
+    objects.first().is_some_and(|first| {
+        first.iter().any(|candidate| {
+            let literals: Vec<&WireLiteral> = objects
+                .iter()
+                .filter_map(|fields| required_literal(fields, &candidate.name))
+                .collect();
+            literals.len() == objects.len()
+                && literals.iter().enumerate().all(|(index, literal)| {
+                    literals
+                        .iter()
+                        .skip(index + 1)
+                        .all(|other| other != literal)
+                })
+        })
+    })
+}
+
+fn required_literal<'a>(fields: &'a [WireField], name: &str) -> Option<&'a WireLiteral> {
+    fields
+        .iter()
+        .find(|field| field.name == name && !field.optional)
+        .and_then(|field| match &field.shape {
+            WireShape::Literal { value } => Some(value),
+            _ => None,
+        })
 }
 
 fn array_item_type(
