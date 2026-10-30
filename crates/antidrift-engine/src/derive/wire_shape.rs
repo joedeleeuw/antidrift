@@ -227,33 +227,44 @@ fn members_shape(
 }
 
 fn overlap_reason(variants: &[WireShape]) -> Option<String> {
-    let objects: Vec<&[WireField]> = variants
-        .iter()
-        .filter_map(|variant| match variant {
-            WireShape::Object { fields } => Some(fields.as_slice()),
-            _ => None,
-        })
-        .collect();
-    if objects.len() > 1 && !has_discriminant(&objects) {
-        return Some(
-            "has object variants that no required literal field tells apart; add a discriminant such as `kind: \"a\"`"
-                .to_owned(),
-        );
+    variants.iter().enumerate().find_map(|(index, left)| {
+        variants
+            .iter()
+            .skip(index + 1)
+            .find_map(|right| shared_value_reason(left, right))
+    })
+}
+
+fn shared_value_reason(left: &WireShape, right: &WireShape) -> Option<String> {
+    match (left, right) {
+        (WireShape::Union { variants }, other) | (other, WireShape::Union { variants }) => variants
+            .iter()
+            .find_map(|variant| shared_value_reason(variant, other)),
+        (WireShape::Object { fields: left_fields }, WireShape::Object { fields: right_fields }) => {
+            (!has_discriminant(&[left_fields.as_slice(), right_fields.as_slice()])).then(|| {
+                "has object variants that no required literal field tells apart; add a discriminant such as `kind: \"a\"`"
+                    .to_owned()
+            })
+        }
+        (WireShape::Array { items: left_items }, WireShape::Array { items: right_items }) => {
+            shared_value_reason(left_items, right_items)
+                .map(|inner| format!("has array variants whose items overlap: the item union {inner}"))
+        }
+        (WireShape::Date, text) | (text, WireShape::Date) if carries_text(text) => {
+            Some("mixes string and Date, which share one wire form".to_owned())
+        }
+        _ => None,
     }
-    let carries_text = variants.iter().any(|variant| {
-        matches!(
-            variant,
-            WireShape::String
-                | WireShape::Literal {
-                    value: WireLiteral::Text(_)
-                }
-        )
-    });
-    let carries_date = variants
-        .iter()
-        .any(|variant| matches!(variant, WireShape::Date));
-    (carries_text && carries_date)
-        .then(|| "mixes string and Date, which share one wire form".to_owned())
+}
+
+const fn carries_text(shape: &WireShape) -> bool {
+    matches!(
+        shape,
+        WireShape::String
+            | WireShape::Literal {
+                value: WireLiteral::Text(_)
+            }
+    )
 }
 
 fn has_discriminant(objects: &[&[WireField]]) -> bool {

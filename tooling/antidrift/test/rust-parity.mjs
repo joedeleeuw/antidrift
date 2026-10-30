@@ -906,6 +906,8 @@ try {
       'export async function surrogateLiteral(): Promise<"\\uD83D"> {\n  return "\\uD83D";\n}\n',
     "src/methods/overlap.ts":
       "export async function overlap(id: string): Promise<{ id: string } | { id: string; detail: number }> {\n  return Promise.resolve({ id, detail: 7 });\n}\n",
+    "src/methods/arrayOverlap.ts":
+      'export async function arrayOverlap(): Promise<{ id: string }[] | { id: string; detail: number }[]> {\n  return Promise.resolve([{ id: "x", detail: 7 }]);\n}\n',
     "src/methods/dateOrText.ts":
       "export async function dateOrText(): Promise<string | Date> {\n  return Promise.resolve(new Date(0));\n}\n",
     "src/client/leaky.ts":
@@ -932,6 +934,7 @@ try {
       .sort(),
     [
       "client/leaky.ts client-reaches-server",
+      "methods/arrayOverlap.ts method-result-not-wire",
       "methods/callbacky.ts method-param-not-wire",
       "methods/dateOrText.ts method-result-not-wire",
       "methods/optionalArg.ts method-param-not-wire",
