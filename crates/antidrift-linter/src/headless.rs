@@ -232,9 +232,6 @@ fn lint_program_files(
     let mut groups: BTreeMap<(usize, u8), Vec<P<SourceFile>>> = BTreeMap::new();
     for &sf in source_files {
         let name = sf.file_name();
-        if plan.inject_defaults && name.contains("/fixtures/") {
-            continue;
-        }
         let normalized = tspath::normalize_slashes(name);
         let Some(&config_idx) = plan.file_to_config.get(&normalized) else {
             continue;
