@@ -4,6 +4,10 @@
 
 - `antidrift/max-module-lines` warns above 1,000 lines (was 1,200); the 1,500 error is unchanged. The cap matches the split rule in the global design guidance.
 - `no-todo-without-issue` treats a debt token as negated only when `not` or `not a` directly precedes it on the same line; `not` before punctuation or a line break no longer silences a TODO.
+- `no-todo-without-issue` finds debt tokens as whole words per comment line, so product names such as `TodoWrite` or `TodoTracker` inside a comment no longer count as a TODO.
+- `no-compat-names` (TypeScript and Rust) no longer counts the `retire` family or `compatibility` as compatibility tokens: across eight corpora every such name was a product action (retiring conversations, workers, providers) or a domain noun, never a kept old code path. When the plain sibling of a compat name is declared anywhere in the program (TypeScript) or crate (Rust), the message names it.
+- The Oxlint plugin forwards each rule's options (`"antidrift/react-max-component-props": ["error", { "max": 2 }]`) to the engine; every bridged rule declares `meta.schema: false`, the engine decodes the options array once per rule and file set, and an unknown field fails the run naming it. The session lints each distinct rule-and-options pair once.
+- `rust/no-structural-type-fork` no longer reports two same-shaped structs that are payloads of variants of one enum; such AST twins are nominal by design. A same-shaped struct outside the enum still reports.
 
 ## 0.21.0
 

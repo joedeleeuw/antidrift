@@ -460,6 +460,36 @@ function rootPackageLintsSmoke(linter) {
   });
 }
 
+function enumTwinSmoke(linter) {
+  withTempDir("antidrift-rust-enum-twins-", (root) => {
+    writeCrate(root, "twins");
+    const structs =
+      "pub struct BlockStatement { pub start: u32, pub end: u32, pub depth: u8 }\npub struct StaticBlock { pub start: u32, pub end: u32, pub depth: u8 }\npub struct Span { pub start: u32, pub end: u32, pub depth: u8 }\n";
+    const forks = () =>
+      linter
+        .findings(root)
+        .filter((line) => line.includes("rust/no-structural-type-fork"));
+    writeFileSync(
+      join(root, "src/lib.rs"),
+      `${structs}pub enum Statement { Block(Box<BlockStatement>), Static(Box<StaticBlock>) }\n`
+    );
+    assert.deepEqual(
+      forks(),
+      ["src/lib.rs:3 rust/no-structural-type-fork error"],
+      "Structs that are payloads of variants of one enum are nominal twins by design; a same-shaped struct outside the enum still reports"
+    );
+    writeFileSync(join(root, "src/lib.rs"), structs);
+    assert.deepEqual(
+      forks(),
+      [
+        "src/lib.rs:2 rust/no-structural-type-fork error",
+        "src/lib.rs:3 rust/no-structural-type-fork error",
+      ],
+      "Without the enum both same-shaped structs report"
+    );
+  });
+}
+
 function shadowedFallbackSmoke(linter) {
   withTempDir("antidrift-rust-shadow-", (root) => {
     writeCrate(root, "shadow");
@@ -510,5 +540,6 @@ export function runRustLinterSmokes({ binaryPath, repoRoot }) {
   workspaceLintsSmoke(linter);
   rootPackageLintsSmoke(linter);
   shadowedFallbackSmoke(linter);
+  enumTwinSmoke(linter);
   wrapperResolutionSmoke(linter);
 }

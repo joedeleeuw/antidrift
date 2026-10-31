@@ -8,6 +8,7 @@ mod constant_fields;
 mod corpus_smells;
 mod discard_shapes;
 mod expression_shapes;
+mod lifecycle_names;
 mod module_graph;
 mod rules;
 mod smells;

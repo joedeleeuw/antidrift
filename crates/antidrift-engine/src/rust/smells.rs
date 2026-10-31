@@ -4,6 +4,7 @@ use super::corpus_smells::check_corpus_smells;
 use super::discard_shapes::{
     DiscardedErrorOutcome, discarded_error_outcome, is_cfg_attribute, stmt_has_cfg_attribute,
 };
+use super::lifecycle_names::{CrateNames, NameLedger, banned_lifecycle_message};
 use super::syn_kernel::{
     expr_mentions_ident, extract_pat_ident, is_err_wild_pat, is_fs_io_call, is_ok_tuple_pat,
     is_wild_pat,
@@ -23,12 +24,13 @@ pub(super) fn check_smells(
     rel_path: &str,
     path: &Path,
     ast: &syn::File,
+    crate_names: &CrateNames,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
     let is_rule_self = rel_path.ends_with("/no_compat_names.rs");
     if !is_rule_self
         && let Some(stem) = path.file_stem().and_then(|name| name.to_str())
-        && has_banned_lifecycle_token(stem)
+        && (is_compat_name(stem) || banned_lifecycle_message(stem).is_some())
     {
         diagnostics.push(RustDiagnostic::error(
             rel_path.to_owned(),
@@ -43,9 +45,13 @@ pub(super) fn check_smells(
         rel_path,
         check_names: !is_rule_self,
         cfg_gated_idents: Vec::new(),
+        names: NameLedger::new(crate_names),
         diagnostics,
     };
     visitor.visit_file(ast);
+    for (span, message) in visitor.names.take_compat_reports() {
+        visitor.push(span, "rust/no-compat-names", message);
+    }
     check_corpus_smells(rel_path, ast, diagnostics);
     check_async_effects(rel_path, ast, diagnostics);
 }
@@ -54,6 +60,7 @@ struct SmellVisitor<'a> {
     rel_path: &'a str,
     check_names: bool,
     cfg_gated_idents: Vec<FxHashSet<String>>,
+    names: NameLedger<'a>,
     diagnostics: &'a mut Vec<RustDiagnostic>,
 }
 
@@ -68,14 +75,11 @@ impl SmellVisitor<'_> {
     }
 
     fn check_ident_name(&mut self, name: &str, span: Span) {
-        if self.check_names && has_banned_lifecycle_token(name) {
-            self.push(
-                span,
-                "rust/no-compat-names",
-                format!(
-                    "'{name}' uses compatibility, retirement, or batch-scaffolding naming; delete the old path or name the item after its domain concept."
-                ),
-            );
+        if !self.check_names || self.names.note_compat(name, span) {
+            return;
+        }
+        if let Some(message) = banned_lifecycle_message(name) {
+            self.push(span, "rust/no-compat-names", message);
         }
     }
 
@@ -263,28 +267,6 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
         }
         visit::visit_expr_let(self, node);
     }
-}
-
-fn has_banned_lifecycle_token(name: &str) -> bool {
-    if is_compat_name(name) {
-        return true;
-    }
-    let lower = name.to_ascii_lowercase();
-    has_numbered_prefix(&lower, "batch") || has_numbered_prefix(&lower, "slice_v")
-}
-
-fn has_numbered_prefix(lower: &str, prefix: &str) -> bool {
-    let mut search_from = 0usize;
-    while let Some(offset) = lower[search_from..].find(prefix) {
-        let after = search_from + offset + prefix.len();
-        let rest = &lower[after..];
-        let trimmed = rest.strip_prefix('_').unwrap_or(rest);
-        if trimmed.as_bytes().first().is_some_and(u8::is_ascii_digit) {
-            return true;
-        }
-        search_from = after;
-    }
-    false
 }
 
 fn discards_closure_error_param(closure: &ExprClosure) -> bool {

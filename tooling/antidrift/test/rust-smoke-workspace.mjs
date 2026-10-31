@@ -27,6 +27,7 @@ const provenanceSource = [
   "#[derive(Deserialize)]",
   "pub struct LooseConfig { pub kind: String, pub seen: HashMap<String, bool>, pub item: Option<BoundaryItem> }",
   "pub fn decode_rule_options(name: &str) -> Result<usize, String> { Ok(name.len()) }",
+  "pub fn adapter(input: &str) -> Result<usize, String> { decode_rule_options(input) }",
   "pub fn legacy_adapter(input: &str) -> Result<usize, String> {",
   "    decode_rule_options(input)?;",
   '    input.parse::<usize>().map_err(|_| "parse failed".to_string())',

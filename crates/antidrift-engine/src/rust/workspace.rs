@@ -5,10 +5,12 @@ use super::catalog::row;
 use super::config::RustConfig;
 use super::config_owner::{ConfigResolver, absolute_path, discover_crate_dirs};
 use super::constant_fields::check_constant_return_fields;
+use super::lifecycle_names::CrateNames;
 use super::module_graph::{
     ModuleCode, check_orphan_modules, declared_modules, normalize_lexical_path,
 };
 use super::rules::{CrateLayer, check_syn_ast};
+use super::smells::check_smells;
 use super::source_context::SourceContext;
 use super::struct_index::StructIndex;
 use super::struct_shapes::check_structural_type_forks;
@@ -84,7 +86,11 @@ fn check_single_file(
         &mut file_diags,
     )? {
         let rel_path = relative_display(display_root, file);
-        check_value_flow(&rel_path, file, None, &ast, &mut file_diags);
+        let lone = FxHashMap::from_iter([(file.to_path_buf(), ast)]);
+        let crate_names = CrateNames::collect(std::slice::from_ref(&file.to_path_buf()), &lone);
+        let ast = &lone[&file.to_path_buf()];
+        check_smells(&rel_path, file, ast, &crate_names, &mut file_diags);
+        check_value_flow(&rel_path, file, None, ast, &mut file_diags);
     }
     diagnostics.extend(settle_diagnostics(
         file_diags,
@@ -147,9 +153,11 @@ fn check_crate_dir(
         &mut crate_diags,
     );
     let index = StructIndex::new(&rs_files, &parsed_files);
+    let crate_names = CrateNames::collect(&rs_files, &parsed_files);
     for file in &rs_files {
         if let Some(ast) = parsed_files.get(file) {
             let rel_path = relative_display(workspace_root, file);
+            check_smells(&rel_path, file, ast, &crate_names, &mut crate_diags);
             check_value_flow(&rel_path, file, Some(&index), ast, &mut crate_diags);
         }
     }

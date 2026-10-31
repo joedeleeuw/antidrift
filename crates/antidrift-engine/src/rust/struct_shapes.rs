@@ -13,7 +13,7 @@ pub(super) fn check_structural_type_forks(
     index: &StructIndex<'_>,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
-    let mut seen = FxHashMap::default();
+    let mut seen: FxHashMap<FieldSignature, (String, String, usize)> = FxHashMap::default();
     for definition in index.definitions.values() {
         let item_struct = definition.structure;
         let rel_path = relative_display(workspace_root, definition.file);
@@ -34,6 +34,9 @@ pub(super) fn check_structural_type_forks(
         let struct_name = item_struct.ident.to_string();
         let line = item_struct.ident.span().start().line.max(1);
         if let Some((owner_name, owner_file, owner_line)) = seen.get(&signature) {
+            if index.variants_of_one_enum(owner_name, &struct_name) {
+                continue;
+            }
             diagnostics.push(RustDiagnostic::error(
                 rel_path,
                 line,

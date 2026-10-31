@@ -1,3 +1,5 @@
+use antidrift_kernel::declared_names::{DeclaredNameIndex, name_key};
+use antidrift_kernel::program_fact::ProgramFact;
 use antidrift_kernel::rule_options::reject_unknown_options;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -5,12 +7,13 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 const RULE_NAME: &str = "antidrift/no-compat-names";
 
+const COMPAT_TOKENS: &[&str] = &["deprecated", "deprecate", "legacy", "nolonger", "compat"];
+
 #[must_use]
 pub fn is_compat_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     if lower.contains("legacy")
         || lower.contains("deprecated")
-        || lower.contains("retire")
         || lower.contains("nolonger")
         || lower.contains("no_longer")
     {
@@ -19,7 +22,7 @@ pub fn is_compat_name(name: &str) -> bool {
     let mut search_from = 0usize;
     while let Some(offset) = lower[search_from..].find("compat") {
         let abs = search_from + offset;
-        if !lower[abs..].starts_with("compatible") {
+        if !lower[abs..].starts_with("compatib") {
             return true;
         }
         search_from = abs + 6;
@@ -27,48 +30,28 @@ pub fn is_compat_name(name: &str) -> bool {
     false
 }
 
-fn build_compat_message(name: &str) -> RuleMessage {
-    RuleMessage::new(
-        "compatName",
-        format!(
-            "'{name}' declares a compatibility or retirement path. Delete the old path instead of keeping or naming it."
+#[must_use]
+pub fn plain_sibling_key(name: &str) -> Option<String> {
+    let key = name_key(name);
+    let (start, token) = COMPAT_TOKENS
+        .iter()
+        .filter_map(|token| key.find(token).map(|start| (start, *token)))
+        .min_by_key(|(start, token)| (*start, std::cmp::Reverse(token.len())))?;
+    let sibling = format!("{}{}", &key[..start], &key[start + token.len()..]);
+    (!sibling.is_empty()).then_some(sibling)
+}
+
+#[must_use]
+pub fn compat_message(name: &str, sibling: Option<&str>) -> RuleMessage {
+    let text = match sibling {
+        Some(sibling) => format!(
+            "'{name}' keeps a compatibility path beside '{sibling}'. Delete the old path instead of keeping or naming it."
         ),
-    )
-}
-
-fn check_ident(ctx: &mut Ctx, node: Option<P<Node>>) {
-    let Some(ident) = node else {
-        return;
+        None => format!(
+            "'{name}' declares a compatibility path. Delete the old path instead of keeping or naming it."
+        ),
     };
-    if !ast::is_identifier(ident) {
-        return;
-    }
-    let text = ident.as_identifier().text();
-    if is_compat_name(text) {
-        ctx.report_node(ident, build_compat_message(text));
-    }
-}
-
-fn check_binding_node(ctx: &mut Ctx, node: Option<P<Node>>) {
-    let Some(curr) = node else {
-        return;
-    };
-    match curr.kind() {
-        Kind::Identifier => check_ident(ctx, Some(curr)),
-        Kind::Parameter | Kind::BindingElement => check_binding_node(ctx, curr.name()),
-        Kind::ObjectBindingPattern | Kind::ArrayBindingPattern => {
-            for &elem in curr.as_binding_pattern().elements().nodes() {
-                check_binding_node(ctx, Some(elem));
-            }
-        }
-        _ => {}
-    }
-}
-
-fn check_parameters(ctx: &mut Ctx, node: P<Node>) {
-    for &param in node.parameters() {
-        check_binding_node(ctx, Some(param));
-    }
+    RuleMessage::new("compatName", text)
 }
 
 pub struct NoCompatNames;
@@ -98,6 +81,7 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::MethodDeclaration),
     Listener::Enter(Kind::PropertyDeclaration),
     Listener::Enter(Kind::PropertySignature),
+    Listener::Enter(Kind::EndOfFile),
 ];
 
 impl Rule for NoCompatNames {
@@ -106,11 +90,65 @@ impl Rule for NoCompatNames {
     }
 
     fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
+        Box::new(Visitor::default())
     }
 }
 
-struct Visitor;
+#[derive(Default)]
+struct Visitor {
+    pending: Vec<(P<Node>, Option<String>)>,
+}
+
+impl Visitor {
+    fn check_ident(&mut self, node: Option<P<Node>>) {
+        let Some(ident) = node else {
+            return;
+        };
+        if !ast::is_identifier(ident) {
+            return;
+        }
+        let text = ident.as_identifier().text();
+        if is_compat_name(text) {
+            self.pending.push((ident, plain_sibling_key(text)));
+        }
+    }
+
+    fn check_binding_node(&mut self, node: Option<P<Node>>) {
+        let Some(curr) = node else {
+            return;
+        };
+        match curr.kind() {
+            Kind::Identifier => self.check_ident(Some(curr)),
+            Kind::Parameter | Kind::BindingElement => self.check_binding_node(curr.name()),
+            Kind::ObjectBindingPattern | Kind::ArrayBindingPattern => {
+                for &elem in curr.as_binding_pattern().elements().nodes() {
+                    self.check_binding_node(Some(elem));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn check_parameters(&mut self, node: P<Node>) {
+        for &param in node.parameters() {
+            self.check_binding_node(Some(param));
+        }
+    }
+
+    fn report_pending(&mut self, ctx: &mut Ctx) {
+        if self.pending.is_empty() {
+            return;
+        }
+        let index = DeclaredNameIndex::for_program(ctx.program);
+        for (ident, sibling_key) in std::mem::take(&mut self.pending) {
+            let sibling = sibling_key
+                .as_deref()
+                .and_then(|key| index.declared_with_key(key));
+            let name = ident.as_identifier().text();
+            ctx.report_node(ident, compat_message(name, sibling));
+        }
+    }
+}
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
@@ -120,8 +158,8 @@ impl RuleVisitor for Visitor {
     fn visit(&mut self, ctx: &mut Ctx, listener: Listener, node: P<Node>) {
         match listener {
             Listener::Enter(Kind::FunctionDeclaration | Kind::MethodDeclaration) => {
-                check_ident(ctx, node.name());
-                check_parameters(ctx, node);
+                self.check_ident(node.name());
+                self.check_parameters(node);
             }
             Listener::Enter(
                 Kind::FunctionExpression
@@ -130,10 +168,10 @@ impl RuleVisitor for Visitor {
                 | Kind::GetAccessor
                 | Kind::SetAccessor,
             ) => {
-                check_parameters(ctx, node);
+                self.check_parameters(node);
             }
             Listener::Enter(Kind::VariableDeclaration) => {
-                check_binding_node(ctx, node.name());
+                self.check_binding_node(node.name());
             }
             Listener::Enter(
                 Kind::ClassDeclaration
@@ -142,8 +180,9 @@ impl RuleVisitor for Visitor {
                 | Kind::PropertyDeclaration
                 | Kind::PropertySignature,
             ) => {
-                check_ident(ctx, node.name());
+                self.check_ident(node.name());
             }
+            Listener::Enter(Kind::EndOfFile) => self.report_pending(ctx),
             _ => {}
         }
     }

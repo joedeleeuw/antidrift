@@ -1,6 +1,5 @@
 use super::RustDiagnostic;
 use super::config::{ForbiddenCall, RustConfig};
-use super::smells::check_smells;
 use super::syn_kernel::{
     derives_deserialize, has_serde_deny_unknown_fields, is_banned_test_attribute, path_ends_with,
 };
@@ -36,7 +35,6 @@ pub(super) fn check_syn_ast(
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
     check_hollow_module(rel_path, path, ast, diagnostics);
-    check_smells(rel_path, path, ast, diagnostics);
     let crate_rank = layer.crate_name.and_then(|name| {
         config
             .layers

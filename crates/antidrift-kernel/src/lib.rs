@@ -3,6 +3,7 @@
 pub mod async_effects;
 pub mod boundary;
 pub mod callgraph;
+pub mod declared_names;
 pub mod decode_guards;
 pub mod diagnostic;
 pub mod directives;

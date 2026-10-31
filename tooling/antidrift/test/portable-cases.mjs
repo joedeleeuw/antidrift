@@ -44,6 +44,14 @@ export const portableCases = [
     valid: "start();",
   },
   {
+    name: "no-compat-names",
+    occurrences: 2,
+    invalid:
+      'export type Filter = { field: string };\nexport type LegacyFilter = { field: string; op: string };\nexport function migrateFromLegacy(filter: Filter): LegacyFilter { return { ...filter, op: "eq" }; }',
+    valid:
+      "export type WheelCompatibility = { tag: string };\nexport const retiredProviders: string[] = [];\nexport function retireWaiting(id: string): string { return id; }",
+  },
+  {
     name: "no-todo-without-issue",
     caseId: "no-todo-without-issue-negation-same-line",
     occurrences: 2,
@@ -622,6 +630,7 @@ export const coreHeadlessProbes = [
     name: "inline eslint-disable-next-line suppresses native antidrift rule",
     rule: "antidrift/no-compat-names",
     source: `
+      export const adapter = 0;
       // eslint-disable-next-line antidrift/no-compat-names -- probe
       export const legacyAdapter = 1;
     `,
@@ -632,6 +641,7 @@ export const coreHeadlessProbes = [
     rule: "antidrift/no-compat-names",
     source: `
       export const fakeDirective = "/* eslint-disable antidrift/no-compat-names */";
+      export const adapter = 0;
       export const legacyAdapter = 1;
     `,
     expectedCount: 1,

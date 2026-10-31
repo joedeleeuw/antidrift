@@ -97,6 +97,7 @@ impl ImportTable {
 
 pub(super) struct StructIndex<'a> {
     pub(super) definitions: BTreeMap<Vec<String>, StructDefinition<'a>>,
+    enum_payloads: FxHashMap<String, FxHashSet<Vec<String>>>,
     imports: ImportTable,
     private_modules: BTreeSet<Vec<String>>,
     reexports: FxHashSet<Vec<String>>,
@@ -108,6 +109,7 @@ impl<'a> StructIndex<'a> {
     pub(super) fn new(files: &'a [PathBuf], parsed: &'a FxHashMap<PathBuf, syn::File>) -> Self {
         let mut index = Self {
             definitions: BTreeMap::new(),
+            enum_payloads: FxHashMap::default(),
             imports: ImportTable::default(),
             private_modules: BTreeSet::new(),
             reexports: FxHashSet::default(),
@@ -131,6 +133,7 @@ impl<'a> StructIndex<'a> {
                     self.definitions
                         .insert(key, StructDefinition { file, structure });
                 }
+                Item::Enum(item_enum) => self.collect_enum_payloads(scope, item_enum),
                 Item::Fn(item_fn) if return_type_is_untyped(&item_fn.sig.output) => {
                     let mut key = scope.to_vec();
                     key.push(item_fn.sig.ident.to_string());
@@ -141,6 +144,35 @@ impl<'a> StructIndex<'a> {
                 Item::Use(import) => self.collect_use(scope, import),
                 _ => {}
             }
+        }
+    }
+
+    fn collect_enum_payloads(&mut self, scope: &[String], item_enum: &syn::ItemEnum) {
+        let mut key = scope.to_vec();
+        key.push(item_enum.ident.to_string());
+        let mut payloads = Vec::new();
+        for field in item_enum
+            .variants
+            .iter()
+            .flat_map(|variant| &variant.fields)
+        {
+            type_path_idents(&field.ty, &mut payloads);
+        }
+        for payload in payloads {
+            self.enum_payloads
+                .entry(payload)
+                .or_default()
+                .insert(key.clone());
+        }
+    }
+
+    pub(super) fn variants_of_one_enum(&self, first: &str, second: &str) -> bool {
+        match (
+            self.enum_payloads.get(first),
+            self.enum_payloads.get(second),
+        ) {
+            (Some(owners), Some(others)) => owners.iter().any(|owner| others.contains(owner)),
+            _ => false,
         }
     }
 
@@ -328,4 +360,40 @@ pub(super) fn type_path(ty: &Type) -> Option<&syn::Path> {
         Type::Group(group) => type_path(&group.elem),
         _ => None,
     }
+}
+
+fn type_path_idents(ty: &Type, out: &mut Vec<String>) {
+    match ty {
+        Type::Path(path) => {
+            for inner in path.path.segments.iter().flat_map(generic_type_arguments) {
+                type_path_idents(inner, out);
+            }
+            if let Some(last) = path.path.segments.last() {
+                out.push(last.ident.to_string());
+            }
+        }
+        Type::Reference(reference) => type_path_idents(&reference.elem, out),
+        Type::Paren(paren) => type_path_idents(&paren.elem, out),
+        Type::Array(array) => type_path_idents(&array.elem, out),
+        Type::Slice(slice) => type_path_idents(&slice.elem, out),
+        Type::Tuple(tuple) => {
+            for elem in &tuple.elems {
+                type_path_idents(elem, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn generic_type_arguments(segment: &syn::PathSegment) -> Vec<&Type> {
+    let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
+        return Vec::new();
+    };
+    args.args
+        .iter()
+        .filter_map(|arg| match arg {
+            syn::GenericArgument::Type(inner) => Some(inner),
+            _ => None,
+        })
+        .collect()
 }
