@@ -1,5 +1,5 @@
 use super::RustDiagnostic;
-use super::struct_index::{ImportTable, file_scope};
+use super::struct_index::{ImportTable, PathResolution, file_scope};
 use super::syn_kernel::{extract_pat_ident, is_wild_pat};
 use super::workspace::relative_display;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -41,6 +41,11 @@ struct ReferenceAudit {
     loose_value_references: FxHashSet<String>,
 }
 
+enum ReferenceTarget {
+    Resolved(Vec<String>),
+    Loose(String),
+}
+
 impl ReferenceAudit {
     fn collect_imports(&mut self, scope: &[String], items: &[syn::Item]) {
         for item in items {
@@ -69,17 +74,30 @@ impl ReferenceAudit {
         let Some(name) = segments.last().cloned() else {
             return;
         };
-        let resolved = self.imports.resolve_path(&self.scope, &segments);
-        let loose = segments.len() == 1 && self.imports.scope_has_glob(&self.scope);
-        if is_call {
-            *self.calls.entry(resolved).or_default() += 1;
-            if loose {
-                *self.loose_calls.entry(name).or_default() += 1;
+        let bare_in_glob_scope = segments.len() == 1 && self.imports.scope_has_glob(&self.scope);
+        let target = match self.imports.resolution(&self.scope, &segments) {
+            PathResolution::Lexical(_) if bare_in_glob_scope => ReferenceTarget::Loose(name),
+            PathResolution::Imported(path) | PathResolution::Lexical(path) => {
+                let owner = &path[..path.len().saturating_sub(1)];
+                if self.imports.scope_has_glob(owner) {
+                    ReferenceTarget::Loose(name)
+                } else {
+                    ReferenceTarget::Resolved(path)
+                }
             }
-        } else {
-            self.value_references.insert(resolved);
-            if loose {
-                self.loose_value_references.insert(name);
+        };
+        match (target, is_call) {
+            (ReferenceTarget::Resolved(path), true) => {
+                *self.calls.entry(path).or_default() += 1;
+            }
+            (ReferenceTarget::Resolved(path), false) => {
+                self.value_references.insert(path);
+            }
+            (ReferenceTarget::Loose(bare), true) => {
+                *self.loose_calls.entry(bare).or_default() += 1;
+            }
+            (ReferenceTarget::Loose(bare), false) => {
+                self.loose_value_references.insert(bare);
             }
         }
     }

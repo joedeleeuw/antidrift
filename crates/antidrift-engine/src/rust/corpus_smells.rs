@@ -4,8 +4,8 @@ use super::expression_shapes::{
     detect_fieldwise_clone_rebuild, first_closure_param_name, is_fs_read_to_string_sentinel,
     is_multi_tier_exists_find, outcome_arm, receiver_is_outer_collection,
 };
-use super::struct_index::type_path;
 use super::syn_kernel::{call_path_ends_with, extract_pat_ident};
+use super::type_aliases::{TypeAliases, last_type_segment};
 use antidrift_kernel::outcome_shape::{OutcomeArm, find_sum_to_product_pair};
 use antidrift_kernel::relational_scan::{is_inner_linear_scan_method, is_outer_traversal_method};
 use antidrift_kernel::runtime_lifecycle::{
@@ -25,8 +25,7 @@ pub(super) fn check_corpus_smells(
     ast: &syn::File,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
-    let mut type_aliases = FxHashMap::default();
-    collect_type_aliases(&ast.items, &mut type_aliases);
+    let type_aliases = TypeAliases::collect(&ast.items);
     let mut visitor = CorpusSmellVisitor {
         rel_path,
         type_aliases,
@@ -46,7 +45,7 @@ pub(super) fn check_corpus_smells(
 
 struct CorpusSmellVisitor<'a> {
     rel_path: &'a str,
-    type_aliases: FxHashMap<String, String>,
+    type_aliases: TypeAliases,
     fn_has_mtime_check: bool,
     script_context: bool,
     error_bindings: FxHashSet<String>,
@@ -122,21 +121,10 @@ impl CorpusSmellVisitor<'_> {
         };
         match (target, self.source_type_of(source_binding)) {
             (Some(target), Some(source)) => {
-                self.canonical_type(&target) != self.canonical_type(source)
+                self.type_aliases.canonical(&target) != self.type_aliases.canonical(source)
             }
             _ => false,
         }
-    }
-
-    fn canonical_type(&self, name: &str) -> String {
-        let mut current = name.to_owned();
-        for _ in 0..8 {
-            let Some(next) = self.type_aliases.get(&current) else {
-                break;
-            };
-            current.clone_from(next);
-        }
-        current
     }
 
     fn report_sum_to_product_arms(&mut self) {
@@ -366,46 +354,6 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
         }
         visit::visit_expr_struct(self, node);
     }
-}
-
-fn collect_type_aliases(items: &[syn::Item], aliases: &mut FxHashMap<String, String>) {
-    for item in items {
-        match item {
-            syn::Item::Type(alias) => {
-                if let Some(target) = last_type_segment(&alias.ty) {
-                    aliases.insert(alias.ident.to_string(), target);
-                }
-            }
-            syn::Item::Use(import) => collect_use_renames(&import.tree, aliases),
-            syn::Item::Mod(syn::ItemMod {
-                content: Some((_, nested)),
-                ..
-            }) => collect_type_aliases(nested, aliases),
-            _ => {}
-        }
-    }
-}
-
-fn collect_use_renames(tree: &syn::UseTree, aliases: &mut FxHashMap<String, String>) {
-    match tree {
-        syn::UseTree::Path(path) => collect_use_renames(&path.tree, aliases),
-        syn::UseTree::Group(group) => {
-            for entry in &group.items {
-                collect_use_renames(entry, aliases);
-            }
-        }
-        syn::UseTree::Rename(rename) => {
-            aliases.insert(rename.rename.to_string(), rename.ident.to_string());
-        }
-        syn::UseTree::Name(_) | syn::UseTree::Glob(_) => {}
-    }
-}
-
-fn last_type_segment(ty: &syn::Type) -> Option<String> {
-    type_path(ty)?
-        .segments
-        .last()
-        .map(|segment| segment.ident.to_string())
 }
 
 fn extract_err_binding_ident(pat: &Pat) -> Option<String> {

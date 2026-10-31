@@ -1,12 +1,19 @@
 use super::value_origin::is_value_type;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use syn::{ImplItem, Item, ItemStruct, ReturnType, Type};
 
 pub(super) struct StructDefinition<'a> {
     pub(super) file: &'a Path,
     pub(super) structure: &'a ItemStruct,
+}
+
+const MAX_REEXPORT_HOPS: usize = 8;
+
+pub(super) enum PathResolution {
+    Imported(Vec<String>),
+    Lexical(Vec<String>),
 }
 
 #[derive(Default)]
@@ -49,15 +56,38 @@ impl ImportTable {
     }
 
     pub(super) fn resolve_path(&self, scope: &[String], segments: &[String]) -> Vec<String> {
-        let candidate = qualify(scope, segments);
-        for prefix_len in (1..=candidate.len()).rev() {
-            if let Some(imported) = self.imports.get(&candidate[..prefix_len]) {
-                let mut resolved = qualify(&candidate[..prefix_len - 1], imported);
-                resolved.extend_from_slice(&candidate[prefix_len..]);
-                return resolved;
-            }
+        match self.resolution(scope, segments) {
+            PathResolution::Imported(path) | PathResolution::Lexical(path) => path,
         }
-        candidate
+    }
+
+    pub(super) fn resolution(&self, scope: &[String], segments: &[String]) -> PathResolution {
+        let mut candidate = qualify(scope, segments);
+        let mut imported = false;
+        for _ in 0..MAX_REEXPORT_HOPS {
+            let Some(resolved) = self.follow_import(&candidate) else {
+                break;
+            };
+            if resolved == candidate {
+                break;
+            }
+            candidate = resolved;
+            imported = true;
+        }
+        if imported {
+            PathResolution::Imported(candidate)
+        } else {
+            PathResolution::Lexical(candidate)
+        }
+    }
+
+    fn follow_import(&self, candidate: &[String]) -> Option<Vec<String>> {
+        (1..=candidate.len()).rev().find_map(|prefix_len| {
+            let imported = self.imports.get(&candidate[..prefix_len])?;
+            let mut resolved = qualify(&candidate[..prefix_len - 1], imported);
+            resolved.extend_from_slice(&candidate[prefix_len..]);
+            Some(resolved)
+        })
     }
 
     pub(super) fn scope_has_glob(&self, scope: &[String]) -> bool {
@@ -68,7 +98,7 @@ impl ImportTable {
 pub(super) struct StructIndex<'a> {
     pub(super) definitions: BTreeMap<Vec<String>, StructDefinition<'a>>,
     imports: ImportTable,
-    module_public: BTreeMap<Vec<String>, bool>,
+    private_modules: BTreeSet<Vec<String>>,
     reexports: FxHashSet<Vec<String>>,
     untyped_functions: FxHashSet<Vec<String>>,
     untyped_methods: FxHashSet<String>,
@@ -79,7 +109,7 @@ impl<'a> StructIndex<'a> {
         let mut index = Self {
             definitions: BTreeMap::new(),
             imports: ImportTable::default(),
-            module_public: BTreeMap::new(),
+            private_modules: BTreeSet::new(),
             reexports: FxHashSet::default(),
             untyped_functions: FxHashSet::default(),
             untyped_methods: FxHashSet::default(),
@@ -117,10 +147,9 @@ impl<'a> StructIndex<'a> {
     fn collect_module(&mut self, file: &'a Path, scope: &[String], item_mod: &'a syn::ItemMod) {
         let mut child = scope.to_vec();
         child.push(item_mod.ident.to_string());
-        self.module_public.insert(
-            child.clone(),
-            matches!(item_mod.vis, syn::Visibility::Public(_)),
-        );
+        if !matches!(item_mod.vis, syn::Visibility::Public(_)) {
+            self.private_modules.insert(child.clone());
+        }
         if let Some((_, items)) = &item_mod.content {
             self.collect(file, &child, items);
         }
@@ -221,12 +250,7 @@ impl<'a> StructIndex<'a> {
         if self.reexports.contains(key) {
             return true;
         }
-        (1..key.len()).all(|depth| {
-            self.module_public
-                .get(&key[..depth])
-                .copied()
-                .unwrap_or(true)
-        })
+        (1..key.len()).all(|depth| !self.private_modules.contains(&key[..depth]))
     }
 }
 

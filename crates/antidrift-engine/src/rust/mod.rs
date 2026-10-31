@@ -16,6 +16,7 @@ mod struct_index;
 mod struct_shapes;
 mod syn_kernel;
 mod syntax;
+mod type_aliases;
 mod value_flow;
 mod value_origin;
 mod workspace;

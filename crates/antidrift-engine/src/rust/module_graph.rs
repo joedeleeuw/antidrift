@@ -1,7 +1,7 @@
 use super::RustDiagnostic;
 use super::workspace::relative_display;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
 use syn::ext::IdentExt;
 use syn::{Attribute, Expr, ExprLit, Item, ItemMod, Lit, Meta};
@@ -34,13 +34,13 @@ pub(super) fn declared_modules(file: &Path, is_root: bool, ast: &syn::File) -> V
     );
     let macro_names = module_names_in_item_macros(&ast.items);
     if !macro_names.is_empty() {
-        collect_macro_declared_files(&search, &macro_names, &mut declared);
+        collect_macro_declared_files(directory, &search, &macro_names, &mut declared);
     }
     declared
 }
 
-fn module_names_in_item_macros(items: &[Item]) -> FxHashSet<String> {
-    let mut names = FxHashSet::default();
+fn module_names_in_item_macros(items: &[Item]) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
     for item in items {
         let Item::Macro(item_macro) = item else {
             continue;
@@ -53,7 +53,7 @@ fn module_names_in_item_macros(items: &[Item]) -> FxHashSet<String> {
     names
 }
 
-fn collect_token_idents(tokens: proc_macro2::TokenStream, out: &mut FxHashSet<String>) {
+fn collect_token_idents(tokens: proc_macro2::TokenStream, out: &mut BTreeSet<String>) {
     for tree in tokens {
         match tree {
             proc_macro2::TokenTree::Ident(ident) => {
@@ -75,22 +75,25 @@ fn collect_token_idents(tokens: proc_macro2::TokenStream, out: &mut FxHashSet<St
 }
 
 fn collect_macro_declared_files(
+    directory: &Path,
     search: &Path,
-    macro_names: &FxHashSet<String>,
+    macro_names: &BTreeSet<String>,
     out: &mut Vec<DeclaredModule>,
 ) {
+    for name in macro_names {
+        let included = directory.join(name);
+        if included.extension().is_some_and(|ext| ext == "rs") && included.is_file() {
+            out.push(DeclaredModule {
+                file: normalize_lexical_path(&included),
+                code: ModuleCode::Shipped,
+            });
+        }
+    }
     let Ok(entries) = std::fs::read_dir(search) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        let module_file = if path.extension().is_some_and(|ext| ext == "rs") {
-            path.clone()
-        } else if path.is_dir() && path.join("mod.rs").is_file() {
-            path.join("mod.rs")
-        } else {
-            continue;
-        };
         let named = path
             .file_stem()
             .and_then(|stem| stem.to_str())
@@ -102,10 +105,31 @@ fn collect_macro_declared_files(
         if !named {
             continue;
         }
-        out.push(DeclaredModule {
-            file: normalize_lexical_path(&module_file),
-            code: ModuleCode::Shipped,
-        });
+        if path.extension().is_some_and(|ext| ext == "rs") {
+            out.push(DeclaredModule {
+                file: normalize_lexical_path(&path),
+                code: ModuleCode::Shipped,
+            });
+        } else if path.is_dir() {
+            collect_rust_files_beneath(&path, out);
+        }
+    }
+}
+
+fn collect_rust_files_beneath(directory: &Path, out: &mut Vec<DeclaredModule>) {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_rust_files_beneath(&path, out);
+        } else if path.extension().is_some_and(|ext| ext == "rs") {
+            out.push(DeclaredModule {
+                file: normalize_lexical_path(&path),
+                code: ModuleCode::Shipped,
+            });
+        }
     }
 }
 

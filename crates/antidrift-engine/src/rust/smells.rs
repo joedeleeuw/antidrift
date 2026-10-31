@@ -80,10 +80,12 @@ impl SmellVisitor<'_> {
     }
 
     fn check_wild_local(&mut self, span: Span, expr: &Expr) {
-        let justified = binding_root_ident(expr).is_some_and(|root| {
-            self.cfg_gated_idents
-                .iter()
-                .any(|idents| idents.contains(&root))
+        let justified = binding_root_idents(expr).is_some_and(|roots| {
+            roots.iter().all(|root| {
+                self.cfg_gated_idents
+                    .iter()
+                    .any(|idents| idents.contains(root))
+            })
         });
         if !justified && is_suppressed_binding_expr(expr) {
             self.push(
@@ -304,6 +306,19 @@ struct IdentCollector<'a>(&'a mut FxHashSet<String>);
 impl<'ast> Visit<'ast> for IdentCollector<'_> {
     fn visit_ident(&mut self, node: &'ast syn::Ident) {
         self.0.insert(node.to_string());
+    }
+}
+
+fn binding_root_idents(expr: &Expr) -> Option<Vec<String>> {
+    match expr {
+        Expr::Tuple(tuple) => tuple.elems.iter().map(binding_root_idents).try_fold(
+            Vec::new(),
+            |mut roots, element| {
+                roots.extend(element?);
+                Some(roots)
+            },
+        ),
+        other => binding_root_ident(other).map(|root| vec![root]),
     }
 }
 

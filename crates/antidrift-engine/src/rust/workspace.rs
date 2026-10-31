@@ -248,6 +248,10 @@ fn manifest_target_roots(
         }
         target_roots.push(target_file);
     }
+    let build_script = normalize_lexical_path(&crate_dir.join("build.rs"));
+    if build_script.is_file() {
+        target_roots.push(build_script);
+    }
     Ok(target_roots)
 }
 
