@@ -121,29 +121,9 @@ pub fn resolve_aliased_symbol(checker: &mut Checker, sym: P<Symbol>) -> P<Symbol
 
 pub fn symbol_at_node(checker: &mut Checker, node: P<Node>) -> Option<P<Symbol>> {
     let unwrapped = tsrs_kernel::unwrap_expression(node);
-    let mut sym = match checker.get_symbol_at_location_exported(unwrapped) {
-        Some(found)
-            if !checker.is_unknown_symbol(found)
-                && (!found.declarations().is_empty() || found.value_declaration().is_some()) =>
-        {
-            found
-        }
-        _ if ast::is_identifier(unwrapped) => {
-            let text = unwrapped.as_identifier().text();
-            checker
-                .get_symbols_in_scope_exported(
-                    unwrapped,
-                    SymbolFlags::Value
-                        | SymbolFlags::Type
-                        | SymbolFlags::Namespace
-                        | SymbolFlags::Alias,
-                )
-                .into_iter()
-                .find(|candidate| candidate.name() == text)?
-        }
-        Some(found) => found,
-        None => return None,
-    };
+    let mut sym = checker
+        .get_symbol_at_location_exported(unwrapped)
+        .filter(|found| !checker.is_unknown_symbol(*found))?;
     if let Some(val_decl) = sym.value_declaration()
         && ast::is_shorthand_property_assignment(val_decl)
         && let Some(shorthand) = checker.get_shorthand_assignment_value_symbol(Some(val_decl))
