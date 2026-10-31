@@ -19,12 +19,15 @@ function integrityOf(bytes) {
 function npmView(spec, field) {
   const viewed = spawnSync("npm", ["view", spec, field], { encoding: "utf8" });
   if (viewed.status === 0) {
-    return viewed.stdout.trim();
+    return { kind: "found", value: viewed.stdout.trim() };
   }
   if (viewed.stderr.includes("E404")) {
-    return "";
+    return { kind: "missing", reason: `${spec} is not on npm yet` };
   }
-  throw new Error(`npm view ${spec} ${field} failed: ${viewed.stderr}`);
+  return {
+    kind: "failed",
+    reason: `npm view ${spec} ${field} failed: ${viewed.stderr}`,
+  };
 }
 
 const releases = tarballPaths.map((tarballPath) => {
@@ -52,40 +55,55 @@ const releases = tarballPaths.map((tarballPath) => {
 
 for (const { tarballPath, spec, built } of releases) {
   const published = npmView(spec, "dist.integrity");
-  if (published === "") {
+  if (published.kind === "failed") {
+    throw new Error(published.reason);
+  }
+  if (published.kind === "missing") {
     execFileSync("npm", ["publish", tarballPath, "--access", "public"], {
       stdio: "inherit",
     });
-  } else if (published === built) {
+  } else if (published.value === built) {
     console.log(`${spec} is already on npm with this run's tarball`);
   } else {
     throw new Error(
-      `${spec} is on npm as ${published}, but this run built ${built}; release a new version`
+      `${spec} is on npm as ${published.value}, but this run built ${built}; release a new version`
     );
   }
 }
 
+async function fetchTarball(tarballUrl) {
+  try {
+    const response = await fetch(tarballUrl, {
+      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    });
+    return response.ok
+      ? { kind: "found", bytes: Buffer.from(await response.arrayBuffer()) }
+      : {
+          kind: "failed",
+          reason: `GET ${tarballUrl} answered ${response.status}`,
+        };
+  } catch (error) {
+    return { kind: "failed", reason: `GET ${tarballUrl} failed: ${error}` };
+  }
+}
+
 async function waitUntilDownloadable({ spec, built }, deadline) {
-  const tarballUrl = npmView(spec, "dist.tarball");
-  const response =
-    tarballUrl === ""
-      ? undefined
-      : await fetch(tarballUrl, {
-          signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-        });
-  if (response?.ok) {
-    const downloaded = integrityOf(Buffer.from(await response.arrayBuffer()));
+  const located = npmView(spec, "dist.tarball");
+  const fetched =
+    located.kind === "found" ? await fetchTarball(located.value) : located;
+  if (fetched.kind === "found") {
+    const downloaded = integrityOf(fetched.bytes);
     if (downloaded !== built) {
       throw new Error(
         `${spec} downloads as ${downloaded}, but this run built ${built}`
       );
     }
-    console.log(`${spec} downloads from ${tarballUrl}`);
+    console.log(`${spec} downloads from ${located.value}`);
     return;
   }
   if (Date.now() > deadline) {
     throw new Error(
-      `${spec} did not download within ${RESOLVE_DEADLINE_MS / 60_000} minutes`
+      `${spec} did not download within ${RESOLVE_DEADLINE_MS / 60_000} minutes; last attempt: ${fetched.reason}`
     );
   }
   await sleep(RESOLVE_POLL_MS);
