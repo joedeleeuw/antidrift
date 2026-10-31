@@ -17,29 +17,35 @@ pub mod require_secure_document_response;
 mod union_owners;
 mod web_provenance;
 
-use antidrift_kernel::rule_scope::ScopedRule;
+use crate::CatalogRule;
+use antidrift_kernel::scope_policy::ScopePolicy;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn typescript_only_rules() -> Vec<&'static dyn ScopedRule> {
-    vec![&no_redeclared_owned_union::DEFAULT_RULE]
+pub fn typescript_only_rules() -> Vec<CatalogRule> {
+    vec![CatalogRule::everywhere(
+        &no_redeclared_owned_union::DEFAULT_RULE,
+    )]
 }
 
 #[must_use]
-pub fn script_default_rules() -> Vec<&'static dyn ScopedRule> {
+pub fn script_default_rules() -> Vec<CatalogRule> {
     vec![
-        &confine_owner::DEFAULT_RULE,
-        &no_auth_token_in_web_storage::DEFAULT_RULE,
-        &no_bun_api_in_shared::DEFAULT_RULE,
-        &no_path_prefix_containment::DEFAULT_RULE,
-        &no_raw_filename_write::DEFAULT_RULE,
-        &no_relative_cross_package_imports::DEFAULT_RULE,
-        &no_unlisted_external_imports::DEFAULT_RULE,
-        &no_unsafe_inner_html::DEFAULT_RULE,
-        &no_unsanitized_href::DEFAULT_RULE,
-        &require_authz_check::DEFAULT_RULE,
-        &require_safe_window_open::DEFAULT_RULE,
-        &require_secure_document_response::DEFAULT_RULE,
+        CatalogRule::everywhere(&confine_owner::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_auth_token_in_web_storage::DEFAULT_RULE),
+        CatalogRule::new(
+            &no_bun_api_in_shared::DEFAULT_RULE,
+            ScopePolicy::InferredRole(no_bun_api_in_shared::inferred_role),
+        ),
+        CatalogRule::everywhere(&no_path_prefix_containment::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_raw_filename_write::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_relative_cross_package_imports::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_unlisted_external_imports::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_unsafe_inner_html::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_unsanitized_href::DEFAULT_RULE),
+        CatalogRule::everywhere(&require_authz_check::DEFAULT_RULE),
+        CatalogRule::everywhere(&require_safe_window_open::DEFAULT_RULE),
+        CatalogRule::everywhere(&require_secure_document_response::DEFAULT_RULE),
     ]
 }
 

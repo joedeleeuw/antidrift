@@ -2,7 +2,7 @@ use antidrift_kernel::jsx::{
     attribute_initializer_expression, is_jsx_element_like, jsx_attributes_list,
     plain_attribute_name, plain_element_name,
 };
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -33,19 +33,14 @@ const PORTAL_POPUPS: [&str; 8] = [
 const INTERACTIVE_ELEMENTS: [&str; 4] = ["a", "button", "Button", "Link"];
 const HELPER_NAMES: [&str; 2] = ["containedEventHandler", "containedHandler"];
 
-pub struct NoPortalUnderInteractiveAncestor {
-    scope: RuleScope,
-}
+pub struct NoPortalUnderInteractiveAncestor;
 
-pub static DEFAULT_RULE: NoPortalUnderInteractiveAncestor = NoPortalUnderInteractiveAncestor {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoPortalUnderInteractiveAncestor = NoPortalUnderInteractiveAncestor;
 
 impl NoPortalUnderInteractiveAncestor {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -54,30 +49,21 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxSelfClosingElement),
 ];
 
-impl ScopedRule for NoPortalUnderInteractiveAncestor {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoPortalUnderInteractiveAncestor {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

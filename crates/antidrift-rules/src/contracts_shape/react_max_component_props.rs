@@ -1,8 +1,6 @@
 use antidrift_kernel::jsx::function_returns_jsx;
 use antidrift_kernel::local_binding::{Binding, binding_for_declarator, resolve_lexical_binding};
-use antidrift_kernel::rule_scope::{
-    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::tsrs_kernel;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -17,19 +15,13 @@ const RULE_NAME: &str = "antidrift/react-max-component-props";
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct MaxComponentPropsOptions {
     max: Option<usize>,
-    #[serde(flatten)]
-    scope: ScopeOptions,
 }
 
 pub struct ReactMaxComponentProps {
     max: usize,
-    scope: RuleScope,
 }
 
-pub static RULE: ReactMaxComponentProps = ReactMaxComponentProps {
-    max: 12,
-    scope: RuleScope::DEFAULT,
-};
+pub static RULE: ReactMaxComponentProps = ReactMaxComponentProps { max: 12 };
 
 impl ReactMaxComponentProps {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
@@ -38,8 +30,7 @@ impl ReactMaxComponentProps {
         if max == 0 {
             return Err(format!("invalid options for {RULE_NAME}: max must be >= 1"));
         }
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
-        Ok(Self { max, scope })
+        Ok(Self { max })
     }
 }
 
@@ -308,21 +299,12 @@ fn check_component_node(ctx: &mut Ctx, node: P<Node>, max: usize) {
     }
 }
 
-impl ScopedRule for ReactMaxComponentProps {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for ReactMaxComponentProps {
     fn name(&self) -> &'static str {
         "antidrift/react-max-component-props"
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor { max: self.max })
     }
 }

@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, ScopedRule, decode_rule_options};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -17,27 +17,21 @@ const DEVTOOLS_PACKAGES: &[&str] = &[
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct NoStaticDevtoolsImportOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     modules: Vec<String>,
 }
 
 pub struct NoStaticDevtoolsImport {
-    scope: RuleScope,
     modules: Vec<String>,
 }
 
 pub static DEFAULT_RULE: NoStaticDevtoolsImport = NoStaticDevtoolsImport {
-    scope: RuleScope::DEFAULT,
     modules: Vec::new(),
 };
 
 impl NoStaticDevtoolsImport {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<NoStaticDevtoolsImportOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
-            scope,
             modules: parsed.modules,
         })
     }
@@ -45,35 +39,23 @@ impl NoStaticDevtoolsImport {
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::ImportDeclaration)];
 
-impl ScopedRule for NoStaticDevtoolsImport {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoStaticDevtoolsImport {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
-        let filename = ctx.file.file_name().replace('\\', "/");
-        Box::new(Visitor {
-            rule: self,
-            enabled: self.scope.matches(&filename, cwd),
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor { rule: self })
     }
 }
 
 struct Visitor {
     rule: &'static NoStaticDevtoolsImport,
-    enabled: bool,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

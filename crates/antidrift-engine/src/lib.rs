@@ -8,6 +8,7 @@ mod headless;
 mod headless_host;
 mod relay;
 mod rule_plan;
+mod rule_scope;
 mod runner;
 mod rust;
 pub mod service;

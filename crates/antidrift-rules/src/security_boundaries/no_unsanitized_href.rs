@@ -1,8 +1,6 @@
 use super::web_provenance::{ImportedOwner, imported_owner};
 use antidrift_kernel::jsx::element_tag_name;
-use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedRule, decode_rule_options, in_scope,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -14,27 +12,21 @@ pub const RULE_NAME: &str = "antidrift/no-unsanitized-href";
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct HrefOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     sanitizers: Vec<ImportedOwner>,
 }
 
 pub struct NoUnsanitizedHref {
-    scope: RuleScope,
     sanitizers: Vec<ImportedOwner>,
 }
 
 pub static DEFAULT_RULE: NoUnsanitizedHref = NoUnsanitizedHref {
-    scope: RuleScope::DEFAULT,
     sanitizers: Vec::new(),
 };
 
 impl NoUnsanitizedHref {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<HrefOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
-            scope,
             sanitizers: parsed.sanitizers,
         })
     }
@@ -42,34 +34,23 @@ impl NoUnsanitizedHref {
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::JsxAttribute)];
 
-impl ScopedRule for NoUnsanitizedHref {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoUnsanitizedHref {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        Box::new(Visitor {
-            rule: self,
-            enabled,
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor { rule: self })
     }
 }
 
 struct Visitor {
     rule: &'static NoUnsanitizedHref,
-    enabled: bool,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

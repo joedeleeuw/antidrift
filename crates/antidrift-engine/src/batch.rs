@@ -7,7 +7,6 @@ use antidrift_kernel::diagnostic::{RuleDiagnostic, RuleFix, Severity, TextEdit, 
 use antidrift_kernel::directives::{DirectiveSet, effective_token_start};
 use antidrift_kernel::line_caps::tiered_severity;
 use antidrift_kernel::span_index::LineIndex;
-use antidrift_rules::{create_rule, lookup_default_rule};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -216,32 +215,15 @@ struct CaseRuleSet {
     severities: FxHashMap<String, Severity>,
 }
 
-fn has_non_empty_options(options: Option<&Value>) -> bool {
-    match options {
-        None | Some(Value::Null) => false,
-        Some(Value::Array(items)) => items.first().is_some_and(|first| !first.is_null()),
-        Some(_) => true,
-    }
-}
-
 fn resolve_case_rule(
     rule_name: &str,
     options: Option<&Value>,
     filename: &str,
     case_id: &str,
 ) -> Result<&'static dyn Rule, String> {
-    if !has_non_empty_options(options)
-        && let Some(default_rule) = lookup_default_rule(rule_name)
-    {
-        return Ok(default_rule);
-    }
-    let Some(rule) = create_rule(rule_name, options).map_err(|err| format!("{filename}: {err}"))?
-    else {
-        return Err(format!(
-            "unknown rule '{rule_name}' in batch case '{case_id}'"
-        ));
-    };
-    Ok(Box::leak(rule))
+    crate::rule_plan::instantiate_rule(rule_name, options)
+        .map_err(|err| format!("{filename}: {err}"))?
+        .ok_or_else(|| format!("unknown rule '{rule_name}' in batch case '{case_id}'"))
 }
 
 fn build_case_rules(case: &BatchCaseInput) -> Result<CaseRuleSet, String> {

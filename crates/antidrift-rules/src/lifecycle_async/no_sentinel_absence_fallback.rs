@@ -1,7 +1,5 @@
 use super::syntax::unwrap_expression;
-use antidrift_kernel::rule_scope::{
-    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::runtime_lifecycle::{has_mtime_ordering_text, spans_multiple_artifact_tiers};
 use antidrift_kernel::tsrs_kernel::{cooked_text, is_function_like, node_text};
 use serde::Deserialize;
@@ -17,36 +15,29 @@ pub const RULE_NAME: &str = "antidrift/no-sentinel-absence-fallback";
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct AbsenceOptions {
     member_sentinels: bool,
-    #[serde(flatten)]
-    scope: ScopeOptions,
 }
 
 impl Default for AbsenceOptions {
     fn default() -> Self {
         Self {
             member_sentinels: true,
-            scope: ScopeOptions::default(),
         }
     }
 }
 
 pub struct NoSentinelAbsenceFallback {
     member_sentinels: bool,
-    scope: RuleScope,
 }
 
 pub static DEFAULT_RULE: NoSentinelAbsenceFallback = NoSentinelAbsenceFallback {
     member_sentinels: true,
-    scope: RuleScope::DEFAULT,
 };
 
 impl NoSentinelAbsenceFallback {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let decoded = decode_rule_options::<AbsenceOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &decoded.scope)?;
         Ok(Self {
             member_sentinels: decoded.member_sentinels,
-            scope,
         })
     }
 }
@@ -57,21 +48,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
 ];
 
-impl ScopedRule for NoSentinelAbsenceFallback {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoSentinelAbsenceFallback {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
             member_sentinels: self.member_sentinels,
         })

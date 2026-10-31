@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::{boundary, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags};
@@ -7,39 +7,25 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-identity-schema-transform";
 
-pub struct NoIdentitySchemaTransform {
-    scope: RuleScope,
-}
+pub struct NoIdentitySchemaTransform;
 
-pub static DEFAULT_RULE: NoIdentitySchemaTransform = NoIdentitySchemaTransform {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoIdentitySchemaTransform = NoIdentitySchemaTransform;
 
 impl NoIdentitySchemaTransform {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
-
-impl ScopedRule for NoIdentitySchemaTransform {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoIdentitySchemaTransform {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

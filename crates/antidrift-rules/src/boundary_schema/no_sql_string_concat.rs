@@ -3,7 +3,6 @@ use super::sql_text::{
     combined_template_text, is_sql_identifier_context, is_sql_interpolation_context,
     is_sql_statement, is_static_string, static_string_text,
 };
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, ScopedRule};
 use antidrift_kernel::tsrs_kernel;
 use antidrift_kernel::tsrs_kernel::cooked_text_lossy;
 use serde::Deserialize;
@@ -27,8 +26,6 @@ const LISTENERS: &[Listener] = &[
 pub struct SqlConcatOptions {
     pub safe_identifier_members: Vec<SafeIdentifierMemberSpec>,
     pub safe_template_tags: Vec<SafeTemplateTagSpec>,
-    #[serde(flatten)]
-    pub scope: ScopeOptions,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -57,35 +54,19 @@ pub enum SafeTemplateTagSpec {
 
 pub struct NoSqlStringConcat {
     options: SqlConcatOptions,
-    scope: RuleScope,
 }
 
 pub static DEFAULT_RULE: NoSqlStringConcat = NoSqlStringConcat {
     options: SqlConcatOptions {
         safe_identifier_members: Vec::new(),
         safe_template_tags: Vec::new(),
-        scope: ScopeOptions {
-            files: None,
-            exclude_files: Vec::new(),
-        },
     },
-    scope: RuleScope::DEFAULT,
 };
 
 impl NoSqlStringConcat {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = super::decode_rule_options::<SqlConcatOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
-        Ok(Self {
-            options: parsed,
-            scope,
-        })
-    }
-}
-
-impl ScopedRule for NoSqlStringConcat {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
+        Ok(Self { options: parsed })
     }
 }
 
@@ -94,10 +75,7 @@ impl Rule for NoSqlStringConcat {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor { rule: self })
     }
 }

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use antidrift_kernel::jsx::is_hook_name;
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{
     is_undefined_or_void_expression, normalize_path, property_name_text, unwrap_expression,
 };
@@ -13,19 +13,14 @@ pub const RULE_NAME: &str = "antidrift/no-hookless-use-function";
 const PLATFORM_INFIXES: [&str; 4] = ["web", "native", "ios", "android"];
 const CODE_EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mts", "mjs"];
 
-pub struct NoHooklessUseFunction {
-    scope: RuleScope,
-}
+pub struct NoHooklessUseFunction;
 
-pub static DEFAULT_RULE: NoHooklessUseFunction = NoHooklessUseFunction {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoHooklessUseFunction = NoHooklessUseFunction;
 
 impl NoHooklessUseFunction {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -36,31 +31,21 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::PropertyAssignment),
 ];
 
-impl ScopedRule for NoHooklessUseFunction {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoHooklessUseFunction {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {
-            active: in_scope(&self.scope, ctx, None),
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor {})
     }
 }
 
-struct Visitor {
-    active: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.active { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

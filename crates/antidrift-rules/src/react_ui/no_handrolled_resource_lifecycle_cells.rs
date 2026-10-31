@@ -6,7 +6,7 @@ use super::shadow_state_mirror::{
 };
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::{EmptyVisitor, reject_unknown_options};
 use antidrift_kernel::tsrs_kernel::{static_member_chain, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -17,25 +17,14 @@ pub const RULE_NAME: &str = "antidrift/no-handrolled-resource-lifecycle-cells";
 const MESSAGE: &str = "This async transition hand-rolls a resource lifecycle: a constant lifecycle cell is toggled around the request while sibling cells receive the resource value and caught error. Model one resource/reducer value instead of coupled setters.";
 const GLOBAL_OBJECTS: [&str; 3] = ["globalThis", "window", "self"];
 
-pub struct NoHandrolledResourceLifecycleCells {
-    scope: RuleScope,
-}
+pub struct NoHandrolledResourceLifecycleCells;
 
-pub static DEFAULT_RULE: NoHandrolledResourceLifecycleCells = NoHandrolledResourceLifecycleCells {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoHandrolledResourceLifecycleCells = NoHandrolledResourceLifecycleCells;
 
 impl NoHandrolledResourceLifecycleCells {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
-    }
-}
-
-impl ScopedRule for NoHandrolledResourceLifecycleCells {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -45,9 +34,6 @@ impl Rule for NoHandrolledResourceLifecycleCells {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
         let mut traversal = LifecycleTraversal {
             imports: FileImports::collect(ctx.file),
             stack: Vec::new(),

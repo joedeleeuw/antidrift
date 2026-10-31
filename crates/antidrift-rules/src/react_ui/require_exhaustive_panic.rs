@@ -1,6 +1,4 @@
-use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedOptions, ScopedRule, decode_scoped, in_scope,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -13,32 +11,21 @@ const MESSAGE: &str = "Terminate this unreachable branch with a throw or the con
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct ExhaustivePanicOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     failure_functions: Vec<String>,
 }
 
-impl ScopedOptions for ExhaustivePanicOptions {
-    fn scope(&self) -> ScopeOptions {
-        self.scope.clone()
-    }
-}
-
 pub struct RequireExhaustivePanic {
-    scope: RuleScope,
     failure_functions: Vec<String>,
 }
 
 pub static DEFAULT_RULE: RequireExhaustivePanic = RequireExhaustivePanic {
-    scope: RuleScope::DEFAULT,
     failure_functions: Vec::new(),
 };
 
 impl RequireExhaustivePanic {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let (parsed, scope) = decode_scoped::<ExhaustivePanicOptions>(RULE_NAME, options)?;
+        let parsed = decode_rule_options::<ExhaustivePanicOptions>(RULE_NAME, options)?;
         Ok(Self {
-            scope,
             failure_functions: parsed.failure_functions,
         })
     }
@@ -46,34 +33,23 @@ impl RequireExhaustivePanic {
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::VariableDeclaration)];
 
-impl ScopedRule for RequireExhaustivePanic {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for RequireExhaustivePanic {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        Box::new(Visitor {
-            rule: self,
-            enabled,
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor { rule: self })
     }
 }
 
 struct Visitor {
     rule: &'static RequireExhaustivePanic,
-    enabled: bool,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

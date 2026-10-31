@@ -1,3 +1,4 @@
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::{shape, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -242,22 +243,14 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
     check_widen_then_assert(ctx, node, operand, type_node);
 }
 
-pub struct NoAppeasementErasure {
-    pub scope: antidrift_kernel::rule_scope::RuleScope,
-}
+pub struct NoAppeasementErasure;
 
-pub static DEFAULT_INSTANCE: NoAppeasementErasure = NoAppeasementErasure {
-    scope: antidrift_kernel::rule_scope::RuleScope::DEFAULT,
-};
+pub static DEFAULT_INSTANCE: NoAppeasementErasure = NoAppeasementErasure;
 
 impl NoAppeasementErasure {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: antidrift_kernel::rule_scope::RuleScope::from_options(
-                "antidrift/no-appeasement-erasure",
-                options,
-            )?,
-        })
+        reject_unknown_options("antidrift/no-appeasement-erasure", options)?;
+        Ok(Self)
     }
 }
 
@@ -271,21 +264,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::TypeAssertionExpression),
 ];
 
-impl antidrift_kernel::rule_scope::ScopedRule for NoAppeasementErasure {
-    fn scope(&self) -> &antidrift_kernel::rule_scope::RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoAppeasementErasure {
     fn name(&self) -> &'static str {
         "antidrift/no-appeasement-erasure"
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

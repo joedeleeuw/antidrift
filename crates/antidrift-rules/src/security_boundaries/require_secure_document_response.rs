@@ -1,7 +1,5 @@
 use super::web_provenance::property_name;
-use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedRule, decode_rule_options, in_scope,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -14,36 +12,27 @@ pub const RULE_NAME: &str = "antidrift/require-secure-document-response";
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct DocumentResponseOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     all_responses: bool,
     headers_module: Option<String>,
     owner: Option<String>,
 }
 
 pub struct RequireSecureDocumentResponse {
-    scope: RuleScope,
-    all_responses: bool,
-    headers_module: Option<String>,
-    owner: Option<String>,
+    options: DocumentResponseOptions,
 }
 
 pub static DEFAULT_RULE: RequireSecureDocumentResponse = RequireSecureDocumentResponse {
-    scope: RuleScope::DEFAULT,
-    all_responses: false,
-    headers_module: None,
-    owner: None,
+    options: DocumentResponseOptions {
+        all_responses: false,
+        headers_module: None,
+        owner: None,
+    },
 };
 
 impl RequireSecureDocumentResponse {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<DocumentResponseOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
-            scope,
-            all_responses: parsed.all_responses,
-            headers_module: parsed.headers_module,
-            owner: parsed.owner,
+            options: decode_rule_options::<DocumentResponseOptions>(RULE_NAME, options)?,
         })
     }
 }
@@ -53,30 +42,21 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::NewExpression),
 ];
 
-impl ScopedRule for RequireSecureDocumentResponse {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for RequireSecureDocumentResponse {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
         let mut download_headers = BTreeSet::new();
-        if enabled {
-            collect_download_headers(ctx.file.as_node(), &mut download_headers);
-        }
+        collect_download_headers(ctx.file.as_node(), &mut download_headers);
         let owner = self
+            .options
             .owner
             .as_deref()
             .unwrap_or("a Response with explicit Content-Type, Content-Disposition and X-Content-Type-Options: nosniff headers");
         Box::new(Visitor {
             rule: self,
-            enabled,
             download_headers,
             owner,
         })
@@ -97,23 +77,31 @@ fn collect_download_headers(node: P<Node>, out: &mut BTreeSet<&'static str>) {
 
 struct Visitor {
     rule: &'static RequireSecureDocumentResponse,
-    enabled: bool,
     download_headers: BTreeSet<&'static str>,
     owner: &'static str,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
         match node.kind() {
             Kind::ImportDeclaration => {
-                inspect_import(ctx, node, self.rule.headers_module.as_deref(), self.owner);
+                inspect_import(
+                    ctx,
+                    node,
+                    self.rule.options.headers_module.as_deref(),
+                    self.owner,
+                );
             }
             Kind::NewExpression
-                if insecure_response(node, self.rule.all_responses, &self.download_headers) =>
+                if insecure_response(
+                    node,
+                    self.rule.options.all_responses,
+                    &self.download_headers,
+                ) =>
             {
                 ctx.report_node(
                     node,

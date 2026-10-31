@@ -1,7 +1,5 @@
 use antidrift_kernel::jsx::{opening_tag_name_node, plain_attribute_name, plain_element_name};
-use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedOptions, ScopedRule, decode_scoped, in_scope, require_non_empty,
-};
+use antidrift_kernel::rule_options::{decode_rule_options, require_non_empty};
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_parentheses};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -45,19 +43,13 @@ impl AllowedFile {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct AdhocLoaderOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     loader_icons: Option<Vec<String>>,
     owner: Option<String>,
     skeleton: Option<String>,
     allowed_files: Vec<AllowedFile>,
 }
 
-impl ScopedOptions for AdhocLoaderOptions {
-    fn scope(&self) -> ScopeOptions {
-        self.scope.clone()
-    }
-
+impl AdhocLoaderOptions {
     fn validate(&self, rule_name: &str) -> Result<(), String> {
         require_non_empty(rule_name, "owner", self.owner.as_ref())?;
         require_non_empty(rule_name, "skeleton", self.skeleton.as_ref())?;
@@ -82,17 +74,11 @@ impl AdhocLoaderOptions {
 }
 
 pub struct NoAdhocLoader {
-    scope: RuleScope,
     options: AdhocLoaderOptions,
 }
 
 pub static DEFAULT_RULE: NoAdhocLoader = NoAdhocLoader {
-    scope: RuleScope::DEFAULT,
     options: AdhocLoaderOptions {
-        scope: ScopeOptions {
-            files: None,
-            exclude_files: Vec::new(),
-        },
         loader_icons: None,
         owner: None,
         skeleton: None,
@@ -102,11 +88,9 @@ pub static DEFAULT_RULE: NoAdhocLoader = NoAdhocLoader {
 
 impl NoAdhocLoader {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let (parsed, scope) = decode_scoped::<AdhocLoaderOptions>(RULE_NAME, options)?;
-        Ok(Self {
-            scope,
-            options: parsed,
-        })
+        let parsed = decode_rule_options::<AdhocLoaderOptions>(RULE_NAME, options)?;
+        parsed.validate(RULE_NAME)?;
+        Ok(Self { options: parsed })
     }
 }
 
@@ -115,12 +99,6 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxSelfClosingElement),
     Listener::Enter(Kind::JsxAttribute),
 ];
-
-impl ScopedRule for NoAdhocLoader {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoAdhocLoader {
     fn name(&self) -> &'static str {
@@ -134,7 +112,7 @@ impl Rule for NoAdhocLoader {
             .allowed_files
             .iter()
             .any(|entry| filename.ends_with(entry.suffix()));
-        let enabled = !allowed && in_scope(&self.scope, ctx, None);
+        let enabled = !allowed;
         Box::new(Visitor {
             rule: self,
             enabled,

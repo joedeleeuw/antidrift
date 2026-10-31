@@ -1,6 +1,6 @@
 use antidrift_kernel::directives::{scan_source_comments, split_identifier_words};
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -28,29 +28,18 @@ const VERB_WORDS: &[&str] = &[
     "validates",
 ];
 
-pub struct NoTutorialComments {
-    scope: RuleScope,
-}
+pub struct NoTutorialComments;
 
-pub static DEFAULT_RULE: NoTutorialComments = NoTutorialComments {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoTutorialComments = NoTutorialComments;
 
 impl NoTutorialComments {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
-
-impl ScopedRule for NoTutorialComments {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoTutorialComments {
     fn name(&self) -> &'static str {
@@ -58,10 +47,9 @@ impl Rule for NoTutorialComments {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
         let filename = ctx.file.file_name().replace('\\', "/");
         let path = ProjectPath::of(ctx.program, &filename);
-        let enabled = self.scope.matches(&filename, cwd) && !path.has_any_role(EXEMPT_ROLES);
+        let enabled = !path.has_any_role(EXEMPT_ROLES);
         Box::new(Visitor { enabled })
     }
 }

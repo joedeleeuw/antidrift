@@ -2,9 +2,7 @@ use antidrift_kernel::jsx::{
     attribute_name, element_tag_name, find_attribute, is_jsx_element_like, jsx_attributes_list,
     jsx_children, render_prop_element, static_attribute_string,
 };
-use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedOptions, ScopedRule, decode_scoped, in_scope,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression, unwrap_parentheses};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -43,32 +41,21 @@ const NATIVE_TOOLTIP_ATTRIBUTES: [&str; 1] = ["title"];
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct IconTooltipOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     icon_components: Vec<String>,
 }
 
-impl ScopedOptions for IconTooltipOptions {
-    fn scope(&self) -> ScopeOptions {
-        self.scope.clone()
-    }
-}
-
 pub struct IconButtonRequiresTooltip {
-    scope: RuleScope,
     icon_components: Vec<String>,
 }
 
 pub static DEFAULT_RULE: IconButtonRequiresTooltip = IconButtonRequiresTooltip {
-    scope: RuleScope::DEFAULT,
     icon_components: Vec::new(),
 };
 
 impl IconButtonRequiresTooltip {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let (parsed, scope) = decode_scoped::<IconTooltipOptions>(RULE_NAME, options)?;
+        let parsed = decode_rule_options::<IconTooltipOptions>(RULE_NAME, options)?;
         Ok(Self {
-            scope,
             icon_components: parsed.icon_components,
         })
     }
@@ -79,19 +66,13 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxSelfClosingElement),
 ];
 
-impl ScopedRule for IconButtonRequiresTooltip {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for IconButtonRequiresTooltip {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = ctx.file.file_name().ends_with(".tsx") && in_scope(&self.scope, ctx, None);
+        let enabled = ctx.file.file_name().ends_with(".tsx");
         Box::new(Visitor {
             rule: self,
             enabled,

@@ -1,3 +1,4 @@
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use std::path::{Path, PathBuf};
 
@@ -175,22 +176,14 @@ fn module_resolves(
         .is_some()
 }
 
-pub struct NoUnresolvedDependencyTypes {
-    pub scope: antidrift_kernel::rule_scope::RuleScope,
-}
+pub struct NoUnresolvedDependencyTypes;
 
-pub static DEFAULT_INSTANCE: NoUnresolvedDependencyTypes = NoUnresolvedDependencyTypes {
-    scope: antidrift_kernel::rule_scope::RuleScope::DEFAULT,
-};
+pub static DEFAULT_INSTANCE: NoUnresolvedDependencyTypes = NoUnresolvedDependencyTypes;
 
 impl NoUnresolvedDependencyTypes {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: antidrift_kernel::rule_scope::RuleScope::from_options(
-                "antidrift/no-unresolved-dependency-types",
-                options,
-            )?,
-        })
+        reject_unknown_options("antidrift/no-unresolved-dependency-types", options)?;
+        Ok(Self)
     }
 }
 
@@ -202,25 +195,16 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ImportType),
 ];
 
-impl antidrift_kernel::rule_scope::ScopedRule for NoUnresolvedDependencyTypes {
-    fn scope(&self) -> &antidrift_kernel::rule_scope::RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoUnresolvedDependencyTypes {
     fn name(&self) -> &'static str {
         "antidrift/no-unresolved-dependency-types"
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
-        }
         let file_path = PathBuf::from(ctx.file.file_name());
         let resolution = match load_dependency_resolution(&file_path) {
             Ok(Some(res)) => Ok(res),
-            Ok(None) => return Box::new(antidrift_kernel::rule_scope::EmptyVisitor),
+            Ok(None) => return Box::new(antidrift_kernel::rule_options::EmptyVisitor),
             Err(err) => Err(err.to_string()),
         };
         let tsconfig = ts_resolver::TsDeclarationResolver::discover_governing_tsconfig(&file_path);

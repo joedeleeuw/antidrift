@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::string_fragments::class_fragments;
 use tsrs_ast::Node;
 use tsrs_core::P;
@@ -7,19 +7,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 pub const RULE_NAME: &str = "antidrift/no-centered-scroll-column";
 const MESSAGE: &str = "Centered, width-capped column owns the vertical scroll (mx-auto + max-w-* + overflow-y-auto/scroll), so the scrollbar floats at the column edge instead of the pane edge next to the inspector rail. Move overflow to a full-width parent (e.g. flex-1 overflow-y-auto) and keep mx-auto/max-w-* on an inner content wrapper. (absolute/fixed/max-h-* boxes are exempt.)";
 
-pub struct NoCenteredScrollColumn {
-    scope: RuleScope,
-}
+pub struct NoCenteredScrollColumn;
 
-pub static DEFAULT_RULE: NoCenteredScrollColumn = NoCenteredScrollColumn {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoCenteredScrollColumn = NoCenteredScrollColumn;
 
 impl NoCenteredScrollColumn {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -33,21 +28,12 @@ impl RuleVisitor for NoopVisitor {
     fn visit(&mut self, _ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {}
 }
 
-impl ScopedRule for NoCenteredScrollColumn {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoCenteredScrollColumn {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !in_scope(&self.scope, ctx, None) {
-            return Box::new(NoopVisitor);
-        }
         for fragment in class_fragments(ctx.file) {
             if is_centered_scroll_column(fragment.text) {
                 ctx.report_node(

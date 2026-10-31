@@ -2,7 +2,7 @@ use super::call_forwarding::{BodyForwarding, is_literal_kind, parameters_match_i
 use antidrift_kernel::callgraph::{IdentifierRef, ProgramSymbolIndex};
 use antidrift_kernel::file_role;
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{callgraph, provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
@@ -271,22 +271,17 @@ fn check_candidate(ctx: &mut Ctx, fn_node: P<Node>, name_ident: P<Node>, decl: P
     }
 }
 
-pub struct NoWrappingFunctions {
-    scope: RuleScope,
-}
+pub struct NoWrappingFunctions;
 
 impl NoWrappingFunctions {
-    pub const DEFAULT: Self = Self {
-        scope: RuleScope::DEFAULT,
-    };
+    pub const DEFAULT: Self = Self;
 }
 
 pub static DEFAULT_INSTANCE: NoWrappingFunctions = NoWrappingFunctions::DEFAULT;
 
 pub fn create(options: Option<&serde_json::Value>) -> Result<Box<dyn Rule>, String> {
-    Ok(Box::new(NoWrappingFunctions {
-        scope: RuleScope::from_options(RULE_NAME, options)?,
-    }))
+    reject_unknown_options(RULE_NAME, options)?;
+    Ok(Box::new(NoWrappingFunctions))
 }
 
 const LISTENERS: &[Listener] = &[
@@ -294,36 +289,21 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::VariableDeclaration),
 ];
 
-impl ScopedRule for NoWrappingFunctions {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoWrappingFunctions {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
-        let file_name = ctx.file.file_name();
-        let enabled = self.scope.matches(file_name, cwd)
-            && !self.scope.skips_generated(
-                &file_role::ProjectPath::of(ctx.program, file_name),
-                ctx.file.text(),
-            );
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, listener: Listener, node: P<Node>) {

@@ -14,23 +14,27 @@ mod stream_origin;
 mod stream_paths;
 mod syntax;
 
-use antidrift_kernel::rule_scope::ScopedRule;
+use crate::CatalogRule;
+use antidrift_kernel::scope_policy::ScopePolicy;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn ScopedRule> {
+pub fn rules() -> Vec<CatalogRule> {
     vec![
-        &no_async_array_method::DEFAULT_RULE,
-        &no_async_context_enter_with::DEFAULT_RULE,
-        &no_awaited_builder_union::DEFAULT_RULE,
-        &no_eager_singleton::DEFAULT_RULE,
-        &no_sentinel_absence_fallback::DEFAULT_RULE,
-        &no_spread_input_in_query_key::DEFAULT_RULE,
-        &require_fetch_timeout::DEFAULT_RULE,
-        &require_function_replacer::DEFAULT_RULE,
-        &require_query_key_factory::DEFAULT_RULE,
-        &require_query_signal::DEFAULT_RULE,
-        &require_stream_reader_disposal::DEFAULT_RULE,
+        CatalogRule::everywhere(&no_async_array_method::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_async_context_enter_with::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_awaited_builder_union::DEFAULT_RULE),
+        CatalogRule::new(
+            &no_eager_singleton::DEFAULT_RULE,
+            ScopePolicy::InferredRole(no_eager_singleton::inferred_role),
+        ),
+        CatalogRule::everywhere(&no_sentinel_absence_fallback::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_spread_input_in_query_key::DEFAULT_RULE),
+        CatalogRule::everywhere(&require_fetch_timeout::DEFAULT_RULE),
+        CatalogRule::everywhere(&require_function_replacer::DEFAULT_RULE),
+        CatalogRule::everywhere(&require_query_key_factory::DEFAULT_RULE),
+        CatalogRule::everywhere(&require_query_signal::DEFAULT_RULE),
+        CatalogRule::everywhere(&require_stream_reader_disposal::DEFAULT_RULE),
     ]
 }
 

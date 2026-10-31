@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{is_const_assertion, unwrap_parentheses};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -7,49 +7,34 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 pub const RULE_NAME: &str = "antidrift/no-partial-record-satisfies";
 const MESSAGE: &str = "Don't pin an object literal with `satisfies Partial<Record<...>>` — Partial cancels the totality check satisfies would otherwise give you, so a union member can silently fall through. Make the record total (explicit 'none'/false/null per member), narrow the key union, or add an eslint-disable naming what absence means for genuinely sparse data.";
 
-pub struct NoPartialRecordSatisfies {
-    scope: RuleScope,
-}
+pub struct NoPartialRecordSatisfies;
 
-pub static DEFAULT_RULE: NoPartialRecordSatisfies = NoPartialRecordSatisfies {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoPartialRecordSatisfies = NoPartialRecordSatisfies;
 
 impl NoPartialRecordSatisfies {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::SatisfiesExpression)];
-
-impl ScopedRule for NoPartialRecordSatisfies {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoPartialRecordSatisfies {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
-        let enabled = self.scope.matches(ctx.file.file_name(), cwd);
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

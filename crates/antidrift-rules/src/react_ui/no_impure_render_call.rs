@@ -4,7 +4,7 @@ use super::render_scope::{
 use antidrift_kernel::file_role::{ProjectPath, TEST_ROLES};
 use antidrift_kernel::jsx::{is_component_or_hook_function, react_function_name};
 use antidrift_kernel::provenance::{symbol_at_node, symbol_declarations};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{
     Span, function_node_from_declaration, is_function_like, property_name_text, unwrap_expression,
 };
@@ -16,19 +16,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-impure-render-call";
 
-pub struct NoImpureRenderCall {
-    scope: RuleScope,
-}
+pub struct NoImpureRenderCall;
 
-pub static DEFAULT_RULE: NoImpureRenderCall = NoImpureRenderCall {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoImpureRenderCall = NoImpureRenderCall;
 
 impl NoImpureRenderCall {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -40,20 +35,13 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionExpression),
 ];
 
-impl ScopedRule for NoImpureRenderCall {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoImpureRenderCall {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let active = in_scope(&self.scope, ctx, None)
-            && !ProjectPath::of(ctx.program, ctx.file.file_name()).has_any_role(TEST_ROLES);
+        let active = !ProjectPath::of(ctx.program, ctx.file.file_name()).has_any_role(TEST_ROLES);
         Box::new(Visitor { active })
     }
 }

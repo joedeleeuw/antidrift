@@ -1,7 +1,6 @@
 use super::repo_state_imports::collect_tainted_imports;
 use super::repo_state_taint::{literal_keyed_source_call, taint_root_name};
-use antidrift_kernel::file_role::ProjectPath;
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, ScopedRule, decode_rule_options};
+use antidrift_kernel::rule_options::decode_rule_options;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -38,8 +37,6 @@ const CHAIN_MODIFIERS: &[&str] = &["not", "resolves", "rejects"];
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct RepoStateMirrorOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     sources: Vec<RepoStateSourceOption>,
 }
 
@@ -51,21 +48,17 @@ pub(super) struct RepoStateSourceOption {
 }
 
 pub struct NoRepoStateMirrorAssertion {
-    scope: RuleScope,
     sources: Vec<RepoStateSourceOption>,
 }
 
 pub static DEFAULT_RULE: NoRepoStateMirrorAssertion = NoRepoStateMirrorAssertion {
-    scope: RuleScope::DEFAULT,
     sources: Vec::new(),
 };
 
 impl NoRepoStateMirrorAssertion {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<RepoStateMirrorOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
-            scope,
             sources: parsed.sources,
         })
     }
@@ -73,43 +66,25 @@ impl NoRepoStateMirrorAssertion {
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 
-impl ScopedRule for NoRepoStateMirrorAssertion {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoRepoStateMirrorAssertion {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
-        let normalized_path = ctx.file.file_name().replace('\\', "/");
-        let path = ProjectPath::of(ctx.program, &normalized_path);
-        let in_scope =
-            self.scope.matches(&normalized_path, cwd) && super::syntax::is_test_file(&path);
-        let tainted_imports = if in_scope {
-            collect_tainted_imports(ctx.file.statements().nodes(), &self.sources)
-        } else {
-            FxHashMap::default()
-        };
         Box::new(Visitor {
-            enabled: in_scope,
-            tainted_imports,
+            tainted_imports: collect_tainted_imports(ctx.file.statements().nodes(), &self.sources),
         })
     }
 }
 
 struct Visitor {
-    enabled: bool,
     tainted_imports: FxHashMap<String, String>,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

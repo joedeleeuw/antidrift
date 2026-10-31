@@ -23,6 +23,7 @@ version = "0.20.0"
 dependencies = [
  "antidrift-kernel",
  "antidrift-rules",
+ "globset",
  "ignore",
  "proc-macro2",
  "rayon",
@@ -46,7 +47,6 @@ dependencies = [
 name = "antidrift-kernel"
 version = "0.20.0"
 dependencies = [
- "globset",
  "oxc_resolver",
  "rustc-hash",
  "serde",

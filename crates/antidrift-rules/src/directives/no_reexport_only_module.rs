@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::{EmptyVisitor, reject_unknown_options};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
@@ -8,25 +8,14 @@ use tsrslint::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-reexport-only-module";
 
-pub struct NoReexportOnlyModule {
-    scope: RuleScope,
-}
+pub struct NoReexportOnlyModule;
 
-pub static DEFAULT_RULE: NoReexportOnlyModule = NoReexportOnlyModule {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoReexportOnlyModule = NoReexportOnlyModule;
 
 impl NoReexportOnlyModule {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
-    }
-}
-
-impl ScopedRule for NoReexportOnlyModule {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -36,7 +25,7 @@ impl Rule for NoReexportOnlyModule {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.admits_authored_source(ctx) || is_tool_config_file(ctx.file.file_name()) {
+        if is_tool_config_file(ctx.file.file_name()) {
             return Box::new(EmptyVisitor);
         }
         match provenance::is_package_entry_file(ctx.file.file_name()) {

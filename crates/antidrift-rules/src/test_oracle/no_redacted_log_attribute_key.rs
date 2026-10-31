@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -26,51 +26,34 @@ const SENSITIVE_SUBSTRINGS: &[&str] = &[
     "phone",
 ];
 
-pub struct NoRedactedLogAttributeKey {
-    scope: RuleScope,
-}
+pub struct NoRedactedLogAttributeKey;
 
-pub static DEFAULT_RULE: NoRedactedLogAttributeKey = NoRedactedLogAttributeKey {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoRedactedLogAttributeKey = NoRedactedLogAttributeKey;
 
 impl NoRedactedLogAttributeKey {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
-
-impl ScopedRule for NoRedactedLogAttributeKey {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoRedactedLogAttributeKey {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
-        let filename = ctx.file.file_name().replace('\\', "/");
-        Box::new(Visitor {
-            enabled: self.scope.matches(&filename, cwd),
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

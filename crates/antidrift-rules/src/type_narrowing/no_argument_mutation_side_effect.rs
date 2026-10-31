@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::{EmptyVisitor, reject_unknown_options};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, Symbol};
 use tsrs_checker::Checker;
@@ -18,25 +18,14 @@ const ACCUMULATOR_NAMES: &[&str] = &[
     "accumulator",
 ];
 
-pub struct NoArgumentMutationSideEffect {
-    scope: RuleScope,
-}
+pub struct NoArgumentMutationSideEffect;
 
-pub static DEFAULT_RULE: NoArgumentMutationSideEffect = NoArgumentMutationSideEffect {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoArgumentMutationSideEffect = NoArgumentMutationSideEffect;
 
 impl NoArgumentMutationSideEffect {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
-    }
-}
-
-impl ScopedRule for NoArgumentMutationSideEffect {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -46,9 +35,6 @@ impl Rule for NoArgumentMutationSideEffect {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.admits_authored_source(ctx) {
-            return Box::new(EmptyVisitor);
-        }
         for &stmt in ctx.file.statements().nodes() {
             for fn_node in module_scope_functions(stmt) {
                 check_function(ctx, fn_node);

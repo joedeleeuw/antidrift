@@ -1,4 +1,3 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, ScopedRule};
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags};
@@ -26,8 +25,6 @@ const LISTENERS: &[Listener] = &[
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct UnknownInputOptions {
     pub defensive_shape_probe_threshold: Option<usize>,
-    #[serde(flatten)]
-    pub scope: ScopeOptions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,12 +44,10 @@ impl BoundarySourceKind {
 
 pub struct UnknownInputMustBeDecoded {
     pub(super) probe_threshold: usize,
-    scope: RuleScope,
 }
 
 pub static DEFAULT_RULE: UnknownInputMustBeDecoded = UnknownInputMustBeDecoded {
     probe_threshold: DEFAULT_PROBE_THRESHOLD,
-    scope: RuleScope::DEFAULT,
 };
 
 impl UnknownInputMustBeDecoded {
@@ -67,17 +62,9 @@ impl UnknownInputMustBeDecoded {
             Some(count) => count,
             None => DEFAULT_PROBE_THRESHOLD,
         };
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
             probe_threshold: threshold,
-            scope,
         })
-    }
-}
-
-impl ScopedRule for UnknownInputMustBeDecoded {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
     }
 }
 
@@ -86,10 +73,7 @@ impl Rule for UnknownInputMustBeDecoded {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor { rule: self })
     }
 }

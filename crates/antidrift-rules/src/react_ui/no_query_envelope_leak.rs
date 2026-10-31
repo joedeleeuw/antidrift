@@ -6,7 +6,7 @@ use antidrift_kernel::local_binding::resolve_lexical_binding;
 use antidrift_kernel::provenance::{
     resolve_aliased_symbol, symbol_at_node, symbol_declarations, type_symbol,
 };
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{
     collect_return_expressions, enclosing_function, function_node_from_declaration,
     is_function_like, normalize_path, property_name_text, unwrap_expression,
@@ -51,19 +51,14 @@ const QUERY_HOOK_CALL_NAMES: [&str; 5] = [
     "useMutation",
 ];
 
-pub struct NoQueryEnvelopeLeak {
-    scope: RuleScope,
-}
+pub struct NoQueryEnvelopeLeak;
 
-pub static DEFAULT_RULE: NoQueryEnvelopeLeak = NoQueryEnvelopeLeak {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoQueryEnvelopeLeak = NoQueryEnvelopeLeak;
 
 impl NoQueryEnvelopeLeak {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -73,20 +68,13 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),
 ];
 
-impl ScopedRule for NoQueryEnvelopeLeak {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoQueryEnvelopeLeak {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let active = in_scope(&self.scope, ctx, None)
-            && !ProjectPath::of(ctx.program, ctx.file.file_name()).has_any_role(TEST_ROLES);
+        let active = !ProjectPath::of(ctx.program, ctx.file.file_name()).has_any_role(TEST_ROLES);
         Box::new(Visitor { active })
     }
 }

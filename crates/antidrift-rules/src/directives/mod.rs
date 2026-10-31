@@ -18,30 +18,40 @@ pub mod no_tutorial_comments;
 pub mod no_unknown_type_aliases;
 pub mod no_unsafe_cast_chain;
 
-use antidrift_kernel::rule_scope::ScopedRule;
+use crate::CatalogRule;
+use antidrift_kernel::scope_policy::ScopePolicy;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn ScopedRule> {
+pub fn rules() -> Vec<CatalogRule> {
     vec![
-        &docs_source_policy::DEFAULT_RULE,
-        &line_caps::MODULE_RULE,
-        &line_caps::FUNCTION_RULE,
-        &line_caps::COMPONENT_RULE,
-        &no_anemic_errors::DEFAULT_RULE,
-        &no_as_never::DEFAULT_RULE,
-        &no_branch_tree::DEFAULT_RULE,
-        &no_dated_comments::DEFAULT_RULE,
-        &no_debug_residue_filenames::DEFAULT_RULE,
-        &no_default_export_in_domain::DEFAULT_RULE,
-        &no_host_path_literal::DEFAULT_RULE,
-        &no_mutable_let_alias::DEFAULT_RULE,
-        &no_partial_record_satisfies::DEFAULT_RULE,
-        &no_reexport_only_module::DEFAULT_RULE,
-        &no_todo_without_issue::DEFAULT_RULE,
-        &no_tutorial_comments::DEFAULT_RULE,
-        &no_unknown_type_aliases::DEFAULT_RULE,
-        &no_unsafe_cast_chain::DEFAULT_RULE,
+        CatalogRule::everywhere(&docs_source_policy::DEFAULT_RULE),
+        CatalogRule::everywhere(&line_caps::MODULE_RULE),
+        CatalogRule::everywhere(&line_caps::FUNCTION_RULE),
+        CatalogRule::everywhere(&line_caps::COMPONENT_RULE),
+        CatalogRule::everywhere(&no_anemic_errors::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_as_never::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_branch_tree::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_dated_comments::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_debug_residue_filenames::DEFAULT_RULE),
+        CatalogRule::new(
+            &no_default_export_in_domain::DEFAULT_RULE,
+            ScopePolicy::InferredRole(no_default_export_in_domain::inferred_role),
+        ),
+        CatalogRule::new(
+            &no_host_path_literal::DEFAULT_RULE,
+            ScopePolicy::InferredRole(no_host_path_literal::inferred_role),
+        ),
+        CatalogRule::everywhere(&no_mutable_let_alias::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_partial_record_satisfies::DEFAULT_RULE),
+        CatalogRule::new(
+            &no_reexport_only_module::DEFAULT_RULE,
+            ScopePolicy::AuthoredSource,
+        ),
+        CatalogRule::everywhere(&no_todo_without_issue::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_tutorial_comments::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_unknown_type_aliases::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_unsafe_cast_chain::DEFAULT_RULE),
     ]
 }
 

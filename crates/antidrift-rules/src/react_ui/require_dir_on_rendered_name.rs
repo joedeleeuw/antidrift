@@ -1,9 +1,7 @@
 use antidrift_kernel::jsx::{
     has_plain_attribute, jsx_children, jsx_opening_node, plain_element_name,
 };
-use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedOptions, ScopedRule, decode_scoped, in_scope, require_non_empty,
-};
+use antidrift_kernel::rule_options::{decode_rule_options, require_non_empty};
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -37,18 +35,12 @@ const RAW_ISOLATING: [&str; 2] = ["bdi", "bdo"];
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct RenderedNameOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     name_props: Option<Vec<String>>,
     isolating_components: Option<Vec<String>>,
     owner: Option<String>,
 }
 
-impl ScopedOptions for RenderedNameOptions {
-    fn scope(&self) -> ScopeOptions {
-        self.scope.clone()
-    }
-
+impl RenderedNameOptions {
     fn validate(&self, rule_name: &str) -> Result<(), String> {
         require_non_empty(rule_name, "owner", self.owner.as_ref())
     }
@@ -73,17 +65,11 @@ impl RenderedNameOptions {
 }
 
 pub struct RequireDirOnRenderedName {
-    scope: RuleScope,
     options: RenderedNameOptions,
 }
 
 pub static DEFAULT_RULE: RequireDirOnRenderedName = RequireDirOnRenderedName {
-    scope: RuleScope::DEFAULT,
     options: RenderedNameOptions {
-        scope: ScopeOptions {
-            files: None,
-            exclude_files: Vec::new(),
-        },
         name_props: None,
         isolating_components: None,
         owner: None,
@@ -92,44 +78,31 @@ pub static DEFAULT_RULE: RequireDirOnRenderedName = RequireDirOnRenderedName {
 
 impl RequireDirOnRenderedName {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let (parsed, scope) = decode_scoped::<RenderedNameOptions>(RULE_NAME, options)?;
-        Ok(Self {
-            scope,
-            options: parsed,
-        })
+        let parsed = decode_rule_options::<RenderedNameOptions>(RULE_NAME, options)?;
+        parsed.validate(RULE_NAME)?;
+        Ok(Self { options: parsed })
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::JsxElement)];
-
-impl ScopedRule for RequireDirOnRenderedName {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for RequireDirOnRenderedName {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        Box::new(Visitor {
-            rule: self,
-            enabled,
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor { rule: self })
     }
 }
 
 struct Visitor {
     rule: &'static RequireDirOnRenderedName,
-    enabled: bool,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

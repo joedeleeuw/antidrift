@@ -4,7 +4,7 @@ use super::anemic_error_fallback::{
     is_error_member_read,
 };
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{
     cooked_text, property_name_text, unwrap_awaited_expression, unwrap_expression,
 };
@@ -40,19 +40,14 @@ const BARE_ERROR_CTORS: &[&str] = &[
 const LOGGER_OBJECTS: &[&str] = &["console", "logger", "log"];
 const LOGGER_METHODS: &[&str] = &["debug", "error", "fatal", "info", "log", "trace", "warn"];
 
-pub struct NoAnemicErrors {
-    scope: RuleScope,
-}
+pub struct NoAnemicErrors;
 
-pub static DEFAULT_RULE: NoAnemicErrors = NoAnemicErrors {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoAnemicErrors = NoAnemicErrors;
 
 impl NoAnemicErrors {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -65,34 +60,25 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ConditionalExpression),
 ];
 
-impl ScopedRule for NoAnemicErrors {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoAnemicErrors {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
         let filename = ctx.file.file_name().replace('\\', "/");
-        let enabled = self.scope.matches(&filename, cwd);
         let is_test = ProjectPath::of(ctx.program, &filename).has_role(FileRole::TestOrSpec);
-        Box::new(Visitor { enabled, is_test })
+        Box::new(Visitor { is_test })
     }
 }
 
 struct Visitor {
-    enabled: bool,
     is_test: bool,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

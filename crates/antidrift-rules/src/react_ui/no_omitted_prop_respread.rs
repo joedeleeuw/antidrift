@@ -3,7 +3,7 @@ use antidrift_kernel::jsx::{
     jsx_attributes_list, jsx_children, jsx_opening_node, plain_attribute_name,
 };
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{is_function_like, unwrap_expression};
 use antidrift_kernel::type_syntax::{LocalTypeAliases, property_key_name};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -13,19 +13,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-omitted-prop-respread";
 
-pub struct NoOmittedPropRespread {
-    scope: RuleScope,
-}
+pub struct NoOmittedPropRespread;
 
-pub static DEFAULT_RULE: NoOmittedPropRespread = NoOmittedPropRespread {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoOmittedPropRespread = NoOmittedPropRespread;
 
 impl NoOmittedPropRespread {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -34,23 +29,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxSelfClosingElement),
 ];
 
-impl ScopedRule for NoOmittedPropRespread {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoOmittedPropRespread {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !in_scope(&self.scope, ctx, None) {
-            return Box::new(Visitor {
-                omitted: FxHashMap::default(),
-            });
-        }
         let aliases = LocalTypeAliases::collect(ctx.file);
         let mut omitted = FxHashMap::default();
         collect_function_omitted(ctx.file.as_node(), &aliases, &mut omitted);

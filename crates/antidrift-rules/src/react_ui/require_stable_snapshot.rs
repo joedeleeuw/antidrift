@@ -2,7 +2,7 @@ use super::render_body_primitives::{is_inside_render_body, reactive_primitive_na
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::jsx::is_hook_name;
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{
     collect_return_expressions, property_name_text, unwrap_expression,
 };
@@ -34,19 +34,14 @@ const COMPARATOR_OPTION_NAMES: [&str; 6] = [
 ];
 const MESSAGE: &str = "getSnapshot/getServerSnapshot must return a cached reference, not a fresh object/array/derived collection each call. React compares results with Object.is, so an unstable snapshot trips 'The result of getSnapshot should be cached' and can loop into 'Maximum update depth exceeded'. Cache the snapshot in the store and return the same reference until the underlying data changes.";
 
-pub struct RequireStableSnapshot {
-    scope: RuleScope,
-}
+pub struct RequireStableSnapshot;
 
-pub static DEFAULT_RULE: RequireStableSnapshot = RequireStableSnapshot {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: RequireStableSnapshot = RequireStableSnapshot;
 
 impl RequireStableSnapshot {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -55,28 +50,14 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::NewExpression),
 ];
 
-impl ScopedRule for RequireStableSnapshot {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for RequireStableSnapshot {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !in_scope(&self.scope, ctx, None) {
-            return Box::new(Visitor {
-                active: false,
-                aliases: FxHashSet::default(),
-                namespaces: FxHashSet::default(),
-            });
-        }
         let imports = FileImports::collect(ctx.file);
         Box::new(Visitor {
-            active: true,
             aliases: imports.locals_from("react", &[HOOK_NAME]),
             namespaces: imports.namespaces_from("react"),
         })
@@ -84,7 +65,6 @@ impl Rule for RequireStableSnapshot {
 }
 
 struct Visitor {
-    active: bool,
     aliases: FxHashSet<&'static str>,
     namespaces: FxHashSet<&'static str>,
 }
@@ -114,7 +94,7 @@ impl Visitor {
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.active { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

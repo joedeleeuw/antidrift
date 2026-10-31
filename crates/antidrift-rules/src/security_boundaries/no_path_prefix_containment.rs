@@ -1,5 +1,5 @@
 use antidrift_kernel::local_binding::{Binding, is_binding_mutated, resolve_lexical_binding};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{cooked_text, numeric_literal_value, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -8,48 +8,34 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-path-prefix-containment";
 
-pub struct NoPathPrefixContainment {
-    scope: RuleScope,
-}
+pub struct NoPathPrefixContainment;
 
-pub static DEFAULT_RULE: NoPathPrefixContainment = NoPathPrefixContainment {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoPathPrefixContainment = NoPathPrefixContainment;
 
 impl NoPathPrefixContainment {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
-
-impl ScopedRule for NoPathPrefixContainment {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoPathPrefixContainment {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

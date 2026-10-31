@@ -1,6 +1,4 @@
-use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedRule, decode_rule_options, in_scope,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -12,8 +10,6 @@ pub const RULE_NAME: &str = "antidrift/confine-owner";
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct ConfineOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     registry: Option<String>,
     entries: Vec<OwnerEntry>,
 }
@@ -84,13 +80,11 @@ impl OwnerEntry {
 }
 
 pub struct ConfineOwner {
-    scope: RuleScope,
     registry: Option<String>,
     entries: Vec<OwnerEntry>,
 }
 
 pub static DEFAULT_RULE: ConfineOwner = ConfineOwner {
-    scope: RuleScope::DEFAULT,
     registry: None,
     entries: Vec::new(),
 };
@@ -106,9 +100,7 @@ impl ConfineOwner {
                     .to_owned(),
             );
         }
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
-            scope,
             registry: parsed.registry,
             entries: parsed.entries,
         })
@@ -121,42 +113,27 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::PropertyAccessExpression),
 ];
 
-impl ScopedRule for ConfineOwner {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for ConfineOwner {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
         let filename = ctx.file.file_name().replace('\\', "/");
-        let entries = if enabled {
-            self.entries
-                .iter()
-                .filter(|entry| entry.applies(&filename))
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let entries: Vec<&'static OwnerEntry> = self
+            .entries
+            .iter()
+            .filter(|entry| entry.applies(&filename))
+            .collect();
         let registry = self
             .registry
             .as_deref()
             .unwrap_or("this rule’s entries configuration");
-        Box::new(Visitor {
-            enabled: enabled && !entries.is_empty(),
-            entries,
-            registry,
-        })
+        Box::new(Visitor { entries, registry })
     }
 }
 
 struct Visitor {
-    enabled: bool,
     entries: Vec<&'static OwnerEntry>,
     registry: &'static str,
 }
@@ -177,7 +154,7 @@ impl Visitor {
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

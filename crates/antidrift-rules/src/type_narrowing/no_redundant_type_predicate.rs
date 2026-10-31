@@ -1,3 +1,4 @@
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::{Checker, Signature, Type, TypeFlags};
@@ -389,22 +390,14 @@ fn check_callback(ctx: &mut Ctx, node: P<Node>) {
     }
 }
 
-pub struct NoRedundantTypePredicate {
-    pub scope: antidrift_kernel::rule_scope::RuleScope,
-}
+pub struct NoRedundantTypePredicate;
 
-pub static DEFAULT_INSTANCE: NoRedundantTypePredicate = NoRedundantTypePredicate {
-    scope: antidrift_kernel::rule_scope::RuleScope::DEFAULT,
-};
+pub static DEFAULT_INSTANCE: NoRedundantTypePredicate = NoRedundantTypePredicate;
 
 impl NoRedundantTypePredicate {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: antidrift_kernel::rule_scope::RuleScope::from_options(
-                "antidrift/no-redundant-type-predicate",
-                options,
-            )?,
-        })
+        reject_unknown_options("antidrift/no-redundant-type-predicate", options)?;
+        Ok(Self)
     }
 }
 
@@ -413,21 +406,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionExpression),
 ];
 
-impl antidrift_kernel::rule_scope::ScopedRule for NoRedundantTypePredicate {
-    fn scope(&self) -> &antidrift_kernel::rule_scope::RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoRedundantTypePredicate {
     fn name(&self) -> &'static str {
         "antidrift/no-redundant-type-predicate"
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

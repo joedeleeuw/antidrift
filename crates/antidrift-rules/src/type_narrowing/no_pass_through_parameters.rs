@@ -1,6 +1,5 @@
 use antidrift_kernel::callgraph;
-use antidrift_kernel::file_role;
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -17,22 +16,17 @@ fn build_pass_through_message(name: &str, targets: &[String]) -> RuleMessage {
     )
 }
 
-pub struct NoPassThroughParameters {
-    scope: RuleScope,
-}
+pub struct NoPassThroughParameters;
 
 impl NoPassThroughParameters {
-    pub const DEFAULT: Self = Self {
-        scope: RuleScope::DEFAULT,
-    };
+    pub const DEFAULT: Self = Self;
 }
 
 pub static DEFAULT_INSTANCE: NoPassThroughParameters = NoPassThroughParameters::DEFAULT;
 
 pub fn create(options: Option<&serde_json::Value>) -> Result<Box<dyn Rule>, String> {
-    Ok(Box::new(NoPassThroughParameters {
-        scope: RuleScope::from_options(RULE_NAME, options)?,
-    }))
+    reject_unknown_options(RULE_NAME, options)?;
+    Ok(Box::new(NoPassThroughParameters))
 }
 
 const LISTENERS: &[Listener] = &[
@@ -41,36 +35,21 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionExpression),
 ];
 
-impl ScopedRule for NoPassThroughParameters {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoPassThroughParameters {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
-        let file_name = ctx.file.file_name();
-        let enabled = self.scope.matches(file_name, cwd)
-            && !self.scope.skips_generated(
-                &file_role::ProjectPath::of(ctx.program, file_name),
-                ctx.file.text(),
-            );
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

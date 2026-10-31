@@ -1,7 +1,5 @@
 use antidrift_kernel::jsx::attribute_name;
-use antidrift_kernel::rule_scope::{
-    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::tsrs_kernel::{cooked_text, is_function_like, unwrap_expression};
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -18,8 +16,6 @@ struct ClassnameOptions {
     helpers: Vec<String>,
     min_shared_ratio: f64,
     min_shared_tokens: usize,
-    #[serde(flatten)]
-    scope: ScopeOptions,
 }
 
 impl Default for ClassnameOptions {
@@ -29,7 +25,6 @@ impl Default for ClassnameOptions {
             helpers: Vec::new(),
             min_shared_ratio: 0.65,
             min_shared_tokens: 4,
-            scope: ScopeOptions::default(),
         }
     }
 }
@@ -70,7 +65,6 @@ impl ClassnameOptions {
 
 pub struct NoDuplicatedConditionalClassnames {
     options: ClassnameOptions,
-    scope: RuleScope,
 }
 
 pub static DEFAULT_RULE: NoDuplicatedConditionalClassnames = NoDuplicatedConditionalClassnames {
@@ -79,22 +73,13 @@ pub static DEFAULT_RULE: NoDuplicatedConditionalClassnames = NoDuplicatedConditi
         helpers: Vec::new(),
         min_shared_ratio: 0.65,
         min_shared_tokens: 4,
-        scope: ScopeOptions {
-            files: None,
-            exclude_files: Vec::new(),
-        },
     },
-    scope: RuleScope::DEFAULT,
 };
 
 impl NoDuplicatedConditionalClassnames {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let decoded = ClassnameOptions::decode(options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &decoded.scope)?;
-        Ok(Self {
-            options: decoded,
-            scope,
-        })
+        Ok(Self { options: decoded })
     }
 
     fn matches_attribute(&self, name: &str) -> bool {
@@ -108,21 +93,12 @@ impl NoDuplicatedConditionalClassnames {
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::ConditionalExpression)];
 
-impl ScopedRule for NoDuplicatedConditionalClassnames {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoDuplicatedConditionalClassnames {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor { rule: self })
     }
 }

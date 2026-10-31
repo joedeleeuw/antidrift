@@ -1,5 +1,5 @@
 use antidrift_kernel::jsx::{attribute_initializer_expression, plain_attribute_name};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression, unwrap_parentheses};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -17,48 +17,34 @@ const SAFE_KEYWORDS: [&str; 7] = [
 ];
 const NAMED_COLORS: [&str; 7] = ["white", "black", "red", "blue", "green", "gray", "grey"];
 
-pub struct NoInlineStyleColors {
-    scope: RuleScope,
-}
+pub struct NoInlineStyleColors;
 
-pub static DEFAULT_RULE: NoInlineStyleColors = NoInlineStyleColors {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoInlineStyleColors = NoInlineStyleColors;
 
 impl NoInlineStyleColors {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::JsxAttribute)];
-
-impl ScopedRule for NoInlineStyleColors {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoInlineStyleColors {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

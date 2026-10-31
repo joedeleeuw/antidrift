@@ -1,5 +1,5 @@
 use antidrift_kernel::json_manifest::load_nearest_package_json_manifest;
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, ScopedRule, decode_rule_options};
+use antidrift_kernel::rule_options::decode_rule_options;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -13,8 +13,6 @@ const MAX_QUARANTINE_MS: i64 = 31 * 24 * 60 * 60 * 1000;
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct DocsSourcePolicyOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     policy_file: Option<String>,
     dependencies: Option<Vec<String>>,
     sources: BTreeMap<String, DocSourceEntry>,
@@ -39,21 +37,15 @@ struct DocExclusionEntry {
 }
 
 pub struct DocsSourcePolicy {
-    scope: RuleScope,
     options: Option<DocsSourcePolicyOptions>,
 }
 
-pub static DEFAULT_RULE: DocsSourcePolicy = DocsSourcePolicy {
-    scope: RuleScope::DEFAULT,
-    options: None,
-};
+pub static DEFAULT_RULE: DocsSourcePolicy = DocsSourcePolicy { options: None };
 
 impl DocsSourcePolicy {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<DocsSourcePolicyOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         Ok(Self {
-            scope,
             options: Some(parsed),
         })
     }
@@ -61,19 +53,12 @@ impl DocsSourcePolicy {
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
 
-impl ScopedRule for DocsSourcePolicy {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for DocsSourcePolicy {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
         let normalized_path = ctx.file.file_name().replace('\\', "/");
         let policy_file = self
             .options
@@ -82,7 +67,7 @@ impl Rule for DocsSourcePolicy {
             .unwrap_or("docs-sources.mjs");
         let matches_policy =
             normalized_path == policy_file || normalized_path.ends_with(&format!("/{policy_file}"));
-        let enabled = self.scope.matches(&normalized_path, cwd) && matches_policy;
+        let enabled = matches_policy;
         Box::new(Visitor {
             enabled,
             rule: self,

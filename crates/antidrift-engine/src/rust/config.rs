@@ -1,7 +1,7 @@
 use super::cargo_manifest::{CargoManifest, read_manifest};
 use super::catalog::{RULES, ResolvedRule, row};
+use crate::rule_scope::{RuleScope, ScopeOptions};
 use antidrift_kernel::diagnostic::Severity;
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -171,8 +171,7 @@ fn resolve_setting(rule_id: &'static str, setting: &RuleSetting) -> Result<RuleL
                 files: scoped.files.clone(),
                 exclude_files: scoped.exclude_files.clone(),
             };
-            let scope = RuleScope::from_scope_options(rule_id, &options)
-                .map_err(|error| error.to_string())?;
+            let scope = RuleScope::from_scope_options(rule_id, &options)?;
             Ok(RuleLevel {
                 level: scoped.level,
                 scope,

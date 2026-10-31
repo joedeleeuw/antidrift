@@ -1,5 +1,6 @@
 use antidrift_kernel::file_role::FileRole;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::file_role::ProjectPath;
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -15,19 +16,14 @@ const EXEMPT_ROLES: &[FileRole] = &[
     FileRole::Story,
 ];
 
-pub struct NoHostPathLiteral {
-    scope: RuleScope,
-}
+pub struct NoHostPathLiteral;
 
-pub static DEFAULT_RULE: NoHostPathLiteral = NoHostPathLiteral {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoHostPathLiteral = NoHostPathLiteral;
 
 impl NoHostPathLiteral {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -38,10 +34,9 @@ const LISTENERS: &[Listener] = &[
 
 struct Visitor;
 
-impl ScopedRule for NoHostPathLiteral {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
+#[must_use]
+pub fn inferred_role(path: &ProjectPath) -> bool {
+    !path.has_any_role(EXEMPT_ROLES)
 }
 
 impl Rule for NoHostPathLiteral {
@@ -49,14 +44,7 @@ impl Rule for NoHostPathLiteral {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !in_scope(
-            &self.scope,
-            ctx,
-            Some(|path| !path.has_any_role(EXEMPT_ROLES)),
-        ) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

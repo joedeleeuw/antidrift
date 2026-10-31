@@ -1,5 +1,6 @@
 use antidrift_kernel::diagnostic::Severity;
 use antidrift_kernel::line_caps::CappedUnit;
+use antidrift_kernel::scope_policy::ScopePolicy;
 use serde::Serialize;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
@@ -9,17 +10,10 @@ pub(super) enum RuleKind {
     HouseStyle,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub(super) enum TestCode {
-    Checked,
-    Skipped,
-}
-
 pub(super) struct RuleRow {
     pub(super) id: &'static str,
     pub(super) kind: RuleKind,
-    pub(super) test_code: TestCode,
+    pub(super) scope_policy: ScopePolicy,
     pub(super) guidance: &'static str,
 }
 
@@ -44,7 +38,7 @@ pub(super) struct LineCapSetting {
 pub(super) struct ResolvedRule {
     pub(super) id: &'static str,
     pub(super) kind: RuleKind,
-    pub(super) test_code: TestCode,
+    pub(super) scope_policy: &'static str,
     pub(super) level: Severity,
     pub(super) guidance: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -64,7 +58,7 @@ impl ResolvedRule {
         Self {
             id: row.id,
             kind: row.kind,
-            test_code: row.test_code,
+            scope_policy: row.scope_policy.label(),
             level,
             guidance: row.guidance,
             line_cap,
@@ -72,11 +66,11 @@ impl ResolvedRule {
     }
 }
 
-const fn general(id: &'static str, test_code: TestCode, guidance: &'static str) -> RuleRow {
+const fn general(id: &'static str, scope_policy: ScopePolicy, guidance: &'static str) -> RuleRow {
     RuleRow {
         id,
         kind: RuleKind::General,
-        test_code,
+        scope_policy,
         guidance,
     }
 }
@@ -85,7 +79,7 @@ const fn house_style(id: &'static str, guidance: &'static str) -> RuleRow {
     RuleRow {
         id,
         kind: RuleKind::HouseStyle,
-        test_code: TestCode::Checked,
+        scope_policy: ScopePolicy::Everywhere,
         guidance,
     }
 }
@@ -93,127 +87,127 @@ const fn house_style(id: &'static str, guidance: &'static str) -> RuleRow {
 pub(super) const RULES: &[RuleRow] = &[
     general(
         "rust/syntax-error",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Every Rust source file must parse.",
     ),
     general(
         "rust/max-module-lines",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Keep Rust modules at or below 500 non-blank lines (warn above 425); split along a domain seam before reaching the ceiling.",
     ),
     general(
         "rust/no-orphan-module",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Every Rust source file under src must be reachable from a Cargo target root through `mod` declarations.",
     ),
     general(
         "rust/no-grab-bag-module",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Name modules after the domain concept they own instead of utils, helpers, common, or misc.",
     ),
     general(
         "rust/no-hollow-module",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Delete empty or stub-only Rust modules.",
     ),
     general(
         "rust/no-layer-violation",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Depend only on lower layers: layers.crates and layers.modules in the antidrift metadata order crates and modules from lowest to highest.",
     ),
     general(
         "rust/no-forbidden-call",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Do not call the callees that forbidden-calls in the antidrift metadata lists; each row carries the reason.",
     ),
     general(
         "rust/no-boolean-map",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Replace Map<K, bool> with Set<K> or a closed state enum.",
     ),
     general(
         "rust/require-strict-serde",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Put #[serde(deny_unknown_fields)] on structs deriving Deserialize so unknown keys fail loudly.",
     ),
     general(
         "rust/no-stringly-variant",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Use closed enums instead of String or str discriminant fields.",
     ),
     general(
         "rust/no-untyped-config-probe",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Decode configuration once at the boundary instead of probing serde_json::Value inward.",
     ),
     general(
         "rust/no-let-underscore-suppression",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Do not suppress unused bindings or struct fields with let _ = ... or leading underscores.",
     ),
     general(
         "rust/no-ident-to-string-compare",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Compare syn::Ident directly against string literals without allocating .to_string().",
     ),
     general(
         "rust/no-compat-names",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Delete legacy, compat, or batch-scaffolding names instead of preserving them.",
     ),
     general(
         "rust/no-wrapping-functions",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Call the underlying function directly instead of adding a pass-through wrapper.",
     ),
     general(
         "rust/no-anemic-errors",
-        TestCode::Skipped,
+        ScopePolicy::AuthoredSource,
         "Preserve underlying error causes in map_err closures and do not branch on formatted error text.",
     ),
     general(
         "rust/no-silent-result-discard",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Do not turn an Err into a new error without its cause, an empty value, or a swallowed filesystem read.",
     ),
     general(
         "rust/no-structural-type-fork",
-        TestCode::Skipped,
+        ScopePolicy::AuthoredSource,
         "Share or import one owned struct instead of duplicating an identical 3+ field struct shape.",
     ),
     general(
         "rust/no-value-roundtrip",
-        TestCode::Skipped,
+        ScopePolicy::AuthoredSource,
         "Convert or construct typed values directly instead of round-tripping through to_string().parse() or to_value/from_value.",
     ),
     general(
         "rust/no-decode-to-option",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Propagate or report boundary serde decode failures explicitly instead of collapsing them via .ok() or unwrap_or.",
     ),
     general(
         "rust/no-constant-return-field",
-        TestCode::Skipped,
+        ScopePolicy::AuthoredSource,
         "Delete struct fields initialized to the same constant across all construction sites and never mutated.",
     ),
     general(
         "rust/no-redundant-owner-prefix",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Drop redundant leading owner-stem prefixes when every field of a non-serde struct repeats the struct stem.",
     ),
     general(
         "rust/no-blocking-in-async",
-        TestCode::Checked,
+        ScopePolicy::Everywhere,
         "Do not block async executors with std::thread::sleep, synchronous std::process::Command waits, or inline sleep hold-open scripts.",
     ),
     general(
         "rust/no-query-join-or-tree-reshape",
-        TestCode::Skipped,
+        ScopePolicy::AuthoredSource,
         "Pre-index inner collections before iterating instead of running nested .find() equijoins, and batch independent awaits.",
     ),
     general(
         "rust/no-contract-appeasement-projection",
-        TestCode::Skipped,
+        ScopePolicy::AuthoredSource,
         "Preserve Result sum types and owned struct values instead of flattening Ok/Err into product envelopes or cloning fields into a parallel struct of the same type.",
     ),
     house_style(

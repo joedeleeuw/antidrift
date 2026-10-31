@@ -1,53 +1,38 @@
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-async-context-enter-with";
 
-pub struct NoAsyncContextEnterWith {
-    scope: RuleScope,
-}
+pub struct NoAsyncContextEnterWith;
 
-pub static DEFAULT_RULE: NoAsyncContextEnterWith = NoAsyncContextEnterWith {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoAsyncContextEnterWith = NoAsyncContextEnterWith;
 
 impl NoAsyncContextEnterWith {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
-
-impl ScopedRule for NoAsyncContextEnterWith {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoAsyncContextEnterWith {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {
-            enabled: self.scope.in_scope(ctx),
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor {})
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

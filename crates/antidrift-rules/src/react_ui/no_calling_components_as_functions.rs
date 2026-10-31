@@ -1,7 +1,7 @@
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::jsx::function_returns_jsx;
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -13,29 +13,18 @@ const IGNORED_NAMES: [&str; 1] = ["OverrideOrDefault"];
 const COMPONENT_WRAPPERS: [&str; 2] = ["forwardRef", "memo"];
 const NON_REACT_JSX_SOURCES: [&str; 3] = ["solid-js", "@builder.io/qwik", "vue"];
 
-pub struct NoCallingComponentsAsFunctions {
-    scope: RuleScope,
-}
+pub struct NoCallingComponentsAsFunctions;
 
-pub static DEFAULT_RULE: NoCallingComponentsAsFunctions = NoCallingComponentsAsFunctions {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoCallingComponentsAsFunctions = NoCallingComponentsAsFunctions;
 
 impl NoCallingComponentsAsFunctions {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
-
-impl ScopedRule for NoCallingComponentsAsFunctions {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoCallingComponentsAsFunctions {
     fn name(&self) -> &'static str {
@@ -43,7 +32,7 @@ impl Rule for NoCallingComponentsAsFunctions {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None) && !is_non_react_jsx_file(ctx.file);
+        let enabled = !is_non_react_jsx_file(ctx.file);
         let imports = if enabled {
             FileImports::collect(ctx.file)
         } else {

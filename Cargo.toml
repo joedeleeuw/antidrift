@@ -19,7 +19,7 @@ publish = false
 rules."rust/no-inline-comment" = "error"
 rules."rust/no-inline-tests" = "error"
 rules."rust/require-strict-serde" = { level = "error", exclude-files = ["crates/antidrift-engine/src/rust/cargo_manifest.rs"] }
-rules."rust/no-untyped-config-probe" = { level = "error", exclude-files = ["crates/antidrift-kernel/src/rule_scope.rs"] }
+rules."rust/no-untyped-config-probe" = { level = "error", exclude-files = ["crates/antidrift-kernel/src/rule_options.rs"] }
 layers.crates = [
   "antidrift-kernel",
   "antidrift-rules",

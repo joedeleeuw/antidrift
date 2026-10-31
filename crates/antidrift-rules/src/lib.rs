@@ -9,14 +9,32 @@ pub mod security_boundaries;
 pub mod test_oracle;
 pub mod type_narrowing;
 
-use antidrift_kernel::rule_scope::ScopedRule;
+use antidrift_kernel::scope_policy::ScopePolicy;
 use std::sync::LazyLock;
 use tsrslint::rule::Rule;
 
-struct RuleCatalogEntry {
-    rule: &'static dyn ScopedRule,
-    default_enabled: bool,
-    typescript_only: bool,
+pub struct CatalogRule {
+    pub rule: &'static dyn Rule,
+    pub scope_policy: ScopePolicy,
+}
+
+impl CatalogRule {
+    #[must_use]
+    pub const fn new(rule: &'static dyn Rule, scope_policy: ScopePolicy) -> Self {
+        Self { rule, scope_policy }
+    }
+
+    #[must_use]
+    pub const fn everywhere(rule: &'static dyn Rule) -> Self {
+        Self::new(rule, ScopePolicy::Everywhere)
+    }
+}
+
+pub struct RuleCatalogEntry {
+    pub rule: &'static dyn Rule,
+    pub scope_policy: ScopePolicy,
+    pub default_enabled: bool,
+    pub typescript_only: bool,
 }
 
 type FamilyFactory = fn(&str, Option<&serde_json::Value>) -> Result<Option<Box<dyn Rule>>, String>;
@@ -34,13 +52,14 @@ const FAMILY_FACTORIES: &[FamilyFactory] = &[
 
 fn push_entries(
     out: &mut Vec<RuleCatalogEntry>,
-    rules: Vec<&'static dyn ScopedRule>,
+    rules: Vec<CatalogRule>,
     default_enabled: bool,
     typescript_only: bool,
 ) {
-    for rule in rules {
+    for CatalogRule { rule, scope_policy } in rules {
         out.push(RuleCatalogEntry {
             rule,
+            scope_policy,
             default_enabled,
             typescript_only,
         });
@@ -101,20 +120,16 @@ static RULE_CATALOG: LazyLock<Vec<RuleCatalogEntry>> = LazyLock::new(|| {
 });
 
 #[must_use]
-pub fn default_rules() -> Vec<&'static dyn Rule> {
+pub fn default_entries() -> Vec<&'static RuleCatalogEntry> {
     RULE_CATALOG
         .iter()
         .filter(|entry| entry.default_enabled)
-        .map(|entry| entry.rule as &'static dyn Rule)
         .collect()
 }
 
 #[must_use]
 pub fn all_rules() -> Vec<&'static dyn Rule> {
-    RULE_CATALOG
-        .iter()
-        .map(|entry| entry.rule as &'static dyn Rule)
-        .collect()
+    RULE_CATALOG.iter().map(|entry| entry.rule).collect()
 }
 
 #[must_use]
@@ -125,11 +140,10 @@ pub fn is_typescript_only_rule(name: &str) -> bool {
 }
 
 #[must_use]
-pub fn lookup_default_rule(name: &str) -> Option<&'static dyn Rule> {
-    RULE_CATALOG.iter().find_map(|entry| {
+pub fn lookup_entry(name: &str) -> Option<&'static RuleCatalogEntry> {
+    RULE_CATALOG.iter().find(|entry| {
         let rule_name = entry.rule.name();
-        (rule_name == name || rule_name.strip_prefix("antidrift/") == Some(name))
-            .then_some(entry.rule as &'static dyn Rule)
+        rule_name == name || rule_name.strip_prefix("antidrift/") == Some(name)
     })
 }
 

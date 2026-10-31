@@ -1,5 +1,5 @@
 use antidrift_kernel::imports::FileImports;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -8,29 +8,18 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 pub const RULE_NAME: &str = "antidrift/require-effect-deps";
 const EFFECT_HOOKS: [&str; 2] = ["useEffect", "useLayoutEffect"];
 
-pub struct RequireEffectDeps {
-    scope: RuleScope,
-}
+pub struct RequireEffectDeps;
 
-pub static DEFAULT_RULE: RequireEffectDeps = RequireEffectDeps {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: RequireEffectDeps = RequireEffectDeps;
 
 impl RequireEffectDeps {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
-
-impl ScopedRule for RequireEffectDeps {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for RequireEffectDeps {
     fn name(&self) -> &'static str {
@@ -38,9 +27,6 @@ impl Rule for RequireEffectDeps {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
         let imports = FileImports::collect(ctx.file);
         let direct = imports.locals_from("react", &EFFECT_HOOKS);
         let namespaces = imports.namespaces_from("react");

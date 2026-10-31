@@ -4,9 +4,7 @@ use super::owned_union_source::{
 use super::union_owners::union_owners;
 use antidrift_kernel::local_binding::Binding;
 use antidrift_kernel::registries::OwnedUnion;
-use antidrift_kernel::rule_scope::{
-    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
-};
+use antidrift_kernel::rule_options::{EmptyVisitor, decode_rule_options};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -20,8 +18,6 @@ pub const RULE_NAME: &str = "antidrift/no-redeclared-owned-union";
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct OwnedUnionOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     allows: BTreeSet<String>,
     statuses: BTreeMap<String, OwnedUnion>,
 }
@@ -34,17 +30,11 @@ pub(super) struct UnionOwner {
 }
 
 pub struct NoRedeclaredOwnedUnion {
-    scope: RuleScope,
     options: OwnedUnionOptions,
 }
 
 pub static DEFAULT_RULE: NoRedeclaredOwnedUnion = NoRedeclaredOwnedUnion {
-    scope: RuleScope::DEFAULT,
     options: OwnedUnionOptions {
-        scope: ScopeOptions {
-            files: None,
-            exclude_files: Vec::new(),
-        },
         allows: BTreeSet::new(),
         statuses: BTreeMap::new(),
     },
@@ -53,8 +43,7 @@ pub static DEFAULT_RULE: NoRedeclaredOwnedUnion = NoRedeclaredOwnedUnion {
 impl NoRedeclaredOwnedUnion {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let options = decode_rule_options::<OwnedUnionOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &options.scope)?;
-        Ok(Self { scope, options })
+        Ok(Self { options })
     }
 }
 
@@ -64,21 +53,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
 ];
 
-impl ScopedRule for NoRedeclaredOwnedUnion {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoRedeclaredOwnedUnion {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
         let owners = match union_owners(ctx.program, ctx.file) {
             Ok(owners) => owners,
             Err(error) => {

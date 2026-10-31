@@ -1,6 +1,7 @@
 use antidrift_kernel::file_role::FileRole;
+use antidrift_kernel::file_role::ProjectPath;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -8,19 +9,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-bun-api-in-shared";
 
-pub struct NoBunApiInShared {
-    scope: RuleScope,
-}
+pub struct NoBunApiInShared;
 
-pub static DEFAULT_RULE: NoBunApiInShared = NoBunApiInShared {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoBunApiInShared = NoBunApiInShared;
 
 impl NoBunApiInShared {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -30,10 +26,9 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ElementAccessExpression),
 ];
 
-impl ScopedRule for NoBunApiInShared {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
+#[must_use]
+pub fn inferred_role(path: &ProjectPath) -> bool {
+    path.has_role(FileRole::Shared)
 }
 
 impl Rule for NoBunApiInShared {
@@ -41,23 +36,16 @@ impl Rule for NoBunApiInShared {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(
-            &self.scope,
-            ctx,
-            Some(|path| path.has_role(FileRole::Shared)),
-        );
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

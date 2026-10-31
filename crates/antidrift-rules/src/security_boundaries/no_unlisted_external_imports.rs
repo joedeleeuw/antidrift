@@ -3,9 +3,7 @@ use super::package_resolution::{
     resolution_config, resolve_dependency, resolver_with_mode, unresolved_module,
 };
 use antidrift_kernel::imports::{ModuleImport, extract_module_import};
-use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedRule, decode_rule_options, in_scope,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::ts_resolver::ResolutionMode;
 use oxc_resolver::{ResolveError, Resolver};
 use serde::Deserialize;
@@ -20,8 +18,6 @@ pub const RULE_NAME: &str = "antidrift/no-unlisted-external-imports";
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct DependencyOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     internal_prefixes: Vec<String>,
     ancestor_dev_dependencies: bool,
 }
@@ -29,7 +25,6 @@ struct DependencyOptions {
 impl Default for DependencyOptions {
     fn default() -> Self {
         Self {
-            scope: ScopeOptions::default(),
             internal_prefixes: vec!["@/".to_owned(), "~/".to_owned()],
             ancestor_dev_dependencies: true,
         }
@@ -37,13 +32,11 @@ impl Default for DependencyOptions {
 }
 
 pub struct NoUnlistedExternalImports {
-    scope: RuleScope,
     internal_prefixes: Vec<&'static str>,
     ancestor_dev_dependencies: bool,
 }
 
 pub static DEFAULT_RULE: NoUnlistedExternalImports = NoUnlistedExternalImports {
-    scope: RuleScope::DEFAULT,
     internal_prefixes: Vec::new(),
     ancestor_dev_dependencies: true,
 };
@@ -51,14 +44,12 @@ pub static DEFAULT_RULE: NoUnlistedExternalImports = NoUnlistedExternalImports {
 impl NoUnlistedExternalImports {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<DependencyOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         let internal_prefixes = parsed
             .internal_prefixes
             .into_iter()
             .map(|prefix| -> &'static str { Box::leak(prefix.into_boxed_str()) })
             .collect();
         Ok(Self {
-            scope,
             internal_prefixes,
             ancestor_dev_dependencies: parsed.ancestor_dev_dependencies,
         })
@@ -79,25 +70,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
 ];
 
-impl ScopedRule for NoUnlistedExternalImports {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoUnlistedExternalImports {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        if !enabled {
-            return Box::new(Visitor {
-                rule: self,
-                contract: None,
-            });
-        }
         match DependencyContract::load(ctx.file.file_name(), self.ancestor_dev_dependencies) {
             Ok(contract) => Box::new(Visitor {
                 rule: self,

@@ -1,7 +1,7 @@
 use antidrift_kernel::jsx::{
     element_tag_name, is_jsx_element_like, jsx_children, render_prop_element,
 };
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -21,19 +21,14 @@ const MENU_ITEM_NAMES: [&str; 4] = [
 ];
 const MESSAGE: &str = "Do not mount a dialog trigger inside a menu item; the menu cannot close under the dialog. Lift the dialog beside the menu with `open` state and let the item request it.";
 
-pub struct NoDialogTriggerMenuItem {
-    scope: RuleScope,
-}
+pub struct NoDialogTriggerMenuItem;
 
-pub static DEFAULT_RULE: NoDialogTriggerMenuItem = NoDialogTriggerMenuItem {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoDialogTriggerMenuItem = NoDialogTriggerMenuItem;
 
 impl NoDialogTriggerMenuItem {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -42,30 +37,21 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxSelfClosingElement),
 ];
 
-impl ScopedRule for NoDialogTriggerMenuItem {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoDialogTriggerMenuItem {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

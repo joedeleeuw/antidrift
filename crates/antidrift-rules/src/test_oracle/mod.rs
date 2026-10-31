@@ -19,8 +19,10 @@ mod syntax;
 mod validator_assertions;
 mod validators;
 
+use crate::CatalogRule;
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::scope_policy::ScopePolicy;
 use rustc_hash::FxHashMap;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -28,19 +30,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-nonindependent-test-oracle";
 
-pub struct NoNonindependentTestOracle {
-    scope: RuleScope,
-}
+pub struct NoNonindependentTestOracle;
 
-pub static DEFAULT_RULE: NoNonindependentTestOracle = NoNonindependentTestOracle {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoNonindependentTestOracle = NoNonindependentTestOracle;
 
 impl NoNonindependentTestOracle {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -49,23 +46,14 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ForOfStatement),
 ];
 
-impl ScopedRule for NoNonindependentTestOracle {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoNonindependentTestOracle {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
-        let file_name = ctx.file.file_name();
-        let enabled = self.scope.matches(file_name, cwd);
-        let path = ProjectPath::of(ctx.program, file_name);
-        let test_file = enabled && syntax::is_test_file(&path);
+        let path = ProjectPath::of(ctx.program, ctx.file.file_name());
+        let test_file = syntax::is_test_file(&path);
         let spec_file = path.has_role(FileRole::TestOrSpec);
         let blocks = if test_file {
             block::collect_blocks(&bindings::Oracle { sf: ctx.file })
@@ -73,7 +61,6 @@ impl Rule for NoNonindependentTestOracle {
             FxHashMap::default()
         };
         Box::new(Visitor {
-            enabled,
             test_file,
             spec_file,
             blocks,
@@ -82,7 +69,6 @@ impl Rule for NoNonindependentTestOracle {
 }
 
 struct Visitor {
-    enabled: bool,
     test_file: bool,
     spec_file: bool,
     blocks: FxHashMap<P<Node>, block::BlockFacts>,
@@ -90,7 +76,7 @@ struct Visitor {
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
@@ -114,13 +100,19 @@ impl RuleVisitor for Visitor {
 }
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn ScopedRule> {
+pub fn rules() -> Vec<CatalogRule> {
     vec![
-        &DEFAULT_RULE,
-        &no_placeholder_tests::DEFAULT_RULE,
-        &no_redacted_log_attribute_key::DEFAULT_RULE,
-        &no_repo_state_mirror_assertion::DEFAULT_RULE,
-        &no_static_devtools_import::DEFAULT_RULE,
+        CatalogRule::everywhere(&DEFAULT_RULE),
+        CatalogRule::new(
+            &no_placeholder_tests::DEFAULT_RULE,
+            ScopePolicy::TestFilesOnly,
+        ),
+        CatalogRule::everywhere(&no_redacted_log_attribute_key::DEFAULT_RULE),
+        CatalogRule::new(
+            &no_repo_state_mirror_assertion::DEFAULT_RULE,
+            ScopePolicy::TestFilesOnly,
+        ),
+        CatalogRule::everywhere(&no_static_devtools_import::DEFAULT_RULE),
     ]
 }
 

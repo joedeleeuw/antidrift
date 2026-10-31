@@ -1,6 +1,6 @@
 use super::syntax::is_function_like;
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, ScopedRule, decode_rule_options};
+use antidrift_kernel::rule_options::decode_rule_options;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_core::P;
@@ -14,8 +14,6 @@ const DEFAULT_FACTORIES: &[&str] = &["createRedisClient", "postgres"];
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct SingletonOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     constructors: Vec<String>,
     factories: Vec<String>,
 }
@@ -23,7 +21,6 @@ struct SingletonOptions {
 impl Default for SingletonOptions {
     fn default() -> Self {
         Self {
-            scope: ScopeOptions::default(),
             constructors: DEFAULT_CONSTRUCTORS
                 .iter()
                 .map(|s| (*s).to_owned())
@@ -34,13 +31,11 @@ impl Default for SingletonOptions {
 }
 
 pub struct NoEagerSingleton {
-    scope: RuleScope,
     constructors: Option<Vec<String>>,
     factories: Option<Vec<String>>,
 }
 
 pub static DEFAULT_RULE: NoEagerSingleton = NoEagerSingleton {
-    scope: RuleScope::DEFAULT,
     constructors: None,
     factories: None,
 };
@@ -48,9 +43,7 @@ pub static DEFAULT_RULE: NoEagerSingleton = NoEagerSingleton {
 impl NoEagerSingleton {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let decoded = decode_rule_options::<SingletonOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &decoded.scope)?;
         Ok(Self {
-            scope,
             constructors: Some(decoded.constructors),
             factories: Some(decoded.factories),
         })
@@ -76,10 +69,9 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::NewExpression),
 ];
 
-impl ScopedRule for NoEagerSingleton {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
+#[must_use]
+pub fn inferred_role(path: &ProjectPath) -> bool {
+    !path.has_role(FileRole::ScriptEntry)
 }
 
 impl Rule for NoEagerSingleton {
@@ -87,24 +79,18 @@ impl Rule for NoEagerSingleton {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let in_default_script_root = !self.scope.has_explicit_files()
-            && ProjectPath::of(ctx.program, ctx.file.file_name()).has_role(FileRole::ScriptEntry);
-        Box::new(Visitor {
-            rule: self,
-            enabled: !in_default_script_root && self.scope.in_scope(ctx),
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor { rule: self })
     }
 }
 
 struct Visitor {
     rule: &'static NoEagerSingleton,
-    enabled: bool,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

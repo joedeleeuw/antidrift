@@ -14,34 +14,47 @@ pub mod no_wrapping_functions;
 pub mod predicate_scan;
 mod vague_name_lexicon;
 
-use antidrift_kernel::rule_scope::ScopedRule;
+use crate::CatalogRule;
+use antidrift_kernel::scope_policy::ScopePolicy;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn typescript_only_rules() -> Vec<&'static dyn ScopedRule> {
+pub fn typescript_only_rules() -> Vec<CatalogRule> {
     vec![
-        &no_appeasement_cast::DEFAULT_INSTANCE,
-        &no_appeasement_erasure::DEFAULT_INSTANCE,
-        &no_redundant_type_predicate::DEFAULT_INSTANCE,
-        &no_underchecked_type_predicate::DEFAULT_INSTANCE,
-        &no_wrapping_functions::DEFAULT_INSTANCE,
-        &no_unresolved_dependency_types::DEFAULT_INSTANCE,
-        &no_closed_string_parameter::DEFAULT_RULE,
-        &no_argument_mutation_side_effect::DEFAULT_RULE,
+        CatalogRule::everywhere(&no_appeasement_cast::DEFAULT_INSTANCE),
+        CatalogRule::everywhere(&no_appeasement_erasure::DEFAULT_INSTANCE),
+        CatalogRule::everywhere(&no_redundant_type_predicate::DEFAULT_INSTANCE),
+        CatalogRule::everywhere(&no_underchecked_type_predicate::DEFAULT_INSTANCE),
+        CatalogRule::new(
+            &no_wrapping_functions::DEFAULT_INSTANCE,
+            ScopePolicy::AuthoredSource,
+        ),
+        CatalogRule::everywhere(&no_unresolved_dependency_types::DEFAULT_INSTANCE),
+        CatalogRule::new(
+            &no_closed_string_parameter::DEFAULT_RULE,
+            ScopePolicy::AuthoredSource,
+        ),
+        CatalogRule::new(
+            &no_argument_mutation_side_effect::DEFAULT_RULE,
+            ScopePolicy::AuthoredSource,
+        ),
     ]
 }
 
 #[must_use]
-pub fn script_default_rules() -> Vec<&'static dyn ScopedRule> {
+pub fn script_default_rules() -> Vec<CatalogRule> {
     vec![
-        &no_pass_through_parameters::DEFAULT_INSTANCE,
-        &no_compat_names::DEFAULT_INSTANCE,
+        CatalogRule::new(
+            &no_pass_through_parameters::DEFAULT_INSTANCE,
+            ScopePolicy::AuthoredSource,
+        ),
+        CatalogRule::everywhere(&no_compat_names::DEFAULT_INSTANCE),
     ]
 }
 
 #[must_use]
-pub fn default_off_rules() -> Vec<&'static dyn ScopedRule> {
-    vec![&no_vague_names::DEFAULT_INSTANCE]
+pub fn default_off_rules() -> Vec<CatalogRule> {
+    vec![CatalogRule::everywhere(&no_vague_names::DEFAULT_INSTANCE)]
 }
 
 pub fn create_rule(

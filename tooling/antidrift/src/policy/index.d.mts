@@ -50,7 +50,7 @@ export function loadRegistriesSync(policyDir?: string): AntidriftRegistries;
 export interface RustRule {
   id: string;
   kind: "general" | "house-style";
-  testCode: "checked" | "skipped";
+  scopePolicy: "everywhere" | "authored-source" | "inferred-role" | "test-files-only";
   level: "error" | "warn" | "off";
   guidance: string;
   lineCap?: { warnAbove: number; max: number };

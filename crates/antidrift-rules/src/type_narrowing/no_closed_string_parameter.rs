@@ -1,6 +1,6 @@
 use antidrift_kernel::callgraph::ProgramSymbolIndex;
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
 use tsrs_checker::Checker;
@@ -17,19 +17,14 @@ const BOUNDARY_IDENTIFIERS: &[&str] = &[
 ];
 const BOUNDARY_PROPERTIES: &[&str] = &["argv", "query", "headers"];
 
-pub struct NoClosedStringParameter {
-    scope: RuleScope,
-}
+pub struct NoClosedStringParameter;
 
-pub static DEFAULT_RULE: NoClosedStringParameter = NoClosedStringParameter {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoClosedStringParameter = NoClosedStringParameter;
 
 impl NoClosedStringParameter {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -40,21 +35,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::MethodDeclaration),
 ];
 
-impl ScopedRule for NoClosedStringParameter {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoClosedStringParameter {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.admits_authored_source(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

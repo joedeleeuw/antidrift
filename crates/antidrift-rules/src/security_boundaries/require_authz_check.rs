@@ -1,6 +1,4 @@
-use antidrift_kernel::rule_scope::{
-    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -12,30 +10,24 @@ pub const RULE_NAME: &str = "antidrift/require-authz-check";
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct AuthzOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     authz_functions: Vec<String>,
 }
 
 pub struct RequireAuthzCheck {
-    scope: RuleScope,
     authz_functions: Vec<String>,
 }
 
 pub static DEFAULT_RULE: RequireAuthzCheck = RequireAuthzCheck {
-    scope: RuleScope::DEFAULT,
     authz_functions: Vec::new(),
 };
 
 impl RequireAuthzCheck {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<AuthzOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         if parsed.authz_functions.iter().any(String::is_empty) {
             return Err("authzFunctions must contain non-empty strings".to_owned());
         }
         Ok(Self {
-            scope,
             authz_functions: parsed.authz_functions,
         })
     }
@@ -61,21 +53,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
 ];
 
-impl ScopedRule for RequireAuthzCheck {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for RequireAuthzCheck {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
             functions: &self.authz_functions,
             frames: Vec::new(),

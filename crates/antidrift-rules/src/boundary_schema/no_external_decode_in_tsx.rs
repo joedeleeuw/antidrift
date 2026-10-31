@@ -1,6 +1,6 @@
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::{EmptyVisitor, reject_unknown_options};
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
@@ -10,29 +10,18 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-external-decode-in-tsx";
 
-pub struct NoExternalDecodeInTsx {
-    scope: RuleScope,
-}
+pub struct NoExternalDecodeInTsx;
 
-pub static DEFAULT_RULE: NoExternalDecodeInTsx = NoExternalDecodeInTsx {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoExternalDecodeInTsx = NoExternalDecodeInTsx;
 
 impl NoExternalDecodeInTsx {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
-
-impl ScopedRule for NoExternalDecodeInTsx {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoExternalDecodeInTsx {
     fn name(&self) -> &'static str {
@@ -40,7 +29,7 @@ impl Rule for NoExternalDecodeInTsx {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) || !ctx.file.file_name().ends_with(".tsx") {
+        if !ctx.file.file_name().ends_with(".tsx") {
             return Box::new(EmptyVisitor);
         }
         Box::new(Visitor {

@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use tsrs_ast::{Kind, Node};
@@ -8,19 +8,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 const RULE_NAME: &str = "antidrift/no-explicit-type-arguments-on-owned-api";
 
-pub struct NoExplicitTypeArgumentsOnOwnedApi {
-    scope: RuleScope,
-}
+pub struct NoExplicitTypeArgumentsOnOwnedApi;
 
-pub static RULE: NoExplicitTypeArgumentsOnOwnedApi = NoExplicitTypeArgumentsOnOwnedApi {
-    scope: RuleScope::DEFAULT,
-};
+pub static RULE: NoExplicitTypeArgumentsOnOwnedApi = NoExplicitTypeArgumentsOnOwnedApi {};
 
 impl NoExplicitTypeArgumentsOnOwnedApi {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -355,21 +350,12 @@ fn is_tanstack_registration_call(checker: &mut Checker, call_node: P<Node>) -> b
     resolves_to_registration(checker, arg0, 6)
 }
 
-impl ScopedRule for NoExplicitTypeArgumentsOnOwnedApi {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoExplicitTypeArgumentsOnOwnedApi {
     fn name(&self) -> &'static str {
         "antidrift/no-explicit-type-arguments-on-owned-api"
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

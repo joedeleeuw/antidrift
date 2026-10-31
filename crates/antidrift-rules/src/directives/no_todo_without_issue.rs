@@ -1,5 +1,5 @@
 use antidrift_kernel::directives::{scan_source_comments, split_identifier_words};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -18,49 +18,34 @@ const AI_TOKENS: &[&str] = &[
     "generated",
 ];
 
-pub struct NoTodoWithoutIssue {
-    scope: RuleScope,
-}
+pub struct NoTodoWithoutIssue;
 
-pub static DEFAULT_RULE: NoTodoWithoutIssue = NoTodoWithoutIssue {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoTodoWithoutIssue = NoTodoWithoutIssue;
 
 impl NoTodoWithoutIssue {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
-
-impl ScopedRule for NoTodoWithoutIssue {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoTodoWithoutIssue {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
-        let enabled = self.scope.matches(ctx.file.file_name(), cwd);
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {

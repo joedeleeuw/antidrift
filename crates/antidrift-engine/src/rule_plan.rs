@@ -1,8 +1,11 @@
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 use antidrift_kernel::directives::is_inline_disabled;
 use antidrift_kernel::registries::PolicyRegistries;
-use antidrift_rules::{create_rule, default_rules, is_typescript_only_rule, lookup_default_rule};
+use antidrift_rules::{
+    RuleCatalogEntry, create_rule, default_entries, is_typescript_only_rule, lookup_entry,
+};
 use rustc_hash::FxHashMap;
 use serde_json::json;
 use tsrs_ast::SourceFile;
@@ -14,30 +17,46 @@ use tsrslint::protocol::{Diagnostic, Payload};
 use tsrslint::rule::{ReportedDiagnostic, Rule};
 use tsrslint::rules;
 
-fn has_non_empty_options(options: Option<&serde_json::Value>) -> bool {
-    match options {
-        None | Some(serde_json::Value::Null) => false,
-        Some(serde_json::Value::Array(items)) => {
-            items.first().is_some_and(|first| !first.is_null())
-        }
-        Some(_) => true,
-    }
+use crate::rule_scope::{RuleScope, Scoped, split_scope_envelope};
+
+fn scoped_default(entry: &RuleCatalogEntry) -> &'static dyn Rule {
+    Box::leak(Box::new(Scoped::new(
+        RuleScope::DEFAULT,
+        entry.scope_policy,
+        entry.rule,
+    )))
 }
 
-fn instantiate_rule(
+static DEFAULT_SCOPED_RULES: LazyLock<Vec<&'static dyn Rule>> =
+    LazyLock::new(|| default_entries().into_iter().map(scoped_default).collect());
+
+pub(crate) fn instantiate_rule(
     name: &str,
     options: Option<&serde_json::Value>,
 ) -> Result<Option<&'static dyn Rule>, String> {
-    if !has_non_empty_options(options)
-        && let Some(default_rule) = lookup_default_rule(name)
-    {
-        return Ok(Some(default_rule));
-    }
-    if let Some(custom) = create_rule(name, options)? {
-        return Ok(Some(Box::leak(custom)));
-    }
-    let created = rules::create_rule(name, options)?;
-    Ok(Some(Box::leak(created)))
+    let Some(entry) = lookup_entry(name) else {
+        let created = rules::create_rule(name, options)?;
+        return Ok(Some(Box::leak(created)));
+    };
+    let rule_name = entry.rule.name();
+    let split = split_scope_envelope(rule_name, options)?;
+    let scope = RuleScope::from_scope_options(rule_name, &split.scope)?;
+    let rule: &'static dyn Rule = match split.rule_options {
+        None => entry.rule,
+        Some(rule_options) => {
+            let Some(custom) = create_rule(name, Some(&rule_options))? else {
+                return Err(format!(
+                    "rule '{rule_name}' is cataloged but no family factory builds it"
+                ));
+            };
+            Box::leak(custom)
+        }
+    };
+    Ok(Some(Box::leak(Box::new(Scoped::new(
+        scope,
+        entry.scope_policy,
+        rule,
+    )))))
 }
 
 pub(crate) struct ConfigRulePlan {
@@ -88,7 +107,7 @@ fn append_default_rules(
             push_unique_rule(config_rules, rule);
         }
     }
-    for custom_rule in default_rules() {
+    for &custom_rule in DEFAULT_SCOPED_RULES.iter() {
         push_unique_rule(config_rules, custom_rule);
     }
     Ok(())

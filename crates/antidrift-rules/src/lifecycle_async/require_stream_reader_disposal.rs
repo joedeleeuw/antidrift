@@ -4,7 +4,7 @@ use super::syntax::{
     identifier_of, is_const_variable_declaration, is_function_like, is_write_reference, member,
     owner, parent_expression, resolve_lexical_binding,
 };
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -17,49 +17,34 @@ pub(super) struct ReaderAnalysis {
     pub(super) root: P<Node>,
 }
 
-pub struct RequireStreamReaderDisposal {
-    scope: RuleScope,
-}
+pub struct RequireStreamReaderDisposal;
 
-pub static DEFAULT_RULE: RequireStreamReaderDisposal = RequireStreamReaderDisposal {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: RequireStreamReaderDisposal = RequireStreamReaderDisposal;
 
 impl RequireStreamReaderDisposal {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
-
-impl ScopedRule for RequireStreamReaderDisposal {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for RequireStreamReaderDisposal {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {
-            enabled: self.scope.in_scope(ctx),
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor {})
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

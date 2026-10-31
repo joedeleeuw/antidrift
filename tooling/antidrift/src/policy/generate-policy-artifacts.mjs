@@ -60,7 +60,12 @@ const rustRuleSchema = z.array(
   z.object({
     id: z.string(),
     kind: z.enum(["general", "house-style"]),
-    testCode: z.enum(["checked", "skipped"]),
+    scopePolicy: z.enum([
+      "everywhere",
+      "authored-source",
+      "inferred-role",
+      "test-files-only",
+    ]),
     level: z.enum(["error", "warn", "off"]),
     guidance: z.string(),
     lineCap: z.object({ warnAbove: z.number(), max: z.number() }).optional(),

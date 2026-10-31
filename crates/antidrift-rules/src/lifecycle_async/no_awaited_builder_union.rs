@@ -1,6 +1,6 @@
 use super::syntax::{Span, member, unwrap_expression, unwrap_parentheses};
 use antidrift_kernel::directives::scan_source_comments;
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -20,49 +20,34 @@ struct BuilderChain {
     steps: Vec<ChainStep>,
 }
 
-pub struct NoAwaitedBuilderUnion {
-    scope: RuleScope,
-}
+pub struct NoAwaitedBuilderUnion;
 
-pub static DEFAULT_RULE: NoAwaitedBuilderUnion = NoAwaitedBuilderUnion {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoAwaitedBuilderUnion = NoAwaitedBuilderUnion;
 
 impl NoAwaitedBuilderUnion {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::AwaitExpression)];
-
-impl ScopedRule for NoAwaitedBuilderUnion {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for NoAwaitedBuilderUnion {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {
-            enabled: self.scope.in_scope(ctx),
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

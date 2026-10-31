@@ -1,7 +1,7 @@
 use antidrift_kernel::jsx::{
     is_event_handler_name, is_hook_name, is_pascal_case_name, react_function_name,
 };
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{is_function_like, property_name_text, unwrap_expression};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_core::P;
@@ -23,19 +23,14 @@ const TIMER_OR_EVENT_METHODS: &[&str] = &[
     "finally",
 ];
 
-pub struct NoUnstableRenderDefaultCollection {
-    scope: RuleScope,
-}
+pub struct NoUnstableRenderDefaultCollection;
 
-pub static DEFAULT_RULE: NoUnstableRenderDefaultCollection = NoUnstableRenderDefaultCollection {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoUnstableRenderDefaultCollection = NoUnstableRenderDefaultCollection;
 
 impl NoUnstableRenderDefaultCollection {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -46,31 +41,21 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::BinaryExpression),
 ];
 
-impl ScopedRule for NoUnstableRenderDefaultCollection {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoUnstableRenderDefaultCollection {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {
-            active: in_scope(&self.scope, ctx, None),
-        })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor {})
     }
 }
 
-struct Visitor {
-    active: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.active { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

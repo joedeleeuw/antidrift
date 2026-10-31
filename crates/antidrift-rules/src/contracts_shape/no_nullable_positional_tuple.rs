@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::{Checker, Type, TypeFlags};
@@ -7,19 +7,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 const RULE_NAME: &str = "antidrift/no-nullable-positional-tuple";
 
-pub struct NoNullablePositionalTuple {
-    scope: RuleScope,
-}
+pub struct NoNullablePositionalTuple;
 
-pub static RULE: NoNullablePositionalTuple = NoNullablePositionalTuple {
-    scope: RuleScope::DEFAULT,
-};
+pub static RULE: NoNullablePositionalTuple = NoNullablePositionalTuple {};
 
 impl NoNullablePositionalTuple {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -108,21 +103,12 @@ fn tuple_element_is_nullish_slot(checker: &mut Checker, element: P<Node>) -> boo
         || tuple_element_resolves_to_nullish(checker, element)
 }
 
-impl ScopedRule for NoNullablePositionalTuple {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoNullablePositionalTuple {
     fn name(&self) -> &'static str {
         "antidrift/no-nullable-positional-tuple"
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

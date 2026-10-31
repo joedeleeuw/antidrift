@@ -10,19 +10,26 @@ mod redundant_owner_prefix;
 pub mod structural_fork_analysis;
 mod test_only_seam;
 
-use antidrift_kernel::rule_scope::ScopedRule;
+use crate::CatalogRule;
+use antidrift_kernel::scope_policy::ScopePolicy;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn ScopedRule> {
+pub fn rules() -> Vec<CatalogRule> {
     vec![
-        &no_contract_appeasement_projection::RULE,
-        &no_structural_type_fork::RULE,
-        &no_nullable_positional_tuple::RULE,
-        &react_max_component_props::RULE,
-        &no_explicit_type_arguments_on_owned_api::RULE,
-        &no_service_constructor_imports::RULE,
-        &no_hypothetical_seam::DEFAULT_RULE,
+        CatalogRule::new(
+            &no_contract_appeasement_projection::RULE,
+            ScopePolicy::AuthoredSource,
+        ),
+        CatalogRule::everywhere(&no_structural_type_fork::RULE),
+        CatalogRule::everywhere(&no_nullable_positional_tuple::RULE),
+        CatalogRule::everywhere(&react_max_component_props::RULE),
+        CatalogRule::everywhere(&no_explicit_type_arguments_on_owned_api::RULE),
+        CatalogRule::everywhere(&no_service_constructor_imports::RULE),
+        CatalogRule::new(
+            &no_hypothetical_seam::DEFAULT_RULE,
+            ScopePolicy::AuthoredSource,
+        ),
     ]
 }
 

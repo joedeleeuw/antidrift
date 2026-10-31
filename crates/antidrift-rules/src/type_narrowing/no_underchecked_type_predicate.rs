@@ -1,3 +1,4 @@
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel;
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, Symbol, SymbolFlags};
@@ -191,22 +192,14 @@ fn check_function(ctx: &mut Ctx, fn_node: P<Node>) {
     );
 }
 
-pub struct NoUndercheckedTypePredicate {
-    pub scope: antidrift_kernel::rule_scope::RuleScope,
-}
+pub struct NoUndercheckedTypePredicate;
 
-pub static DEFAULT_INSTANCE: NoUndercheckedTypePredicate = NoUndercheckedTypePredicate {
-    scope: antidrift_kernel::rule_scope::RuleScope::DEFAULT,
-};
+pub static DEFAULT_INSTANCE: NoUndercheckedTypePredicate = NoUndercheckedTypePredicate;
 
 impl NoUndercheckedTypePredicate {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: antidrift_kernel::rule_scope::RuleScope::from_options(
-                "antidrift/no-underchecked-type-predicate",
-                options,
-            )?,
-        })
+        reject_unknown_options("antidrift/no-underchecked-type-predicate", options)?;
+        Ok(Self)
     }
 }
 
@@ -216,21 +209,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),
 ];
 
-impl antidrift_kernel::rule_scope::ScopedRule for NoUndercheckedTypePredicate {
-    fn scope(&self) -> &antidrift_kernel::rule_scope::RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoUndercheckedTypePredicate {
     fn name(&self) -> &'static str {
         "antidrift/no-underchecked-type-predicate"
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

@@ -3,7 +3,7 @@ use super::syntax::{
     resolve_lexical_binding, unwrap_expression,
 };
 use antidrift_kernel::imports::FileImports;
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -23,19 +23,14 @@ const CACHE_METHODS: [&str; 10] = [
     "cancelQueries",
 ];
 
-pub struct RequireQueryKeyFactory {
-    scope: RuleScope,
-}
+pub struct RequireQueryKeyFactory;
 
-pub static DEFAULT_RULE: RequireQueryKeyFactory = RequireQueryKeyFactory {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: RequireQueryKeyFactory = RequireQueryKeyFactory;
 
 impl RequireQueryKeyFactory {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -44,32 +39,24 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::BinaryExpression),
 ];
 
-impl ScopedRule for RequireQueryKeyFactory {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for RequireQueryKeyFactory {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = self.scope.in_scope(ctx);
         let imports = FileImports::collect(ctx.file);
-        Box::new(Visitor { enabled, imports })
+        Box::new(Visitor { imports })
     }
 }
 
 struct Visitor {
-    enabled: bool,
     imports: FileImports,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

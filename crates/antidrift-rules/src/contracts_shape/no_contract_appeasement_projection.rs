@@ -1,7 +1,6 @@
-use antidrift_kernel::file_role;
 use antidrift_kernel::outcome_shape::find_sum_to_product_pair;
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_symbol_origin, symbol_at_node};
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::{projection, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, SourceFile};
@@ -10,19 +9,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 const RULE_NAME: &str = "antidrift/no-contract-appeasement-projection";
 
-pub struct NoContractAppeasementProjection {
-    scope: RuleScope,
-}
+pub struct NoContractAppeasementProjection;
 
-pub static RULE: NoContractAppeasementProjection = NoContractAppeasementProjection {
-    scope: RuleScope::DEFAULT,
-};
+pub static RULE: NoContractAppeasementProjection = NoContractAppeasementProjection {};
 
 impl NoContractAppeasementProjection {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -278,28 +272,16 @@ fn report_appeasement_projection(ctx: &mut Ctx, function: P<Node>, candidate: P<
     false
 }
 
-impl ScopedRule for NoContractAppeasementProjection {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoContractAppeasementProjection {
     fn name(&self) -> &'static str {
         "antidrift/no-contract-appeasement-projection"
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
-        let path = file_role::ProjectPath::of(ctx.program, ctx.file.file_name());
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
             candidates: Vec::new(),
             object_literals: Vec::new(),
             reported_functions: FxHashSet::default(),
-            authored_file: !path.has_any_role(file_role::TEST_ROLES)
-                && !self.scope.skips_generated(&path, ctx.file.text()),
         })
     }
 }
@@ -308,7 +290,6 @@ struct Visitor {
     candidates: Vec<(P<Node>, P<Node>)>,
     object_literals: Vec<P<Node>>,
     reported_functions: FxHashSet<P<Node>>,
-    authored_file: bool,
 }
 
 const LISTENERS: [Listener; 7] = [
@@ -401,9 +382,6 @@ impl RuleVisitor for Visitor {
 
     fn visit(&mut self, ctx: &mut Ctx, listener: Listener, node: P<Node>) {
         if matches!(listener, Listener::Exit(Kind::EndOfFile)) {
-            if !self.authored_file {
-                return;
-            }
             report_end_of_file(
                 ctx,
                 &self.candidates,
@@ -418,10 +396,7 @@ impl RuleVisitor for Visitor {
         }
         if let Some(fn_node) = tsrs_kernel::function_node_from_declaration(node) {
             self.candidates.push((fn_node, node));
-            let reported = self
-                .authored_file
-                .then(|| report_bag_reshaper(ctx, fn_node, node))
-                .flatten()
+            let reported = report_bag_reshaper(ctx, fn_node, node)
                 .unwrap_or_else(|| report_appeasement_projection(ctx, fn_node, node));
             if reported {
                 self.reported_functions.insert(fn_node);

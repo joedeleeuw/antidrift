@@ -1,8 +1,6 @@
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::jsx::{has_plain_attribute, plain_attribute_name, plain_element_name};
-use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedOptions, ScopedRule, decode_scoped, in_scope, require_non_empty,
-};
+use antidrift_kernel::rule_options::{decode_rule_options, require_non_empty};
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -33,36 +31,26 @@ const NON_DISPLAY_ATTRIBUTES: [&str; 11] = [
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct UnformattedNumberOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     formatter: Option<String>,
 }
 
-impl ScopedOptions for UnformattedNumberOptions {
-    fn scope(&self) -> ScopeOptions {
-        self.scope.clone()
-    }
-
+impl UnformattedNumberOptions {
     fn validate(&self, rule_name: &str) -> Result<(), String> {
         require_non_empty(rule_name, "formatter", self.formatter.as_ref())
     }
 }
 
 pub struct NoUnformattedNumber {
-    scope: RuleScope,
     formatter: Option<String>,
 }
 
-pub static DEFAULT_RULE: NoUnformattedNumber = NoUnformattedNumber {
-    scope: RuleScope::DEFAULT,
-    formatter: None,
-};
+pub static DEFAULT_RULE: NoUnformattedNumber = NoUnformattedNumber { formatter: None };
 
 impl NoUnformattedNumber {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let (parsed, scope) = decode_scoped::<UnformattedNumberOptions>(RULE_NAME, options)?;
+        let parsed = decode_rule_options::<UnformattedNumberOptions>(RULE_NAME, options)?;
+        parsed.validate(RULE_NAME)?;
         Ok(Self {
-            scope,
             formatter: parsed.formatter,
         })
     }
@@ -70,24 +58,16 @@ impl NoUnformattedNumber {
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::JsxExpression)];
 
-impl ScopedRule for NoUnformattedNumber {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoUnformattedNumber {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
         let test_file =
             ProjectPath::of(ctx.program, ctx.file.file_name()).has_role(FileRole::TestOrSpec);
         Box::new(Visitor {
             rule: self,
-            enabled,
             test_file,
         })
     }
@@ -95,13 +75,12 @@ impl Rule for NoUnformattedNumber {
 
 struct Visitor {
     rule: &'static NoUnformattedNumber,
-    enabled: bool,
     test_file: bool,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

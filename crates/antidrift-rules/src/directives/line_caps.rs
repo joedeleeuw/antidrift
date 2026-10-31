@@ -2,7 +2,7 @@ use antidrift_kernel::directives::effective_token_start;
 use antidrift_kernel::file_role;
 use antidrift_kernel::jsx::{expression_contains_jsx, is_pascal_case_name, react_function_name};
 use antidrift_kernel::line_caps::{CappedUnit, LineCapFinding};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{property_name_text, unwrap_expression};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -10,22 +10,18 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub struct LineCapRule {
     unit: CappedUnit,
-    scope: RuleScope,
 }
 
 pub static MODULE_RULE: LineCapRule = LineCapRule {
     unit: CappedUnit::Module,
-    scope: RuleScope::DEFAULT,
 };
 
 pub static FUNCTION_RULE: LineCapRule = LineCapRule {
     unit: CappedUnit::Function,
-    scope: RuleScope::DEFAULT,
 };
 
 pub static COMPONENT_RULE: LineCapRule = LineCapRule {
     unit: CappedUnit::Component,
-    scope: RuleScope::DEFAULT,
 };
 
 pub fn create_rule(
@@ -41,10 +37,8 @@ pub fn create_rule(
     else {
         return Ok(None);
     };
-    Ok(Some(Box::new(LineCapRule {
-        unit: rule.unit,
-        scope: RuleScope::from_options(rule.unit.cap().rule_id, options)?,
-    })))
+    reject_unknown_options(rule.unit.cap().rule_id, options)?;
+    Ok(Some(Box::new(LineCapRule { unit: rule.unit })))
 }
 
 const MODULE_LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
@@ -59,20 +53,13 @@ const FUNCTION_LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::SetAccessor),
 ];
 
-impl ScopedRule for LineCapRule {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for LineCapRule {
     fn name(&self) -> &'static str {
         self.unit.cap().rule_id
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled =
-            self.scope.in_scope(ctx) && !file_role::is_declaration_file(ctx.file.file_name());
+        let enabled = !file_role::is_declaration_file(ctx.file.file_name());
         Box::new(Visitor {
             unit: self.unit,
             enabled,

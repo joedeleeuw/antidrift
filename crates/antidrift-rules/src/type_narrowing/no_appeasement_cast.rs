@@ -1,3 +1,4 @@
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::{shape, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
 use tsrs_checker::{Checker, Type, TypeFlags};
@@ -259,22 +260,14 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
     );
 }
 
-pub struct NoAppeasementCast {
-    pub scope: antidrift_kernel::rule_scope::RuleScope,
-}
+pub struct NoAppeasementCast;
 
-pub static DEFAULT_INSTANCE: NoAppeasementCast = NoAppeasementCast {
-    scope: antidrift_kernel::rule_scope::RuleScope::DEFAULT,
-};
+pub static DEFAULT_INSTANCE: NoAppeasementCast = NoAppeasementCast;
 
 impl NoAppeasementCast {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: antidrift_kernel::rule_scope::RuleScope::from_options(
-                "antidrift/no-appeasement-cast",
-                options,
-            )?,
-        })
+        reject_unknown_options("antidrift/no-appeasement-cast", options)?;
+        Ok(Self)
     }
 }
 
@@ -283,21 +276,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::TypeAssertionExpression),
 ];
 
-impl antidrift_kernel::rule_scope::ScopedRule for NoAppeasementCast {
-    fn scope(&self) -> &antidrift_kernel::rule_scope::RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoAppeasementCast {
     fn name(&self) -> &'static str {
         "antidrift/no-appeasement-cast"
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(antidrift_kernel::rule_scope::EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

@@ -1,4 +1,3 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, ScopedRule};
 use antidrift_kernel::{boundary, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -25,24 +24,19 @@ struct AllowedFunctionSpec {
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct ConvexValidatorOptions {
     allows: Vec<AllowedEntry>,
-    #[serde(flatten)]
-    scope: ScopeOptions,
 }
 
 pub struct RequireConvexReturnValidator {
     allows: FxHashSet<String>,
-    scope: RuleScope,
 }
 
 pub static DEFAULT_RULE: RequireConvexReturnValidator = RequireConvexReturnValidator {
     allows: FxHashSet::with_hasher(rustc_hash::FxBuildHasher),
-    scope: RuleScope::DEFAULT,
 };
 
 impl RequireConvexReturnValidator {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = super::decode_rule_options::<ConvexValidatorOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         let mut allows = FxHashSet::default();
         for entry in parsed.allows {
             let name = match entry {
@@ -56,7 +50,7 @@ impl RequireConvexReturnValidator {
             }
             allows.insert(name);
         }
-        Ok(Self { allows, scope })
+        Ok(Self { allows })
     }
 }
 
@@ -68,21 +62,12 @@ struct RegistrationInspection {
     returns_initializer: Option<P<Node>>,
 }
 
-impl ScopedRule for RequireConvexReturnValidator {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for RequireConvexReturnValidator {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor { rule: self })
     }
 }

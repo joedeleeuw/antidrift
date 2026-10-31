@@ -1,7 +1,7 @@
 use super::RustDiagnostic;
 use super::boundary_decode::check_decode_to_option;
 use super::cargo_manifest::{ManifestSource, check_cargo_manifest, read_manifest_source};
-use super::catalog::{TestCode, row};
+use super::catalog::row;
 use super::config::RustConfig;
 use super::constant_fields::check_constant_return_fields;
 use super::module_graph::{
@@ -15,6 +15,7 @@ use super::syntax::check_file_surface;
 use super::value_flow::check_value_flow;
 use super::wrapping::check_wrapping_functions;
 use antidrift_kernel::diagnostic::Severity;
+use antidrift_kernel::scope_policy::ScopePolicy;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::{BTreeSet, VecDeque};
 use std::fs;
@@ -314,12 +315,12 @@ fn settle_diagnostics(
                 known.id
             ));
         };
-        if level.level == Severity::Off || !level.scope.matches(&diag.file, "") {
+        if level.level == Severity::Off || !level.scope.matches_candidates(&[&diag.file]) {
             continue;
         }
+        let skips_tests = matches!(known.scope_policy, ScopePolicy::AuthoredSource);
         if let Some(context) = contexts.get(&diag.file)
-            && (context.generated
-                || (known.test_code == TestCode::Skipped && context.in_test_code(diag.line)))
+            && (context.generated || (skips_tests && context.in_test_code(diag.line)))
         {
             continue;
         }

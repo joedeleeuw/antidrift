@@ -2,7 +2,7 @@ use super::test_only_seam::check_test_only_seams;
 use antidrift_kernel::callgraph::ProgramSymbolIndex;
 use antidrift_kernel::file_role;
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::{EmptyVisitor, reject_unknown_options};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_compiler::Program;
@@ -33,19 +33,14 @@ const EFFECTFUL_MEMBERS: &[(&str, &str)] = &[
     ("Math", "random"),
 ];
 
-pub struct NoHypotheticalSeam {
-    scope: RuleScope,
-}
+pub struct NoHypotheticalSeam;
 
-pub static DEFAULT_RULE: NoHypotheticalSeam = NoHypotheticalSeam {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoHypotheticalSeam = NoHypotheticalSeam;
 
 impl NoHypotheticalSeam {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -57,21 +52,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::Constructor),
 ];
 
-impl ScopedRule for NoHypotheticalSeam {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoHypotheticalSeam {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.admits_authored_source(ctx) {
-            return Box::new(EmptyVisitor);
-        }
         match provenance::is_package_entry_file(ctx.file.file_name()) {
             Ok(true) => return Box::new(EmptyVisitor),
             Ok(false) => {}

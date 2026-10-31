@@ -4,7 +4,7 @@ use super::syntax::{
     unwrap_expression,
 };
 use antidrift_kernel::local_binding::is_identifier_reference_position;
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, ScopedRule, decode_rule_options};
+use antidrift_kernel::rule_options::decode_rule_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -17,8 +17,6 @@ pub const RULE_NAME: &str = "antidrift/require-query-signal";
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct QuerySignalOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     api_module: Option<String>,
 }
 
@@ -29,21 +27,15 @@ enum NetworkKind {
 }
 
 pub struct RequireQuerySignal {
-    scope: RuleScope,
     api_module: Option<String>,
 }
 
-pub static DEFAULT_RULE: RequireQuerySignal = RequireQuerySignal {
-    scope: RuleScope::DEFAULT,
-    api_module: None,
-};
+pub static DEFAULT_RULE: RequireQuerySignal = RequireQuerySignal { api_module: None };
 
 impl RequireQuerySignal {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let decoded = decode_rule_options::<QuerySignalOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &decoded.scope)?;
         Ok(Self {
-            scope,
             api_module: decoded.api_module,
         })
     }
@@ -51,41 +43,27 @@ impl RequireQuerySignal {
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 
-impl ScopedRule for RequireQuerySignal {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for RequireQuerySignal {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = self.scope.in_scope(ctx);
-        let functions = if enabled {
-            query_functions(ctx.file.as_node())
-        } else {
-            FxHashSet::default()
-        };
         Box::new(Visitor {
             rule: self,
-            enabled,
-            functions,
+            functions: query_functions(ctx.file.as_node()),
         })
     }
 }
 
 struct Visitor {
     rule: &'static RequireQuerySignal,
-    enabled: bool,
     functions: FxHashSet<P<Node>>,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled && !self.functions.is_empty() {
+        if !self.functions.is_empty() {
             LISTENERS
         } else {
             &[]

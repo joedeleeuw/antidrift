@@ -3,9 +3,7 @@ use super::web_provenance::{
     resolve_lexical_binding, unwrap_expression,
 };
 use antidrift_kernel::local_binding::Binding;
-use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedRule, decode_rule_options, in_scope,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -16,20 +14,16 @@ pub const RULE_NAME: &str = "antidrift/no-unsafe-inner-html";
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct HtmlOptions {
-    #[serde(flatten)]
-    scope: ScopeOptions,
     sanitizers: Option<Vec<ImportedOwner>>,
     trusted_sources: Vec<ImportedOwner>,
 }
 
 pub struct NoUnsafeInnerHtml {
-    scope: RuleScope,
     sanitizers: Vec<ImportedOwner>,
     trusted_sources: Vec<ImportedOwner>,
 }
 
 pub static DEFAULT_RULE: NoUnsafeInnerHtml = NoUnsafeInnerHtml {
-    scope: RuleScope::DEFAULT,
     sanitizers: Vec::new(),
     trusted_sources: Vec::new(),
 };
@@ -37,7 +31,6 @@ pub static DEFAULT_RULE: NoUnsafeInnerHtml = NoUnsafeInnerHtml {
 impl NoUnsafeInnerHtml {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let parsed = decode_rule_options::<HtmlOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &parsed.scope)?;
         let sanitizers = parsed.sanitizers.unwrap_or_else(|| {
             vec![ImportedOwner {
                 module: "dompurify".to_owned(),
@@ -46,7 +39,6 @@ impl NoUnsafeInnerHtml {
             }]
         });
         Ok(Self {
-            scope,
             sanitizers,
             trusted_sources: parsed.trusted_sources,
         })
@@ -70,41 +62,27 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::BinaryExpression),
 ];
 
-impl ScopedRule for NoUnsafeInnerHtml {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoUnsafeInnerHtml {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        let sanitizers = if enabled {
-            self.effective_sanitizers()
-        } else {
-            Vec::new()
-        };
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
             rule: self,
-            enabled,
-            sanitizers,
+            sanitizers: self.effective_sanitizers(),
         })
     }
 }
 
 struct Visitor {
     rule: &'static NoUnsafeInnerHtml,
-    enabled: bool,
     sanitizers: Vec<ImportedOwner>,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

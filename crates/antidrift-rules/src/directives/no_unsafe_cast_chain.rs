@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{assertion_parts, is_const_assertion, unwrap_parentheses};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -7,19 +7,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 pub const RULE_NAME: &str = "antidrift/no-unsafe-cast-chain";
 const MESSAGE: &str = "This assertion chain discards type evidence. Keep the original precise type, or parse untrusted input at its boundary before narrowing it.";
 
-pub struct NoUnsafeCastChain {
-    scope: RuleScope,
-}
+pub struct NoUnsafeCastChain;
 
-pub static DEFAULT_RULE: NoUnsafeCastChain = NoUnsafeCastChain {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoUnsafeCastChain = NoUnsafeCastChain;
 
 impl NoUnsafeCastChain {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -28,31 +23,21 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::TypeAssertionExpression),
 ];
 
-impl ScopedRule for NoUnsafeCastChain {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoUnsafeCastChain {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
-        let enabled = self.scope.matches(ctx.file.file_name(), cwd);
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

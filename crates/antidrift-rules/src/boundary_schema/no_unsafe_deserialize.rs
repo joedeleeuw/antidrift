@@ -1,24 +1,19 @@
 use antidrift_kernel::boundary;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-unsafe-deserialize";
 
-pub struct NoUnsafeDeserialize {
-    scope: RuleScope,
-}
+pub struct NoUnsafeDeserialize;
 
-pub static DEFAULT_RULE: NoUnsafeDeserialize = NoUnsafeDeserialize {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoUnsafeDeserialize = NoUnsafeDeserialize;
 
 impl NoUnsafeDeserialize {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -27,21 +22,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::Identifier),
 ];
 
-impl ScopedRule for NoUnsafeDeserialize {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoUnsafeDeserialize {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

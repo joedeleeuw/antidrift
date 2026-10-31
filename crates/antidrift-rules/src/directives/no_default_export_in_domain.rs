@@ -1,24 +1,19 @@
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use tsrs_ast::{Kind, ModifierFlags, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-default-export-in-domain";
 
-pub struct NoDefaultExportInDomain {
-    scope: RuleScope,
-}
+pub struct NoDefaultExportInDomain;
 
-pub static DEFAULT_RULE: NoDefaultExportInDomain = NoDefaultExportInDomain {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoDefaultExportInDomain = NoDefaultExportInDomain;
 
 impl NoDefaultExportInDomain {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -29,10 +24,9 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::InterfaceDeclaration),
 ];
 
-impl ScopedRule for NoDefaultExportInDomain {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
+#[must_use]
+pub fn inferred_role(path: &ProjectPath) -> bool {
+    is_domain_file(path.as_str())
 }
 
 impl Rule for NoDefaultExportInDomain {
@@ -41,16 +35,8 @@ impl Rule for NoDefaultExportInDomain {
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let cwd = ctx.program.host().get_current_directory();
-        let filename = ctx.file.file_name().replace('\\', "/");
-        let path = ProjectPath::of(ctx.program, &filename);
-        let in_scope = if self.scope.has_explicit_files() {
-            self.scope.matches(&filename, cwd)
-        } else {
-            self.scope.matches(&filename, cwd) && is_domain_file(path.as_str())
-        };
-        let enabled = in_scope
-            && !path.has_role(FileRole::TestOrSpec)
+        let path = ProjectPath::of(ctx.program, ctx.file.file_name());
+        let enabled = !path.has_role(FileRole::TestOrSpec)
             && !is_migration_file(path.as_str())
             && !is_generated_or_declaration_module(path.as_str());
         Box::new(Visitor { enabled })

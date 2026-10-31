@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::string_fragments::class_fragments;
 use tsrs_ast::Node;
 use tsrs_core::P;
@@ -7,19 +7,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 pub const RULE_NAME: &str = "antidrift/no-physical-properties";
 const MESSAGE: &str = "Physical directional CSS property breaks RTL. Use logical equivalents: ml→ms, mr→me, pl→ps, pr→pe, left→start, right→end, text-left→text-start, text-right→text-end, border-l→border-s, border-r→border-e, rounded-l→rounded-s, rounded-r→rounded-e.";
 
-pub struct NoPhysicalProperties {
-    scope: RuleScope,
-}
+pub struct NoPhysicalProperties;
 
-pub static DEFAULT_RULE: NoPhysicalProperties = NoPhysicalProperties {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoPhysicalProperties = NoPhysicalProperties;
 
 impl NoPhysicalProperties {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -33,21 +28,12 @@ impl RuleVisitor for NoopVisitor {
     fn visit(&mut self, _ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {}
 }
 
-impl ScopedRule for NoPhysicalProperties {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoPhysicalProperties {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !in_scope(&self.scope, ctx, None) {
-            return Box::new(NoopVisitor);
-        }
         for fragment in class_fragments(ctx.file) {
             if has_physical_property(&without_symmetric_insets(fragment.text)) {
                 ctx.report_node(fragment.node, RuleMessage::new("physicalProperty", MESSAGE));

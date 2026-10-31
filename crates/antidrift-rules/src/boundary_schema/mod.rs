@@ -10,26 +10,27 @@ mod sql_text;
 pub mod unknown_input_must_be_decoded;
 pub mod unknown_input_probe;
 
-use antidrift_kernel::rule_scope::{ScopedRule, decode_rule_options};
+use crate::CatalogRule;
+use antidrift_kernel::rule_options::decode_rule_options;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn typescript_only_rules() -> Vec<&'static dyn ScopedRule> {
+pub fn typescript_only_rules() -> Vec<CatalogRule> {
     vec![
-        &unknown_input_must_be_decoded::DEFAULT_RULE,
-        &no_external_decode_in_tsx::DEFAULT_RULE,
-        &no_redundant_zod_parse::DEFAULT_RULE,
-        &no_identity_schema_transform::DEFAULT_RULE,
-        &no_schema_validator_transcoding::DEFAULT_RULE,
-        &require_convex_return_validator::DEFAULT_RULE,
+        CatalogRule::everywhere(&unknown_input_must_be_decoded::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_external_decode_in_tsx::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_redundant_zod_parse::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_identity_schema_transform::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_schema_validator_transcoding::DEFAULT_RULE),
+        CatalogRule::everywhere(&require_convex_return_validator::DEFAULT_RULE),
     ]
 }
 
 #[must_use]
-pub fn script_default_rules() -> Vec<&'static dyn ScopedRule> {
+pub fn script_default_rules() -> Vec<CatalogRule> {
     vec![
-        &no_unsafe_deserialize::DEFAULT_RULE,
-        &no_sql_string_concat::DEFAULT_RULE,
+        CatalogRule::everywhere(&no_unsafe_deserialize::DEFAULT_RULE),
+        CatalogRule::everywhere(&no_sql_string_concat::DEFAULT_RULE),
     ]
 }
 

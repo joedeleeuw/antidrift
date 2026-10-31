@@ -2,9 +2,7 @@ use super::syntax::{
     Binding, Span, binding_for_declarator, collect_binding_references, identifier_member,
     identifier_of, parent_expression, unwrap_parentheses,
 };
-use antidrift_kernel::rule_scope::{
-    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
-};
+use antidrift_kernel::rule_options::decode_rule_options;
 use serde::Deserialize;
 use tsrs_ast::{Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
@@ -24,8 +22,6 @@ enum AsyncBranch {
 struct AsyncArrayOptions {
     #[serde(deserialize_with = "decode_branches")]
     branches: Vec<AsyncBranch>,
-    #[serde(flatten)]
-    scope: ScopeOptions,
 }
 
 fn decode_branches<'de, D: serde::Deserializer<'de>>(
@@ -47,42 +43,29 @@ fn decode_branches<'de, D: serde::Deserializer<'de>>(
 
 pub struct NoAsyncArrayMethod {
     requires_collection: bool,
-    scope: RuleScope,
 }
 
 pub static DEFAULT_RULE: NoAsyncArrayMethod = NoAsyncArrayMethod {
     requires_collection: false,
-    scope: RuleScope::DEFAULT,
 };
 
 impl NoAsyncArrayMethod {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
         let decoded = decode_rule_options::<AsyncArrayOptions>(RULE_NAME, options)?;
-        let scope = RuleScope::from_scope_options(RULE_NAME, &decoded.scope)?;
         Ok(Self {
             requires_collection: decoded.branches.contains(&AsyncBranch::RequiresCollection),
-            scope,
         })
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 
-impl ScopedRule for NoAsyncArrayMethod {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoAsyncArrayMethod {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
             requires_collection: self.requires_collection,
         })

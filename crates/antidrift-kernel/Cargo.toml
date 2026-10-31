@@ -12,7 +12,6 @@ test = false
 doctest = false
 
 [dependencies]
-globset.workspace = true
 oxc_resolver.workspace = true
 rustc-hash.workspace = true
 serde.workspace = true

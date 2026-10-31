@@ -1,5 +1,5 @@
 use antidrift_kernel::file_role;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{boundary, provenance};
 use tsrs_ast::{Kind, Node, SourceFile, Symbol};
@@ -8,19 +8,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 const RULE_NAME: &str = "antidrift/no-service-constructor-imports";
 
-pub struct NoServiceConstructorImports {
-    scope: RuleScope,
-}
+pub struct NoServiceConstructorImports;
 
-pub static RULE: NoServiceConstructorImports = NoServiceConstructorImports {
-    scope: RuleScope::DEFAULT,
-};
+pub static RULE: NoServiceConstructorImports = NoServiceConstructorImports {};
 
 impl NoServiceConstructorImports {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -167,21 +162,12 @@ fn check_import_declaration(ctx: &mut Ctx, import: P<Node>) {
     }
 }
 
-impl ScopedRule for NoServiceConstructorImports {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoServiceConstructorImports {
     fn name(&self) -> &'static str {
         "antidrift/no-service-constructor-imports"
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.in_scope(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

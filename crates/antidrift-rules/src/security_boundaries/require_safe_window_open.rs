@@ -3,7 +3,7 @@ use super::web_provenance::{
     static_property_name, unwrap_expression,
 };
 use antidrift_kernel::local_binding::Binding;
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -11,48 +11,34 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/require-safe-window-open";
 
-pub struct RequireSafeWindowOpen {
-    scope: RuleScope,
-}
+pub struct RequireSafeWindowOpen;
 
-pub static DEFAULT_RULE: RequireSafeWindowOpen = RequireSafeWindowOpen {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: RequireSafeWindowOpen = RequireSafeWindowOpen;
 
 impl RequireSafeWindowOpen {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
-
-impl ScopedRule for RequireSafeWindowOpen {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
 
 impl Rule for RequireSafeWindowOpen {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        Box::new(Visitor { enabled })
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        Box::new(Visitor)
     }
 }
 
-struct Visitor {
-    enabled: bool,
-}
+struct Visitor;
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

@@ -3,7 +3,7 @@ use super::syntax::{
     identifier_of, is_binding_mutated, is_write_reference, member, object_property, property_name,
     resolve_lexical_binding, unwrap_expression, unwrap_parentheses,
 };
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -18,19 +18,14 @@ enum SignalState {
     Opaque,
 }
 
-pub struct RequireFetchTimeout {
-    scope: RuleScope,
-}
+pub struct RequireFetchTimeout;
 
-pub static DEFAULT_RULE: RequireFetchTimeout = RequireFetchTimeout {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: RequireFetchTimeout = RequireFetchTimeout;
 
 impl RequireFetchTimeout {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -40,33 +35,25 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
 ];
 
-impl ScopedRule for RequireFetchTimeout {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for RequireFetchTimeout {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor {
-            enabled: self.scope.in_scope(ctx),
             signals: FxHashMap::default(),
         })
     }
 }
 
 struct Visitor {
-    enabled: bool,
     signals: FxHashMap<Binding, SignalState>,
 }
 
 impl RuleVisitor for Visitor {
     fn listeners(&self) -> &[Listener] {
-        if self.enabled { LISTENERS } else { &[] }
+        LISTENERS
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

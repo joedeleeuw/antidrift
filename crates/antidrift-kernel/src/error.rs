@@ -28,12 +28,6 @@ pub enum KernelError {
         #[source]
         source: yaml_serde::Error,
     },
-    #[error("{context}: {source}")]
-    GlobCompile {
-        context: String,
-        #[source]
-        source: globset::Error,
-    },
 }
 
 impl From<KernelError> for String {

@@ -6,7 +6,7 @@ use antidrift_kernel::local_binding::{
     Binding, binding_pattern_identifiers, for_each_resolved_reference, resolve_lexical_binding,
 };
 use antidrift_kernel::relational_scan::{is_inner_linear_scan_method, is_outer_traversal_method};
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::{
     callee_name, is_function_like, numeric_literal_value, property_name_text, unwrap_expression,
 };
@@ -36,25 +36,14 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::MethodDeclaration),
 ];
 
-pub struct NoQueryJoinOrTreeReshape {
-    scope: RuleScope,
-}
+pub struct NoQueryJoinOrTreeReshape;
 
-pub static DEFAULT_RULE: NoQueryJoinOrTreeReshape = NoQueryJoinOrTreeReshape {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoQueryJoinOrTreeReshape = NoQueryJoinOrTreeReshape;
 
 impl NoQueryJoinOrTreeReshape {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
-    }
-}
-
-impl ScopedRule for NoQueryJoinOrTreeReshape {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -63,10 +52,7 @@ impl Rule for NoQueryJoinOrTreeReshape {
         RULE_NAME
     }
 
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if !self.scope.admits_authored_source(ctx) {
-            return Box::new(EmptyVisitor);
-        }
+    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         Box::new(Visitor)
     }
 }

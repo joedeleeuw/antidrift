@@ -1,6 +1,6 @@
 use super::package_ownership::{PackageOwner, absolute_filename, package_owner};
 use antidrift_kernel::imports::extract_module_import;
-use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
+use antidrift_kernel::rule_options::reject_unknown_options;
 use std::path::{Path, PathBuf};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -8,19 +8,14 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-relative-cross-package-imports";
 
-pub struct NoRelativeCrossPackageImports {
-    scope: RuleScope,
-}
+pub struct NoRelativeCrossPackageImports;
 
-pub static DEFAULT_RULE: NoRelativeCrossPackageImports = NoRelativeCrossPackageImports {
-    scope: RuleScope::DEFAULT,
-};
+pub static DEFAULT_RULE: NoRelativeCrossPackageImports = NoRelativeCrossPackageImports;
 
 impl NoRelativeCrossPackageImports {
     pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            scope: RuleScope::from_options(RULE_NAME, options)?,
-        })
+        reject_unknown_options(RULE_NAME, options)?;
+        Ok(Self)
     }
 }
 
@@ -30,22 +25,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
 ];
 
-impl ScopedRule for NoRelativeCrossPackageImports {
-    fn scope(&self) -> &RuleScope {
-        &self.scope
-    }
-}
-
 impl Rule for NoRelativeCrossPackageImports {
     fn name(&self) -> &'static str {
         RULE_NAME
     }
 
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let enabled = in_scope(&self.scope, ctx, None);
-        if !enabled {
-            return Box::new(Visitor { state: None });
-        }
         match load_owner_state(ctx.file.file_name()) {
             Ok(state) => Box::new(Visitor { state }),
             Err(message) => {
