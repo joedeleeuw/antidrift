@@ -35,6 +35,8 @@ const SOURCES = {
     "export const clean = 1;\n",
   "src/floating.ts": "export async function work() {}\n\nwork();\n",
   "src/api.d.ts": "export declare function read(): void;\n",
+  "src/card.tsx":
+    "export function Card(props: { title: string; body: string; footer: string }) {\n  return props.title + props.body + props.footer;\n}\n",
   "src/caller.ts": 'import { read } from "./api";\n\nread();\n',
 };
 
@@ -114,6 +116,64 @@ function proveConfiguredLevels(repoRoot, project) {
       `antidrift/no-as-never at ${level} must report ${severity}s, exit ${status}, and count its honored disable comment as used`
     );
   }
+}
+
+const PROPS_RULE = "antidrift/react-max-component-props";
+const PROPS_FILE = "src/card.tsx";
+
+function runPropsRule({ repoRoot, project, setting, label }) {
+  const configPath = join(project, `oxlintrc.props-${label}.json`);
+  writeFileSync(
+    configPath,
+    JSON.stringify({
+      jsPlugins: [
+        resolve(repoRoot, "tooling/antidrift/src/oxlint-plugin/index.mjs"),
+      ],
+      categories: { correctness: "off" },
+      rules: { [PROPS_RULE]: setting },
+    })
+  );
+  return spawnSync(
+    resolve(repoRoot, "node_modules/.bin/oxlint"),
+    ["-c", configPath, "--format", "json", PROPS_FILE],
+    { cwd: project, encoding: "utf8" }
+  );
+}
+
+function proveRuleOptions(repoRoot, project) {
+  const strict = runPropsRule({
+    repoRoot,
+    project,
+    setting: ["error", { max: 2 }],
+    label: "strict",
+  });
+  assert.deepEqual(
+    [strict.status, summarize(JSON.parse(strict.stdout).diagnostics)],
+    [1, [[PROPS_FILE, "antidrift(react-max-component-props)", "error", 1]]],
+    `rule options reach the engine through the plugin: max 2 must report the three-prop component, got ${strict.stderr}`
+  );
+  const defaults = runPropsRule({
+    repoRoot,
+    project,
+    setting: "error",
+    label: "default",
+  });
+  assert.deepEqual(
+    [defaults.status, summarize(JSON.parse(defaults.stdout).diagnostics)],
+    [0, []],
+    `without options the shipped default (12) keeps the component clean, got ${defaults.stderr}`
+  );
+  const unknown = runPropsRule({
+    repoRoot,
+    project,
+    setting: ["error", { maximum: 2 }],
+    label: "unknown",
+  });
+  assert.ok(
+    unknown.status !== 0 &&
+      `${unknown.stdout}${unknown.stderr}`.includes("maximum"),
+    `an unknown option must fail the run naming the field, got status ${unknown.status}: ${unknown.stderr}`
+  );
 }
 
 function proveIdleDirective(repoRoot, project) {
@@ -394,6 +454,7 @@ export function proveOxlintPluginBridge(repoRoot, linter) {
   const project = writeProject();
   try {
     proveConfiguredLevels(repoRoot, project);
+    proveRuleOptions(repoRoot, project);
     proveIdleDirective(repoRoot, project);
     proveTypeAwareRelay(repoRoot, project, linter);
     proveFixAfterRegularPass(repoRoot, project, linter);

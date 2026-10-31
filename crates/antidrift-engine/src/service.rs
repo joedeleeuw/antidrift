@@ -10,13 +10,13 @@ use tsrs_core::tspath;
 use crate::headless::{HeadlessRequest, RelayReply};
 use crate::headless_host::program_counts;
 use crate::relay;
-use crate::session::{Finding, Session};
+use crate::session::{Finding, RuleRequest, Session};
 
 enum EngineRequest {
     Lint {
         cwd: String,
         file_path: String,
-        rules: Vec<String>,
+        rules: Vec<RuleRequest>,
         reply: Sender<Result<Vec<Finding>, String>>,
     },
     Headless {
@@ -111,7 +111,7 @@ impl EngineService {
         &self,
         cwd: String,
         file_path: String,
-        rules: Vec<String>,
+        rules: Vec<RuleRequest>,
     ) -> Result<Vec<Finding>, String> {
         let (reply, outcome) = channel();
         self.sender()?

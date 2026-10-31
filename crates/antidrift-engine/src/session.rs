@@ -13,7 +13,9 @@ use tsrslint::rule::Rule;
 
 use crate::batch::reported_to_rule_diagnostic;
 use crate::headless_host::{BoundProgram, ProgramBuilderEnv, collect_missing_bound_files};
-use crate::rule_plan::{all_scoped_rules, default_workspace_rules, push_unique_rule};
+use crate::rule_plan::{
+    all_scoped_rules, default_workspace_rules, instantiate_rule, push_unique_rule,
+};
 use crate::runner::{collect_lintable_files, is_supported_file};
 
 #[derive(Clone)]
@@ -23,11 +25,52 @@ pub struct Finding {
     pub location: DiagnosticLocation,
 }
 
+pub struct RuleRequest {
+    pub name: String,
+    pub options: Option<String>,
+}
+
+struct RequestedRule {
+    identity: String,
+    rule: &'static dyn Rule,
+}
+
+fn rule_identity(name: &str, options: Option<&serde_json::Value>) -> String {
+    match options {
+        Some(value) => format!("{name}\u{0}{value}"),
+        None => name.to_owned(),
+    }
+}
+
+fn decode_rule_options(
+    name: &str,
+    options: Option<&str>,
+) -> Result<Option<serde_json::Value>, String> {
+    let Some(text) = options else {
+        return Ok(None);
+    };
+    let value: serde_json::Value = serde_json::from_str(text)
+        .map_err(|err| format!("{name}: the host sent rule options that are not JSON: {err}"))?;
+    let serde_json::Value::Array(items) = value else {
+        return Err(format!(
+            "{name}: the host must send rule options as the ESLint options array, got {value}"
+        ));
+    };
+    match items.as_slice() {
+        [] => Ok(None),
+        [single] => Ok(Some(single.clone())),
+        _ => Err(format!(
+            "{name}: antidrift rules take one options object, the host sent {} values",
+            items.len()
+        )),
+    }
+}
+
 struct Batch {
     files: Vec<String>,
     bound: Option<BoundProgram>,
     missing: Vec<String>,
-    linted: FxHashSet<&'static str>,
+    linted: FxHashSet<String>,
 }
 
 struct Family {
@@ -56,9 +99,10 @@ pub(crate) struct Session {
     cwd: String,
     pub(crate) env: ProgramBuilderEnv,
     rules: FxHashMap<&'static str, &'static dyn Rule>,
+    configured_rules: FxHashMap<String, &'static dyn Rule>,
     families: Vec<Family>,
     slots: FxHashMap<String, (usize, Slot)>,
-    findings: FxHashMap<String, Vec<Finding>>,
+    findings: FxHashMap<String, Vec<(String, Finding)>>,
 }
 
 impl Session {
@@ -77,6 +121,7 @@ impl Session {
                 .into_iter()
                 .map(|rule| (rule.name(), rule))
                 .collect(),
+            configured_rules: FxHashMap::default(),
             families: Vec::new(),
             slots: FxHashMap::default(),
             findings: FxHashMap::default(),
@@ -92,21 +137,47 @@ impl Session {
         Ok(session)
     }
 
+    fn requested_rule(&mut self, request: &RuleRequest) -> Result<RequestedRule, String> {
+        let name = request.name.as_str();
+        let default = self.rules.get(name).copied().ok_or_else(|| {
+            format!("{name} is not an antidrift rule; the plugin registers only the rules the addon lists")
+        })?;
+        let Some(options) = decode_rule_options(name, request.options.as_deref())? else {
+            return Ok(RequestedRule {
+                identity: rule_identity(name, None),
+                rule: default,
+            });
+        };
+        let identity = rule_identity(name, Some(&options));
+        if let Some(&rule) = self.configured_rules.get(&identity) {
+            return Ok(RequestedRule { identity, rule });
+        }
+        let rule = instantiate_rule(name, Some(&options))?
+            .ok_or_else(|| format!("rule '{name}' is cataloged but no family factory builds it"))?;
+        self.configured_rules.insert(identity.clone(), rule);
+        Ok(RequestedRule { identity, rule })
+    }
+
     pub(crate) fn lint_file(
         &mut self,
         file_path: &str,
-        rule_names: &[String],
+        requests: &[RuleRequest],
     ) -> Result<Vec<Finding>, String> {
-        if rule_names.is_empty() || !is_supported_file(Path::new(file_path)) {
+        if requests.is_empty() || !is_supported_file(Path::new(file_path)) {
             return Ok(Vec::new());
         }
-        let rules = rule_names
+        let mut names = FxHashSet::default();
+        for request in requests {
+            if !names.insert(request.name.as_str()) {
+                return Err(format!(
+                    "{} was requested twice for {file_path}; the plugin sends one options set per rule per file",
+                    request.name
+                ));
+            }
+        }
+        let rules = requests
             .iter()
-            .map(|name| {
-                self.rules.get(name.as_str()).copied().ok_or_else(|| {
-                    format!("{name} is not an antidrift rule; the plugin registers only the rules the addon lists")
-                })
-            })
+            .map(|request| self.requested_rule(request))
             .collect::<Result<Vec<_>, _>>()?;
         let normalized = tspath::normalize_slashes(file_path);
         let (family, slot) = match self.slots.get(&normalized) {
@@ -125,14 +196,14 @@ impl Session {
         {
             self.lint_slot(family, Slot::Inferred, &rules)?;
         }
-        let wanted: FxHashSet<&str> = rules.iter().map(|rule| rule.name()).collect();
+        let wanted: FxHashSet<&str> = rules.iter().map(|rule| rule.identity.as_str()).collect();
         self.findings
             .get(&normalized)
             .map(|findings| {
                 findings
                     .iter()
-                    .filter(|finding| wanted.contains(finding.rule.as_str()))
-                    .cloned()
+                    .filter(|(identity, _)| wanted.contains(identity.as_str()))
+                    .map(|(_, finding)| finding.clone())
                     .collect()
             })
             .ok_or_else(|| {
@@ -214,7 +285,7 @@ impl Session {
         &mut self,
         family: usize,
         slot: Slot,
-        rules: &[&'static dyn Rule],
+        rules: &[RequestedRule],
     ) -> Result<(), String> {
         match slot {
             Slot::Configured(index) => self.build_configured(family, index)?,
@@ -224,23 +295,39 @@ impl Session {
             Slot::Configured(index) => &mut self.families[family].configured[index].1,
             Slot::Inferred => &mut self.families[family].inferred,
         };
-        let missing: Vec<&'static dyn Rule> = rules
+        let missing: Vec<&RequestedRule> = rules
             .iter()
-            .copied()
-            .filter(|rule| !batch.linted.contains(rule.name()))
+            .filter(|requested| !batch.linted.contains(&requested.identity))
             .collect();
         let Some(bound) = batch.bound.as_ref().filter(|_| !missing.is_empty()) else {
             return Ok(());
         };
-        let recorded = record(bound, &missing);
-        batch.linted.extend(missing.iter().map(|rule| rule.name()));
+        let identities: FxHashMap<&str, &str> = missing
+            .iter()
+            .map(|requested| (requested.rule.name(), requested.identity.as_str()))
+            .collect();
+        let instances: Vec<&'static dyn Rule> =
+            missing.iter().map(|requested| requested.rule).collect();
+        let recorded = record(bound, &instances);
+        batch
+            .linted
+            .extend(missing.iter().map(|requested| requested.identity.clone()));
         for sf in &bound.source_files {
             self.findings
                 .entry(tspath::normalize_slashes(sf.file_name()))
                 .or_default();
         }
         for (file, finding) in recorded {
-            self.findings.entry(file).or_default().push(finding);
+            let identity = identities.get(finding.rule.as_str()).ok_or_else(|| {
+                format!(
+                    "{} reported under a rule id that was not requested",
+                    finding.rule
+                )
+            })?;
+            self.findings
+                .entry(file)
+                .or_default()
+                .push(((*identity).to_owned(), finding));
         }
         Ok(())
     }
