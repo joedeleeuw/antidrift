@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,7 +50,7 @@ export const ADDON_LIBRARY_NAMES = {
 
 export const ADDON_PACKAGE_PATH = "antidrift.node";
 
-const NATIVE_ARTIFACTS = {
+export const NATIVE_ARTIFACTS = {
   linter: {
     env: "ANTIDRIFT_LINTER_BIN",
     builds: [
@@ -101,7 +101,7 @@ function platformArtifactPackages(artifact) {
   }
 }
 
-function resolveNativeArtifact(artifact, cwd) {
+export function resolveNativeArtifact(artifact, cwd) {
   if (process.env[artifact.env]) {
     return process.env[artifact.env];
   }
@@ -109,14 +109,6 @@ function resolveNativeArtifact(artifact, cwd) {
     ...localArtifactCandidates(artifact, cwd),
     ...platformArtifactPackages(artifact),
   ].find((candidate) => existsSync(candidate));
-}
-
-export function resolveNativeLinterBinary(cwd = process.cwd()) {
-  const found = resolveNativeArtifact(NATIVE_ARTIFACTS.linter, cwd);
-  if (found && (statSync(found).mode & 0o111) === 0) {
-    chmodSync(found, 0o755);
-  }
-  return found;
 }
 
 export function loadNativeAddon(cwd = process.cwd()) {
@@ -193,7 +185,7 @@ export function runOxlint({
     stdout.write(OXLINT_USAGE);
     return exit(0);
   }
-  const tsgolintBinary = resolveNativeLinterBinary(cwd);
+  const tsgolintBinary = resolveNativeArtifact(NATIVE_ARTIFACTS.linter, cwd);
   if (!tsgolintBinary) {
     stderr.write(
       "Missing antidrift-linter native binary; build crates/antidrift-linter or run pnpm --filter @joedeleeuw/antidrift build.\n"

@@ -16,9 +16,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-latest
+          - runner: ubuntu-22.04
             package: linux-x64-gnu
-          - runner: ubuntu-24.04-arm
+          - runner: ubuntu-22.04-arm
             package: linux-arm64-gnu
           - runner: macos-15-intel
             package: darwin-x64
@@ -31,22 +31,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.9.0
-          standalone: true
-          run_install: false
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           package-manager-cache: false
 
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
-          toolchain: 1.99.1
-
-      - uses: Swatinem/rust-cache@v2
+          build-warnings: warn
 
       - name: Verify release tag matches package version
         if: github.event_name == 'release'
@@ -92,24 +86,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.9.0
-          run_install: false
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           package-manager-cache: false
 
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
-          toolchain: 1.99.1
-          components: rustfmt, clippy
+          build-warnings: warn
 
-      - uses: Swatinem/rust-cache@v2
-
-      - run: npm install -g npm@latest
       - run: node --version && npm --version && pnpm --version && cargo --version
       - run: pnpm install --frozen-lockfile
       - run: cargo build --release --locked -p antidrift-linter -p antidrift-napi
@@ -134,34 +121,10 @@ jobs:
           merge-multiple: true
 
       - name: Publish platform packages
-        run: |
-          for tarball in "$RUNNER_TEMP"/platform-packs/*.tgz; do
-            spec="$(tar -xOzf "$tarball" package/package.json | node -p 'const m = JSON.parse(require("fs").readFileSync(0, "utf8")); `${m.name}@${m.version}`')"
-            built="$(node -p '`sha512-${require("crypto").createHash("sha512").update(require("fs").readFileSync(process.argv[1])).digest("base64")}`' "$tarball")"
-            published="$(npm view "$spec" dist.integrity 2> /dev/null || true)"
-            if [ -z "$published" ]; then
-              npm publish "$tarball" --access public
-            elif [ "$published" = "$built" ]; then
-              echo "${spec} is already on npm with this run's tarball"
-            else
-              echo "${spec} is on npm with a different tarball (${published}, this run built ${built}); release a new version" >&2
-              exit 1
-            fi
-          done
-
-      - name: Wait until every platform package resolves
-        run: |
-          for tarball in "$RUNNER_TEMP"/platform-packs/*.tgz; do
-            spec="$(tar -xOzf "$tarball" package/package.json | node -p 'const m = JSON.parse(require("fs").readFileSync(0, "utf8")); `${m.name}@${m.version}`')"
-            for attempt in $(seq 1 60); do
-              npm view "$spec" version > /dev/null 2>&1 && break
-              sleep 10
-            done
-            npm view "$spec" version > /dev/null || { echo "${spec} did not resolve on npm within 10 minutes" >&2; exit 1; }
-          done
+        run: node tooling/antidrift/scripts/publish-tarball.mjs "$RUNNER_TEMP"/platform-packs/*.tgz
 
       - name: Pack package
         run: pnpm --dir tooling/antidrift pack --pack-destination "$RUNNER_TEMP/antidrift-pack"
 
-      - name: Publish packed tarball
-        run: npm publish "$RUNNER_TEMP"/antidrift-pack/*.tgz --access public
+      - name: Publish package
+        run: node tooling/antidrift/scripts/publish-tarball.mjs "$RUNNER_TEMP"/antidrift-pack/*.tgz

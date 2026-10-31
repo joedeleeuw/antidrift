@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -20,7 +21,15 @@ import {
 import { proveAdoptionPresets } from "./consumer-adoption.mjs";
 import { scaffoldConsumerWorkspace } from "./consumer-workspace.mjs";
 
-const pnpmBinary = process.env.ANTIDRIFT_CONSUMER_PNPM ?? "pnpm";
+const pnpmEntry = process.env.npm_execpath;
+if (!pnpmEntry) {
+  throw new Error(
+    "consumer-monorepo.mjs runs through pnpm (pnpm package:verify): npm_execpath is unset"
+  );
+}
+const pnpmLaunch = /\.[cm]?js$/u.test(pnpmEntry)
+  ? { file: process.execPath, prefix: [pnpmEntry] }
+  : { file: pnpmEntry, prefix: [] };
 
 const pkgDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const work = mkdtempSync(join(tmpdir(), "antidrift-consumer-"));
@@ -64,12 +73,16 @@ function fail(message) {
 
 try {
   console.log("1/6  packing @joedeleeuw/antidrift ...");
-  run("pnpm", ["pack", "--pack-destination", work], pkgDir);
+  run(
+    pnpmLaunch.file,
+    [...pnpmLaunch.prefix, "pack", "--pack-destination", work],
+    pkgDir
+  );
   const tgz = readdirSync(work).find((filename) => filename.endsWith(".tgz"));
   if (!tgz) fail("pack produced no tarball");
   const tarball = join(work, tgz);
   const packedFiles = new Set(
-    run("tar", ["-tzf", tarball], work).trim().split("\n")
+    run("tar", ["-tzf", tarball], work).trim().split(/\r?\n/u)
   );
   for (const required of [
     "package/NOTICE",
@@ -116,10 +129,25 @@ try {
   const platformPackageName = platformManifest.name;
   const platformPack = join(work, "platform-pack");
   mkdirSync(platformPack);
+  const npmCli = join(
+    dirname(process.execPath),
+    process.platform === "win32"
+      ? "node_modules/npm/bin/npm-cli.js"
+      : "../lib/node_modules/npm/bin/npm-cli.js"
+  );
+  if (!existsSync(npmCli)) {
+    fail(`npm CLI not found beside Node at ${npmCli}`);
+  }
   run(
-    pnpmBinary,
-    ["pack", "--pack-destination", platformPack],
-    platformPackageDirectory
+    process.execPath,
+    [
+      npmCli,
+      "pack",
+      platformPackageDirectory,
+      "--pack-destination",
+      platformPack,
+    ],
+    work
   );
   const platformTarballs = readdirSync(platformPack).filter((name) =>
     name.endsWith(".tgz")
@@ -134,7 +162,7 @@ try {
     work
   ).trim();
   console.log(`  platform tarball contents:\n${platformTarballContents}`);
-  const platformPackedFiles = new Set(platformTarballContents.split("\n"));
+  const platformPackedFiles = new Set(platformTarballContents.split(/\r?\n/u));
   for (const required of [
     `package/${ADDON_PACKAGE_PATH}`,
     `package/${platformManifest.main}`,
@@ -157,7 +185,11 @@ try {
     );
     const toolingPack = join(work, "tooling-pack");
     mkdirSync(toolingPack);
-    run(pnpmBinary, ["pack", "--pack-destination", toolingPack], toolingRoot);
+    run(
+      pnpmLaunch.file,
+      [...pnpmLaunch.prefix, "pack", "--pack-destination", toolingPack],
+      toolingRoot
+    );
     const packed = readdirSync(toolingPack).filter((name) =>
       name.endsWith(".tgz")
     );
@@ -176,8 +208,9 @@ try {
 
   console.log("3/6  installing the tarball into the consumer ...");
   runInherit(
-    pnpmBinary,
+    pnpmLaunch.file,
     [
+      ...pnpmLaunch.prefix,
       "install",
       process.env.ANTIDRIFT_CONSUMER_OFFLINE === "1"
         ? "--offline"
@@ -194,8 +227,9 @@ try {
 
   function runPackedOxlint() {
     const completed = spawnSync(
-      pnpmBinary,
+      pnpmLaunch.file,
       [
+        ...pnpmLaunch.prefix,
         "exec",
         "oxlint",
         "portable-proofs/addon.ts",
@@ -333,8 +367,9 @@ try {
   function lintOxlint(relFile, config) {
     try {
       return runJson(
-        pnpmBinary,
+        pnpmLaunch.file,
         [
+          ...pnpmLaunch.prefix,
           "exec",
           "oxlint",
           relFile,
@@ -363,8 +398,9 @@ try {
   function lintAntidriftOxlint(relFile, config) {
     try {
       return runJson(
-        pnpmBinary,
+        pnpmLaunch.file,
         [
+          ...pnpmLaunch.prefix,
           "exec",
           "antidrift",
           "oxlint",
@@ -395,8 +431,9 @@ try {
   function lintOxlintRepository() {
     try {
       return runJson(
-        pnpmBinary,
+        pnpmLaunch.file,
         [
+          ...pnpmLaunch.prefix,
           "exec",
           "antidrift",
           "oxlint",
@@ -607,18 +644,34 @@ try {
     "5/6  typechecking every public export under supported TS resolution modes ..."
   );
   run(
-    pnpmBinary,
-    ["exec", "tsc", "-p", "tsconfig.bundler.json", "--pretty", "false"],
+    pnpmLaunch.file,
+    [
+      ...pnpmLaunch.prefix,
+      "exec",
+      "tsc",
+      "-p",
+      "tsconfig.bundler.json",
+      "--pretty",
+      "false",
+    ],
     work
   );
   run(
-    pnpmBinary,
-    ["exec", "tsc", "-p", "tsconfig.nodenext.json", "--pretty", "false"],
+    pnpmLaunch.file,
+    [
+      ...pnpmLaunch.prefix,
+      "exec",
+      "tsc",
+      "-p",
+      "tsconfig.nodenext.json",
+      "--pretty",
+      "false",
+    ],
     work
   );
 
   console.log("6/6  importing every public runtime export ...");
-  run("node", ["packages/app/src/runtime.mjs"], work);
+  run(process.execPath, ["packages/app/src/runtime.mjs"], work);
 
   console.log(
     `\n✓ tarball installs, type-checks, imports, and enforces via native antidrift-linter in a consumer monorepo`

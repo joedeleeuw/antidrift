@@ -6,7 +6,7 @@ import { dirname, relative, resolve } from "node:path";
 import { z } from "zod";
 
 import { collectChangeSurface } from "./change-context.mjs";
-import { resolveNativeLinterBinary } from "../policy/oxlint.mjs";
+import { NATIVE_ARTIFACTS, resolveNativeArtifact } from "../policy/oxlint.mjs";
 
 const CODE_FILE_RE = /\.(?:js|mjs|cjs|ts|tsx|mts|cts)$/u;
 
@@ -117,7 +117,10 @@ function lintTargets(root, targets) {
   const emptySuppressionsPath = resolve(tempDir, "suppressions.json");
   try {
     writeFileSync(emptySuppressionsPath, "{}\n", "utf8");
-    const linterBinary = resolveNativeLinterBinary();
+    const linterBinary = resolveNativeArtifact(
+      NATIVE_ARTIFACTS.linter,
+      process.cwd()
+    );
     const linterRun = spawnSync(
       linterBinary,
       [
