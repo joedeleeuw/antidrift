@@ -101,6 +101,35 @@ If you use the generated hooks/instructions, add the scripts they call to your r
 }
 ```
 
+## Rust workspaces
+
+`antidrift-linter rust` carries the same drift rules to Rust: one owner per type, decode at the boundary, keep error causes, no pass-through hops, no grab-bag or orphan modules. Install it from the repository and run it at the workspace root:
+
+```sh
+cargo install --git https://github.com/joedeleeuw/antidrift --locked antidrift-linter
+antidrift-linter rust .
+antidrift-linter rust --list-rules .
+```
+
+Every general rule is on at `error` with no configuration. Rule levels, per-rule file scopes, crate and module layering, and forbidden calls live in the workspace `Cargo.toml` under `[workspace.metadata.antidrift]` (`[package.metadata.antidrift]` for a crate outside any workspace). The table is decoded once with unknown keys, unknown rule ids and invalid levels rejected by name:
+
+```toml
+[workspace.metadata.antidrift]
+rules."rust/no-inline-comment" = "error"
+rules."rust/require-strict-serde" = { level = "error", exclude-files = ["crates/app/src/cargo_manifest.rs"] }
+layers.crates = ["app-kernel", "app-rules", "app-engine"]
+layers.modules.app-kernel = ["provenance", "shape", "boundary"]
+
+[[workspace.metadata.antidrift.forbidden-calls]]
+callee = "Listener::Enter"
+argument = "Kind::SourceFile"
+reason = "Listener::Enter(Kind::SourceFile) never fires in tsrslint."
+```
+
+Levels are `error`, `warn` or `off`; `files` and `exclude-files` take globs relative to the manifest. `layers.crates` and `layers.modules` order crates (and a crate's top-level modules) from lowest to highest; a lower layer may not depend on a higher one, and `rust/no-layer-violation` stays silent until you declare layers. Generated files (`@generated`, `DO NOT EDIT`, `generated/` directories) report nothing, and `#[cfg(test)]` code is exempt from the rules whose TypeScript counterparts skip test files.
+
+Two house-style rules ship off and are opt-in through the same table: `rust/no-inline-comment` (rationale goes in the commit body) and `rust/no-inline-tests` (no `#[test]` or `#[cfg(test)]`, and `test = false` / `doctest = false` on Cargo targets). This repository turns both on.
+
 ## What's in the box
 
 Public entry points, one package:

@@ -5,7 +5,7 @@ A native Rust TypeScript/JavaScript semantic linter (`antidrift-linter`, built o
 ## What is included
 
 - **Single-pass native Rust rule engine (`crates/antidrift-kernel`, `crates/antidrift-rules`, `crates/antidrift-engine`):** All 98 `antidrift/*` rules run in a single unified pass over `tsrs` (`tsrs_ast`, `tsrs_compiler`, `tsrs_checker`, and `tsrslint`), invoked automatically by `antidrift oxlint` via `OXLINT_TSGOLINT_PATH`.
-- **Rust self-governance (`antidrift-linter rust`):** Enforces crate/kernel DAG layering, file-size budgets (`<= 500` non-blank lines), strict `serde` decoding (`deny_unknown_fields`), no stringly-typed enums, no boolean maps, no anemic errors, no compatibility shims, and no pass-through wrapper functions across the Rust workspace.
+- **Rust drift rules (`antidrift-linter rust`):** The same intents for any Rust workspace: module-size budgets (`<= 500` non-blank lines), strict `serde` decoding (`deny_unknown_fields`), no stringly-typed enums, no boolean maps, no anemic errors, no compatibility shims, no pass-through wrapper functions, and configured crate/module layering. Levels, scopes and layers live in `Cargo.toml` under `[workspace.metadata.antidrift]`; see `tooling/antidrift/README.md`.
 - **Declarative policy & registries (`policy/agent-guardrails.yaml`, `policy/registries/*.yaml`):** Generates `AGENTS.md`, `CLAUDE.md`, Claude hooks, Codex hooks, and Copilot instructions from a single source of truth.
 - **Packed consumer verification (`pnpm package:verify`):** Packs `@joedeleeuw/antidrift` and verifies installation, `tsc` under `Bundler` and `NodeNext`, runtime imports, and live `antidrift oxlint` enforcement in an isolated consumer monorepo.
 
