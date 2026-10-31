@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -868,6 +869,42 @@ try {
   rmSync(projectRootWorkspace, { recursive: true, force: true });
 }
 
+const inferredTypesWorkspace = mkdtempSync(
+  join(tmpdir(), "antidrift-inferred-types-")
+);
+try {
+  const projectDir = join(inferredTypesWorkspace, "project");
+  mkdirSync(join(projectDir, "node_modules/@types"), { recursive: true });
+  mkdirSync(join(projectDir, "src/nested"), { recursive: true });
+  symlinkSync(
+    realpathSync(resolve(repoRoot, "node_modules/@types/node")),
+    join(projectDir, "node_modules/@types/node"),
+    "junction"
+  );
+  writeFileSync(
+    join(projectDir, "package.json"),
+    '{ "name": "inferred-types-probe", "version": "0.0.0", "type": "module", "private": true }\n'
+  );
+  writeFileSync(
+    join(projectDir, "src/nested/probe.mjs"),
+    'import { readFileSync } from "node:fs";\nconst fromDisk = JSON.parse(readFileSync("x.json", "utf8"));\nconst fromNowhere = JSON.parse(globalThis.untypedThing);\nconsole.log(fromDisk, fromNowhere);\n'
+  );
+  const inferredRun = spawnSync(
+    binaryPath,
+    ["--format", "json", "src/nested/probe.mjs"],
+    { cwd: projectDir, encoding: "utf8" }
+  );
+  assert.deepEqual(
+    JSON.parse(String(inferredRun.stdout ?? "[]")).flatMap((entry) =>
+      entry.messages.map((message) => `${message.line} ${message.ruleId}`)
+    ),
+    ["3 antidrift/no-unsafe-deserialize"],
+    "A file outside every tsconfig resolves node:fs through the project's @types packages: only the untyped JSON.parse argument is unsafe"
+  );
+} finally {
+  rmSync(inferredTypesWorkspace, { recursive: true, force: true });
+}
+
 const deriveWorkspace = mkdtempSync(join(tmpdir(), "antidrift-derive-"));
 try {
   const sampleRoot = resolve(repoRoot, "apps/shape-sample");
@@ -1012,7 +1049,7 @@ assert.deepEqual(sampleSmoke.stdout.trim().split("\n"), [
 ]);
 
 console.log(
-  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path, project-root, derive, line-cap & rust linter smokes verified)`
+  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path, project-root, inferred-types, derive, line-cap & rust linter smokes verified)`
 );
 
 proveOxlintPluginBridge(repoRoot, binaryPath);

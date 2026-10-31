@@ -200,6 +200,7 @@ pub(crate) fn inferred_compiler_options() -> CompilerOptions {
         es_module_interop: Tristate::True,
         allow_non_ts_extensions: Tristate::True,
         resolve_json_module: Tristate::True,
+        types: Some(vec!["*".to_owned()]),
         ..Default::default()
     }
 }
