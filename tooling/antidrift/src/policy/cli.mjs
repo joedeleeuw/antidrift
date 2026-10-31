@@ -3,6 +3,7 @@ import { checkChanged } from "./check-changed.mjs";
 import { checkGenerated } from "./check-generated-policy-artifacts.mjs";
 import { checkRegistries } from "./check-registries.mjs";
 import { generate } from "./generate-policy-artifacts.mjs";
+import { blockGeneratedPolicyEdits } from "./hooks/block-generated-policy-edits.mjs";
 import { runOxlint } from "./oxlint.mjs";
 import { shellGuardrails } from "./shell-guardrails.mjs";
 import { verifySession } from "./verify-session.mjs";
@@ -11,6 +12,21 @@ import { changeContractCommand } from "../change-scope/change-contract.mjs";
 import { diffScopedAdaptersCommand } from "../change-scope/diff-scoped-adapters.mjs";
 
 const [, , command, ...args] = process.argv;
+
+const AGENT_HOOKS = {
+  "block-generated-policy-edits": blockGeneratedPolicyEdits,
+};
+
+function runAgentHook(name) {
+  const hook = AGENT_HOOKS[name];
+  if (!hook) {
+    console.error(
+      `Unknown agent hook: ${name ?? "(none)"}. Usage: antidrift hook <${Object.keys(AGENT_HOOKS).join("|")}>`
+    );
+    return 1;
+  }
+  return hook();
+}
 
 const commands = {
   generate,
@@ -28,6 +44,9 @@ const commands = {
     process.exitCode = shellGuardrails({ argv: args });
   },
   "verify-session": verifySession,
+  hook: () => {
+    process.exitCode = runAgentHook(args[0]);
+  },
   oxlint: () => {
     process.exitCode = runOxlint({
       argv: args,

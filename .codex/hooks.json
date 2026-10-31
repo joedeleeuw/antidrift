@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node node_modules/@joedeleeuw/antidrift/src/policy/hooks/block-generated-policy-edits.mjs"
+            "command": "pnpm exec antidrift hook block-generated-policy-edits"
           }
         ]
       }

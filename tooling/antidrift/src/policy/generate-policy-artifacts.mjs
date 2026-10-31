@@ -9,8 +9,7 @@ import { z } from "zod";
 
 import { NATIVE_ARTIFACTS, resolveNativeArtifact } from "./oxlint.mjs";
 
-const hookScript = (name) =>
-  `node node_modules/@joedeleeuw/antidrift/src/policy/hooks/${name}.mjs`;
+const hookScript = (name) => `pnpm exec antidrift hook ${name}`;
 
 async function write(path, content) {
   await mkdir(dirname(path), { recursive: true });

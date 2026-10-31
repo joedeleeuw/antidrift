@@ -68,6 +68,51 @@ function file(rel, fileContents) {
   writeFileSync(targetPath, fileContents, "utf8");
 }
 
+function runGeneratedHook(command, payload) {
+  const completed = spawnSync(command, {
+    cwd: work,
+    shell: true,
+    encoding: "utf8",
+    input: JSON.stringify(payload),
+    timeout: 120_000,
+  });
+  if (completed.error) throw completed.error;
+  return completed;
+}
+
+function proveGeneratedHook(pnpmLaunch) {
+  file(
+    "policy/agent-guardrails.yaml",
+    "version: 1\nmeta:\n  never: []\nclusters: []\n"
+  );
+  run(
+    pnpmLaunch.file,
+    [...pnpmLaunch.prefix, "exec", "antidrift", "generate"],
+    work
+  );
+  const settings = JSON.parse(
+    readFileSync(join(work, ".claude/settings.json"), "utf8")
+  );
+  const command = settings.hooks.PreToolUse[0].hooks[0].command;
+  const blocked = runGeneratedHook(command, {
+    tool_input: { file_path: "CLAUDE.md" },
+  });
+  if (blocked.status !== 2 || !blocked.stderr.includes("Blocked edit")) {
+    fail(
+      `generated hook \`${command}\` should block an edit to CLAUDE.md with exit 2, got exit ${blocked.status}: ${blocked.stdout}${blocked.stderr}`
+    );
+  }
+  const allowed = runGeneratedHook(command, {
+    tool_input: { file_path: "CLAUDE.md" },
+    prompt: "[policy-change] regenerate",
+  });
+  if (allowed.status !== 0) {
+    fail(
+      `generated hook \`${command}\` should allow a [policy-change] edit, got exit ${allowed.status}: ${allowed.stderr}`
+    );
+  }
+}
+
 function fail(message) {
   console.error(`\n✗ ${message}`);
   console.error(`  (left workspace for inspection: ${work})`);
@@ -241,6 +286,11 @@ try {
     ],
     work
   );
+
+  console.log(
+    "3b/6 generating policy artifacts in the consumer and running the generated hook ..."
+  );
+  proveGeneratedHook(pnpmLaunch);
 
   console.log(
     "4/6  linting consumer files through shipped and opt-in configs ..."
