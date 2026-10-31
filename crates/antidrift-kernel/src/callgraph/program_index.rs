@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::thread::LocalKey;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{Node, SourceFile, Symbol};
@@ -8,6 +8,7 @@ use tsrs_compiler::Program;
 use tsrs_core::P;
 
 use super::file_scan::{AnnotatedObjectLiteral, FileScan, HeritageRecord};
+use crate::program_fact::{ProgramFact, ProgramFactSlot};
 use crate::{file_role, provenance, tsrs_kernel};
 
 #[derive(Clone, Copy, Debug)]
@@ -53,31 +54,18 @@ pub struct ProgramSymbolIndex {
     pub(super) annotated_objects: FxHashMap<&'static str, Vec<AnnotatedObjectLiteral>>,
 }
 
-type CacheKey = (usize, usize);
-
 thread_local! {
-    static INDEX_CACHE: RefCell<Option<(CacheKey, Rc<ProgramSymbolIndex>)>> = const { RefCell::new(None) };
+    static INDEX_SLOT: ProgramFactSlot<ProgramSymbolIndex> = const { RefCell::new(None) };
 }
 
-impl ProgramSymbolIndex {
-    pub fn for_program(program: &Program) -> Rc<Self> {
-        let files = program.get_source_files();
-        let key = (files.as_ptr().addr(), files.len());
-        INDEX_CACHE.with(|cache| {
-            if let Some((cached_key, index)) = cache.borrow().as_ref()
-                && *cached_key == key
-            {
-                return Rc::clone(index);
-            }
-            let index = Rc::new(Self::build(program, files));
-            *cache.borrow_mut() = Some((key, Rc::clone(&index)));
-            index
-        })
+impl ProgramFact for ProgramSymbolIndex {
+    fn slot() -> &'static LocalKey<ProgramFactSlot<Self>> {
+        &INDEX_SLOT
     }
 
-    fn build(program: &Program, files: &[P<SourceFile>]) -> Self {
+    fn build(program: &Program) -> Self {
         let mut index = Self::default();
-        for &sf in files {
+        for &sf in program.get_source_files() {
             if file_role::is_declaration_file(sf.file_name())
                 || program.is_source_file_from_external_library(sf)
             {
@@ -93,7 +81,9 @@ impl ProgramSymbolIndex {
         }
         index
     }
+}
 
+impl ProgramSymbolIndex {
     pub(super) fn add_alias(&mut self, from: &'static str, to: &'static str) {
         let locals = self.aliases.entry(from).or_default();
         if !locals.contains(&to) {

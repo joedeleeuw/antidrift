@@ -1,6 +1,7 @@
 use super::call_forwarding::{BodyForwarding, is_literal_kind, parameters_match_in_order};
 use antidrift_kernel::callgraph::{IdentifierRef, ProgramSymbolIndex};
 use antidrift_kernel::file_role;
+use antidrift_kernel::program_fact::ProgramFact;
 use antidrift_kernel::rule_scope::RuleScope;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{callgraph, provenance, tsrs_kernel};

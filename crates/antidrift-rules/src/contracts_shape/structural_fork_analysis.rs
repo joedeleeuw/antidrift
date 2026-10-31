@@ -1,9 +1,15 @@
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::thread::LocalKey;
+
 use antidrift_kernel::directives::split_identifier_words;
 use antidrift_kernel::file_role;
+use antidrift_kernel::program_fact::{ProgramFact, ProgramFactSlot};
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_source_file_origin};
 use antidrift_kernel::shape;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, SourceFile};
 use tsrs_checker::Checker;
+use tsrs_compiler::Program;
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, RuleMessage};
 use tsrslint::utils::is_object_type;
@@ -80,17 +86,46 @@ fn plain_declaration_member_names(node: P<Node>) -> Option<(String, Vec<String>)
     }
 }
 
-fn exported_owner_member_names(
-    checker: &mut Checker,
-    node: P<Node>,
-) -> Option<(String, Vec<String>)> {
-    if let Some(plain) = plain_declaration_member_names(node) {
-        return Some(plain);
-    }
-    if node.kind() != Kind::TypeAliasDeclaration {
+enum OwnerMembers {
+    Declared(Vec<String>),
+    Resolved,
+}
+
+struct OwnerDeclaration {
+    statement: P<Node>,
+    name: String,
+    members: OwnerMembers,
+}
+
+struct OwnerFile {
+    file: P<SourceFile>,
+    origin: DeclarationOrigin,
+    declarations: Vec<OwnerDeclaration>,
+}
+
+struct ExportedOwnerIndex {
+    files: Vec<OwnerFile>,
+}
+
+thread_local! {
+    static OWNER_INDEX: ProgramFactSlot<ExportedOwnerIndex> = const { RefCell::new(None) };
+}
+
+fn owner_declaration(statement: P<Node>) -> Option<OwnerDeclaration> {
+    if !has_modifier(statement, ModifierFlags::Export) {
         return None;
     }
-    let alias = node.as_type_alias_declaration();
+    if let Some((name, members)) = plain_declaration_member_names(statement) {
+        return Some(OwnerDeclaration {
+            statement,
+            name,
+            members: OwnerMembers::Declared(members),
+        });
+    }
+    if statement.kind() != Kind::TypeAliasDeclaration {
+        return None;
+    }
+    let alias = statement.as_type_alias_declaration();
     if alias
         .type_parameters()
         .is_some_and(|tp| !tp.nodes().is_empty())
@@ -98,7 +133,59 @@ fn exported_owner_member_names(
     {
         return None;
     }
-    let owner_type = checker.get_type_at_location(node);
+    Some(OwnerDeclaration {
+        statement,
+        name: alias.name().as_identifier().text().to_owned(),
+        members: OwnerMembers::Resolved,
+    })
+}
+
+fn index_owner_files(program: &Program) -> Vec<OwnerFile> {
+    program
+        .get_source_files()
+        .iter()
+        .filter_map(|&sf| {
+            if file_role::ProjectPath::of(program, sf.file_name())
+                .has_any_role(file_role::TEST_ROLES)
+            {
+                return None;
+            }
+            let origin = classify_source_file_origin(program, sf, None);
+            if matches!(
+                origin,
+                DeclarationOrigin::DefaultLib | DeclarationOrigin::Unknown
+            ) {
+                return None;
+            }
+            let declarations: Vec<OwnerDeclaration> = sf
+                .statements()
+                .nodes()
+                .iter()
+                .filter_map(|&statement| owner_declaration(statement))
+                .collect();
+            (!declarations.is_empty()).then_some(OwnerFile {
+                file: sf,
+                origin,
+                declarations,
+            })
+        })
+        .collect()
+}
+
+impl ProgramFact for ExportedOwnerIndex {
+    fn slot() -> &'static LocalKey<ProgramFactSlot<Self>> {
+        &OWNER_INDEX
+    }
+
+    fn build(program: &Program) -> Self {
+        Self {
+            files: index_owner_files(program),
+        }
+    }
+}
+
+fn resolved_owner_member_names(checker: &mut Checker, statement: P<Node>) -> Option<Vec<String>> {
+    let owner_type = checker.get_type_at_location(statement);
     if !is_object_type(owner_type)
         || checker.is_array_type(owner_type)
         || tsrs_checker::is_tuple_type_exported(owner_type)
@@ -107,7 +194,7 @@ fn exported_owner_member_names(
         return None;
     }
     let names = shape::object_property_names(checker, owner_type);
-    (names.len() >= 2).then(|| (alias.name().as_identifier().text().to_owned(), names))
+    (names.len() >= 2).then_some(names)
 }
 
 fn shares_identifier_stem(left: &str, right: &str) -> bool {
@@ -160,31 +247,37 @@ fn has_exact_same_property_types(
     })
 }
 
-fn find_owner_in_source_file(
+fn find_owner_in_file(
     checker: &mut Checker,
-    sf: P<SourceFile>,
+    owner_file: &OwnerFile,
     is_accepted_authority: bool,
     cand_node: P<Node>,
     cand_name: &str,
     cand_props: &[String],
 ) -> Option<String> {
     let cand_exported = has_modifier(cand_node, ModifierFlags::Export);
-    for &stmt in sf.statements().nodes() {
-        if !has_modifier(stmt, ModifierFlags::Export) {
+    for declaration in &owner_file.declarations {
+        let owner_props: Cow<'_, [String]> = match &declaration.members {
+            OwnerMembers::Declared(members) => Cow::Borrowed(members),
+            OwnerMembers::Resolved => {
+                match resolved_owner_member_names(checker, declaration.statement) {
+                    Some(members) => Cow::Owned(members),
+                    None => continue,
+                }
+            }
+        };
+        if *owner_props != *cand_props {
             continue;
         }
-        let Some((owner_name, owner_props)) = exported_owner_member_names(checker, stmt) else {
-            continue;
-        };
+        let owner_name = &declaration.name;
         let authority_match = is_accepted_authority
             && (cand_props.len() >= 3
                 || !cand_exported
-                || shares_identifier_stem(cand_name, &owner_name));
-        if owner_props == cand_props
-            && (authority_match || owner_name == cand_name)
-            && has_exact_same_property_types(checker, cand_node, stmt, cand_props)
+                || shares_identifier_stem(cand_name, owner_name));
+        if (authority_match || owner_name == cand_name)
+            && has_exact_same_property_types(checker, cand_node, declaration.statement, cand_props)
         {
-            return Some(owner_name);
+            return Some(owner_name.clone());
         }
     }
     None
@@ -198,35 +291,25 @@ fn find_matching_exported_owner(
     cand_props: &[String],
 ) -> Option<String> {
     let cand_exported = has_modifier(cand_node, ModifierFlags::Export);
-    for &sf in ctx.program.get_source_files() {
-        if sf == ctx.file
-            || file_role::ProjectPath::of(ctx.program, sf.file_name())
-                .has_any_role(file_role::TEST_ROLES)
-        {
+    let index = ExportedOwnerIndex::for_program(ctx.program);
+    for owner_file in &index.files {
+        if owner_file.file == ctx.file {
             continue;
         }
-        let origin = classify_source_file_origin(ctx.program, sf, Some(ctx.file));
-        if matches!(
-            origin,
-            DeclarationOrigin::DefaultLib
-                | DeclarationOrigin::SameFile
-                | DeclarationOrigin::Unknown
-        ) {
-            continue;
-        }
+        let origin = owner_file.origin;
         if file_origin == DeclarationOrigin::LocalDomain
             && origin == DeclarationOrigin::LocalDomain
             && cand_exported
-            && sf.file_name() > ctx.file.file_name()
+            && owner_file.file.file_name() > ctx.file.file_name()
         {
             continue;
         }
         let is_accepted_authority = origin == DeclarationOrigin::Generated
             || (origin == DeclarationOrigin::LocalDomain
                 && (file_origin != DeclarationOrigin::LocalDomain || !cand_exported));
-        if let Some(owner_name) = find_owner_in_source_file(
+        if let Some(owner_name) = find_owner_in_file(
             ctx.checker,
-            sf,
+            owner_file,
             is_accepted_authority,
             cand_node,
             cand_name,

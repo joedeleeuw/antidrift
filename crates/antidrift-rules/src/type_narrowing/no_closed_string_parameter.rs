@@ -1,4 +1,5 @@
 use antidrift_kernel::callgraph::ProgramSymbolIndex;
+use antidrift_kernel::program_fact::ProgramFact;
 use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node, Symbol};

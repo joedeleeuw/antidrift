@@ -1,5 +1,6 @@
 use super::no_hypothetical_seam::{identifier_name, is_effectful_default};
 use antidrift_kernel::callgraph::{CallSiteRecord, ProgramSymbolIndex};
+use antidrift_kernel::program_fact::ProgramFact;
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, Symbol};
 use tsrs_checker::Checker;

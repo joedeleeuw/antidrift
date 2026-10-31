@@ -14,6 +14,7 @@ pub mod jsx;
 pub mod line_caps;
 pub mod local_binding;
 pub mod outcome_shape;
+pub mod program_fact;
 pub mod projection;
 pub mod provenance;
 pub mod registries;
