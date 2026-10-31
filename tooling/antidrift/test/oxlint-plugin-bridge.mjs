@@ -398,6 +398,11 @@ export function proveOxlintPluginBridge(repoRoot, linter) {
     proveTypeAwareRelay(repoRoot, project, linter);
     proveFixAfterRegularPass(repoRoot, project, linter);
     const addon = loadNativeAddon(project);
+    assert.deepEqual(
+      addon.lintFile(project, join(project, CAST_FILES[0]), []),
+      [],
+      "A lint request with no rules must report nothing"
+    );
     for (const file of CAST_FILES) {
       addon.lintFile(project, join(project, file), ["antidrift/no-as-never"]);
     }

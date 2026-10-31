@@ -97,7 +97,7 @@ impl Session {
         file_path: &str,
         rule_names: &[String],
     ) -> Result<Vec<Finding>, String> {
-        if !is_supported_file(Path::new(file_path)) {
+        if rule_names.is_empty() || !is_supported_file(Path::new(file_path)) {
             return Ok(Vec::new());
         }
         let rules = rule_names
