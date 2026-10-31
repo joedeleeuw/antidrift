@@ -460,11 +460,13 @@ function rootPackageLintsSmoke(linter) {
   });
 }
 
+const ENUM_TWIN_STRUCTS =
+  "pub struct BlockStatement { pub start: u32, pub end: u32, pub depth: u8 }\npub struct StaticBlock { pub start: u32, pub end: u32, pub depth: u8 }\npub struct Span { pub start: u32, pub end: u32, pub depth: u8 }\n";
+
 function enumTwinSmoke(linter) {
   withTempDir("antidrift-rust-enum-twins-", (root) => {
     writeCrate(root, "twins");
-    const structs =
-      "pub struct BlockStatement { pub start: u32, pub end: u32, pub depth: u8 }\npub struct StaticBlock { pub start: u32, pub end: u32, pub depth: u8 }\npub struct Span { pub start: u32, pub end: u32, pub depth: u8 }\n";
+    const structs = ENUM_TWIN_STRUCTS;
     const forks = () =>
       linter
         .findings(root)
@@ -477,6 +479,18 @@ function enumTwinSmoke(linter) {
       forks(),
       ["src/lib.rs:3 rust/no-structural-type-fork error"],
       "Structs that are payloads of variants of one enum are nominal twins by design; a same-shaped struct outside the enum still reports"
+    );
+    writeFileSync(
+      join(root, "src/lib.rs"),
+      `${structs}pub enum Pair { Both(Box<BlockStatement>, Box<StaticBlock>) }\n`
+    );
+    assert.deepEqual(
+      forks(),
+      [
+        "src/lib.rs:2 rust/no-structural-type-fork error",
+        "src/lib.rs:3 rust/no-structural-type-fork error",
+      ],
+      "Two same-shaped structs carried by one variant are not twins; the exemption needs two variants of one enum"
     );
     writeFileSync(join(root, "src/lib.rs"), structs);
     assert.deepEqual(

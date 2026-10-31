@@ -8,7 +8,7 @@
 - `no-todo-without-issue` finds debt tokens as whole words per comment line, so product names such as `TodoWrite` or `TodoTracker` inside a comment no longer count as a TODO.
 - `no-compat-names` (TypeScript and Rust) no longer counts the `retire` family or `compatibility` as compatibility tokens: across eight corpora every such name was a product action (retiring conversations, workers, providers) or a domain noun, never a kept old code path. When the plain sibling of a compat name is declared anywhere in the program (TypeScript) or crate (Rust), the message names it.
 - The Oxlint plugin forwards each rule's options (`"antidrift/react-max-component-props": ["error", { "max": 2 }]`) to the engine; every bridged rule declares `meta.schema: false`, the engine decodes the options array once per rule and file set, and an unknown field fails the run naming it. The session lints each distinct rule-and-options pair once.
-- `rust/no-structural-type-fork` no longer reports two same-shaped structs that are payloads of variants of one enum; such AST twins are nominal by design. A same-shaped struct outside the enum still reports.
+- `rust/no-structural-type-fork` no longer reports two same-shaped structs that are payloads of two different variants of one enum; such AST twins are nominal by design. Two structs carried by the same variant, or a same-shaped struct outside the enum, still report.
 
 ## 0.21.0
 

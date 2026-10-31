@@ -97,7 +97,7 @@ impl ImportTable {
 
 pub(super) struct StructIndex<'a> {
     pub(super) definitions: BTreeMap<Vec<String>, StructDefinition<'a>>,
-    enum_payloads: FxHashMap<String, FxHashSet<Vec<String>>>,
+    enum_payloads: FxHashMap<String, FxHashSet<(Vec<String>, usize)>>,
     imports: ImportTable,
     private_modules: BTreeSet<Vec<String>>,
     reexports: FxHashSet<Vec<String>>,
@@ -150,19 +150,17 @@ impl<'a> StructIndex<'a> {
     fn collect_enum_payloads(&mut self, scope: &[String], item_enum: &syn::ItemEnum) {
         let mut key = scope.to_vec();
         key.push(item_enum.ident.to_string());
-        let mut payloads = Vec::new();
-        for field in item_enum
-            .variants
-            .iter()
-            .flat_map(|variant| &variant.fields)
-        {
-            type_path_idents(&field.ty, &mut payloads);
-        }
-        for payload in payloads {
-            self.enum_payloads
-                .entry(payload)
-                .or_default()
-                .insert(key.clone());
+        for (variant_index, variant) in item_enum.variants.iter().enumerate() {
+            let mut payloads = Vec::new();
+            for field in &variant.fields {
+                type_path_idents(&field.ty, &mut payloads);
+            }
+            for payload in payloads {
+                self.enum_payloads
+                    .entry(payload)
+                    .or_default()
+                    .insert((key.clone(), variant_index));
+            }
         }
     }
 
@@ -171,7 +169,11 @@ impl<'a> StructIndex<'a> {
             self.enum_payloads.get(first),
             self.enum_payloads.get(second),
         ) {
-            (Some(owners), Some(others)) => owners.iter().any(|owner| others.contains(owner)),
+            (Some(owners), Some(others)) => owners.iter().any(|(owner, variant)| {
+                others
+                    .iter()
+                    .any(|(other, other_variant)| other == owner && other_variant != variant)
+            }),
             _ => false,
         }
     }
