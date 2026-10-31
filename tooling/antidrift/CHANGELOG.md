@@ -1,5 +1,10 @@
 # changelog
 
+## Unreleased
+
+- `antidrift/max-module-lines` warns above 1,000 lines (was 1,200); the 1,500 error is unchanged. The cap matches the split rule in the global design guidance.
+- `no-todo-without-issue` treats a debt token as negated only when `not` or `not a` directly precedes it on the same line; `not` before punctuation or a line break no longer silences a TODO.
+
 ## 0.21.0
 
 The tree carried version 0.20.0 for a while but it was never published; everything below ships together as 0.21.0, the first npm release after 0.18.1.

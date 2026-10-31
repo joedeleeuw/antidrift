@@ -60,7 +60,7 @@ impl CappedUnit {
             Self::Module => LineCap {
                 rule_id: "antidrift/max-module-lines",
                 count: LineCount::Physical,
-                warn_above: 1200,
+                warn_above: 1000,
                 max: 1500,
                 split: "split by owned responsibility",
             },

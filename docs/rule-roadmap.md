@@ -409,7 +409,7 @@ Policy IDs from `policyRuleReviews` that antidrift deliberately does not impleme
 | `sonar/import-custom-eslint-issues`                           | `pnpm sonar:prepare`                                                                                                 |
 | `rules/one-source-generates-agent-files`                      | `pnpm policy:check-generated`                                                                                        |
 | `sonar/no-new-critical-issues`, `sonar/complexity-budget`     | SonarQube server gates plus the local `antidrift oxlint` complexity/depth/params gate                                |
-| `arch/max-module-lines`                                       | `antidrift/max-module-lines`: warn above 1,200 and error above 1,500 lines, blank and comment lines counted          |
+| `arch/max-module-lines`                                       | `antidrift/max-module-lines`: warn above 1,000 and error above 1,500 lines, blank and comment lines counted          |
 | `arch/max-function-lines`                                     | `antidrift/max-function-lines`: warn above 40 and error above 50 lines; suite callbacks are exempt containers        |
 | `arch/max-component-lines`                                    | `antidrift/max-component-lines`: warn above 150 and error above 180 lines for PascalCase JSX functions               |
 | `ts/no-mechanical-get-x-from-y`                               | Merged into `ts/no-contract-appeasement-projection` — the name was the symptom, the projection structure is the rule |
