@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import YAML from "yaml";
@@ -62,6 +63,7 @@ const rustRuleSchema = z.array(
     kind: z.enum(["general", "house-style"]),
     scopePolicy: z.enum([
       "everywhere",
+      "except-generated",
       "authored-source",
       "inferred-role",
       "test-files-only",
@@ -72,11 +74,65 @@ const rustRuleSchema = z.array(
   })
 );
 
+const cargoArtifactSchema = z.object({
+  reason: z.string(),
+  target: z.object({ name: z.string() }).optional(),
+  executable: z.string().nullable().optional(),
+});
+
+function buildWorkspaceLinter(cwd) {
+  let output;
+  try {
+    output = execFileSync(
+      "cargo",
+      [
+        "build",
+        "--locked",
+        "-p",
+        "antidrift-linter",
+        "--message-format=json-render-diagnostics",
+      ],
+      { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] }
+    );
+  } catch (error) {
+    throw new Error(
+      "antidrift-linter must be rebuilt before the Rust rule levels are read, and `cargo build --locked -p antidrift-linter` failed; put the rustup cargo on PATH, or set ANTIDRIFT_LINTER_BIN to a binary built from this checkout",
+      { cause: error }
+    );
+  }
+  const executable = output
+    .split("\n")
+    .filter((line) => line.startsWith("{"))
+    .map((line) => cargoArtifactSchema.parse(JSON.parse(line)))
+    .find(
+      (message) =>
+        message.reason === "compiler-artifact" &&
+        message.target?.name === "antidrift-linter" &&
+        message.executable
+    )?.executable;
+  if (!executable) {
+    throw new Error(
+      "cargo build reported no antidrift-linter executable; the crates/antidrift-linter target must produce a binary"
+    );
+  }
+  return executable;
+}
+
+function freshNativeLinterBinary(cwd) {
+  if (process.env.ANTIDRIFT_LINTER_BIN) {
+    return process.env.ANTIDRIFT_LINTER_BIN;
+  }
+  if (existsSync(resolve(cwd, "crates/antidrift-linter/Cargo.toml"))) {
+    return buildWorkspaceLinter(cwd);
+  }
+  return resolveNativeLinterBinary(cwd);
+}
+
 export function loadRustRules(cwd = process.cwd()) {
-  const binary = resolveNativeLinterBinary(cwd);
+  const binary = freshNativeLinterBinary(cwd);
   if (!binary) {
     throw new Error(
-      "antidrift-linter binary not found: build it with `cargo build -p antidrift-linter` or set ANTIDRIFT_LINTER_BIN before generating policy artifacts"
+      "antidrift-linter binary not found: install the @joedeleeuw/antidrift-linter platform package or set ANTIDRIFT_LINTER_BIN before generating policy artifacts"
     );
   }
   const output = execFileSync(

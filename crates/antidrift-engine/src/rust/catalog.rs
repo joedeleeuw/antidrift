@@ -96,6 +96,11 @@ pub(super) const RULES: &[RuleRow] = &[
         "Keep Rust modules at or below 500 non-blank lines (warn above 425); split along a domain seam before reaching the ceiling.",
     ),
     general(
+        "rust/require-workspace-lints",
+        ScopePolicy::Everywhere,
+        "When the workspace declares [workspace.lints], every member crate inherits it with `[lints] workspace = true`.",
+    ),
+    general(
         "rust/no-orphan-module",
         ScopePolicy::Everywhere,
         "Every Rust source file under src must be reachable from a Cargo target root through `mod` declarations.",

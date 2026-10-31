@@ -3,6 +3,7 @@ use super::boundary_decode::check_decode_to_option;
 use super::cargo_manifest::{ManifestSource, check_cargo_manifest, read_manifest_source};
 use super::catalog::row;
 use super::config::RustConfig;
+use super::config_owner::{ConfigResolver, absolute_path, discover_crate_dirs};
 use super::constant_fields::check_constant_return_fields;
 use super::module_graph::{
     ModuleCode, check_orphan_modules, declared_modules, normalize_lexical_path,
@@ -25,40 +26,37 @@ pub(super) fn check_workspace_root(
     root: &Path,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) -> Result<usize, String> {
-    let clean_root = normalize_lexical_path(root);
-    let root_ref = if clean_root.as_os_str().is_empty() {
-        Path::new(".")
-    } else {
-        clean_root.as_path()
-    };
+    let root_abs = absolute_path(root)?;
+    let root_ref = root_abs.as_path();
+    let mut resolver = ConfigResolver::default();
     if root_ref.is_file()
         && root_ref
             .extension()
             .is_some_and(|extension| extension == "rs")
     {
-        return check_single_file(root_ref, diagnostics);
+        return check_single_file(root_ref, &mut resolver, diagnostics);
     }
-    let config = RustConfig::load(root_ref)?;
     let crate_dirs = discover_crate_dirs(root_ref)?;
     let mut total_files = 0usize;
     for crate_dir in crate_dirs {
+        let config = resolver.config_for_package(&crate_dir)?;
         total_files += check_crate_dir(root_ref, &crate_dir, &config, diagnostics)?;
     }
     Ok(total_files)
 }
 
-fn check_single_file(file: &Path, diagnostics: &mut Vec<RustDiagnostic>) -> Result<usize, String> {
+fn check_single_file(
+    file: &Path,
+    resolver: &mut ConfigResolver,
+    diagnostics: &mut Vec<RustDiagnostic>,
+) -> Result<usize, String> {
     if let Some(crate_dir) = file
         .ancestors()
         .skip(1)
         .find(|directory| directory.join("Cargo.toml").is_file())
     {
-        let workspace_dir = crate_dir
-            .ancestors()
-            .skip(1)
-            .find(|directory| directory.join("Cargo.toml").is_file())
-            .unwrap_or(crate_dir);
-        let config = RustConfig::load(crate_dir)?;
+        let config = resolver.config_for_package(crate_dir)?;
+        let workspace_dir = config.root_dir.as_path();
         let target_rel = relative_display(workspace_dir, file);
         let mut crate_diags = Vec::new();
         check_crate_dir(workspace_dir, crate_dir, &config, &mut crate_diags)?;
@@ -69,8 +67,8 @@ fn check_single_file(file: &Path, diagnostics: &mut Vec<RustDiagnostic>) -> Resu
         );
         return Ok(1);
     }
-    let config = RustConfig::load(file.parent().unwrap_or(Path::new(".")))?;
     let display_root = file.parent().unwrap_or(Path::new("."));
+    let config = resolver.config_for_directory(display_root)?;
     let layer = CrateLayer {
         crate_name: None,
         top_module: None,
@@ -88,52 +86,13 @@ fn check_single_file(file: &Path, diagnostics: &mut Vec<RustDiagnostic>) -> Resu
         let rel_path = relative_display(display_root, file);
         check_value_flow(&rel_path, file, None, &ast, &mut file_diags);
     }
-    diagnostics.extend(settle_diagnostics(file_diags, &config, &contexts)?);
+    diagnostics.extend(settle_diagnostics(
+        file_diags,
+        &config,
+        &contexts,
+        display_root,
+    )?);
     Ok(1)
-}
-
-fn discover_crate_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
-    let mut dirs = Vec::new();
-    collect_crate_dirs_recursive(root, &mut dirs)?;
-    dirs.sort();
-    dirs.dedup();
-    Ok(dirs)
-}
-
-fn collect_crate_dirs_recursive(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
-    if dir.join("Cargo.toml").is_file() {
-        out.push(dir.to_path_buf());
-    }
-    let entries =
-        fs::read_dir(dir).map_err(|err| format!("failed to read {}: {err}", dir.display()))?;
-    for entry in entries {
-        let path = entry
-            .map_err(|err| format!("failed to read directory entry: {err}"))?
-            .path();
-        if !path.is_dir() {
-            continue;
-        }
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
-            continue;
-        };
-        if matches!(
-            name,
-            ".git"
-                | "target"
-                | "node_modules"
-                | "src"
-                | "tests"
-                | "benches"
-                | "examples"
-                | "vendor"
-                | "dist"
-        ) || name.starts_with('.')
-        {
-            continue;
-        }
-        collect_crate_dirs_recursive(&path, out)?;
-    }
-    Ok(())
 }
 
 fn check_crate_dir(
@@ -203,7 +162,12 @@ fn check_crate_dir(
         &mut crate_diags,
     );
     check_wrapping_functions(workspace_root, &rs_files, &parsed_files, &mut crate_diags);
-    diagnostics.extend(settle_diagnostics(crate_diags, config, &contexts)?);
+    diagnostics.extend(settle_diagnostics(
+        crate_diags,
+        config,
+        &contexts,
+        workspace_root,
+    )?);
     Ok(rs_files.len())
 }
 
@@ -300,6 +264,7 @@ fn settle_diagnostics(
     raw: Vec<RustDiagnostic>,
     config: &RustConfig,
     contexts: &FxHashMap<String, SourceContext>,
+    scan_root: &Path,
 ) -> Result<Vec<RustDiagnostic>, String> {
     let mut settled = Vec::with_capacity(raw.len());
     for mut diag in raw {
@@ -315,7 +280,21 @@ fn settle_diagnostics(
                 known.id
             ));
         };
-        if level.level == Severity::Off || !level.scope.matches_candidates(&[&diag.file]) {
+        if level.level == Severity::Off {
+            continue;
+        }
+        let absolute = scan_root.join(&diag.file);
+        let Ok(owner_relative) = absolute.strip_prefix(&config.root_dir) else {
+            return Err(format!(
+                "engine bug: {} lies outside its configuration root {}",
+                absolute.display(),
+                config.root_dir.display()
+            ));
+        };
+        if !level
+            .scope
+            .matches_candidates(&[&relative_display(Path::new(""), owner_relative)])
+        {
             continue;
         }
         let skips_tests = matches!(known.scope_policy, ScopePolicy::AuthoredSource);

@@ -1,10 +1,11 @@
-use super::cargo_manifest::{CargoManifest, read_manifest};
 use super::catalog::{RULES, ResolvedRule, row};
 use crate::rule_scope::{RuleScope, ScopeOptions};
 use antidrift_kernel::diagnostic::Severity;
 use serde::Deserialize;
+use serde::de::{self, Deserializer, MapAccess, Visitor};
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::fmt;
+use std::path::{Path, PathBuf};
 
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case", default)]
@@ -14,17 +15,56 @@ pub(super) struct AntidriftTable {
     forbidden_calls: Vec<ForbiddenCall>,
 }
 
-#[derive(Deserialize)]
-#[serde(untagged)]
 enum RuleSetting {
     Level(Severity),
     Scoped(ScopedSetting),
 }
 
+const VALID_LEVELS: &str = "off, warn, error";
+
+fn parse_level(text: &str) -> Result<Severity, String> {
+    match text {
+        "off" => Ok(Severity::Off),
+        "warn" => Ok(Severity::Warn),
+        "error" => Ok(Severity::Error),
+        other => Err(format!(
+            "unknown level '{other}'; valid levels: {VALID_LEVELS}"
+        )),
+    }
+}
+
+impl<'de> Deserialize<'de> for RuleSetting {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct SettingVisitor;
+
+        impl<'de> Visitor<'de> for SettingVisitor {
+            type Value = RuleSetting;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(
+                    formatter,
+                    "a level ({VALID_LEVELS}) or a table with level, files and exclude-files"
+                )
+            }
+
+            fn visit_str<E: de::Error>(self, text: &str) -> Result<Self::Value, E> {
+                parse_level(text).map(RuleSetting::Level).map_err(E::custom)
+            }
+
+            fn visit_map<M: MapAccess<'de>>(self, map: M) -> Result<Self::Value, M::Error> {
+                ScopedSetting::deserialize(de::value::MapAccessDeserializer::new(map))
+                    .map(RuleSetting::Scoped)
+            }
+        }
+
+        deserializer.deserialize_any(SettingVisitor)
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 struct ScopedSetting {
-    level: Severity,
+    level: String,
     #[serde(default)]
     files: Option<Vec<String>>,
     #[serde(default)]
@@ -53,9 +93,19 @@ pub(super) struct RuleLevel {
 }
 
 pub(super) struct RustConfig {
+    pub(super) manifest_path: PathBuf,
+    pub(super) root_dir: PathBuf,
+    pub(super) workspace_defines_lints: bool,
     pub(super) levels: BTreeMap<&'static str, RuleLevel>,
     pub(super) layers: LayerTable,
     pub(super) forbidden_calls: Vec<ForbiddenCall>,
+}
+
+pub(super) struct ConfigSource<'a> {
+    pub(super) manifest_path: &'a Path,
+    pub(super) table_name: &'static str,
+    pub(super) table: Option<&'a AntidriftTable>,
+    pub(super) workspace_defines_lints: bool,
 }
 
 impl RustConfig {
@@ -76,59 +126,35 @@ impl RustConfig {
             .collect()
     }
 
-    pub(super) fn load(start_dir: &Path) -> Result<Self, String> {
-        let mut package_manifest = None;
-        for directory in start_dir.ancestors() {
-            let manifest_path = directory.join("Cargo.toml");
-            if !manifest_path.is_file() {
-                continue;
-            }
-            let manifest = read_manifest(&manifest_path)?;
-            if let Some(workspace) = &manifest.workspace {
-                return Self::from_table(
-                    &manifest_path,
-                    "[workspace.metadata.antidrift]",
-                    workspace.metadata.antidrift.as_ref(),
-                );
-            }
-            if package_manifest.is_none() && manifest.package.is_some() {
-                package_manifest = Some((manifest_path, manifest));
-            }
-        }
-        match package_manifest {
-            Some((manifest_path, manifest)) => Self::from_table(
-                &manifest_path,
-                "[package.metadata.antidrift]",
-                package_table(&manifest),
-            ),
-            None => Self::from_table(Path::new(""), "", None),
+    pub(super) fn defaults(root_dir: &Path) -> Self {
+        Self {
+            manifest_path: PathBuf::new(),
+            root_dir: root_dir.to_path_buf(),
+            workspace_defines_lints: false,
+            levels: default_levels(),
+            layers: LayerTable::default(),
+            forbidden_calls: Vec::new(),
         }
     }
 
-    fn from_table(
-        manifest_path: &Path,
-        table_name: &str,
-        table: Option<&AntidriftTable>,
-    ) -> Result<Self, String> {
-        let mut levels: BTreeMap<&'static str, RuleLevel> = RULES
-            .iter()
-            .map(|row| {
-                (
-                    row.id,
-                    RuleLevel {
-                        level: row.default_level(),
-                        scope: RuleScope::DEFAULT,
-                    },
-                )
-            })
-            .collect();
-        let Some(table) = table else {
-            return Ok(Self {
-                levels,
-                layers: LayerTable::default(),
-                forbidden_calls: Vec::new(),
-            });
+    pub(super) fn from_source(source: &ConfigSource<'_>) -> Result<Self, String> {
+        let manifest_path = source.manifest_path;
+        let root_dir = manifest_path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf();
+        let mut config = Self {
+            manifest_path: manifest_path.to_path_buf(),
+            root_dir,
+            workspace_defines_lints: source.workspace_defines_lints,
+            levels: default_levels(),
+            layers: LayerTable::default(),
+            forbidden_calls: Vec::new(),
         };
+        let Some(table) = source.table else {
+            return Ok(config);
+        };
+        let table_name = source.table_name;
         for (rule_id, setting) in &table.rules {
             let Some(known) = row(rule_id) else {
                 return Err(format!(
@@ -147,17 +173,30 @@ impl RustConfig {
                     manifest_path.display()
                 )
             })?;
-            levels.insert(known.id, resolved);
+            config.levels.insert(known.id, resolved);
         }
-        Ok(Self {
-            levels,
-            layers: LayerTable {
-                crates: table.layers.crates.clone(),
-                modules: table.layers.modules.clone(),
-            },
-            forbidden_calls: table.forbidden_calls.clone(),
-        })
+        config.layers = LayerTable {
+            crates: table.layers.crates.clone(),
+            modules: table.layers.modules.clone(),
+        };
+        config.forbidden_calls.clone_from(&table.forbidden_calls);
+        Ok(config)
     }
+}
+
+fn default_levels() -> BTreeMap<&'static str, RuleLevel> {
+    RULES
+        .iter()
+        .map(|row| {
+            (
+                row.id,
+                RuleLevel {
+                    level: row.default_level(),
+                    scope: RuleScope::DEFAULT,
+                },
+            )
+        })
+        .collect()
 }
 
 fn resolve_setting(rule_id: &'static str, setting: &RuleSetting) -> Result<RuleLevel, String> {
@@ -167,19 +206,13 @@ fn resolve_setting(rule_id: &'static str, setting: &RuleSetting) -> Result<RuleL
             scope: RuleScope::DEFAULT,
         }),
         RuleSetting::Scoped(scoped) => {
+            let level = parse_level(&scoped.level).map_err(|error| format!("level: {error}"))?;
             let options = ScopeOptions {
                 files: scoped.files.clone(),
                 exclude_files: scoped.exclude_files.clone(),
             };
             let scope = RuleScope::from_scope_options(rule_id, &options)?;
-            Ok(RuleLevel {
-                level: scoped.level,
-                scope,
-            })
+            Ok(RuleLevel { level, scope })
         }
     }
-}
-
-fn package_table(manifest: &CargoManifest) -> Option<&AntidriftTable> {
-    manifest.package.as_ref()?.metadata.antidrift.as_ref()
 }

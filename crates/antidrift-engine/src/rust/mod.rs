@@ -3,6 +3,7 @@ mod boundary_decode;
 mod cargo_manifest;
 mod catalog;
 mod config;
+mod config_owner;
 mod constant_fields;
 mod corpus_smells;
 mod discard_shapes;
@@ -21,7 +22,7 @@ mod workspace;
 mod wrapping;
 
 use antidrift_kernel::diagnostic::Severity;
-use config::RustConfig;
+use config_owner::{ConfigResolver, absolute_path};
 use serde::Serialize;
 use std::path::Path;
 use workspace::check_workspace_root;
@@ -171,7 +172,9 @@ fn print_resolved_rules(roots: &[String], json_output: bool) -> Result<i32, Stri
             "--list-rules needs a workspace directory, got {root}"
         ));
     }
-    let resolved = RustConfig::load(root_path)?.resolved_rules();
+    let resolved = ConfigResolver::default()
+        .config_for_directory(&absolute_path(root_path)?)?
+        .resolved_rules();
     if json_output {
         let rendered = serde_json::to_string_pretty(&resolved)
             .map_err(|err| format!("failed to serialize rust rules: {err}"))?;

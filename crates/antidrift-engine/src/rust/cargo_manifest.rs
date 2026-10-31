@@ -3,7 +3,7 @@ use super::config::{AntidriftTable, RustConfig};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use toml::Spanned;
 
 #[derive(Deserialize, Default)]
@@ -13,19 +13,29 @@ pub(super) struct CargoManifest {
     pub(super) workspace: Option<WorkspaceTable>,
     pub(super) lib: Option<Spanned<TargetTable>>,
     pub(super) bin: Vec<Spanned<TargetTable>>,
+    pub(super) lints: Option<LintsTable>,
     pub(super) dependencies: BTreeMap<String, toml::Value>,
+    #[serde(rename = "dev-dependencies")]
+    pub(super) dev_dependencies: BTreeMap<String, toml::Value>,
+    #[serde(rename = "build-dependencies")]
+    pub(super) build_dependencies: BTreeMap<String, toml::Value>,
 }
 
 #[derive(Deserialize, Default)]
 #[serde(default)]
 pub(super) struct PackageTable {
     pub(super) name: Option<String>,
+    pub(super) workspace: Option<String>,
     pub(super) metadata: MetadataTable,
 }
 
 #[derive(Deserialize, Default)]
 #[serde(default)]
 pub(super) struct WorkspaceTable {
+    pub(super) members: Vec<String>,
+    pub(super) exclude: Vec<String>,
+    pub(super) lints: Option<toml::Value>,
+    pub(super) dependencies: BTreeMap<String, toml::Value>,
     pub(super) metadata: MetadataTable,
 }
 
@@ -43,12 +53,43 @@ pub(super) struct TargetTable {
     pub(super) doctest: Option<bool>,
 }
 
+#[derive(Deserialize, Default)]
+#[serde(default)]
+pub(super) struct LintsTable {
+    pub(super) workspace: Option<bool>,
+}
+
 pub(super) struct ManifestSource {
+    pub(super) path: PathBuf,
     pub(super) manifest: CargoManifest,
     text: String,
 }
 
+fn dependency_package_name<'a>(alias: &'a str, spec: &'a toml::Value) -> &'a str {
+    match spec {
+        toml::Value::Table(detailed) => match detailed.get("package") {
+            Some(toml::Value::String(package)) => package.as_str(),
+            _ => alias,
+        },
+        _ => alias,
+    }
+}
+
+fn dependency_path(spec: &toml::Value) -> Option<&str> {
+    match spec {
+        toml::Value::Table(detailed) => match detailed.get("path") {
+            Some(toml::Value::String(path)) => Some(path.as_str()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 impl ManifestSource {
+    pub(super) fn directory(&self) -> &Path {
+        self.path.parent().unwrap_or_else(|| Path::new("."))
+    }
+
     pub(super) fn crate_name(&self) -> Option<&str> {
         self.manifest.package.as_ref()?.name.as_deref()
     }
@@ -65,13 +106,24 @@ impl ManifestSource {
         self.manifest
             .dependencies
             .iter()
-            .map(|(alias, spec)| match spec {
-                toml::Value::Table(detailed) => match detailed.get("package") {
-                    Some(toml::Value::String(package)) => package.as_str(),
-                    _ => alias.as_str(),
-                },
-                _ => alias.as_str(),
-            })
+            .map(|(alias, spec)| dependency_package_name(alias, spec))
+    }
+
+    pub(super) fn dependency_paths(&self) -> Vec<PathBuf> {
+        let manifest = &self.manifest;
+        let workspace_paths = manifest
+            .workspace
+            .iter()
+            .flat_map(|workspace| workspace.dependencies.values());
+        manifest
+            .dependencies
+            .values()
+            .chain(manifest.dev_dependencies.values())
+            .chain(manifest.build_dependencies.values())
+            .chain(workspace_paths)
+            .filter_map(dependency_path)
+            .map(|relative| self.directory().join(relative))
+            .collect()
     }
 
     pub(super) fn line_of(&self, byte_offset: usize) -> usize {
@@ -88,11 +140,11 @@ pub(super) fn read_manifest_source(manifest_path: &Path) -> Result<ManifestSourc
         .map_err(|err| format!("failed to read {}: {err}", manifest_path.display()))?;
     let manifest: CargoManifest = toml::from_str(&text)
         .map_err(|err| format!("{}: invalid Cargo manifest: {err}", manifest_path.display()))?;
-    Ok(ManifestSource { manifest, text })
-}
-
-pub(super) fn read_manifest(manifest_path: &Path) -> Result<CargoManifest, String> {
-    Ok(read_manifest_source(manifest_path)?.manifest)
+    Ok(ManifestSource {
+        path: manifest_path.to_path_buf(),
+        manifest,
+        text,
+    })
 }
 
 pub(super) fn check_cargo_manifest(
@@ -118,6 +170,25 @@ pub(super) fn check_cargo_manifest(
                 ));
             }
         }
+    }
+    if config.workspace_defines_lints
+        && source.path != config.manifest_path
+        && source
+            .manifest
+            .lints
+            .as_ref()
+            .and_then(|lints| lints.workspace)
+            != Some(true)
+    {
+        diagnostics.push(RustDiagnostic::error(
+            manifest_rel.to_owned(),
+            1,
+            "rust/require-workspace-lints",
+            format!(
+                "The workspace at {} declares [workspace.lints] but this crate does not inherit it; add `[lints] workspace = true` so one lint policy owns every crate.",
+                config.manifest_path.display()
+            ),
+        ));
     }
     let Some(crate_name) = source.crate_name() else {
         return;
