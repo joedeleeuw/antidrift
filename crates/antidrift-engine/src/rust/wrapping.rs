@@ -121,10 +121,11 @@ pub(super) fn check_wrapping_functions(
 ) {
     let mut candidates = Vec::new();
     let mut audit = ReferenceAudit::default();
-    for file in rs_files {
-        let Some(ast) = parsed_files.get(file) else {
-            continue;
-        };
+    let parsed = rs_files
+        .iter()
+        .filter_map(|file| parsed_files.get(file).map(|ast| (file, ast)))
+        .collect::<Vec<_>>();
+    for (file, ast) in &parsed {
         let scope = file_scope(file);
         let mut collector = CandidateCollector {
             file,
@@ -132,8 +133,10 @@ pub(super) fn check_wrapping_functions(
             candidates: &mut candidates,
         };
         collector.visit_file(ast);
-        audit.scope = scope;
-        audit.collect_imports(&audit.scope.clone(), &ast.items);
+        audit.collect_imports(&scope, &ast.items);
+    }
+    for (file, ast) in &parsed {
+        audit.scope = file_scope(file);
         audit.visit_file(ast);
     }
     for candidate in candidates {

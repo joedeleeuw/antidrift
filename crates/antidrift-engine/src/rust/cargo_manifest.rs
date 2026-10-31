@@ -172,7 +172,7 @@ pub(super) fn check_cargo_manifest(
         }
     }
     if config.workspace_defines_lints
-        && source.path != config.manifest_path
+        && source.manifest.package.is_some()
         && source
             .manifest
             .lints

@@ -80,8 +80,10 @@ fn block_outcome<'a>(
         Expr::Return(ret) => ret.expr.as_deref()?,
         Expr::Path(path) => {
             let name = path.path.get_ident()?;
-            let (_, init) = bindings.iter().rev().find(|(ident, _)| *ident == name)?;
-            return block_outcome(init, bindings);
+            let index = bindings.iter().rposition(|(ident, _)| *ident == name)?;
+            let (_, init) = bindings[index];
+            let mut earlier = bindings[..index].to_vec();
+            return block_outcome(init, &mut earlier);
         }
         other => other,
     };

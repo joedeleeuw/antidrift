@@ -436,6 +436,45 @@ function workspaceLintsSmoke(linter) {
   });
 }
 
+function rootPackageLintsSmoke(linter) {
+  withTempDir("antidrift-rust-root-lints-", (root) => {
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/lib.rs"), "pub fn one() -> u8 {\n    1\n}\n");
+    const manifest = (lints) =>
+      `[workspace]\n\n[package]\nname = "root"\nversion = "0.0.0"\n\n[lib]\npath = "src/lib.rs"\ntest = false\ndoctest = false\n\n[workspace.lints.rust]\nunsafe_code = "forbid"\n${lints}`;
+    writeFileSync(join(root, "Cargo.toml"), manifest(""));
+    assert.deepEqual(
+      linter.findings(root),
+      ["Cargo.toml:1 rust/require-workspace-lints error"],
+      "A root package that is also the workspace must inherit its own [workspace.lints]"
+    );
+    writeFileSync(
+      join(root, "Cargo.toml"),
+      manifest("\n[lints]\nworkspace = true\n")
+    );
+    assert.deepEqual(
+      linter.findings(root),
+      [],
+      "A root package that inherits [workspace.lints] reports nothing"
+    );
+  });
+}
+
+function shadowedFallbackSmoke(linter) {
+  withTempDir("antidrift-rust-shadow-", (root) => {
+    writeCrate(root, "shadow");
+    writeFileSync(
+      join(root, "src/lib.rs"),
+      "pub fn parse_or_empty(input: &str) -> String {\n    match input.parse::<u32>() {\n        Ok(n) => n.to_string(),\n        Err(_) => {\n            let fallback = String::new();\n            let fallback = fallback;\n            fallback\n        }\n    }\n}\n"
+    );
+    assert.deepEqual(
+      linter.findings(root),
+      ["src/lib.rs:4 rust/no-silent-result-discard error"],
+      "A fallback rebound to itself resolves to its earlier initializer instead of looping"
+    );
+  });
+}
+
 function wrapperResolutionSmoke(linter) {
   withTempDir("antidrift-rust-hops-", (root) => {
     for (const [relative, text] of Object.entries(HOP_CRATE)) {
@@ -469,5 +508,7 @@ export function runRustLinterSmokes({ binaryPath, repoRoot }) {
   decodeFailureSmoke(linter);
   configOwnerSmoke(linter);
   workspaceLintsSmoke(linter);
+  rootPackageLintsSmoke(linter);
+  shadowedFallbackSmoke(linter);
   wrapperResolutionSmoke(linter);
 }
