@@ -7,6 +7,7 @@ use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 pub const RULE_NAME: &str = "antidrift/no-todo-without-issue";
 
 const DEBT_TOKENS: &[&str] = &["todo", "fixme", "hack", "temporary", "later", "cleanup"];
+const BARE_TOKENS: &[&str] = &["todo", "fixme", "hack"];
 const AI_TOKENS: &[&str] = &[
     "ai",
     "llm",
@@ -59,9 +60,7 @@ impl RuleVisitor for Visitor {
                 continue;
             }
             let words = split_identifier_words(&text);
-            let has_debt = words.iter().enumerate().any(|(index, word)| {
-                DEBT_TOKENS.contains(&word.as_str()) && !is_negated(&words, index)
-            });
+            let has_debt = unnegated_debt_token(&text, DEBT_TOKENS).is_some();
             let has_ai = words.iter().any(|w| AI_TOKENS.contains(&w.as_str()));
             if has_debt && has_ai {
                 ctx.report_range(
@@ -74,9 +73,7 @@ impl RuleVisitor for Visitor {
                 );
                 continue;
             }
-            if let Some((_, bare_token)) = words.iter().enumerate().find(|(index, word)| {
-                matches!(word.as_str(), "todo" | "fixme" | "hack") && !is_negated(&words, *index)
-            }) {
+            if let Some(bare_token) = unnegated_debt_token(&text, BARE_TOKENS) {
                 let upper = bare_token.to_ascii_uppercase();
                 ctx.report_range(
                     comment.pos,
@@ -114,11 +111,59 @@ fn is_rule_id(token: &str) -> bool {
     })
 }
 
-fn is_negated(words: &[String], index: usize) -> bool {
-    if index >= 1 && words[index - 1] == "not" {
+fn unnegated_debt_token(text: &str, tokens: &[&str]) -> Option<String> {
+    text.lines().find_map(|line| {
+        let lower = line.to_ascii_lowercase();
+        let bytes = lower.as_bytes();
+        let mut start = 0;
+        while start < bytes.len() {
+            if !bytes[start].is_ascii_alphanumeric() {
+                start += 1;
+                continue;
+            }
+            let mut end = start;
+            while end < bytes.len() && bytes[end].is_ascii_alphanumeric() {
+                end += 1;
+            }
+            let word = &lower[start..end];
+            if tokens.contains(&word) && !negated_directly_before(bytes, start) {
+                return Some(word.to_owned());
+            }
+            start = end;
+        }
+        None
+    })
+}
+
+fn negated_directly_before(bytes: &[u8], token_start: usize) -> bool {
+    let word_before = |end: usize| -> Option<(usize, &[u8])> {
+        let mut start = end;
+        while start > 0 && bytes[start - 1].is_ascii_alphanumeric() {
+            start -= 1;
+        }
+        (start < end).then_some((start, &bytes[start..end]))
+    };
+    let skip_spaces = |mut idx: usize| -> usize {
+        while idx > 0 && bytes[idx - 1].is_ascii_whitespace() {
+            idx -= 1;
+        }
+        idx
+    };
+    let before_token = skip_spaces(token_start);
+    if before_token == token_start {
+        return false;
+    }
+    let Some((start, word)) = word_before(before_token) else {
+        return false;
+    };
+    if word == b"not" {
         return true;
     }
-    index >= 2 && words[index - 2] == "not" && words[index - 1] == "a"
+    if word != b"a" {
+        return false;
+    }
+    let before_article = skip_spaces(start);
+    before_article < start && word_before(before_article).is_some_and(|(_, word)| word == b"not")
 }
 
 fn has_tracked_ticket(text: &str) -> bool {

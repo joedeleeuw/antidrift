@@ -44,6 +44,15 @@ export const portableCases = [
     valid: "start();",
   },
   {
+    name: "no-todo-without-issue",
+    caseId: "no-todo-without-issue-negation-same-line",
+    occurrences: 2,
+    invalid:
+      "/* the generator does not.\n   TODO verify the mapping */\n// not\n// TODO later\nstart();",
+    valid:
+      "// not a TODO, the generator owns this mapping\n// this is not TODO material\nstart();",
+  },
+  {
     name: "no-default-export-in-domain",
     filename: "domain/entity.ts",
     invalid: "export default class Entity {}",
