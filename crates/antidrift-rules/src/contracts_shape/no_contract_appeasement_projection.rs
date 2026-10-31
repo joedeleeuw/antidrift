@@ -1,3 +1,4 @@
+use antidrift_kernel::file_role;
 use antidrift_kernel::outcome_shape::find_sum_to_product_pair;
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_symbol_origin, symbol_at_node};
 use antidrift_kernel::rule_options::reject_unknown_options;
@@ -277,11 +278,13 @@ impl Rule for NoContractAppeasementProjection {
         "antidrift/no-contract-appeasement-projection"
     }
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
+        let path = file_role::ProjectPath::of(ctx.program, ctx.file.file_name());
         Box::new(Visitor {
             candidates: Vec::new(),
             object_literals: Vec::new(),
             reported_functions: FxHashSet::default(),
+            authored_file: !path.has_any_role(file_role::TEST_ROLES),
         })
     }
 }
@@ -290,6 +293,7 @@ struct Visitor {
     candidates: Vec<(P<Node>, P<Node>)>,
     object_literals: Vec<P<Node>>,
     reported_functions: FxHashSet<P<Node>>,
+    authored_file: bool,
 }
 
 const LISTENERS: [Listener; 7] = [
@@ -382,6 +386,9 @@ impl RuleVisitor for Visitor {
 
     fn visit(&mut self, ctx: &mut Ctx, listener: Listener, node: P<Node>) {
         if matches!(listener, Listener::Exit(Kind::EndOfFile)) {
+            if !self.authored_file {
+                return;
+            }
             report_end_of_file(
                 ctx,
                 &self.candidates,
@@ -396,7 +403,10 @@ impl RuleVisitor for Visitor {
         }
         if let Some(fn_node) = tsrs_kernel::function_node_from_declaration(node) {
             self.candidates.push((fn_node, node));
-            let reported = report_bag_reshaper(ctx, fn_node, node)
+            let reported = self
+                .authored_file
+                .then(|| report_bag_reshaper(ctx, fn_node, node))
+                .flatten()
                 .unwrap_or_else(|| report_appeasement_projection(ctx, fn_node, node));
             if reported {
                 self.reported_functions.insert(fn_node);

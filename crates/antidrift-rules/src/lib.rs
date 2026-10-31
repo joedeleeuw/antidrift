@@ -128,6 +128,11 @@ pub fn default_entries() -> Vec<&'static RuleCatalogEntry> {
 }
 
 #[must_use]
+pub fn all_entries() -> Vec<&'static RuleCatalogEntry> {
+    RULE_CATALOG.iter().collect()
+}
+
+#[must_use]
 pub fn all_rules() -> Vec<&'static dyn Rule> {
     RULE_CATALOG.iter().map(|entry| entry.rule).collect()
 }

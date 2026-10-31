@@ -27,7 +27,7 @@ pub fn typescript_only_rules() -> Vec<CatalogRule> {
         CatalogRule::everywhere(&no_underchecked_type_predicate::DEFAULT_INSTANCE),
         CatalogRule::new(
             &no_wrapping_functions::DEFAULT_INSTANCE,
-            ScopePolicy::AuthoredSource,
+            ScopePolicy::ExceptGenerated,
         ),
         CatalogRule::everywhere(&no_unresolved_dependency_types::DEFAULT_INSTANCE),
         CatalogRule::new(
@@ -46,7 +46,7 @@ pub fn script_default_rules() -> Vec<CatalogRule> {
     vec![
         CatalogRule::new(
             &no_pass_through_parameters::DEFAULT_INSTANCE,
-            ScopePolicy::AuthoredSource,
+            ScopePolicy::ExceptGenerated,
         ),
         CatalogRule::everywhere(&no_compat_names::DEFAULT_INSTANCE),
     ]

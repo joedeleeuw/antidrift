@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use antidrift_kernel::directives::is_inline_disabled;
 use antidrift_kernel::registries::PolicyRegistries;
 use antidrift_rules::{
-    RuleCatalogEntry, create_rule, default_entries, is_typescript_only_rule, lookup_entry,
+    RuleCatalogEntry, all_entries, create_rule, is_typescript_only_rule, lookup_entry,
 };
 use rustc_hash::FxHashMap;
 use serde_json::json;
@@ -27,8 +27,31 @@ fn scoped_default(entry: &RuleCatalogEntry) -> &'static dyn Rule {
     )))
 }
 
-static DEFAULT_SCOPED_RULES: LazyLock<Vec<&'static dyn Rule>> =
-    LazyLock::new(|| default_entries().into_iter().map(scoped_default).collect());
+struct ScopedCatalogRule {
+    default_enabled: bool,
+    rule: &'static dyn Rule,
+}
+
+static SCOPED_CATALOG: LazyLock<Vec<ScopedCatalogRule>> = LazyLock::new(|| {
+    all_entries()
+        .into_iter()
+        .map(|entry| ScopedCatalogRule {
+            default_enabled: entry.default_enabled,
+            rule: scoped_default(entry),
+        })
+        .collect()
+});
+
+fn default_scoped_rules() -> impl Iterator<Item = &'static dyn Rule> {
+    SCOPED_CATALOG
+        .iter()
+        .filter(|entry| entry.default_enabled)
+        .map(|entry| entry.rule)
+}
+
+pub(crate) fn all_scoped_rules() -> impl Iterator<Item = &'static dyn Rule> {
+    SCOPED_CATALOG.iter().map(|entry| entry.rule)
+}
 
 pub(crate) fn instantiate_rule(
     name: &str,
@@ -107,7 +130,7 @@ fn append_default_rules(
             push_unique_rule(config_rules, rule);
         }
     }
-    for &custom_rule in DEFAULT_SCOPED_RULES.iter() {
+    for custom_rule in default_scoped_rules() {
         push_unique_rule(config_rules, custom_rule);
     }
     Ok(())

@@ -158,12 +158,11 @@ impl Scoped {
         if !self.scope.matches(file_name, cwd) {
             return false;
         }
-        let path = ProjectPath::of(ctx.program, file_name);
         self.policy.admits(
-            &path,
             file_name,
             ctx.file.text(),
             self.scope.has_explicit_files(),
+            || ProjectPath::of(ctx.program, file_name),
         )
     }
 }

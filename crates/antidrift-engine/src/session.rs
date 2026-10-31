@@ -13,7 +13,7 @@ use tsrslint::rule::Rule;
 
 use crate::batch::reported_to_rule_diagnostic;
 use crate::headless_host::{BoundProgram, ProgramBuilderEnv, collect_missing_bound_files};
-use crate::rule_plan::{default_workspace_rules, push_unique_rule};
+use crate::rule_plan::{all_scoped_rules, default_workspace_rules, push_unique_rule};
 use crate::runner::{collect_lintable_files, is_supported_file};
 
 #[derive(Clone)]
@@ -66,7 +66,7 @@ impl Session {
         tsrs_checker::links::set_sparse_id_pages(true);
         let registries = PolicyRegistries::load_from_repo(Path::new(cwd))?;
         let mut catalog = default_workspace_rules(&registries)?;
-        for rule in antidrift_rules::all_rules() {
+        for rule in all_scoped_rules() {
             push_unique_rule(&mut catalog, rule);
         }
         let fs: Arc<dyn FS> = Arc::new(bundled::wrap_fs(cachedvfs::from(Arc::new(osvfs::fs()))));

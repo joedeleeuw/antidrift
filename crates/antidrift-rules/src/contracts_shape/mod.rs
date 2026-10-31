@@ -19,7 +19,7 @@ pub fn rules() -> Vec<CatalogRule> {
     vec![
         CatalogRule::new(
             &no_contract_appeasement_projection::RULE,
-            ScopePolicy::AuthoredSource,
+            ScopePolicy::ExceptGenerated,
         ),
         CatalogRule::everywhere(&no_structural_type_fork::RULE),
         CatalogRule::everywhere(&no_nullable_positional_tuple::RULE),
