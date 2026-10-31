@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -11,12 +12,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   ADDON_PACKAGE_PATH,
-  LINTER_PLATFORM_KEYS,
+  hostLinterPlatform,
 } from "../src/policy/oxlint.mjs";
 import { proveAdoptionPresets } from "./consumer-adoption.mjs";
 import { scaffoldConsumerWorkspace } from "./consumer-workspace.mjs";
@@ -72,12 +73,18 @@ function fail(message) {
 }
 
 try {
-  console.log("1/6  packing @joedeleeuw/antidrift ...");
-  run(
-    pnpmLaunch.file,
-    [...pnpmLaunch.prefix, "pack", "--pack-destination", work],
-    pkgDir
-  );
+  const packedParent = process.env.ANTIDRIFT_TARBALL;
+  if (packedParent) {
+    console.log(`1/6  using packed @joedeleeuw/antidrift ${packedParent} ...`);
+    copyFileSync(resolve(packedParent), join(work, basename(packedParent)));
+  } else {
+    console.log("1/6  packing @joedeleeuw/antidrift ...");
+    run(
+      pnpmLaunch.file,
+      [...pnpmLaunch.prefix, "pack", "--pack-destination", work],
+      pkgDir
+    );
+  }
   const tgz = readdirSync(work).find((filename) => filename.endsWith(".tgz"));
   if (!tgz) fail("pack produced no tarball");
   const tarball = join(work, tgz);
@@ -110,45 +117,47 @@ try {
     fail(`tarball contains forbidden entries: ${shippedForbidden.join(", ")}`);
   }
 
-  const hostPlatform = `${process.platform}-${process.arch}`;
-  const platformKey = LINTER_PLATFORM_KEYS[hostPlatform];
-  if (!platformKey) fail(`Unsupported host platform: ${hostPlatform}`);
-  const platformPackageDirectory = join(work, "platform-package");
-  run(
-    process.execPath,
-    [
-      join(pkgDir, "scripts/stage-platform-package.mjs"),
-      platformKey,
-      platformPackageDirectory,
-    ],
-    pkgDir
-  );
-  const platformManifest = JSON.parse(
-    readFileSync(join(platformPackageDirectory, "package.json"), "utf8")
-  );
-  const platformPackageName = platformManifest.name;
+  const platformKey = hostLinterPlatform().key;
   const platformPack = join(work, "platform-pack");
   mkdirSync(platformPack);
-  const npmCli = join(
-    dirname(process.execPath),
-    process.platform === "win32"
-      ? "node_modules/npm/bin/npm-cli.js"
-      : "../lib/node_modules/npm/bin/npm-cli.js"
-  );
-  if (!existsSync(npmCli)) {
-    fail(`npm CLI not found beside Node at ${npmCli}`);
+  const packedPlatform = process.env.ANTIDRIFT_PLATFORM_TARBALL;
+  if (packedPlatform) {
+    copyFileSync(
+      resolve(packedPlatform),
+      join(platformPack, basename(packedPlatform))
+    );
+  } else {
+    const platformPackageDirectory = join(work, "platform-package");
+    run(
+      process.execPath,
+      [
+        join(pkgDir, "scripts/stage-platform-package.mjs"),
+        platformKey,
+        platformPackageDirectory,
+      ],
+      pkgDir
+    );
+    const npmCli = join(
+      dirname(process.execPath),
+      process.platform === "win32"
+        ? "node_modules/npm/bin/npm-cli.js"
+        : "../lib/node_modules/npm/bin/npm-cli.js"
+    );
+    if (!existsSync(npmCli)) {
+      fail(`npm CLI not found beside Node at ${npmCli}`);
+    }
+    run(
+      process.execPath,
+      [
+        npmCli,
+        "pack",
+        platformPackageDirectory,
+        "--pack-destination",
+        platformPack,
+      ],
+      work
+    );
   }
-  run(
-    process.execPath,
-    [
-      npmCli,
-      "pack",
-      platformPackageDirectory,
-      "--pack-destination",
-      platformPack,
-    ],
-    work
-  );
   const platformTarballs = readdirSync(platformPack).filter((name) =>
     name.endsWith(".tgz")
   );
@@ -156,6 +165,16 @@ try {
     fail("platform pack must produce exactly one tarball");
   }
   const platformTarball = join(platformPack, platformTarballs[0]);
+  const platformManifest = JSON.parse(
+    run("tar", ["-xOzf", platformTarball, "package/package.json"], work)
+  );
+  const platformPackageName = platformManifest.name;
+  if (platformPackageName !== `@joedeleeuw/antidrift-linter-${platformKey}`) {
+    fail(
+      `${platformTarball} holds ${platformPackageName}, but this host resolves @joedeleeuw/antidrift-linter-${platformKey}`
+    );
+  }
+  console.log(`  host platform: ${platformKey}`);
   const platformTarballContents = run(
     "tar",
     ["-tzf", platformTarball],
@@ -310,7 +329,7 @@ try {
   rmSync(installedAddon);
   const missingAddonRun = runPackedOxlint();
   const missingAddonOutput = `${missingAddonRun.stdout}${missingAddonRun.stderr}`;
-  const expectedMissingAddon = `Missing the antidrift Oxlint addon for ${process.platform}-${process.arch}`;
+  const expectedMissingAddon = `Missing the antidrift Oxlint addon for ${platformKey}`;
   if (
     missingAddonRun.status === 0 ||
     !missingAddonOutput.includes(expectedMissingAddon)

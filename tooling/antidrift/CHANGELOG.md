@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Platform packages: `@joedeleeuw/antidrift-linter-linux-x64-musl` and `@joedeleeuw/antidrift-linter-linux-arm64-musl` ship for Alpine and other musl hosts, built with `cargo-zigbuild` and smoked in `node:24-alpine`; `@joedeleeuw/antidrift-linter-darwin-x64` is retired before its first release. The launcher picks the package from one platform table (`LINTER_PLATFORMS`), reads glibc or musl from `process.report`, and on a host outside the table (Intel macOS included) throws an error listing the supported platforms instead of loading another package.
+- The package and its platform packages require Node `>=24`.
 - The Oxlint plugin's native addon ships in the per-platform packages beside `antidrift-linter`, and the main package carries no native binary: each artifact resolves from its environment override (`ANTIDRIFT_LINTER_BIN`, `ANTIDRIFT_NAPI_ADDON`), then a local cargo build, then the installed platform package. Platform manifests now name the repository, which npm provenance requires.
 - Line caps: `antidrift/max-module-lines` (warns above 1200 lines, errors above 1500), `antidrift/max-function-lines` (40 and 50) and `antidrift/max-component-lines` (150 and 180) own file and function size; turn Oxlint's `max-lines` and `max-lines-per-function` off in your own config, as the README composition shows.
 - File roles (generated, test, fixture, boundary, domain and the rest) come from the file's path relative to the run's working directory, not from directory names anywhere in the absolute path, and generator headers count only in a file's leading comments. Files under `fixtures/` are no longer skipped when `antidrift oxlint` injects the default rules.
