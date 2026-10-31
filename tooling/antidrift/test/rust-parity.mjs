@@ -873,33 +873,45 @@ const inferredTypesWorkspace = mkdtempSync(
   join(tmpdir(), "antidrift-inferred-types-")
 );
 try {
-  const projectDir = join(inferredTypesWorkspace, "project");
-  mkdirSync(join(projectDir, "node_modules/@types"), { recursive: true });
-  mkdirSync(join(projectDir, "src/nested"), { recursive: true });
+  const monorepoDir = join(inferredTypesWorkspace, "monorepo");
+  const appDir = join(monorepoDir, "packages/app");
+  mkdirSync(join(appDir, "node_modules/@types"), { recursive: true });
+  mkdirSync(join(appDir, "scripts"), { recursive: true });
   symlinkSync(
     realpathSync(resolve(repoRoot, "node_modules/@types/node")),
-    join(projectDir, "node_modules/@types/node"),
+    join(appDir, "node_modules/@types/node"),
     "junction"
   );
   writeFileSync(
-    join(projectDir, "package.json"),
-    '{ "name": "inferred-types-probe", "version": "0.0.0", "type": "module", "private": true }\n'
+    join(monorepoDir, "package.json"),
+    '{ "name": "inferred-types-root", "version": "0.0.0", "type": "module", "private": true }\n'
   );
   writeFileSync(
-    join(projectDir, "src/nested/probe.mjs"),
+    join(appDir, "package.json"),
+    '{ "name": "inferred-types-app", "version": "0.0.0", "type": "module", "private": true }\n'
+  );
+  writeFileSync(
+    join(appDir, "scripts/probe.mjs"),
     'import { readFileSync } from "node:fs";\nconst fromDisk = JSON.parse(readFileSync("x.json", "utf8"));\nconst fromNowhere = JSON.parse(globalThis.untypedThing);\nconsole.log(fromDisk, fromNowhere);\n'
   );
-  const inferredRun = spawnSync(
-    binaryPath,
-    ["--format", "json", "src/nested/probe.mjs"],
-    { cwd: projectDir, encoding: "utf8" }
+  const inferredFindings = (cwd, target) => {
+    const run = spawnSync(binaryPath, ["--format", "json", target], {
+      cwd,
+      encoding: "utf8",
+    });
+    return JSON.parse(String(run.stdout ?? "[]")).flatMap((entry) =>
+      entry.messages.map((message) => `${message.line} ${message.ruleId}`)
+    );
+  };
+  assert.deepEqual(
+    inferredFindings(monorepoDir, "packages/app/scripts/probe.mjs"),
+    ["3 antidrift/no-unsafe-deserialize"],
+    "A file outside every tsconfig resolves node:fs through the @types packages installed beside it, even when the run starts at a monorepo root that installs none: only the untyped JSON.parse argument is unsafe"
   );
   assert.deepEqual(
-    JSON.parse(String(inferredRun.stdout ?? "[]")).flatMap((entry) =>
-      entry.messages.map((message) => `${message.line} ${message.ruleId}`)
-    ),
+    inferredFindings(appDir, "scripts/probe.mjs"),
     ["3 antidrift/no-unsafe-deserialize"],
-    "A file outside every tsconfig resolves node:fs through the project's @types packages: only the untyped JSON.parse argument is unsafe"
+    "The same file gets the same types when the run starts inside the package"
   );
 } finally {
   rmSync(inferredTypesWorkspace, { recursive: true, force: true });

@@ -6,13 +6,13 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{SourceFile, SourceFileParseOptions};
 use tsrs_compiler::{CompilerHost, Program, ProgramOptions, new_compiler_host, new_program};
 use tsrs_core::tspath::{self, Path};
-use tsrs_core::{
-    CompilerOptions, JsxEmit, ModuleKind, ModuleResolutionKind, P, ScriptTarget, Tristate,
-};
+use tsrs_core::{P, Tristate};
 use tsrs_vfs::{FS, bundled, cachedvfs, osvfs};
 use tsrslint::overlayfs::OverlayFS;
 use tsrslint::protocol::{Diagnostic, Message, Payload, Range};
 use tsrslint::tsconfig::{ExtendedConfigCache, ParseHost, TsConfigResolver};
+
+use crate::inferred_program::{inferred_compiler_options, inferred_type_roots};
 
 pub(crate) type DeclarationCache = Mutex<FxHashMap<SourceFileParseOptions, P<SourceFile>>>;
 
@@ -186,25 +186,6 @@ pub(crate) fn tsconfig_error_diagnostic(
     }
 }
 
-pub(crate) fn inferred_compiler_options() -> CompilerOptions {
-    CompilerOptions {
-        allow_js: Tristate::True,
-        module: ModuleKind::ESNext,
-        module_resolution: ModuleResolutionKind::Bundler,
-        target: ScriptTarget::ES2022,
-        jsx: JsxEmit::ReactJSX,
-        allow_importing_ts_extensions: Tristate::True,
-        strict_null_checks: Tristate::True,
-        strict_function_types: Tristate::True,
-        source_map: Tristate::True,
-        es_module_interop: Tristate::True,
-        allow_non_ts_extensions: Tristate::True,
-        resolve_json_module: Tristate::True,
-        types: Some(vec!["*".to_owned()]),
-        ..Default::default()
-    }
-}
-
 pub(crate) struct BoundProgram {
     pub(crate) program: &'static Program,
     pub(crate) source_files: Vec<P<SourceFile>>,
@@ -267,8 +248,10 @@ impl ProgramFactory {
     fn inferred(&self, unmatched: &[String]) -> &'static Program {
         let compiler_host =
             build_shared_host(&self.cwd, &self.fs, self.ext_cache, self.declarations);
+        let mut options = inferred_compiler_options();
+        options.type_roots = Some(inferred_type_roots(&self.cwd, unmatched, self.fs.as_ref()));
         let config = P::new(tsrs_tsoptions::new_parsed_command_line(
-            P::new(inferred_compiler_options()),
+            P::new(options),
             unmatched.to_vec(),
             Vec::new(),
             tspath::ComparePathsOptions {
