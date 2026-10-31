@@ -19,7 +19,7 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "antidrift-engine"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "antidrift-kernel",
  "antidrift-rules",
@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "antidrift-kernel"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "oxc_resolver",
  "rustc-hash",
@@ -62,14 +62,14 @@ dependencies = [
 
 [[package]]
 name = "antidrift-linter"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "antidrift-engine",
 ]
 
 [[package]]
 name = "antidrift-napi"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "antidrift-engine",
  "napi",
@@ -79,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "antidrift-rules"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "antidrift-kernel",
  "oxc_resolver",

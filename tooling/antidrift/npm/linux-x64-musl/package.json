@@ -1,6 +1,6 @@
 {
   "name": "@joedeleeuw/antidrift-linter-linux-x64-musl",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "license": "MIT",
   "repository": {
     "type": "git",
