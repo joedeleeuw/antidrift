@@ -36,7 +36,7 @@ const SOURCES = {
   "src/floating.ts": "export async function work() {}\n\nwork();\n",
   "src/api.d.ts": "export declare function read(): void;\n",
   "src/card.tsx":
-    "export function Card(props: { title: string; body: string; footer: string }) {\n  return props.title + props.body + props.footer;\n}\n",
+    "export function Card(props: { title: string; body: string; footer: string }) {\n  return <article>{props.title}{props.body}{props.footer}</article>;\n}\n",
   "src/caller.ts": 'import { read } from "./api";\n\nread();\n',
 };
 
@@ -465,7 +465,9 @@ export function proveOxlintPluginBridge(repoRoot, linter) {
       "A lint request with no rules must report nothing"
     );
     for (const file of CAST_FILES) {
-      addon.lintFile(project, join(project, file), ["antidrift/no-as-never"]);
+      addon.lintFile(project, join(project, file), [
+        { rule: "antidrift/no-as-never" },
+      ]);
     }
     assert.equal(
       addon.engineStats().programsBuilt,
