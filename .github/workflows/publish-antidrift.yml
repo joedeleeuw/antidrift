@@ -12,6 +12,8 @@ jobs:
   platform-packages:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'antidrift-v')
     runs-on: ${{ matrix.runner }}
+    env:
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     strategy:
       fail-fast: false
       matrix:
@@ -22,13 +24,17 @@ jobs:
             package: linux-arm64-gnu
           - runner: macos-15-intel
             package: darwin-x64
-          - runner: macos-14
+          - runner: macos-15
             package: darwin-arm64
           - runner: windows-latest
             package: win32-x64-msvc
           - runner: windows-11-arm
             package: win32-arm64-msvc
     steps:
+      - name: Allow long paths in git checkouts
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
       - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v6
@@ -90,7 +96,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 26
           package-manager-cache: false
 
       - uses: actions-rust-lang/setup-rust-toolchain@v2

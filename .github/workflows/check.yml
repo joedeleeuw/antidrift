@@ -8,12 +8,16 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [24, 26]
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: pnpm
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
@@ -24,5 +28,5 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: policy-reports
+          name: policy-reports-node-${{ matrix.node }}
           path: reports
