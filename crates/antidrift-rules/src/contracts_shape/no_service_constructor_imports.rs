@@ -1,5 +1,5 @@
 use antidrift_kernel::file_role;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{boundary, provenance};
 use tsrs_ast::{Kind, Node, SourceFile, Symbol};
@@ -164,6 +164,12 @@ fn check_import_declaration(ctx: &mut Ctx, import: P<Node>) {
     }
     for binding in collect_import_bindings(import_decl.import_clause()) {
         check_import_binding(ctx, import, module_text, &prov, &binding);
+    }
+}
+
+impl ScopedRule for NoServiceConstructorImports {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
     }
 }
 

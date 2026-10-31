@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::{Checker, Type, TypeFlags};
@@ -106,6 +106,12 @@ fn tuple_element_is_nullish_slot(checker: &mut Checker, element: P<Node>) -> boo
     tuple_element_is_optional(element)
         || type_node_includes_direct_nullish(type_node)
         || tuple_element_resolves_to_nullish(checker, element)
+}
+
+impl ScopedRule for NoNullablePositionalTuple {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
 }
 
 impl Rule for NoNullablePositionalTuple {

@@ -6,7 +6,7 @@ use antidrift_kernel::local_binding::resolve_lexical_binding;
 use antidrift_kernel::provenance::{
     resolve_aliased_symbol, symbol_at_node, symbol_declarations, type_symbol,
 };
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::{
     collect_return_expressions, enclosing_function, function_node_from_declaration,
     is_function_like, normalize_path, property_name_text, unwrap_expression,
@@ -72,6 +72,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ReturnStatement),
     Listener::Enter(Kind::ArrowFunction),
 ];
+
+impl ScopedRule for NoQueryEnvelopeLeak {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoQueryEnvelopeLeak {
     fn name(&self) -> &'static str {

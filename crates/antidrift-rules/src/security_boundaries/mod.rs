@@ -17,15 +17,16 @@ pub mod require_secure_document_response;
 mod union_owners;
 mod web_provenance;
 
+use antidrift_kernel::rule_scope::ScopedRule;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
+pub fn typescript_only_rules() -> Vec<&'static dyn ScopedRule> {
     vec![&no_redeclared_owned_union::DEFAULT_RULE]
 }
 
 #[must_use]
-pub fn script_default_rules() -> Vec<&'static dyn Rule> {
+pub fn script_default_rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &confine_owner::DEFAULT_RULE,
         &no_auth_token_in_web_storage::DEFAULT_RULE,

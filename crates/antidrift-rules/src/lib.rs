@@ -9,11 +9,12 @@ pub mod security_boundaries;
 pub mod test_oracle;
 pub mod type_narrowing;
 
+use antidrift_kernel::rule_scope::ScopedRule;
 use std::sync::LazyLock;
 use tsrslint::rule::Rule;
 
 struct RuleCatalogEntry {
-    rule: &'static dyn Rule,
+    rule: &'static dyn ScopedRule,
     default_enabled: bool,
     typescript_only: bool,
 }
@@ -33,7 +34,7 @@ const FAMILY_FACTORIES: &[FamilyFactory] = &[
 
 fn push_entries(
     out: &mut Vec<RuleCatalogEntry>,
-    rules: Vec<&'static dyn Rule>,
+    rules: Vec<&'static dyn ScopedRule>,
     default_enabled: bool,
     typescript_only: bool,
 ) {
@@ -104,13 +105,16 @@ pub fn default_rules() -> Vec<&'static dyn Rule> {
     RULE_CATALOG
         .iter()
         .filter(|entry| entry.default_enabled)
-        .map(|entry| entry.rule)
+        .map(|entry| entry.rule as &'static dyn Rule)
         .collect()
 }
 
 #[must_use]
 pub fn all_rules() -> Vec<&'static dyn Rule> {
-    RULE_CATALOG.iter().map(|entry| entry.rule).collect()
+    RULE_CATALOG
+        .iter()
+        .map(|entry| entry.rule as &'static dyn Rule)
+        .collect()
 }
 
 #[must_use]
@@ -125,7 +129,7 @@ pub fn lookup_default_rule(name: &str) -> Option<&'static dyn Rule> {
     RULE_CATALOG.iter().find_map(|entry| {
         let rule_name = entry.rule.name();
         (rule_name == name || rule_name.strip_prefix("antidrift/") == Some(name))
-            .then_some(entry.rule)
+            .then_some(entry.rule as &'static dyn Rule)
     })
 }
 

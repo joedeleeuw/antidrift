@@ -1,5 +1,5 @@
 use antidrift_kernel::provenance::relative_to_cwd;
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -23,6 +23,12 @@ impl NoDebugResidueFilenames {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
+
+impl ScopedRule for NoDebugResidueFilenames {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoDebugResidueFilenames {
     fn name(&self) -> &'static str {

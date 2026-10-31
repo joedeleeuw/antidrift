@@ -1,5 +1,7 @@
 use antidrift_kernel::jsx::attribute_name;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{
+    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
+};
 use antidrift_kernel::tsrs_kernel::{cooked_text, is_function_like, unwrap_expression};
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -105,6 +107,12 @@ impl NoDuplicatedConditionalClassnames {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::ConditionalExpression)];
+
+impl ScopedRule for NoDuplicatedConditionalClassnames {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoDuplicatedConditionalClassnames {
     fn name(&self) -> &'static str {

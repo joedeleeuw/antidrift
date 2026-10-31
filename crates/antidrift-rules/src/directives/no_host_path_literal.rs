@@ -1,5 +1,5 @@
 use antidrift_kernel::file_role::FileRole;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -37,6 +37,12 @@ const LISTENERS: &[Listener] = &[
 ];
 
 struct Visitor;
+
+impl ScopedRule for NoHostPathLiteral {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoHostPathLiteral {
     fn name(&self) -> &'static str {

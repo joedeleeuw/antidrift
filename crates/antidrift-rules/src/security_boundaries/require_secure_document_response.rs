@@ -1,5 +1,7 @@
 use super::web_provenance::property_name;
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options, in_scope};
+use antidrift_kernel::rule_scope::{
+    RuleScope, ScopeOptions, ScopedRule, decode_rule_options, in_scope,
+};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -50,6 +52,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ImportDeclaration),
     Listener::Enter(Kind::NewExpression),
 ];
+
+impl ScopedRule for RequireSecureDocumentResponse {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireSecureDocumentResponse {
     fn name(&self) -> &'static str {

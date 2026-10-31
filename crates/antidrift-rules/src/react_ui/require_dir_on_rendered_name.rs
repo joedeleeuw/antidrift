@@ -2,7 +2,7 @@ use antidrift_kernel::jsx::{
     has_plain_attribute, jsx_children, jsx_opening_node, plain_element_name,
 };
 use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedOptions, decode_scoped, in_scope, require_non_empty,
+    RuleScope, ScopeOptions, ScopedOptions, ScopedRule, decode_scoped, in_scope, require_non_empty,
 };
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
@@ -101,6 +101,12 @@ impl RequireDirOnRenderedName {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::JsxElement)];
+
+impl ScopedRule for RequireDirOnRenderedName {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireDirOnRenderedName {
     fn name(&self) -> &'static str {

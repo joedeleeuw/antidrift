@@ -1,6 +1,8 @@
 use antidrift_kernel::jsx::function_returns_jsx;
 use antidrift_kernel::local_binding::{Binding, binding_for_declarator, resolve_lexical_binding};
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{
+    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
+};
 use antidrift_kernel::tsrs_kernel;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -303,6 +305,12 @@ fn check_component_node(ctx: &mut Ctx, node: P<Node>, max: usize) {
     let count = object_pattern_prop_count(param_name).max(typed_count);
     if count > max {
         ctx.report_node(first_param, build_max_component_props_message(count, max));
+    }
+}
+
+impl ScopedRule for ReactMaxComponentProps {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
     }
 }
 

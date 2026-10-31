@@ -1,5 +1,5 @@
 use antidrift_kernel::directives::scan_source_comments;
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -23,6 +23,12 @@ impl NoDatedComments {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
+
+impl ScopedRule for NoDatedComments {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoDatedComments {
     fn name(&self) -> &'static str {

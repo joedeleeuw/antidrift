@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, ScopedRule};
 use antidrift_kernel::{boundary, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -66,6 +66,12 @@ struct RegistrationInspection {
     has_dynamic: bool,
     has_handler: bool,
     returns_initializer: Option<P<Node>>,
+}
+
+impl ScopedRule for RequireConvexReturnValidator {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
 }
 
 impl Rule for RequireConvexReturnValidator {

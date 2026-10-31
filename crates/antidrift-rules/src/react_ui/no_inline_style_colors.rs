@@ -1,5 +1,5 @@
 use antidrift_kernel::jsx::{attribute_initializer_expression, plain_attribute_name};
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression, unwrap_parentheses};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -34,6 +34,12 @@ impl NoInlineStyleColors {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::JsxAttribute)];
+
+impl ScopedRule for NoInlineStyleColors {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoInlineStyleColors {
     fn name(&self) -> &'static str {

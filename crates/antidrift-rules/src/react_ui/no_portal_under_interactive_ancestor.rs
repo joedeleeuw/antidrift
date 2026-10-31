@@ -2,7 +2,7 @@ use antidrift_kernel::jsx::{
     attribute_initializer_expression, is_jsx_element_like, jsx_attributes_list,
     plain_attribute_name, plain_element_name,
 };
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -53,6 +53,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxOpeningElement),
     Listener::Enter(Kind::JsxSelfClosingElement),
 ];
+
+impl ScopedRule for NoPortalUnderInteractiveAncestor {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoPortalUnderInteractiveAncestor {
     fn name(&self) -> &'static str {

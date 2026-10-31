@@ -413,6 +413,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionExpression),
 ];
 
+impl antidrift_kernel::rule_scope::ScopedRule for NoRedundantTypePredicate {
+    fn scope(&self) -> &antidrift_kernel::rule_scope::RuleScope {
+        &self.scope
+    }
+}
+
 impl Rule for NoRedundantTypePredicate {
     fn name(&self) -> &'static str {
         "antidrift/no-redundant-type-predicate"

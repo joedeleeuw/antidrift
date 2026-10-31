@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::{boundary, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags};
@@ -24,6 +24,12 @@ impl NoIdentitySchemaTransform {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
+
+impl ScopedRule for NoIdentitySchemaTransform {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoIdentitySchemaTransform {
     fn name(&self) -> &'static str {

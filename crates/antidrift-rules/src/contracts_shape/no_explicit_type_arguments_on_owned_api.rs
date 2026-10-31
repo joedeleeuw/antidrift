@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use tsrs_ast::{Kind, Node};
@@ -353,6 +353,12 @@ fn is_tanstack_registration_call(checker: &mut Checker, call_node: P<Node>) -> b
         return false;
     };
     resolves_to_registration(checker, arg0, 6)
+}
+
+impl ScopedRule for NoExplicitTypeArgumentsOnOwnedApi {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
 }
 
 impl Rule for NoExplicitTypeArgumentsOnOwnedApi {

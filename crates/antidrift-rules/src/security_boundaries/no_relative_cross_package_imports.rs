@@ -1,6 +1,6 @@
 use super::package_ownership::{PackageOwner, absolute_filename, package_owner};
 use antidrift_kernel::imports::extract_module_import;
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use std::path::{Path, PathBuf};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -29,6 +29,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ExportDeclaration),
     Listener::Enter(Kind::CallExpression),
 ];
+
+impl ScopedRule for NoRelativeCrossPackageImports {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoRelativeCrossPackageImports {
     fn name(&self) -> &'static str {

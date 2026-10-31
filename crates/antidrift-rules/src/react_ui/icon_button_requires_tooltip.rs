@@ -3,7 +3,7 @@ use antidrift_kernel::jsx::{
     jsx_children, render_prop_element, static_attribute_string,
 };
 use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedOptions, decode_scoped, in_scope,
+    RuleScope, ScopeOptions, ScopedOptions, ScopedRule, decode_scoped, in_scope,
 };
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression, unwrap_parentheses};
 use serde::Deserialize;
@@ -78,6 +78,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxElement),
     Listener::Enter(Kind::JsxSelfClosingElement),
 ];
+
+impl ScopedRule for IconButtonRequiresTooltip {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for IconButtonRequiresTooltip {
     fn name(&self) -> &'static str {

@@ -32,6 +32,7 @@ pub mod require_exhaustive_panic;
 pub mod require_stable_snapshot;
 mod shadow_state_mirror;
 
+use antidrift_kernel::rule_scope::ScopedRule;
 use icon_button_requires_tooltip::IconButtonRequiresTooltip;
 use no_adhoc_loader::NoAdhocLoader;
 use no_ambient_hotkey_format::NoAmbientHotkeyFormat;
@@ -60,7 +61,7 @@ use require_stable_snapshot::RequireStableSnapshot;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
+pub fn typescript_only_rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &no_impure_render_call::DEFAULT_RULE,
         &no_query_envelope_leak::DEFAULT_RULE,
@@ -69,7 +70,7 @@ pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
 }
 
 #[must_use]
-pub fn script_default_rules() -> Vec<&'static dyn Rule> {
+pub fn script_default_rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &icon_button_requires_tooltip::DEFAULT_RULE,
         &no_adhoc_loader::DEFAULT_RULE,

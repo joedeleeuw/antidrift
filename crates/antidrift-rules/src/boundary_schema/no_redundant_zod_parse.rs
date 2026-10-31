@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::{boundary, projection, provenance, tsrs_kernel};
 use rustc_hash::FxHashMap;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags, SourceFile, Symbol};
@@ -25,6 +25,12 @@ impl NoRedundantZodParse {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
+
+impl ScopedRule for NoRedundantZodParse {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoRedundantZodParse {
     fn name(&self) -> &'static str {

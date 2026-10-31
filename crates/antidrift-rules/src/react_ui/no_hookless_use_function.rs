@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use antidrift_kernel::jsx::is_hook_name;
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::{
     is_undefined_or_void_expression, normalize_path, property_name_text, unwrap_expression,
 };
@@ -35,6 +35,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::MethodDeclaration),
     Listener::Enter(Kind::PropertyAssignment),
 ];
+
+impl ScopedRule for NoHooklessUseFunction {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoHooklessUseFunction {
     fn name(&self) -> &'static str {

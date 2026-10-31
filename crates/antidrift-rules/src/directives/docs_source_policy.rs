@@ -1,5 +1,5 @@
 use antidrift_kernel::json_manifest::load_nearest_package_json_manifest;
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, ScopedRule, decode_rule_options};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -60,6 +60,12 @@ impl DocsSourcePolicy {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
+
+impl ScopedRule for DocsSourcePolicy {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for DocsSourcePolicy {
     fn name(&self) -> &'static str {

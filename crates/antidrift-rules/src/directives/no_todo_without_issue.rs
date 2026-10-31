@@ -1,5 +1,5 @@
 use antidrift_kernel::directives::{scan_source_comments, split_identifier_words};
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -35,6 +35,12 @@ impl NoTodoWithoutIssue {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
+
+impl ScopedRule for NoTodoWithoutIssue {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoTodoWithoutIssue {
     fn name(&self) -> &'static str {

@@ -1,7 +1,7 @@
 use antidrift_kernel::file_role;
 use antidrift_kernel::outcome_shape::find_sum_to_product_pair;
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_symbol_origin, symbol_at_node};
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::{projection, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, SourceFile};
@@ -276,6 +276,12 @@ fn report_appeasement_projection(ctx: &mut Ctx, function: P<Node>, candidate: P<
         return true;
     }
     false
+}
+
+impl ScopedRule for NoContractAppeasementProjection {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
 }
 
 impl Rule for NoContractAppeasementProjection {

@@ -3,7 +3,7 @@ use super::syntax::{
     identifier_of, is_binding_mutated, is_write_reference, member, object_property, property_name,
     resolve_lexical_binding, unwrap_expression, unwrap_parentheses,
 };
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -39,6 +39,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::BinaryExpression),
     Listener::Enter(Kind::CallExpression),
 ];
+
+impl ScopedRule for RequireFetchTimeout {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireFetchTimeout {
     fn name(&self) -> &'static str {

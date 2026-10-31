@@ -2,7 +2,7 @@ use super::render_body_primitives::{is_inside_render_body, reactive_primitive_na
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::jsx::is_hook_name;
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::{
     collect_return_expressions, property_name_text, unwrap_expression,
 };
@@ -54,6 +54,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
     Listener::Enter(Kind::NewExpression),
 ];
+
+impl ScopedRule for RequireStableSnapshot {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireStableSnapshot {
     fn name(&self) -> &'static str {

@@ -14,10 +14,11 @@ pub mod no_wrapping_functions;
 pub mod predicate_scan;
 mod vague_name_lexicon;
 
+use antidrift_kernel::rule_scope::ScopedRule;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
+pub fn typescript_only_rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &no_appeasement_cast::DEFAULT_INSTANCE,
         &no_appeasement_erasure::DEFAULT_INSTANCE,
@@ -31,7 +32,7 @@ pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
 }
 
 #[must_use]
-pub fn script_default_rules() -> Vec<&'static dyn Rule> {
+pub fn script_default_rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &no_pass_through_parameters::DEFAULT_INSTANCE,
         &no_compat_names::DEFAULT_INSTANCE,
@@ -39,7 +40,7 @@ pub fn script_default_rules() -> Vec<&'static dyn Rule> {
 }
 
 #[must_use]
-pub fn default_off_rules() -> Vec<&'static dyn Rule> {
+pub fn default_off_rules() -> Vec<&'static dyn ScopedRule> {
     vec![&no_vague_names::DEFAULT_INSTANCE]
 }
 

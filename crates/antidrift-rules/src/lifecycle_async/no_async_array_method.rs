@@ -2,7 +2,9 @@ use super::syntax::{
     Binding, Span, binding_for_declarator, collect_binding_references, identifier_member,
     identifier_of, parent_expression, unwrap_parentheses,
 };
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{
+    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
+};
 use serde::Deserialize;
 use tsrs_ast::{Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
@@ -65,6 +67,12 @@ impl NoAsyncArrayMethod {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
+
+impl ScopedRule for NoAsyncArrayMethod {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoAsyncArrayMethod {
     fn name(&self) -> &'static str {

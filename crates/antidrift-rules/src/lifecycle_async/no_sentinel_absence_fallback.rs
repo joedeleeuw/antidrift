@@ -1,5 +1,7 @@
 use super::syntax::unwrap_expression;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{
+    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
+};
 use antidrift_kernel::runtime_lifecycle::{has_mtime_ordering_text, spans_multiple_artifact_tiers};
 use antidrift_kernel::tsrs_kernel::{cooked_text, is_function_like, node_text};
 use serde::Deserialize;
@@ -54,6 +56,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CatchClause),
     Listener::Enter(Kind::CallExpression),
 ];
+
+impl ScopedRule for NoSentinelAbsenceFallback {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoSentinelAbsenceFallback {
     fn name(&self) -> &'static str {

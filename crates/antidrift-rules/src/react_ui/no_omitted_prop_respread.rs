@@ -3,7 +3,7 @@ use antidrift_kernel::jsx::{
     jsx_attributes_list, jsx_children, jsx_opening_node, plain_attribute_name,
 };
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::{is_function_like, unwrap_expression};
 use antidrift_kernel::type_syntax::{LocalTypeAliases, property_key_name};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -33,6 +33,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxElement),
     Listener::Enter(Kind::JsxSelfClosingElement),
 ];
+
+impl ScopedRule for NoOmittedPropRespread {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoOmittedPropRespread {
     fn name(&self) -> &'static str {

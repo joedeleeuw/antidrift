@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -104,6 +104,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::PropertyDeclaration),
     Listener::Enter(Kind::PropertySignature),
 ];
+
+impl ScopedRule for NoCompatNames {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoCompatNames {
     fn name(&self) -> &'static str {

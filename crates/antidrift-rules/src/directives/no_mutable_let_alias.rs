@@ -3,7 +3,7 @@ use super::alias_usage_scan::{
     has_loop_mutation, has_memo_cache_store, is_function_boundary, is_immediate_return,
     is_loop_node,
 };
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::{enclosing_function, unwrap_expression};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -28,6 +28,12 @@ impl NoMutableLetAlias {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::Block)];
+
+impl ScopedRule for NoMutableLetAlias {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoMutableLetAlias {
     fn name(&self) -> &'static str {

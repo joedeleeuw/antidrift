@@ -6,13 +6,15 @@ pub mod no_service_constructor_imports;
 pub mod no_structural_type_fork;
 pub mod react_max_component_props;
 pub mod redundant_local_return;
+mod redundant_owner_prefix;
 pub mod structural_fork_analysis;
 mod test_only_seam;
 
+use antidrift_kernel::rule_scope::ScopedRule;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn Rule> {
+pub fn rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &no_contract_appeasement_projection::RULE,
         &no_structural_type_fork::RULE,

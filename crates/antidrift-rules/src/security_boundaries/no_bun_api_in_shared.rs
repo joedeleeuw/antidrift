@@ -1,6 +1,6 @@
 use antidrift_kernel::file_role::FileRole;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -29,6 +29,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::PropertyAccessExpression),
     Listener::Enter(Kind::ElementAccessExpression),
 ];
+
+impl ScopedRule for NoBunApiInShared {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoBunApiInShared {
     fn name(&self) -> &'static str {

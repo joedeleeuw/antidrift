@@ -1,7 +1,7 @@
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::jsx::function_returns_jsx;
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -30,6 +30,12 @@ impl NoCallingComponentsAsFunctions {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
+
+impl ScopedRule for NoCallingComponentsAsFunctions {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoCallingComponentsAsFunctions {
     fn name(&self) -> &'static str {

@@ -4,7 +4,7 @@ use super::anemic_error_fallback::{
     is_error_member_read,
 };
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::{
     cooked_text, property_name_text, unwrap_awaited_expression, unwrap_expression,
 };
@@ -64,6 +64,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::BinaryExpression),
     Listener::Enter(Kind::ConditionalExpression),
 ];
+
+impl ScopedRule for NoAnemicErrors {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoAnemicErrors {
     fn name(&self) -> &'static str {

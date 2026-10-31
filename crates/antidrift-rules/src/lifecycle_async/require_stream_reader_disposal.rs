@@ -4,7 +4,7 @@ use super::syntax::{
     identifier_of, is_const_variable_declaration, is_function_like, is_write_reference, member,
     owner, parent_expression, resolve_lexical_binding,
 };
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -34,6 +34,12 @@ impl RequireStreamReaderDisposal {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
+
+impl ScopedRule for RequireStreamReaderDisposal {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireStreamReaderDisposal {
     fn name(&self) -> &'static str {

@@ -20,7 +20,7 @@ mod validator_assertions;
 mod validators;
 
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use rustc_hash::FxHashMap;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -48,6 +48,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
     Listener::Enter(Kind::ForOfStatement),
 ];
+
+impl ScopedRule for NoNonindependentTestOracle {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoNonindependentTestOracle {
     fn name(&self) -> &'static str {
@@ -108,7 +114,7 @@ impl RuleVisitor for Visitor {
 }
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn Rule> {
+pub fn rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &DEFAULT_RULE,
         &no_placeholder_tests::DEFAULT_RULE,

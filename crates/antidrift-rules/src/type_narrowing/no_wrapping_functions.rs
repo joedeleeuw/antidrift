@@ -2,7 +2,7 @@ use super::call_forwarding::{BodyForwarding, is_literal_kind, parameters_match_i
 use antidrift_kernel::callgraph::{IdentifierRef, ProgramSymbolIndex};
 use antidrift_kernel::file_role;
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{callgraph, provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
@@ -293,6 +293,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),
     Listener::Enter(Kind::VariableDeclaration),
 ];
+
+impl ScopedRule for NoWrappingFunctions {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoWrappingFunctions {
     fn name(&self) -> &'static str {

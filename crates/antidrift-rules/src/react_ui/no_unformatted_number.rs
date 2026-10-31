@@ -1,7 +1,7 @@
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::jsx::{has_plain_attribute, plain_attribute_name, plain_element_name};
 use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedOptions, decode_scoped, in_scope, require_non_empty,
+    RuleScope, ScopeOptions, ScopedOptions, ScopedRule, decode_scoped, in_scope, require_non_empty,
 };
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
@@ -69,6 +69,12 @@ impl NoUnformattedNumber {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::JsxExpression)];
+
+impl ScopedRule for NoUnformattedNumber {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoUnformattedNumber {
     fn name(&self) -> &'static str {

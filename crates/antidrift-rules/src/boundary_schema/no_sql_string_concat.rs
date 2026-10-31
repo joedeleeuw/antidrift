@@ -3,7 +3,7 @@ use super::sql_text::{
     combined_template_text, is_sql_identifier_context, is_sql_interpolation_context,
     is_sql_statement, is_static_string, static_string_text,
 };
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, ScopedRule};
 use antidrift_kernel::tsrs_kernel;
 use antidrift_kernel::tsrs_kernel::cooked_text_lossy;
 use serde::Deserialize;
@@ -80,6 +80,12 @@ impl NoSqlStringConcat {
             options: parsed,
             scope,
         })
+    }
+}
+
+impl ScopedRule for NoSqlStringConcat {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
     }
 }
 

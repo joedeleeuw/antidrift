@@ -1,5 +1,5 @@
 use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedOptions, decode_scoped, in_scope,
+    RuleScope, ScopeOptions, ScopedOptions, ScopedRule, decode_scoped, in_scope,
 };
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
@@ -45,6 +45,12 @@ impl RequireExhaustivePanic {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::VariableDeclaration)];
+
+impl ScopedRule for RequireExhaustivePanic {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireExhaustivePanic {
     fn name(&self) -> &'static str {

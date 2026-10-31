@@ -14,10 +14,11 @@ mod stream_origin;
 mod stream_paths;
 mod syntax;
 
+use antidrift_kernel::rule_scope::ScopedRule;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn Rule> {
+pub fn rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &no_async_array_method::DEFAULT_RULE,
         &no_async_context_enter_with::DEFAULT_RULE,

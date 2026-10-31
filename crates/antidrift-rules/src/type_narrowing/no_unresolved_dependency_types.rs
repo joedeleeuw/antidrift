@@ -202,6 +202,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ImportType),
 ];
 
+impl antidrift_kernel::rule_scope::ScopedRule for NoUnresolvedDependencyTypes {
+    fn scope(&self) -> &antidrift_kernel::rule_scope::RuleScope {
+        &self.scope
+    }
+}
+
 impl Rule for NoUnresolvedDependencyTypes {
     fn name(&self) -> &'static str {
         "antidrift/no-unresolved-dependency-types"

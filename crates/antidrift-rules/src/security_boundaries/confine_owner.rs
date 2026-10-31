@@ -1,4 +1,6 @@
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options, in_scope};
+use antidrift_kernel::rule_scope::{
+    RuleScope, ScopeOptions, ScopedRule, decode_rule_options, in_scope,
+};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -118,6 +120,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
     Listener::Enter(Kind::PropertyAccessExpression),
 ];
+
+impl ScopedRule for ConfineOwner {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for ConfineOwner {
     fn name(&self) -> &'static str {

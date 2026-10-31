@@ -3,7 +3,9 @@ use super::web_provenance::{
     resolve_lexical_binding, unwrap_expression,
 };
 use antidrift_kernel::local_binding::Binding;
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options, in_scope};
+use antidrift_kernel::rule_scope::{
+    RuleScope, ScopeOptions, ScopedRule, decode_rule_options, in_scope,
+};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -67,6 +69,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxAttribute),
     Listener::Enter(Kind::BinaryExpression),
 ];
+
+impl ScopedRule for NoUnsafeInnerHtml {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoUnsafeInnerHtml {
     fn name(&self) -> &'static str {

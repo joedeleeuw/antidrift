@@ -4,7 +4,7 @@ use super::render_scope::{
 use antidrift_kernel::file_role::{ProjectPath, TEST_ROLES};
 use antidrift_kernel::jsx::{is_component_or_hook_function, react_function_name};
 use antidrift_kernel::provenance::{symbol_at_node, symbol_declarations};
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::{
     Span, function_node_from_declaration, is_function_like, property_name_text, unwrap_expression,
 };
@@ -39,6 +39,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),
     Listener::Enter(Kind::FunctionExpression),
 ];
+
+impl ScopedRule for NoImpureRenderCall {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoImpureRenderCall {
     fn name(&self) -> &'static str {

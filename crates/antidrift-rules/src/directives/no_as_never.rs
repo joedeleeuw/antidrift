@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -22,6 +22,12 @@ impl NoAsNever {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::AsExpression)];
+
+impl ScopedRule for NoAsNever {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoAsNever {
     fn name(&self) -> &'static str {

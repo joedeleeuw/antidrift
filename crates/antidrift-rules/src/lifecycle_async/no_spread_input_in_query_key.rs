@@ -3,7 +3,7 @@ use super::syntax::{
     object_property, parent_expression, property_name, resolve_lexical_binding, root_identifier,
     unwrap_expression,
 };
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -32,6 +32,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrayLiteralExpression),
     Listener::Enter(Kind::CallExpression),
 ];
+
+impl ScopedRule for NoSpreadInputInQueryKey {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoSpreadInputInQueryKey {
     fn name(&self) -> &'static str {

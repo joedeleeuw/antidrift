@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -23,6 +23,12 @@ impl NoUnknownTypeAliases {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
+
+impl ScopedRule for NoUnknownTypeAliases {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoUnknownTypeAliases {
     fn name(&self) -> &'static str {

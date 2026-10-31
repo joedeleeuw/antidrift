@@ -1,6 +1,6 @@
 use antidrift_kernel::callgraph;
 use antidrift_kernel::file_role;
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -40,6 +40,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),
     Listener::Enter(Kind::FunctionExpression),
 ];
+
+impl ScopedRule for NoPassThroughParameters {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoPassThroughParameters {
     fn name(&self) -> &'static str {

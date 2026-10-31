@@ -1,5 +1,5 @@
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{Kind, ModifierFlags, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -28,6 +28,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ClassDeclaration),
     Listener::Enter(Kind::InterfaceDeclaration),
 ];
+
+impl ScopedRule for NoDefaultExportInDomain {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoDefaultExportInDomain {
     fn name(&self) -> &'static str {

@@ -10,11 +10,11 @@ mod sql_text;
 pub mod unknown_input_must_be_decoded;
 pub mod unknown_input_probe;
 
-use antidrift_kernel::rule_scope::decode_rule_options;
+use antidrift_kernel::rule_scope::{ScopedRule, decode_rule_options};
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
+pub fn typescript_only_rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &unknown_input_must_be_decoded::DEFAULT_RULE,
         &no_external_decode_in_tsx::DEFAULT_RULE,
@@ -26,7 +26,7 @@ pub fn typescript_only_rules() -> Vec<&'static dyn Rule> {
 }
 
 #[must_use]
-pub fn script_default_rules() -> Vec<&'static dyn Rule> {
+pub fn script_default_rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &no_unsafe_deserialize::DEFAULT_RULE,
         &no_sql_string_concat::DEFAULT_RULE,

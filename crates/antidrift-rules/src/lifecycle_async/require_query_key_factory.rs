@@ -3,7 +3,7 @@ use super::syntax::{
     resolve_lexical_binding, unwrap_expression,
 };
 use antidrift_kernel::imports::FileImports;
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -43,6 +43,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
     Listener::Enter(Kind::BinaryExpression),
 ];
+
+impl ScopedRule for RequireQueryKeyFactory {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireQueryKeyFactory {
     fn name(&self) -> &'static str {

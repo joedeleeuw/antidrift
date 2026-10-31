@@ -1,4 +1,6 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{
+    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
+};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -58,6 +60,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ElementAccessExpression),
     Listener::Enter(Kind::CallExpression),
 ];
+
+impl ScopedRule for RequireAuthzCheck {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireAuthzCheck {
     fn name(&self) -> &'static str {

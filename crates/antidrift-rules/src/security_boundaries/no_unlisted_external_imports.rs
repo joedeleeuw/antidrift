@@ -3,7 +3,9 @@ use super::package_resolution::{
     resolution_config, resolve_dependency, resolver_with_mode, unresolved_module,
 };
 use antidrift_kernel::imports::{ModuleImport, extract_module_import};
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options, in_scope};
+use antidrift_kernel::rule_scope::{
+    RuleScope, ScopeOptions, ScopedRule, decode_rule_options, in_scope,
+};
 use antidrift_kernel::ts_resolver::ResolutionMode;
 use oxc_resolver::{ResolveError, Resolver};
 use serde::Deserialize;
@@ -76,6 +78,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ExportDeclaration),
     Listener::Enter(Kind::CallExpression),
 ];
+
+impl ScopedRule for NoUnlistedExternalImports {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoUnlistedExternalImports {
     fn name(&self) -> &'static str {

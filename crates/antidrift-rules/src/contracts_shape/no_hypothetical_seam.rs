@@ -2,7 +2,7 @@ use super::test_only_seam::check_test_only_seams;
 use antidrift_kernel::callgraph::ProgramSymbolIndex;
 use antidrift_kernel::file_role;
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_compiler::Program;
@@ -56,6 +56,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::MethodDeclaration),
     Listener::Enter(Kind::Constructor),
 ];
+
+impl ScopedRule for NoHypotheticalSeam {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoHypotheticalSeam {
     fn name(&self) -> &'static str {

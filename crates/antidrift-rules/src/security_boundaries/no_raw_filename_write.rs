@@ -1,7 +1,7 @@
 use antidrift_kernel::local_binding::{
     Binding, enclosing_variable_declaration, resolve_lexical_binding,
 };
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -30,6 +30,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::PropertyAssignment),
     Listener::Enter(Kind::ShorthandPropertyAssignment),
 ];
+
+impl ScopedRule for NoRawFilenameWrite {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoRawFilenameWrite {
     fn name(&self) -> &'static str {

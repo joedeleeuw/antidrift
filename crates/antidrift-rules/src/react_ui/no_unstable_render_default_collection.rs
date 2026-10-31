@@ -1,7 +1,7 @@
 use antidrift_kernel::jsx::{
     is_event_handler_name, is_hook_name, is_pascal_case_name, react_function_name,
 };
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::{is_function_like, property_name_text, unwrap_expression};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_core::P;
@@ -45,6 +45,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),
     Listener::Enter(Kind::BinaryExpression),
 ];
+
+impl ScopedRule for NoUnstableRenderDefaultCollection {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoUnstableRenderDefaultCollection {
     fn name(&self) -> &'static str {

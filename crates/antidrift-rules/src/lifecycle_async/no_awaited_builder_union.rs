@@ -1,6 +1,6 @@
 use super::syntax::{Span, member, unwrap_expression, unwrap_parentheses};
 use antidrift_kernel::directives::scan_source_comments;
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -37,6 +37,12 @@ impl NoAwaitedBuilderUnion {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::AwaitExpression)];
+
+impl ScopedRule for NoAwaitedBuilderUnion {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoAwaitedBuilderUnion {
     fn name(&self) -> &'static str {

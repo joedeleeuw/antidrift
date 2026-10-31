@@ -283,6 +283,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::TypeAssertionExpression),
 ];
 
+impl antidrift_kernel::rule_scope::ScopedRule for NoAppeasementCast {
+    fn scope(&self) -> &antidrift_kernel::rule_scope::RuleScope {
+        &self.scope
+    }
+}
+
 impl Rule for NoAppeasementCast {
     fn name(&self) -> &'static str {
         "antidrift/no-appeasement-cast"

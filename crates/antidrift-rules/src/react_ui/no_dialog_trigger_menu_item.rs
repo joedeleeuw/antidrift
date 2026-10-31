@@ -1,7 +1,7 @@
 use antidrift_kernel::jsx::{
     element_tag_name, is_jsx_element_like, jsx_children, render_prop_element,
 };
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -41,6 +41,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxElement),
     Listener::Enter(Kind::JsxSelfClosingElement),
 ];
+
+impl ScopedRule for NoDialogTriggerMenuItem {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoDialogTriggerMenuItem {
     fn name(&self) -> &'static str {

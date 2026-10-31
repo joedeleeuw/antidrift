@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
@@ -21,6 +21,12 @@ impl NoReexportOnlyModule {
         Ok(Self {
             scope: RuleScope::from_options(RULE_NAME, options)?,
         })
+    }
+}
+
+impl ScopedRule for NoReexportOnlyModule {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
     }
 }
 

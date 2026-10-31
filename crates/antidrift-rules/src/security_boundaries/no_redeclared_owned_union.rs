@@ -4,7 +4,9 @@ use super::owned_union_source::{
 use super::union_owners::union_owners;
 use antidrift_kernel::local_binding::Binding;
 use antidrift_kernel::registries::OwnedUnion;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{
+    EmptyVisitor, RuleScope, ScopeOptions, ScopedRule, decode_rule_options,
+};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -61,6 +63,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::TypeAliasDeclaration),
     Listener::Enter(Kind::CallExpression),
 ];
+
+impl ScopedRule for NoRedeclaredOwnedUnion {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoRedeclaredOwnedUnion {
     fn name(&self) -> &'static str {

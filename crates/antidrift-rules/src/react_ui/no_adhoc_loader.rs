@@ -1,6 +1,6 @@
 use antidrift_kernel::jsx::{opening_tag_name_node, plain_attribute_name, plain_element_name};
 use antidrift_kernel::rule_scope::{
-    RuleScope, ScopeOptions, ScopedOptions, decode_scoped, in_scope, require_non_empty,
+    RuleScope, ScopeOptions, ScopedOptions, ScopedRule, decode_scoped, in_scope, require_non_empty,
 };
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_parentheses};
 use serde::Deserialize;
@@ -115,6 +115,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxSelfClosingElement),
     Listener::Enter(Kind::JsxAttribute),
 ];
+
+impl ScopedRule for NoAdhocLoader {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoAdhocLoader {
     fn name(&self) -> &'static str {

@@ -1,7 +1,7 @@
 use super::repo_state_imports::collect_tainted_imports;
 use super::repo_state_taint::{literal_keyed_source_call, taint_root_name};
 use antidrift_kernel::file_role::ProjectPath;
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, ScopedRule, decode_rule_options};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -72,6 +72,12 @@ impl NoRepoStateMirrorAssertion {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
+
+impl ScopedRule for NoRepoStateMirrorAssertion {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoRepoStateMirrorAssertion {
     fn name(&self) -> &'static str {

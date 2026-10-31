@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::{boundary, tsrs_kernel};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -23,6 +23,12 @@ impl NoSchemaValidatorTranscoding {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
+
+impl ScopedRule for NoSchemaValidatorTranscoding {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoSchemaValidatorTranscoding {
     fn name(&self) -> &'static str {

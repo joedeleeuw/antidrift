@@ -1,6 +1,6 @@
 use super::syntax::is_function_like;
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, ScopedRule, decode_rule_options};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_core::P;
@@ -75,6 +75,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
     Listener::Enter(Kind::NewExpression),
 ];
+
+impl ScopedRule for NoEagerSingleton {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoEagerSingleton {
     fn name(&self) -> &'static str {

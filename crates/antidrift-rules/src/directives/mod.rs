@@ -18,10 +18,11 @@ pub mod no_tutorial_comments;
 pub mod no_unknown_type_aliases;
 pub mod no_unsafe_cast_chain;
 
+use antidrift_kernel::rule_scope::ScopedRule;
 use tsrslint::rule::Rule;
 
 #[must_use]
-pub fn rules() -> Vec<&'static dyn Rule> {
+pub fn rules() -> Vec<&'static dyn ScopedRule> {
     vec![
         &docs_source_policy::DEFAULT_RULE,
         &line_caps::MODULE_RULE,

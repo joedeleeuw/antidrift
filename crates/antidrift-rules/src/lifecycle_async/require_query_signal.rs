@@ -4,7 +4,7 @@ use super::syntax::{
     unwrap_expression,
 };
 use antidrift_kernel::local_binding::is_identifier_reference_position;
-use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, decode_rule_options};
+use antidrift_kernel::rule_scope::{RuleScope, ScopeOptions, ScopedRule, decode_rule_options};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -50,6 +50,12 @@ impl RequireQuerySignal {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
+
+impl ScopedRule for RequireQuerySignal {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireQuerySignal {
     fn name(&self) -> &'static str {

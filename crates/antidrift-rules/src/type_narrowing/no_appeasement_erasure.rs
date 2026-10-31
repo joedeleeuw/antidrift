@@ -271,6 +271,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::TypeAssertionExpression),
 ];
 
+impl antidrift_kernel::rule_scope::ScopedRule for NoAppeasementErasure {
+    fn scope(&self) -> &antidrift_kernel::rule_scope::RuleScope {
+        &self.scope
+    }
+}
+
 impl Rule for NoAppeasementErasure {
     fn name(&self) -> &'static str {
         "antidrift/no-appeasement-erasure"

@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::{is_const_assertion, unwrap_parentheses};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -24,6 +24,12 @@ impl NoPartialRecordSatisfies {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::SatisfiesExpression)];
+
+impl ScopedRule for NoPartialRecordSatisfies {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoPartialRecordSatisfies {
     fn name(&self) -> &'static str {

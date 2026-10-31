@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tsrs_ast::Node;
 use tsrs_core::{P, tspath};
-use tsrslint::rule::{Ctx, Listener, RuleVisitor};
+use tsrslint::rule::{Ctx, Listener, Rule, RuleVisitor};
 
 pub struct EmptyVisitor;
 
@@ -16,6 +16,10 @@ impl RuleVisitor for EmptyVisitor {
     }
 
     fn visit(&mut self, _ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {}
+}
+
+pub trait ScopedRule: Rule {
+    fn scope(&self) -> &RuleScope;
 }
 
 pub trait ScopedOptions: DeserializeOwned + Default {

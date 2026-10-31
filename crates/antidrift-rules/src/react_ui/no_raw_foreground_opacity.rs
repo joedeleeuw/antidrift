@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::string_fragments::string_fragments;
 use tsrs_ast::Node;
 use tsrs_core::P;
@@ -33,6 +33,12 @@ impl RuleVisitor for NoopVisitor {
     }
 
     fn visit(&mut self, _ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {}
+}
+
+impl ScopedRule for NoRawForegroundOpacity {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
 }
 
 impl Rule for NoRawForegroundOpacity {

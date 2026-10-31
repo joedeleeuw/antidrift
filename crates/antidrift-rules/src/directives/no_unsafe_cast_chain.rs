@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::{assertion_parts, is_const_assertion, unwrap_parentheses};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -27,6 +27,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::AsExpression),
     Listener::Enter(Kind::TypeAssertionExpression),
 ];
+
+impl ScopedRule for NoUnsafeCastChain {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoUnsafeCastChain {
     fn name(&self) -> &'static str {

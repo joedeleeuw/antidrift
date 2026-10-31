@@ -2,7 +2,7 @@ use super::syntax::{
     enclosing_variable_declaration, global, identifier_member, is_var_variable_declaration, member,
     resolve_lexical_binding, unwrap_expression, unwrap_parentheses,
 };
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
@@ -26,6 +26,12 @@ impl RequireFunctionReplacer {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
+
+impl ScopedRule for RequireFunctionReplacer {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireFunctionReplacer {
     fn name(&self) -> &'static str {

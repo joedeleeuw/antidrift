@@ -1,5 +1,5 @@
 use super::vague_name_lexicon::{duplicate_context_word, vague_reason};
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -264,6 +264,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::InterfaceDeclaration),
     Listener::Enter(Kind::ImportSpecifier),
 ];
+
+impl ScopedRule for NoVagueNames {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoVagueNames {
     fn name(&self) -> &'static str {

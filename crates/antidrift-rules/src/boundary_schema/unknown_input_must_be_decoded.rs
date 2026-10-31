@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopeOptions, ScopedRule};
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags};
@@ -72,6 +72,12 @@ impl UnknownInputMustBeDecoded {
             probe_threshold: threshold,
             scope,
         })
+    }
+}
+
+impl ScopedRule for UnknownInputMustBeDecoded {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
     }
 }
 

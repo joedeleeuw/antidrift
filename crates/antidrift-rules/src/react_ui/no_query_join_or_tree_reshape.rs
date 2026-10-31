@@ -6,7 +6,7 @@ use antidrift_kernel::local_binding::{
     Binding, binding_pattern_identifiers, for_each_resolved_reference, resolve_lexical_binding,
 };
 use antidrift_kernel::relational_scan::{is_inner_linear_scan_method, is_outer_traversal_method};
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::{
     callee_name, is_function_like, numeric_literal_value, property_name_text, unwrap_expression,
 };
@@ -49,6 +49,12 @@ impl NoQueryJoinOrTreeReshape {
         Ok(Self {
             scope: RuleScope::from_options(RULE_NAME, options)?,
         })
+    }
+}
+
+impl ScopedRule for NoQueryJoinOrTreeReshape {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
     }
 }
 

@@ -2,7 +2,7 @@ use antidrift_kernel::directives::effective_token_start;
 use antidrift_kernel::file_role;
 use antidrift_kernel::jsx::{expression_contains_jsx, is_pascal_case_name, react_function_name};
 use antidrift_kernel::line_caps::{CappedUnit, LineCapFinding};
-use antidrift_kernel::rule_scope::RuleScope;
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::{property_name_text, unwrap_expression};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -58,6 +58,12 @@ const FUNCTION_LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::GetAccessor),
     Listener::Enter(Kind::SetAccessor),
 ];
+
+impl ScopedRule for LineCapRule {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for LineCapRule {
     fn name(&self) -> &'static str {

@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, Symbol};
 use tsrs_checker::Checker;
@@ -31,6 +31,12 @@ impl NoArgumentMutationSideEffect {
         Ok(Self {
             scope: RuleScope::from_options(RULE_NAME, options)?,
         })
+    }
+}
+
+impl ScopedRule for NoArgumentMutationSideEffect {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
     }
 }
 

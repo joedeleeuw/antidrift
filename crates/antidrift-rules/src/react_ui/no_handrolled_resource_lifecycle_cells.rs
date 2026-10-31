@@ -6,7 +6,7 @@ use super::shadow_state_mirror::{
 };
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::{static_member_chain, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -30,6 +30,12 @@ impl NoHandrolledResourceLifecycleCells {
         Ok(Self {
             scope: RuleScope::from_options(RULE_NAME, options)?,
         })
+    }
+}
+
+impl ScopedRule for NoHandrolledResourceLifecycleCells {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
     }
 }
 

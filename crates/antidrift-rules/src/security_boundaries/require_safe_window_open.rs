@@ -3,7 +3,7 @@ use super::web_provenance::{
     static_property_name, unwrap_expression,
 };
 use antidrift_kernel::local_binding::Binding;
-use antidrift_kernel::rule_scope::{RuleScope, in_scope};
+use antidrift_kernel::rule_scope::{RuleScope, ScopedRule, in_scope};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node, SourceFile};
 use tsrs_core::P;
@@ -28,6 +28,12 @@ impl RequireSafeWindowOpen {
 }
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
+
+impl ScopedRule for RequireSafeWindowOpen {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for RequireSafeWindowOpen {
     fn name(&self) -> &'static str {

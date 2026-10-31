@@ -1,4 +1,4 @@
-use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope};
+use antidrift_kernel::rule_scope::{EmptyVisitor, RuleScope, ScopedRule};
 use antidrift_kernel::tsrs_kernel::{
     cooked_text, node_text, unwrap_awaited_expression, unwrap_expression,
 };
@@ -30,6 +30,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::IfStatement),
     Listener::Enter(Kind::Block),
 ];
+
+impl ScopedRule for NoBranchTree {
+    fn scope(&self) -> &RuleScope {
+        &self.scope
+    }
+}
 
 impl Rule for NoBranchTree {
     fn name(&self) -> &'static str {

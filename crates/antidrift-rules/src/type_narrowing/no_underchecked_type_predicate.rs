@@ -216,6 +216,12 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),
 ];
 
+impl antidrift_kernel::rule_scope::ScopedRule for NoUndercheckedTypePredicate {
+    fn scope(&self) -> &antidrift_kernel::rule_scope::RuleScope {
+        &self.scope
+    }
+}
+
 impl Rule for NoUndercheckedTypePredicate {
     fn name(&self) -> &'static str {
         "antidrift/no-underchecked-type-predicate"
