@@ -32,7 +32,7 @@ const pnpmLaunch = /\.[cm]?js$/u.test(pnpmEntry)
   : { file: pnpmEntry, prefix: [] };
 
 const pkgDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const work = mkdtempSync(join(tmpdir(), "antidrift-consumer-"));
+const work = realpathSync(mkdtempSync(join(tmpdir(), "antidrift-consumer-")));
 
 function run(cmd, args, cwd) {
   return execFileSync(cmd, args, {
