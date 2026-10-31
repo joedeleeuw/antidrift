@@ -16,6 +16,24 @@ if (!packsArgument || !archivesArgument) {
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const parentPath = resolve(packageRoot, "package.json");
 const parent = JSON.parse(String(readFileSync(parentPath)));
+const workspaceManifestPath = resolve(packageRoot, "../../Cargo.toml");
+const workspacePackageSection = readFileSync(
+  workspaceManifestPath,
+  "utf8"
+).match(/^\[workspace\.package\]\n(?<body>(?:(?!^\[).*\n?)*)/mu);
+const cargoVersion = workspacePackageSection?.groups?.body.match(
+  /^version = "(?<version>[^"]+)"$/mu
+)?.groups?.version;
+if (!cargoVersion) {
+  throw new Error(
+    `${workspaceManifestPath} has no [workspace.package] version; cargo binstall resolves antidrift-linter archives from it`
+  );
+}
+if (cargoVersion !== parent.version) {
+  throw new Error(
+    `${workspaceManifestPath} [workspace.package] version is ${cargoVersion} but ${parentPath} is ${parent.version}; cargo binstall requests release assets under antidrift-v${cargoVersion} while the release publishes antidrift-v${parent.version}. Bump both together.`
+  );
+}
 const platformNames = LINTER_PLATFORMS.map(
   ({ key }) => `@joedeleeuw/antidrift-linter-${key}`
 ).sort();
