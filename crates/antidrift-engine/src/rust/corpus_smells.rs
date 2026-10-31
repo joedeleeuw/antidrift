@@ -25,8 +25,11 @@ pub(super) fn check_corpus_smells(
     ast: &syn::File,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
+    let mut type_aliases = FxHashMap::default();
+    collect_type_aliases(&ast.items, &mut type_aliases);
     let mut visitor = CorpusSmellVisitor {
         rel_path,
+        type_aliases,
         fn_has_mtime_check: false,
         script_context: false,
         error_bindings: FxHashSet::default(),
@@ -43,6 +46,7 @@ pub(super) fn check_corpus_smells(
 
 struct CorpusSmellVisitor<'a> {
     rel_path: &'a str,
+    type_aliases: FxHashMap<String, String>,
     fn_has_mtime_check: bool,
     script_context: bool,
     error_bindings: FxHashSet<String>,
@@ -117,9 +121,22 @@ impl CorpusSmellVisitor<'_> {
             Some(target)
         };
         match (target, self.source_type_of(source_binding)) {
-            (Some(target), Some(source)) => target != source,
+            (Some(target), Some(source)) => {
+                self.canonical_type(&target) != self.canonical_type(source)
+            }
             _ => false,
         }
+    }
+
+    fn canonical_type(&self, name: &str) -> String {
+        let mut current = name.to_owned();
+        for _ in 0..8 {
+            let Some(next) = self.type_aliases.get(&current) else {
+                break;
+            };
+            current.clone_from(next);
+        }
+        current
     }
 
     fn report_sum_to_product_arms(&mut self) {
@@ -348,6 +365,39 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
             );
         }
         visit::visit_expr_struct(self, node);
+    }
+}
+
+fn collect_type_aliases(items: &[syn::Item], aliases: &mut FxHashMap<String, String>) {
+    for item in items {
+        match item {
+            syn::Item::Type(alias) => {
+                if let Some(target) = last_type_segment(&alias.ty) {
+                    aliases.insert(alias.ident.to_string(), target);
+                }
+            }
+            syn::Item::Use(import) => collect_use_renames(&import.tree, aliases),
+            syn::Item::Mod(syn::ItemMod {
+                content: Some((_, nested)),
+                ..
+            }) => collect_type_aliases(nested, aliases),
+            _ => {}
+        }
+    }
+}
+
+fn collect_use_renames(tree: &syn::UseTree, aliases: &mut FxHashMap<String, String>) {
+    match tree {
+        syn::UseTree::Path(path) => collect_use_renames(&path.tree, aliases),
+        syn::UseTree::Group(group) => {
+            for entry in &group.items {
+                collect_use_renames(entry, aliases);
+            }
+        }
+        syn::UseTree::Rename(rename) => {
+            aliases.insert(rename.rename.to_string(), rename.ident.to_string());
+        }
+        syn::UseTree::Name(_) | syn::UseTree::Glob(_) => {}
     }
 }
 

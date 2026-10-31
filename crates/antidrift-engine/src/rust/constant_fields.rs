@@ -82,7 +82,7 @@ pub(super) fn check_constant_return_fields(
         ) {
             continue;
         }
-        let crate_public = matches!(definition.structure.vis, Visibility::Public(_));
+        let crate_public = index.is_externally_visible(key, &definition.structure.vis);
         let fields: BTreeMap<_, _> = definition
             .structure
             .fields

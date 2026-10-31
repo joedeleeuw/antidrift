@@ -1,4 +1,5 @@
 use super::RustDiagnostic;
+use super::struct_index::{ImportTable, file_scope};
 use super::syn_kernel::{extract_pat_ident, is_wild_pat};
 use super::workspace::relative_display;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -24,6 +25,7 @@ const INERT_ATTRIBUTES: &[&str] = &[
 struct WrapperCandidate {
     file: PathBuf,
     line: usize,
+    key: Vec<String>,
     name: String,
     callee: String,
     public: bool,
@@ -31,8 +33,66 @@ struct WrapperCandidate {
 
 #[derive(Default)]
 struct ReferenceAudit {
-    calls: FxHashMap<String, usize>,
-    value_references: FxHashSet<String>,
+    imports: ImportTable,
+    scope: Vec<String>,
+    calls: FxHashMap<Vec<String>, usize>,
+    value_references: FxHashSet<Vec<String>>,
+    loose_calls: FxHashMap<String, usize>,
+    loose_value_references: FxHashSet<String>,
+}
+
+impl ReferenceAudit {
+    fn collect_imports(&mut self, scope: &[String], items: &[syn::Item]) {
+        for item in items {
+            match item {
+                syn::Item::Use(import) => self.imports.collect(scope, &import.tree, &[]),
+                syn::Item::Mod(syn::ItemMod {
+                    ident,
+                    content: Some((_, nested)),
+                    ..
+                }) => {
+                    let mut child = scope.to_vec();
+                    child.push(ident.to_string());
+                    self.collect_imports(&child, nested);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn record_reference(&mut self, path: &syn::Path, is_call: bool) {
+        let segments: Vec<String> = path
+            .segments
+            .iter()
+            .map(|segment| segment.ident.to_string())
+            .collect();
+        let Some(name) = segments.last().cloned() else {
+            return;
+        };
+        let resolved = self.imports.resolve_path(&self.scope, &segments);
+        let loose = segments.len() == 1 && self.imports.scope_has_glob(&self.scope);
+        if is_call {
+            *self.calls.entry(resolved).or_default() += 1;
+            if loose {
+                *self.loose_calls.entry(name).or_default() += 1;
+            }
+        } else {
+            self.value_references.insert(resolved);
+            if loose {
+                self.loose_value_references.insert(name);
+            }
+        }
+    }
+
+    fn calls_to(&self, candidate: &WrapperCandidate) -> usize {
+        self.calls.get(&candidate.key).copied().unwrap_or(0)
+            + self.loose_calls.get(&candidate.name).copied().unwrap_or(0)
+    }
+
+    fn references_value(&self, candidate: &WrapperCandidate) -> bool {
+        self.value_references.contains(&candidate.key)
+            || self.loose_value_references.contains(&candidate.name)
+    }
 }
 
 pub(super) fn check_wrapping_functions(
@@ -47,18 +107,22 @@ pub(super) fn check_wrapping_functions(
         let Some(ast) = parsed_files.get(file) else {
             continue;
         };
+        let scope = file_scope(file);
         let mut collector = CandidateCollector {
             file,
+            scope: scope.clone(),
             candidates: &mut candidates,
         };
         collector.visit_file(ast);
+        audit.scope = scope;
+        audit.collect_imports(&audit.scope.clone(), &ast.items);
         audit.visit_file(ast);
     }
     for candidate in candidates {
-        if audit.value_references.contains(&candidate.name) {
+        if audit.references_value(&candidate) {
             continue;
         }
-        let calls = audit.calls.get(&candidate.name).copied().unwrap_or(0);
+        let calls = audit.calls_to(&candidate);
         if calls == 0 && candidate.public {
             continue;
         }
@@ -84,10 +148,17 @@ pub(super) fn check_wrapping_functions(
 
 struct CandidateCollector<'a> {
     file: &'a Path,
+    scope: Vec<String>,
     candidates: &'a mut Vec<WrapperCandidate>,
 }
 
 impl<'ast> Visit<'ast> for CandidateCollector<'_> {
+    fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+        self.scope.push(node.ident.to_string());
+        visit::visit_item_mod(self, node);
+        self.scope.pop();
+    }
+
     fn visit_item_fn(&mut self, node: &'ast ItemFn) {
         if node.sig.ident != "main"
             && node.sig.abi.is_none()
@@ -98,9 +169,12 @@ impl<'ast> Visit<'ast> for CandidateCollector<'_> {
             })
             && let Some(callee) = detect_passthrough_wrapper(node)
         {
+            let mut key = self.scope.clone();
+            key.push(node.sig.ident.to_string());
             self.candidates.push(WrapperCandidate {
                 file: self.file.to_path_buf(),
                 line: node.sig.ident.span().start().line.max(1),
+                key,
                 name: node.sig.ident.to_string(),
                 callee,
                 public: matches!(node.vis, Visibility::Public(_)),
@@ -111,11 +185,15 @@ impl<'ast> Visit<'ast> for CandidateCollector<'_> {
 }
 
 impl<'ast> Visit<'ast> for ReferenceAudit {
+    fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+        self.scope.push(node.ident.to_string());
+        visit::visit_item_mod(self, node);
+        self.scope.pop();
+    }
+
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
         if let Expr::Path(callee) = &*node.func {
-            if let Some(last) = callee.path.segments.last() {
-                *self.calls.entry(last.ident.to_string()).or_default() += 1;
-            }
+            self.record_reference(&callee.path, true);
             for argument in &node.args {
                 self.visit_expr(argument);
             }
@@ -125,15 +203,13 @@ impl<'ast> Visit<'ast> for ReferenceAudit {
     }
 
     fn visit_expr_path(&mut self, node: &'ast syn::ExprPath) {
-        if let Some(last) = node.path.segments.last() {
-            self.value_references.insert(last.ident.to_string());
-        }
+        self.record_reference(&node.path, false);
         visit::visit_expr_path(self, node);
     }
 
     fn visit_macro(&mut self, node: &'ast syn::Macro) {
         for token in node.tokens.clone() {
-            collect_macro_idents(token, &mut self.value_references);
+            collect_macro_idents(token, &mut self.loose_value_references);
         }
         visit::visit_macro(self, node);
     }

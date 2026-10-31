@@ -344,7 +344,7 @@ fn admits_unknown_fields(node: &ItemStruct) -> bool {
         .attrs
         .iter()
         .filter(|attr| attr.path().is_ident("serde"))
-        .any(|attr| serde_attr_mentions(attr, &["transparent", "from", "try_from", "remote"]));
+        .any(|attr| serde_attr_mentions(attr, &["transparent", "from", "try_from"]));
     let has_flatten = named.named.iter().any(|field| {
         field
             .attrs

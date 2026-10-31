@@ -32,32 +32,76 @@ pub(super) fn declared_modules(file: &Path, is_root: bool, ast: &syn::File) -> V
         ModuleCode::Shipped,
         &mut declared,
     );
-    if declares_modules_by_macro(&ast.items) {
-        collect_macro_declared_files(&search, &mut declared);
+    let macro_names = module_names_in_item_macros(&ast.items);
+    if !macro_names.is_empty() {
+        collect_macro_declared_files(&search, &macro_names, &mut declared);
     }
     declared
 }
 
-fn declares_modules_by_macro(items: &[Item]) -> bool {
-    !items.iter().any(|item| matches!(item, Item::Mod(_)))
-        && items.iter().any(|item| {
-            matches!(item, Item::Macro(item_macro) if !item_macro.mac.path.is_ident("macro_rules"))
-        })
+fn module_names_in_item_macros(items: &[Item]) -> FxHashSet<String> {
+    let mut names = FxHashSet::default();
+    for item in items {
+        let Item::Macro(item_macro) = item else {
+            continue;
+        };
+        if item_macro.mac.path.is_ident("macro_rules") {
+            continue;
+        }
+        collect_token_idents(item_macro.mac.tokens.clone(), &mut names);
+    }
+    names
 }
 
-fn collect_macro_declared_files(search: &Path, out: &mut Vec<DeclaredModule>) {
+fn collect_token_idents(tokens: proc_macro2::TokenStream, out: &mut FxHashSet<String>) {
+    for tree in tokens {
+        match tree {
+            proc_macro2::TokenTree::Ident(ident) => {
+                out.insert(ident.to_string());
+            }
+            proc_macro2::TokenTree::Literal(literal) => {
+                let text = literal.to_string();
+                if let Some(inner) = text
+                    .strip_prefix('"')
+                    .and_then(|rest| rest.strip_suffix('"'))
+                {
+                    out.insert(inner.to_owned());
+                }
+            }
+            proc_macro2::TokenTree::Group(group) => collect_token_idents(group.stream(), out),
+            proc_macro2::TokenTree::Punct(_) => {}
+        }
+    }
+}
+
+fn collect_macro_declared_files(
+    search: &Path,
+    macro_names: &FxHashSet<String>,
+    out: &mut Vec<DeclaredModule>,
+) {
     let Ok(entries) = std::fs::read_dir(search) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
         let module_file = if path.extension().is_some_and(|ext| ext == "rs") {
-            path
+            path.clone()
         } else if path.is_dir() && path.join("mod.rs").is_file() {
             path.join("mod.rs")
         } else {
             continue;
         };
+        let named = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .is_some_and(|stem| macro_names.contains(stem))
+            || path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| macro_names.contains(name));
+        if !named {
+            continue;
+        }
         out.push(DeclaredModule {
             file: normalize_lexical_path(&module_file),
             code: ModuleCode::Shipped,

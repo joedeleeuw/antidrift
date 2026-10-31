@@ -52,14 +52,37 @@ pub(super) enum DiscardedErrorOutcome {
 }
 
 pub(super) fn discarded_error_outcome(body: &Expr) -> Option<DiscardedErrorOutcome> {
+    let mut bindings: Vec<(&syn::Ident, &Expr)> = Vec::new();
+    block_outcome(body, &mut bindings)
+}
+
+fn block_outcome<'a>(
+    body: &'a Expr,
+    bindings: &mut Vec<(&'a syn::Ident, &'a Expr)>,
+) -> Option<DiscardedErrorOutcome> {
     let outcome = match body {
         Expr::Block(block) => {
-            let [Stmt::Expr(tail, _)] = block.block.stmts.as_slice() else {
-                return None;
+            let (last, leading) = block.block.stmts.split_last()?;
+            for statement in leading {
+                if let Stmt::Local(local) = statement
+                    && let syn::Pat::Ident(pat) = &local.pat
+                    && let Some(init) = &local.init
+                {
+                    bindings.push((&pat.ident, &init.expr));
+                }
+            }
+            return match last {
+                Stmt::Expr(Expr::Return(ret), _) => block_outcome(ret.expr.as_deref()?, bindings),
+                Stmt::Expr(tail, None) => block_outcome(tail, bindings),
+                _ => None,
             };
-            return discarded_error_outcome(tail);
         }
         Expr::Return(ret) => ret.expr.as_deref()?,
+        Expr::Path(path) => {
+            let name = path.path.get_ident()?;
+            let (_, init) = bindings.iter().rev().find(|(ident, _)| *ident == name)?;
+            return block_outcome(init, bindings);
+        }
         other => other,
     };
     match peel_expr(outcome) {

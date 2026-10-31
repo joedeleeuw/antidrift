@@ -25,28 +25,56 @@ pub(super) fn is_banned_test_attribute(attr: &Attribute) -> bool {
     let Meta::List(list) = &attr.meta else {
         return false;
     };
-    path.segments
-        .last()
-        .is_some_and(|seg| seg.ident == "cfg" || seg.ident == "cfg_attr")
-        && token_stream_contains_test(list.tokens.clone())
+    path.segments.last().is_some_and(|seg| seg.ident == "cfg")
+        && cfg_requires_test(&parse_cfg_predicates(list.tokens.clone()))
 }
 
-fn token_stream_contains_test(tokens: proc_macro2::TokenStream) -> bool {
-    let mut neg = false;
-    tokens.into_iter().any(|tree| match tree {
-        proc_macro2::TokenTree::Ident(id) => {
-            let hit = id == "test" && !neg;
-            neg = id == "not";
-            hit
-        }
-        proc_macro2::TokenTree::Group(g) => {
-            let hit = !neg && token_stream_contains_test(g.stream());
-            neg = false;
-            hit
-        }
-        _ => {
-            neg = false;
-            false
+enum CfgPredicate {
+    Test,
+    Other,
+    All(Vec<CfgPredicate>),
+    Any(Vec<CfgPredicate>),
+    Negated,
+}
+
+fn parse_cfg_predicates(tokens: proc_macro2::TokenStream) -> Vec<CfgPredicate> {
+    let mut predicates = Vec::new();
+    let mut trees = tokens.into_iter().peekable();
+    while let Some(tree) = trees.next() {
+        let proc_macro2::TokenTree::Ident(ident) = tree else {
+            continue;
+        };
+        let nested = match trees.peek() {
+            Some(proc_macro2::TokenTree::Group(group))
+                if group.delimiter() == proc_macro2::Delimiter::Parenthesis =>
+            {
+                let inner = parse_cfg_predicates(group.stream());
+                trees.next();
+                Some(inner)
+            }
+            _ => None,
+        };
+        predicates.push(match (ident.to_string().as_str(), nested) {
+            ("all", Some(inner)) => CfgPredicate::All(inner),
+            ("any", Some(inner)) => CfgPredicate::Any(inner),
+            ("not", Some(_)) => CfgPredicate::Negated,
+            ("test", None) => CfgPredicate::Test,
+            _ => CfgPredicate::Other,
+        });
+    }
+    predicates
+}
+
+fn cfg_requires_test(predicates: &[CfgPredicate]) -> bool {
+    predicates.iter().any(|predicate| match predicate {
+        CfgPredicate::Test => true,
+        CfgPredicate::Other | CfgPredicate::Negated => false,
+        CfgPredicate::All(inner) => cfg_requires_test(inner),
+        CfgPredicate::Any(inner) => {
+            !inner.is_empty()
+                && inner
+                    .iter()
+                    .all(|entry| cfg_requires_test(std::slice::from_ref(entry)))
         }
     })
 }

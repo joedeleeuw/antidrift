@@ -9,9 +9,67 @@ pub(super) struct StructDefinition<'a> {
     pub(super) structure: &'a ItemStruct,
 }
 
+#[derive(Default)]
+pub(super) struct ImportTable {
+    imports: BTreeMap<Vec<String>, Vec<String>>,
+    glob_scopes: FxHashSet<Vec<String>>,
+}
+
+impl ImportTable {
+    pub(super) fn collect(&mut self, scope: &[String], tree: &syn::UseTree, prefix: &[String]) {
+        match tree {
+            syn::UseTree::Path(path) => {
+                let mut child = prefix.to_vec();
+                child.push(path.ident.to_string());
+                self.collect(scope, &path.tree, &child);
+            }
+            syn::UseTree::Group(group) => {
+                for child in &group.items {
+                    self.collect(scope, child, prefix);
+                }
+            }
+            syn::UseTree::Name(name) => {
+                let mut target = prefix.to_vec();
+                target.push(name.ident.to_string());
+                let mut alias = scope.to_vec();
+                alias.push(name.ident.to_string());
+                self.imports.insert(alias, target);
+            }
+            syn::UseTree::Rename(rename) => {
+                let mut target = prefix.to_vec();
+                target.push(rename.ident.to_string());
+                let mut alias = scope.to_vec();
+                alias.push(rename.rename.to_string());
+                self.imports.insert(alias, target);
+            }
+            syn::UseTree::Glob(_) => {
+                self.glob_scopes.insert(scope.to_vec());
+            }
+        }
+    }
+
+    pub(super) fn resolve_path(&self, scope: &[String], segments: &[String]) -> Vec<String> {
+        let candidate = qualify(scope, segments);
+        for prefix_len in (1..=candidate.len()).rev() {
+            if let Some(imported) = self.imports.get(&candidate[..prefix_len]) {
+                let mut resolved = qualify(&candidate[..prefix_len - 1], imported);
+                resolved.extend_from_slice(&candidate[prefix_len..]);
+                return resolved;
+            }
+        }
+        candidate
+    }
+
+    pub(super) fn scope_has_glob(&self, scope: &[String]) -> bool {
+        self.glob_scopes.contains(scope)
+    }
+}
+
 pub(super) struct StructIndex<'a> {
     pub(super) definitions: BTreeMap<Vec<String>, StructDefinition<'a>>,
-    imports: BTreeMap<Vec<String>, Vec<String>>,
+    imports: ImportTable,
+    module_public: BTreeMap<Vec<String>, bool>,
+    reexports: FxHashSet<Vec<String>>,
     untyped_functions: FxHashSet<Vec<String>>,
     untyped_methods: FxHashSet<String>,
 }
@@ -20,7 +78,9 @@ impl<'a> StructIndex<'a> {
     pub(super) fn new(files: &'a [PathBuf], parsed: &'a FxHashMap<PathBuf, syn::File>) -> Self {
         let mut index = Self {
             definitions: BTreeMap::new(),
-            imports: BTreeMap::new(),
+            imports: ImportTable::default(),
+            module_public: BTreeMap::new(),
+            reexports: FxHashSet::default(),
             untyped_functions: FxHashSet::default(),
             untyped_methods: FxHashSet::default(),
         };
@@ -47,18 +107,34 @@ impl<'a> StructIndex<'a> {
                     self.untyped_functions.insert(key);
                 }
                 Item::Impl(item_impl) => self.collect_impl(scope, item_impl),
-                Item::Mod(syn::ItemMod {
-                    ident,
-                    content: Some((_, items)),
-                    ..
-                }) => {
-                    let mut child = scope.to_vec();
-                    child.push(ident.to_string());
-                    self.collect(file, &child, items);
-                }
-                Item::Use(import) => self.collect_import(scope, &import.tree, &[]),
+                Item::Mod(item_mod) => self.collect_module(file, scope, item_mod),
+                Item::Use(import) => self.collect_use(scope, import),
                 _ => {}
             }
+        }
+    }
+
+    fn collect_module(&mut self, file: &'a Path, scope: &[String], item_mod: &'a syn::ItemMod) {
+        let mut child = scope.to_vec();
+        child.push(item_mod.ident.to_string());
+        self.module_public.insert(
+            child.clone(),
+            matches!(item_mod.vis, syn::Visibility::Public(_)),
+        );
+        if let Some((_, items)) = &item_mod.content {
+            self.collect(file, &child, items);
+        }
+    }
+
+    fn collect_use(&mut self, scope: &[String], import: &syn::ItemUse) {
+        self.imports.collect(scope, &import.tree, &[]);
+        if !matches!(import.vis, syn::Visibility::Public(_)) {
+            return;
+        }
+        let mut leaves = Vec::new();
+        collect_use_leaves(&import.tree, &[], &mut leaves);
+        for leaf in leaves {
+            self.reexports.insert(qualify(scope, &leaf));
         }
     }
 
@@ -84,36 +160,6 @@ impl<'a> StructIndex<'a> {
         }
     }
 
-    fn collect_import(&mut self, scope: &[String], tree: &syn::UseTree, prefix: &[String]) {
-        match tree {
-            syn::UseTree::Path(path) => {
-                let mut child = prefix.to_vec();
-                child.push(path.ident.to_string());
-                self.collect_import(scope, &path.tree, &child);
-            }
-            syn::UseTree::Group(group) => {
-                for child in &group.items {
-                    self.collect_import(scope, child, prefix);
-                }
-            }
-            syn::UseTree::Name(name) => {
-                let mut target = prefix.to_vec();
-                target.push(name.ident.to_string());
-                let mut alias = scope.to_vec();
-                alias.push(name.ident.to_string());
-                self.imports.insert(alias, target);
-            }
-            syn::UseTree::Rename(rename) => {
-                let mut target = prefix.to_vec();
-                target.push(rename.ident.to_string());
-                let mut alias = scope.to_vec();
-                alias.push(rename.rename.to_string());
-                self.imports.insert(alias, target);
-            }
-            syn::UseTree::Glob(_) => {}
-        }
-    }
-
     pub(super) fn resolve(&self, scope: &[String], path: &syn::Path) -> Option<Vec<String>> {
         let segments: Vec<_> = path
             .segments
@@ -124,12 +170,9 @@ impl<'a> StructIndex<'a> {
         if self.definitions.contains_key(&candidate) {
             return Some(candidate);
         }
-        for prefix_len in (1..=candidate.len()).rev() {
-            if let Some(imported) = self.imports.get(&candidate[..prefix_len]) {
-                let mut resolved = qualify(&candidate[..prefix_len - 1], imported);
-                resolved.extend_from_slice(&candidate[prefix_len..]);
-                return self.definitions.contains_key(&resolved).then_some(resolved);
-            }
+        let resolved = self.imports.resolve_path(scope, &segments);
+        if resolved != candidate {
+            return self.definitions.contains_key(&resolved).then_some(resolved);
         }
         if segments.len() == 1 {
             let mut matches = self
@@ -154,12 +197,9 @@ impl<'a> StructIndex<'a> {
         if self.untyped_functions.contains(&candidate) {
             return true;
         }
-        for prefix_len in (1..=candidate.len()).rev() {
-            if let Some(imported) = self.imports.get(&candidate[..prefix_len]) {
-                let mut resolved = qualify(&candidate[..prefix_len - 1], imported);
-                resolved.extend_from_slice(&candidate[prefix_len..]);
-                return self.untyped_functions.contains(&resolved);
-            }
+        let resolved = self.imports.resolve_path(scope, &segments);
+        if resolved != candidate {
+            return self.untyped_functions.contains(&resolved);
         }
         if segments.len() == 1 {
             return self
@@ -173,6 +213,47 @@ impl<'a> StructIndex<'a> {
     pub(super) fn is_untyped_method(&self, method_name: &str) -> bool {
         self.untyped_methods.contains(method_name)
     }
+
+    pub(super) fn is_externally_visible(&self, key: &[String], vis: &syn::Visibility) -> bool {
+        if !matches!(vis, syn::Visibility::Public(_)) {
+            return false;
+        }
+        if self.reexports.contains(key) {
+            return true;
+        }
+        (1..key.len()).all(|depth| {
+            self.module_public
+                .get(&key[..depth])
+                .copied()
+                .unwrap_or(true)
+        })
+    }
+}
+
+fn collect_use_leaves(tree: &syn::UseTree, prefix: &[String], out: &mut Vec<Vec<String>>) {
+    match tree {
+        syn::UseTree::Path(path) => {
+            let mut child = prefix.to_vec();
+            child.push(path.ident.to_string());
+            collect_use_leaves(&path.tree, &child, out);
+        }
+        syn::UseTree::Group(group) => {
+            for child in &group.items {
+                collect_use_leaves(child, prefix, out);
+            }
+        }
+        syn::UseTree::Name(name) => {
+            let mut target = prefix.to_vec();
+            target.push(name.ident.to_string());
+            out.push(target);
+        }
+        syn::UseTree::Rename(rename) => {
+            let mut target = prefix.to_vec();
+            target.push(rename.ident.to_string());
+            out.push(target);
+        }
+        syn::UseTree::Glob(_) => {}
+    }
 }
 
 fn return_type_is_untyped(output: &ReturnType) -> bool {
@@ -182,7 +263,7 @@ fn return_type_is_untyped(output: &ReturnType) -> bool {
     }
 }
 
-fn qualify(scope: &[String], segments: &[String]) -> Vec<String> {
+pub(super) fn qualify(scope: &[String], segments: &[String]) -> Vec<String> {
     let mut qualified = scope.to_vec();
     for (position, segment) in segments.iter().enumerate() {
         match segment.as_str() {

@@ -1,11 +1,11 @@
 use super::RustDiagnostic;
-use super::struct_index::{StructIndex, file_scope};
+use super::struct_index::{StructIndex, file_scope, type_path};
 use super::value_origin::{
     Bindings, Origin, Representation, UNTYPED_VALUE_METHODS, has_value_evidence,
     is_string_key_probe, is_value_path, is_value_type, peel_expr, serde_representation,
 };
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
@@ -25,6 +25,7 @@ pub(super) fn check_value_flow(
         index,
         scope: file_scope(path),
         bindings: Bindings::default(),
+        declared_types: vec![FxHashMap::default()],
         module_items: &ast.items,
         self_fields: FxHashSet::default(),
         diagnostics,
@@ -38,6 +39,7 @@ struct ValueFlow<'a, 'ast> {
     index: Option<&'a StructIndex<'ast>>,
     scope: Vec<String>,
     bindings: Bindings,
+    declared_types: Vec<FxHashMap<String, syn::Path>>,
     module_items: &'ast [Item],
     self_fields: FxHashSet<String>,
     diagnostics: &'a mut Vec<RustDiagnostic>,
@@ -78,6 +80,9 @@ impl ValueFlow<'_, '_> {
             {
                 Origin::Untyped
             }
+            Expr::Field(field) if self.field_type(field).is_some_and(|ty| is_value_type(&ty)) => {
+                Origin::Untyped
+            }
             Expr::MethodCall(call) => {
                 if UNTYPED_VALUE_METHODS
                     .iter()
@@ -114,8 +119,60 @@ impl ValueFlow<'_, '_> {
                 Origin::Typed
             };
             self.bindings.bind(&typed.pat, origin);
+            self.declare_type(&typed.pat, &typed.ty);
         }
         previous
+    }
+
+    fn declare_type(&mut self, pat: &Pat, ty: &Type) {
+        if let Pat::Ident(ident) = pat
+            && let Some(path) = type_path(ty)
+            && let Some(scope) = self.declared_types.last_mut()
+        {
+            scope.insert(ident.ident.to_string(), path.clone());
+        }
+    }
+
+    fn declared_type_of(&self, name: &str) -> Option<&syn::Path> {
+        self.declared_types
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(name))
+    }
+
+    fn owner_struct_of(&self, expr: &Expr) -> Option<&syn::ItemStruct> {
+        let index = self.index?;
+        let path = match peel_expr(expr) {
+            Expr::Path(path) => self
+                .declared_type_of(&path.path.get_ident()?.to_string())?
+                .clone(),
+            Expr::Field(field) => {
+                let owner = self.owner_struct_of(&field.base)?;
+                let syn::Member::Named(name) = &field.member else {
+                    return None;
+                };
+                let declared = owner
+                    .fields
+                    .iter()
+                    .find(|candidate| candidate.ident.as_ref() == Some(name))?;
+                type_path(&declared.ty)?.clone()
+            }
+            _ => return None,
+        };
+        let key = index.resolve(&self.scope, &path)?;
+        Some(index.definitions.get(&key)?.structure)
+    }
+
+    fn field_type(&self, field: &syn::ExprField) -> Option<Type> {
+        let owner = self.owner_struct_of(&field.base)?;
+        let syn::Member::Named(name) = &field.member else {
+            return None;
+        };
+        owner
+            .fields
+            .iter()
+            .find(|candidate| candidate.ident.as_ref() == Some(name))
+            .map(|declared| declared.ty.clone())
     }
 
     fn probe_is_untyped(&self, expr: &Expr) -> bool {
@@ -181,12 +238,17 @@ impl<'ast> Visit<'ast> for ValueFlow<'_, 'ast> {
 
     fn visit_block(&mut self, node: &'ast syn::Block) {
         self.bindings.enter();
+        self.declared_types.push(FxHashMap::default());
         visit::visit_block(self, node);
+        self.declared_types.pop();
         self.bindings.leave();
     }
 
     fn visit_local(&mut self, node: &'ast syn::Local) {
         visit::visit_local(self, node);
+        if let Pat::Type(typed) = &node.pat {
+            self.declare_type(&typed.pat, &typed.ty);
+        }
         let origin = match &node.pat {
             Pat::Type(typed) if is_value_type(&typed.ty) => Origin::Untyped,
             Pat::Type(typed) if !matches!(&*typed.ty, Type::Infer(_)) => Origin::Typed,

@@ -10,6 +10,7 @@ use super::syn_kernel::{
 };
 use antidrift_rules::type_narrowing::no_compat_names::is_compat_name;
 use proc_macro2::Span;
+use rustc_hash::FxHashSet;
 use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
@@ -41,7 +42,7 @@ pub(super) fn check_smells(
     let mut visitor = SmellVisitor {
         rel_path,
         check_names: !is_rule_self,
-        cfg_gated_block: false,
+        cfg_gated_idents: Vec::new(),
         diagnostics,
     };
     visitor.visit_file(ast);
@@ -52,7 +53,7 @@ pub(super) fn check_smells(
 struct SmellVisitor<'a> {
     rel_path: &'a str,
     check_names: bool,
-    cfg_gated_block: bool,
+    cfg_gated_idents: Vec<FxHashSet<String>>,
     diagnostics: &'a mut Vec<RustDiagnostic>,
 }
 
@@ -79,7 +80,12 @@ impl SmellVisitor<'_> {
     }
 
     fn check_wild_local(&mut self, span: Span, expr: &Expr) {
-        if !self.cfg_gated_block && is_suppressed_binding_expr(expr) {
+        let justified = binding_root_ident(expr).is_some_and(|root| {
+            self.cfg_gated_idents
+                .iter()
+                .any(|idents| idents.contains(&root))
+        });
+        if !justified && is_suppressed_binding_expr(expr) {
             self.push(
                 span,
                 "rust/no-let-underscore-suppression",
@@ -127,10 +133,18 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
     }
 
     fn visit_block(&mut self, node: &'ast Block) {
-        let previous = self.cfg_gated_block;
-        self.cfg_gated_block = node.stmts.iter().any(stmt_has_cfg_attribute);
+        let mut gated = FxHashSet::default();
+        for statement in node
+            .stmts
+            .iter()
+            .filter(|stmt| stmt_has_cfg_attribute(stmt))
+        {
+            let mut collector = IdentCollector(&mut gated);
+            collector.visit_stmt(statement);
+        }
+        self.cfg_gated_idents.push(gated);
         visit::visit_block(self, node);
-        self.cfg_gated_block = previous;
+        self.cfg_gated_idents.pop();
     }
 
     fn visit_stmt(&mut self, node: &'ast Stmt) {
@@ -283,6 +297,24 @@ fn discards_closure_error_param(closure: &ExprClosure) -> bool {
         return false;
     };
     !expr_mentions_ident(&closure.body, &param_name)
+}
+
+struct IdentCollector<'a>(&'a mut FxHashSet<String>);
+
+impl<'ast> Visit<'ast> for IdentCollector<'_> {
+    fn visit_ident(&mut self, node: &'ast syn::Ident) {
+        self.0.insert(node.to_string());
+    }
+}
+
+fn binding_root_ident(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Reference(reference) => binding_root_ident(&reference.expr),
+        Expr::Paren(paren) => binding_root_ident(&paren.expr),
+        Expr::Field(field) => binding_root_ident(&field.base),
+        Expr::Path(path) => path.path.get_ident().map(ToString::to_string),
+        _ => None,
+    }
 }
 
 fn is_suppressed_binding_expr(expr: &Expr) -> bool {

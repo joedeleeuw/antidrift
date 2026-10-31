@@ -3,6 +3,7 @@ use antidrift_kernel::async_effects::{
     IndependentAwaitRun, is_discard_binding_name, is_effect_callee_name,
 };
 use proc_macro2::Span;
+use rustc_hash::FxHashSet;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{Block, Expr, ExprCall, ExprMethodCall, ImplItemFn, ItemFn, Local, Pat, Stmt};
@@ -60,7 +61,7 @@ pub(super) fn check_async_effects(
         in_async: false,
         loop_depth: 0,
         offload_depth: 0,
-        awaited_depth: 0,
+        awaited_chain: FxHashSet::default(),
         diagnostics,
     }
     .visit_file(ast);
@@ -71,7 +72,7 @@ struct AsyncEffectVisitor<'a> {
     in_async: bool,
     loop_depth: usize,
     offload_depth: usize,
-    awaited_depth: usize,
+    awaited_chain: FxHashSet<(usize, usize)>,
     diagnostics: &'a mut Vec<RustDiagnostic>,
 }
 
@@ -198,16 +199,29 @@ impl<'ast> Visit<'ast> for AsyncEffectVisitor<'_> {
     }
 
     fn visit_expr_await(&mut self, node: &'ast syn::ExprAwait) {
-        self.awaited_depth += 1;
-        self.visit_expr(&node.base);
-        self.awaited_depth -= 1;
+        let mut cursor: &Expr = &node.base;
+        loop {
+            match cursor {
+                Expr::MethodCall(call) => {
+                    let start = call.method.span().start();
+                    self.awaited_chain.insert((start.line, start.column));
+                    cursor = &call.receiver;
+                }
+                Expr::Try(tried) => cursor = &tried.expr,
+                Expr::Paren(paren) => cursor = &paren.expr,
+                Expr::Await(inner) => cursor = &inner.base,
+                _ => break,
+            }
+        }
+        visit::visit_expr_await(self, node);
     }
 
     fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
         let method = node.method.to_string();
+        let start = node.method.span().start();
         if self.in_async
             && self.offload_depth == 0
-            && self.awaited_depth == 0
+            && !self.awaited_chain.contains(&(start.line, start.column))
             && SUBPROCESS_WAIT_METHODS.contains(&method.as_str())
             && receiver_root_blocking_call(&node.receiver) == Some(BlockingCall::Subprocess)
         {
