@@ -68,7 +68,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         if: endsWith(matrix.package, '-musl')
         with:
-          tool: cargo-zigbuild
+          tool: cargo-zigbuild@0.24.0
 
       - name: Verify release tag matches package version
         if: github.event_name == 'release'
@@ -219,12 +219,6 @@ jobs:
       - name: Publish platform packages
         run: node tooling/antidrift/scripts/publish-tarball.mjs "$RUNNER_TEMP"/platform-packs/*.tgz
 
-      - name: Pack package
-        run: pnpm --dir tooling/antidrift pack --pack-destination "$RUNNER_TEMP/antidrift-pack"
-
-      - name: Publish package
-        run: node tooling/antidrift/scripts/publish-tarball.mjs "$RUNNER_TEMP"/antidrift-pack/*.tgz
-
       - uses: actions/download-artifact@v8
         with:
           pattern: release-*
@@ -235,4 +229,28 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$RELEASE_TAG" "$RUNNER_TEMP"/release-archives/* --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          existing="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          mkdir -p "$RUNNER_TEMP/published-archives"
+          for archive in "$RUNNER_TEMP"/release-archives/*; do
+            name="$(basename "$archive")"
+            if ! grep -qxF "$name" <<<"$existing"; then
+              gh release upload "$RELEASE_TAG" "$archive" --repo "$GITHUB_REPOSITORY"
+              echo "uploaded $name"
+              continue
+            fi
+            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$name" --dir "$RUNNER_TEMP/published-archives" --clobber
+            local_digest="$(sha256sum "$archive" | cut -d' ' -f1)"
+            published_digest="$(sha256sum "$RUNNER_TEMP/published-archives/$name" | cut -d' ' -f1)"
+            if [ "$local_digest" != "$published_digest" ]; then
+              echo "release asset $name already exists with digest $published_digest, this build produced $local_digest; delete the asset by hand if this build should replace it" >&2
+              exit 1
+            fi
+            echo "kept $name (same digest)"
+          done
+
+      - name: Pack package
+        run: pnpm --dir tooling/antidrift pack --pack-destination "$RUNNER_TEMP/antidrift-pack"
+
+      - name: Publish package
+        run: node tooling/antidrift/scripts/publish-tarball.mjs "$RUNNER_TEMP"/antidrift-pack/*.tgz

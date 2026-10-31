@@ -66,10 +66,25 @@ export const LINTER_PLATFORMS = [
 ];
 
 function linuxLibc() {
+  if (!process.report) {
+    throw new Error(
+      `antidrift-linter cannot tell glibc from musl on this Linux host: process.report is unavailable, so the libc marker cannot be read; supported platforms: ${LINTER_PLATFORMS.map(({ key }) => key).join(", ")}. Build crates/antidrift-linter and crates/antidrift-napi and point ANTIDRIFT_LINTER_BIN and ANTIDRIFT_NAPI_ADDON at the results.`
+    );
+  }
   process.report.excludeNetwork = true;
-  return process.report.getReport().header.glibcVersionRuntime
-    ? "glibc"
-    : "musl";
+  const report = process.report.getReport();
+  if (report.header.glibcVersionRuntime || report.header.glibcVersionCompiler) {
+    return "glibc";
+  }
+  const loaders = report.sharedObjects.filter((entry) =>
+    /\/ld-musl-|\/libc\.musl-/u.test(entry)
+  );
+  if (loaders.length > 0) {
+    return "musl";
+  }
+  throw new Error(
+    `antidrift-linter cannot tell glibc from musl on this Linux host: the process report carries no glibc marker and no musl loader among ${report.sharedObjects.length} shared objects; supported platforms: ${LINTER_PLATFORMS.map(({ key }) => key).join(", ")}. Build crates/antidrift-linter and crates/antidrift-napi and point ANTIDRIFT_LINTER_BIN and ANTIDRIFT_NAPI_ADDON at the results.`
+  );
 }
 
 export function hostLinterPlatform() {
