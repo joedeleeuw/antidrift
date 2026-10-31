@@ -3,16 +3,15 @@ name: Publish Antidrift
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  build-native-binaries:
-    if: startsWith(github.event.release.tag_name, 'antidrift-v')
+  platform-packages:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'antidrift-v')
     runs-on: ${{ matrix.runner }}
-    environment: npm-publish
     strategy:
       fail-fast: false
       matrix:
@@ -32,6 +31,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          standalone: true
+          run_install: false
+
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -43,9 +48,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - run: npm install -g npm@latest
-
       - name: Verify release tag matches package version
+        if: github.event_name == 'release'
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         shell: bash
@@ -57,19 +61,34 @@ jobs:
             exit 1
           fi
 
+      - run: pnpm install --frozen-lockfile
+
       - run: cargo build --release --locked -p antidrift-linter -p antidrift-napi
 
-      - name: Stage platform package
-        run: node tooling/antidrift/scripts/stage-platform-package.mjs "${{ matrix.package }}" "${{ runner.temp }}/platform-package"
+      - name: Smoke the packed package on this platform
+        run: pnpm package:verify
 
-      - name: Publish platform package
-        run: npm publish "${{ runner.temp }}/platform-package" --access public
+      - name: Pack platform package
+        shell: bash
+        run: |
+          node tooling/antidrift/scripts/stage-platform-package.mjs "${{ matrix.package }}" "$RUNNER_TEMP/platform-package"
+          mkdir -p "$RUNNER_TEMP/platform-pack"
+          npm pack "$RUNNER_TEMP/platform-package" --pack-destination "$RUNNER_TEMP/platform-pack"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: platform-${{ matrix.package }}
+          path: ${{ runner.temp }}/platform-pack/*.tgz
+          if-no-files-found: error
 
   publish:
-    if: startsWith(github.event.release.tag_name, 'antidrift-v')
-    needs: build-native-binaries
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'antidrift-v')
+    needs: platform-packages
     runs-on: ubuntu-latest
     environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
 
@@ -107,6 +126,39 @@ jobs:
           fi
 
       - run: pnpm verify:release
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: platform-*
+          path: ${{ runner.temp }}/platform-packs
+          merge-multiple: true
+
+      - name: Publish platform packages
+        run: |
+          for tarball in "$RUNNER_TEMP"/platform-packs/*.tgz; do
+            spec="$(tar -xOzf "$tarball" package/package.json | node -p 'const m = JSON.parse(require("fs").readFileSync(0, "utf8")); `${m.name}@${m.version}`')"
+            built="$(node -p '`sha512-${require("crypto").createHash("sha512").update(require("fs").readFileSync(process.argv[1])).digest("base64")}`' "$tarball")"
+            published="$(npm view "$spec" dist.integrity 2> /dev/null || true)"
+            if [ -z "$published" ]; then
+              npm publish "$tarball" --access public
+            elif [ "$published" = "$built" ]; then
+              echo "${spec} is already on npm with this run's tarball"
+            else
+              echo "${spec} is on npm with a different tarball (${published}, this run built ${built}); release a new version" >&2
+              exit 1
+            fi
+          done
+
+      - name: Wait until every platform package resolves
+        run: |
+          for tarball in "$RUNNER_TEMP"/platform-packs/*.tgz; do
+            spec="$(tar -xOzf "$tarball" package/package.json | node -p 'const m = JSON.parse(require("fs").readFileSync(0, "utf8")); `${m.name}@${m.version}`')"
+            for attempt in $(seq 1 60); do
+              npm view "$spec" version > /dev/null 2>&1 && break
+              sleep 10
+            done
+            npm view "$spec" version > /dev/null || { echo "${spec} did not resolve on npm within 10 minutes" >&2; exit 1; }
+          done
 
       - name: Pack package
         run: pnpm --dir tooling/antidrift pack --pack-destination "$RUNNER_TEMP/antidrift-pack"

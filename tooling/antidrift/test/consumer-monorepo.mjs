@@ -289,6 +289,47 @@ try {
   rmSync(join(work, "portable-proofs/addon.ts"));
   rmSync(join(work, "oxlint.addon.config.json"));
 
+  const packedLinter = join(
+    installedPlatformPackageRoot,
+    platformManifest.main
+  );
+  file(
+    "rust-proofs/Cargo.toml",
+    '[package]\nname = "rust-proofs"\nversion = "0.1.0"\nedition = "2024"\n'
+  );
+  file(
+    "rust-proofs/src/lib.rs",
+    'pub fn parse_port(text: &str) -> Result<u16, String> {\n    text.parse::<u16>().map_err(|_| "bad port".to_owned())\n}\n'
+  );
+  const packedRustRun = spawnSync(
+    packedLinter,
+    ["rust", "--format", "json", "rust-proofs"],
+    {
+      cwd: work,
+      encoding: "utf8",
+      timeout: 300_000,
+      killSignal: "SIGKILL",
+      maxBuffer: 64 * 1024 * 1024,
+    }
+  );
+  if (packedRustRun.error) throw packedRustRun.error;
+  const rustFinding =
+    packedRustRun.status === 1
+      ? JSON.parse(packedRustRun.stdout).find(
+          ({ ruleId, file: findingFile }) =>
+            ruleId === "rust/no-anemic-errors" && findingFile.endsWith("lib.rs")
+        )
+      : undefined;
+  if (!rustFinding) {
+    fail(
+      `packed antidrift-linter rust must exit 1 with rust/no-anemic-errors in rust-proofs/src/lib.rs: ${packedRustRun.status} ${packedRustRun.stdout}${packedRustRun.stderr}`
+    );
+  }
+  console.log(
+    `  packed rust finding: ${rustFinding.ruleId} ${rustFinding.file}:${rustFinding.line}`
+  );
+  rmSync(join(work, "rust-proofs"), { recursive: true });
+
   function lintOxlint(relFile, config) {
     try {
       return runJson(
