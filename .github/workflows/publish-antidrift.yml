@@ -121,19 +121,63 @@ jobs:
             node:24-alpine \
             sh -euc 'export PATH="/tmp/npm-global/bin:$PATH"; npm install --global "$(node -p "require(\"./package.json\").packageManager")" && pnpm package:verify'
 
+      - name: Archive antidrift-linter for the GitHub release
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-archive"
+          tar -czf "$RUNNER_TEMP/release-archive/antidrift-linter-${{ matrix.target }}.tar.gz" -C "target/${{ matrix.target }}/release" antidrift-linter
+
+      - name: Archive antidrift-linter for the GitHub release
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/release-archive" | Out-Null
+          Compress-Archive -Path "target/${{ matrix.target }}/release/antidrift-linter.exe" -DestinationPath "$env:RUNNER_TEMP/release-archive/antidrift-linter-${{ matrix.target }}.zip"
+
       - uses: actions/upload-artifact@v7
         with:
           name: platform-${{ matrix.package }}
           path: ${{ runner.temp }}/platform-pack/*.tgz
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.package }}
+          path: ${{ runner.temp }}/release-archive/*
+          if-no-files-found: error
+
+  release-set:
+    needs: platform-packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: platform-*
+          path: ${{ runner.temp }}/platform-packs
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: ${{ runner.temp }}/release-archives
+          merge-multiple: true
+
+      - run: node tooling/antidrift/scripts/verify-release-set.mjs "$RUNNER_TEMP/platform-packs" "$RUNNER_TEMP/release-archives"
+
   publish:
     if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'antidrift-v')
-    needs: platform-packages
+    needs: release-set
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - uses: actions/checkout@v6
@@ -180,3 +224,15 @@ jobs:
 
       - name: Publish package
         run: node tooling/antidrift/scripts/publish-tarball.mjs "$RUNNER_TEMP"/antidrift-pack/*.tgz
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: ${{ runner.temp }}/release-archives
+          merge-multiple: true
+
+      - name: Attach antidrift-linter archives to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" "$RUNNER_TEMP"/release-archives/* --clobber --repo "$GITHUB_REPOSITORY"

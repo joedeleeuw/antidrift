@@ -20,6 +20,13 @@ pnpm add -D @joedeleeuw/antidrift typescript
 
 The native `antidrift-linter` and the Oxlint addon arrive through one optional platform package, `@joedeleeuw/antidrift-linter-<platform>`, for these platforms: `linux-x64-gnu`, `linux-arm64-gnu`, `linux-x64-musl`, `linux-arm64-musl` (Alpine), `darwin-arm64`, `win32-x64-msvc` and `win32-arm64-msvc`. On Linux the launcher reads the C library from Node's own report, so glibc and musl hosts each load their own build. Intel Macs and other hosts get no package and fail with the list above; build `crates/antidrift-linter` and `crates/antidrift-napi` yourself and point `ANTIDRIFT_LINTER_BIN` and `ANTIDRIFT_NAPI_ADDON` at the results.
 
+Rust projects that only want `antidrift-linter rust` can skip npm. Each GitHub release carries an `antidrift-linter-<target>` archive for every platform above, which `cargo binstall` downloads; `cargo install` builds from source instead:
+
+```sh
+cargo binstall --git https://github.com/joedeleeuw/antidrift antidrift-linter
+cargo install --git https://github.com/joedeleeuw/antidrift --locked antidrift-linter
+```
+
 ## Default Ruleset
 
 `antidrift/no-wrapping-functions` runs as a typed rule in `antidrift-linter` that inlines each candidate in memory and reports only verified hops. Named functions and named arrows that only delegate to another call, read a parameter property, or apply a literal property fallback must earn their extra layer through a concrete boundary or callback requirement. Exports are included. Anonymous inline callbacks, calculations, argument transformations and functions that own additional behavior stay outside the rule. It provides no automatic fix. When removing a callback adapter, preserve its exact signature, receiver behavior, hook position and stable identity; pass the existing owner directly only when it already satisfies that callback contract.
