@@ -14,22 +14,32 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+      CARGO_BUILD_TARGET: ${{ matrix.target }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: ubuntu-22.04
             package: linux-x64-gnu
+            target: x86_64-unknown-linux-gnu
           - runner: ubuntu-22.04-arm
             package: linux-arm64-gnu
-          - runner: macos-15-intel
-            package: darwin-x64
+            target: aarch64-unknown-linux-gnu
+          - runner: ubuntu-22.04
+            package: linux-x64-musl
+            target: x86_64-unknown-linux-musl
+          - runner: ubuntu-22.04-arm
+            package: linux-arm64-musl
+            target: aarch64-unknown-linux-musl
           - runner: macos-15
             package: darwin-arm64
+            target: aarch64-apple-darwin
           - runner: windows-latest
             package: win32-x64-msvc
+            target: x86_64-pc-windows-msvc
           - runner: windows-11-arm
             package: win32-arm64-msvc
+            target: aarch64-pc-windows-msvc
     steps:
       - name: Allow long paths in git checkouts
         if: runner.os == 'Windows'
@@ -48,6 +58,18 @@ jobs:
         with:
           build-warnings: warn
 
+      - run: rustup target add "${{ matrix.target }}"
+
+      - uses: mlugg/setup-zig@v2
+        if: endsWith(matrix.package, '-musl')
+        with:
+          version: 0.15.2
+
+      - uses: taiki-e/install-action@v2
+        if: endsWith(matrix.package, '-musl')
+        with:
+          tool: cargo-zigbuild
+
       - name: Verify release tag matches package version
         if: github.event_name == 'release'
         env:
@@ -63,10 +85,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: cargo build --release --locked -p antidrift-linter -p antidrift-napi
+      - name: Build antidrift-linter and the Oxlint addon
+        if: "!endsWith(matrix.package, '-musl')"
+        run: cargo build --release --locked --target "${{ matrix.target }}" -p antidrift-linter -p antidrift-napi
 
-      - name: Smoke the packed package on this platform
-        run: pnpm package:verify
+      - name: Build antidrift-linter and the Oxlint addon against musl
+        if: endsWith(matrix.package, '-musl')
+        env:
+          RUSTFLAGS: -C target-feature=-crt-static
+        run: cargo zigbuild --release --locked --target "${{ matrix.target }}" -p antidrift-linter -p antidrift-napi
 
       - name: Pack platform package
         shell: bash
@@ -74,6 +101,25 @@ jobs:
           node tooling/antidrift/scripts/stage-platform-package.mjs "${{ matrix.package }}" "$RUNNER_TEMP/platform-package"
           mkdir -p "$RUNNER_TEMP/platform-pack"
           npm pack "$RUNNER_TEMP/platform-package" --pack-destination "$RUNNER_TEMP/platform-pack"
+          echo "ANTIDRIFT_PLATFORM_TARBALL=$RUNNER_TEMP/platform-pack/$(ls -- "$RUNNER_TEMP/platform-pack")" >> "$GITHUB_ENV"
+
+      - name: Smoke the packed platform package on this runner
+        if: "!endsWith(matrix.package, '-musl')"
+        run: pnpm package:verify
+
+      - name: Smoke the packed platform package in node:24-alpine
+        if: endsWith(matrix.package, '-musl')
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --env HOME=/tmp/home \
+            --env NPM_CONFIG_PREFIX=/tmp/npm-global \
+            --env ANTIDRIFT_PLATFORM_TARBALL \
+            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+            --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
+            --workdir "$GITHUB_WORKSPACE" \
+            node:24-alpine \
+            sh -euc 'export PATH="/tmp/npm-global/bin:$PATH"; npm install --global "$(node -p "require(\"./package.json\").packageManager")" && pnpm package:verify'
 
       - uses: actions/upload-artifact@v7
         with:

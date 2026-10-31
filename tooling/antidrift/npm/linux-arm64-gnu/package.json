@@ -7,6 +7,9 @@
     "url": "git+https://github.com/joedeleeuw/antidrift.git",
     "directory": "tooling/antidrift/npm/linux-arm64-gnu"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "os": [
     "linux"
   ],
