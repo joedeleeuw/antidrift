@@ -1,6 +1,6 @@
 # Claude Project Instructions
 
-This file is generated from `policy/agent-guardrails.yaml`. Do not edit it directly.
+This file is generated from `policy/agent-guardrails.yaml` and the Rust rule levels in `Cargo.toml`. Do not edit it directly.
 
 Treat hooks and deterministic checks as authoritative. Fix code instead of weakening policy.
 
@@ -28,5 +28,12 @@ Run `pnpm policy:verify-session` before pushing.
 - **agent-ops** (developer-experience): agent/block-generated-policy-edits, agent/lint-after-edit, agent/require-checks-before-push
 - **quality-gate-drift** (developer-experience): policy/no-check-weakening-without-policy-task, policy/no-inline-disable-without-ticket
 - **mcp-tooling-drift** (platform-security): mcp/no-unapproved-server, mcp/pin-server-version
-- **rust-self-governance** (engineering-productivity): rust/no-inline-comment, rust/max-file-lines, rust/no-orphan-module, rust/no-grab-bag-module, rust/no-hollow-module, rust/no-layer-violation, rust/no-boolean-map, rust/require-strict-serde, rust/no-stringly-variant, rust/no-untyped-config-probe, rust/no-discarded-decoded-config, rust/no-duplicate-scope-fields, rust/no-let-underscore-suppression, rust/no-ident-to-string-compare, rust/no-compat-names, rust/no-wrapping-functions, rust/no-anemic-errors, rust/no-inline-tests, rust/target-manifest-policy, rust/require-rule-scope, rust/no-silent-result-discard, rust/no-structural-type-fork, rust/no-value-roundtrip, rust/no-decode-to-option, rust/no-constant-return-field, rust/no-redundant-owner-prefix, rust/no-blocking-in-async, rust/no-query-join-or-tree-reshape, rust/no-contract-appeasement-projection
 - **agent-instructions** (developer-experience): rules/one-source-generates-agent-files, rules/no-vague-agent-rules
+- **rust-general** (antidrift-linter rust, levels from `[workspace.metadata.antidrift]` in Cargo.toml): rust/syntax-error, rust/max-module-lines, rust/no-orphan-module, rust/no-grab-bag-module, rust/no-hollow-module, rust/no-layer-violation, rust/no-forbidden-call, rust/no-boolean-map, rust/require-strict-serde, rust/no-stringly-variant, rust/no-untyped-config-probe, rust/no-let-underscore-suppression, rust/no-ident-to-string-compare, rust/no-compat-names, rust/no-wrapping-functions, rust/no-anemic-errors, rust/no-silent-result-discard, rust/no-structural-type-fork, rust/no-value-roundtrip, rust/no-decode-to-option, rust/no-constant-return-field, rust/no-redundant-owner-prefix, rust/no-blocking-in-async, rust/no-query-join-or-tree-reshape, rust/no-contract-appeasement-projection
+
+## Rust house style
+
+Opt-in rules this repository turns on in `[workspace.metadata.antidrift]` (Cargo.toml). Follow them before the linter fires.
+
+- **rust/no-inline-comment**: Put rationale and history in the commit body or field notes instead of inline comments.
+- **rust/no-inline-tests**: Validate via real CLI smoke runs instead of inline unit tests; keep test = false and doctest = false on Cargo targets.

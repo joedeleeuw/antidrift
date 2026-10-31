@@ -2,6 +2,7 @@ export { loadRegistriesSync } from "./lib/registries.mjs";
 export {
   generate,
   loadPolicy,
+  loadRustRules,
   renderPolicyArtifacts,
 } from "./generate-policy-artifacts.mjs";
 export { checkGenerated } from "./check-generated-policy-artifacts.mjs";

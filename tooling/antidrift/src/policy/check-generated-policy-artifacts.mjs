@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   loadPolicy,
+  loadRustRules,
   renderPolicyArtifacts,
 } from "./generate-policy-artifacts.mjs";
 
@@ -21,7 +22,10 @@ export async function checkGenerated({
   policyPath = join(repoRoot, "policy/agent-guardrails.yaml"),
   report = console.error,
 } = {}) {
-  const artifacts = renderPolicyArtifacts(await loadPolicy(policyPath));
+  const artifacts = renderPolicyArtifacts(
+    await loadPolicy(policyPath),
+    loadRustRules(repoRoot)
+  );
   const comparisons = await Promise.all(
     [...artifacts].map(async ([target, expected]) => ({
       target,

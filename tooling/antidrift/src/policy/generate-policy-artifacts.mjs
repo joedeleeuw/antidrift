@@ -1,8 +1,12 @@
+import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import YAML from "yaml";
+import { z } from "zod";
+
+import { resolveNativeLinterBinary } from "./oxlint.mjs";
 
 const hookScript = (name) =>
   `node node_modules/@joedeleeuw/antidrift/src/policy/hooks/${name}.mjs`;
@@ -13,7 +17,7 @@ async function write(path, content) {
 }
 
 const POLICY_HEADER =
-  "This file is generated from `policy/agent-guardrails.yaml`. Do not edit it directly.";
+  "This file is generated from `policy/agent-guardrails.yaml` and the Rust rule levels in `Cargo.toml`. Do not edit it directly.";
 
 const AGENT_HOOKS = {
   PreToolUse: [
@@ -52,6 +56,54 @@ function clusterLinesFor(clusters) {
     .join("\n");
 }
 
+const rustRuleSchema = z.array(
+  z.object({
+    id: z.string(),
+    kind: z.enum(["general", "house-style"]),
+    testCode: z.enum(["checked", "skipped"]),
+    level: z.enum(["error", "warn", "off"]),
+    guidance: z.string(),
+    lineCap: z.object({ warnAbove: z.number(), max: z.number() }).optional(),
+  })
+);
+
+export function loadRustRules(cwd = process.cwd()) {
+  const binary = resolveNativeLinterBinary(cwd);
+  if (!binary) {
+    throw new Error(
+      "antidrift-linter binary not found: build it with `cargo build -p antidrift-linter` or set ANTIDRIFT_LINTER_BIN before generating policy artifacts"
+    );
+  }
+  const output = execFileSync(
+    binary,
+    ["rust", "--list-rules", "--format", "json", cwd],
+    { cwd, encoding: "utf8" }
+  );
+  return rustRuleSchema.parse(JSON.parse(output));
+}
+
+function rustSectionsFor(rustRules) {
+  const enabled = rustRules.filter((rule) => rule.level !== "off");
+  const general = enabled.filter((rule) => rule.kind === "general");
+  const houseStyle = enabled.filter((rule) => rule.kind === "house-style");
+  const generalLine =
+    general.length === 0
+      ? ""
+      : `\n- **rust-general** (antidrift-linter rust, levels from \`[workspace.metadata.antidrift]\` in Cargo.toml): ${general
+          .map((rule) => rule.id)
+          .join(", ")}`;
+  const houseStyleLines = houseStyle
+    .map((rule) => `- **${rule.id}**: ${rule.guidance}`)
+    .join("\n");
+  return {
+    generalLine,
+    houseStyleSection:
+      houseStyle.length === 0
+        ? ""
+        : `\n## Rust house style\n\nOpt-in rules this repository turns on in \`[workspace.metadata.antidrift]\` (Cargo.toml). Follow them before the linter fires.\n\n${houseStyleLines}\n`,
+  };
+}
+
 function neverLinesFor(meta) {
   return [
     "Do not edit generated policy artifacts directly.",
@@ -63,18 +115,20 @@ function neverLinesFor(meta) {
     .join("\n");
 }
 
-export function renderPolicyArtifacts(policy) {
+export function renderPolicyArtifacts(policy, rustRules = []) {
   const clusterLines = clusterLinesFor(policy.clusters);
   const neverLines = neverLinesFor(policy.meta);
+  const { generalLine, houseStyleSection } = rustSectionsFor(rustRules);
+  const ruleClusters = `${clusterLines}${generalLine}`;
   const artifacts = new Map();
   artifacts.set(
     "AGENTS.md",
-    `# Repository Agent Instructions\n\n${POLICY_HEADER}\n\n## Required checks\n\nRun \`pnpm policy:verify-session\` before pushing.\n\n## Never\n\n${neverLines}\n\n## Rule clusters\n\n${clusterLines}\n`
+    `# Repository Agent Instructions\n\n${POLICY_HEADER}\n\n## Required checks\n\nRun \`pnpm policy:verify-session\` before pushing.\n\n## Never\n\n${neverLines}\n\n## Rule clusters\n\n${ruleClusters}\n${houseStyleSection}`
   );
 
   artifacts.set(
     "CLAUDE.md",
-    `# Claude Project Instructions\n\n${POLICY_HEADER}\n\nTreat hooks and deterministic checks as authoritative. Fix code instead of weakening policy.\n\n## Required checks\n\nRun \`pnpm policy:verify-session\` before pushing.\n\n## Rule clusters\n\n${clusterLines}\n`
+    `# Claude Project Instructions\n\n${POLICY_HEADER}\n\nTreat hooks and deterministic checks as authoritative. Fix code instead of weakening policy.\n\n## Required checks\n\nRun \`pnpm policy:verify-session\` before pushing.\n\n## Rule clusters\n\n${ruleClusters}\n${houseStyleSection}`
   );
 
   artifacts.set(
@@ -99,7 +153,7 @@ export async function loadPolicy(policyPath = "policy/agent-guardrails.yaml") {
 }
 
 export async function generate() {
-  const artifacts = renderPolicyArtifacts(await loadPolicy());
+  const artifacts = renderPolicyArtifacts(await loadPolicy(), loadRustRules());
   await Promise.all(
     [...artifacts].map(([path, content]) => write(path, content))
   );

@@ -47,8 +47,18 @@ export interface OxlintArgs {
 }
 
 export function loadRegistriesSync(policyDir?: string): AntidriftRegistries;
+export interface RustRule {
+  id: string;
+  kind: "general" | "house-style";
+  testCode: "checked" | "skipped";
+  level: "error" | "warn" | "off";
+  guidance: string;
+  lineCap?: { warnAbove: number; max: number };
+}
+export function loadRustRules(cwd?: string): RustRule[];
 export function renderPolicyArtifacts(
-  policy: AgentGuardrailsPolicy
+  policy: AgentGuardrailsPolicy,
+  rustRules?: RustRule[]
 ): PolicyArtifacts;
 export function loadPolicy(policyPath?: string): Promise<AgentGuardrailsPolicy>;
 export function generate(): Promise<void>;
