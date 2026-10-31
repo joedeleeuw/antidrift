@@ -15,6 +15,30 @@ rust-version = "1.99"
 license = "MIT"
 publish = false
 
+[workspace.metadata.antidrift]
+rules."rust/no-inline-comment" = "error"
+rules."rust/no-inline-tests" = "error"
+rules."rust/require-strict-serde" = { level = "error", exclude-files = ["crates/antidrift-engine/src/rust/cargo_manifest.rs"] }
+rules."rust/no-untyped-config-probe" = { level = "error", exclude-files = ["crates/antidrift-kernel/src/rule_scope.rs"] }
+layers.crates = [
+  "antidrift-kernel",
+  "antidrift-rules",
+  "antidrift-engine",
+  "antidrift-linter",
+  "antidrift-napi",
+]
+layers.modules.antidrift-kernel = ["provenance", "shape", "projection", "boundary", "callgraph"]
+
+[[workspace.metadata.antidrift.forbidden-calls]]
+callee = "Listener::Enter"
+argument = "Kind::SourceFile"
+reason = "Listener::Enter(Kind::SourceFile) never fires in tsrslint; attach listeners to statement/declaration kinds or use post-walk state."
+
+[[workspace.metadata.antidrift.forbidden-calls]]
+callee = "Listener::Exit"
+argument = "Kind::SourceFile"
+reason = "Listener::Exit(Kind::SourceFile) never fires in tsrslint; attach listeners to statement/declaration kinds or use post-walk state."
+
 [workspace.dependencies]
 antidrift-engine = { path = "crates/antidrift-engine" }
 antidrift-kernel = { path = "crates/antidrift-kernel" }

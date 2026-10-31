@@ -150,7 +150,7 @@ impl FileRole {
 
 impl RolePattern {
     fn matches(&self, path: &ProjectPath) -> bool {
-        let stem = strip_script_ext(&path.0);
+        let stem = strip_source_ext(&path.0);
         if self.script_only && stem.is_none() {
             return false;
         }
@@ -181,6 +181,11 @@ impl ProjectPath {
     }
 
     #[must_use]
+    pub fn from_relative(relative_path: &str) -> Self {
+        Self(tspath::normalize_slashes(relative_path))
+    }
+
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -201,7 +206,10 @@ pub fn is_declaration_file(file_path: &str) -> bool {
     tspath::is_declaration_file_name(&tspath::normalize_slashes(file_path))
 }
 
-fn strip_script_ext(file_path: &str) -> Option<&str> {
+fn strip_source_ext(file_path: &str) -> Option<&str> {
+    if let Some(stem) = file_path.strip_suffix(".rs") {
+        return Some(stem);
+    }
     (tspath::has_ts_file_extension(file_path) || tspath::has_js_file_extension(file_path))
         .then(|| tspath::remove_file_extension(file_path))
 }

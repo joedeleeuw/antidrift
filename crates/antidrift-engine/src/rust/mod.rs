@@ -1,12 +1,16 @@
 mod async_effects;
 mod boundary_decode;
 mod cargo_manifest;
+mod catalog;
+mod config;
 mod constant_fields;
 mod corpus_smells;
+mod discard_shapes;
 mod expression_shapes;
 mod module_graph;
 mod rules;
 mod smells;
+mod source_context;
 mod struct_index;
 mod struct_shapes;
 mod syn_kernel;
@@ -14,8 +18,10 @@ mod syntax;
 mod value_flow;
 mod value_origin;
 mod workspace;
+mod wrapping;
 
 use antidrift_kernel::diagnostic::Severity;
+use config::RustConfig;
 use serde::Serialize;
 use std::path::Path;
 use workspace::check_workspace_root;
@@ -42,26 +48,38 @@ impl RustDiagnostic {
     }
 }
 
-pub(crate) fn run_rust_cli(raw_args: &[String]) -> Result<i32, String> {
-    let mut json_output = false;
-    let mut deny_warnings = false;
-    let mut roots = Vec::new();
+struct RustArgs {
+    json_output: bool,
+    deny_warnings: bool,
+    list_rules: bool,
+    roots: Vec<String>,
+}
+
+fn parse_rust_args(raw_args: &[String]) -> Result<Option<RustArgs>, String> {
+    let mut args = RustArgs {
+        json_output: false,
+        deny_warnings: false,
+        list_rules: false,
+        roots: Vec::new(),
+    };
     let mut iter = raw_args.iter();
     while let Some(arg) = iter.next() {
         if arg == "--help" || arg == "-h" {
             println!(
-                "Usage: antidrift-linter rust [--json] [--format human|stylish|json] [--deny-warnings] [paths...]"
+                "Usage: antidrift-linter rust [--json] [--format human|stylish|json] [--deny-warnings] [--list-rules] [paths...]"
             );
-            return Ok(0);
+            return Ok(None);
         } else if arg == "--json" {
-            json_output = true;
+            args.json_output = true;
+        } else if arg == "--list-rules" {
+            args.list_rules = true;
         } else if arg == "--deny-warnings" {
-            deny_warnings = true;
+            args.deny_warnings = true;
         } else if arg == "--format" {
             let fmt = iter.next().ok_or("missing value for --format")?;
             match fmt.as_str() {
-                "json" => json_output = true,
-                "human" | "stylish" => json_output = false,
+                "json" => args.json_output = true,
+                "human" | "stylish" => args.json_output = false,
                 other => {
                     return Err(format!(
                         "unsupported format '{other}' for `rust` (expected human, stylish, or json)"
@@ -71,11 +89,27 @@ pub(crate) fn run_rust_cli(raw_args: &[String]) -> Result<i32, String> {
         } else if let Some(flag) = arg.strip_prefix('-') {
             return Err(format!("unknown `rust` flag: -{flag}"));
         } else {
-            roots.push(arg.clone());
+            args.roots.push(arg.clone());
         }
     }
-    if roots.is_empty() {
-        roots.push(".".to_owned());
+    if args.roots.is_empty() {
+        args.roots.push(".".to_owned());
+    }
+    Ok(Some(args))
+}
+
+pub(crate) fn run_rust_cli(raw_args: &[String]) -> Result<i32, String> {
+    let Some(RustArgs {
+        json_output,
+        deny_warnings,
+        list_rules,
+        roots,
+    }) = parse_rust_args(raw_args)?
+    else {
+        return Ok(0);
+    };
+    if list_rules {
+        return print_resolved_rules(&roots, json_output);
     }
 
     let mut diagnostics = Vec::new();
@@ -125,4 +159,32 @@ pub(crate) fn run_rust_cli(raw_args: &[String]) -> Result<i32, String> {
         return Ok(0);
     }
     Ok(1)
+}
+
+fn print_resolved_rules(roots: &[String], json_output: bool) -> Result<i32, String> {
+    let [root] = roots else {
+        return Err("--list-rules resolves one workspace; pass exactly one path".to_owned());
+    };
+    let root_path = Path::new(root);
+    if !root_path.is_dir() {
+        return Err(format!(
+            "--list-rules needs a workspace directory, got {root}"
+        ));
+    }
+    let resolved = RustConfig::load(root_path)?.resolved_rules();
+    if json_output {
+        let rendered = serde_json::to_string_pretty(&resolved)
+            .map_err(|err| format!("failed to serialize rust rules: {err}"))?;
+        println!("{rendered}");
+        return Ok(0);
+    }
+    for rule in &resolved {
+        let level = match rule.level {
+            Severity::Error => "error",
+            Severity::Warn => "warn",
+            Severity::Off => "off",
+        };
+        println!("{} {level}", rule.id);
+    }
+    Ok(0)
 }

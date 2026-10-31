@@ -1,6 +1,9 @@
 use super::RustDiagnostic;
 use super::async_effects::check_async_effects;
 use super::corpus_smells::check_corpus_smells;
+use super::discard_shapes::{
+    DiscardedErrorOutcome, discarded_error_outcome, is_cfg_attribute, stmt_has_cfg_attribute,
+};
 use super::syn_kernel::{
     expr_mentions_ident, extract_pat_ident, is_err_wild_pat, is_fs_io_call, is_ok_tuple_pat,
     is_wild_pat,
@@ -11,8 +14,8 @@ use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Arm, BinOp, Expr, ExprBinary, ExprCall, ExprClosure, ExprField, ExprLet, ExprLit,
-    ExprMethodCall, FnArg, ItemEnum, ItemFn, ItemStruct, ItemType, Lit, Member, Stmt,
+    Arm, BinOp, Block, Expr, ExprBinary, ExprClosure, ExprField, ExprLet, ExprLit, ExprMethodCall,
+    FnArg, ItemEnum, ItemFn, ItemStruct, ItemType, Lit, Member, Stmt,
 };
 
 pub(super) fn check_smells(
@@ -38,6 +41,7 @@ pub(super) fn check_smells(
     let mut visitor = SmellVisitor {
         rel_path,
         check_names: !is_rule_self,
+        cfg_gated_block: false,
         diagnostics,
     };
     visitor.visit_file(ast);
@@ -48,6 +52,7 @@ pub(super) fn check_smells(
 struct SmellVisitor<'a> {
     rel_path: &'a str,
     check_names: bool,
+    cfg_gated_block: bool,
     diagnostics: &'a mut Vec<RustDiagnostic>,
 }
 
@@ -74,13 +79,7 @@ impl SmellVisitor<'_> {
     }
 
     fn check_wild_local(&mut self, span: Span, expr: &Expr) {
-        if is_decoded_config_call(expr) {
-            self.push(
-                span,
-                "rust/no-discarded-decoded-config",
-                "Decoded configuration or RuleScope is discarded; store the decoded value on the rule and enforce it during traversal.".to_owned(),
-            );
-        } else if is_suppressed_binding_expr(expr) {
+        if !self.cfg_gated_block && is_suppressed_binding_expr(expr) {
             self.push(
                 span,
                 "rust/no-let-underscore-suppression",
@@ -100,17 +99,6 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
             {
                 self.check_ident_name(&param_name, span);
             }
-        }
-        if fn_name != "main"
-            && let Some(callee) = detect_passthrough_wrapper(node)
-        {
-            self.push(
-                node.sig.ident.span(),
-                "rust/no-wrapping-functions",
-                format!(
-                    "Function '{fn_name}' is a pass-through wrapper around '{callee}'; call '{callee}' directly and delete '{fn_name}'."
-                ),
-            );
         }
         visit::visit_item_fn(self, node);
     }
@@ -134,33 +122,24 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
                     ),
                 );
             }
-            if ident == "exclude_files" && node.ident != "ScopeOptions" && node.ident != "RuleScope"
-            {
-                self.push(
-                    ident.span(),
-                    "rust/no-duplicate-scope-fields",
-                    "Do not redeclare 'files' / 'exclude_files' on rule option structs; embed '#[serde(flatten)] scope: ScopeOptions' instead.".to_owned(),
-                );
-            }
         }
         visit::visit_item_struct(self, node);
     }
 
+    fn visit_block(&mut self, node: &'ast Block) {
+        let previous = self.cfg_gated_block;
+        self.cfg_gated_block = node.stmts.iter().any(stmt_has_cfg_attribute);
+        visit::visit_block(self, node);
+        self.cfg_gated_block = previous;
+    }
+
     fn visit_stmt(&mut self, node: &'ast Stmt) {
-        match node {
-            Stmt::Local(local) if is_wild_pat(&local.pat) => {
-                if let Some(init) = &local.init {
-                    self.check_wild_local(local.let_token.span, &init.expr);
-                }
-            }
-            Stmt::Expr(expr, Some(semi)) if is_decoded_config_call(expr) => {
-                self.push(
-                    semi.spans[0],
-                    "rust/no-discarded-decoded-config",
-                    "Decoded configuration or RuleScope is discarded; store the decoded value on the rule and enforce it during traversal.".to_owned(),
-                );
-            }
-            _ => {}
+        if let Stmt::Local(local) = node
+            && is_wild_pat(&local.pat)
+            && !local.attrs.iter().any(is_cfg_attribute)
+            && let Some(init) = &local.init
+        {
+            self.check_wild_local(local.let_token.span, &init.expr);
         }
         visit::visit_stmt(self, node);
     }
@@ -241,11 +220,19 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
 
     fn visit_arm(&mut self, node: &'ast Arm) {
         if node.guard.is_none() && is_err_wild_pat(&node.pat) {
-            self.push(
-                node.pat.span(),
-                "rust/no-silent-result-discard",
-                "'Err(_) => ...' discards the underlying error value; bind the error and propagate or report it explicitly.".to_owned(),
-            );
+            match discarded_error_outcome(&node.body) {
+                Some(DiscardedErrorOutcome::NewError) => self.push(
+                    node.pat.span(),
+                    "rust/no-silent-result-discard",
+                    "'Err(_) => ...' raises a new error without its cause; bind the error and carry it as the source.".to_owned(),
+                ),
+                Some(DiscardedErrorOutcome::EmptyValue) => self.push(
+                    node.pat.span(),
+                    "rust/no-silent-result-discard",
+                    "'Err(_) => ...' turns a failure into an empty value that looks valid; bind the error and propagate or report it explicitly.".to_owned(),
+                ),
+                None => {}
+            }
         }
         visit::visit_arm(self, node);
     }
@@ -307,24 +294,6 @@ fn is_suppressed_binding_expr(expr: &Expr) -> bool {
     }
 }
 
-fn is_decoded_config_call(expr: &Expr) -> bool {
-    let inner = match expr {
-        Expr::Try(expr_try) => &*expr_try.expr,
-        other => other,
-    };
-    let Expr::Call(ExprCall { func, .. }) = inner else {
-        return false;
-    };
-    let Expr::Path(callee) = &**func else {
-        return false;
-    };
-    callee.path.segments.last().is_some_and(|seg| {
-        seg.ident == "decode_rule_options"
-            || seg.ident == "from_options"
-            || seg.ident == "from_scope_options"
-    })
-}
-
 fn ident_to_string_call_span(expr: &Expr) -> Option<Span> {
     let Expr::MethodCall(call) = expr else {
         return None;
@@ -347,80 +316,35 @@ fn is_to_string_call(expr: &Expr) -> bool {
 }
 
 fn is_raii_or_marker_field(field_name: &str, ty: &syn::Type) -> bool {
-    matches!(
+    struct RaiiTypeFinder(bool);
+    impl<'ast> Visit<'ast> for RaiiTypeFinder {
+        fn visit_path_segment(&mut self, node: &'ast syn::PathSegment) {
+            let name = node.ident.to_string();
+            self.0 |= matches!(
+                name.as_str(),
+                "PhantomData"
+                    | "Retention"
+                    | "TempDir"
+                    | "NamedTempFile"
+                    | "countme"
+                    | "Paren"
+                    | "Bracket"
+                    | "Brace"
+            ) || name.ends_with("Guard")
+                || name.ends_with("Permit")
+                || name.ends_with("Lease");
+            visit::visit_path_segment(self, node);
+        }
+    }
+    if matches!(
         field_name,
         "_guard" | "_lock" | "_permit" | "_marker" | "_phantom" | "_thread_bound" | "_drop"
-    ) || matches!(ty, syn::Type::Path(tp) if tp.path.segments.iter().any(|seg| {
-        let s = seg.ident.to_string();
-        matches!(s.as_str(), "PhantomData" | "Retention" | "TempDir" | "NamedTempFile")
-            || s.ends_with("Guard")
-            || s.ends_with("Permit")
-    }))
-}
-
-fn is_serde_adapter_param(ty: &syn::Type) -> bool {
-    match ty {
-        syn::Type::Path(tp) => tp.path.segments.last().is_some_and(|seg| {
-            matches!(
-                seg.ident.to_string().as_str(),
-                "Serializer" | "Deserializer" | "D" | "S"
-            )
-        }),
-        syn::Type::Reference(tr) => is_serde_adapter_param(&tr.elem),
-        _ => false,
-    }
-}
-
-fn detect_passthrough_wrapper(item_fn: &ItemFn) -> Option<String> {
-    if item_fn.sig.inputs.is_empty() {
-        return None;
-    }
-    let mut param_names = Vec::with_capacity(item_fn.sig.inputs.len());
-    for input in &item_fn.sig.inputs {
-        let FnArg::Typed(pat_type) = input else {
-            return None;
-        };
-        if !item_fn.sig.generics.params.is_empty() && is_serde_adapter_param(&pat_type.ty) {
-            return None;
-        }
-        param_names.push(extract_pat_ident(&pat_type.pat)?.0);
-    }
-    let meaningful: Vec<&Stmt> = item_fn
-        .block
-        .stmts
-        .iter()
-        .filter(|s| !matches!(s, Stmt::Local(l) if is_wild_pat(&l.pat)))
-        .collect();
-    if meaningful.len() != 1 {
-        return None;
-    }
-    let expr = match meaningful[0] {
-        Stmt::Expr(expr, None) => expr,
-        Stmt::Expr(Expr::Return(ret), _) => ret.expr.as_deref()?,
-        _ => return None,
-    };
-    let Expr::Call(ExprCall { func, args, .. }) = expr else {
-        return None;
-    };
-    let Expr::Path(callee_path) = &**func else {
-        return None;
-    };
-    if args.len() != param_names.len()
-        || !args
-            .iter()
-            .zip(&param_names)
-            .all(|(arg, exp)| matches!(arg, Expr::Path(p) if p.path.is_ident(exp)))
+    ) || matches!(ty, syn::Type::Macro(_))
+        || matches!(ty, syn::Type::Tuple(tuple) if tuple.elems.is_empty())
     {
-        return None;
+        return true;
     }
-    let segments: Vec<String> = callee_path
-        .path
-        .segments
-        .iter()
-        .map(|s| s.ident.to_string())
-        .collect();
-    (!segments
-        .last()
-        .is_some_and(|l| l.as_bytes().first().is_some_and(u8::is_ascii_uppercase)))
-    .then(|| segments.join("::"))
+    let mut finder = RaiiTypeFinder(false);
+    finder.visit_type(ty);
+    finder.0
 }

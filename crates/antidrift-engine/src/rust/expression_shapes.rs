@@ -1,4 +1,4 @@
-use super::syn_kernel::extract_pat_ident;
+use super::syn_kernel::{call_path_ends_with, extract_pat_ident};
 use antidrift_kernel::outcome_shape::{
     OutcomeArm, is_outcome_error_field, is_outcome_flag_field, outcome_shape_key,
 };
@@ -242,4 +242,33 @@ pub(super) fn block_mentions_modified(block: &syn::Block) -> bool {
     let mut finder = ModifiedFinder(false);
     finder.visit_block(block);
     finder.0
+}
+
+fn is_fs_read_to_string_call(expr: &Expr) -> bool {
+    matches!(expr, Expr::Call(call) if call_path_ends_with(call, &["fs", "read_to_string"]))
+}
+
+fn is_empty_string_expr(expr: &Expr) -> bool {
+    match expr {
+        Expr::Lit(ExprLit {
+            lit: Lit::Str(s), ..
+        }) => s.value().is_empty(),
+        Expr::Call(call) => call.args.is_empty() && call_path_ends_with(call, &["String", "new"]),
+        Expr::MethodCall(c)
+            if (c.method == "to_string" || c.method == "to_owned") && c.args.is_empty() =>
+        {
+            is_empty_string_expr(&c.receiver)
+        }
+        _ => false,
+    }
+}
+
+pub(super) fn is_fs_read_to_string_sentinel(node: &ExprMethodCall) -> bool {
+    is_fs_read_to_string_call(&node.receiver)
+        && ((node.method == "unwrap_or_default" && node.args.is_empty())
+            || (node.method == "unwrap_or"
+                && node.args.len() == 1
+                && is_empty_string_expr(&node.args[0]))
+            || (node.method == "unwrap_or_else"
+                && matches!(node.args.first(), Some(Expr::Closure(c)) if is_empty_string_expr(&c.body))))
 }

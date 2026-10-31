@@ -4,6 +4,7 @@ use super::value_origin::{
     Bindings, Origin, Representation, UNTYPED_VALUE_METHODS, has_value_evidence,
     is_string_key_probe, is_value_path, is_value_type, peel_expr, serde_representation,
 };
+use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use rustc_hash::FxHashSet;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -17,10 +18,7 @@ pub(super) fn check_value_flow(
     ast: &syn::File,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
-    let boundary = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| ["rule_scope.rs", "batch.rs", "json_manifest.rs"].contains(&name));
+    let boundary = ProjectPath::from_relative(rel_path).has_role(FileRole::Boundary);
     ValueFlow {
         rel_path,
         boundary,
@@ -296,7 +294,8 @@ impl<'ast> Visit<'ast> for ValueFlow<'_, 'ast> {
     fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
         let specific = UNTYPED_VALUE_METHODS
             .iter()
-            .any(|name| node.method == *name);
+            .any(|name| node.method == *name)
+            && self.probe_is_untyped(&node.receiver);
         let string_probe = (node.method == "and_then" || node.method == "as_str")
             && is_string_key_probe(&node.receiver)
             && (self.probe_is_untyped(&node.receiver) || node.args.iter().any(has_value_evidence));

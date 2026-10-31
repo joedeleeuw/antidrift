@@ -51,7 +51,7 @@ impl CappedUnit {
     pub const fn cap(self) -> LineCap {
         match self {
             Self::RustFile => LineCap {
-                rule_id: "rust/max-file-lines",
+                rule_id: "rust/max-module-lines",
                 count: LineCount::NonBlank,
                 warn_above: 425,
                 max: 500,

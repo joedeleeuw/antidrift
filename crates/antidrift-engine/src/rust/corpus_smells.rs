@@ -1,9 +1,10 @@
 use super::RustDiagnostic;
 use super::expression_shapes::{
     block_mentions_modified, closure_has_field_key_equality, collect_string_literals,
-    detect_fieldwise_clone_rebuild, first_closure_param_name, is_multi_tier_exists_find,
-    outcome_arm, receiver_is_outer_collection,
+    detect_fieldwise_clone_rebuild, first_closure_param_name, is_fs_read_to_string_sentinel,
+    is_multi_tier_exists_find, outcome_arm, receiver_is_outer_collection,
 };
+use super::struct_index::type_path;
 use super::syn_kernel::{call_path_ends_with, extract_pat_ident};
 use antidrift_kernel::outcome_shape::{OutcomeArm, find_sum_to_product_pair};
 use antidrift_kernel::relational_scan::{is_inner_linear_scan_method, is_outer_traversal_method};
@@ -15,8 +16,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Arm, Expr, ExprCall, ExprForLoop, ExprIf, ExprLit, ExprMethodCall, ExprStruct, ImplItemFn,
-    ItemFn, Lit, Local, Pat,
+    Arm, Expr, ExprCall, ExprForLoop, ExprIf, ExprLit, ExprMethodCall, ExprStruct, FnArg,
+    ImplItemFn, ItemFn, Lit, Local, Pat, Signature,
 };
 
 pub(super) fn check_corpus_smells(
@@ -33,6 +34,8 @@ pub(super) fn check_corpus_smells(
         local_string_lists: FxHashMap::default(),
         outer_loop_params: Vec::new(),
         outcome_arms: Vec::new(),
+        impl_type: None,
+        param_types: FxHashMap::default(),
         diagnostics,
     };
     visitor.visit_file(ast);
@@ -47,6 +50,8 @@ struct CorpusSmellVisitor<'a> {
     local_string_lists: FxHashMap<String, Vec<String>>,
     outer_loop_params: Vec<String>,
     outcome_arms: Vec<(OutcomeArm, Span)>,
+    impl_type: Option<String>,
+    param_types: FxHashMap<String, String>,
     diagnostics: &'a mut Vec<RustDiagnostic>,
 }
 
@@ -60,15 +65,29 @@ impl CorpusSmellVisitor<'_> {
         ));
     }
 
-    fn visit_fn_scope(&mut self, has_mtime: bool, body: impl FnOnce(&mut Self)) {
+    fn visit_fn_scope(
+        &mut self,
+        signature: &Signature,
+        has_mtime: bool,
+        body: impl FnOnce(&mut Self),
+    ) {
         let prev = (
             self.fn_has_mtime_check,
             std::mem::take(&mut self.error_bindings),
             std::mem::take(&mut self.error_string_bindings),
             std::mem::take(&mut self.local_string_lists),
             std::mem::take(&mut self.outcome_arms),
+            std::mem::take(&mut self.param_types),
         );
         self.fn_has_mtime_check = has_mtime;
+        for input in &signature.inputs {
+            if let FnArg::Typed(typed) = input
+                && let Some((name, _)) = extract_pat_ident(&typed.pat)
+                && let Some(type_name) = last_type_segment(&typed.ty)
+            {
+                self.param_types.insert(name, type_name);
+            }
+        }
         body(self);
         self.report_sum_to_product_arms();
         (
@@ -77,7 +96,30 @@ impl CorpusSmellVisitor<'_> {
             self.error_string_bindings,
             self.local_string_lists,
             self.outcome_arms,
+            self.param_types,
         ) = prev;
+    }
+
+    fn source_type_of(&self, binding: &str) -> Option<&str> {
+        if binding == "self" {
+            return self.impl_type.as_deref();
+        }
+        self.param_types.get(binding).map(String::as_str)
+    }
+
+    fn is_cross_type_rebuild(&self, node: &ExprStruct, source_binding: &str) -> bool {
+        let Some(target) = node.path.segments.last().map(|seg| seg.ident.to_string()) else {
+            return false;
+        };
+        let target = if target == "Self" {
+            self.impl_type.clone()
+        } else {
+            Some(target)
+        };
+        match (target, self.source_type_of(source_binding)) {
+            (Some(target), Some(source)) => target != source,
+            _ => false,
+        }
     }
 
     fn report_sum_to_product_arms(&mut self) {
@@ -119,16 +161,22 @@ impl CorpusSmellVisitor<'_> {
 }
 
 impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
+    fn visit_item_impl(&mut self, node: &'ast syn::ItemImpl) {
+        let previous = std::mem::replace(&mut self.impl_type, last_type_segment(&node.self_ty));
+        visit::visit_item_impl(self, node);
+        self.impl_type = previous;
+    }
+
     fn visit_item_fn(&mut self, node: &'ast ItemFn) {
         let has_mtime = block_mentions_modified(&node.block);
-        self.visit_fn_scope(has_mtime, |this| {
+        self.visit_fn_scope(&node.sig, has_mtime, |this| {
             visit::visit_item_fn(this, node);
         });
     }
 
     fn visit_impl_item_fn(&mut self, node: &'ast ImplItemFn) {
         let has_mtime = block_mentions_modified(&node.block);
-        self.visit_fn_scope(has_mtime, |this| {
+        self.visit_fn_scope(&node.sig, has_mtime, |this| {
             visit::visit_impl_item_fn(this, node);
         });
     }
@@ -287,6 +335,7 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
             self.outcome_arms.push((arm, node.path.span()));
         }
         if let Some(src_ident) = detect_fieldwise_clone_rebuild(node)
+            && !self.is_cross_type_rebuild(node, &src_ident)
             && let Some(seg) = node.path.segments.last()
         {
             self.push(
@@ -300,6 +349,13 @@ impl<'ast> Visit<'ast> for CorpusSmellVisitor<'_> {
         }
         visit::visit_expr_struct(self, node);
     }
+}
+
+fn last_type_segment(ty: &syn::Type) -> Option<String> {
+    type_path(ty)?
+        .segments
+        .last()
+        .map(|segment| segment.ident.to_string())
 }
 
 fn extract_err_binding_ident(pat: &Pat) -> Option<String> {
@@ -371,33 +427,4 @@ fn expr_tests_error_string(
         Expr::Paren(p) => expr_tests_error_string(&p.expr, err_bindings, str_bindings),
         _ => false,
     }
-}
-
-fn is_fs_read_to_string_call(expr: &Expr) -> bool {
-    matches!(expr, Expr::Call(call) if call_path_ends_with(call, &["fs", "read_to_string"]))
-}
-
-fn is_empty_string_expr(expr: &Expr) -> bool {
-    match expr {
-        Expr::Lit(ExprLit {
-            lit: Lit::Str(s), ..
-        }) => s.value().is_empty(),
-        Expr::Call(call) => call.args.is_empty() && call_path_ends_with(call, &["String", "new"]),
-        Expr::MethodCall(c)
-            if (c.method == "to_string" || c.method == "to_owned") && c.args.is_empty() =>
-        {
-            is_empty_string_expr(&c.receiver)
-        }
-        _ => false,
-    }
-}
-
-fn is_fs_read_to_string_sentinel(node: &ExprMethodCall) -> bool {
-    is_fs_read_to_string_call(&node.receiver)
-        && ((node.method == "unwrap_or_default" && node.args.is_empty())
-            || (node.method == "unwrap_or"
-                && node.args.len() == 1
-                && is_empty_string_expr(&node.args[0]))
-            || (node.method == "unwrap_or_else"
-                && matches!(node.args.first(), Some(Expr::Closure(c)) if is_empty_string_expr(&c.body))))
 }

@@ -7,7 +7,7 @@ use rustc_hash::FxHashMap;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use syn::visit::{self, Visit};
-use syn::{Expr, ExprLit, ExprPath, ExprStruct, FnArg, Lit, Member, Pat, Type};
+use syn::{Expr, ExprLit, ExprPath, ExprStruct, FnArg, Lit, Member, Pat, Type, Visibility};
 
 fn is_candidate_scalar_or_option_type(ty: &Type) -> bool {
     let Type::Path(tp) = ty else {
@@ -82,10 +82,12 @@ pub(super) fn check_constant_return_fields(
         ) {
             continue;
         }
+        let crate_public = matches!(definition.structure.vis, Visibility::Public(_));
         let fields: BTreeMap<_, _> = definition
             .structure
             .fields
             .iter()
+            .filter(|field| !(crate_public && matches!(field.vis, Visibility::Public(_))))
             .filter_map(|field| {
                 let ident = field.ident.as_ref()?;
                 is_candidate_scalar_or_option_type(&field.ty).then(|| {
