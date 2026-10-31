@@ -20,7 +20,7 @@ use tsrslint::linter::{Options, lint_files};
 use tsrslint::overlayfs::OverlayFS;
 use tsrslint::rule::{ReportedDiagnostic, Rule};
 
-use crate::headless_host::inferred_compiler_options;
+use crate::inferred_program::inferred_compiler_options;
 
 #[derive(Debug, Clone)]
 pub(crate) struct RuleActivation {

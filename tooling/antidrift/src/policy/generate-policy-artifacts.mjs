@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { z } from "zod";
 
-import { resolveNativeLinterBinary } from "./oxlint.mjs";
+import { NATIVE_ARTIFACTS, resolveNativeArtifact } from "./oxlint.mjs";
 
 const hookScript = (name) =>
   `node node_modules/@joedeleeuw/antidrift/src/policy/hooks/${name}.mjs`;
@@ -125,7 +125,7 @@ function freshNativeLinterBinary(cwd) {
   if (existsSync(resolve(cwd, "crates/antidrift-linter/Cargo.toml"))) {
     return buildWorkspaceLinter(cwd);
   }
-  return resolveNativeLinterBinary(cwd);
+  return resolveNativeArtifact(NATIVE_ARTIFACTS.linter, cwd);
 }
 
 export function loadRustRules(cwd = process.cwd()) {

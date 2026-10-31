@@ -50,7 +50,7 @@
   },
   "types": "./src/index.d.mts",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24"
   },
   "exports": {
     ".": {
@@ -94,9 +94,10 @@
   },
   "optionalDependencies": {
     "@joedeleeuw/antidrift-linter-darwin-arm64": "0.20.0",
-    "@joedeleeuw/antidrift-linter-darwin-x64": "0.20.0",
     "@joedeleeuw/antidrift-linter-linux-arm64-gnu": "0.20.0",
+    "@joedeleeuw/antidrift-linter-linux-arm64-musl": "0.20.0",
     "@joedeleeuw/antidrift-linter-linux-x64-gnu": "0.20.0",
+    "@joedeleeuw/antidrift-linter-linux-x64-musl": "0.20.0",
     "@joedeleeuw/antidrift-linter-win32-arm64-msvc": "0.20.0",
     "@joedeleeuw/antidrift-linter-win32-x64-msvc": "0.20.0"
   },

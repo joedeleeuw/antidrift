@@ -1,0 +1,31 @@
+{
+  "name": "@joedeleeuw/antidrift-linter-linux-x64-musl",
+  "version": "0.20.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joedeleeuw/antidrift.git",
+    "directory": "tooling/antidrift/npm/linux-x64-musl"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "musl"
+  ],
+  "main": "antidrift-linter",
+  "files": [
+    "antidrift-linter",
+    "antidrift.node"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

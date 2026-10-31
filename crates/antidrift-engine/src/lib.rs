@@ -6,6 +6,7 @@ mod derive;
 mod format;
 mod headless;
 mod headless_host;
+mod inferred_program;
 mod relay;
 mod rule_plan;
 mod rule_scope;

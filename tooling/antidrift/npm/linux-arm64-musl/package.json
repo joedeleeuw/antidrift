@@ -1,17 +1,23 @@
 {
-  "name": "@joedeleeuw/antidrift-linter-darwin-x64",
+  "name": "@joedeleeuw/antidrift-linter-linux-arm64-musl",
   "version": "0.20.0",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/joedeleeuw/antidrift.git",
-    "directory": "tooling/antidrift/npm/darwin-x64"
+    "directory": "tooling/antidrift/npm/linux-arm64-musl"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "os": [
-    "darwin"
+    "linux"
   ],
   "cpu": [
-    "x64"
+    "arm64"
+  ],
+  "libc": [
+    "musl"
   ],
   "main": "antidrift-linter",
   "files": [

@@ -1,3 +1,16 @@
+import { readFileSync } from "node:fs";
+
+const rootPackageManager = String(
+  JSON.parse(
+    readFileSync(new URL("../../../package.json", import.meta.url), "utf8")
+  ).packageManager
+);
+if (!rootPackageManager.startsWith("pnpm@")) {
+  throw new Error(
+    `root package.json packageManager must pin pnpm, got ${rootPackageManager}`
+  );
+}
+
 function lines(count, prefix = "Line") {
   return Array.from(
     { length: count },
@@ -332,7 +345,7 @@ export function scaffoldConsumerWorkspace({
         name: "antidrift-consumer-fixture",
         private: true,
         type: "module",
-        packageManager: "pnpm@11.9.0",
+        packageManager: rootPackageManager,
         devDependencies: {
           "@joedeleeuw/antidrift": `file:${tarball}`,
           "@joedeleeuw/typescript-tooling": `file:${toolingTarball}`,

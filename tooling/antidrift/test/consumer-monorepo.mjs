@@ -1,5 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import {
+  copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -10,20 +12,30 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   ADDON_PACKAGE_PATH,
-  LINTER_PLATFORM_KEYS,
+  hostLinterPlatform,
 } from "../src/policy/oxlint.mjs";
 import { proveAdoptionPresets } from "./consumer-adoption.mjs";
 import { scaffoldConsumerWorkspace } from "./consumer-workspace.mjs";
 
-const pnpmBinary = process.env.ANTIDRIFT_CONSUMER_PNPM ?? "pnpm";
+const pnpmEntry = process.env.npm_execpath;
+if (!pnpmEntry) {
+  throw new Error(
+    "consumer-monorepo.mjs runs through pnpm (pnpm package:verify): npm_execpath is unset"
+  );
+}
+const pnpmLaunch = /\.[cm]?js$/u.test(pnpmEntry)
+  ? { file: process.execPath, prefix: [pnpmEntry] }
+  : { file: pnpmEntry, prefix: [] };
 
 const pkgDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const work = mkdtempSync(join(tmpdir(), "antidrift-consumer-"));
+const work = realpathSync.native(
+  mkdtempSync(join(tmpdir(), "antidrift-consumer-"))
+);
 
 function run(cmd, args, cwd) {
   return execFileSync(cmd, args, {
@@ -63,13 +75,23 @@ function fail(message) {
 }
 
 try {
-  console.log("1/6  packing @joedeleeuw/antidrift ...");
-  run("pnpm", ["pack", "--pack-destination", work], pkgDir);
+  const packedParent = process.env.ANTIDRIFT_TARBALL;
+  if (packedParent) {
+    console.log(`1/6  using packed @joedeleeuw/antidrift ${packedParent} ...`);
+    copyFileSync(resolve(packedParent), join(work, basename(packedParent)));
+  } else {
+    console.log("1/6  packing @joedeleeuw/antidrift ...");
+    run(
+      pnpmLaunch.file,
+      [...pnpmLaunch.prefix, "pack", "--pack-destination", work],
+      pkgDir
+    );
+  }
   const tgz = readdirSync(work).find((filename) => filename.endsWith(".tgz"));
   if (!tgz) fail("pack produced no tarball");
   const tarball = join(work, tgz);
   const packedFiles = new Set(
-    run("tar", ["-tzf", tarball], work).trim().split("\n")
+    run("tar", ["-tzf", tarball], work).trim().split(/\r?\n/u)
   );
   for (const required of [
     "package/NOTICE",
@@ -97,30 +119,47 @@ try {
     fail(`tarball contains forbidden entries: ${shippedForbidden.join(", ")}`);
   }
 
-  const hostPlatform = `${process.platform}-${process.arch}`;
-  const platformKey = LINTER_PLATFORM_KEYS[hostPlatform];
-  if (!platformKey) fail(`Unsupported host platform: ${hostPlatform}`);
-  const platformPackageDirectory = join(work, "platform-package");
-  run(
-    process.execPath,
-    [
-      join(pkgDir, "scripts/stage-platform-package.mjs"),
-      platformKey,
-      platformPackageDirectory,
-    ],
-    pkgDir
-  );
-  const platformManifest = JSON.parse(
-    readFileSync(join(platformPackageDirectory, "package.json"), "utf8")
-  );
-  const platformPackageName = platformManifest.name;
+  const platformKey = hostLinterPlatform().key;
   const platformPack = join(work, "platform-pack");
   mkdirSync(platformPack);
-  run(
-    pnpmBinary,
-    ["pack", "--pack-destination", platformPack],
-    platformPackageDirectory
-  );
+  const packedPlatform = process.env.ANTIDRIFT_PLATFORM_TARBALL;
+  if (packedPlatform) {
+    copyFileSync(
+      resolve(packedPlatform),
+      join(platformPack, basename(packedPlatform))
+    );
+  } else {
+    const platformPackageDirectory = join(work, "platform-package");
+    run(
+      process.execPath,
+      [
+        join(pkgDir, "scripts/stage-platform-package.mjs"),
+        platformKey,
+        platformPackageDirectory,
+      ],
+      pkgDir
+    );
+    const npmCli = join(
+      dirname(process.execPath),
+      process.platform === "win32"
+        ? "node_modules/npm/bin/npm-cli.js"
+        : "../lib/node_modules/npm/bin/npm-cli.js"
+    );
+    if (!existsSync(npmCli)) {
+      fail(`npm CLI not found beside Node at ${npmCli}`);
+    }
+    run(
+      process.execPath,
+      [
+        npmCli,
+        "pack",
+        platformPackageDirectory,
+        "--pack-destination",
+        platformPack,
+      ],
+      work
+    );
+  }
   const platformTarballs = readdirSync(platformPack).filter((name) =>
     name.endsWith(".tgz")
   );
@@ -128,13 +167,23 @@ try {
     fail("platform pack must produce exactly one tarball");
   }
   const platformTarball = join(platformPack, platformTarballs[0]);
+  const platformManifest = JSON.parse(
+    run("tar", ["-xOzf", platformTarball, "package/package.json"], work)
+  );
+  const platformPackageName = platformManifest.name;
+  if (platformPackageName !== `@joedeleeuw/antidrift-linter-${platformKey}`) {
+    fail(
+      `${platformTarball} holds ${platformPackageName}, but this host resolves @joedeleeuw/antidrift-linter-${platformKey}`
+    );
+  }
+  console.log(`  host platform: ${platformKey}`);
   const platformTarballContents = run(
     "tar",
     ["-tzf", platformTarball],
     work
   ).trim();
   console.log(`  platform tarball contents:\n${platformTarballContents}`);
-  const platformPackedFiles = new Set(platformTarballContents.split("\n"));
+  const platformPackedFiles = new Set(platformTarballContents.split(/\r?\n/u));
   for (const required of [
     `package/${ADDON_PACKAGE_PATH}`,
     `package/${platformManifest.main}`,
@@ -157,7 +206,11 @@ try {
     );
     const toolingPack = join(work, "tooling-pack");
     mkdirSync(toolingPack);
-    run(pnpmBinary, ["pack", "--pack-destination", toolingPack], toolingRoot);
+    run(
+      pnpmLaunch.file,
+      [...pnpmLaunch.prefix, "pack", "--pack-destination", toolingPack],
+      toolingRoot
+    );
     const packed = readdirSync(toolingPack).filter((name) =>
       name.endsWith(".tgz")
     );
@@ -176,8 +229,9 @@ try {
 
   console.log("3/6  installing the tarball into the consumer ...");
   runInherit(
-    pnpmBinary,
+    pnpmLaunch.file,
     [
+      ...pnpmLaunch.prefix,
       "install",
       process.env.ANTIDRIFT_CONSUMER_OFFLINE === "1"
         ? "--offline"
@@ -194,8 +248,9 @@ try {
 
   function runPackedOxlint() {
     const completed = spawnSync(
-      pnpmBinary,
+      pnpmLaunch.file,
       [
+        ...pnpmLaunch.prefix,
         "exec",
         "oxlint",
         "portable-proofs/addon.ts",
@@ -236,7 +291,7 @@ try {
     join(installedPackageRoot, "package.json")
   );
   const installedPlatformPackageRoot = dirname(
-    realpathSync(
+    realpathSync.native(
       installedParentRequire.resolve(`${platformPackageName}/package.json`)
     )
   );
@@ -276,7 +331,7 @@ try {
   rmSync(installedAddon);
   const missingAddonRun = runPackedOxlint();
   const missingAddonOutput = `${missingAddonRun.stdout}${missingAddonRun.stderr}`;
-  const expectedMissingAddon = `Missing the antidrift Oxlint addon for ${process.platform}-${process.arch}`;
+  const expectedMissingAddon = `Missing the antidrift Oxlint addon for ${platformKey}`;
   if (
     missingAddonRun.status === 0 ||
     !missingAddonOutput.includes(expectedMissingAddon)
@@ -289,11 +344,53 @@ try {
   rmSync(join(work, "portable-proofs/addon.ts"));
   rmSync(join(work, "oxlint.addon.config.json"));
 
+  const packedLinter = join(
+    installedPlatformPackageRoot,
+    platformManifest.main
+  );
+  file(
+    "rust-proofs/Cargo.toml",
+    '[package]\nname = "rust-proofs"\nversion = "0.1.0"\nedition = "2024"\n'
+  );
+  file(
+    "rust-proofs/src/lib.rs",
+    'pub fn parse_port(text: &str) -> Result<u16, String> {\n    text.parse::<u16>().map_err(|_| "bad port".to_owned())\n}\n'
+  );
+  const packedRustRun = spawnSync(
+    packedLinter,
+    ["rust", "--format", "json", "rust-proofs"],
+    {
+      cwd: work,
+      encoding: "utf8",
+      timeout: 300_000,
+      killSignal: "SIGKILL",
+      maxBuffer: 64 * 1024 * 1024,
+    }
+  );
+  if (packedRustRun.error) throw packedRustRun.error;
+  const rustFinding =
+    packedRustRun.status === 1
+      ? JSON.parse(packedRustRun.stdout).find(
+          ({ ruleId, file: findingFile }) =>
+            ruleId === "rust/no-anemic-errors" && findingFile.endsWith("lib.rs")
+        )
+      : undefined;
+  if (!rustFinding) {
+    fail(
+      `packed antidrift-linter rust must exit 1 with rust/no-anemic-errors in rust-proofs/src/lib.rs: ${packedRustRun.status} ${packedRustRun.stdout}${packedRustRun.stderr}`
+    );
+  }
+  console.log(
+    `  packed rust finding: ${rustFinding.ruleId} ${rustFinding.file}:${rustFinding.line}`
+  );
+  rmSync(join(work, "rust-proofs"), { recursive: true });
+
   function lintOxlint(relFile, config) {
     try {
       return runJson(
-        pnpmBinary,
+        pnpmLaunch.file,
         [
+          ...pnpmLaunch.prefix,
           "exec",
           "oxlint",
           relFile,
@@ -322,8 +419,9 @@ try {
   function lintAntidriftOxlint(relFile, config) {
     try {
       return runJson(
-        pnpmBinary,
+        pnpmLaunch.file,
         [
+          ...pnpmLaunch.prefix,
           "exec",
           "antidrift",
           "oxlint",
@@ -354,8 +452,9 @@ try {
   function lintOxlintRepository() {
     try {
       return runJson(
-        pnpmBinary,
+        pnpmLaunch.file,
         [
+          ...pnpmLaunch.prefix,
           "exec",
           "antidrift",
           "oxlint",
@@ -566,18 +665,34 @@ try {
     "5/6  typechecking every public export under supported TS resolution modes ..."
   );
   run(
-    pnpmBinary,
-    ["exec", "tsc", "-p", "tsconfig.bundler.json", "--pretty", "false"],
+    pnpmLaunch.file,
+    [
+      ...pnpmLaunch.prefix,
+      "exec",
+      "tsc",
+      "-p",
+      "tsconfig.bundler.json",
+      "--pretty",
+      "false",
+    ],
     work
   );
   run(
-    pnpmBinary,
-    ["exec", "tsc", "-p", "tsconfig.nodenext.json", "--pretty", "false"],
+    pnpmLaunch.file,
+    [
+      ...pnpmLaunch.prefix,
+      "exec",
+      "tsc",
+      "-p",
+      "tsconfig.nodenext.json",
+      "--pretty",
+      "false",
+    ],
     work
   );
 
   console.log("6/6  importing every public runtime export ...");
-  run("node", ["packages/app/src/runtime.mjs"], work);
+  run(process.execPath, ["packages/app/src/runtime.mjs"], work);
 
   console.log(
     `\n✓ tarball installs, type-checks, imports, and enforces via native antidrift-linter in a consumer monorepo`

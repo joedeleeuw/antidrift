@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,14 +16,95 @@ export function resolveOxlintBinary() {
   return resolve(dirname(packageJsonPath), packageJson.bin.oxlint);
 }
 
-export const LINTER_PLATFORM_KEYS = {
-  "linux-x64": "linux-x64-gnu",
-  "linux-arm64": "linux-arm64-gnu",
-  "darwin-x64": "darwin-x64",
-  "darwin-arm64": "darwin-arm64",
-  "win32-x64": "win32-x64-msvc",
-  "win32-arm64": "win32-arm64-msvc",
-};
+export const LINTER_PLATFORMS = [
+  {
+    key: "linux-x64-gnu",
+    os: "linux",
+    cpu: "x64",
+    libc: "glibc",
+    target: "x86_64-unknown-linux-gnu",
+  },
+  {
+    key: "linux-arm64-gnu",
+    os: "linux",
+    cpu: "arm64",
+    libc: "glibc",
+    target: "aarch64-unknown-linux-gnu",
+  },
+  {
+    key: "linux-x64-musl",
+    os: "linux",
+    cpu: "x64",
+    libc: "musl",
+    target: "x86_64-unknown-linux-musl",
+  },
+  {
+    key: "linux-arm64-musl",
+    os: "linux",
+    cpu: "arm64",
+    libc: "musl",
+    target: "aarch64-unknown-linux-musl",
+  },
+  {
+    key: "darwin-arm64",
+    os: "darwin",
+    cpu: "arm64",
+    target: "aarch64-apple-darwin",
+  },
+  {
+    key: "win32-x64-msvc",
+    os: "win32",
+    cpu: "x64",
+    target: "x86_64-pc-windows-msvc",
+  },
+  {
+    key: "win32-arm64-msvc",
+    os: "win32",
+    cpu: "arm64",
+    target: "aarch64-pc-windows-msvc",
+  },
+];
+
+function linuxLibc() {
+  if (!process.report) {
+    throw new Error(
+      `antidrift-linter cannot tell glibc from musl on this Linux host: process.report is unavailable, so the libc marker cannot be read; supported platforms: ${LINTER_PLATFORMS.map(({ key }) => key).join(", ")}. Build crates/antidrift-linter and crates/antidrift-napi and point ANTIDRIFT_LINTER_BIN and ANTIDRIFT_NAPI_ADDON at the results.`
+    );
+  }
+  process.report.excludeNetwork = true;
+  const report = process.report.getReport();
+  if (report.header.glibcVersionRuntime || report.header.glibcVersionCompiler) {
+    return "glibc";
+  }
+  const loaders = report.sharedObjects.filter((entry) =>
+    /\/ld-musl-|\/libc\.musl-/u.test(entry)
+  );
+  if (loaders.length > 0) {
+    return "musl";
+  }
+  throw new Error(
+    `antidrift-linter cannot tell glibc from musl on this Linux host: the process report carries no glibc marker and no musl loader among ${report.sharedObjects.length} shared objects; supported platforms: ${LINTER_PLATFORMS.map(({ key }) => key).join(", ")}. Build crates/antidrift-linter and crates/antidrift-napi and point ANTIDRIFT_LINTER_BIN and ANTIDRIFT_NAPI_ADDON at the results.`
+  );
+}
+
+export function hostLinterPlatform() {
+  const libc = process.platform === "linux" ? linuxLibc() : undefined;
+  const platform = LINTER_PLATFORMS.find(
+    (row) =>
+      row.os === process.platform &&
+      row.cpu === process.arch &&
+      row.libc === libc
+  );
+  if (!platform) {
+    const host = [process.platform, process.arch, libc]
+      .filter(Boolean)
+      .join("-");
+    throw new Error(
+      `antidrift-linter ships no platform package for ${host}; supported platforms: ${LINTER_PLATFORMS.map(({ key }) => key).join(", ")}. Elsewhere, build crates/antidrift-linter and crates/antidrift-napi and point ANTIDRIFT_LINTER_BIN and ANTIDRIFT_NAPI_ADDON at the results.`
+    );
+  }
+  return platform;
+}
 
 const OXLINT_VALUE_FLAGS = [
   "--config",
@@ -50,7 +131,7 @@ export const ADDON_LIBRARY_NAMES = {
 
 export const ADDON_PACKAGE_PATH = "antidrift.node";
 
-const NATIVE_ARTIFACTS = {
+export const NATIVE_ARTIFACTS = {
   linter: {
     env: "ANTIDRIFT_LINTER_BIN",
     builds: [
@@ -78,17 +159,12 @@ function localArtifactCandidates(artifact, cwd) {
   );
 }
 
-function platformArtifactPackages(artifact) {
-  const platformKey =
-    LINTER_PLATFORM_KEYS[`${process.platform}-${process.arch}`];
-  if (!platformKey) return [];
+function platformArtifactPackage(artifact) {
   const require = createRequire(import.meta.url);
   try {
-    return [
-      require.resolve(
-        `@joedeleeuw/antidrift-linter-${platformKey}${artifact.packageSubpath}`
-      ),
-    ];
+    return require.resolve(
+      `@joedeleeuw/antidrift-linter-${hostLinterPlatform().key}${artifact.packageSubpath}`
+    );
   } catch (error) {
     if (
       !(error instanceof Error) ||
@@ -97,33 +173,24 @@ function platformArtifactPackages(artifact) {
     ) {
       throw error;
     }
-    return [];
+    return undefined;
   }
 }
 
-function resolveNativeArtifact(artifact, cwd) {
+export function resolveNativeArtifact(artifact, cwd) {
   if (process.env[artifact.env]) {
     return process.env[artifact.env];
   }
-  return [
-    ...localArtifactCandidates(artifact, cwd),
-    ...platformArtifactPackages(artifact),
-  ].find((candidate) => existsSync(candidate));
-}
-
-export function resolveNativeLinterBinary(cwd = process.cwd()) {
-  const found = resolveNativeArtifact(NATIVE_ARTIFACTS.linter, cwd);
-  if (found && (statSync(found).mode & 0o111) === 0) {
-    chmodSync(found, 0o755);
-  }
-  return found;
+  const [localBuild] = localArtifactCandidates(artifact, cwd);
+  return localBuild ?? platformArtifactPackage(artifact);
 }
 
 export function loadNativeAddon(cwd = process.cwd()) {
   const addonPath = resolveNativeArtifact(NATIVE_ARTIFACTS.addon, cwd);
   if (!addonPath) {
+    const { key } = hostLinterPlatform();
     throw new Error(
-      `Missing the antidrift Oxlint addon for ${process.platform}-${process.arch}; build crates/antidrift-napi or install the matching @joedeleeuw/antidrift-linter platform package.`
+      `Missing the antidrift Oxlint addon for ${key}; build crates/antidrift-napi or install @joedeleeuw/antidrift-linter-${key}.`
     );
   }
   const addonModule = { exports: {} };
@@ -193,7 +260,7 @@ export function runOxlint({
     stdout.write(OXLINT_USAGE);
     return exit(0);
   }
-  const tsgolintBinary = resolveNativeLinterBinary(cwd);
+  const tsgolintBinary = resolveNativeArtifact(NATIVE_ARTIFACTS.linter, cwd);
   if (!tsgolintBinary) {
     stderr.write(
       "Missing antidrift-linter native binary; build crates/antidrift-linter or run pnpm --filter @joedeleeuw/antidrift build.\n"

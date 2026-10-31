@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -991,6 +992,54 @@ try {
   rmSync(projectRootWorkspace, { recursive: true, force: true });
 }
 
+const inferredTypesWorkspace = mkdtempSync(
+  join(tmpdir(), "antidrift-inferred-types-")
+);
+try {
+  const monorepoDir = join(inferredTypesWorkspace, "monorepo");
+  const appDir = join(monorepoDir, "packages/app");
+  mkdirSync(join(appDir, "node_modules/@types"), { recursive: true });
+  mkdirSync(join(appDir, "scripts"), { recursive: true });
+  symlinkSync(
+    realpathSync(resolve(repoRoot, "node_modules/@types/node")),
+    join(appDir, "node_modules/@types/node"),
+    "junction"
+  );
+  writeFileSync(
+    join(monorepoDir, "package.json"),
+    '{ "name": "inferred-types-root", "version": "0.0.0", "type": "module", "private": true }\n'
+  );
+  writeFileSync(
+    join(appDir, "package.json"),
+    '{ "name": "inferred-types-app", "version": "0.0.0", "type": "module", "private": true }\n'
+  );
+  writeFileSync(
+    join(appDir, "scripts/probe.mjs"),
+    'import { readFileSync } from "node:fs";\nconst fromDisk = JSON.parse(readFileSync("x.json", "utf8"));\nconst fromNowhere = JSON.parse(globalThis.untypedThing);\nconsole.log(fromDisk, fromNowhere);\n'
+  );
+  const inferredFindings = (cwd, target) => {
+    const run = spawnSync(binaryPath, ["--format", "json", target], {
+      cwd,
+      encoding: "utf8",
+    });
+    return JSON.parse(String(run.stdout ?? "[]")).flatMap((entry) =>
+      entry.messages.map((message) => `${message.line} ${message.ruleId}`)
+    );
+  };
+  assert.deepEqual(
+    inferredFindings(monorepoDir, "packages/app/scripts/probe.mjs"),
+    ["3 antidrift/no-unsafe-deserialize"],
+    "A file outside every tsconfig resolves node:fs through the @types packages installed beside it, even when the run starts at a monorepo root that installs none: only the untyped JSON.parse argument is unsafe"
+  );
+  assert.deepEqual(
+    inferredFindings(appDir, "scripts/probe.mjs"),
+    ["3 antidrift/no-unsafe-deserialize"],
+    "The same file gets the same types when the run starts inside the package"
+  );
+} finally {
+  rmSync(inferredTypesWorkspace, { recursive: true, force: true });
+}
+
 const deriveWorkspace = mkdtempSync(join(tmpdir(), "antidrift-derive-"));
 try {
   const sampleRoot = resolve(repoRoot, "apps/shape-sample");
@@ -1135,7 +1184,7 @@ assert.deepEqual(sampleSmoke.stdout.trim().split("\n"), [
 ]);
 
 console.log(
-  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path, project-root, derive, line-cap & rust linter smokes verified)`
+  `✓ antidrift-linter Rust smoke passed (${registeredRules.size} rules registered, ${batchResults.length} portable batch cases + ${headlessProbes.length + 2} native tsrslint headless probes + failure-path, project-root, inferred-types, derive, line-cap & rust linter smokes verified)`
 );
 
 proveOxlintPluginBridge(repoRoot, binaryPath);
