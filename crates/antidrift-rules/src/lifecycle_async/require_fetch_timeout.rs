@@ -257,7 +257,7 @@ fn fetch_origin(sf: P<SourceFile>, expression: P<Node>, visited: &mut FxHashSet<
     if let Some(initializer) = initializer {
         return fetch_origin(sf, initializer, visited);
     }
-    !is_binding_mutated(sf.as_node(), binding)
-        && const_binding_initializer(binding)
-            .is_some_and(|initializer| fetch_origin(sf, initializer, visited))
+    const_binding_initializer(binding)
+        .is_some_and(|initializer| fetch_origin(sf, initializer, visited))
+        && !is_binding_mutated(sf.as_node(), binding)
 }
