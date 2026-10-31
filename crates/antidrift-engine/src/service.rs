@@ -16,6 +16,7 @@ enum EngineRequest {
     Lint {
         cwd: String,
         file_path: String,
+        rules: Vec<String>,
         reply: Sender<Result<Vec<Finding>, String>>,
     },
     Headless {
@@ -61,10 +62,11 @@ fn serve(receiver: &Receiver<EngineRequest>) {
             EngineRequest::Lint {
                 cwd,
                 file_path,
+                rules,
                 reply,
             } => reply
                 .send(guarded(|| {
-                    session_for(&mut sessions, &cwd)?.lint_file(&file_path)
+                    session_for(&mut sessions, &cwd)?.lint_file(&file_path, &rules)
                 }))
                 .is_ok(),
             EngineRequest::Headless { request, reply } => {
@@ -105,12 +107,18 @@ impl EngineService {
             .map_err(|err| format!("antidrift engine lock poisoned: {err}"))
     }
 
-    pub fn lint_file(&self, cwd: String, file_path: String) -> Result<Vec<Finding>, String> {
+    pub fn lint_file(
+        &self,
+        cwd: String,
+        file_path: String,
+        rules: Vec<String>,
+    ) -> Result<Vec<Finding>, String> {
         let (reply, outcome) = channel();
         self.sender()?
             .send(EngineRequest::Lint {
                 cwd,
                 file_path,
+                rules,
                 reply,
             })
             .map_err(|err| format!("antidrift engine stopped: {err}"))?;

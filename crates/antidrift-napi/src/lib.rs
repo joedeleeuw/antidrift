@@ -32,9 +32,13 @@ fn service() -> napi::Result<&'static EngineService> {
 }
 
 #[napi]
-pub fn lint_file(cwd: String, file_path: String) -> napi::Result<Vec<EngineFinding>> {
+pub fn lint_file(
+    cwd: String,
+    file_path: String,
+    rules: Vec<String>,
+) -> napi::Result<Vec<EngineFinding>> {
     let findings = service()?
-        .lint_file(cwd, file_path)
+        .lint_file(cwd, file_path, rules)
         .map_err(napi::Error::from_reason)?;
     Ok(findings
         .into_iter()

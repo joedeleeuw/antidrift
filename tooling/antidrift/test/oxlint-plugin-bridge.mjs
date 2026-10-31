@@ -399,7 +399,7 @@ export function proveOxlintPluginBridge(repoRoot, linter) {
     proveFixAfterRegularPass(repoRoot, project, linter);
     const addon = loadNativeAddon(project);
     for (const file of CAST_FILES) {
-      addon.lintFile(project, join(project, file));
+      addon.lintFile(project, join(project, file), ["antidrift/no-as-never"]);
     }
     assert.equal(
       addon.engineStats().programsBuilt,

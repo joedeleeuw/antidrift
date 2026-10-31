@@ -5,34 +5,68 @@ const RULE_PREFIX = "antidrift/";
 const addon = loadNativeAddon();
 process.env.ANTIDRIFT_ENGINE = addon.engineEndpoint();
 
-const currentFile = { filename: "", findings: [] };
+const enabledRules = new Set();
+const currentFile = { filename: "", requested: new Set(), findings: new Map() };
 
-function findingsFor(context) {
-  if (currentFile.filename !== context.filename) {
-    currentFile.findings = addon.lintFile(context.cwd, context.filename);
-    currentFile.filename = context.filename;
+function enterFile(filename, ruleId) {
+  if (currentFile.filename !== filename || currentFile.requested.has(ruleId)) {
+    currentFile.filename = filename;
+    currentFile.requested = new Set();
+    currentFile.findings = new Map();
   }
-  return currentFile.findings;
+  currentFile.requested.add(ruleId);
+}
+
+function lintRules(context, ruleIds) {
+  const unlinted = ruleIds.filter(
+    (ruleId) => !currentFile.findings.has(ruleId)
+  );
+  if (unlinted.length === 0) {
+    return;
+  }
+  const findings = addon.lintFile(context.cwd, context.filename, unlinted);
+  for (const ruleId of unlinted) {
+    currentFile.findings.set(ruleId, []);
+  }
+  for (const finding of findings) {
+    currentFile.findings.get(finding.rule).push(finding);
+  }
+}
+
+function reportFindings(context, ruleId) {
+  for (const finding of currentFile.findings.get(ruleId)) {
+    context.report({
+      message: finding.message,
+      loc: {
+        start: { line: finding.line, column: finding.column - 1 },
+        end: { line: finding.endLine, column: finding.endColumn - 1 },
+      },
+    });
+  }
 }
 
 function bridgeRule(ruleId) {
   return {
     meta: { type: "problem" },
-    create(context) {
+    createOnce(context) {
       return {
-        Program() {
-          for (const finding of findingsFor(context)) {
-            if (finding.rule !== ruleId) {
-              continue;
-            }
-            context.report({
-              message: finding.message,
-              loc: {
-                start: { line: finding.line, column: finding.column - 1 },
-                end: { line: finding.endLine, column: finding.endColumn - 1 },
-              },
-            });
+        before() {
+          enterFile(context.filename, ruleId);
+          if (!enabledRules.has(ruleId)) {
+            enabledRules.add(ruleId);
+            return true;
           }
+          if (!currentFile.findings.has(ruleId)) {
+            lintRules(context, [...enabledRules]);
+          }
+          reportFindings(context, ruleId);
+          return false;
+        },
+        Program() {
+          if (!currentFile.findings.has(ruleId)) {
+            lintRules(context, [...currentFile.requested]);
+          }
+          reportFindings(context, ruleId);
         },
       };
     },
