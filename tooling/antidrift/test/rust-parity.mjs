@@ -23,6 +23,11 @@ import {
 } from "./portable-cases.mjs";
 import { headlessRuleProbes } from "./headless-rule-probes.mjs";
 import { proveOxlintPluginBridge } from "./oxlint-plugin-bridge.mjs";
+import {
+  rustHouseStyleMetadata,
+  rustSmokeManifest,
+  writeRustSmokeWorkspace,
+} from "./rust-smoke-workspace.mjs";
 import { loadPolicy } from "../src/policy/generate-policy-artifacts.mjs";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -412,114 +417,31 @@ assert.notEqual(
   "Expected missing CLI path to fail with non-zero exit code"
 );
 
-const tempWorkspace = mkdtempSync(join(tmpdir(), "antidrift-rust-smoke-"));
-try {
-  const kernelSrc = join(tempWorkspace, "crates/antidrift-kernel/src");
-  mkdirSync(kernelSrc, { recursive: true });
-  writeFileSync(
-    join(tempWorkspace, "crates/antidrift-kernel/Cargo.toml"),
-    '[package]\nname = "antidrift-kernel"\nversion = "0.20.0"\n\n[lib]\npath = "src/lib.rs"\ntest = false\n\n[lints]\nworkspace = true\n'
-  );
-  writeFileSync(
-    join(kernelSrc, "lib.rs"),
-    "pub mod boundary;\npub mod provenance;\n"
-  );
-  writeFileSync(
-    join(kernelSrc, "boundary.rs"),
-    "pub struct BoundaryItem;\npub struct WindowBounds { pub x: i32, pub y: i32, pub width: u32 }\npub fn load_raw_manifest() -> serde_json::Value { serde_json::Value::Null }\n"
-  );
-  writeFileSync(
-    join(kernelSrc, "provenance.rs"),
-    [
-      "use crate::{ boundary::BoundaryItem, boundary::load_raw_manifest };",
-      "use serde::Deserialize;",
-      "use std::collections::HashMap;",
-      "// forbidden inline comment",
-      "pub struct FrameBounds { pub x: i32, pub y: i32, pub width: u32 }",
-      "#[derive(Deserialize)]",
-      "pub struct LooseConfig { pub kind: String, pub exclude_files: Vec<String>, pub seen: HashMap<String, bool>, pub item: Option<BoundaryItem> }",
-      "pub fn decode_rule_options(name: &str) -> Result<usize, String> { Ok(name.len()) }",
-      "pub fn legacy_adapter(input: &str) -> Result<usize, String> {",
-      "    decode_rule_options(input)?;",
-      '    input.parse::<usize>().map_err(|_| "parse failed".to_string())',
-      "}",
-      "pub fn hop_wrapper(input: &str) -> Result<usize, String> { let _ = input; legacy_adapter(input) }",
-      "pub struct Holder { pub ident: String }",
-      "pub struct ProjectMeta { pub project_id: String, pub project_key: String }",
-      "pub struct StatusEnvelope { pub ok: bool, pub count: usize }",
-      "pub struct OutcomeBag { pub ok: bool, pub count: usize, pub error: Option<String> }",
-      "pub fn make_envelope_a(n: usize) -> StatusEnvelope { StatusEnvelope { ok: true, count: n } }",
-      "pub fn make_envelope_b(n: usize) -> StatusEnvelope { StatusEnvelope { ok: true, count: n + 1 } }",
-      "pub fn compare_ident(h: &Holder, val: &serde_json::Value) -> bool {",
-      '    let _ = val["k"].as_str();',
-      "    let from_helper = load_raw_manifest();",
-      '    let _ = from_helper.get("nested").and_then(|v| v.as_u64());',
-      '    let _ = h.ident.to_string() == "foo";',
-      '    if let Ok(text) = std::fs::read_to_string("foo.txt") { let _ = text.len(); }',
-      '    let _ = std::fs::read_to_string("bar.txt").unwrap_or_default();',
-      '    let bins = ["dist/bin/tool", "target/release/tool", "target/debug/tool"];',
-      "    let _ = bins.iter().find(|p| std::path::Path::new(p).exists());",
-      "    let raw_json = serde_json::to_string(&h.ident).unwrap();",
-      "    let _ = serde_json::from_str::<LooseConfig>(&raw_json);",
-      "    let _ = h.ident.to_string().parse::<u32>();",
-      "    let _ = serde_json::from_str::<LooseConfig>(&h.ident).ok();",
-      "    match legacy_adapter(&h.ident) { Ok(_) => true, Err(_) => false }",
-      "}",
-      "pub async fn bad_async_sleep(err: &str, xs: &[Holder], ys: &[Holder]) -> OutcomeBag {",
-      "    std::thread::sleep(std::time::Duration::from_millis(10));",
-      '    let _ = err.to_string().contains("not found");',
-      "    let _ = xs.iter().map(|x| ys.iter().find(|y| y.ident == x.ident)).count();",
-      "    let cloned = Holder { ident: xs[0].ident.clone() };",
-      "    let _ = cloned.ident.len();",
-      "    match legacy_adapter(err) { Ok(v) => OutcomeBag { ok: true, count: v, error: None }, Err(e) => OutcomeBag { ok: false, count: 0, error: Some(e) } }",
-      "}",
-      "pub async fn serial_reads(h: &Holder) -> usize {",
-      "    let first = read_one(h).await;",
-      "    let second = read_two(h).await;",
-      "    let third = read_three(h).await;",
-      "    first + second + third",
-      "}",
-      "async fn read_one(h: &Holder) -> usize { h.ident.len() }",
-      "async fn read_two(h: &Holder) -> usize { h.ident.len() + 1 }",
-      "async fn read_three(h: &Holder) -> usize { h.ident.len() + 2 }",
-      "pub fn branch_bag(flag: bool, h: &Holder) -> OutcomeBag {",
-      "    if flag { OutcomeBag { ok: true, count: 1, error: None } } else { OutcomeBag { ok: false, count: 0, error: Some(h.ident.clone()) } }",
-      "}",
-      "pub fn sniff_text(text: &str) -> Option<LooseConfig> {",
-      "    serde_json::from_str(text).ok()",
-      "}",
-      "#[cfg(all(test))]\nmod inline_tests {}",
-      "",
-    ].join("\n")
-  );
-  writeFileSync(join(kernelSrc, "orphan_file.rs"), "pub fn unused() {}\n");
-  writeFileSync(join(kernelSrc, "bad_helpers.rs"), "pub fn helper() {}\n");
-  const rulesSrc = join(tempWorkspace, "crates/antidrift-rules/src");
-  mkdirSync(rulesSrc, { recursive: true });
-  writeFileSync(
-    join(tempWorkspace, "crates/antidrift-rules/Cargo.toml"),
-    '[package]\nname = "antidrift-rules"\nversion = "0.20.0"\n\n[lib]\npath = "src/lib.rs"\ntest = false\ndoctest = false\n\n[lints]\nworkspace = true\n'
-  );
-  writeFileSync(
-    join(rulesSrc, "lib.rs"),
-    "pub struct ScopelessRule;\npub trait Rule {}\nimpl Rule for ScopelessRule {}\n"
-  );
-
-  const rustSubcmd = spawnSync(binaryPath, ["rust", "--json", tempWorkspace], {
+function runRustSmoke(tempWorkspace) {
+  const run = spawnSync(binaryPath, ["rust", "--json", tempWorkspace], {
     cwd: repoRoot,
     encoding: "utf8",
   });
+  return {
+    run,
+    diags: run.status === 1 ? JSON.parse(String(run.stdout ?? "")) : [],
+  };
+}
+
+const tempWorkspace = mkdtempSync(join(tmpdir(), "antidrift-rust-smoke-"));
+try {
+  writeRustSmokeWorkspace(tempWorkspace, rustHouseStyleMetadata);
+  const { run: rustSubcmd, diags: rustDiags } = runRustSmoke(tempWorkspace);
   assert.equal(
     rustSubcmd.status,
     1,
     `Expected antidrift-linter rust to exit 1 on violations, got ${rustSubcmd.status}: ${rustSubcmd.stderr}`
   );
-  const rustDiags = JSON.parse(String(rustSubcmd.stdout ?? ""));
   const reportedRuleIds = new Set(rustDiags.map((diag) => diag.ruleId));
   for (const expectedRuleId of [
-    "rust/target-manifest-policy",
     "rust/no-inline-comment",
     "rust/no-layer-violation",
+    "rust/no-forbidden-call",
     "rust/require-strict-serde",
     "rust/no-stringly-variant",
     "rust/no-boolean-map",
@@ -528,14 +450,11 @@ try {
     "rust/no-anemic-errors",
     "rust/no-compat-names",
     "rust/no-wrapping-functions",
-    "rust/no-duplicate-scope-fields",
-    "rust/no-discarded-decoded-config",
     "rust/no-let-underscore-suppression",
     "rust/no-ident-to-string-compare",
     "rust/no-untyped-config-probe",
     "rust/no-inline-tests",
     "rust/no-silent-result-discard",
-    "rust/require-rule-scope",
     "rust/no-structural-type-fork",
     "rust/no-value-roundtrip",
     "rust/no-decode-to-option",
@@ -559,12 +478,19 @@ try {
     "Nested '.find(...)' performs an O(N*M)",
     "spans multiple build output tiers",
     "Untyped config probe '.as_u64()'",
+    "turns a failure into an empty value",
+    "Section [lib] must set `doctest = false`",
+    "Crate 'antidrift-kernel' (layer 0) cannot depend on 'antidrift-engine' (layer 2)",
+    "Crate layer 0 cannot use 'antidrift-engine' (layer 2)",
+    "Module layer 'provenance' (rank 0) cannot import higher layer 'boundary' (rank 3)",
+    "'Listener::Enter' is forbidden here: Listener::Enter(Kind::SourceFile) never fires in tsrslint.",
+    "'hop_wrapper' is a hop to 'legacy_adapter': inlining it at its 1 call site(s)",
   ]) {
     assert.equal(
       rustDiags.filter((diag) => String(diag.message).includes(expectedMessage))
         .length,
       1,
-      `Expected antidrift-linter rust diagnostics to include '${expectedMessage}', got ${JSON.stringify(rustDiags)}`
+      `Expected antidrift-linter rust diagnostics to include '${expectedMessage}' once, got ${JSON.stringify(rustDiags)}`
     );
   }
   assert.equal(
@@ -580,6 +506,46 @@ try {
     1,
     `Expected one decode-to-option report for the .ok() discard and none for the sniffed text input, got ${JSON.stringify(rustDiags)}`
   );
+  assert.deepEqual(
+    [
+      ...new Set(
+        rustDiags
+          .filter((diag) => diag.ruleId === "rust/no-value-roundtrip")
+          .map((diag) => diag.file)
+      ),
+    ],
+    ["crates/antidrift-kernel/src/provenance.rs"],
+    `Expected the #[cfg(test)] module's serde round-trip to be skipped, got ${JSON.stringify(rustDiags)}`
+  );
+  assert.equal(
+    rustDiags.filter((diag) => diag.file.endsWith("generated_shapes.rs"))
+      .length,
+    0,
+    `Expected the @generated file to report nothing, got ${JSON.stringify(rustDiags)}`
+  );
+  assert.deepEqual(
+    [
+      ...new Set(
+        rustDiags
+          .filter((diag) => diag.ruleId === "rust/no-stringly-variant")
+          .map((diag) => diag.severity)
+      ),
+    ],
+    ["warn"],
+    `Expected the configured warn level to cap rust/no-stringly-variant, got ${JSON.stringify(rustDiags)}`
+  );
+  for (const absentRuleId of [
+    "rust/target-manifest-policy",
+    "rust/require-rule-scope",
+    "rust/no-duplicate-scope-fields",
+    "rust/no-discarded-decoded-config",
+    "antidrift/no-tsrslint-sourcefile-listener",
+  ]) {
+    assert.ok(
+      !reportedRuleIds.has(absentRuleId),
+      `Expected removed rule ${absentRuleId} to be gone, got ${JSON.stringify(rustDiags)}`
+    );
+  }
   const singleRsRun = spawnSync(
     binaryPath,
     ["rust", "crates/antidrift-linter/src/main.rs"],
@@ -597,6 +563,123 @@ try {
   rmSync(tempWorkspace, { recursive: true, force: true });
 }
 
+const defaultWorkspace = mkdtempSync(
+  join(tmpdir(), "antidrift-rust-defaults-")
+);
+try {
+  writeRustSmokeWorkspace(defaultWorkspace, "");
+  const listed = execFileSync(
+    binaryPath,
+    ["rust", "--list-rules", defaultWorkspace],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+  assert.ok(
+    listed.includes("rust/no-inline-comment off") &&
+      listed.includes("rust/no-inline-tests off") &&
+      listed.includes("rust/no-structural-type-fork error"),
+    `Expected --list-rules to show shipped defaults, got ${listed}`
+  );
+  const { run, diags } = runRustSmoke(defaultWorkspace);
+  assert.equal(
+    run.status,
+    1,
+    `Expected default run to exit 1, got ${run.status}: ${run.stderr}`
+  );
+  const reported = new Set(diags.map((diag) => diag.ruleId));
+  for (const houseStyleRuleId of [
+    "rust/no-inline-comment",
+    "rust/no-inline-tests",
+  ]) {
+    assert.ok(
+      !reported.has(houseStyleRuleId),
+      `Expected house-style rule ${houseStyleRuleId} to be off by default, got ${JSON.stringify(diags)}`
+    );
+  }
+  for (const layoutRuleId of [
+    "rust/no-layer-violation",
+    "rust/no-forbidden-call",
+  ]) {
+    assert.ok(
+      !reported.has(layoutRuleId),
+      `Expected ${layoutRuleId} to stay silent without layer or forbidden-call configuration, got ${JSON.stringify(diags)}`
+    );
+  }
+  assert.deepEqual(
+    diags
+      .filter((diag) => diag.ruleId === "rust/no-structural-type-fork")
+      .map((diag) => [diag.file, diag.line, diag.severity]),
+    [["crates/antidrift-kernel/src/provenance.rs", 6, "error"]],
+    `Expected general rules to stay on by default, got ${JSON.stringify(diags)}`
+  );
+  writeFileSync(
+    join(defaultWorkspace, "Cargo.toml"),
+    rustSmokeManifest(
+      '[workspace.metadata.antidrift]\nrules."rust/no-boolean-map" = { level = "error", exclude-files = ["crates/antidrift-kernel/src/provenance.rs"] }\n'
+    )
+  );
+  const scoped = runRustSmoke(defaultWorkspace);
+  const booleanMapFiles = (reports) =>
+    reports
+      .filter((diag) => diag.ruleId === "rust/no-boolean-map")
+      .map((diag) => `${diag.file}:${diag.line}`);
+  assert.deepEqual(
+    [booleanMapFiles(diags), booleanMapFiles(scoped.diags)],
+    [["crates/antidrift-kernel/src/provenance.rs:8"], []],
+    `Expected exclude-files to scope rust/no-boolean-map out of provenance.rs, got ${JSON.stringify(scoped.diags)}`
+  );
+  writeFileSync(
+    join(defaultWorkspace, "Cargo.toml"),
+    rustSmokeManifest(
+      '[workspace.metadata.antidrift]\nrules."rust/no-such-rule" = "error"\n'
+    )
+  );
+  const unknownRule = spawnSync(
+    binaryPath,
+    ["rust", "--json", defaultWorkspace],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }
+  );
+  assert.notEqual(
+    unknownRule.status,
+    0,
+    "Expected an unknown rule id to fail the run"
+  );
+  assert.ok(
+    unknownRule.stderr.includes(
+      "[workspace.metadata.antidrift] rules names unknown rule 'rust/no-such-rule'"
+    ) && unknownRule.stderr.includes(join(defaultWorkspace, "Cargo.toml")),
+    `Expected the unknown rule error to name the manifest and the rule, got ${unknownRule.stderr}`
+  );
+  writeFileSync(
+    join(defaultWorkspace, "Cargo.toml"),
+    rustSmokeManifest(
+      '[workspace.metadata.antidrift]\nrules."rust/no-boolean-map" = { level = "error", colour = "blue" }\n'
+    )
+  );
+  const unknownKey = spawnSync(
+    binaryPath,
+    ["rust", "--json", defaultWorkspace],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }
+  );
+  assert.notEqual(
+    unknownKey.status,
+    0,
+    "Expected an unknown metadata key to fail the run"
+  );
+  assert.ok(
+    unknownKey.stderr.includes("invalid Cargo manifest") &&
+      unknownKey.stderr.includes("colour"),
+    `Expected the unknown key error to name the key, got ${unknownKey.stderr}`
+  );
+} finally {
+  rmSync(defaultWorkspace, { recursive: true, force: true });
+}
+
 const policyRowsSchema = z.object({
   clusters: z.array(
     z.object({
@@ -612,10 +695,9 @@ const lineCapDiagnosticsSchema = z.array(
 const lineCapBatchSchema = z.array(
   z.object({ id: z.string(), diagnostics: lineCapDiagnosticsSchema })
 );
-const lineCapDetector =
-  /^(antidrift|antidrift-linter):([^,]+),warnAt:(\d+),max:(\d+)$/u;
+const lineCapDetector = /^antidrift:([^,]+),warnAt:(\d+),max:(\d+)$/u;
 const lineCapShapes = {
-  "rust/max-file-lines": {
+  "rust/max-module-lines": {
     head: [],
     tail: [],
     line: (index) => `pub const C_${index}: usize = ${index};`,
@@ -644,23 +726,61 @@ function lineCapSource(ruleId, count) {
   );
   return `${[...head, ...body, ...tail].join("\n")}\n`;
 }
-const lineCaps = policyRowsSchema
-  .parse(await loadPolicy(resolve(repoRoot, "policy/agent-guardrails.yaml")))
-  .clusters.flatMap(({ rules }) => rules)
-  .flatMap(({ detector }) => {
-    const match = lineCapDetector.exec(detector ?? "");
-    if (!match) {
-      return [];
-    }
-    const [, tool, rule, warnAt, max] = match;
-    return [
-      {
-        ruleId: tool === "antidrift" ? `antidrift/${rule}` : rule,
-        warnAt: Number(warnAt),
-        max: Number(max),
-      },
-    ];
-  });
+const rustRuleRows = z
+  .array(
+    z.object({
+      id: z.string(),
+      kind: z.enum(["general", "house-style"]),
+      level: z.enum(["error", "warn", "off"]),
+      lineCap: z.object({ warnAbove: z.number(), max: z.number() }).optional(),
+    })
+  )
+  .parse(
+    JSON.parse(
+      execFileSync(
+        binaryPath,
+        ["rust", "--list-rules", "--format", "json", repoRoot],
+        { cwd: repoRoot, encoding: "utf8" }
+      )
+    )
+  );
+assert.deepEqual(
+  rustRuleRows
+    .filter((row) => row.kind === "house-style")
+    .map((row) => `${row.id}=${row.level}`),
+  ["rust/no-inline-comment=error", "rust/no-inline-tests=error"],
+  "antidrift's own Cargo.toml must turn the house-style rules on"
+);
+const lineCaps = [
+  ...policyRowsSchema
+    .parse(await loadPolicy(resolve(repoRoot, "policy/agent-guardrails.yaml")))
+    .clusters.flatMap(({ rules }) => rules)
+    .flatMap(({ detector }) => {
+      const match = lineCapDetector.exec(detector ?? "");
+      if (!match) {
+        return [];
+      }
+      const [, rule, warnAt, max] = match;
+      return [
+        {
+          ruleId: `antidrift/${rule}`,
+          warnAt: Number(warnAt),
+          max: Number(max),
+        },
+      ];
+    }),
+  ...rustRuleRows.flatMap((row) =>
+    row.lineCap
+      ? [
+          {
+            ruleId: row.id,
+            warnAt: row.lineCap.warnAbove,
+            max: row.lineCap.max,
+          },
+        ]
+      : []
+  ),
+];
 assert.deepEqual(
   lineCaps.map(({ ruleId }) => ruleId).sort(),
   Object.keys(lineCapShapes).sort(),
@@ -719,9 +839,12 @@ try {
     );
   }
   const rustCap = lineCaps.find(
-    ({ ruleId }) => ruleId === "rust/max-file-lines"
+    ({ ruleId }) => ruleId === "rust/max-module-lines"
   );
-  assert.ok(rustCap, "policy must declare rust/max-file-lines");
+  assert.ok(
+    rustCap,
+    "antidrift-linter rust --list-rules must declare rust/max-module-lines"
+  );
   for (const [count, expected] of lineCapBoundaries(rustCap)) {
     const rustFile = join(lineCapWorkspace, `cap_${count}.rs`);
     writeFileSync(rustFile, lineCapSource(rustCap.ruleId, count));
@@ -735,12 +858,12 @@ try {
         .filter(({ ruleId }) => ruleId === rustCap.ruleId)
         .map(({ severity }) => severity),
       expected,
-      `rust/max-file-lines at ${count} non-blank lines`
+      `rust/max-module-lines at ${count} non-blank lines`
     );
     assert.equal(
       rustRun.status,
       expected.includes("error") ? 1 : 0,
-      `rust/max-file-lines at ${count} lines exited ${rustRun.status}`
+      `rust/max-module-lines at ${count} lines exited ${rustRun.status}`
     );
   }
   const deniedNearCap = spawnSync(
