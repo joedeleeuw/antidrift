@@ -19,6 +19,17 @@ pub(super) struct CargoManifest {
     pub(super) dev_dependencies: BTreeMap<String, toml::Value>,
     #[serde(rename = "build-dependencies")]
     pub(super) build_dependencies: BTreeMap<String, toml::Value>,
+    pub(super) target: BTreeMap<String, TargetDependenciesTable>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+pub(super) struct TargetDependenciesTable {
+    pub(super) dependencies: BTreeMap<String, toml::Value>,
+    #[serde(rename = "dev-dependencies")]
+    pub(super) dev_dependencies: BTreeMap<String, toml::Value>,
+    #[serde(rename = "build-dependencies")]
+    pub(super) build_dependencies: BTreeMap<String, toml::Value>,
 }
 
 #[derive(Deserialize, Default)]
@@ -85,6 +96,14 @@ fn dependency_path(spec: &toml::Value) -> Option<&str> {
     }
 }
 
+fn dependency_uses_workspace(spec: &toml::Value) -> bool {
+    matches!(
+        spec,
+        toml::Value::Table(detailed)
+            if matches!(detailed.get("workspace"), Some(toml::Value::Boolean(true)))
+    )
+}
+
 impl ManifestSource {
     pub(super) fn directory(&self) -> &Path {
         self.path.parent().unwrap_or_else(|| Path::new("."))
@@ -109,21 +128,63 @@ impl ManifestSource {
             .map(|(alias, spec)| dependency_package_name(alias, spec))
     }
 
-    pub(super) fn dependency_paths(&self) -> Vec<PathBuf> {
+    fn all_dependency_entries(&self) -> impl Iterator<Item = (&str, &toml::Value)> {
         let manifest = &self.manifest;
-        let workspace_paths = manifest
-            .workspace
-            .iter()
-            .flat_map(|workspace| workspace.dependencies.values());
+        let target_entries = manifest.target.values().flat_map(|target| {
+            target
+                .dependencies
+                .iter()
+                .chain(target.dev_dependencies.iter())
+                .chain(target.build_dependencies.iter())
+        });
         manifest
             .dependencies
-            .values()
-            .chain(manifest.dev_dependencies.values())
-            .chain(manifest.build_dependencies.values())
-            .chain(workspace_paths)
+            .iter()
+            .chain(manifest.dev_dependencies.iter())
+            .chain(manifest.build_dependencies.iter())
+            .chain(target_entries)
+            .map(|(alias, spec)| (alias.as_str(), spec))
+    }
+
+    pub(super) fn dependency_paths(
+        &self,
+        workspace_deps: Option<(&Path, &BTreeMap<String, toml::Value>)>,
+    ) -> Vec<PathBuf> {
+        let mut paths: Vec<PathBuf> = self
+            .manifest
+            .workspace
+            .iter()
+            .flat_map(|workspace| workspace.dependencies.values())
             .filter_map(dependency_path)
             .map(|relative| self.directory().join(relative))
-            .collect()
+            .collect();
+        for (alias, spec) in self.all_dependency_entries() {
+            if let Some(resolved) = self.resolve_dependency_path(alias, spec, workspace_deps) {
+                paths.push(resolved);
+            }
+        }
+        paths
+    }
+
+    fn resolve_dependency_path(
+        &self,
+        alias: &str,
+        spec: &toml::Value,
+        workspace_deps: Option<(&Path, &BTreeMap<String, toml::Value>)>,
+    ) -> Option<PathBuf> {
+        if let Some(relative) = dependency_path(spec) {
+            return Some(self.directory().join(relative));
+        }
+        if !dependency_uses_workspace(spec) {
+            return None;
+        }
+        let (workspace_dir, root_deps) = workspace_deps?;
+        let package = dependency_package_name(alias, spec);
+        let relative = root_deps
+            .get(package)
+            .or_else(|| root_deps.get(alias))
+            .and_then(dependency_path)?;
+        Some(workspace_dir.join(relative))
     }
 
     pub(super) fn line_of(&self, byte_offset: usize) -> usize {

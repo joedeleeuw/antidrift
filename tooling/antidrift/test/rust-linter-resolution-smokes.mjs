@@ -103,3 +103,71 @@ export function wrapperResolutionSmoke(linter) {
     );
   });
 }
+
+const CFG_SUPPRESSION_SOURCE = [
+  "pub struct Helper;",
+  "impl Helper { pub fn unused(&self) -> usize { 1 } }",
+  "pub fn method_name_not_justification(unused: usize, helper: &Helper) -> usize {",
+  "    let _ = unused;",
+  "    #[cfg(unix)]",
+  "    let count = helper.unused();",
+  "    #[cfg(not(unix))]",
+  "    let count = 0;",
+  "    count",
+  "}",
+  "pub fn shadowed_binding_not_justification(unused: usize) -> usize {",
+  "    let _ = unused;",
+  "    #[cfg(unix)]",
+  "    let count = { let unused = 2; unused };",
+  "    #[cfg(not(unix))]",
+  "    let count = 0;",
+  "    count",
+  "}",
+  "pub fn real_cfg_use_justified(used_on_unix: usize) -> usize {",
+  "    let _ = used_on_unix;",
+  "    #[cfg(unix)]",
+  "    let count = used_on_unix + 1;",
+  "    #[cfg(not(unix))]",
+  "    let count = 0;",
+  "    count",
+  "}",
+  "",
+].join("\n");
+
+export function cfgSuppressionAndMacroModuleSmoke(linter) {
+  withTempDir("antidrift-rust-cfg-macro-", (root) => {
+    writeCrate(root, "cfg-macro");
+    writeFileSync(join(root, "src/lib.rs"), CFG_SUPPRESSION_SOURCE);
+    assert.deepEqual(
+      linter
+        .findings(root)
+        .filter((line) => line.includes("rust/no-let-underscore-suppression")),
+      [
+        "src/lib.rs:12 rust/no-let-underscore-suppression error",
+        "src/lib.rs:4 rust/no-let-underscore-suppression error",
+      ],
+      "Only expression uses of the suppressed binding justify let _ = ...; method calls and shadowed bindings still report"
+    );
+    writeFileSync(
+      join(root, "Cargo.toml"),
+      '[package]\nname = "cfg-macro"\nversion = "0.0.0"\n\n[lib]\npath = "src/lib.rs"\ntest = false\ndoctest = false\n\n[package.metadata.antidrift]\nmodule-macros = ["declare_custom_mod"]\n'
+    );
+    writeFileSync(
+      join(root, "src/lib.rs"),
+      'macro_rules! noop { ($id:ident) => {}; }\nmacro_rules! declare_custom_mod { ($id:ident) => {}; }\nnoop!(orphan);\ndeclare_custom_mod!(custom_owned);\ninclude!("included.rs");\n'
+    );
+    writeFileSync(join(root, "src/orphan.rs"), "pub fn orphan() {}\n");
+    writeFileSync(
+      join(root, "src/custom_owned.rs"),
+      "pub fn custom_owned() {}\n"
+    );
+    writeFileSync(join(root, "src/included.rs"), "pub fn included() {}\n");
+    assert.deepEqual(
+      linter
+        .findings(root)
+        .filter((line) => line.includes("rust/no-orphan-module")),
+      ["src/orphan.rs:1 rust/no-orphan-module error"],
+      "Arbitrary macro invocations do not grant module ownership, while include! and configured module-macros do"
+    );
+  });
+}

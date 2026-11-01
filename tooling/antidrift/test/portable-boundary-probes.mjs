@@ -49,16 +49,23 @@ export const boundaryCoreHeadlessProbes = [
     expectedCount: 2,
   },
   {
-    name: "unknown-input-must-be-decoded (call argument & assignment sinks)",
+    name: "unknown-input-must-be-decoded (call argument & assignment sinks; Readable.toWeb stream bridge stays clean while JSON.parse as T reports)",
     rule: "antidrift/unknown-input-must-be-decoded",
     source: `
       type Account = { id: string };
+      interface NodeReadableStream<R = any> {
+        pipeThrough<T>(transform: { writable: unknown; readable: NodeReadableStream<T> }): NodeReadableStream<T>;
+      }
+      declare const Readable: { toWeb(stream: unknown): NodeReadableStream<any> };
       declare function consume(account: Account): void;
-      export async function load(response: Response) {
+      export async function load(response: Response, raw: string, stream: unknown) {
         consume(await response.json());
+        const bridge = new Response(Readable.toWeb(stream) as ReadableStream<Uint8Array>);
+        void bridge;
+        return JSON.parse(raw) as Account;
       }
     `,
-    expectedCount: 1,
+    expectedCount: 2,
   },
   {
     name: "no-unsafe-deserialize (alias-to-contract and JSON.stringify roundtrip)",

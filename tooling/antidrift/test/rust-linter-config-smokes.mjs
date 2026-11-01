@@ -133,14 +133,20 @@ function writeOwnerWorkspace(root) {
   mkdirSync(join(root, "nested"), { recursive: true });
   writeFileSync(
     join(root, "Cargo.toml"),
-    '[workspace]\nmembers = ["crates/*"]\nexclude = ["crates/standalone", "nested"]\n\n[workspace.metadata.antidrift]\nrules."rust/no-boolean-map" = { level = "error", exclude-files = ["crates/member/src/lib.rs"] }\n'
+    '[workspace]\nmembers = ["crates/member", "crates/other", "../sibling"]\nexclude = ["crates/standalone", "nested"]\n\n[workspace.dependencies]\ninherited-dep = { path = "crates/inherited" }\n\n[workspace.metadata.antidrift]\nrules."rust/no-boolean-map" = { level = "error", exclude-files = ["crates/member/src/lib.rs"] }\n'
   );
   writeFileSync(
     join(root, "nested/Cargo.toml"),
     '[workspace]\nmembers = ["pkg"]\n\n[workspace.metadata.antidrift]\nrules."rust/no-boolean-map" = "off"\n'
   );
-  writeCrate(join(root, "crates/member"), "member");
+  writeCrate(
+    join(root, "crates/member"),
+    "member",
+    "\n[dependencies]\ninherited-dep = { workspace = true }\n\n[target.'cfg(unix)'.dependencies]\ntarget-dep = { path = \"../target-dep\" }\n"
+  );
   writeCrate(join(root, "crates/other"), "other");
+  writeCrate(join(root, "crates/inherited"), "inherited-dep");
+  writeCrate(join(root, "crates/target-dep"), "target-dep");
   writeCrate(
     join(root, "crates/standalone"),
     "standalone",
@@ -149,8 +155,49 @@ function writeOwnerWorkspace(root) {
   writeCrate(join(root, "nested/pkg"), "nested-pkg");
 }
 
+function externalAndAutomaticMemberSmokes(linter, parent, root, booleanMaps) {
+  assert.deepEqual(
+    booleanMaps(".", join(root, "crates/member")),
+    [],
+    "A member scanned directly keeps its workspace's table, and the workspace's exclude-files glob matches relative to the workspace manifest"
+  );
+  assert.deepEqual(
+    booleanMaps(".", join(root, "crates/other")),
+    ["src/lib.rs:2 rust/no-boolean-map error"],
+    "A member scanned directly reports under the workspace's level"
+  );
+  assert.deepEqual(
+    booleanMaps(".", join(root, "crates/standalone")),
+    ["src/lib.rs:2 rust/no-boolean-map warn"],
+    "An excluded package scanned directly reads its own package table"
+  );
+  assert.deepEqual(
+    booleanMaps(".", join(root, "nested/pkg")),
+    [],
+    "A nested workspace's member reads the nested workspace's table"
+  );
+  writeCrate(join(parent, "sibling"), "sibling", 'workspace = "../ws"\n');
+  assert.deepEqual(
+    booleanMaps(".", join(parent, "sibling")),
+    ["src/lib.rs:2 rust/no-boolean-map error"],
+    "An external workspace member declared with package.workspace settles diagnostics relative to its scan root"
+  );
+  assert.deepEqual(
+    booleanMaps(".", join(root, "crates/inherited")),
+    ["src/lib.rs:2 rust/no-boolean-map error"],
+    "A crate reached through [workspace.dependencies] inheritance (workspace = true) is a workspace member"
+  );
+  assert.deepEqual(
+    booleanMaps(".", join(root, "crates/target-dep")),
+    ["src/lib.rs:2 rust/no-boolean-map error"],
+    "A crate reached only through a target-specific path dependency is a workspace member"
+  );
+}
+
 export function configOwnerSmoke(linter) {
-  withTempDir("antidrift-rust-owners-", (root) => {
+  withTempDir("antidrift-rust-owners-", (parent) => {
+    const root = join(parent, "ws");
+    mkdirSync(root, { recursive: true });
     writeOwnerWorkspace(root);
     const booleanMaps = (target, cwd) =>
       linter
@@ -159,31 +206,14 @@ export function configOwnerSmoke(linter) {
     assert.deepEqual(
       booleanMaps(root),
       [
+        "crates/inherited/src/lib.rs:2 rust/no-boolean-map error",
         "crates/other/src/lib.rs:2 rust/no-boolean-map error",
         "crates/standalone/src/lib.rs:2 rust/no-boolean-map warn",
+        "crates/target-dep/src/lib.rs:2 rust/no-boolean-map error",
       ],
       "A workspace scan reads each crate's level from its owning manifest: the workspace table for members, the package table for an excluded package, the nested workspace's table for its members"
     );
-    assert.deepEqual(
-      booleanMaps(".", join(root, "crates/member")),
-      [],
-      "A member scanned directly keeps its workspace's table, and the workspace's exclude-files glob matches relative to the workspace manifest"
-    );
-    assert.deepEqual(
-      booleanMaps(".", join(root, "crates/other")),
-      ["src/lib.rs:2 rust/no-boolean-map error"],
-      "A member scanned directly reports under the workspace's level"
-    );
-    assert.deepEqual(
-      booleanMaps(".", join(root, "crates/standalone")),
-      ["src/lib.rs:2 rust/no-boolean-map warn"],
-      "An excluded package scanned directly reads its own package table"
-    );
-    assert.deepEqual(
-      booleanMaps(".", join(root, "nested/pkg")),
-      [],
-      "A nested workspace's member reads the nested workspace's table"
-    );
+    externalAndAutomaticMemberSmokes(linter, parent, root, booleanMaps);
   });
 }
 

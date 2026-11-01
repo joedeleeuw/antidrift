@@ -13,6 +13,7 @@ pub(super) struct AntidriftTable {
     rules: BTreeMap<String, RuleSetting>,
     layers: LayerTable,
     forbidden_calls: Vec<ForbiddenCall>,
+    module_macros: Vec<String>,
 }
 
 enum RuleSetting {
@@ -107,6 +108,7 @@ pub(super) struct RustConfig {
     pub(super) levels: BTreeMap<&'static str, RuleLevel>,
     pub(super) layers: LayerTable,
     pub(super) forbidden_calls: Vec<ForbiddenCall>,
+    pub(super) module_macros: Vec<String>,
 }
 
 pub(super) struct ConfigSource<'a> {
@@ -142,6 +144,7 @@ impl RustConfig {
             levels: default_levels(),
             layers: LayerTable::default(),
             forbidden_calls: Vec::new(),
+            module_macros: Vec::new(),
         }
     }
 
@@ -158,6 +161,7 @@ impl RustConfig {
             levels: default_levels(),
             layers: LayerTable::default(),
             forbidden_calls: Vec::new(),
+            module_macros: Vec::new(),
         };
         let Some(table) = source.table else {
             return Ok(config);
@@ -188,6 +192,7 @@ impl RustConfig {
             modules: table.layers.modules.clone(),
         };
         config.forbidden_calls.clone_from(&table.forbidden_calls);
+        config.module_macros.clone_from(&table.module_macros);
         Ok(config)
     }
 }

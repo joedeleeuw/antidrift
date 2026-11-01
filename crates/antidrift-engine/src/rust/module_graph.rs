@@ -1,5 +1,5 @@
 use super::RustDiagnostic;
-use super::workspace::relative_display;
+use super::workspace::{CrateWalk, relative_display};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::{BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
@@ -17,7 +17,14 @@ pub(super) struct DeclaredModule {
     pub(super) code: ModuleCode,
 }
 
-pub(super) fn declared_modules(file: &Path, is_root: bool, ast: &syn::File) -> Vec<DeclaredModule> {
+const BUILTIN_MODULE_MACROS: &[&str] = &["declare_group_from_fs", "include"];
+
+pub(super) fn declared_modules(
+    file: &Path,
+    is_root: bool,
+    ast: &syn::File,
+    module_macros: &[String],
+) -> Vec<DeclaredModule> {
     let directory = file.parent().unwrap_or_else(|| Path::new("."));
     let search = if is_root {
         directory.to_path_buf()
@@ -32,20 +39,31 @@ pub(super) fn declared_modules(file: &Path, is_root: bool, ast: &syn::File) -> V
         ModuleCode::Shipped,
         &mut declared,
     );
-    let macro_names = module_names_in_item_macros(&ast.items);
+    let macro_names = module_names_in_item_macros(&ast.items, module_macros);
     if !macro_names.is_empty() {
         collect_macro_declared_files(directory, &search, &macro_names, &mut declared);
     }
     declared
 }
 
-fn module_names_in_item_macros(items: &[Item]) -> BTreeSet<String> {
+fn is_module_declaring_macro(path: &syn::Path, configured_macros: &[String]) -> bool {
+    let Some(segment) = path.segments.last() else {
+        return false;
+    };
+    let name = segment.ident.unraw().to_string();
+    BUILTIN_MODULE_MACROS.contains(&name.as_str())
+        || configured_macros
+            .iter()
+            .any(|configured| configured == &name)
+}
+
+fn module_names_in_item_macros(items: &[Item], configured_macros: &[String]) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for item in items {
         let Item::Macro(item_macro) = item else {
             continue;
         };
-        if item_macro.mac.path.is_ident("macro_rules") {
+        if !is_module_declaring_macro(&item_macro.mac.path, configured_macros) {
             continue;
         }
         collect_token_idents(item_macro.mac.tokens.clone(), &mut names);
@@ -88,6 +106,14 @@ fn collect_macro_declared_files(
                 code: ModuleCode::Shipped,
             });
         }
+    }
+    if search.is_dir()
+        && search
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| macro_names.contains(name))
+    {
+        collect_rust_files_beneath(search, out);
     }
     let Ok(entries) = std::fs::read_dir(search) else {
         return;
@@ -246,21 +272,20 @@ fn extract_path_attr(attrs: &[Attribute]) -> Option<String> {
 }
 
 pub(super) fn check_orphan_modules(
-    workspace_root: &Path,
-    src_dir: &Path,
+    walk: &CrateWalk<'_>,
     rs_files: &[PathBuf],
     parsed_files: &FxHashMap<PathBuf, syn::File>,
-    mut roots: Vec<PathBuf>,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
+    let mut roots = walk.target_roots.to_vec();
     for root_name in ["lib.rs", "main.rs"] {
-        let candidate = src_dir.join(root_name);
+        let candidate = walk.src_dir.join(root_name);
         if parsed_files.contains_key(&candidate) {
             roots.push(candidate);
         }
     }
     for file_path in rs_files {
-        if let Ok(rel) = file_path.strip_prefix(src_dir)
+        if let Ok(rel) = file_path.strip_prefix(walk.src_dir)
             && rel.starts_with("bin")
         {
             roots.push(file_path.clone());
@@ -283,7 +308,12 @@ pub(super) fn check_orphan_modules(
         let Some(ast) = parsed_files.get(&current) else {
             continue;
         };
-        for declared in declared_modules(&current, target_roots.contains(&current), ast) {
+        for declared in declared_modules(
+            &current,
+            target_roots.contains(&current),
+            ast,
+            &walk.config.module_macros,
+        ) {
             if reachable.insert(declared.file.clone()) {
                 queue.push_back(declared.file);
             }
@@ -292,7 +322,7 @@ pub(super) fn check_orphan_modules(
 
     for file_path in rs_files {
         if !reachable.contains(file_path) {
-            let rel_path = relative_display(workspace_root, file_path);
+            let rel_path = relative_display(walk.workspace_root, file_path);
             diagnostics.push(RustDiagnostic::error(
                 rel_path,
                 1,

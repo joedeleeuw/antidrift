@@ -81,7 +81,7 @@ const cargoArtifactSchema = z.object({
   executable: z.string().nullable().optional(),
 });
 
-function buildWorkspaceLinter(cwd) {
+export function buildWorkspaceLinter(cwd) {
   let output;
   try {
     output = execFileSync(

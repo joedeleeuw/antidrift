@@ -58,7 +58,11 @@ fn check_single_file(
         .find(|directory| directory.join("Cargo.toml").is_file())
     {
         let config = resolver.config_for_package(crate_dir)?;
-        let workspace_dir = config.root_dir.as_path();
+        let workspace_dir = if file.starts_with(&config.root_dir) {
+            config.root_dir.as_path()
+        } else {
+            crate_dir
+        };
         let target_rel = relative_display(workspace_dir, file);
         let mut crate_diags = Vec::new();
         check_crate_dir(workspace_dir, crate_dir, &config, &mut crate_diags)?;
@@ -144,14 +148,7 @@ fn check_crate_dir(
     let mut rs_files: Vec<_> = visited.into_iter().collect();
     rs_files.sort();
 
-    check_orphan_modules(
-        workspace_root,
-        &src_dir,
-        &rs_files,
-        &parsed_files,
-        target_roots,
-        &mut crate_diags,
-    );
+    check_orphan_modules(&walk, &rs_files, &parsed_files, &mut crate_diags);
     let index = StructIndex::new(&rs_files, &parsed_files);
     let crate_names = CrateNames::collect(&rs_files, &parsed_files);
     for file in &rs_files {
@@ -185,12 +182,12 @@ struct ParsedCrate {
     test_files: BTreeSet<PathBuf>,
 }
 
-struct CrateWalk<'a> {
-    workspace_root: &'a Path,
-    src_dir: &'a Path,
-    config: &'a RustConfig,
-    crate_name: Option<&'a str>,
-    target_roots: &'a [PathBuf],
+pub(super) struct CrateWalk<'a> {
+    pub(super) workspace_root: &'a Path,
+    pub(super) src_dir: &'a Path,
+    pub(super) config: &'a RustConfig,
+    pub(super) crate_name: Option<&'a str>,
+    pub(super) target_roots: &'a [PathBuf],
 }
 
 fn parse_crate_files(
@@ -226,7 +223,12 @@ fn parse_crate_files(
             continue;
         };
         let file_is_test = parsed.test_files.contains(&file);
-        for declared in declared_modules(&file, walk.target_roots.contains(&file), &ast) {
+        for declared in declared_modules(
+            &file,
+            walk.target_roots.contains(&file),
+            &ast,
+            &walk.config.module_macros,
+        ) {
             if declared.code == ModuleCode::Test || file_is_test {
                 parsed.test_files.insert(declared.file.clone());
             }
@@ -295,18 +297,18 @@ fn settle_diagnostics(
         if level.level == Severity::Off {
             continue;
         }
-        let absolute = scan_root.join(&diag.file);
-        let Ok(owner_relative) = absolute.strip_prefix(&config.root_dir) else {
-            return Err(format!(
-                "engine bug: {} lies outside its configuration root {}",
-                absolute.display(),
-                config.root_dir.display()
-            ));
+        let absolute = normalize_lexical_path(&scan_root.join(&diag.file));
+        let owner_candidate = if let Ok(owner_relative) = absolute.strip_prefix(&config.root_dir) {
+            Some(relative_display(Path::new(""), owner_relative))
+        } else {
+            None
         };
-        if !level
-            .scope
-            .matches_candidates(&[&relative_display(Path::new(""), owner_relative)])
-        {
+        let candidates: Vec<&str> = match owner_candidate.as_deref() {
+            Some(owner_rel) if owner_rel != diag.file => vec![owner_rel, diag.file.as_str()],
+            Some(owner_rel) => vec![owner_rel],
+            None => vec![diag.file.as_str()],
+        };
+        if !level.scope.matches_candidates(&candidates) {
             continue;
         }
         let skips_tests = matches!(known.scope_policy, ScopePolicy::AuthoredSource);

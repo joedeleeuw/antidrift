@@ -11,7 +11,10 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { ADDON_LIBRARY_NAMES } from "../src/policy/oxlint.mjs";
+import {
+  ADDON_LIBRARY_NAMES,
+  resolveOxlintBinary,
+} from "../src/policy/oxlint.mjs";
 import {
   PLUGIN_TEST_SOURCES,
   proveDirectAddonAndCreate,
@@ -42,8 +45,9 @@ function runOxlint({ repoRoot, project, level, files }) {
     })
   );
   const run = spawnSync(
-    resolve(repoRoot, "node_modules/.bin/oxlint"),
+    process.execPath,
     [
+      resolveOxlintBinary(),
       "-c",
       configPath,
       "--format",
@@ -123,8 +127,8 @@ function runPropsRule({ repoRoot, project, setting, label }) {
     })
   );
   return spawnSync(
-    resolve(repoRoot, "node_modules/.bin/oxlint"),
-    ["-c", configPath, "--format", "json", PROPS_FILE],
+    process.execPath,
+    [resolveOxlintBinary(), "-c", configPath, "--format", "json", PROPS_FILE],
     { cwd: project, encoding: "utf8" }
   );
 }
@@ -191,29 +195,31 @@ function proveFixAfterRegularPass(repoRoot, project, linter) {
     "let answer = { key: 1 };\nexport const value = answer.key as number;\n"
   );
   const configPath = join(project, "oxlintrc.fix.json");
+  const jsPlugins = [
+    resolve(repoRoot, "tooling/antidrift/src/oxlint-plugin/index.mjs"),
+  ];
+  const rules = {
+    "prefer-const": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "antidrift/no-as-never": "error",
+  };
   writeFileSync(
     configPath,
-    JSON.stringify({
-      jsPlugins: [
-        resolve(repoRoot, "tooling/antidrift/src/oxlint-plugin/index.mjs"),
-      ],
-      categories: { correctness: "off" },
-      rules: {
-        "prefer-const": "error",
-        "typescript/no-unnecessary-type-assertion": "error",
-        "antidrift/no-as-never": "error",
-      },
-    })
+    JSON.stringify({ jsPlugins, categories: { correctness: "off" }, rules })
   );
-  const run = spawnSync(
-    resolve(repoRoot, "node_modules/.bin/oxlint"),
-    ["-c", configPath, "--type-aware", "--fix", FIXABLE_FILE],
-    {
-      cwd: project,
-      encoding: "utf8",
-      env: { ...process.env, OXLINT_TSGOLINT_PATH: linter },
-    }
-  );
+  const args = [
+    resolveOxlintBinary(),
+    "-c",
+    configPath,
+    "--type-aware",
+    "--fix",
+    FIXABLE_FILE,
+  ];
+  const run = spawnSync(process.execPath, args, {
+    cwd: project,
+    encoding: "utf8",
+    env: { ...process.env, OXLINT_TSGOLINT_PATH: linter },
+  });
   assert.equal(
     readFileSync(join(project, FIXABLE_FILE), "utf8"),
     "const answer = { key: 1 };\nexport const value = answer.key;\n",

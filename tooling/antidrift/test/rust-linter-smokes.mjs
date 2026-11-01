@@ -12,6 +12,7 @@ import {
   rootPackageLintsSmoke,
 } from "./rust-linter-config-smokes.mjs";
 import {
+  cfgSuppressionAndMacroModuleSmoke,
   enumTwinSmoke,
   shadowedFallbackSmoke,
   wrapperResolutionSmoke,
@@ -175,4 +176,5 @@ export function runRustLinterSmokes({ binaryPath, repoRoot }) {
   shadowedFallbackSmoke(linter);
   enumTwinSmoke(linter);
   wrapperResolutionSmoke(linter);
+  cfgSuppressionAndMacroModuleSmoke(linter);
 }

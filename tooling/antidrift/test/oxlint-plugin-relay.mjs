@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { loadNativeAddon } from "../src/policy/oxlint.mjs";
+import { loadNativeAddon, resolveOxlintBinary } from "../src/policy/oxlint.mjs";
 
 const CAST_FILES = ["src/cast.ts", "src/other.ts"];
 const RULE_CODE = "antidrift(no-as-never)";
@@ -174,37 +174,36 @@ function proveRelay(linter, project, addon) {
 
 function runTypeAwareOxlint({ repoRoot, project, linter, plugin }) {
   const configPath = join(project, `oxlintrc.type-aware.${plugin}.json`);
-  const pluginConfig = plugin
-    ? {
-        jsPlugins: [
-          resolve(repoRoot, "tooling/antidrift/src/oxlint-plugin/index.mjs"),
-        ],
-      }
-    : {};
+  const jsPlugins = plugin
+    ? [resolve(repoRoot, "tooling/antidrift/src/oxlint-plugin/index.mjs")]
+    : [];
+  const rules = {
+    "typescript/no-floating-promises": "error",
+    ...(plugin ? { "antidrift/no-as-never": "error" } : {}),
+  };
   writeFileSync(
     configPath,
-    JSON.stringify({
-      ...pluginConfig,
-      categories: { correctness: "off" },
-      rules: {
-        "typescript/no-floating-promises": "error",
-        ...(plugin ? { "antidrift/no-as-never": "error" } : {}),
-      },
-    })
+    JSON.stringify({ jsPlugins, categories: { correctness: "off" }, rules })
   );
-  const run = spawnSync(
-    resolve(repoRoot, "node_modules/.bin/oxlint"),
-    ["-c", configPath, "--type-aware", "--format", "json", ...RELAYED_FILES],
-    {
-      cwd: project,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        OXLINT_TSGOLINT_PATH: linter,
-        ANTIDRIFT_ENGINE: STALE_ENGINE,
-      },
-    }
-  );
+  const args = [
+    resolveOxlintBinary(),
+    "-c",
+    configPath,
+    "--type-aware",
+    "--format",
+    "json",
+    ...RELAYED_FILES,
+  ];
+  const env = {
+    ...process.env,
+    OXLINT_TSGOLINT_PATH: linter,
+    ANTIDRIFT_ENGINE: STALE_ENGINE,
+  };
+  const run = spawnSync(process.execPath, args, {
+    cwd: project,
+    encoding: "utf8",
+    env,
+  });
   return { status: run.status, output: `${run.stdout}${run.stderr}` };
 }
 

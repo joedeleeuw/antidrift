@@ -141,6 +141,14 @@ impl ConfigResolver {
         if root.manifest.package.is_some() {
             dirs.insert(workspace_dir.clone());
         }
+        for pattern in &table.members {
+            let member_dir = normalize_lexical_path(&workspace_dir.join(pattern));
+            if member_dir.join("Cargo.toml").is_file()
+                && !excluded.iter().any(|ex| member_dir.starts_with(ex))
+            {
+                dirs.insert(member_dir);
+            }
+        }
         for candidate in discover_crate_dirs(&workspace_dir)? {
             let Ok(relative) = candidate.strip_prefix(&workspace_dir) else {
                 continue;
@@ -149,7 +157,15 @@ impl ConfigResolver {
                 dirs.insert(candidate);
             }
         }
-        self.add_path_dependency_members(&workspace_dir, &excluded, &mut dirs)?;
+        let workspace_deps = table.dependencies.clone();
+        let initial_roots = root.dependency_paths(Some((&workspace_dir, &workspace_deps)));
+        self.add_path_dependency_members(
+            &workspace_dir,
+            &workspace_deps,
+            initial_roots,
+            &excluded,
+            &mut dirs,
+        )?;
         let members = Rc::new(WorkspaceMembers { dirs, excluded });
         self.members
             .insert(workspace_manifest.to_path_buf(), Rc::clone(&members));
@@ -159,15 +175,27 @@ impl ConfigResolver {
     fn add_path_dependency_members(
         &mut self,
         workspace_dir: &Path,
+        workspace_deps: &std::collections::BTreeMap<String, toml::Value>,
+        initial_roots: Vec<PathBuf>,
         excluded: &[PathBuf],
         dirs: &mut BTreeSet<PathBuf>,
     ) -> Result<(), String> {
         let mut pending: Vec<PathBuf> = dirs.iter().cloned().collect();
+        for dependency_dir in initial_roots {
+            let normalized = normalize_lexical_path(&dependency_dir);
+            if normalized.starts_with(workspace_dir)
+                && !excluded.iter().any(|ex| normalized.starts_with(ex))
+                && normalized.join("Cargo.toml").is_file()
+                && dirs.insert(normalized.clone())
+            {
+                pending.push(normalized);
+            }
+        }
         while let Some(member_dir) = pending.pop() {
             let member = self.manifest(&member_dir.join("Cargo.toml"))?;
             pending.extend(
                 member
-                    .dependency_paths()
+                    .dependency_paths(Some((workspace_dir, workspace_deps)))
                     .into_iter()
                     .map(|dependency_dir| normalize_lexical_path(&dependency_dir))
                     .filter(|dependency_dir| {

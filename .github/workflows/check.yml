@@ -7,12 +7,25 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     strategy:
       fail-fast: false
       matrix:
-        node: [24, 26]
+        include:
+          - os: ubuntu-latest
+            node: 24
+          - os: ubuntu-latest
+            node: 26
+          - os: macos-15
+            node: 26
+          - os: windows-latest
+            node: 26
     steps:
+      - name: Allow long paths in git checkouts
+        if: runner.os == 'Windows'
+        run: git config --global core.longpaths true
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
@@ -28,5 +41,5 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: policy-reports-node-${{ matrix.node }}
+          name: policy-reports-${{ matrix.os }}-node-${{ matrix.node }}
           path: reports

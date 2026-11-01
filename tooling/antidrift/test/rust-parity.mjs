@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { buildWorkspaceLinter } from "../src/policy/generate-policy-artifacts.mjs";
 import { buildBoundaryProbes } from "./boundary-probes.mjs";
 import {
   buildSharedHelperFiles,
@@ -24,12 +25,7 @@ import { runRustLinterSmokes } from "./rust-linter-smokes.mjs";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, "../../..");
-const binaryPath = resolve(repoRoot, "target/debug/antidrift-linter");
-
-execFileSync("cargo", ["build", "--bin", "antidrift-linter", "--quiet"], {
-  cwd: repoRoot,
-  stdio: "inherit",
-});
+const binaryPath = buildWorkspaceLinter(repoRoot);
 
 const registeredRulesOutput = execFileSync(binaryPath, ["--list-rules"], {
   cwd: repoRoot,

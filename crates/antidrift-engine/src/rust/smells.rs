@@ -2,7 +2,8 @@ use super::RustDiagnostic;
 use super::async_effects::check_async_effects;
 use super::corpus_smells::check_corpus_smells;
 use super::discard_shapes::{
-    DiscardedErrorOutcome, discarded_error_outcome, is_cfg_attribute, stmt_has_cfg_attribute,
+    DiscardedErrorOutcome, collect_cfg_used_bindings, discarded_error_outcome, is_cfg_attribute,
+    stmt_has_cfg_attribute,
 };
 use super::lifecycle_names::{CrateNames, NameLedger, banned_lifecycle_message};
 use super::syn_kernel::{
@@ -147,8 +148,7 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
             .iter()
             .filter(|stmt| stmt_has_cfg_attribute(stmt))
         {
-            let mut collector = IdentCollector(&mut gated);
-            collector.visit_stmt(statement);
+            collect_cfg_used_bindings(statement, &mut gated);
         }
         self.cfg_gated_idents.push(gated);
         visit::visit_block(self, node);
@@ -318,14 +318,6 @@ fn stringifies_closure_error_param(closure: &ExprClosure) -> bool {
                 || compact == format!("\"{{:?}}\",{param_name}")
         }
         _ => false,
-    }
-}
-
-struct IdentCollector<'a>(&'a mut FxHashSet<String>);
-
-impl<'ast> Visit<'ast> for IdentCollector<'_> {
-    fn visit_ident(&mut self, node: &'ast syn::Ident) {
-        self.0.insert(node.to_string());
     }
 }
 
