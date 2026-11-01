@@ -12,6 +12,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { STALE_MESSAGE } from "../src/oxlint-plugin/index.mjs";
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const oxlint = resolve(repoRoot, "node_modules/.bin/oxlint");
 const linter = resolve(repoRoot, "target/debug/antidrift-linter");
@@ -140,6 +142,12 @@ class LspSession {
         candidate.params.version === version
     );
     console.log(`${label} ${JSON.stringify(message)}`);
+    const stale = message.params.diagnostics.find(
+      (diagnostic) => diagnostic.code === "antidrift(stale-session)"
+    );
+    if (stale) {
+      this.lastStaleMessage = stale.message;
+    }
     return message.params.diagnostics;
   }
 
@@ -185,6 +193,7 @@ function writeProject() {
       rules: {
         "antidrift/no-appeasement-cast": "error",
         "antidrift/no-as-never": "error",
+        "antidrift/stale-session": "error",
         "typescript/no-floating-promises": "error",
       },
     })
@@ -194,7 +203,7 @@ function writeProject() {
     `#!/usr/bin/env node\nimport { spawn } from "node:child_process";\nimport { appendFileSync } from "node:fs";\nconst chunks = [];\nfor await (const chunk of process.stdin) chunks.push(chunk);\nconst payload = Buffer.concat(chunks);\nappendFileSync(process.env.ANTIDRIFT_HEADLESS_LOG, payload.toString("utf8") + "\\n");\nconst child = spawn(process.env.ANTIDRIFT_LINTER_BIN, process.argv.slice(2), { env: process.env, stdio: ["pipe", "inherit", "inherit"] });\nchild.stdin.end(payload);\nchild.on("exit", (code, signal) => { if (signal) process.kill(process.pid, signal); else process.exit(code ?? 1); });\n`,
     { mode: 0o755 }
   );
-  writeFileSync(join(project, "src/cast.ts"), firstCast);
+  writeFileSync(join(project, "src/cast.ts"), cleanCast);
   writeFileSync(join(project, "src/api.ts"), syncApi);
   writeFileSync(join(project, "src/caller.ts"), callerSource);
   return project;
@@ -208,15 +217,19 @@ async function proveCastEdits(session, project) {
   const cast = join(project, "src/cast.ts");
   return [
     [
-      "initial cast",
+      "unsaved initial cast",
       codes(await session.open(cast, firstCast)),
       ["antidrift(no-as-never)"],
     ],
-    ["cleaned cast", codes(await session.change(cast, cleanCast, 2)), []],
     [
-      "new cast",
+      "edit after the build",
+      codes(await session.change(cast, cleanCast, 2)),
+      ["antidrift(stale-session)"],
+    ],
+    [
+      "second edit",
       codes(await session.change(cast, secondCast, 3)),
-      ["antidrift(no-as-never)"],
+      ["antidrift(stale-session)"],
     ],
   ];
 }
@@ -230,14 +243,14 @@ async function proveDependentEdits(session, project) {
   ];
   writeFileSync(api, asyncApi);
   observed.push([
-    "async api",
+    "saved api change",
     codes(await session.change(api, asyncApi, 2)),
-    [],
+    ["antidrift(stale-session)"],
   ]);
   observed.push([
-    "dependent caller",
+    "dependent caller after the change",
     codes(await session.change(caller, callerSource, 2)),
-    ["antidrift(no-appeasement-cast)", "typescript(no-floating-promises)"],
+    ["antidrift(stale-session)", "typescript(no-floating-promises)"],
   ]);
   return observed;
 }
@@ -289,8 +302,13 @@ export async function proveLongLivedHost() {
     ];
     proveHelperPayloads(project);
     for (const [label, actual, expected] of observed) {
-      assert.deepEqual(actual, expected, `${label} diagnostics are stale`);
+      assert.deepEqual(actual, expected, `${label} diagnostics differ`);
     }
+    assert.equal(
+      session.lastStaleMessage,
+      STALE_MESSAGE,
+      "The stale marker must carry the plugin's restart message"
+    );
     console.log("✓ long-lived Oxlint host smoke passed");
   } finally {
     child.kill("SIGTERM");

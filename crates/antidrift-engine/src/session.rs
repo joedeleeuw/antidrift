@@ -11,7 +11,7 @@ use tsrslint::rule::Rule;
 
 use crate::batch::reported_to_rule_diagnostic;
 use crate::headless_host::{BoundProgram, ProgramBuilderEnv, base_fs, collect_missing_bound_files};
-use crate::program_inputs::{FileStamp, matches_stamps, stamp_program_inputs};
+use crate::program_inputs::{Batch, Family, Slot};
 use crate::rule_catalog::{RequestedRule, RuleCatalog, RuleRequest};
 use crate::runner::{collect_lintable_files, is_supported_file};
 
@@ -22,69 +22,14 @@ pub struct Finding {
     pub location: DiagnosticLocation,
 }
 
-struct Batch {
-    files: Vec<String>,
-    bound: Option<BoundProgram>,
-    stamps: FxHashMap<String, FileStamp>,
-    validated_run: Option<String>,
-    missing: Vec<String>,
-    linted: FxHashSet<String>,
+pub struct LintOutcome {
+    pub findings: Vec<Finding>,
+    pub stale: bool,
 }
 
-struct Family {
-    configured: Vec<(String, Batch)>,
-    inferred: Batch,
-}
-
-#[derive(Clone, Copy)]
-enum Slot {
-    Configured(usize),
-    Inferred,
-}
-
-impl Batch {
-    fn of(files: Vec<String>) -> Self {
-        Self {
-            files,
-            bound: None,
-            stamps: FxHashMap::default(),
-            validated_run: None,
-            missing: Vec::new(),
-            linted: FxHashSet::default(),
-        }
-    }
-
-    fn validated(&self, run_id: Option<&str>) -> bool {
-        run_id.is_some() && self.validated_run.as_deref() == run_id
-    }
-
-    fn matches(&self, overrides: &FxHashMap<String, String>, run_id: Option<&str>) -> bool {
-        self.bound.as_ref().is_none_or(|bound| {
-            matches_stamps(
-                bound.program,
-                &self.stamps,
-                overrides,
-                self.validated(run_id),
-            )
-        })
-    }
-
-    fn bind(&mut self, bound: BoundProgram, run_id: Option<&str>) -> Result<(), String> {
-        self.stamps = if run_id.is_some() {
-            FxHashMap::default()
-        } else {
-            stamp_program_inputs(bound.program)?
-        };
-        self.bound = Some(bound);
-        self.mark_validated(run_id);
-        Ok(())
-    }
-
-    fn mark_validated(&mut self, run_id: Option<&str>) {
-        if let Some(run_id) = run_id {
-            self.validated_run = Some(run_id.to_owned());
-        }
-    }
+enum Freshness {
+    Fresh,
+    Stale,
 }
 
 pub(crate) struct Session {
@@ -154,30 +99,37 @@ impl Session {
         }
     }
 
+    fn any_bound(&self) -> bool {
+        self.families.iter().any(|family| {
+            family.inferred.bound.is_some()
+                || family
+                    .configured
+                    .iter()
+                    .any(|(_, batch)| batch.bound.is_some())
+        })
+    }
+
     fn refresh(
         &mut self,
         normalized: &str,
         source_text: &str,
         run_id: Option<&str>,
-    ) -> Result<(), String> {
+    ) -> Result<Freshness, String> {
         let batches = self.batches_of(normalized);
-        let disk_validated = !batches.is_empty()
+        let mut overrides = self.source_overrides.clone();
+        if osvfs::fs().read_file(normalized).as_deref() == Some(source_text) {
+            overrides.remove(normalized);
+        } else {
+            overrides.insert(normalized.to_owned(), source_text.to_owned());
+        }
+        let fresh = overrides == self.source_overrides
             && batches
                 .iter()
-                .all(|&(family, slot)| self.batch(family, slot).validated(run_id));
-        let mut overrides = self.source_overrides.clone();
-        if !disk_validated || overrides.contains_key(normalized) {
-            if osvfs::fs().read_file(normalized).as_deref() == Some(source_text) {
-                overrides.remove(normalized);
-            } else {
-                overrides.insert(normalized.to_owned(), source_text.to_owned());
-            }
-        }
-        let fresh = batches
-            .iter()
-            .all(|&(family, slot)| self.batch(family, slot).matches(&overrides, run_id));
+                .all(|&(family, slot)| self.batch(family, slot).matches(&overrides, run_id));
         if fresh {
             self.source_overrides = overrides;
+        } else if run_id.is_none() && self.any_bound() {
+            return Ok(Freshness::Stale);
         } else {
             let cwd = self.cwd.clone();
             let catalog = std::mem::take(&mut self.catalog);
@@ -186,7 +138,7 @@ impl Session {
         for (family, slot) in self.batches_of(normalized) {
             self.batch_mut(family, slot).mark_validated(run_id);
         }
-        Ok(())
+        Ok(Freshness::Fresh)
     }
 
     pub(crate) fn lint_file(
@@ -195,9 +147,12 @@ impl Session {
         source_text: &str,
         run_id: Option<&str>,
         requests: &[RuleRequest],
-    ) -> Result<Vec<Finding>, String> {
-        if requests.is_empty() || !is_supported_file(Path::new(file_path)) {
-            return Ok(Vec::new());
+    ) -> Result<LintOutcome, String> {
+        if requests.is_empty() || !is_requestable_file(Path::new(file_path)) {
+            return Ok(LintOutcome {
+                findings: Vec::new(),
+                stale: false,
+            });
         }
         let mut names = FxHashSet::default();
         for request in requests {
@@ -213,7 +168,12 @@ impl Session {
             .map(|request| self.catalog.resolve(request))
             .collect::<Result<Vec<_>, _>>()?;
         let normalized = tspath::normalize_slashes(file_path);
-        self.refresh(&normalized, source_text, run_id)?;
+        if let Freshness::Stale = self.refresh(&normalized, source_text, run_id)? {
+            return Ok(LintOutcome {
+                findings: Vec::new(),
+                stale: true,
+            });
+        }
         let (family, slot) = match self.slots.get(&normalized) {
             Some(&found) => found,
             None => {
@@ -231,7 +191,8 @@ impl Session {
             self.lint_slot(family, Slot::Inferred, run_id, &rules)?;
         }
         let wanted: FxHashSet<&str> = rules.iter().map(|rule| rule.identity.as_str()).collect();
-        self.findings
+        let findings = self
+            .findings
             .get(&normalized)
             .map(|findings| {
                 findings
@@ -242,7 +203,11 @@ impl Session {
             })
             .ok_or_else(|| {
                 format!("{normalized} was linted but is missing from every program built for it")
-            })
+            })?;
+        Ok(LintOutcome {
+            findings,
+            stale: false,
+        })
     }
 
     fn add_family(&mut self, files: &[String]) {
@@ -369,6 +334,14 @@ impl Session {
         }
         Ok(())
     }
+}
+
+fn is_requestable_file(path: &Path) -> bool {
+    is_supported_file(path)
+        || path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(tspath::is_declaration_file_name)
 }
 
 fn record(bound: &BoundProgram, rules: &[&'static dyn Rule]) -> Vec<(String, Finding)> {

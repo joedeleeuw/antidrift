@@ -122,18 +122,23 @@ function proveConfiguredRules(lintAntidriftOxlint) {
   const observed = {
     "configured/cast.ts": rows("configured/cast.ts"),
     "configured/sub/cast.ts": rows("configured/sub/cast.ts"),
+    "configured/shapes.d.ts": rows("configured/shapes.d.ts"),
     "configured/card.tsx": rows("configured/card.tsx"),
     "configured/exempt-card.tsx": rows("configured/exempt-card.tsx"),
   };
   const expected = {
     "configured/cast.ts": ["antidrift(no-as-never) warning"],
     "configured/sub/cast.ts": [],
+    "configured/shapes.d.ts": [
+      "antidrift(no-tutorial-comments) error",
+      "antidrift(no-tutorial-comments) error",
+    ],
     "configured/card.tsx": ["antidrift(react-max-component-props) error"],
     "configured/exempt-card.tsx": [],
   };
   if (JSON.stringify(observed) !== JSON.stringify(expected)) {
     fail(
-      `the installed package must honor per-rule severity, override globs, rule options and per-file off through the Oxlint config, got: ${JSON.stringify(observed)}`
+      `the installed package must honor per-rule severity, override globs, rule options, per-file off and a declaration file the config stops ignoring through the Oxlint config, got: ${JSON.stringify(observed)}`
     );
   }
   console.log(

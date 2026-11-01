@@ -124,6 +124,7 @@ const workspaceFiles = {
     "export default {\n" +
     "  ...governance,\n" +
     '  categories: { correctness: "off" },\n' +
+    '  ignorePatterns: governance.ignorePatterns.filter((pattern) => !pattern.startsWith("**/*.d.")),\n' +
     "  rules: {\n" +
     "    ...governance.rules,\n" +
     '    "antidrift/no-as-never": "warn",\n' +
@@ -137,6 +138,8 @@ const workspaceFiles = {
     "};\n",
   "configured/cast.ts": 'export const top = "x" as never;\n',
   "configured/sub/cast.ts": 'export const inner = "y" as never;\n',
+  "configured/shapes.d.ts":
+    "// ============================================================\n// Shapes\n// ============================================================\nexport interface Shape {\n  id: string;\n}\n",
   "configured/card.tsx":
     "export function Card(props: { title: string; body: string; footer: string }) {\n  return <article>{props.title}{props.body}{props.footer}</article>;\n}\n",
   "configured/exempt-card.tsx":

@@ -1,4 +1,6 @@
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
+
+use crate::headless_host::BoundProgram;
 use tsrs_ast::SourceFile;
 use tsrs_compiler::Program;
 use tsrs_core::P;
@@ -67,4 +69,73 @@ pub(crate) fn matches_stamps(
             || FileStamp::read(sf.file_name())
                 .is_ok_and(|current| stamps.get(sf.file_name()) == Some(&current))
     })
+}
+
+pub(crate) struct Batch {
+    pub(crate) files: Vec<String>,
+    pub(crate) bound: Option<BoundProgram>,
+    pub(crate) stamps: FxHashMap<String, FileStamp>,
+    pub(crate) validated_run: Option<String>,
+    pub(crate) missing: Vec<String>,
+    pub(crate) linted: FxHashSet<String>,
+}
+
+pub(crate) struct Family {
+    pub(crate) configured: Vec<(String, Batch)>,
+    pub(crate) inferred: Batch,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum Slot {
+    Configured(usize),
+    Inferred,
+}
+
+impl Batch {
+    pub(crate) fn of(files: Vec<String>) -> Self {
+        Self {
+            files,
+            bound: None,
+            stamps: FxHashMap::default(),
+            validated_run: None,
+            missing: Vec::new(),
+            linted: FxHashSet::default(),
+        }
+    }
+
+    pub(crate) fn validated(&self, run_id: Option<&str>) -> bool {
+        run_id.is_some() && self.validated_run.as_deref() == run_id
+    }
+
+    pub(crate) fn matches(
+        &self,
+        overrides: &FxHashMap<String, String>,
+        run_id: Option<&str>,
+    ) -> bool {
+        self.bound.as_ref().is_none_or(|bound| {
+            matches_stamps(
+                bound.program,
+                &self.stamps,
+                overrides,
+                self.validated(run_id),
+            )
+        })
+    }
+
+    pub(crate) fn bind(&mut self, bound: BoundProgram, run_id: Option<&str>) -> Result<(), String> {
+        self.stamps = if run_id.is_some() {
+            FxHashMap::default()
+        } else {
+            stamp_program_inputs(bound.program)?
+        };
+        self.bound = Some(bound);
+        self.mark_validated(run_id);
+        Ok(())
+    }
+
+    pub(crate) fn mark_validated(&mut self, run_id: Option<&str>) {
+        if let Some(run_id) = run_id {
+            self.validated_run = Some(run_id.to_owned());
+        }
+    }
 }

@@ -11,12 +11,15 @@ const ANTIDRIFT_PLUGIN = fileURLToPath(
 );
 
 function antidriftRuleLevels(repoRoot) {
-  return Object.fromEntries(
-    loadNativeAddon(repoRoot)
-      .antidriftRules()
-      .filter(({ defaultEnabled }) => defaultEnabled)
-      .map(({ name }) => [name, "error"])
-  );
+  return {
+    ...Object.fromEntries(
+      loadNativeAddon(repoRoot)
+        .antidriftRules()
+        .filter(({ defaultEnabled }) => defaultEnabled)
+        .map(({ name }) => [name, "error"])
+    ),
+    "antidrift/stale-session": "error",
+  };
 }
 
 const touchableImports = new Map([

@@ -12,7 +12,7 @@ use crate::headless_host::program_counts;
 use crate::relay;
 use crate::rule_catalog::RuleRequest;
 use crate::rule_plan::RulePlanCache;
-use crate::session::{Finding, Session};
+use crate::session::{LintOutcome, Session};
 
 enum EngineRequest {
     Lint {
@@ -21,7 +21,7 @@ enum EngineRequest {
         source_text: String,
         run_id: Option<String>,
         rules: Vec<RuleRequest>,
-        reply: Sender<Result<Vec<Finding>, String>>,
+        reply: Sender<Result<LintOutcome, String>>,
     },
     Headless {
         request: HeadlessRequest,
@@ -126,7 +126,7 @@ impl EngineService {
         source_text: String,
         run_id: Option<String>,
         rules: Vec<RuleRequest>,
-    ) -> Result<Vec<Finding>, String> {
+    ) -> Result<LintOutcome, String> {
         let (reply, outcome) = channel();
         self.sender()?
             .send(EngineRequest::Lint {

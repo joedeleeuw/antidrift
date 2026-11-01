@@ -453,7 +453,7 @@ function proveDirectAddon(project, linter) {
       null,
       []
     ),
-    [],
+    { findings: [], stale: false },
     "A lint request with no rules must report nothing"
   );
   for (const file of CAST_FILES) {
