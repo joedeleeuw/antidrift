@@ -6,7 +6,6 @@ pub mod docs_source_policy;
 pub mod line_caps;
 pub mod no_anemic_errors;
 pub mod no_branch_tree;
-pub mod no_default_export_in_domain;
 pub mod no_mutable_let_alias;
 pub mod no_reexport_only_module;
 pub mod no_todo_without_issue;
@@ -27,10 +26,6 @@ pub fn rules() -> Vec<CatalogRule> {
         CatalogRule::everywhere(&no_branch_tree::DEFAULT_RULE),
         CatalogRule::everywhere(&comment_directives::NO_DATED_COMMENTS),
         CatalogRule::everywhere(&syntax_directives::NO_DEBUG_RESIDUE_FILENAMES),
-        CatalogRule::new(
-            &no_default_export_in_domain::DEFAULT_RULE,
-            ScopePolicy::InferredRole(no_default_export_in_domain::inferred_role),
-        ),
         CatalogRule::new(
             &syntax_directives::NO_HOST_PATH_LITERAL,
             ScopePolicy::InferredRole(syntax_directives::host_path_inferred_role),

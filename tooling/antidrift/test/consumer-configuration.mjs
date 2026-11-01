@@ -55,6 +55,8 @@ export function proveConfiguredRules() {
     "configured/shapes.d.ts": rows("configured/shapes.d.ts"),
     "configured/card.tsx": rows("configured/card.tsx"),
     "configured/exempt-card.tsx": rows("configured/exempt-card.tsx"),
+    "domain/entity.ts": rows("domain/entity.ts"),
+    "domain/migrations/001_init.ts": rows("domain/migrations/001_init.ts"),
   };
   const expected = {
     "configured/cast.ts": ["antidrift(no-as-never) warning"],
@@ -65,6 +67,8 @@ export function proveConfiguredRules() {
     ],
     "configured/card.tsx": ["antidrift(react-max-component-props) error"],
     "configured/exempt-card.tsx": [],
+    "domain/entity.ts": ["import(no-default-export) error"],
+    "domain/migrations/001_init.ts": [],
   };
   if (JSON.stringify(observed) !== JSON.stringify(expected)) {
     fail(

@@ -144,6 +144,8 @@ const workspaceFiles = {
     "export function Card(props: { title: string; body: string; footer: string }) {\n  return <article>{props.title}{props.body}{props.footer}</article>;\n}\n",
   "configured/exempt-card.tsx":
     "export function ExemptCard(props: { title: string; body: string; footer: string }) {\n  return <article>{props.title}{props.body}{props.footer}</article>;\n}\n",
+  "domain/entity.ts": "export default class Entity {}\n",
+  "domain/migrations/001_init.ts": "export default function up() {}\n",
   "oxlint.precedence.config.mjs":
     'import config from "./oxlint.config.mjs";\n' +
     "export default {\n" +

@@ -205,3 +205,6 @@ retiredRules:
     status: retired
     reason: Retired default-off false-positive-prone anti-slop import; comments are not type evidence, and antidrift/no-appeasement-cast and antidrift/no-appeasement-erasure own type-assertion discipline.
     referenceDoc: docs/rule-investigations/anti-slop-import.md
+  antidrift/no-default-export-in-domain:
+    status: retired
+    reason: Replaced by Oxlint's native import/no-default-export rule scoped to domain/ and model/ directories in createGovernanceOxlintConfig overrides.

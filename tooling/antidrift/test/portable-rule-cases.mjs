@@ -61,12 +61,6 @@ export const portableRuleCases = [
       "// not a TODO, the generator owns this mapping\n// this is not TODO material\nstart();",
   },
   {
-    name: "no-default-export-in-domain",
-    filename: "domain/entity.ts",
-    invalid: "export default class Entity {}",
-    valid: "export class Entity {}",
-  },
-  {
     name: "no-anemic-errors",
     occurrences: 2,
     invalid:

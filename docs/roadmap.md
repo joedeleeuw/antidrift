@@ -6,11 +6,11 @@ For runtime ownership and parity, see `docs/lint-rule-parity.md`. For historical
 
 ## Current Scope
 
-- Primary lint engine: Oxlint, including stable type-aware rules through `oxlint-tsgolint`.
+- Primary lint engine: Oxlint (including stable type-aware rules through `oxlint-tsgolint`) plus one native Rust engine (`antidrift-linter` and `antidrift-napi`, built on pinned `oxc-project/tsrs` and `tsrslint`).
 - Generic native and third-party rules are owned by `@joedeleeuw/typescript-tooling`, not reimplemented by Antidrift.
-- Syntax-only custom rules run through the Oxlint JavaScript plugin API.
-- Custom rules that require TypeScript `Program` or `TypeChecker` data remain in the reduced ESLint pass until Oxlint exposes equivalent custom-rule primitives.
-- Custom rule surface: the implemented `antidrift/*` rules exported by the ESLint and Oxlint plugins; `policy:check-rule-surface` keeps exports, runtime ownership, and configuration aligned.
+- Custom `antidrift/*` rules (both syntax and program/checker-backed) live in one table-driven `RuleCatalogEntry` catalog in `crates/antidrift-rules` and run in the native engine through `@joedeleeuw/antidrift/oxlint-plugin`. The plugin exposes both `createOnce(context)` for Oxlint and standard `create(context)` for `eslint` and `bun lint`, so hosts execute it directly without requiring the `antidrift oxlint` wrapper.
+- Module, function, and component size caps share one kernel table across Rust and TypeScript (`antidrift/max-module-lines` and `rust/max-module-lines` warn above 425 and error above 500 lines). Rust `rust/*` rules run via `antidrift-linter rust` and are configured from `[workspace.metadata.antidrift]` in `Cargo.toml`.
+- Custom rule surface: the implemented `antidrift/*` rules exported by the native addon and `@joedeleeuw/antidrift/oxlint-plugin`, plus native Oxlint rules and overrides in `createGovernanceOxlintConfig`; `policy:check-registries` and `parity:rust` keep the rule catalog, retirement records, and configuration aligned.
 - Antidrift's config factories retain custom-rule enablement and policy-derived mappings; maintained ecosystem rules come from the shared tooling package.
 - Type-contract authority remains the design frame for the type-system work. See `docs/rule-family-type-contract-authority.md` for subsets, examples, non-goals, and research boundaries; it is not a separate rule registry.
 
@@ -66,9 +66,9 @@ Completed in this batch:
 
 These checks support existing rules; they are not new product scope.
 
-- `policy:check-rule-surface`: custom rules must stay exported, configured in one runtime, and covered by corpus evidence.
-- `policy:check-registries`: registry-backed rule facts must point at real owners/wrappers and match exported domain literals where configured.
-- `policy:check-generated`: generated agent files must match the policy source without mutating the working tree during the check.
+- `parity:rust`: custom rules stay registered in the native catalog, decoded through one `RuleCatalogEntry` seam, and covered by portable batch, headless, and plugin-bridge smokes.
+- `policy:check-registries`: registry-backed rule facts must point at real owners/wrappers and match exported domain literals and retirement records where configured.
+- `policy:check-generated`: generated agent files must match the policy source and `[workspace.metadata.antidrift]` without mutating the working tree during the check.
 
 ### 4. Stop
 
@@ -91,8 +91,8 @@ Each future progress slice must clear these gates before it is considered done:
 2. **Pattern gate**: the desired construction path is documented or already present in `docs/build-patterns.md`. A rule should point to a better way to build, not only say no.
 3. **Signal gate**: the slice declares its strongest required signal: TypeChecker, registry facts, scope/binding, deterministic AST shape, or import graph. If it relies on AST shape as a proxy for intent, stop.
 4. **Real-corpus gate**: assert at least one real drift path and one real clean path for the changed rule, preferably in Chaski. If Chaski has only clean controls, use a narrowly accepted fallback repo and document the fallback in `docs/real-corpus-validation.md`.
-5. **Inventory gate**: run `pnpm policy:validate-corpus` for the full custom-rule inventory, and run the changed rules against the real repository corpus (`apps`, `packages`, and `tooling`) with `pnpm policy:repo-corpus -- --slice <slice-name> --rules antidrift/<rule-name>`. For React state broad co-mutation, run `pnpm policy:inventory-react-state`; those facts are classification evidence, not diagnostics.
-6. **Rule surface gate**: any custom rule is exported, configured in one runtime, and covered by a real corpus case; `pnpm policy:check-rule-surface` must pass.
+5. **Inventory gate**: run `pnpm parity:rust` and `pnpm package:verify` for the custom-rule catalog and consumer workspace smokes.
+6. **Rule surface gate**: any custom rule is registered in `crates/antidrift-rules`, exported through `@joedeleeuw/antidrift/oxlint-plugin`, and covered by a smoke case; `pnpm policy:check-registries` and `pnpm parity:rust` must pass.
 7. **Self-host gate**: `pnpm check` must pass against this repository. If a rule flags antidrift itself, either fix the repo pattern or narrow the rule with real corpus evidence.
 8. **Package gate**: when exports, package shape, or shipped config change, `pnpm test:integration` must pass against the packed tarball consumer.
 9. **Session gate**: `pnpm policy:verify-session` is the pre-push gate.
@@ -105,5 +105,5 @@ Subagents should be assigned against these gates: one agent can implement a narr
 
 - Work from the built/hardened rules and chosen next scope, not aspirational cluster names.
 - Prefer TypeChecker, registry, and scope signals over AST shape. Use AST shape only when the syntax is itself the violation.
-- Keep hooks for lifecycle/tool safety, policy scripts for control-plane integrity, Oxlint for native/type-aware baseline semantics, and the reduced ESLint pass for custom TypeChecker semantics.
+- Keep hooks for lifecycle/tool safety, policy scripts for control-plane integrity, Oxlint for native/type-aware baseline semantics, and the native Rust engine (`antidrift-linter` + `antidrift-napi`) for custom TypeScript and Rust semantics.
 - Every nontrivial custom-rule change needs real-corpus drift and clean evidence before promotion.

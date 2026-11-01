@@ -226,6 +226,44 @@ function applicationExclusionOverrides(otherPatterns) {
   ];
 }
 
+const domainFiles = [
+  "domain/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
+  "**/domain/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
+  "model/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
+  "**/model/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
+];
+
+const domainDefaultExportExclusions = [
+  "**/__tests__/**",
+  "**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
+  "**/*.{gen,generated,d}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
+  "**/migration/**",
+  "**/migrations/**",
+  ...[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((digit) => [
+    `**/${digit}*_*`,
+    `**/${digit}*-*`,
+  ]),
+];
+
+function domainDefaultExportOverrides() {
+  return [
+    {
+      files: domainFiles,
+      plugins: ["import"],
+      rules: {
+        "import/no-default-export": "error",
+      },
+    },
+    {
+      files: domainDefaultExportExclusions,
+      plugins: ["import"],
+      rules: {
+        "import/no-default-export": "off",
+      },
+    },
+  ];
+}
+
 const governanceIgnorePatterns = [
   "**/node_modules/**",
   "**/dist/**",
@@ -279,6 +317,7 @@ export function createGovernanceOxlintConfig({
       ...gatewayWrapperOverrides(registries, generatedPatterns),
       ...touchableOwnerOverrides(reactNativePolicy, otherPatterns),
       ...applicationExclusionOverrides(otherPatterns),
+      ...domainDefaultExportOverrides(),
     ],
   });
 }
