@@ -61,10 +61,18 @@ impl<'de> Deserialize<'de> for RuleSetting {
     }
 }
 
+fn deserialize_scoped_level<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Severity, D::Error> {
+    let text = String::deserialize(deserializer)?;
+    parse_level(&text).map_err(|error| de::Error::custom(format!("level: {error}")))
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 struct ScopedSetting {
-    level: String,
+    #[serde(deserialize_with = "deserialize_scoped_level")]
+    level: Severity,
     #[serde(default)]
     files: Option<Vec<String>>,
     #[serde(default)]
@@ -206,13 +214,15 @@ fn resolve_setting(rule_id: &'static str, setting: &RuleSetting) -> Result<RuleL
             scope: RuleScope::DEFAULT,
         }),
         RuleSetting::Scoped(scoped) => {
-            let level = parse_level(&scoped.level).map_err(|error| format!("level: {error}"))?;
             let options = ScopeOptions {
                 files: scoped.files.clone(),
                 exclude_files: scoped.exclude_files.clone(),
             };
             let scope = RuleScope::from_scope_options(rule_id, &options)?;
-            Ok(RuleLevel { level, scope })
+            Ok(RuleLevel {
+                level: scoped.level,
+                scope,
+            })
         }
     }
 }

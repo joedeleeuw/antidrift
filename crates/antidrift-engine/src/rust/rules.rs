@@ -1,15 +1,17 @@
 use super::RustDiagnostic;
+use super::boundary_decode::check_strict_serde;
 use super::config::{ForbiddenCall, RustConfig};
 use super::syn_kernel::{
-    derives_deserialize, has_serde_deny_unknown_fields, is_banned_test_attribute, path_ends_with,
+    has_bool_second_type_arg, is_banned_test_attribute, is_option_type, is_string_or_str_type,
+    path_ends_with,
 };
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Attribute, Expr, ExprCall, ExprPath, Fields, GenericArgument, Item, ItemFn, ItemMod,
-    ItemStruct, ItemUse, Lit, Macro, PathArguments, Stmt, Type, TypePath, UseTree,
+    Attribute, Expr, ExprCall, ExprPath, ImplItemFn, Item, ItemEnum, ItemFn, ItemMod, ItemStruct,
+    ItemUse, Lit, Macro, Stmt, Type, TypePath, UseTree,
 };
 
 const STRINGLY_VARIANT_FIELDS: &[&str] = &[
@@ -19,6 +21,10 @@ const STRINGLY_VARIANT_FIELDS: &[&str] = &[
     "variant",
     "category",
     "classification",
+    "type",
+    "state",
+    "level",
+    "severity",
 ];
 
 pub(super) struct CrateLayer<'a> {
@@ -35,6 +41,7 @@ pub(super) fn check_syn_ast(
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
     check_hollow_module(rel_path, path, ast, diagnostics);
+    check_strict_serde(rel_path, ast, diagnostics);
     let crate_rank = layer.crate_name.and_then(|name| {
         config
             .layers
@@ -238,6 +245,11 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
         visit::visit_item_fn(self, node);
     }
 
+    fn visit_impl_item_fn(&mut self, node: &'ast ImplItemFn) {
+        self.check_attributes(&node.attrs);
+        visit::visit_impl_item_fn(self, node);
+    }
+
     fn visit_item_use(&mut self, node: &'ast ItemUse) {
         self.check_attributes(&node.attrs);
         let mut prefix = Vec::new();
@@ -284,33 +296,43 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
         visit::visit_type_path(self, node);
     }
 
+    fn visit_type(&mut self, node: &'ast Type) {
+        if let Type::Tuple(tuple) = node {
+            let option_count = tuple
+                .elems
+                .iter()
+                .filter(|elem| is_option_type(elem))
+                .count();
+            if option_count >= 2 {
+                self.push(
+                    tuple.paren_token.span.open(),
+                    "rust/no-nullable-positional-tuple",
+                    "Tuple type has 2 or more nullable (Option<_>) positional elements; use a named struct or enum so each optional slot is named.".to_owned(),
+                );
+            }
+        }
+        visit::visit_type(self, node);
+    }
+
+    fn visit_item_enum(&mut self, node: &'ast ItemEnum) {
+        self.check_attributes(&node.attrs);
+        visit::visit_item_enum(self, node);
+    }
+
     fn visit_item_struct(&mut self, node: &'ast ItemStruct) {
         self.check_attributes(&node.attrs);
-        if derives_deserialize(&node.attrs)
-            && !has_serde_deny_unknown_fields(&node.attrs)
-            && admits_unknown_fields(node)
-        {
-            self.push(
-                node.ident.span(),
-                "rust/require-strict-serde",
-                format!(
-                    "Struct '{}' derives Deserialize without #[serde(deny_unknown_fields)].",
-                    node.ident
-                ),
-            );
-        }
         for field in &node.fields {
             let Some(ident) = &field.ident else {
                 continue;
             };
-            if STRINGLY_VARIANT_FIELDS.iter().any(|name| ident == *name)
-                && is_string_or_str_type(&field.ty)
-            {
+            let raw_name = ident.to_string();
+            let field_name = raw_name.strip_prefix("r#").unwrap_or(&raw_name);
+            if STRINGLY_VARIANT_FIELDS.contains(&field_name) && is_string_or_str_type(&field.ty) {
                 self.push(
                     ident.span(),
                     "rust/no-stringly-variant",
                     format!(
-                        "Struct '{}' field '{ident}' uses a stringly discriminant; replace with a closed enum.",
+                        "Struct '{}' field '{raw_name}' uses a stringly discriminant; replace with a closed enum.",
                         node.ident
                     ),
                 );
@@ -332,38 +354,6 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
         }
         visit::visit_expr_call(self, node);
     }
-}
-
-fn admits_unknown_fields(node: &ItemStruct) -> bool {
-    let Fields::Named(named) = &node.fields else {
-        return false;
-    };
-    let container_reshaped = node
-        .attrs
-        .iter()
-        .filter(|attr| attr.path().is_ident("serde"))
-        .any(|attr| serde_attr_mentions(attr, &["transparent", "from", "try_from"]));
-    let has_flatten = named.named.iter().any(|field| {
-        field
-            .attrs
-            .iter()
-            .filter(|attr| attr.path().is_ident("serde"))
-            .any(|attr| serde_attr_mentions(attr, &["flatten"]))
-    });
-    !container_reshaped && !has_flatten
-}
-
-fn serde_attr_mentions(attr: &Attribute, keys: &[&str]) -> bool {
-    let mut found = false;
-    let parsed = attr.parse_nested_meta(|meta| {
-        found |= keys.iter().any(|key| meta.path.is_ident(key));
-        if meta.input.peek(syn::Token![=]) {
-            meta.input.parse::<syn::Token![=]>()?;
-            meta.input.parse::<Expr>()?;
-        }
-        Ok(())
-    });
-    parsed.is_ok() && found
 }
 
 fn matching_forbidden_call<'a>(
@@ -413,30 +403,4 @@ fn flatten_use_tree(tree: &UseTree, prefix: &mut Vec<String>, out: &mut Vec<(Vec
             }
         }
     }
-}
-
-fn is_string_or_str_type(ty: &Type) -> bool {
-    match ty {
-        Type::Path(type_path) => {
-            path_ends_with(&type_path.path, &["String"])
-                || path_ends_with(&type_path.path, &["str"])
-        }
-        Type::Reference(type_ref) => is_string_or_str_type(&type_ref.elem),
-        _ => false,
-    }
-}
-
-fn has_bool_second_type_arg(args: &PathArguments) -> bool {
-    let PathArguments::AngleBracketed(angle) = args else {
-        return false;
-    };
-    let mut type_args = angle.args.iter().filter_map(|arg| match arg {
-        GenericArgument::Type(ty) => Some(ty),
-        _ => None,
-    });
-    let _first = type_args.next();
-    let Some(Type::Path(second)) = type_args.next() else {
-        return false;
-    };
-    second.path.is_ident("bool")
 }

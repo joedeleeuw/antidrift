@@ -126,7 +126,7 @@ export function provePackedRust(platformRoot, platformManifest) {
   );
   file(
     "rust-proofs/src/lib.rs",
-    'pub fn parse_port(text: &str) -> Result<u16, String> {\n    text.parse::<u16>().map_err(|_| "bad port".to_owned())\n}\n'
+    "pub fn parse_port(text: &str) -> Result<u16, String> {\n    text.parse::<u16>().map_err(|err| err.to_string())\n}\n"
   );
   const packedRustRun = spawnSync(
     packedLinter,

@@ -1,5 +1,7 @@
 use super::RustDiagnostic;
-use super::syn_kernel::is_ok_tuple_pat;
+use super::syn_kernel::{
+    derives_deserialize, has_derive_or_repr, has_serde_deny_unknown_fields, is_ok_tuple_pat,
+};
 use antidrift_kernel::decode_guards::{
     is_line_chunk_identifier, is_parser_module_path, is_sniffed_text_identifier,
     is_sniffer_function_name,
@@ -8,8 +10,9 @@ use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Expr, ExprCall, ExprForLoop, ExprIf, ExprLet, ExprLoop, ExprMethodCall, ExprWhile, FnArg,
-    ImplItemFn, ItemFn, Pat,
+    Attribute, Block, Expr, ExprCall, ExprForLoop, ExprIf, ExprLet, ExprLoop, ExprMethodCall,
+    ExprWhile, Fields, FnArg, ImplItemFn, Item, ItemEnum, ItemFn, ItemStruct, Pat, ReturnType,
+    Type,
 };
 
 pub(super) fn check_decode_to_option(
@@ -170,7 +173,7 @@ fn receiver_is_line_or_split_iter(expr: &Expr) -> bool {
     ) || receiver_is_line_or_split_iter(&call.receiver)
 }
 
-fn extract_serde_decode_call(expr: &Expr) -> Option<(&ExprCall, String)> {
+pub(super) fn extract_serde_decode_call(expr: &Expr) -> Option<(&ExprCall, String)> {
     let Expr::Call(call) = expr else {
         return None;
     };
@@ -229,5 +232,225 @@ fn expr_diverges(expr: &Expr) -> bool {
             _ => false,
         }),
         _ => false,
+    }
+}
+
+pub(super) fn check_strict_serde(
+    rel_path: &str,
+    ast: &syn::File,
+    diagnostics: &mut Vec<RustDiagnostic>,
+) {
+    let default_helper_return_types = collect_default_helper_return_types(&ast.items);
+    StrictSerdeVisitor {
+        rel_path,
+        default_helper_return_types,
+        diagnostics,
+    }
+    .visit_file(ast);
+}
+
+struct StrictSerdeVisitor<'a> {
+    rel_path: &'a str,
+    default_helper_return_types: Vec<String>,
+    diagnostics: &'a mut Vec<RustDiagnostic>,
+}
+
+impl StrictSerdeVisitor<'_> {
+    fn push(&mut self, span: Span, message: String) {
+        self.diagnostics.push(RustDiagnostic::error(
+            self.rel_path.to_owned(),
+            span.start().line.max(1),
+            "rust/require-strict-serde",
+            message,
+        ));
+    }
+
+    fn check_duplicate_default(
+        &mut self,
+        kind: &str,
+        ident: &syn::Ident,
+        attrs: &[Attribute],
+        has_field_default: bool,
+    ) {
+        let name = ident.to_string();
+        if has_derive_or_repr(attrs, &["Default"])
+            && (self.default_helper_return_types.contains(&name)
+                || attrs_have_serde_default_fn(attrs)
+                || has_field_default)
+        {
+            self.push(
+                ident.span(),
+                format!(
+                    "{kind} '{name}' derives Default alongside a custom default helper; own defaults in one place."
+                ),
+            );
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for StrictSerdeVisitor<'_> {
+    fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+        let Some((_, items)) = &node.content else {
+            return;
+        };
+        let prev = std::mem::replace(
+            &mut self.default_helper_return_types,
+            collect_default_helper_return_types(items),
+        );
+        visit::visit_item_mod(self, node);
+        self.default_helper_return_types = prev;
+    }
+
+    fn visit_item_fn(&mut self, node: &'ast ItemFn) {
+        check_decode_then_validate(self.rel_path, &node.block, self.diagnostics);
+        visit::visit_item_fn(self, node);
+    }
+
+    fn visit_impl_item_fn(&mut self, node: &'ast ImplItemFn) {
+        check_decode_then_validate(self.rel_path, &node.block, self.diagnostics);
+        visit::visit_impl_item_fn(self, node);
+    }
+
+    fn visit_item_enum(&mut self, node: &'ast ItemEnum) {
+        self.check_duplicate_default("Enum", &node.ident, &node.attrs, false);
+        visit::visit_item_enum(self, node);
+    }
+
+    fn visit_item_struct(&mut self, node: &'ast ItemStruct) {
+        if derives_deserialize(&node.attrs)
+            && !has_serde_deny_unknown_fields(&node.attrs)
+            && admits_unknown_fields(node)
+        {
+            self.push(
+                node.ident.span(),
+                format!(
+                    "Struct '{}' derives Deserialize without #[serde(deny_unknown_fields)].",
+                    node.ident
+                ),
+            );
+        }
+        let has_field_default = node
+            .fields
+            .iter()
+            .any(|field| attrs_have_serde_default_fn(&field.attrs));
+        self.check_duplicate_default("Struct", &node.ident, &node.attrs, has_field_default);
+        visit::visit_item_struct(self, node);
+    }
+}
+
+fn admits_unknown_fields(node: &ItemStruct) -> bool {
+    let Fields::Named(named) = &node.fields else {
+        return false;
+    };
+    !attrs_mention_serde(&node.attrs, &["transparent", "from", "try_from"])
+        && !named
+            .named
+            .iter()
+            .any(|field| attrs_mention_serde(&field.attrs, &["flatten"]))
+}
+
+fn attrs_mention_serde(attrs: &[Attribute], keys: &[&str]) -> bool {
+    attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("serde"))
+        .any(|attr| {
+            let mut found = false;
+            let parsed = attr.parse_nested_meta(|meta| {
+                found |= keys.iter().any(|key| meta.path.is_ident(key));
+                if meta.input.peek(syn::Token![=]) {
+                    meta.input.parse::<syn::Token![=]>()?;
+                    meta.input.parse::<Expr>()?;
+                }
+                Ok(())
+            });
+            parsed.is_ok() && found
+        })
+}
+
+fn collect_default_helper_return_types(items: &[Item]) -> Vec<String> {
+    items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Fn(item_fn) if item_fn.sig.ident.to_string().starts_with("default_") => {
+                match &item_fn.sig.output {
+                    ReturnType::Type(_, ret_ty) => match &**ret_ty {
+                        Type::Path(tp) => tp.path.segments.last().map(|s| s.ident.to_string()),
+                        _ => None,
+                    },
+                    ReturnType::Default => None,
+                }
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn attrs_have_serde_default_fn(attrs: &[Attribute]) -> bool {
+    attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("serde"))
+        .any(serde_attr_has_default_fn)
+}
+
+fn serde_attr_has_default_fn(attr: &Attribute) -> bool {
+    let mut has_default_path = false;
+    let parsed = attr.parse_nested_meta(|meta| {
+        has_default_path |= meta.path.is_ident("default") && meta.input.peek(syn::Token![=]);
+        if meta.input.peek(syn::Token![=]) {
+            meta.input.parse::<syn::Token![=]>()?;
+            meta.input.parse::<Expr>()?;
+        }
+        Ok(())
+    });
+    parsed.is_ok() && has_default_path
+}
+
+fn check_decode_then_validate(
+    rel_path: &str,
+    block: &Block,
+    diagnostics: &mut Vec<RustDiagnostic>,
+) {
+    struct DecodeValidateFinder {
+        has_decode: bool,
+        validate_span: Option<Span>,
+    }
+    impl<'ast> Visit<'ast> for DecodeValidateFinder {
+        fn visit_item(&mut self, _node: &'ast Item) {}
+        fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+            visit::visit_expr_call(self, node);
+            if extract_serde_decode_call(&Expr::Call(node.clone())).is_some() {
+                self.has_decode = true;
+                return;
+            }
+            if self.has_decode
+                && let Expr::Path(callee) = &*node.func
+                && let Some(last) = callee.path.segments.last()
+                && (last.ident == "validate" || last.ident.to_string().starts_with("validate_"))
+            {
+                self.validate_span.get_or_insert_with(|| last.ident.span());
+            }
+        }
+        fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
+            visit::visit_expr_method_call(self, node);
+            let name = node.method.to_string();
+            if self.has_decode && (name == "validate" || name.starts_with("validate_")) {
+                self.validate_span.get_or_insert_with(|| node.method.span());
+            }
+        }
+    }
+    let mut finder = DecodeValidateFinder {
+        has_decode: false,
+        validate_span: None,
+    };
+    finder.visit_block(block);
+    if finder.has_decode
+        && let Some(span) = finder.validate_span
+    {
+        diagnostics.push(RustDiagnostic::error(
+            rel_path.to_owned(),
+            span.start().line.max(1),
+            "rust/require-strict-serde",
+            "Function decodes with serde and then calls validate; enforce invariants during deserialization (#[serde(deserialize_with = ...)] or #[serde(try_from = ...)]) instead of post-decode .validate().".to_owned(),
+        ));
     }
 }

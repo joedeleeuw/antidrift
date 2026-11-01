@@ -6,7 +6,7 @@ use super::discard_shapes::{
 };
 use super::lifecycle_names::{CrateNames, NameLedger, banned_lifecycle_message};
 use super::syn_kernel::{
-    expr_mentions_ident, extract_pat_ident, is_err_wild_pat, is_fs_io_call, is_ok_tuple_pat,
+    call_path_ends_with, extract_pat_ident, is_err_wild_pat, is_fs_io_call, is_ok_tuple_pat,
     is_wild_pat,
 };
 use antidrift_kernel::declared_names::is_compat_name;
@@ -183,12 +183,12 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
         if node.method == "map_err"
             && node.args.len() == 1
             && let Expr::Closure(closure) = &node.args[0]
-            && discards_closure_error_param(closure)
+            && stringifies_closure_error_param(closure)
         {
             self.push(
                 node.method.span(),
                 "rust/no-anemic-errors",
-                "'.map_err(|_| ...)' discards the underlying error cause; preserve or format the source error.".to_owned(),
+                "'.map_err(...)' converts the source error to a bare string without adding boundary context; wrap in a typed error or include the operation/input that failed.".to_owned(),
             );
         }
         if node.method == "as_str" && ident_to_string_call_span(&node.receiver).is_some() {
@@ -271,18 +271,54 @@ impl<'ast> Visit<'ast> for SmellVisitor<'_> {
     }
 }
 
-fn discards_closure_error_param(closure: &ExprClosure) -> bool {
+fn peel_closure_expr(expr: &Expr) -> &Expr {
+    match expr {
+        Expr::Block(block) if block.block.stmts.len() == 1 => match &block.block.stmts[0] {
+            Stmt::Expr(inner, None) => peel_closure_expr(inner),
+            _ => expr,
+        },
+        Expr::Paren(paren) => peel_closure_expr(&paren.expr),
+        Expr::Group(group) => peel_closure_expr(&group.expr),
+        other => other,
+    }
+}
+
+fn stringifies_closure_error_param(closure: &ExprClosure) -> bool {
     if closure.inputs.len() != 1 {
         return false;
     }
-    let pat = &closure.inputs[0];
-    if is_wild_pat(pat) {
-        return true;
-    }
-    let Some((param_name, _)) = extract_pat_ident(pat) else {
+    let Some((param_name, _)) = extract_pat_ident(&closure.inputs[0]) else {
         return false;
     };
-    !expr_mentions_ident(&closure.body, &param_name)
+    if param_name.starts_with('_') {
+        return false;
+    }
+    match peel_closure_expr(&closure.body) {
+        Expr::MethodCall(call) => {
+            (call.method == "to_string" || call.method == "to_owned")
+                && call.args.is_empty()
+                && matches!(&*call.receiver, Expr::Path(path) if path.path.is_ident(&param_name))
+        }
+        Expr::Call(call) => {
+            call_path_ends_with(call, &["String", "from"])
+                && call.args.len() == 1
+                && matches!(&call.args[0], Expr::Path(path) if path.path.is_ident(&param_name))
+        }
+        Expr::Macro(mac) if mac.mac.path.is_ident("format") => {
+            let compact: String = mac
+                .mac
+                .tokens
+                .to_string()
+                .chars()
+                .filter(|ch| !ch.is_whitespace())
+                .collect();
+            compact == format!("\"{{{param_name}}}\"")
+                || compact == format!("\"{{{param_name}:?}}\"")
+                || compact == format!("\"{{}}\",{param_name}")
+                || compact == format!("\"{{:?}}\",{param_name}")
+        }
+        _ => false,
+    }
 }
 
 struct IdentCollector<'a>(&'a mut FxHashSet<String>);

@@ -28,8 +28,8 @@ fn decode_configured<R: ConfigurableRule>(
     rule_name: &'static str,
     options: Option<&serde_json::Value>,
 ) -> Result<Box<dyn Rule>, String> {
-    let parsed =
-        decode_rule_options::<R::Options>(rule_name, options).map_err(|err| err.to_string())?;
+    let parsed = decode_rule_options::<R::Options>(rule_name, options)
+        .map_err(|err| format!("invalid options for {rule_name}: {err}"))?;
     Ok(Box::new(R::from_options(parsed)?))
 }
 

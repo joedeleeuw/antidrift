@@ -13,11 +13,14 @@ use super::tuple_and_service_shape::check_redundant_owner_prefix;
 const RULE_NAME: &str = "antidrift/no-structural-type-fork";
 
 #[derive(Clone, Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 struct RawFieldBlockConfig {
-    min_shared_fields: Option<usize>,
-    min_shapes: Option<usize>,
-    min_redundant_declarations: Option<usize>,
+    #[serde(rename = "minSharedFields")]
+    shared_fields: Option<usize>,
+    #[serde(rename = "minShapes")]
+    shapes: Option<usize>,
+    #[serde(rename = "minRedundantDeclarations")]
+    redundant_declarations: Option<usize>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -28,9 +31,9 @@ pub(crate) struct StructuralTypeForkOptions {
 
 #[derive(Clone, Copy)]
 pub struct FieldBlockConfig {
-    pub min_shared_fields: usize,
-    pub min_shapes: usize,
-    pub min_redundant_declarations: usize,
+    pub shared_fields: usize,
+    pub shapes: usize,
+    pub redundant_declarations: usize,
 }
 
 pub struct FieldEntry {
@@ -50,9 +53,9 @@ pub struct NoStructuralTypeFork {
 
 pub static RULE: NoStructuralTypeFork = NoStructuralTypeFork {
     field_blocks: FieldBlockConfig {
-        min_shared_fields: 2,
-        min_shapes: 2,
-        min_redundant_declarations: 3,
+        shared_fields: 2,
+        shapes: 2,
+        redundant_declarations: 3,
     },
 };
 
@@ -77,15 +80,15 @@ impl crate::ConfigurableRule for NoStructuralTypeFork {
         let fb = parsed.field_blocks;
         Ok(Self {
             field_blocks: FieldBlockConfig {
-                min_shared_fields: validate_positive_threshold(
+                shared_fields: validate_positive_threshold(
                     "fieldBlocks.minSharedFields",
-                    fb.min_shared_fields,
+                    fb.shared_fields,
                     2,
                 )?,
-                min_shapes: validate_positive_threshold("fieldBlocks.minShapes", fb.min_shapes, 2)?,
-                min_redundant_declarations: validate_positive_threshold(
+                shapes: validate_positive_threshold("fieldBlocks.minShapes", fb.shapes, 2)?,
+                redundant_declarations: validate_positive_threshold(
                     "fieldBlocks.minRedundantDeclarations",
-                    fb.min_redundant_declarations,
+                    fb.redundant_declarations,
                     3,
                 )?,
             },
@@ -212,7 +215,7 @@ fn evaluate_pair_intersection(
     cfg: FieldBlockConfig,
 ) -> Option<(usize, usize, usize, FxHashSet<String>)> {
     let shared: FxHashSet<String> = left.keys.intersection(&right.keys).cloned().collect();
-    if shared.len() < cfg.min_shared_fields {
+    if shared.len() < cfg.shared_fields {
         return None;
     }
     let matching_count = eligible
@@ -220,7 +223,7 @@ fn evaluate_pair_intersection(
         .filter(|s| shared.iter().all(|k| s.keys.contains(k)))
         .count();
     let redundant = (matching_count.saturating_sub(1)) * shared.len();
-    if matching_count < cfg.min_shapes || redundant < cfg.min_redundant_declarations {
+    if matching_count < cfg.shapes || redundant < cfg.redundant_declarations {
         return None;
     }
     Some((redundant, shared.len(), matching_count, shared))
@@ -250,9 +253,9 @@ fn find_best_field_block_cluster(
 fn report_duplicated_field_blocks(ctx: &mut Ctx, shapes: &[ShapeEntry], cfg: FieldBlockConfig) {
     let eligible: Vec<&ShapeEntry> = shapes
         .iter()
-        .filter(|s| s.fields.len() >= cfg.min_shared_fields)
+        .filter(|s| s.fields.len() >= cfg.shared_fields)
         .collect();
-    if eligible.len() < cfg.min_shapes {
+    if eligible.len() < cfg.shapes {
         return;
     }
     let Some((redundant, _, matching_count, shared)) =

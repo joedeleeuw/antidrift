@@ -38,7 +38,7 @@ const HOUSE_STYLE_RULE_IDS = [
   "rust/no-value-roundtrip",
   "rust/no-decode-to-option",
   "rust/no-constant-return-field",
-  "rust/no-redundant-owner-prefix",
+  "rust/no-nullable-positional-tuple",
   "rust/no-hollow-module",
   "rust/no-blocking-in-async",
   "rust/no-query-join-or-tree-reshape",
@@ -49,7 +49,11 @@ const HOUSE_STYLE_MESSAGES = [
   'collapsed into "" via fallback',
   "Do not serialize and deserialize the same value",
   "wall-clock sleep 'std::thread::sleep' inside an async context",
-  "Three or more independent reads are awaited one after another",
+  "Tuple type has 2 or more nullable (Option<_>) positional elements",
+  "'.map_err(...)' converts the source error to a bare string without adding boundary context",
+  "Struct 'RawEvent' field 'r#type' uses a stringly discriminant",
+  "Struct 'DefaultedConfig' derives Default alongside a custom default helper",
+  "Function decodes with serde and then calls validate",
   "Nested '.find(...)' performs an O(N*M)",
   "spans multiple build output tiers",
   "Untyped config probe '.as_u64()'",
@@ -67,6 +71,7 @@ const REMOVED_RULE_IDS = [
   "rust/require-rule-scope",
   "rust/no-duplicate-scope-fields",
   "rust/no-discarded-decoded-config",
+  "rust/no-redundant-owner-prefix",
   "antidrift/no-tsrslint-sourcefile-listener",
 ];
 
@@ -84,6 +89,11 @@ function houseStyleShapeAsserts(diags) {
     byRule("rust/no-decode-to-option").length,
     1,
     `Expected one decode-to-option report for the .ok() discard and none for the sniffed text input, got ${printed}`
+  );
+  assert.equal(
+    byRule("rust/no-query-join-or-tree-reshape").length,
+    1,
+    `Expected only nested .find() equijoin to report rust/no-query-join-or-tree-reshape, got ${printed}`
   );
   assert.deepEqual(
     [...new Set(byRule("rust/no-value-roundtrip").map((diag) => diag.file))],

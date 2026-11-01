@@ -1,6 +1,5 @@
 use super::RustDiagnostic;
 use super::struct_index::StructIndex;
-use super::syn_kernel::has_derive_or_repr;
 use super::workspace::relative_display;
 use rustc_hash::FxHashMap;
 use std::path::Path;
@@ -17,7 +16,6 @@ pub(super) fn check_structural_type_forks(
     for definition in index.definitions.values() {
         let item_struct = definition.structure;
         let rel_path = relative_display(workspace_root, definition.file);
-        check_redundant_owner_prefix(&rel_path, item_struct, diagnostics);
         let signature = match struct_field_signature(item_struct) {
             Ok(Some(signature)) => signature,
             Ok(None) => continue,
@@ -49,65 +47,6 @@ pub(super) fn check_structural_type_forks(
             seen.insert(signature, (struct_name, rel_path, line));
         }
     }
-}
-
-fn check_redundant_owner_prefix(
-    rel_path: &str,
-    item_struct: &ItemStruct,
-    diagnostics: &mut Vec<RustDiagnostic>,
-) {
-    if has_derive_or_repr(&item_struct.attrs, &["Deserialize", "Serialize"]) {
-        return;
-    }
-    let Fields::Named(named) = &item_struct.fields else {
-        return;
-    };
-    if named.named.len() < 2 {
-        return;
-    }
-    let struct_name = item_struct.ident.to_string();
-    let Some(stem) = leading_compound_stem(&struct_name) else {
-        return;
-    };
-    let prefix = format!("{stem}_");
-    let all_prefixed = named.named.iter().all(|field| {
-        field.ident.as_ref().is_some_and(|ident| {
-            ident
-                .to_string()
-                .strip_prefix(&prefix)
-                .is_some_and(|rest| !rest.is_empty())
-        })
-    });
-    if all_prefixed {
-        diagnostics.push(RustDiagnostic::error(
-            rel_path.to_owned(),
-            item_struct.ident.span().start().line.max(1),
-            "rust/no-redundant-owner-prefix",
-            format!(
-                "Struct '{struct_name}' prefixes all {} fields with '{prefix}'; drop the redundant owner prefix from field names.",
-                named.named.len()
-            ),
-        ));
-    }
-}
-
-fn leading_compound_stem(name: &str) -> Option<String> {
-    let mut chars = name.chars();
-    let first = chars.next()?;
-    if !first.is_ascii_uppercase() {
-        return None;
-    }
-    let mut stem = String::from(first.to_ascii_lowercase());
-    for ch in chars {
-        if ch.is_ascii_uppercase() {
-            return (stem.len() >= 3).then_some(stem);
-        }
-        if !ch.is_ascii_alphanumeric() {
-            return None;
-        }
-        stem.push(ch);
-    }
-    None
 }
 
 fn struct_field_signature(item_struct: &ItemStruct) -> syn::Result<Option<FieldSignature>> {

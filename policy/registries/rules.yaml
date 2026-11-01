@@ -208,3 +208,6 @@ retiredRules:
   antidrift/no-default-export-in-domain:
     status: retired
     reason: Replaced by Oxlint's native import/no-default-export rule scoped to domain/ and model/ directories in createGovernanceOxlintConfig overrides.
+  rust/no-redundant-owner-prefix:
+    status: retired
+    reason: Replaced by Clippy's native clippy::struct_field_names lint in [workspace.lints.clippy], which checks both shared prefixes and shared suffixes across a struct's fields with a >= 3 field threshold.

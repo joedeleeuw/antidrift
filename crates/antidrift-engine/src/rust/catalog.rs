@@ -168,7 +168,7 @@ pub(super) const RULES: &[RuleRow] = &[
     general(
         "rust/no-anemic-errors",
         ScopePolicy::AuthoredSource,
-        "Preserve underlying error causes in map_err closures and do not branch on formatted error text.",
+        "Use typed domain error enums with source context instead of Result<_, String>, bare Err(\"...\") literals, or context-free .map_err(|e| e.to_string()).",
     ),
     general(
         "rust/no-silent-result-discard",
@@ -196,9 +196,9 @@ pub(super) const RULES: &[RuleRow] = &[
         "Delete struct fields initialized to the same constant across all construction sites and never mutated.",
     ),
     general(
-        "rust/no-redundant-owner-prefix",
+        "rust/no-nullable-positional-tuple",
         ScopePolicy::Everywhere,
-        "Drop redundant leading owner-stem prefixes when every field of a non-serde struct repeats the struct stem.",
+        "Return or store a named struct or enum instead of a tuple with two or more Option<_> elements.",
     ),
     general(
         "rust/no-blocking-in-async",
@@ -208,7 +208,7 @@ pub(super) const RULES: &[RuleRow] = &[
     general(
         "rust/no-query-join-or-tree-reshape",
         ScopePolicy::AuthoredSource,
-        "Pre-index inner collections before iterating instead of running nested .find() equijoins, and batch independent awaits.",
+        "Pre-index inner collections before iterating instead of running nested .find() equijoins.",
     ),
     general(
         "rust/no-contract-appeasement-projection",

@@ -157,7 +157,11 @@ impl LifecycleTraversal {
                 frame.cells.awaited_names.insert(name);
             }
         }
-        if let Some((cell, Some(setter))) = state_pair {
+        if let Some(StateBinding {
+            cell,
+            setter: Some(setter),
+        }) = state_pair
+        {
             frame.cells.setters.insert(setter);
             if let Some(cell) = cell {
                 frame.cells.cell_of.insert(setter, cell);
@@ -255,7 +259,12 @@ fn is_new_abort_controller(expression: Option<P<Node>>) -> bool {
         .is_some_and(|c| ast::is_identifier(c) && c.as_identifier().text() == "AbortController")
 }
 
-fn array_state_pair(pattern: P<Node>) -> (Option<&'static str>, Option<&'static str>) {
+struct StateBinding {
+    cell: Option<&'static str>,
+    setter: Option<&'static str>,
+}
+
+fn array_state_pair(pattern: P<Node>) -> StateBinding {
     let elems = pattern.as_binding_pattern().elements().nodes();
     let elem_id = |idx: usize| {
         let elem = *elems.get(idx)?;
@@ -264,7 +273,10 @@ fn array_state_pair(pattern: P<Node>) -> (Option<&'static str>, Option<&'static 
             .flatten()?;
         ast::is_identifier(id).then(|| id.as_identifier().text())
     };
-    (elem_id(0), elem_id(1))
+    StateBinding {
+        cell: elem_id(0),
+        setter: elem_id(1),
+    }
 }
 
 fn is_source_member_write(expression: P<Node>, awaited: &FxHashSet<&str>) -> bool {
