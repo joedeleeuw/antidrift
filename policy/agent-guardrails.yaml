@@ -106,8 +106,8 @@ clusters:
         message: Split container, view, and state/resource boundaries (warn above 150 lines, error above 180 lines for PascalCase functions that render JSX).
       - id: arch/max-module-lines # Oversized modules accumulate unrelated responsibilities and defeat local ownership.
         severity: error
-        detector: antidrift:max-module-lines,warnAt:1000,max:1500
-        message: Split modules over 1,500 lines by owned responsibility (warn above 1,000 lines before reaching the ceiling; blank and comment lines count).
+        detector: antidrift:max-module-lines,warnAt:425,max:500
+        message: Split modules over 500 lines by owned responsibility (warn above 425 lines before reaching the ceiling; blank and comment lines count).
       - id: react/max-component-props # Large prop bags make component API combinations hard to reason about.
         severity: error
         detector: locallyOwnedReactComponentPropsGt:12

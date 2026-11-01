@@ -1,10 +1,8 @@
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  checkDomainRegistries,
-  readRegistry,
-} from "./registry-checks/domain.mjs";
+import { checkDomainRegistries } from "./registry-checks/domain.mjs";
+import { readRegistry } from "./registry-checks/registry-contracts.mjs";
 import { checkPackageSurface } from "./registry-checks/package-surface.mjs";
 import { checkRuleRegistry } from "./registry-checks/rules.mjs";
 
