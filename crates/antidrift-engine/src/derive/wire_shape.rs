@@ -1,7 +1,8 @@
+use super::wire_overlap::overlap_reason;
 use antidrift_kernel::shape::{has_string_or_number_index_signature, is_true_literal_type};
 use antidrift_kernel::tsrs_kernel::decodable_text;
 use serde::Serialize;
-use tsrs_ast::SymbolFlags;
+use tsrs_ast::{Kind, Symbol, SymbolFlags};
 use tsrs_checker::{Checker, LiteralValue, ObjectFlags, SignatureKind, Type, TypeFlags};
 use tsrs_core::P;
 
@@ -74,6 +75,9 @@ pub(crate) fn shape_of(
     }
     if flags.intersects(TypeFlags::Union) {
         return union_shape(checker, typ, path, depth);
+    }
+    if flags.intersects(TypeFlags::Intersection) {
+        return intersection_shape(checker, typ, path, depth);
     }
     if flags.intersects(TypeFlags::BooleanLiteral) {
         return Ok(WireShape::Literal {
@@ -162,6 +166,27 @@ fn union_shape(
     )
 }
 
+fn intersection_shape(
+    checker: &mut Checker,
+    typ: P<Type>,
+    path: &str,
+    depth: u8,
+) -> Result<WireShape, ShapeProblem> {
+    for &member in typ.as_intersection_type().types() {
+        let member_shape = shape_of(checker, member, path, depth + 1)?;
+        if !matches!(member_shape, WireShape::Object { .. }) {
+            return Err(ShapeProblem::at(
+                path,
+                format!(
+                    "is `{}`, which cannot cross the wire",
+                    checker.type_to_string_exported(typ)
+                ),
+            ));
+        }
+    }
+    object_shape(checker, typ, path, depth)
+}
+
 fn optional_shape(
     checker: &mut Checker,
     typ: P<Type>,
@@ -226,111 +251,6 @@ fn members_shape(
     }
 }
 
-fn overlap_reason(variants: &[WireShape]) -> Option<String> {
-    variants.iter().enumerate().find_map(|(index, left)| {
-        variants
-            .iter()
-            .skip(index + 1)
-            .find_map(|right| shared_value_reason(left, right))
-    })
-}
-
-fn shared_value_reason(left: &WireShape, right: &WireShape) -> Option<String> {
-    match (left, right) {
-        (WireShape::Union { variants }, other) | (other, WireShape::Union { variants }) => variants
-            .iter()
-            .find_map(|variant| shared_value_reason(variant, other)),
-        (WireShape::Object { fields: left_fields }, WireShape::Object { fields: right_fields }) => {
-            (!has_discriminant(&[left_fields.as_slice(), right_fields.as_slice()])).then(|| {
-                "has object variants that no required literal field tells apart; add a discriminant such as `kind: \"a\"`"
-                    .to_owned()
-            })
-        }
-        (WireShape::Array { items: left_items }, WireShape::Array { items: right_items }) => {
-            shared_value_reason(left_items, right_items)
-                .map(|inner| format!("has array variants whose items overlap: the item union {inner}"))
-        }
-        (WireShape::Date, text) | (text, WireShape::Date) if carries_text(text) => {
-            Some("mixes string and Date, which share one wire form".to_owned())
-        }
-        (WireShape::String, other) | (other, WireShape::String) if carries_text(other) => {
-            Some("has overlapping string variants".to_owned())
-        }
-        (WireShape::Number, other) | (other, WireShape::Number) if carries_number(other) => {
-            Some("has overlapping number variants".to_owned())
-        }
-        (WireShape::Boolean, other) | (other, WireShape::Boolean) if carries_boolean(other) => {
-            Some("has overlapping boolean variants".to_owned())
-        }
-        (WireShape::Null, WireShape::Null) => Some("has duplicate null variants".to_owned()),
-        (WireShape::Date, WireShape::Date) => Some("has duplicate Date variants".to_owned()),
-        (WireShape::Literal { value: left_val }, WireShape::Literal { value: right_val })
-            if left_val == right_val =>
-        {
-            Some("has duplicate literal variants".to_owned())
-        }
-        _ => None,
-    }
-}
-
-const fn carries_text(shape: &WireShape) -> bool {
-    matches!(
-        shape,
-        WireShape::String
-            | WireShape::Literal {
-                value: WireLiteral::Text(_)
-            }
-    )
-}
-
-const fn carries_number(shape: &WireShape) -> bool {
-    matches!(
-        shape,
-        WireShape::Number
-            | WireShape::Literal {
-                value: WireLiteral::Number(_)
-            }
-    )
-}
-
-const fn carries_boolean(shape: &WireShape) -> bool {
-    matches!(
-        shape,
-        WireShape::Boolean
-            | WireShape::Literal {
-                value: WireLiteral::Flag(_)
-            }
-    )
-}
-
-fn has_discriminant(objects: &[&[WireField]]) -> bool {
-    objects.first().is_some_and(|first| {
-        first.iter().any(|candidate| {
-            let literals: Vec<&WireLiteral> = objects
-                .iter()
-                .filter_map(|fields| required_literal(fields, &candidate.name))
-                .collect();
-            literals.len() == objects.len()
-                && literals.iter().enumerate().all(|(index, literal)| {
-                    literals
-                        .iter()
-                        .skip(index + 1)
-                        .all(|other| other != literal)
-                })
-        })
-    })
-}
-
-fn required_literal<'a>(fields: &'a [WireField], name: &str) -> Option<&'a WireLiteral> {
-    fields
-        .iter()
-        .find(|field| field.name == name && !field.optional)
-        .and_then(|field| match &field.shape {
-            WireShape::Literal { value } => Some(value),
-            _ => None,
-        })
-}
-
 fn array_item_type(
     checker: &mut Checker,
     typ: P<Type>,
@@ -347,6 +267,34 @@ fn array_item_type(
         .first()
         .copied()
         .ok_or_else(|| ShapeProblem::at(path, "is an array without an element type".to_owned()))
+}
+
+fn is_symbol_keyed_property(checker: &mut Checker, property: P<Symbol>) -> bool {
+    let mut has_non_computed_name = false;
+    for decl in property
+        .declarations()
+        .iter()
+        .copied()
+        .chain(property.value_declaration())
+    {
+        let Some(name_node) = decl.name() else {
+            continue;
+        };
+        if name_node.kind() != Kind::ComputedPropertyName {
+            has_non_computed_name = true;
+            continue;
+        }
+        let expr = name_node.as_computed_property_name().expression();
+        if checker
+            .get_type_at_location(expr)
+            .flags()
+            .intersects(TypeFlags::ESSymbolLike)
+        {
+            return true;
+        }
+    }
+    let raw_name = property.name();
+    (raw_name.starts_with("\x7f@") || raw_name.starts_with("__@")) && !has_non_computed_name
 }
 
 fn object_shape(
@@ -398,6 +346,12 @@ fn object_shape(
     }
     let mut fields = Vec::new();
     for &property in checker.get_properties_of_type(typ) {
+        if is_symbol_keyed_property(checker, property) {
+            return Err(ShapeProblem::at(
+                path,
+                "has a symbol-keyed property, which JSON drops on the wire".to_owned(),
+            ));
+        }
         let Some(name) = decodable_text(property.name()) else {
             return Err(ShapeProblem::at(
                 path,

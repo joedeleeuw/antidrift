@@ -204,8 +204,10 @@ pub fn type_literal_keys(typ: P<Type>, out: &mut FxHashSet<String>) {
 pub fn has_string_or_number_index_signature(checker: &mut Checker, typ: P<Type>) -> bool {
     let str_type = checker.string_type;
     let num_type = checker.number_type;
+    let sym_type = checker.es_symbol_type;
     checker.get_index_type_of_type(typ, str_type).is_some()
         || checker.get_index_type_of_type(typ, num_type).is_some()
+        || checker.get_index_type_of_type(typ, sym_type).is_some()
 }
 
 pub fn object_property_names(checker: &mut Checker, typ: P<Type>) -> Vec<String> {

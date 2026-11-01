@@ -47,7 +47,8 @@ pub(crate) fn run_workspace(args: &CliArgs) -> Result<i32, String> {
         })
         .unwrap_or_else(|| cwd.clone());
     let registries = PolicyRegistries::load_from_repo(&registry_base)?;
-    let files = collect_lintable_files(&args.paths, &cwd)?;
+    let mut files = collect_lintable_files(&args.paths, &cwd)?;
+    files.retain(|path| !registries.is_generated_path(path));
     if files.is_empty() {
         return handle_suppressions_and_format(args, &BTreeMap::new());
     }

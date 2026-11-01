@@ -244,6 +244,9 @@ fn server_module(report: &DeriveReport) -> String {
         "import type { Session } from \"../shared/session\";".to_owned(),
         "import type { DispatchTable, MethodInvoker, PubInvoker, RouteEntry } from \"../runtime/server\";".to_owned(),
     ];
+    if !report.methods.is_empty() || !report.publications.is_empty() {
+        lines.push("import { expectArgs } from \"../runtime/decode\";".to_owned());
+    }
     let mut decoders = Vec::new();
     for method in &report.methods {
         decoders.extend(
@@ -268,8 +271,9 @@ fn server_module(report: &DeriveReport) -> String {
     lines.push("\nconst methods = {".to_owned());
     for method in &report.methods {
         lines.push(format!(
-            "  {name}: async (args: readonly unknown[], session: Session): Promise<unknown> => {{\n    const {{ {name} }} = await import({spec});\n    return {name}({call});\n  }},",
+            "  {name}: async (args: readonly unknown[], session: Session): Promise<unknown> => {{\n    expectArgs(args, {arity});\n    const {{ {name} }} = await import({spec});\n    return {name}({call});\n  }},",
             name = method.name,
+            arity = method.params.len(),
             spec = js_string(&module_specifier(&method.file)),
             call = call_args(&method.name, &method.params, &method.injected)
         ));
@@ -278,8 +282,9 @@ fn server_module(report: &DeriveReport) -> String {
     lines.push("\nconst pubs = {".to_owned());
     for publication in &report.publications {
         lines.push(format!(
-            "  {name}: async function* (args: readonly unknown[], session: Session, signal: AbortSignal): AsyncGenerator {{\n    const {{ {name} }} = await import({spec});\n    yield* {name}({call});\n  }},",
+            "  {name}: async function* (args: readonly unknown[], session: Session, signal: AbortSignal): AsyncGenerator {{\n    expectArgs(args, {arity});\n    const {{ {name} }} = await import({spec});\n    yield* {name}({call});\n  }},",
             name = publication.name,
+            arity = publication.params.len(),
             spec = js_string(&module_specifier(&publication.file)),
             call = call_args(&publication.name, &publication.params, &publication.injected)
         ));

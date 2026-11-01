@@ -3,6 +3,7 @@ mod decoders;
 mod emit;
 mod layout;
 mod route_contracts;
+mod wire_overlap;
 mod wire_shape;
 
 use std::sync::Arc;
@@ -79,6 +80,23 @@ pub(crate) fn run_derive(args: &[String]) -> Result<i32, String> {
         return Err(format!(
             "{} has no src directory; derive reads <package-root>/src/{{methods,pubs,routes,shared,server,client}}",
             root.display()
+        ));
+    }
+    let missing_runtime: Vec<String> = [
+        "runtime/decode.ts",
+        "runtime/client.ts",
+        "runtime/server.ts",
+        "shared/session.ts",
+    ]
+    .into_iter()
+    .filter(|rel| !src_dir.join(rel).is_file())
+    .map(|rel| format!("src/{rel}"))
+    .collect();
+    if !missing_runtime.is_empty() {
+        return Err(format!(
+            "{} is missing required derive runtime module(s): {}",
+            root.display(),
+            missing_runtime.join(", ")
         ));
     }
     let layout = SourceLayout::new(&src_dir);

@@ -1,13 +1,16 @@
 import type { Session } from "../shared/session";
 import type { DispatchTable, MethodInvoker, PubInvoker, RouteEntry } from "../runtime/server";
+import { expectArgs } from "../runtime/decode";
 import { decodeAddTodoArg0, decodeCompleteTodoArg0, decodeTodosByListArg0 } from "./wire";
 
 const methods = {
   addTodo: async (args: readonly unknown[], session: Session): Promise<unknown> => {
+    expectArgs(args, 1);
     const { addTodo } = await import("../methods/addTodo");
     return addTodo(decodeAddTodoArg0(args[0], "args[0]"), session);
   },
   completeTodo: async (args: readonly unknown[], session: Session): Promise<unknown> => {
+    expectArgs(args, 1);
     const { completeTodo } = await import("../methods/completeTodo");
     return completeTodo(decodeCompleteTodoArg0(args[0], "args[0]"), session);
   },
@@ -15,6 +18,7 @@ const methods = {
 
 const pubs = {
   todosByList: async function* (args: readonly unknown[], session: Session, signal: AbortSignal): AsyncGenerator {
+    expectArgs(args, 1);
     const { todosByList } = await import("../pubs/todosByList");
     yield* todosByList(decodeTodosByListArg0(args[0], "args[0]"), session, signal);
   },

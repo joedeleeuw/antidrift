@@ -13,6 +13,8 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
+import { parseNameStatusRecords } from "../src/change-scope/change-context.mjs";
+
 const PLANTED_DERIVE_VIOLATIONS = {
   "src/methods/callbacky.ts":
     'import type { Session } from "../shared/session";\n\nexport async function callbacky(input: { label: string; onDone: () => void }, session: Session): Promise<string> {\n  input.onDone();\n  return Promise.resolve(session.userId);\n}\n',
@@ -40,6 +42,12 @@ const PLANTED_DERIVE_VIOLATIONS = {
     "export async function primitiveArrayOverlap(): Promise<(1 | 2)[] | (2 | 3)[]> {\n  return Promise.resolve([2]);\n}\n",
   "src/methods/dateOrText.ts":
     "export async function dateOrText(): Promise<string | Date> {\n  return Promise.resolve(new Date(0));\n}\n",
+  "src/methods/dateOrIsoLiteral.ts":
+    'export async function dateOrIsoLiteral(): Promise<"2026-11-01T09:00:00.000Z" | Date> {\n  return Promise.resolve(new Date(0));\n}\n',
+  "src/methods/symbolKey.ts":
+    'const secret = Symbol("secret");\nexport async function symbolKey(input: { [secret]: number }): Promise<string> {\n  return Promise.resolve(String(input[secret]));\n}\n',
+  "src/methods/mappedSymbolKey.ts":
+    'const secret = Symbol("secret");\nexport async function mappedSymbolKey(input: { id: string } & Record<typeof secret, number>): Promise<number> {\n  return Promise.resolve(input[secret]);\n}\n',
   "src/client/leaky.ts":
     'import { listTodos } from "../server/store";\n\nexport function leak(): Promise<number> {\n  return listTodos("any").then((todos) => todos.length);\n}\n',
 };
@@ -56,13 +64,16 @@ const EXPECTED_PLANTED_DERIVE_DIAGNOSTICS = [
   "client/leaky.ts client-reaches-server",
   "methods/arrayOverlap.ts method-result-not-wire",
   "methods/callbacky.ts method-param-not-wire",
+  "methods/dateOrIsoLiteral.ts method-result-not-wire",
   "methods/dateOrText.ts method-result-not-wire",
+  "methods/mappedSymbolKey.ts method-param-not-wire",
   "methods/optionalArg.ts method-param-not-wire",
   "methods/overlap.ts method-result-not-wire",
   "methods/primitiveArrayOverlap.ts method-result-not-wire",
   "methods/renamed.ts method-export-name",
   "methods/surrogateKey.ts method-param-not-wire",
   "methods/surrogateLiteral.ts method-result-not-wire",
+  "methods/symbolKey.ts method-param-not-wire",
   "methods/syncMethod.ts method-must-be-async",
   "methods/voidResult.ts method-result-not-wire",
   "routes/lists/route.ts route-must-be-async",
@@ -330,10 +341,63 @@ function verifyShapeSampleRuntime(repoRoot) {
   ]);
 }
 
+function verifyAcceptedAndRuntimeProbes(binaryPath, copyRoot) {
+  const acceptedFile = join(copyRoot, "src/methods/acceptedShapes.ts");
+  writeFileSync(
+    acceptedFile,
+    'export async function acceptedShapes(input: { a: string } & { b: number }): Promise<Date | "missing"> {\n  return Promise.resolve(input.b > 0 ? new Date(0) : "missing");\n}\n'
+  );
+  const acceptedRun = spawnSync(binaryPath, ["derive", copyRoot], {
+    encoding: "utf8",
+  });
+  assert.equal(
+    acceptedRun.status,
+    0,
+    `${acceptedRun.stdout}${acceptedRun.stderr}`
+  );
+  rmSync(acceptedFile);
+
+  const decodePath = join(copyRoot, "src/runtime/decode.ts");
+  const decodeSource = readFileSync(decodePath, "utf8");
+  rmSync(decodePath);
+  const missingRun = spawnSync(binaryPath, ["derive", copyRoot], {
+    encoding: "utf8",
+  });
+  assert.notEqual(missingRun.status, 0);
+  assert.match(
+    `${missingRun.stdout}${missingRun.stderr}`,
+    /missing required derive runtime module\(s\): src\/runtime\/decode\.ts/u
+  );
+  writeFileSync(decodePath, decodeSource);
+
+  assert.deepEqual(parseNameStatusRecords("", "/repo"), []);
+  assert.deepEqual(
+    parseNameStatusRecords("M\0a.ts\0R100\0old.ts\0new.ts\0", "/repo"),
+    [
+      { status: "M", operation: "modify", path: "a.ts", oldPath: null },
+      {
+        status: "R100",
+        operation: "rename",
+        path: "new.ts",
+        oldPath: "old.ts",
+      },
+    ]
+  );
+  for (const bad of [
+    "M\0\0",
+    "R100\0old.ts\0",
+    "R100\0old.ts\0\0",
+    "M\0ok.ts\0A",
+  ]) {
+    assert.throws(() => parseNameStatusRecords(bad, "/repo"), TypeError);
+  }
+}
+
 export function proveDeriveSmoke(binaryPath, repoRoot) {
   const workspace = mkdtempSync(join(tmpdir(), "antidrift-derive-"));
   try {
     const { sampleRoot, copyRoot } = copyDeriveSample(repoRoot, workspace);
+    verifyAcceptedAndRuntimeProbes(binaryPath, copyRoot);
     const cleanRun = spawnSync(binaryPath, ["derive", copyRoot], {
       encoding: "utf8",
     });

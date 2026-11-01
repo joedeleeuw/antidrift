@@ -68,20 +68,29 @@ step(
 step(
   "malformed wire input fails at the boundary and names the field",
   async () => {
-    const error = await rejection(
-      callMethod(
-        "addTodo",
-        [{ listId: "list_1", title: 42 }],
-        decodeAddTodoResult
-      )
-    );
-    check(
-      error instanceof Error && error.message.includes("400"),
-      `expected status 400: ${String(error)}`
-    );
-    check(
-      causeText(error).includes("args[0].title"),
-      `error did not name the field: ${causeText(error)}`
+    const cases = [
+      [[{ listId: "list_1", title: 42 }], "args[0].title"],
+      [[{ listId: "list_1", title: "probe", dueAt: "1" }], "args[0].dueAt"],
+      [
+        [{ listId: "list_1", title: "probe", dueAt: "March 5 2020" }],
+        "args[0].dueAt",
+      ],
+      [[{ listId: "list_1", title: "probe" }, "stray", 2], "args"],
+    ] as const;
+    await Promise.all(
+      cases.map(async ([args, field]) => {
+        const error = await rejection(
+          callMethod("addTodo", args, decodeAddTodoResult)
+        );
+        check(
+          error instanceof Error && error.message.includes("400"),
+          `expected status 400: ${String(error)}`
+        );
+        check(
+          causeText(error).includes(field),
+          `error did not name ${field}: ${causeText(error)}`
+        );
+      })
     );
   }
 );

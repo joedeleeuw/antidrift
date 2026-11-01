@@ -75,28 +75,44 @@ export function changedFilesBetween({ base, head, cwd }) {
   return parseNameStatusRecords(raw, cwd);
 }
 
-function parseNameStatusRecords(raw, cwd) {
-  const records = raw.split("\0");
+function requireRecordField(value, message) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new TypeError(message);
+  }
+  return value;
+}
+
+export function parseNameStatusRecords(raw, cwd) {
+  if (raw.length === 0) return [];
+  if (!raw.endsWith("\0")) {
+    throw new TypeError(
+      `malformed git diff --name-status -z output in ${cwd}: record stream must end with NUL`
+    );
+  }
+  const records = raw.slice(0, -1).split("\0");
   const changedFiles = [];
-  for (let index = 0; index < records.length - 1; index += 2) {
-    const status = records[index];
-    const path = records[index + 1];
+  for (let index = 0; index < records.length; ) {
+    const status = records[index] ?? "";
     const operation = STATUS_OPERATION[status[0]];
-    if (operation === undefined) {
-      throw new Error(
-        `unsupported git status "${status}" for path ${path} in ${cwd}`
+    if (status.length === 0 || operation === undefined) {
+      throw new TypeError(
+        `unsupported git status "${status}" at field ${index} in ${cwd}`
       );
     }
+    const path = requireRecordField(
+      records[index + 1],
+      `malformed git diff --name-status -z record for status "${status}" at field ${index} in ${cwd}: missing path`
+    );
     if (status[0] === "R" || status[0] === "C") {
-      changedFiles.push({
-        status,
-        operation,
-        path: records[index + 2],
-        oldPath: path,
-      });
-      index += 1;
+      const destPath = requireRecordField(
+        records[index + 2],
+        `malformed git diff --name-status -z record for status "${status}" (${path}) at field ${index} in ${cwd}: missing destination path`
+      );
+      changedFiles.push({ status, operation, path: destPath, oldPath: path });
+      index += 3;
     } else {
       changedFiles.push({ status, operation, path, oldPath: null });
+      index += 2;
     }
   }
   return changedFiles;

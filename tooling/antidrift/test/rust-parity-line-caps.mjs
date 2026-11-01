@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { z } from "zod";
 
 import { loadPolicy } from "../src/policy/generate-policy-artifacts.mjs";
+import { loadNativeAddon } from "../src/policy/oxlint.mjs";
 
 const policyRowsSchema = z.object({
   clusters: z.array(
@@ -26,7 +27,7 @@ const lineCapBatchSchema = z.array(
   z.object({ id: z.string(), diagnostics: lineCapDiagnosticsSchema })
 );
 
-const lineCapDetector = /^antidrift:([^,]+),warnAt:(\d+),max:(\d+)$/u;
+const lineCapDetector = /^antidrift:(max-[^,]+)$/u;
 
 const lineCapShapes = {
   "rust/max-module-lines": {
@@ -78,11 +79,7 @@ const lineCapBoundaries = ({ warnAt, max }) => [
 
 function parsePolicyLineCap({ detector }) {
   const match = lineCapDetector.exec(detector ?? "");
-  if (!match) return [];
-  const [, rule, warnAt, max] = match;
-  return [
-    { ruleId: `antidrift/${rule}`, warnAt: Number(warnAt), max: Number(max) },
-  ];
+  return match ? [`antidrift/${match[1]}`] : [];
 }
 
 function loadRustRuleRows(binaryPath, repoRoot) {
@@ -105,31 +102,37 @@ function loadRustRuleRows(binaryPath, repoRoot) {
   return rows;
 }
 
+function toLineCapEntry(ruleId, lineCap) {
+  return lineCap
+    ? [{ ruleId, warnAt: lineCap.warnAbove, max: lineCap.max }]
+    : [];
+}
+
 async function loadLineCaps(binaryPath, repoRoot) {
   const rustRuleRows = loadRustRuleRows(binaryPath, repoRoot);
   const policy = policyRowsSchema.parse(
     await loadPolicy(resolve(repoRoot, "policy/agent-guardrails.yaml"))
   );
+  const policyRuleIds = policy.clusters
+    .flatMap(({ rules }) => rules)
+    .flatMap(parsePolicyLineCap)
+    .sort();
+  const addonCaps = loadNativeAddon(repoRoot)
+    .antidriftRules()
+    .flatMap((row) => toLineCapEntry(row.name, row.lineCap));
+  assert.deepEqual(
+    policyRuleIds,
+    addonCaps.map(({ ruleId }) => ruleId).sort(),
+    "policy/agent-guardrails.yaml must bind every script line-cap rule to its kernel owner"
+  );
   const lineCaps = [
-    ...policy.clusters
-      .flatMap(({ rules }) => rules)
-      .flatMap(parsePolicyLineCap),
-    ...rustRuleRows.flatMap((row) =>
-      row.lineCap
-        ? [
-            {
-              ruleId: row.id,
-              warnAt: row.lineCap.warnAbove,
-              max: row.lineCap.max,
-            },
-          ]
-        : []
-    ),
+    ...addonCaps,
+    ...rustRuleRows.flatMap((row) => toLineCapEntry(row.id, row.lineCap)),
   ];
   assert.deepEqual(
     lineCaps.map(({ ruleId }) => ruleId).sort(),
     Object.keys(lineCapShapes).sort(),
-    "policy/agent-guardrails.yaml must declare warnAt and max for every line-cap unit"
+    "the kernel cap table must declare warnAbove and max for every line-cap unit"
   );
   return lineCaps;
 }
@@ -316,6 +319,32 @@ function headlessFunctionCapPayload(repoRoot, lineCaps) {
   };
 }
 
+function verifyRegistryGeneratedExclusion({ binaryPath, workspace, lineCaps }) {
+  const moduleCap = lineCaps.find(
+    ({ ruleId }) => ruleId === "antidrift/max-module-lines"
+  );
+  assert.ok(moduleCap, "kernel must declare antidrift/max-module-lines");
+  const repoDir = join(workspace, "generated-registry-repo");
+  mkdirSync(join(repoDir, "policy/registries"), { recursive: true });
+  mkdirSync(join(repoDir, "src/codegen"), { recursive: true });
+  writeFileSync(
+    join(repoDir, "policy/registries/generated.yaml"),
+    "generatedSources:\n  codegen:\n    generated: src/codegen\n  routeTree:\n    generated: src/routeTree.gen.ts\n"
+  );
+  const oversized = lineCapSource(moduleCap.ruleId, moduleCap.max + 1);
+  writeFileSync(join(repoDir, "src/codegen/client.ts"), oversized);
+  writeFileSync(join(repoDir, "src/routeTree.gen.ts"), oversized);
+  writeFileSync(join(repoDir, "src/authored.ts"), oversized);
+  const run = spawnSync(binaryPath, ["--format", "json", "."], {
+    cwd: repoDir,
+    encoding: "utf8",
+  });
+  const reportedFiles = JSON.parse(String(run.stdout ?? "[]")).map(
+    (entry) => entry.filePath
+  );
+  assert.deepEqual(reportedFiles, ["src/authored.ts"]);
+}
+
 export async function proveLineCapSmokes({
   binaryPath,
   repoRoot,
@@ -325,6 +354,7 @@ export async function proveLineCapSmokes({
   const workspace = mkdtempSync(join(tmpdir(), "antidrift-line-caps-"));
   try {
     verifyScriptLineCaps({ binaryPath, repoRoot, workspace, lineCaps });
+    verifyRegistryGeneratedExclusion({ binaryPath, workspace, lineCaps });
     verifyRustLineCaps({
       binaryPath,
       repoRoot,

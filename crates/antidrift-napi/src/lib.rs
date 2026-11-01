@@ -82,9 +82,16 @@ pub fn engine_stats() -> napi::Result<EngineStats> {
 }
 
 #[napi(object)]
+pub struct EngineLineCap {
+    pub warn_above: u32,
+    pub max: u32,
+}
+
+#[napi(object)]
 pub struct EngineRule {
     pub name: String,
     pub default_enabled: bool,
+    pub line_cap: Option<EngineLineCap>,
 }
 
 #[napi]
@@ -92,9 +99,12 @@ pub struct EngineRule {
 pub fn antidrift_rules() -> Vec<EngineRule> {
     rule_listing()
         .into_iter()
-        .map(|(name, default_enabled)| EngineRule {
-            name,
-            default_enabled,
+        .map(|listed| EngineRule {
+            name: listed.name,
+            default_enabled: listed.default_enabled,
+            line_cap: listed
+                .line_cap
+                .map(|(warn_above, max)| EngineLineCap { warn_above, max }),
         })
         .collect()
 }

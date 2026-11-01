@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use antidrift_kernel::line_caps::CappedUnit;
 use antidrift_kernel::registries::PolicyRegistries;
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrslint::rule::Rule;
@@ -93,12 +94,37 @@ impl RuleCatalog {
     }
 }
 
+pub struct ListedRule {
+    pub name: String,
+    pub default_enabled: bool,
+    pub line_cap: Option<(u32, u32)>,
+}
+
 #[must_use]
-pub fn rule_listing() -> Vec<(String, bool)> {
+pub fn rule_listing() -> Vec<ListedRule> {
     let mut seen = FxHashSet::default();
     antidrift_rules::all_entries()
         .into_iter()
-        .map(|entry| (entry.rule.name().to_owned(), entry.default_enabled))
-        .filter(|(name, _)| seen.insert(name.clone()))
+        .filter_map(|entry| {
+            let name = entry.rule.name().to_owned();
+            if !seen.insert(name.clone()) {
+                return None;
+            }
+            let line_cap = CappedUnit::ALL
+                .iter()
+                .map(|unit| unit.cap())
+                .find(|cap| cap.rule_id == name)
+                .map(|cap| {
+                    (
+                        u32::try_from(cap.warn_above).unwrap_or(u32::MAX),
+                        u32::try_from(cap.max).unwrap_or(u32::MAX),
+                    )
+                });
+            Some(ListedRule {
+                name,
+                default_enabled: entry.default_enabled,
+                line_cap,
+            })
+        })
         .collect()
 }

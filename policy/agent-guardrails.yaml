@@ -98,15 +98,15 @@ clusters:
         message: Inline or name a real domain concept.
       - id: arch/max-function-lines # Long functions hide generated complexity.
         severity: error
-        detector: antidrift:max-function-lines,warnAt:40,max:50
+        detector: antidrift:max-function-lines
         message: Split by responsibility rather than arbitrary wrappers (warn above 40 lines, error above 50 lines; blank and comment lines count, describe-style suite callbacks are containers and exempt).
       - id: arch/max-component-lines # Large components mix data, state, render, and effects.
         severity: error
-        detector: antidrift:max-component-lines,warnAt:150,max:180
+        detector: antidrift:max-component-lines
         message: Split container, view, and state/resource boundaries (warn above 150 lines, error above 180 lines for PascalCase functions that render JSX).
       - id: arch/max-module-lines # Oversized modules accumulate unrelated responsibilities and defeat local ownership.
         severity: error
-        detector: antidrift:max-module-lines,warnAt:425,max:500
+        detector: antidrift:max-module-lines
         message: Split modules over 500 lines by owned responsibility (warn above 425 lines before reaching the ceiling; blank and comment lines count).
       - id: react/max-component-props # Large prop bags make component API combinations hard to reason about.
         severity: error

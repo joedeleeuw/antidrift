@@ -44,12 +44,31 @@ export function expectNull(raw: unknown, path: string): null {
   return raw;
 }
 
+const ISO_8601_TIMESTAMP =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u;
+
 export function expectDate(raw: unknown, path: string): Date {
-  const parsed = raw instanceof Date ? raw : new Date(expectString(raw, path));
+  if (raw instanceof Date) {
+    if (Number.isNaN(raw.getTime())) {
+      throw new DecodeError(path, "ISO-8601 date", raw);
+    }
+    return raw;
+  }
+  const text = expectString(raw, path);
+  if (!ISO_8601_TIMESTAMP.test(text)) {
+    throw new DecodeError(path, "ISO-8601 date", raw);
+  }
+  const parsed = new Date(text);
   if (Number.isNaN(parsed.getTime())) {
     throw new DecodeError(path, "ISO-8601 date", raw);
   }
   return parsed;
+}
+
+export function expectArgs(args: readonly unknown[], expected: number): void {
+  if (args.length !== expected) {
+    throw new DecodeError("args", `${expected} argument(s)`, args);
+  }
 }
 
 export function expectLiteral<const T extends string | number | boolean>(
