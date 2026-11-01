@@ -1,6 +1,6 @@
 # changelog
 
-## Unreleased
+## 0.21.1
 
 - Generated agent hooks (`.claude/settings.json`, `.codex/hooks.json`) now run `pnpm exec antidrift hook <name>` through the shipped bin; the previous `node node_modules/@joedeleeuw/antidrift/src/policy/hooks/<name>.mjs` command pointed at a path the published package does not ship, so every consumer's PreToolUse hook failed. The packed consumer smoke now runs `antidrift generate` and executes the generated hook.
 - `antidrift/max-module-lines` warns above 1,000 lines (was 1,200); the 1,500 error is unchanged. The cap matches the split rule in the global design guidance.

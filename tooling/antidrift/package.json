@@ -1,6 +1,6 @@
 {
   "name": "@joedeleeuw/antidrift",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "type": "module",
   "license": "MIT",
   "description": "Deterministic Oxlint and TypeScript-aware policy guardrails against code and AI-agent drift.",
@@ -93,13 +93,13 @@
     "zod": "^3.24.1"
   },
   "optionalDependencies": {
-    "@joedeleeuw/antidrift-linter-darwin-arm64": "0.21.0",
-    "@joedeleeuw/antidrift-linter-linux-arm64-gnu": "0.21.0",
-    "@joedeleeuw/antidrift-linter-linux-arm64-musl": "0.21.0",
-    "@joedeleeuw/antidrift-linter-linux-x64-gnu": "0.21.0",
-    "@joedeleeuw/antidrift-linter-linux-x64-musl": "0.21.0",
-    "@joedeleeuw/antidrift-linter-win32-arm64-msvc": "0.21.0",
-    "@joedeleeuw/antidrift-linter-win32-x64-msvc": "0.21.0"
+    "@joedeleeuw/antidrift-linter-darwin-arm64": "0.21.1",
+    "@joedeleeuw/antidrift-linter-linux-arm64-gnu": "0.21.1",
+    "@joedeleeuw/antidrift-linter-linux-arm64-musl": "0.21.1",
+    "@joedeleeuw/antidrift-linter-linux-x64-gnu": "0.21.1",
+    "@joedeleeuw/antidrift-linter-linux-x64-musl": "0.21.1",
+    "@joedeleeuw/antidrift-linter-win32-arm64-msvc": "0.21.1",
+    "@joedeleeuw/antidrift-linter-win32-x64-msvc": "0.21.1"
   },
   "peerDependencies": {
     "typescript": ">=5 <6.1"
