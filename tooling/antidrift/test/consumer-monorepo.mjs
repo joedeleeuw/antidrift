@@ -113,6 +113,34 @@ function proveGeneratedHook(pnpmLaunch) {
   }
 }
 
+function proveConfiguredRules(lintAntidriftOxlint) {
+  const config = "oxlint.configured.config.mjs";
+  const rows = (relFile) =>
+    (lintAntidriftOxlint(relFile, config).diagnostics ?? []).map(
+      ({ code, severity }) => `${code} ${severity}`
+    );
+  const observed = {
+    "configured/cast.ts": rows("configured/cast.ts"),
+    "configured/sub/cast.ts": rows("configured/sub/cast.ts"),
+    "configured/card.tsx": rows("configured/card.tsx"),
+    "configured/exempt-card.tsx": rows("configured/exempt-card.tsx"),
+  };
+  const expected = {
+    "configured/cast.ts": ["antidrift(no-as-never) warning"],
+    "configured/sub/cast.ts": [],
+    "configured/card.tsx": ["antidrift(react-max-component-props) error"],
+    "configured/exempt-card.tsx": [],
+  };
+  if (JSON.stringify(observed) !== JSON.stringify(expected)) {
+    fail(
+      `the installed package must honor per-rule severity, override globs, rule options and per-file off through the Oxlint config, got: ${JSON.stringify(observed)}`
+    );
+  }
+  console.log(
+    "  configured rules: severity, glob, options and per-file off honored"
+  );
+}
+
 function fail(message) {
   console.error(`\n✗ ${message}`);
   console.error(`  (left workspace for inspection: ${work})`);
@@ -391,6 +419,10 @@ try {
     );
   }
   console.log(`  missing addon failure: ${expectedMissingAddon}`);
+  copyFileSync(
+    join(work, "platform-package", ADDON_PACKAGE_PATH),
+    installedAddon
+  );
   rmSync(join(work, "portable-proofs/addon.ts"));
   rmSync(join(work, "oxlint.addon.config.json"));
 
@@ -537,6 +569,7 @@ try {
   }
 
   proveAdoptionPresets({ file, runJson, lintOxlint, work });
+  proveConfiguredRules(lintAntidriftOxlint);
 
   const unconfiguredTouchableRules = oxlintRuleIds(
     lintOxlint("portable-proofs/raw-touchable.tsx", "oxlint.config.mjs")
@@ -594,16 +627,14 @@ try {
   );
   if (
     !fallbackRules.includes("@rikalabs/no-property-default-fallbacks") ||
-    !fallbackRules.includes("typescript/antidrift/no-host-path-literal") ||
+    !fallbackRules.includes("antidrift/no-host-path-literal") ||
     hostPathDiagnostics.length !== 2
   ) {
     fail(
       `Fallback opt-in must enforce Rika defaults and both host-path literal forms, got: ${JSON.stringify(fallbackOutput.diagnostics)}`
     );
   }
-  if (
-    !fallbackRules.includes("typescript/antidrift/no-sentinel-absence-fallback")
-  ) {
+  if (!fallbackRules.includes("antidrift/no-sentinel-absence-fallback")) {
     fail("Template-literal sentinels must remain covered when Rika is enabled");
   }
   const allowedFallbackRules = oxlintRuleIds(
@@ -611,7 +642,7 @@ try {
   );
   if (
     allowedFallbackRules.includes("@rikalabs/no-property-default-fallbacks") ||
-    allowedFallbackRules.includes("typescript/antidrift/no-host-path-literal")
+    allowedFallbackRules.includes("antidrift/no-host-path-literal")
   ) {
     fail(
       `Nested config must honor repo-relative fallback exceptions, got: ${JSON.stringify(allowedFallbackRules)}`
@@ -624,7 +655,7 @@ try {
 
   const repositoryDiagnostics = lintOxlintRepository().diagnostics ?? [];
   const moduleSizeDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) => code === "typescript(antidrift/max-module-lines)"
+    ({ code }) => code === "antidrift(max-module-lines)"
   );
   const oversizedFiles = moduleSizeDiagnostics
     .map(({ filename }) => filename)
@@ -648,7 +679,7 @@ try {
     );
   }
   const asyncRepositoryDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) => code === "typescript(antidrift/no-async-array-method)"
+    ({ code }) => code === "antidrift(no-async-array-method)"
   );
   if (
     JSON.stringify(
@@ -660,8 +691,7 @@ try {
     );
   }
   const predicateDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) =>
-      code === "typescript(antidrift/no-underchecked-type-predicate)"
+    ({ code }) => code === "antidrift(no-underchecked-type-predicate)"
   );
   if (
     JSON.stringify(predicateDiagnostics.map(({ filename }) => filename)) !==
@@ -672,7 +702,7 @@ try {
     );
   }
   const structuralForkDiagnostics = repositoryDiagnostics.filter(
-    ({ code }) => code === "typescript(antidrift/no-structural-type-fork)"
+    ({ code }) => code === "antidrift(no-structural-type-fork)"
   );
   if (
     JSON.stringify(

@@ -10,12 +10,16 @@ use tsrs_core::tspath;
 use crate::headless::{HeadlessRequest, RelayReply};
 use crate::headless_host::program_counts;
 use crate::relay;
-use crate::session::{Finding, RuleRequest, Session};
+use crate::rule_catalog::RuleRequest;
+use crate::rule_plan::RulePlanCache;
+use crate::session::{Finding, Session};
 
 enum EngineRequest {
     Lint {
         cwd: String,
         file_path: String,
+        source_text: String,
+        run_id: Option<String>,
         rules: Vec<RuleRequest>,
         reply: Sender<Result<Vec<Finding>, String>>,
     },
@@ -57,23 +61,31 @@ fn session_for<'a>(
 
 fn serve(receiver: &Receiver<EngineRequest>) {
     let mut sessions: FxHashMap<String, Session> = FxHashMap::default();
+    let mut rule_plans = RulePlanCache::default();
     for request in receiver {
         let delivered = match request {
             EngineRequest::Lint {
                 cwd,
                 file_path,
+                source_text,
+                run_id,
                 rules,
                 reply,
             } => reply
                 .send(guarded(|| {
-                    session_for(&mut sessions, &cwd)?.lint_file(&file_path, &rules)
+                    session_for(&mut sessions, &cwd)?.lint_file(
+                        &file_path,
+                        &source_text,
+                        run_id.as_deref(),
+                        &rules,
+                    )
                 }))
                 .is_ok(),
             EngineRequest::Headless { request, reply } => {
                 let shared = sessions
                     .get(&tspath::normalize_path(&request.cwd))
                     .map(|session| &session.env);
-                let answered = guarded(|| Ok(request.serve_cached(shared)));
+                let answered = guarded(|| Ok(request.serve_cached(shared, &mut rule_plans)));
                 reply
                     .send(answered.unwrap_or_else(RelayReply::Failure))
                     .is_ok()
@@ -111,6 +123,8 @@ impl EngineService {
         &self,
         cwd: String,
         file_path: String,
+        source_text: String,
+        run_id: Option<String>,
         rules: Vec<RuleRequest>,
     ) -> Result<Vec<Finding>, String> {
         let (reply, outcome) = channel();
@@ -118,6 +132,8 @@ impl EngineService {
             .send(EngineRequest::Lint {
                 cwd,
                 file_path,
+                source_text,
+                run_id,
                 rules,
                 reply,
             })

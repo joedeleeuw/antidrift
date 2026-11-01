@@ -1,5 +1,10 @@
 # changelog
 
+## Unreleased
+
+- `antidrift/*` rules run as an Oxlint JS plugin. `createGovernanceOxlintConfig()` registers the plugin (`jsPlugins`) and enables every default rule at `error`; severity, `overrides` globs, rule options and `oxlint-disable` directives are Oxlint's own, and findings print as `antidrift(rule)` instead of `typescript(antidrift/rule)`. The package exports `./oxlint-plugin`. `antidrift oxlint` no longer injects the default rules into the type-aware helper (which now serves only the typed rules Oxlint requests) and exits with a named error when the resolved config does not register the plugin. `ANTIDRIFT_TSGOLINT_DEFAULTS` and `ANTIDRIFT_DISABLE_TYPED_RULES` are gone. Declaration files matched by the governance `ignorePatterns` no longer report (the helper path linted every file in a program, the plugin lints only the files Oxlint hands it; on sudocode that is 89 rows in `types/src/*.d.ts`, every other row is identical). On sudocode the plugin run takes about 1.7 s against 1.05 s for the helper path (release builds, program diagnostics suppressed on both); the remaining gap is the second helper process and the bridge, tracked in i-57vj.
+- Long-lived hosts stay fresh: the plugin passes the editor buffer with each request, the engine stamps every program input on build and rebuilds its session when a buffer or any input on disk changed, and a CLI run validates each program once. Oxlint's language server now reports current antidrift findings after edits (smoke: `tooling/antidrift/test/long-lived-host.mjs`).
+
 ## 0.21.1
 
 - Generated agent hooks (`.claude/settings.json`, `.codex/hooks.json`) now run `pnpm exec antidrift hook <name>` through the shipped bin; the previous `node node_modules/@joedeleeuw/antidrift/src/policy/hooks/<name>.mjs` command pointed at a path the published package does not ship, so every consumer's PreToolUse hook failed. The packed consumer smoke now runs `antidrift generate` and executes the generated hook.

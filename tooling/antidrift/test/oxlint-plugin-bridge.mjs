@@ -442,6 +442,33 @@ function proveFixAfterRegularPass(repoRoot, project, linter) {
   rmSync(join(project, FIXABLE_FILE));
 }
 
+function proveDirectAddon(project, linter) {
+  const addon = loadNativeAddon(project);
+  const sourceOf = (file) => readFileSync(join(project, file), "utf8");
+  assert.deepEqual(
+    addon.lintFile(
+      project,
+      join(project, CAST_FILES[0]),
+      sourceOf(CAST_FILES[0]),
+      null,
+      []
+    ),
+    [],
+    "A lint request with no rules must report nothing"
+  );
+  for (const file of CAST_FILES) {
+    addon.lintFile(project, join(project, file), sourceOf(file), null, [
+      { rule: "antidrift/no-as-never" },
+    ]);
+  }
+  assert.equal(
+    addon.engineStats().programsBuilt,
+    1,
+    "Two files under one tsconfig must share one type program"
+  );
+  proveRelay(linter, project, addon);
+}
+
 export function proveOxlintPluginBridge(repoRoot, linter) {
   execFileSync(
     "cargo",
@@ -458,23 +485,7 @@ export function proveOxlintPluginBridge(repoRoot, linter) {
     proveIdleDirective(repoRoot, project);
     proveTypeAwareRelay(repoRoot, project, linter);
     proveFixAfterRegularPass(repoRoot, project, linter);
-    const addon = loadNativeAddon(project);
-    assert.deepEqual(
-      addon.lintFile(project, join(project, CAST_FILES[0]), []),
-      [],
-      "A lint request with no rules must report nothing"
-    );
-    for (const file of CAST_FILES) {
-      addon.lintFile(project, join(project, file), [
-        { rule: "antidrift/no-as-never" },
-      ]);
-    }
-    assert.equal(
-      addon.engineStats().programsBuilt,
-      1,
-      "Two files under one tsconfig must share one type program"
-    );
-    proveRelay(linter, project, addon);
+    proveDirectAddon(project, linter);
   } finally {
     rmSync(project, { recursive: true, force: true });
   }

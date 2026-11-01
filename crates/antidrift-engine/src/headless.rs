@@ -13,7 +13,7 @@ use crate::headless_host::{
     ProgramBuilderEnv, base_fs, collect_missing_bound_files, filter_suppressed_diagnostics,
 };
 use crate::relay;
-use crate::rule_plan::{build_config_rule_plan, lint_program_files};
+use crate::rule_plan::{RulePlanCache, build_config_rule_plan, lint_program_files};
 
 fn apply_debug_flag(raw: &str, opts: &mut Options) -> Result<(), String> {
     for part in raw.split(',') {
@@ -93,7 +93,6 @@ pub(crate) struct HeadlessRequest {
     pub(crate) cwd: String,
     args: Vec<String>,
     payload: String,
-    inject_defaults: bool,
     suppress_program_diagnostics: bool,
 }
 
@@ -124,8 +123,6 @@ impl HeadlessRequest {
             cwd: tspath::normalize_path(&cwd.to_string_lossy()),
             args: args.to_vec(),
             payload,
-            inject_defaults: env_flag("ANTIDRIFT_TSGOLINT_DEFAULTS", "1")
-                && !env_flag("ANTIDRIFT_DISABLE_TYPED_RULES", "1"),
             suppress_program_diagnostics: env_flag(
                 "OXLINT_TSGOLINT_DANGEROUSLY_SUPPRESS_PROGRAM_DIAGNOSTICS",
                 "true",
@@ -141,8 +138,12 @@ impl HeadlessRequest {
         Ok((opts, payload))
     }
 
-    pub(crate) fn serve_cached(&self, shared: Option<&ProgramBuilderEnv>) -> RelayReply {
-        match self.cached_output(shared) {
+    pub(crate) fn serve_cached(
+        &self,
+        shared: Option<&ProgramBuilderEnv>,
+        rule_plans: &mut RulePlanCache,
+    ) -> RelayReply {
+        match self.cached_output(shared, rule_plans) {
             Ok((output, leftovers)) => RelayReply::Served { output, leftovers },
             Err(message) => RelayReply::Failure(message),
         }
@@ -151,6 +152,7 @@ impl HeadlessRequest {
     fn cached_output(
         &self,
         shared: Option<&ProgramBuilderEnv>,
+        rule_plans: &mut RulePlanCache,
     ) -> Result<(Vec<u8>, Leftovers), String> {
         let (opts, payload) = self.parse()?;
         let files = requested_files(&payload);
@@ -169,7 +171,8 @@ impl HeadlessRequest {
             ));
         };
         tsrs_checker::links::set_sparse_id_pages(true);
-        let plan = build_config_rule_plan(&payload, &self.cwd, self.inject_defaults)
+        let plan = rule_plans
+            .get(&payload)
             .map_err(|err| format!("error running linter: {err}"))?;
         let (programs, unmatched) = env.group_files_by_tsconfig(&files);
         let mut leftovers = Leftovers {
@@ -193,7 +196,7 @@ impl HeadlessRequest {
                     lint_program_files(
                         bound.program,
                         &bound.source_files,
-                        &plan,
+                        plan,
                         &opts,
                         &mut diagnostics,
                     );
@@ -213,7 +216,7 @@ impl HeadlessRequest {
             inferred: Vec::new(),
         });
         tsrs_checker::links::set_sparse_id_pages(true);
-        let mut env = ProgramBuilderEnv::new(base_fs(&payload), &self.cwd);
+        let mut env = ProgramBuilderEnv::new(base_fs(payload.source_overrides.as_ref()), &self.cwd);
         let diagnostics = self
             .local_diagnostics(&mut env, &payload, &opts, leftovers)
             .map_err(|err| format!("error running linter: {err}"))?;
@@ -234,7 +237,7 @@ impl HeadlessRequest {
         opts: &Options,
         leftovers: Leftovers,
     ) -> Result<Vec<Diagnostic>, String> {
-        let plan = build_config_rule_plan(payload, &self.cwd, self.inject_defaults)?;
+        let plan = build_config_rule_plan(payload)?;
         let (programs, unmatched) = env.group_files_by_tsconfig(&leftovers.grouped);
         let mut inferred = leftovers.inferred;
         inferred.extend(unmatched);

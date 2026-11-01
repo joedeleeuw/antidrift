@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -247,6 +248,64 @@ function oxlintCommandArgs({ passthrough, targets }) {
   ];
 }
 
+const PLUGIN_SPECIFIER_SUFFIX = "/oxlint-plugin/index.mjs";
+
+function pluginSpecifier(entry) {
+  return typeof entry === "string" ? entry : entry?.specifier;
+}
+
+function registersAntidriftPlugin(resolvedConfig) {
+  return (resolvedConfig.jsPlugins ?? []).some((entry) =>
+    String(pluginSpecifier(entry) ?? "")
+      .replaceAll("\\", "/")
+      .endsWith(PLUGIN_SPECIFIER_SUFFIX)
+  );
+}
+
+function resolvedConfigRegistersPlugin({ passthrough, cwd, spawn }) {
+  const printed = spawn(
+    process.execPath,
+    [resolveOxlintBinary(), "--print-config", ...passthrough],
+    { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
+  );
+  if (printed.error) throw printed.error;
+  if (printed.status !== 0) {
+    throw new Error(
+      `oxlint --print-config failed (exit ${printed.status}): ${printed.stderr}`
+    );
+  }
+  return registersAntidriftPlugin(JSON.parse(String(printed.stdout)));
+}
+
+function oxlintLaunch({ parsed, cwd, spawn }) {
+  const tsgolintBinary = resolveNativeArtifact(NATIVE_ARTIFACTS.linter, cwd);
+  if (!tsgolintBinary) {
+    return {
+      failure:
+        "Missing antidrift-linter native binary; build crates/antidrift-linter or run pnpm --filter @joedeleeuw/antidrift build.\n",
+    };
+  }
+  const registered = resolvedConfigRegistersPlugin({
+    passthrough: parsed.passthrough,
+    cwd,
+    spawn,
+  });
+  if (!registered) {
+    return {
+      failure:
+        "The resolved Oxlint config does not register the antidrift plugin, so no antidrift rule would run. Spread createGovernanceOxlintConfig() from @joedeleeuw/antidrift/oxlint-config into your config (it sets jsPlugins and the antidrift/* rules), or pass -c with a config that does.\n",
+    };
+  }
+  return {
+    args: oxlintCommandArgs(parsed),
+    env: {
+      ...process.env,
+      OXLINT_TSGOLINT_PATH: tsgolintBinary,
+      ANTIDRIFT_LINT_RUN: randomUUID(),
+    },
+  };
+}
+
 export function runOxlint({
   argv = [],
   cwd = process.cwd(),
@@ -260,20 +319,16 @@ export function runOxlint({
     stdout.write(OXLINT_USAGE);
     return exit(0);
   }
-  const tsgolintBinary = resolveNativeArtifact(NATIVE_ARTIFACTS.linter, cwd);
-  if (!tsgolintBinary) {
-    stderr.write(
-      "Missing antidrift-linter native binary; build crates/antidrift-linter or run pnpm --filter @joedeleeuw/antidrift build.\n"
-    );
+  const launch = oxlintLaunch({ parsed, cwd, spawn });
+  if ("failure" in launch) {
+    stderr.write(launch.failure);
     return exit(1);
   }
-  const args = oxlintCommandArgs(parsed);
-  const env = {
-    ...process.env,
-    OXLINT_TSGOLINT_PATH: tsgolintBinary,
-    ANTIDRIFT_TSGOLINT_DEFAULTS: "1",
-  };
-  const result = spawn(process.execPath, args, { cwd, env, stdio: "inherit" });
+  const result = spawn(process.execPath, launch.args, {
+    cwd,
+    env: launch.env,
+    stdio: "inherit",
+  });
   if (result.error) {
     stderr.write(`Failed to run oxlint: ${result.error.message}\n`);
     return exit(1);

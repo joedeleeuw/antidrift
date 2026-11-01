@@ -1,8 +1,23 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "oxlint";
 
 import { loadRegistriesSync } from "../policy/lib/registries.mjs";
+import { loadNativeAddon } from "../policy/oxlint.mjs";
+
+const ANTIDRIFT_PLUGIN = fileURLToPath(
+  new URL("../oxlint-plugin/index.mjs", import.meta.url)
+);
+
+function antidriftRuleLevels(repoRoot) {
+  return Object.fromEntries(
+    loadNativeAddon(repoRoot)
+      .antidriftRules()
+      .filter(({ defaultEnabled }) => defaultEnabled)
+      .map(({ name }) => [name, "error"])
+  );
+}
 
 const touchableImports = new Map([
   [
@@ -247,15 +262,19 @@ export function createGovernanceOxlintConfig({
   ];
 
   return defineConfig({
+    jsPlugins: [ANTIDRIFT_PLUGIN],
     ignorePatterns: [
       ...governanceIgnorePatterns,
       ...generatedIgnorePatterns(registries, repoRoot),
       ...declarationIgnorePatterns,
     ],
-    rules: governanceRules([
-      ...otherPatterns,
-      ...touchableImportPatterns(reactNativePolicy),
-    ]),
+    rules: {
+      ...antidriftRuleLevels(repoRoot),
+      ...governanceRules([
+        ...otherPatterns,
+        ...touchableImportPatterns(reactNativePolicy),
+      ]),
+    },
     overrides: [
       ...gatewayWrapperOverrides(registries, generatedPatterns),
       ...touchableOwnerOverrides(reactNativePolicy, otherPatterns),

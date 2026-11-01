@@ -3,9 +3,7 @@ use std::sync::LazyLock;
 
 use antidrift_kernel::directives::is_inline_disabled;
 use antidrift_kernel::registries::PolicyRegistries;
-use antidrift_rules::{
-    RuleCatalogEntry, all_entries, create_rule, is_typescript_only_rule, lookup_entry,
-};
+use antidrift_rules::{RuleCatalogEntry, all_entries, create_rule, lookup_entry};
 use rustc_hash::FxHashMap;
 use serde_json::json;
 use tsrs_ast::SourceFile;
@@ -14,7 +12,7 @@ use tsrs_core::P;
 use tsrs_core::tspath;
 use tsrslint::linter::{Options, lint_files};
 use tsrslint::protocol::{Diagnostic, Payload};
-use tsrslint::rule::{ReportedDiagnostic, Rule};
+use tsrslint::rule::Rule;
 use tsrslint::rules;
 
 use crate::rule_scope::{RuleScope, Scoped, split_scope_envelope};
@@ -85,7 +83,6 @@ pub(crate) fn instantiate_rule(
 pub(crate) struct ConfigRulePlan {
     rules_by_config: Vec<Vec<&'static dyn Rule>>,
     file_to_config: FxHashMap<String, usize>,
-    inject_defaults: bool,
 }
 
 pub(crate) fn push_unique_rule(
@@ -164,21 +161,25 @@ fn resolve_cached_rule(
     Ok(Some(created))
 }
 
-pub(crate) fn build_config_rule_plan(
-    payload: &Payload,
-    cwd: &str,
-    inject_defaults: bool,
-) -> Result<ConfigRulePlan, String> {
-    let registries = if inject_defaults {
-        PolicyRegistries::load_from_repo(std::path::Path::new(cwd))?
-    } else {
-        PolicyRegistries::default()
-    };
+fn files_by_config(payload: &Payload) -> FxHashMap<String, usize> {
+    payload
+        .configs
+        .iter()
+        .enumerate()
+        .flat_map(|(config_idx, config)| {
+            config
+                .file_paths
+                .iter()
+                .map(move |file_path| (tspath::normalize_slashes(file_path), config_idx))
+        })
+        .collect()
+}
+
+pub(crate) fn build_config_rule_plan(payload: &Payload) -> Result<ConfigRulePlan, String> {
     let mut rule_cache: FxHashMap<String, &'static dyn Rule> = FxHashMap::default();
     let mut rules_by_config: Vec<Vec<&'static dyn Rule>> =
         Vec::with_capacity(payload.configs.len());
-    let mut file_to_config: FxHashMap<String, usize> = FxHashMap::default();
-    for (config_idx, config) in payload.configs.iter().enumerate() {
+    for config in &payload.configs {
         let mut config_rules: Vec<&'static dyn Rule> = Vec::new();
         for rule_spec in &config.rules {
             if let Some(leaked) =
@@ -187,29 +188,48 @@ pub(crate) fn build_config_rule_plan(
                 push_unique_rule(&mut config_rules, leaked);
             }
         }
-        if inject_defaults {
-            append_default_rules(&mut config_rules, &mut rule_cache, &registries)?;
-        }
-        for file_path in &config.file_paths {
-            file_to_config.insert(tspath::normalize_slashes(file_path), config_idx);
-        }
         rules_by_config.push(config_rules);
     }
     Ok(ConfigRulePlan {
         rules_by_config,
-        file_to_config,
-        inject_defaults,
+        file_to_config: files_by_config(payload),
     })
 }
 
-fn to_protocol_diagnostic(reported: &ReportedDiagnostic) -> Diagnostic {
-    let mut proto = reported.to_protocol();
-    if reported.rule_name.starts_with("antidrift/") {
-        proto.kind = 1;
-        proto.rule = None;
-        reported.rule_name.clone_into(&mut proto.message.id);
+#[derive(Default)]
+pub(crate) struct RulePlanCache {
+    plans: FxHashMap<String, ConfigRulePlan>,
+}
+
+impl RulePlanCache {
+    pub(crate) fn get(&mut self, payload: &Payload) -> Result<&ConfigRulePlan, String> {
+        let mut key = String::new();
+        for config in &payload.configs {
+            key.push('\u{1}');
+            for rule_spec in &config.rules {
+                key.push('\0');
+                key.push_str(&rule_spec.name);
+                key.push('\0');
+                key.push_str(
+                    &rule_spec
+                        .options
+                        .as_ref()
+                        .map_or_else(String::new, ToString::to_string),
+                );
+            }
+        }
+        let plan = match self.plans.entry(key) {
+            std::collections::hash_map::Entry::Occupied(entry) => {
+                let plan = entry.into_mut();
+                plan.file_to_config = files_by_config(payload);
+                plan
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(build_config_rule_plan(payload)?)
+            }
+        };
+        Ok(plan)
     }
-    proto
 }
 
 pub(crate) fn lint_program_files(
@@ -219,39 +239,29 @@ pub(crate) fn lint_program_files(
     opts: &Options,
     out_diags: &mut Vec<Diagnostic>,
 ) {
-    let mut groups: BTreeMap<(usize, u8), Vec<P<SourceFile>>> = BTreeMap::new();
+    let mut groups: BTreeMap<usize, Vec<P<SourceFile>>> = BTreeMap::new();
     for &sf in source_files {
-        let name = sf.file_name();
-        let normalized = tspath::normalize_slashes(name);
+        let normalized = tspath::normalize_slashes(sf.file_name());
         let Some(&config_idx) = plan.file_to_config.get(&normalized) else {
             continue;
         };
-        let bucket = u8::from(plan.inject_defaults && tspath::has_js_file_extension(name));
-        groups.entry((config_idx, bucket)).or_default().push(sf);
+        groups.entry(config_idx).or_default().push(sf);
     }
-    for ((config_idx, bucket), files) in groups {
-        let Some(base_rules) = plan.rules_by_config.get(config_idx) else {
+    for (config_idx, files) in groups {
+        let Some(active_rules) = plan
+            .rules_by_config
+            .get(config_idx)
+            .filter(|rules| !rules.is_empty())
+        else {
             continue;
         };
-        let active_rules: Vec<&'static dyn Rule> = if bucket == 1 {
-            base_rules
-                .iter()
-                .copied()
-                .filter(|rule| !is_typescript_only_rule(rule.name()))
-                .collect()
-        } else {
-            base_rules.clone()
-        };
-        if active_rules.is_empty() {
-            continue;
-        }
-        for item in &lint_files(program, &files, &active_rules, opts) {
+        for item in &lint_files(program, &files, active_rules, opts) {
             if item.rule_name.starts_with("antidrift/")
                 && is_inline_disabled(item.file.text(), item.pos, item.end, item.rule_name)
             {
                 continue;
             }
-            out_diags.push(to_protocol_diagnostic(item));
+            out_diags.push(item.to_protocol());
         }
     }
 }

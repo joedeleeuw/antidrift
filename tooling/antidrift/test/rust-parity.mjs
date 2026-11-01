@@ -24,6 +24,7 @@ import {
 } from "./portable-cases.mjs";
 import { headlessRuleProbes } from "./headless-rule-probes.mjs";
 import { proveOxlintPluginBridge } from "./oxlint-plugin-bridge.mjs";
+import { proveLongLivedHost } from "./long-lived-host.mjs";
 import { runRustLinterSmokes } from "./rust-linter-smokes.mjs";
 import { loadPolicy } from "../src/policy/generate-policy-artifacts.mjs";
 
@@ -255,44 +256,44 @@ const loneSurrogateDiags = runHeadlessProbe({
 });
 assert.deepEqual(
   loneSurrogateDiags
-    .filter((diag) => diag.message.id === "antidrift/no-raw-foreground-opacity")
+    .filter((diag) => diag.rule === "antidrift/no-raw-foreground-opacity")
     .map((diag) => diag.range.pos),
   [loneSurrogateSource.indexOf('"text-foreground/50">ok')],
   `Lone-surrogate literals must lint without aborting and leave the valid className reported, got ${JSON.stringify(loneSurrogateDiags)}`
 );
 assert.equal(
   loneSurrogateDiags.filter(
-    (diag) => diag.message.id === "antidrift/no-sql-string-concat"
+    (diag) => diag.rule === "antidrift/no-sql-string-concat"
   ).length,
   2,
   `A lone surrogate in a SQL fragment must not hide the dynamic input, got ${JSON.stringify(loneSurrogateDiags)}`
 );
 
-const sqlDefaultDiags = runHeadlessProbe(
-  {
-    version: 2,
-    configs: [
-      {
-        file_paths: [probeFileA],
-        rules: [{ name: "no-floating-promises" }],
-      },
-    ],
-    source_overrides: {
-      [probeFileA]: `
+const sqlDefaultDiags = runHeadlessProbe({
+  version: 2,
+  configs: [
+    {
+      file_paths: [probeFileA],
+      rules: [
+        { name: "no-floating-promises" },
+        { name: "antidrift/no-sql-string-concat" },
+      ],
+    },
+  ],
+  source_overrides: {
+    [probeFileA]: `
         export function queryUser(userId: string) {
           return \`SELECT id FROM users WHERE id = \${userId}\`;
         }
       `,
-    },
   },
-  { ANTIDRIFT_TSGOLINT_DEFAULTS: "1" }
-);
+});
 assert.equal(
   sqlDefaultDiags.filter(
-    (diag) => diag.message?.id === "antidrift/no-sql-string-concat"
+    (diag) => diag.rule === "antidrift/no-sql-string-concat"
   ).length,
   1,
-  `Expected default native rules to report antidrift/no-sql-string-concat, got ${JSON.stringify(sqlDefaultDiags)}`
+  `Expected a requested antidrift rule to report antidrift/no-sql-string-concat as a rule diagnostic, got ${JSON.stringify(sqlDefaultDiags)}`
 );
 
 const perFileIsolationDiags = runHeadlessProbe({
@@ -641,7 +642,7 @@ try {
     },
   });
   assert.deepEqual(
-    nearFunctionDiags.map(({ message }) => message.id),
+    nearFunctionDiags.map(({ rule }) => rule),
     [functionCap.ruleId],
     `Expected the headless path to surface one near-cap function, got ${JSON.stringify(nearFunctionDiags)}`
   );
@@ -923,3 +924,4 @@ console.log(
 );
 
 proveOxlintPluginBridge(repoRoot, binaryPath);
+await proveLongLivedHost();

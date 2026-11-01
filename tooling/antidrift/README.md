@@ -75,20 +75,30 @@ const tooling = createConfig({ repoRoot: import.meta.dirname });
 
 export default {
   ...tooling,
+  jsPlugins: [...(tooling.jsPlugins ?? []), ...governance.jsPlugins],
   rules: {
     ...tooling.rules,
     ...governance.rules,
     "max-lines": "off",
     "max-lines-per-function": "off",
+    "antidrift/no-as-never": "warn",
+    "antidrift/react-max-component-props": ["error", { max: 6 }],
   },
   ignorePatterns: [
     ...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns]),
   ],
-  overrides: [...(tooling.overrides ?? []), ...governance.overrides],
+  overrides: [
+    ...(tooling.overrides ?? []),
+    ...governance.overrides,
+    {
+      files: ["apps/client/convex/**/*.ts"],
+      rules: { "antidrift/require-convex-return-validator": "error" },
+    },
+  ],
 };
 ```
 
-The governance config sets only antidrift's import restrictions, ignore patterns and overrides. Categories, plugins, `denyWarnings` and unused-directive reporting stay with your config. Oxlint cannot see antidrift's rules, so if your config reports unused disable directives, a disable comment naming an antidrift rule is reported as unused even though antidrift honored it.
+The governance config registers the antidrift Oxlint plugin (`jsPlugins`) and turns on every default `antidrift/*` rule at `error`, plus antidrift's import restrictions, ignore patterns and overrides. Categories, other plugins, `denyWarnings` and unused-directive reporting stay with your config. Because the rules are plugin rules, Oxlint owns their severity (`"warn"`, `"error"`, `"off"`), `overrides` file globs, rule options (the ESLint options array) and `oxlint-disable` directives, and reports them as `antidrift(rule-name)`. Keep `jsPlugins` from the governance config in a composed config: `antidrift oxlint` refuses to run when the resolved config does not register the plugin, because no antidrift rule would run. The rules themselves execute in the native engine behind the plugin; the type-aware helper (`OXLINT_TSGOLINT_PATH`) serves only the typed rules Oxlint requests. In a long-lived host such as Oxlint's language server the engine re-lints from the editor buffer and rebuilds its programs when any input on disk changes, so findings stay current across edits.
 
 Generate policy artifacts when `policy/agent-guardrails.yaml` changes:
 
@@ -147,6 +157,7 @@ Public entry points, one package:
 - `@joedeleeuw/antidrift/package.json` — package metadata for consumer tooling
 - `@joedeleeuw/antidrift/brand` — `Brand<T, Name>`, `Unbrand<T>`, and `brand(name, check)`
 - `@joedeleeuw/antidrift/oxlint-config` — custom drift governance and registry-aware import restrictions
+- `@joedeleeuw/antidrift/oxlint-plugin` — the Oxlint JS plugin that runs every `antidrift/*` rule in the native engine; the governance config registers it
 - `@joedeleeuw/antidrift/policy` — functional policy checks, artifact generation, and registry validation for advanced tooling
 - `antidrift` — the CLI binary for generate/check/report commands, `antidrift oxlint`, and opt-in `shell` guardrails
 

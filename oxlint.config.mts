@@ -45,6 +45,7 @@ export default defineConfig({
   ],
   jsPlugins: [
     ...(tooling.jsPlugins ?? []),
+    ...(governance.jsPlugins ?? []),
     {
       name: "boundaries",
       specifier: packageRequire.resolve("eslint-plugin-boundaries"),

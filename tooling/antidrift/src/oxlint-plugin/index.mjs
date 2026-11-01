@@ -6,7 +6,12 @@ const addon = loadNativeAddon();
 process.env.ANTIDRIFT_ENGINE = addon.engineEndpoint();
 
 const enabledRules = new Map();
-const currentFile = { filename: "", requested: new Map(), findings: new Map() };
+const currentFile = {
+  filename: "",
+  sourceText: "",
+  requested: new Map(),
+  findings: new Map(),
+};
 
 function optionsOf(context) {
   const options = context.options;
@@ -15,9 +20,14 @@ function optionsOf(context) {
     : undefined;
 }
 
-function enterFile(filename, ruleId, options) {
-  if (currentFile.filename !== filename || currentFile.requested.has(ruleId)) {
+function enterFile(filename, sourceText, ruleId, options) {
+  if (
+    currentFile.filename !== filename ||
+    currentFile.sourceText !== sourceText ||
+    currentFile.requested.has(ruleId)
+  ) {
     currentFile.filename = filename;
+    currentFile.sourceText = sourceText;
     currentFile.requested = new Map();
     currentFile.findings = new Map();
   }
@@ -39,6 +49,8 @@ function lintRules(context, requests) {
   const findings = addon.lintFile(
     context.cwd,
     context.filename,
+    currentFile.sourceText,
+    process.env.ANTIDRIFT_LINT_RUN ?? null,
     unlinted.map(([rule, options]) => ({ rule, options }))
   );
   for (const [ruleId, options] of unlinted) {
@@ -68,7 +80,7 @@ function bridgeRule(ruleId) {
       return {
         before() {
           const options = optionsOf(context);
-          enterFile(context.filename, ruleId, options);
+          enterFile(context.filename, context.sourceCode.text, ruleId, options);
           if (!enabledRules.has(ruleId)) {
             enabledRules.set(ruleId, options);
             return true;

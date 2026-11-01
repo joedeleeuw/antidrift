@@ -1,21 +1,18 @@
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
-use antidrift_kernel::registries::PolicyRegistries;
 use antidrift_kernel::span_index::{DiagnosticLocation, LineIndex};
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::SourceFile;
 use tsrs_core::P;
 use tsrs_core::tspath;
-use tsrs_vfs::{FS, bundled, cachedvfs, osvfs};
+use tsrs_vfs::osvfs;
 use tsrslint::linter::{Options, lint_files};
 use tsrslint::rule::Rule;
 
 use crate::batch::reported_to_rule_diagnostic;
-use crate::headless_host::{BoundProgram, ProgramBuilderEnv, collect_missing_bound_files};
-use crate::rule_plan::{
-    all_scoped_rules, default_workspace_rules, instantiate_rule, push_unique_rule,
-};
+use crate::headless_host::{BoundProgram, ProgramBuilderEnv, base_fs, collect_missing_bound_files};
+use crate::program_inputs::{FileStamp, matches_stamps, stamp_program_inputs};
+use crate::rule_catalog::{RequestedRule, RuleCatalog, RuleRequest};
 use crate::runner::{collect_lintable_files, is_supported_file};
 
 #[derive(Clone)]
@@ -25,50 +22,11 @@ pub struct Finding {
     pub location: DiagnosticLocation,
 }
 
-pub struct RuleRequest {
-    pub name: String,
-    pub options: Option<String>,
-}
-
-struct RequestedRule {
-    identity: String,
-    rule: &'static dyn Rule,
-}
-
-fn rule_identity(name: &str, options: Option<&serde_json::Value>) -> String {
-    match options {
-        Some(value) => format!("{name}\u{0}{value}"),
-        None => name.to_owned(),
-    }
-}
-
-fn decode_rule_options(
-    name: &str,
-    options: Option<&str>,
-) -> Result<Option<serde_json::Value>, String> {
-    let Some(text) = options else {
-        return Ok(None);
-    };
-    let value: serde_json::Value = serde_json::from_str(text)
-        .map_err(|err| format!("{name}: the host sent rule options that are not JSON: {err}"))?;
-    let serde_json::Value::Array(items) = value else {
-        return Err(format!(
-            "{name}: the host must send rule options as the ESLint options array, got {value}"
-        ));
-    };
-    match items.as_slice() {
-        [] => Ok(None),
-        [single] => Ok(Some(single.clone())),
-        _ => Err(format!(
-            "{name}: antidrift rules take one options object, the host sent {} values",
-            items.len()
-        )),
-    }
-}
-
 struct Batch {
     files: Vec<String>,
     bound: Option<BoundProgram>,
+    stamps: FxHashMap<String, FileStamp>,
+    validated_run: Option<String>,
     missing: Vec<String>,
     linted: FxHashSet<String>,
 }
@@ -89,8 +47,42 @@ impl Batch {
         Self {
             files,
             bound: None,
+            stamps: FxHashMap::default(),
+            validated_run: None,
             missing: Vec::new(),
             linted: FxHashSet::default(),
+        }
+    }
+
+    fn validated(&self, run_id: Option<&str>) -> bool {
+        run_id.is_some() && self.validated_run.as_deref() == run_id
+    }
+
+    fn matches(&self, overrides: &FxHashMap<String, String>, run_id: Option<&str>) -> bool {
+        self.bound.as_ref().is_none_or(|bound| {
+            matches_stamps(
+                bound.program,
+                &self.stamps,
+                overrides,
+                self.validated(run_id),
+            )
+        })
+    }
+
+    fn bind(&mut self, bound: BoundProgram, run_id: Option<&str>) -> Result<(), String> {
+        self.stamps = if run_id.is_some() {
+            FxHashMap::default()
+        } else {
+            stamp_program_inputs(bound.program)?
+        };
+        self.bound = Some(bound);
+        self.mark_validated(run_id);
+        Ok(())
+    }
+
+    fn mark_validated(&mut self, run_id: Option<&str>) {
+        if let Some(run_id) = run_id {
+            self.validated_run = Some(run_id.to_owned());
         }
     }
 }
@@ -98,33 +90,34 @@ impl Batch {
 pub(crate) struct Session {
     cwd: String,
     pub(crate) env: ProgramBuilderEnv,
-    rules: FxHashMap<&'static str, &'static dyn Rule>,
-    configured_rules: FxHashMap<String, &'static dyn Rule>,
+    catalog: RuleCatalog,
     families: Vec<Family>,
     slots: FxHashMap<String, (usize, Slot)>,
     findings: FxHashMap<String, Vec<(String, Finding)>>,
+    source_overrides: FxHashMap<String, String>,
 }
 
 impl Session {
     pub(crate) fn new(cwd: &str) -> Result<Self, String> {
         tsrs_checker::links::set_sparse_id_pages(true);
-        let registries = PolicyRegistries::load_from_repo(Path::new(cwd))?;
-        let mut catalog = default_workspace_rules(&registries)?;
-        for rule in all_scoped_rules() {
-            push_unique_rule(&mut catalog, rule);
-        }
-        let fs: Arc<dyn FS> = Arc::new(bundled::wrap_fs(cachedvfs::from(Arc::new(osvfs::fs()))));
+        let catalog = RuleCatalog::load(Path::new(cwd))?;
+        Self::with_overrides(cwd, catalog, FxHashMap::default())
+    }
+
+    fn with_overrides(
+        cwd: &str,
+        catalog: RuleCatalog,
+        source_overrides: FxHashMap<String, String>,
+    ) -> Result<Self, String> {
         let cwd = tspath::normalize_slashes(cwd);
+        let env = ProgramBuilderEnv::new(base_fs(Some(&source_overrides)), &cwd);
         let mut session = Self {
-            env: ProgramBuilderEnv::new(fs, &cwd),
-            rules: catalog
-                .into_iter()
-                .map(|rule| (rule.name(), rule))
-                .collect(),
-            configured_rules: FxHashMap::default(),
+            env,
+            catalog,
             families: Vec::new(),
             slots: FxHashMap::default(),
             findings: FxHashMap::default(),
+            source_overrides,
             cwd,
         };
         let walked =
@@ -137,30 +130,70 @@ impl Session {
         Ok(session)
     }
 
-    fn requested_rule(&mut self, request: &RuleRequest) -> Result<RequestedRule, String> {
-        let name = request.name.as_str();
-        let default = self.rules.get(name).copied().ok_or_else(|| {
-            format!("{name} is not an antidrift rule; the plugin registers only the rules the addon lists")
-        })?;
-        let Some(options) = decode_rule_options(name, request.options.as_deref())? else {
-            return Ok(RequestedRule {
-                identity: rule_identity(name, None),
-                rule: default,
-            });
-        };
-        let identity = rule_identity(name, Some(&options));
-        if let Some(&rule) = self.configured_rules.get(&identity) {
-            return Ok(RequestedRule { identity, rule });
+    fn batches_of(&self, normalized: &str) -> Vec<(usize, Slot)> {
+        match self.slots.get(normalized).copied() {
+            Some((family, Slot::Configured(index))) => {
+                vec![(family, Slot::Configured(index)), (family, Slot::Inferred)]
+            }
+            Some((family, Slot::Inferred)) => vec![(family, Slot::Inferred)],
+            None => Vec::new(),
         }
-        let rule = instantiate_rule(name, Some(&options))?
-            .ok_or_else(|| format!("rule '{name}' is cataloged but no family factory builds it"))?;
-        self.configured_rules.insert(identity.clone(), rule);
-        Ok(RequestedRule { identity, rule })
+    }
+
+    fn batch_mut(&mut self, family: usize, slot: Slot) -> &mut Batch {
+        match slot {
+            Slot::Configured(index) => &mut self.families[family].configured[index].1,
+            Slot::Inferred => &mut self.families[family].inferred,
+        }
+    }
+
+    fn batch(&self, family: usize, slot: Slot) -> &Batch {
+        match slot {
+            Slot::Configured(index) => &self.families[family].configured[index].1,
+            Slot::Inferred => &self.families[family].inferred,
+        }
+    }
+
+    fn refresh(
+        &mut self,
+        normalized: &str,
+        source_text: &str,
+        run_id: Option<&str>,
+    ) -> Result<(), String> {
+        let batches = self.batches_of(normalized);
+        let disk_validated = !batches.is_empty()
+            && batches
+                .iter()
+                .all(|&(family, slot)| self.batch(family, slot).validated(run_id));
+        let mut overrides = self.source_overrides.clone();
+        if !disk_validated || overrides.contains_key(normalized) {
+            if osvfs::fs().read_file(normalized).as_deref() == Some(source_text) {
+                overrides.remove(normalized);
+            } else {
+                overrides.insert(normalized.to_owned(), source_text.to_owned());
+            }
+        }
+        let fresh = batches
+            .iter()
+            .all(|&(family, slot)| self.batch(family, slot).matches(&overrides, run_id));
+        if fresh {
+            self.source_overrides = overrides;
+        } else {
+            let cwd = self.cwd.clone();
+            let catalog = std::mem::take(&mut self.catalog);
+            *self = Self::with_overrides(&cwd, catalog, overrides)?;
+        }
+        for (family, slot) in self.batches_of(normalized) {
+            self.batch_mut(family, slot).mark_validated(run_id);
+        }
+        Ok(())
     }
 
     pub(crate) fn lint_file(
         &mut self,
         file_path: &str,
+        source_text: &str,
+        run_id: Option<&str>,
         requests: &[RuleRequest],
     ) -> Result<Vec<Finding>, String> {
         if requests.is_empty() || !is_supported_file(Path::new(file_path)) {
@@ -177,9 +210,10 @@ impl Session {
         }
         let rules = requests
             .iter()
-            .map(|request| self.requested_rule(request))
+            .map(|request| self.catalog.resolve(request))
             .collect::<Result<Vec<_>, _>>()?;
         let normalized = tspath::normalize_slashes(file_path);
+        self.refresh(&normalized, source_text, run_id)?;
         let (family, slot) = match self.slots.get(&normalized) {
             Some(&found) => found,
             None => {
@@ -187,14 +221,14 @@ impl Session {
                 self.slots[&normalized]
             }
         };
-        self.lint_slot(family, slot, &rules)?;
+        self.lint_slot(family, slot, run_id, &rules)?;
         if let Slot::Configured(index) = slot
             && self.families[family].configured[index]
                 .1
                 .missing
                 .contains(&normalized)
         {
-            self.lint_slot(family, Slot::Inferred, &rules)?;
+            self.lint_slot(family, Slot::Inferred, run_id, &rules)?;
         }
         let wanted: FxHashSet<&str> = rules.iter().map(|rule| rule.identity.as_str()).collect();
         self.findings
@@ -232,7 +266,12 @@ impl Session {
         });
     }
 
-    fn build_configured(&mut self, family: usize, index: usize) -> Result<(), String> {
+    fn build_configured(
+        &mut self,
+        family: usize,
+        index: usize,
+        run_id: Option<&str>,
+    ) -> Result<(), String> {
         let (config_file_name, batch) = &self.families[family].configured[index];
         if batch.bound.is_some() {
             return Ok(());
@@ -249,16 +288,15 @@ impl Session {
             })?;
         let batch = &mut self.families[family].configured[index].1;
         collect_missing_bound_files(&bound.source_files, &batch.files, &mut batch.missing);
-        batch.bound = Some(bound);
-        Ok(())
+        batch.bind(bound, run_id)
     }
 
-    fn build_inferred(&mut self, family: usize) -> Result<(), String> {
+    fn build_inferred(&mut self, family: usize, run_id: Option<&str>) -> Result<(), String> {
         if self.families[family].inferred.bound.is_some() {
             return Ok(());
         }
         for index in 0..self.families[family].configured.len() {
-            self.build_configured(family, index)?;
+            self.build_configured(family, index, run_id)?;
         }
         let selected = &self.families[family];
         let roots: Vec<String> = selected
@@ -277,19 +315,19 @@ impl Session {
             return Ok(());
         }
         let bound = self.env.inferred_program(&roots);
-        self.families[family].inferred.bound = Some(bound);
-        Ok(())
+        self.families[family].inferred.bind(bound, run_id)
     }
 
     fn lint_slot(
         &mut self,
         family: usize,
         slot: Slot,
+        run_id: Option<&str>,
         rules: &[RequestedRule],
     ) -> Result<(), String> {
         match slot {
-            Slot::Configured(index) => self.build_configured(family, index)?,
-            Slot::Inferred => self.build_inferred(family)?,
+            Slot::Configured(index) => self.build_configured(family, index, run_id)?,
+            Slot::Inferred => self.build_inferred(family, run_id)?,
         }
         let batch = match slot {
             Slot::Configured(index) => &mut self.families[family].configured[index].1,
@@ -370,15 +408,5 @@ fn record(bound: &BoundProgram, rules: &[&'static dyn Rule]) -> Vec<(String, Fin
             };
             (file, finding)
         })
-        .collect()
-}
-
-#[must_use]
-pub fn rule_names() -> Vec<String> {
-    let mut seen = FxHashSet::default();
-    antidrift_rules::all_rules()
-        .into_iter()
-        .map(|rule| rule.name().to_owned())
-        .filter(|name| seen.insert(name.clone()))
         .collect()
 }

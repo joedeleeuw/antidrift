@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
+use antidrift_engine::rule_catalog::{RuleRequest, rule_listing};
 use antidrift_engine::service::EngineService;
-use antidrift_engine::session::{RuleRequest, rule_names};
 use napi_derive::napi;
 
 #[napi(object)]
@@ -41,6 +41,8 @@ pub struct EngineRuleRequest {
 pub fn lint_file(
     cwd: String,
     file_path: String,
+    source_text: String,
+    run_id: Option<String>,
     rules: Vec<EngineRuleRequest>,
 ) -> napi::Result<Vec<EngineFinding>> {
     let requests = rules
@@ -51,7 +53,7 @@ pub fn lint_file(
         })
         .collect();
     let findings = service()?
-        .lint_file(cwd, file_path, requests)
+        .lint_file(cwd, file_path, source_text, run_id, requests)
         .map_err(napi::Error::from_reason)?;
     Ok(findings
         .into_iter()
@@ -84,13 +86,17 @@ pub fn engine_stats() -> napi::Result<EngineStats> {
 #[napi(object)]
 pub struct EngineRule {
     pub name: String,
+    pub default_enabled: bool,
 }
 
 #[napi]
 #[must_use]
 pub fn antidrift_rules() -> Vec<EngineRule> {
-    rule_names()
+    rule_listing()
         .into_iter()
-        .map(|name| EngineRule { name })
+        .map(|(name, default_enabled)| EngineRule {
+            name,
+            default_enabled,
+        })
         .collect()
 }

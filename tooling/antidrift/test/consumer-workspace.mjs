@@ -76,6 +76,7 @@ const workspaceFiles = {
     "const tooling = createConfig({ repoRoot: import.meta.dirname, typeAware: false });\n" +
     "export default {\n" +
     "  ...tooling,\n" +
+    "  jsPlugins: [...(tooling.jsPlugins ?? []), ...governance.jsPlugins],\n" +
     '  rules: { ...tooling.rules, ...governance.rules, "max-lines": "off" },\n' +
     "  ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])],\n" +
     "  overrides: [...(tooling.overrides ?? []), ...governance.overrides],\n" +
@@ -107,7 +108,7 @@ const workspaceFiles = {
     "const repoRoot = resolve(import.meta.dirname, '..');\n" +
     "const governance = createGovernanceOxlintConfig({ repoRoot });\n" +
     "const tooling = createConfig({ repoRoot, typeAware: false, enforceNoPropertyDefaultFallbacks: true, propertyDefaultAllowedFiles: ['portable-proofs/allowed-fallback.ts'] });\n" +
-    'export default { ...tooling, rules: { ...tooling.rules, ...governance.rules, "max-lines": "off" }, ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])], overrides: [...(tooling.overrides ?? []), ...governance.overrides] };\n',
+    'export default { ...tooling, jsPlugins: [...(tooling.jsPlugins ?? []), ...governance.jsPlugins], rules: { ...tooling.rules, ...governance.rules, "max-lines": "off" }, ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])], overrides: [...(tooling.overrides ?? []), ...governance.overrides] };\n',
   "portable-proofs/fallback.ts":
     "export function labels(row: { state?: string; count?: number }) {\n" +
     '  return { state: row?.state ?? "unknown", template: row?.state ?? `unknown`, count: row.count ?? 0 };\n' +
@@ -117,6 +118,29 @@ const workspaceFiles = {
     "export function projectPath(project: string) { return `/home/example/${project}`; }\n",
   "portable-proofs/allowed-fallback.ts":
     "export function count(row: { count?: number }) { return row.count ?? 0; }\n",
+  "oxlint.configured.config.mjs":
+    'import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
+    "const governance = createGovernanceOxlintConfig({ repoRoot: import.meta.dirname });\n" +
+    "export default {\n" +
+    "  ...governance,\n" +
+    '  categories: { correctness: "off" },\n' +
+    "  rules: {\n" +
+    "    ...governance.rules,\n" +
+    '    "antidrift/no-as-never": "warn",\n' +
+    '    "antidrift/react-max-component-props": ["error", { max: 2 }],\n' +
+    "  },\n" +
+    "  overrides: [\n" +
+    "    ...governance.overrides,\n" +
+    '    { files: ["configured/sub/**"], rules: { "antidrift/no-as-never": "off" } },\n' +
+    '    { files: ["configured/exempt-card.tsx"], rules: { "antidrift/react-max-component-props": "off" } },\n' +
+    "  ],\n" +
+    "};\n",
+  "configured/cast.ts": 'export const top = "x" as never;\n',
+  "configured/sub/cast.ts": 'export const inner = "y" as never;\n',
+  "configured/card.tsx":
+    "export function Card(props: { title: string; body: string; footer: string }) {\n  return <article>{props.title}{props.body}{props.footer}</article>;\n}\n",
+  "configured/exempt-card.tsx":
+    "export function ExemptCard(props: { title: string; body: string; footer: string }) {\n  return <article>{props.title}{props.body}{props.footer}</article>;\n}\n",
   "oxlint.precedence.config.mjs":
     'import config from "./oxlint.config.mjs";\n' +
     "export default {\n" +

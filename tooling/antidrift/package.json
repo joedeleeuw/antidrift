@@ -42,6 +42,9 @@
         "types": "./dist/oxlint-config/index.d.mts",
         "import": "./dist/oxlint-config/index.mjs"
       },
+      "./oxlint-plugin": {
+        "import": "./dist/oxlint-plugin/index.mjs"
+      },
       "./policy": {
         "types": "./dist/policy/index.d.mts",
         "import": "./dist/policy/index.mjs"
@@ -65,6 +68,9 @@
     "./oxlint-config": {
       "types": "./src/oxlint-config/index.d.mts",
       "import": "./src/oxlint-config/index.mjs"
+    },
+    "./oxlint-plugin": {
+      "import": "./src/oxlint-plugin/index.mjs"
     },
     "./policy": {
       "types": "./src/policy/index.d.mts",
