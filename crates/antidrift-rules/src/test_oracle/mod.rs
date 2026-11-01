@@ -5,10 +5,7 @@ mod classification;
 mod dependencies;
 mod lengths;
 mod literals;
-pub mod no_placeholder_tests;
-pub mod no_redacted_log_attribute_key;
 pub mod no_repo_state_mirror_assertion;
-pub mod no_static_devtools_import;
 mod paths;
 mod repo_state_imports;
 mod repo_state_path;
@@ -16,6 +13,7 @@ mod repo_state_taint;
 mod response_shapes;
 mod static_properties;
 mod syntax;
+pub mod test_hygiene;
 mod validator_assertions;
 mod validators;
 
@@ -96,15 +94,15 @@ pub fn rules() -> Vec<CatalogRule> {
     vec![
         CatalogRule::everywhere(&DEFAULT_RULE),
         CatalogRule::new(
-            &no_placeholder_tests::DEFAULT_RULE,
+            &test_hygiene::NO_PLACEHOLDER_TESTS,
             ScopePolicy::TestFilesOnly,
         ),
-        CatalogRule::everywhere(&no_redacted_log_attribute_key::DEFAULT_RULE),
+        CatalogRule::everywhere(&test_hygiene::NO_REDACTED_LOG_ATTRIBUTE_KEY),
         CatalogRule::configured(
             &no_repo_state_mirror_assertion::DEFAULT_RULE,
             ScopePolicy::TestFilesOnly,
         ),
-        CatalogRule::configured_everywhere(&no_static_devtools_import::DEFAULT_RULE),
+        CatalogRule::configured_everywhere(&test_hygiene::NO_STATIC_DEVTOOLS_IMPORT),
     ]
 }
 

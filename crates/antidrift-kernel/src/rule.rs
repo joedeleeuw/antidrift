@@ -155,6 +155,7 @@ impl Rule for RuleSpec {
     fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
         if self.listeners.is_empty() {
             (self.visit)(ctx, Listener::Enter(Kind::SourceFile), ctx.file.as_node());
+            return Box::new(crate::rule_options::EmptyVisitor);
         }
         Box::new(*self)
     }

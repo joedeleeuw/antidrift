@@ -1,5 +1,5 @@
 use antidrift_kernel::local_binding::{Binding, is_binding_mutated, resolve_lexical_binding};
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::{cooked_text, numeric_literal_value, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -7,40 +7,20 @@ use tsrs_core::P;
 
 pub const RULE_NAME: &str = "antidrift/no-path-prefix-containment";
 
-pub struct NoPathPrefixContainment;
-
-pub static DEFAULT_RULE: NoPathPrefixContainment = NoPathPrefixContainment;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 
-impl Rule for NoPathPrefixContainment {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        let provenance = PathProvenance { sf: ctx.file };
-        if bare_path_prefix(node, &provenance) {
-            ctx.report_node(
-                node,
-                RuleMessage::new(
-                    "noPathPrefixContainment",
-                    "A bare path prefix also accepts sibling paths such as '<root>-backup'. Use path.relative() with '..' and absolute-path checks, or an approved boundary-aware containment helper.",
-                ),
-            );
-        }
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    let provenance = PathProvenance { sf: ctx.file };
+    if bare_path_prefix(node, &provenance) {
+        ctx.report_node(
+            node,
+            RuleMessage::new(
+                "noPathPrefixContainment",
+                "A bare path prefix also accepts sibling paths such as '<root>-backup'. Use path.relative() with '..' and absolute-path checks, or an approved boundary-aware containment helper.",
+            ),
+        );
     }
 }
 

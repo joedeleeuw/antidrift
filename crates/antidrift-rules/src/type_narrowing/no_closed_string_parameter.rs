@@ -1,6 +1,6 @@
 use antidrift_kernel::callgraph::ProgramSymbolIndex;
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
 use tsrs_checker::Checker;
@@ -16,9 +16,7 @@ const BOUNDARY_IDENTIFIERS: &[&str] = &[
 ];
 const BOUNDARY_PROPERTIES: &[&str] = &["argv", "query", "headers"];
 
-pub struct NoClosedStringParameter;
-
-pub static DEFAULT_RULE: NoClosedStringParameter = NoClosedStringParameter;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),
@@ -27,28 +25,10 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::MethodDeclaration),
 ];
 
-impl Rule for NoClosedStringParameter {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        check_closed_string_parameters(ctx, node);
-        if node.kind() == Kind::FunctionDeclaration {
-            check_boolean_flag_parameters(ctx, node);
-        }
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    check_closed_string_parameters(ctx, node);
+    if node.kind() == Kind::FunctionDeclaration {
+        check_boolean_flag_parameters(ctx, node);
     }
 }
 

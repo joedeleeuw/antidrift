@@ -2,7 +2,7 @@ use super::call_forwarding::{BodyForwarding, is_literal_kind, parameters_match_i
 use antidrift_kernel::callgraph::{IdentifierRef, ProgramSymbolIndex};
 use antidrift_kernel::file_role;
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{callgraph, provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
@@ -270,56 +270,63 @@ fn check_candidate(ctx: &mut Ctx, fn_node: P<Node>, name_ident: P<Node>, decl: P
     }
 }
 
-pub struct NoWrappingFunctions;
-
-impl NoWrappingFunctions {
-    pub const DEFAULT: Self = Self;
-}
-
-pub static DEFAULT_INSTANCE: NoWrappingFunctions = NoWrappingFunctions::DEFAULT;
+pub static DEFAULT_INSTANCE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),
     Listener::Enter(Kind::VariableDeclaration),
 ];
 
-impl Rule for NoWrappingFunctions {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
+fn visit(ctx: &mut Ctx, listener: Listener, node: P<Node>) {
+    match listener {
+        Listener::Enter(Kind::FunctionDeclaration) => {
+            if let Some(name_ident) = node.name() {
+                check_candidate(ctx, node, name_ident, node);
+            }
+        }
+        Listener::Enter(Kind::VariableDeclaration) => {
+            let var_decl = node.as_variable_declaration();
+            let name_ident = var_decl.name();
+            let Some(init) = var_decl.initializer() else {
+                return;
+            };
+            if ast::is_identifier(name_ident)
+                && matches!(init.kind(), Kind::ArrowFunction | Kind::FunctionExpression)
+            {
+                check_candidate(ctx, init, name_ident, node);
+            }
+        }
+        _ => {}
     }
 }
 
-struct Visitor;
+const PASS_THROUGH_LISTENERS: &[Listener] = &[
+    Listener::Enter(Kind::ArrowFunction),
+    Listener::Enter(Kind::FunctionDeclaration),
+    Listener::Enter(Kind::FunctionExpression),
+];
 
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
+pub static NO_PASS_THROUGH_PARAMETERS: RuleSpec = RuleSpec::new(
+    "antidrift/no-pass-through-parameters",
+    PASS_THROUGH_LISTENERS,
+    visit_pass_through_parameters,
+);
 
-    fn visit(&mut self, ctx: &mut Ctx, listener: Listener, node: P<Node>) {
-        match listener {
-            Listener::Enter(Kind::FunctionDeclaration) => {
-                if let Some(name_ident) = node.name() {
-                    check_candidate(ctx, node, name_ident, node);
-                }
-            }
-            Listener::Enter(Kind::VariableDeclaration) => {
-                let var_decl = node.as_variable_declaration();
-                let name_ident = var_decl.name();
-                let Some(init) = var_decl.initializer() else {
-                    return;
-                };
-                if ast::is_identifier(name_ident)
-                    && matches!(init.kind(), Kind::ArrowFunction | Kind::FunctionExpression)
-                {
-                    check_candidate(ctx, init, name_ident, node);
-                }
-            }
-            _ => {}
-        }
+fn build_pass_through_message(name: &str, targets: &[String]) -> RuleMessage {
+    RuleMessage::new(
+        "passThrough",
+        format!(
+            "'{name}' is a pass-through variable: this function never reads it and only forwards it to {}. Let that layer obtain it from its owner, or move the work that needs it here.",
+            targets.join(", ")
+        ),
+    )
+}
+
+fn visit_pass_through_parameters(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    for matched in callgraph::find_pass_through_parameters(node, ctx.file, ctx.checker) {
+        ctx.report_node(
+            matched.name_node,
+            build_pass_through_message(&matched.name, &matched.targets),
+        );
     }
 }

@@ -1,4 +1,4 @@
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::{
     cooked_text, node_text, unwrap_awaited_expression, unwrap_expression,
 };
@@ -9,46 +9,19 @@ use tsrs_core::P;
 
 pub const RULE_NAME: &str = "antidrift/no-branch-tree";
 
-pub struct NoBranchTree;
-
-pub static DEFAULT_RULE: NoBranchTree = NoBranchTree;
-
 const LISTENERS: &[Listener] = &[
+    Listener::Enter(Kind::SourceFile),
     Listener::Enter(Kind::IfStatement),
     Listener::Enter(Kind::Block),
 ];
 
-impl Rule for NoBranchTree {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {
-            checked_source_file: false,
-        })
-    }
-}
-
-struct Visitor {
-    checked_source_file: bool,
-}
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        if !self.checked_source_file {
-            self.checked_source_file = true;
-            check_negated_discriminant_scatter(ctx, ctx.file.as_node());
-        }
-        if node.kind() == Kind::IfStatement {
-            check_subject_coupled_branch_tree(ctx, node);
-        } else {
-            check_negated_discriminant_scatter(ctx, node);
-        }
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    if node.kind() == Kind::IfStatement {
+        check_subject_coupled_branch_tree(ctx, node);
+    } else {
+        check_negated_discriminant_scatter(ctx, node);
     }
 }
 

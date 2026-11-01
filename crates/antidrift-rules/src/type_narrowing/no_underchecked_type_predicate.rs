@@ -1,4 +1,4 @@
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel;
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, Symbol, SymbolFlags};
@@ -191,9 +191,8 @@ fn check_function(ctx: &mut Ctx, fn_node: P<Node>) {
     );
 }
 
-pub struct NoUndercheckedTypePredicate;
-
-pub static DEFAULT_INSTANCE: NoUndercheckedTypePredicate = NoUndercheckedTypePredicate;
+pub static DEFAULT_INSTANCE: RuleSpec =
+    RuleSpec::new("antidrift/no-underchecked-type-predicate", LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),
@@ -201,24 +200,6 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),
 ];
 
-impl Rule for NoUndercheckedTypePredicate {
-    fn name(&self) -> &'static str {
-        "antidrift/no-underchecked-type-predicate"
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        check_function(ctx, node);
-    }
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    check_function(ctx, node);
 }

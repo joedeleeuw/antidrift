@@ -3,53 +3,33 @@ use super::web_provenance::{
     static_property_name, static_string, unwrap_expression,
 };
 use antidrift_kernel::local_binding::Binding;
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 
 pub const RULE_NAME: &str = "antidrift/no-auth-token-in-web-storage";
 
-pub struct NoAuthTokenInWebStorage;
-
-pub static DEFAULT_RULE: NoAuthTokenInWebStorage = NoAuthTokenInWebStorage;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
     Listener::Enter(Kind::BinaryExpression),
 ];
 
-impl Rule for NoAuthTokenInWebStorage {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        let key = match node.kind() {
-            Kind::CallExpression => credential_call(ctx.file, node),
-            Kind::BinaryExpression => credential_assignment(ctx.file, node),
-            _ => None,
-        };
-        if key.is_some_and(|key| credential_key(&key)) {
-            ctx.report_node(
-                node,
-                RuleMessage::new(
-                    "noAuthTokenInWebStorage",
-                    "Do not store authentication credentials in localStorage or sessionStorage; any script running in the page can read and exfiltrate them. Use a server-set HttpOnly, Secure, SameSite cookie instead.",
-                ),
-            );
-        }
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    let key = match node.kind() {
+        Kind::CallExpression => credential_call(ctx.file, node),
+        Kind::BinaryExpression => credential_assignment(ctx.file, node),
+        _ => None,
+    };
+    if key.is_some_and(|key| credential_key(&key)) {
+        ctx.report_node(
+            node,
+            RuleMessage::new(
+                "noAuthTokenInWebStorage",
+                "Do not store authentication credentials in localStorage or sessionStorage; any script running in the page can read and exfiltrate them. Use a server-set HttpOnly, Secure, SameSite cookie instead.",
+            ),
+        );
     }
 }
 

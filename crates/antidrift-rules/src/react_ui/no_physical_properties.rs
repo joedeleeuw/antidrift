@@ -1,4 +1,4 @@
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::string_fragments::class_fragments;
 use tsrs_ast::Node;
 use tsrs_core::P;
@@ -6,32 +6,13 @@ use tsrs_core::P;
 pub const RULE_NAME: &str = "antidrift/no-physical-properties";
 const MESSAGE: &str = "Physical directional CSS property breaks RTL. Use logical equivalents: ml→ms, mr→me, pl→ps, pr→pe, left→start, right→end, text-left→text-start, text-right→text-end, border-l→border-s, border-r→border-e, rounded-l→rounded-s, rounded-r→rounded-e.";
 
-pub struct NoPhysicalProperties;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, &[], visit);
 
-pub static DEFAULT_RULE: NoPhysicalProperties = NoPhysicalProperties;
-
-struct NoopVisitor;
-
-impl RuleVisitor for NoopVisitor {
-    fn listeners(&self) -> &[Listener] {
-        &[]
-    }
-
-    fn visit(&mut self, _ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {}
-}
-
-impl Rule for NoPhysicalProperties {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        for fragment in class_fragments(ctx.file) {
-            if has_physical_property(&without_symmetric_insets(fragment.text)) {
-                ctx.report_node(fragment.node, RuleMessage::new("physicalProperty", MESSAGE));
-            }
+fn visit(ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
+    for fragment in class_fragments(ctx.file) {
+        if has_physical_property(&without_symmetric_insets(fragment.text)) {
+            ctx.report_node(fragment.node, RuleMessage::new("physicalProperty", MESSAGE));
         }
-        Box::new(NoopVisitor)
     }
 }
 

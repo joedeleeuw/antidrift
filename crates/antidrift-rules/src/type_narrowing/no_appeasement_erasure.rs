@@ -1,4 +1,4 @@
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::{shape, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
@@ -242,9 +242,8 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
     check_widen_then_assert(ctx, node, operand, type_node);
 }
 
-pub struct NoAppeasementErasure;
-
-pub static DEFAULT_INSTANCE: NoAppeasementErasure = NoAppeasementErasure;
+pub static DEFAULT_INSTANCE: RuleSpec =
+    RuleSpec::new("antidrift/no-appeasement-erasure", LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::VariableDeclaration),
@@ -256,58 +255,40 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::TypeAssertionExpression),
 ];
 
-impl Rule for NoAppeasementErasure {
-    fn name(&self) -> &'static str {
-        "antidrift/no-appeasement-erasure"
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        match node.kind() {
-            Kind::VariableDeclaration => check_variable_declaration(ctx, node),
-            Kind::PropertyDeclaration => {
-                let prop = node.as_property_declaration();
-                if let (Some(type_node), Some(init)) = (prop.type_(), prop.initializer())
-                    && let Some(target) = classify_widening_target(type_node)
-                    && is_known_value_expression(ctx.checker, init)
-                {
-                    report_widening(ctx, type_node, target, "property");
-                }
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    match node.kind() {
+        Kind::VariableDeclaration => check_variable_declaration(ctx, node),
+        Kind::PropertyDeclaration => {
+            let prop = node.as_property_declaration();
+            if let (Some(type_node), Some(init)) = (prop.type_(), prop.initializer())
+                && let Some(target) = classify_widening_target(type_node)
+                && is_known_value_expression(ctx.checker, init)
+            {
+                report_widening(ctx, type_node, target, "property");
             }
-            Kind::BinaryExpression => check_binary_expression(ctx, node),
-            Kind::ReturnStatement => {
-                if let Some(expr) = node.as_return_statement().expression()
-                    && let Some(ret_type) = tsrs_kernel::enclosing_function(node)
-                        .and_then(tsrs_kernel::function_return_type_node)
-                    && let Some(target) = classify_widening_target(ret_type)
-                    && is_known_value_expression(ctx.checker, expr)
-                {
-                    report_widening(ctx, expr, target, "return value");
-                }
-            }
-            Kind::ArrowFunction => {
-                if let Some(body) = node.as_arrow_function().body()
-                    && body.kind() != Kind::Block
-                    && let Some(ret_type) = tsrs_kernel::function_return_type_node(node)
-                    && let Some(target) = classify_widening_target(ret_type)
-                    && is_known_value_expression(ctx.checker, body)
-                {
-                    report_widening(ctx, body, target, "return value");
-                }
-            }
-            Kind::AsExpression | Kind::TypeAssertionExpression => check_assertion(ctx, node),
-            _ => {}
         }
+        Kind::BinaryExpression => check_binary_expression(ctx, node),
+        Kind::ReturnStatement => {
+            if let Some(expr) = node.as_return_statement().expression()
+                && let Some(ret_type) = tsrs_kernel::enclosing_function(node)
+                    .and_then(tsrs_kernel::function_return_type_node)
+                && let Some(target) = classify_widening_target(ret_type)
+                && is_known_value_expression(ctx.checker, expr)
+            {
+                report_widening(ctx, expr, target, "return value");
+            }
+        }
+        Kind::ArrowFunction => {
+            if let Some(body) = node.as_arrow_function().body()
+                && body.kind() != Kind::Block
+                && let Some(ret_type) = tsrs_kernel::function_return_type_node(node)
+                && let Some(target) = classify_widening_target(ret_type)
+                && is_known_value_expression(ctx.checker, body)
+            {
+                report_widening(ctx, body, target, "return value");
+            }
+        }
+        Kind::AsExpression | Kind::TypeAssertionExpression => check_assertion(ctx, node),
+        _ => {}
     }
 }

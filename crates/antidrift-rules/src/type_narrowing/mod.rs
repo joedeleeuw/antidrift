@@ -5,7 +5,6 @@ pub mod no_appeasement_erasure;
 pub mod no_argument_mutation_side_effect;
 pub mod no_closed_string_parameter;
 pub mod no_compat_names;
-pub mod no_pass_through_parameters;
 pub mod no_redundant_type_predicate;
 pub mod no_underchecked_type_predicate;
 pub mod no_unresolved_dependency_types;
@@ -44,7 +43,7 @@ pub fn typescript_only_rules() -> Vec<CatalogRule> {
 pub fn script_default_rules() -> Vec<CatalogRule> {
     vec![
         CatalogRule::new(
-            &no_pass_through_parameters::DEFAULT_INSTANCE,
+            &no_wrapping_functions::NO_PASS_THROUGH_PARAMETERS,
             ScopePolicy::ExceptGenerated,
         ),
         CatalogRule::everywhere(&no_compat_names::DEFAULT_INSTANCE),

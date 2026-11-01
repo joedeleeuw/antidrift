@@ -1,5 +1,4 @@
-use antidrift_kernel::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
-use antidrift_kernel::rule_options::EmptyVisitor;
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, Symbol};
 use tsrs_checker::Checker;
@@ -18,22 +17,13 @@ const ACCUMULATOR_NAMES: &[&str] = &[
     "accumulator",
 ];
 
-pub struct NoArgumentMutationSideEffect;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, &[], visit);
 
-pub static DEFAULT_RULE: NoArgumentMutationSideEffect = NoArgumentMutationSideEffect;
-
-impl Rule for NoArgumentMutationSideEffect {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        for &stmt in ctx.file.statements().nodes() {
-            for fn_node in module_scope_functions(stmt) {
-                check_function(ctx, fn_node);
-            }
+fn visit(ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
+    for &stmt in ctx.file.statements().nodes() {
+        for fn_node in module_scope_functions(stmt) {
+            check_function(ctx, fn_node);
         }
-        Box::new(EmptyVisitor)
     }
 }
 

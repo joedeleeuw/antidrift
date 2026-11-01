@@ -1,5 +1,4 @@
-use antidrift_kernel::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
-use antidrift_kernel::rule_options::EmptyVisitor;
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
@@ -8,41 +7,32 @@ use tsrs_core::P;
 
 pub const RULE_NAME: &str = "antidrift/no-reexport-only-module";
 
-pub struct NoReexportOnlyModule;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, &[], visit);
 
-pub static DEFAULT_RULE: NoReexportOnlyModule = NoReexportOnlyModule;
-
-impl Rule for NoReexportOnlyModule {
-    fn name(&self) -> &'static str {
-        RULE_NAME
+fn visit(ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
+    if is_tool_config_file(ctx.file.file_name()) {
+        return;
     }
-
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        if is_tool_config_file(ctx.file.file_name()) {
-            return Box::new(EmptyVisitor);
-        }
-        match provenance::is_package_entry_file(ctx.file.file_name()) {
-            Ok(true) => return Box::new(EmptyVisitor),
-            Ok(false) => {}
-            Err(error) => {
-                ctx.report_node(
-                    ctx.file.as_node(),
-                    RuleMessage::new("invalidPackageJson", error.to_string()),
-                );
-                return Box::new(EmptyVisitor);
-            }
-        }
-        let statements = ctx.file.statements().nodes();
-        if let Some(first_export) = reexport_only_anchor(statements) {
+    match provenance::is_package_entry_file(ctx.file.file_name()) {
+        Ok(true) => return,
+        Ok(false) => {}
+        Err(error) => {
             ctx.report_node(
-                first_export,
-                RuleMessage::new(
-                    "reexportOnlyModule",
-                    "This module only re-exports bindings owned elsewhere. Import from the owning module directly and delete this hop.",
-                ),
+                ctx.file.as_node(),
+                RuleMessage::new("invalidPackageJson", error.to_string()),
             );
+            return;
         }
-        Box::new(EmptyVisitor)
+    }
+    let statements = ctx.file.statements().nodes();
+    if let Some(first_export) = reexport_only_anchor(statements) {
+        ctx.report_node(
+            first_export,
+            RuleMessage::new(
+                "reexportOnlyModule",
+                "This module only re-exports bindings owned elsewhere. Import from the owning module directly and delete this hop.",
+            ),
+        );
     }
 }
 

@@ -1,5 +1,5 @@
 use antidrift_kernel::jsx::{attribute_initializer_expression, plain_attribute_name};
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression, unwrap_parentheses};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -16,63 +16,43 @@ const SAFE_KEYWORDS: [&str; 7] = [
 ];
 const NAMED_COLORS: [&str; 7] = ["white", "black", "red", "blue", "green", "gray", "grey"];
 
-pub struct NoInlineStyleColors;
-
-pub static DEFAULT_RULE: NoInlineStyleColors = NoInlineStyleColors;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::JsxAttribute)];
 
-impl Rule for NoInlineStyleColors {
-    fn name(&self) -> &'static str {
-        RULE_NAME
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    if plain_attribute_name(node) != Some("style") {
+        return;
     }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
+    let Some(expr) = attribute_initializer_expression(node) else {
+        return;
+    };
+    let style = unwrap_expression(expr);
+    if style.kind() != Kind::ObjectLiteralExpression {
+        return;
     }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        if plain_attribute_name(node) != Some("style") {
-            return;
+    for &property in style.as_object_literal_expression().properties().nodes() {
+        if property.kind() != Kind::PropertyAssignment {
+            continue;
         }
-        let Some(expr) = attribute_initializer_expression(node) else {
-            return;
+        let assign = property.as_property_assignment();
+        let val_node = assign.initializer();
+        let Some(text) = static_style_value(val_node) else {
+            continue;
         };
-        let style = unwrap_expression(expr);
-        if style.kind() != Kind::ObjectLiteralExpression {
-            return;
-        }
-        for &property in style.as_object_literal_expression().properties().nodes() {
-            if property.kind() != Kind::PropertyAssignment {
-                continue;
-            }
-            let assign = property.as_property_assignment();
-            let val_node = assign.initializer();
-            let Some(text) = static_style_value(val_node) else {
-                continue;
-            };
-            let Some(color) = hardcoded_color(text) else {
-                continue;
-            };
-            let prop = property_label(assign.name());
-            ctx.report_node(
-                val_node,
-                RuleMessage::new(
-                    "inlineColor",
-                    format!(
-                        "Hardcoded color '{color}' in '{prop}' breaks dark mode. Use a CSS variable or Tailwind class instead."
-                    ),
+        let Some(color) = hardcoded_color(text) else {
+            continue;
+        };
+        let prop = property_label(assign.name());
+        ctx.report_node(
+            val_node,
+            RuleMessage::new(
+                "inlineColor",
+                format!(
+                    "Hardcoded color '{color}' in '{prop}' breaks dark mode. Use a CSS variable or Tailwind class instead."
                 ),
-            );
-        }
+            ),
+        );
     }
 }
 

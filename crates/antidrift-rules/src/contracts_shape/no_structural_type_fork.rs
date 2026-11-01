@@ -7,8 +7,8 @@ use tsrs_ast::{Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
 
 use super::redundant_local_return::check_redundant_local_return;
-use super::redundant_owner_prefix::check_redundant_owner_prefix;
 use super::structural_fork_analysis::{check_structural_fork_declaration, has_modifier};
+use super::tuple_and_service_shape::check_redundant_owner_prefix;
 
 const RULE_NAME: &str = "antidrift/no-structural-type-fork";
 

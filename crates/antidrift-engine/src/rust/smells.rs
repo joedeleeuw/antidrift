@@ -9,7 +9,7 @@ use super::syn_kernel::{
     expr_mentions_ident, extract_pat_ident, is_err_wild_pat, is_fs_io_call, is_ok_tuple_pat,
     is_wild_pat,
 };
-use antidrift_rules::type_narrowing::no_compat_names::is_compat_name;
+use antidrift_kernel::declared_names::is_compat_name;
 use proc_macro2::Span;
 use rustc_hash::FxHashSet;
 use std::path::Path;
@@ -27,7 +27,9 @@ pub(super) fn check_smells(
     crate_names: &CrateNames,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
-    let is_rule_self = rel_path.ends_with("/no_compat_names.rs");
+    let is_rule_self = rel_path.ends_with("/declared_names.rs")
+        || rel_path.ends_with("/no_compat_names.rs")
+        || rel_path.ends_with("/naming_conventions.rs");
     if !is_rule_self
         && let Some(stem) = path.file_stem().and_then(|name| name.to_str())
         && (is_compat_name(stem) || banned_lifecycle_message(stem).is_some())

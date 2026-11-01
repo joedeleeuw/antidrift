@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use antidrift_kernel::jsx::is_hook_name;
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::{
     is_undefined_or_void_expression, normalize_path, property_name_text, unwrap_expression,
 };
@@ -12,9 +12,7 @@ pub const RULE_NAME: &str = "antidrift/no-hookless-use-function";
 const PLATFORM_INFIXES: [&str; 4] = ["web", "native", "ios", "android"];
 const CODE_EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mts", "mjs"];
 
-pub struct NoHooklessUseFunction;
-
-pub static DEFAULT_RULE: NoHooklessUseFunction = NoHooklessUseFunction;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),
@@ -23,53 +21,35 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::PropertyAssignment),
 ];
 
-impl Rule for NoHooklessUseFunction {
-    fn name(&self) -> &'static str {
-        RULE_NAME
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    let Some((report_node, function_node, name)) = extract_hook_candidate(node) else {
+        return;
+    };
+    if !is_hook_name(name) || is_ambient_or_overload(node, function_node) {
+        return;
     }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {})
+    let Some(body) = function_node.body() else {
+        return;
+    };
+    if subtree_calls_hook(body) {
+        return;
     }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
+    if is_stub_body(body) && has_sibling_calling_hook(ctx, name) {
+        return;
     }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        let Some((report_node, function_node, name)) = extract_hook_candidate(node) else {
-            return;
-        };
-        if !is_hook_name(name) || is_ambient_or_overload(node, function_node) {
-            return;
-        }
-        let Some(body) = function_node.body() else {
-            return;
-        };
-        if subtree_calls_hook(body) {
-            return;
-        }
-        if is_stub_body(body) && has_sibling_calling_hook(ctx, name) {
-            return;
-        }
-        let suffix = name
-            .strip_prefix("use")
-            .filter(|rest| !rest.is_empty())
-            .unwrap_or("Value");
-        ctx.report_node(
-            report_node,
-            RuleMessage::new(
-                "noHooklessUseFunction",
-                format!(
-                    "Function '{name}' uses the 'use*' prefix but calls no React hooks. React Compiler treats all 'use*' functions as reactive hooks, splitting memo cache scopes and hoisting caller dependencies. If this is a procedural helper, rename it to a non-hook prefix (e.g. 'get{suffix}', 'read{suffix}', 'sync{suffix}'). If this is an intentional platform stub, implement it in a platform-suffixed file (.native.ts, .web.ts) whose sibling calls a hook."
-                ),
+    let suffix = name
+        .strip_prefix("use")
+        .filter(|rest| !rest.is_empty())
+        .unwrap_or("Value");
+    ctx.report_node(
+        report_node,
+        RuleMessage::new(
+            "noHooklessUseFunction",
+            format!(
+                "Function '{name}' uses the 'use*' prefix but calls no React hooks. React Compiler treats all 'use*' functions as reactive hooks, splitting memo cache scopes and hoisting caller dependencies. If this is a procedural helper, rename it to a non-hook prefix (e.g. 'get{suffix}', 'read{suffix}', 'sync{suffix}'). If this is an intentional platform stub, implement it in a platform-suffixed file (.native.ts, .web.ts) whose sibling calls a hook."
             ),
-        );
-    }
+        ),
+    );
 }
 
 fn extract_hook_candidate(node: P<Node>) -> Option<(P<Node>, P<Node>, &'static str)> {

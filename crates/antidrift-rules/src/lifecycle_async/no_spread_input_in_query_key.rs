@@ -3,15 +3,13 @@ use super::syntax::{
     object_property, parent_expression, property_name, resolve_lexical_binding, root_identifier,
     unwrap_expression,
 };
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 
 pub const RULE_NAME: &str = "antidrift/no-spread-input-in-query-key";
 
-pub struct NoSpreadInputInQueryKey;
-
-pub static DEFAULT_RULE: NoSpreadInputInQueryKey = NoSpreadInputInQueryKey;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::PropertyAssignment),
@@ -20,50 +18,32 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
 ];
 
-impl Rule for NoSpreadInputInQueryKey {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {})
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        match node.kind() {
-            Kind::PropertyAssignment | Kind::ShorthandPropertyAssignment => {
-                if let Some((key, value, _)) = object_property(node)
-                    && property_name(key) == Some("queryKey")
-                {
-                    report_key(ctx, value);
-                }
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    match node.kind() {
+        Kind::PropertyAssignment | Kind::ShorthandPropertyAssignment => {
+            if let Some((key, value, _)) = object_property(node)
+                && property_name(key) == Some("queryKey")
+            {
+                report_key(ctx, value);
             }
-            Kind::ArrayLiteralExpression if factory_return(node) => {
-                for &element in node.as_array_literal_expression().elements().nodes() {
-                    report_element(ctx, element);
-                }
-            }
-            Kind::CallExpression => {
-                let call = node.as_call_expression();
-                if identifier_of(call.expression()).is_some_and(|callee| {
-                    ["useSWR", "useSWRImmutable", "useSWRMutation"]
-                        .contains(&callee.as_identifier().text())
-                }) && let Some(&key) = call.arguments().nodes().first()
-                    && key.kind() != Kind::SpreadElement
-                {
-                    report_key(ctx, key);
-                }
-            }
-            _ => {}
         }
+        Kind::ArrayLiteralExpression if factory_return(node) => {
+            for &element in node.as_array_literal_expression().elements().nodes() {
+                report_element(ctx, element);
+            }
+        }
+        Kind::CallExpression => {
+            let call = node.as_call_expression();
+            if identifier_of(call.expression()).is_some_and(|callee| {
+                ["useSWR", "useSWRImmutable", "useSWRMutation"]
+                    .contains(&callee.as_identifier().text())
+            }) && let Some(&key) = call.arguments().nodes().first()
+                && key.kind() != Kind::SpreadElement
+            {
+                report_key(ctx, key);
+            }
+        }
+        _ => {}
     }
 }
 

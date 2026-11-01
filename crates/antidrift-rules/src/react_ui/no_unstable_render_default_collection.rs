@@ -1,7 +1,7 @@
 use antidrift_kernel::jsx::{
     is_event_handler_name, is_hook_name, is_pascal_case_name, react_function_name,
 };
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::{is_function_like, property_name_text, unwrap_expression};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_core::P;
@@ -22,9 +22,7 @@ const TIMER_OR_EVENT_METHODS: &[&str] = &[
     "finally",
 ];
 
-pub struct NoUnstableRenderDefaultCollection;
-
-pub static DEFAULT_RULE: NoUnstableRenderDefaultCollection = NoUnstableRenderDefaultCollection;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),
@@ -33,46 +31,28 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::BinaryExpression),
 ];
 
-impl Rule for NoUnstableRenderDefaultCollection {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {})
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        if is_function_like(node) && is_named_component_or_hook(node) {
-            for &param in node.parameters() {
-                check_parameter_defaults(ctx, param);
-            }
-            return;
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    if is_function_like(node) && is_named_component_or_hook(node) {
+        for &param in node.parameters() {
+            check_parameter_defaults(ctx, param);
         }
-        if node.kind() == Kind::BinaryExpression {
-            let bin = node.as_binary_expression();
-            if matches!(
-                bin.operator_token().kind(),
-                Kind::QuestionQuestionToken | Kind::BarBarToken
-            ) && is_collection_allocation(bin.right())
-                && is_inside_render_body(node)
-            {
-                ctx.report_node(
-                    node,
-                    RuleMessage::new(
-                        "unstableRenderFallbackCollection",
-                        "Inline fallback collection allocates a fresh reference every render, busting React Compiler and downstream memoization. Hoist an immutable constant (e.g. const EMPTY = []) and default to it (e.g. expr ?? EMPTY).",
-                    ),
-                );
-            }
+        return;
+    }
+    if node.kind() == Kind::BinaryExpression {
+        let bin = node.as_binary_expression();
+        if matches!(
+            bin.operator_token().kind(),
+            Kind::QuestionQuestionToken | Kind::BarBarToken
+        ) && is_collection_allocation(bin.right())
+            && is_inside_render_body(node)
+        {
+            ctx.report_node(
+                node,
+                RuleMessage::new(
+                    "unstableRenderFallbackCollection",
+                    "Inline fallback collection allocates a fresh reference every render, busting React Compiler and downstream memoization. Hoist an immutable constant (e.g. const EMPTY = []) and default to it (e.g. expr ?? EMPTY).",
+                ),
+            );
         }
     }
 }

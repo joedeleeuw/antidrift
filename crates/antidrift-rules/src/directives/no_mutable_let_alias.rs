@@ -3,46 +3,26 @@ use super::alias_usage_scan::{
     has_loop_mutation, has_memo_cache_store, is_function_boundary, is_immediate_return,
     is_loop_node,
 };
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::{enclosing_function, unwrap_expression};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 
 pub const RULE_NAME: &str = "antidrift/no-mutable-let-alias";
 
-pub struct NoMutableLetAlias;
-
-pub static DEFAULT_RULE: NoMutableLetAlias = NoMutableLetAlias;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::Block)];
 
-impl Rule for NoMutableLetAlias {
-    fn name(&self) -> &'static str {
-        RULE_NAME
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    if node.kind() != Kind::Block {
+        return;
     }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        if node.kind() != Kind::Block {
-            return;
-        }
-        let Some(fn_node) = enclosing_function(node) else {
-            return;
-        };
-        check_settled_let_const_alias(ctx, node);
-        check_staged_let_const_alias(ctx, node, fn_node);
-    }
+    let Some(fn_node) = enclosing_function(node) else {
+        return;
+    };
+    check_settled_let_const_alias(ctx, node);
+    check_staged_let_const_alias(ctx, node, fn_node);
 }
 
 fn check_settled_let_const_alias(ctx: &mut Ctx, block: P<Node>) {

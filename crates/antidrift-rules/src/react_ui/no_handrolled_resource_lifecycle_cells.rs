@@ -6,8 +6,7 @@ use super::shadow_state_mirror::{
 };
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
-use antidrift_kernel::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
-use antidrift_kernel::rule_options::EmptyVisitor;
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::{static_member_chain, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -17,38 +16,29 @@ pub const RULE_NAME: &str = "antidrift/no-handrolled-resource-lifecycle-cells";
 const MESSAGE: &str = "This async transition hand-rolls a resource lifecycle: a constant lifecycle cell is toggled around the request while sibling cells receive the resource value and caught error. Model one resource/reducer value instead of coupled setters.";
 const GLOBAL_OBJECTS: [&str; 3] = ["globalThis", "window", "self"];
 
-pub struct NoHandrolledResourceLifecycleCells;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, &[], visit);
 
-pub static DEFAULT_RULE: NoHandrolledResourceLifecycleCells = NoHandrolledResourceLifecycleCells;
-
-impl Rule for NoHandrolledResourceLifecycleCells {
-    fn name(&self) -> &'static str {
-        RULE_NAME
+fn visit(ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
+    let mut traversal = LifecycleTraversal {
+        imports: FileImports::collect(ctx.file),
+        stack: Vec::new(),
+        catch_params: Vec::new(),
+        reports: Vec::new(),
+    };
+    traversal.walk(ctx.file.as_node());
+    for node in traversal.reports {
+        ctx.report_node(
+            node,
+            RuleMessage::new("handrolledResourceLifecycle", MESSAGE),
+        );
     }
-
-    fn create_visitor(&'static self, ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        let mut traversal = LifecycleTraversal {
-            imports: FileImports::collect(ctx.file),
-            stack: Vec::new(),
-            catch_params: Vec::new(),
-            reports: Vec::new(),
-        };
-        traversal.walk(ctx.file.as_node());
-        for node in traversal.reports {
-            ctx.report_node(
-                node,
-                RuleMessage::new("handrolledResourceLifecycle", MESSAGE),
-            );
-        }
-        for node in shadow_state_mirrors(ctx.file, &traversal.imports) {
-            ctx.report_node(
-                node,
-                RuleMessage::new("shadowStateMirror", SHADOW_STATE_MIRROR_MESSAGE),
-            );
-        }
-        check_process_lifecycle_loa(ctx.file, &traversal.imports, ctx);
-        Box::new(EmptyVisitor)
+    for node in shadow_state_mirrors(ctx.file, &traversal.imports) {
+        ctx.report_node(
+            node,
+            RuleMessage::new("shadowStateMirror", SHADOW_STATE_MIRROR_MESSAGE),
+        );
     }
+    check_process_lifecycle_loa(ctx.file, &traversal.imports, ctx);
 }
 
 struct LifecycleTraversal {

@@ -1,4 +1,4 @@
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::{shape, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
 use tsrs_checker::{Checker, Type, TypeFlags};
@@ -259,33 +259,14 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
     );
 }
 
-pub struct NoAppeasementCast;
-
-pub static DEFAULT_INSTANCE: NoAppeasementCast = NoAppeasementCast;
+pub static DEFAULT_INSTANCE: RuleSpec =
+    RuleSpec::new("antidrift/no-appeasement-cast", LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::AsExpression),
     Listener::Enter(Kind::TypeAssertionExpression),
 ];
 
-impl Rule for NoAppeasementCast {
-    fn name(&self) -> &'static str {
-        "antidrift/no-appeasement-cast"
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        check_assertion(ctx, node);
-    }
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    check_assertion(ctx, node);
 }

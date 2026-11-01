@@ -17,6 +17,40 @@ pub fn name_key(name: &str) -> String {
         .collect()
 }
 
+pub const COMPAT_TOKENS: &[&str] = &["deprecated", "deprecate", "legacy", "nolonger", "compat"];
+
+#[must_use]
+pub fn is_compat_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    if lower.contains("legacy")
+        || lower.contains("deprecated")
+        || lower.contains("nolonger")
+        || lower.contains("no_longer")
+    {
+        return true;
+    }
+    let mut search_from = 0usize;
+    while let Some(offset) = lower[search_from..].find("compat") {
+        let abs = search_from + offset;
+        if !lower[abs..].starts_with("compatib") {
+            return true;
+        }
+        search_from = abs + 6;
+    }
+    false
+}
+
+#[must_use]
+pub fn plain_sibling_key(name: &str) -> Option<String> {
+    let key = name_key(name);
+    let (start, token) = COMPAT_TOKENS
+        .iter()
+        .filter_map(|token| key.find(token).map(|start| (start, *token)))
+        .min_by_key(|(start, token)| (*start, std::cmp::Reverse(token.len())))?;
+    let sibling = format!("{}{}", &key[..start], &key[start + token.len()..]);
+    (!sibling.is_empty()).then_some(sibling)
+}
+
 const DECLARATION_KINDS: &[Kind] = &[
     Kind::FunctionDeclaration,
     Kind::MethodDeclaration,

@@ -1,5 +1,5 @@
 use super::vague_name_lexicon::{duplicate_context_word, vague_reason};
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -230,13 +230,7 @@ fn check_import_specifier(ctx: &mut Ctx, node: P<Node>) {
     }
 }
 
-pub struct NoVagueNames;
-
-impl NoVagueNames {
-    pub const DEFAULT: Self = Self;
-}
-
-pub static DEFAULT_INSTANCE: NoVagueNames = NoVagueNames::DEFAULT;
+pub static DEFAULT_INSTANCE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::VariableDeclaration),
@@ -254,63 +248,45 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ImportSpecifier),
 ];
 
-impl Rule for NoVagueNames {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, listener: Listener, node: P<Node>) {
-        match listener {
-            Listener::Enter(Kind::VariableDeclaration) => {
-                let var_decl = node.as_variable_declaration();
-                let name_node = var_decl.name();
-                check_binding_node(ctx, Some(name_node));
-                if let Some(init) = var_decl.initializer()
-                    && matches!(init.kind(), Kind::ArrowFunction | Kind::FunctionExpression)
-                {
-                    check_duplicate_context(ctx, Some(name_node), node);
-                }
+fn visit(ctx: &mut Ctx, listener: Listener, node: P<Node>) {
+    match listener {
+        Listener::Enter(Kind::VariableDeclaration) => {
+            let var_decl = node.as_variable_declaration();
+            let name_node = var_decl.name();
+            check_binding_node(ctx, Some(name_node));
+            if let Some(init) = var_decl.initializer()
+                && matches!(init.kind(), Kind::ArrowFunction | Kind::FunctionExpression)
+            {
+                check_duplicate_context(ctx, Some(name_node), node);
             }
-            Listener::Enter(
-                Kind::FunctionDeclaration
-                | Kind::FunctionExpression
-                | Kind::ArrowFunction
-                | Kind::Constructor
-                | Kind::GetAccessor
-                | Kind::SetAccessor,
-            ) => {
-                check_function(ctx, node);
-            }
-            Listener::Enter(Kind::MethodDeclaration) => {
-                check_duplicate_context(ctx, node.name(), node);
-                check_function(ctx, node);
-            }
-            Listener::Enter(Kind::CatchClause) => {
-                if let Some(var_decl) = node.as_catch_clause().variable_declaration() {
-                    check_binding_node(ctx, var_decl.name());
-                }
-            }
-            Listener::Enter(
-                Kind::ClassDeclaration | Kind::TypeAliasDeclaration | Kind::InterfaceDeclaration,
-            ) => {
-                check_ident(ctx, node.name());
-            }
-            Listener::Enter(Kind::ImportSpecifier) => {
-                check_import_specifier(ctx, node);
-            }
-            _ => {}
         }
+        Listener::Enter(
+            Kind::FunctionDeclaration
+            | Kind::FunctionExpression
+            | Kind::ArrowFunction
+            | Kind::Constructor
+            | Kind::GetAccessor
+            | Kind::SetAccessor,
+        ) => {
+            check_function(ctx, node);
+        }
+        Listener::Enter(Kind::MethodDeclaration) => {
+            check_duplicate_context(ctx, node.name(), node);
+            check_function(ctx, node);
+        }
+        Listener::Enter(Kind::CatchClause) => {
+            if let Some(var_decl) = node.as_catch_clause().variable_declaration() {
+                check_binding_node(ctx, var_decl.name());
+            }
+        }
+        Listener::Enter(
+            Kind::ClassDeclaration | Kind::TypeAliasDeclaration | Kind::InterfaceDeclaration,
+        ) => {
+            check_ident(ctx, node.name());
+        }
+        Listener::Enter(Kind::ImportSpecifier) => {
+            check_import_specifier(ctx, node);
+        }
+        _ => {}
     }
 }

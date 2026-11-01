@@ -1,5 +1,5 @@
 use antidrift_kernel::directives::{scan_source_comments, split_identifier_words};
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 
@@ -18,66 +18,46 @@ const AI_TOKENS: &[&str] = &[
     "generated",
 ];
 
-pub struct NoTodoWithoutIssue;
-
-pub static DEFAULT_RULE: NoTodoWithoutIssue = NoTodoWithoutIssue;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
 
-impl Rule for NoTodoWithoutIssue {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
-        for comment in scan_source_comments(ctx.file.text()) {
-            let text = if comment.is_lint_directive {
-                scannable_directive_text(comment.text)
-            } else {
-                comment.raw_content.to_owned()
-            };
-            if has_tracked_ticket(&text) {
-                continue;
-            }
-            let words = split_identifier_words(&text);
-            let has_debt = unnegated_debt_token(&text, DEBT_TOKENS).is_some();
-            let has_ai = words.iter().any(|w| AI_TOKENS.contains(&w.as_str()));
-            if has_debt && has_ai {
-                ctx.report_range(
-                    comment.pos,
-                    comment.end,
-                    RuleMessage::new(
-                        "forbidden",
-                        "AI debt comment is forbidden. Replace with immediate fix or a tracked issue reference outside source files.",
+fn visit(ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
+    for comment in scan_source_comments(ctx.file.text()) {
+        let text = if comment.is_lint_directive {
+            scannable_directive_text(comment.text)
+        } else {
+            comment.raw_content.to_owned()
+        };
+        if has_tracked_ticket(&text) {
+            continue;
+        }
+        let words = split_identifier_words(&text);
+        let has_debt = unnegated_debt_token(&text, DEBT_TOKENS).is_some();
+        let has_ai = words.iter().any(|w| AI_TOKENS.contains(&w.as_str()));
+        if has_debt && has_ai {
+            ctx.report_range(
+                comment.pos,
+                comment.end,
+                RuleMessage::new(
+                    "forbidden",
+                    "AI debt comment is forbidden. Replace with immediate fix or a tracked issue reference outside source files.",
+                ),
+            );
+            continue;
+        }
+        if let Some(bare_token) = unnegated_debt_token(&text, BARE_TOKENS) {
+            let upper = bare_token.to_ascii_uppercase();
+            ctx.report_range(
+                comment.pos,
+                comment.end,
+                RuleMessage::new(
+                    "bareToken",
+                    format!(
+                        "{upper} comment must include a tracked issue reference (e.g. TODO(ABC-123))."
                     ),
-                );
-                continue;
-            }
-            if let Some(bare_token) = unnegated_debt_token(&text, BARE_TOKENS) {
-                let upper = bare_token.to_ascii_uppercase();
-                ctx.report_range(
-                    comment.pos,
-                    comment.end,
-                    RuleMessage::new(
-                        "bareToken",
-                        format!(
-                            "{upper} comment must include a tracked issue reference (e.g. TODO(ABC-123))."
-                        ),
-                    ),
-                );
-            }
+                ),
+            );
         }
     }
 }

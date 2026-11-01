@@ -6,7 +6,7 @@ use antidrift_kernel::local_binding::{
     Binding, binding_pattern_identifiers, for_each_resolved_reference, resolve_lexical_binding,
 };
 use antidrift_kernel::relational_scan::{is_inner_linear_scan_method, is_outer_traversal_method};
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::{
     callee_name, is_function_like, numeric_literal_value, property_name_text, unwrap_expression,
 };
@@ -35,19 +35,7 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::MethodDeclaration),
 ];
 
-pub struct NoQueryJoinOrTreeReshape;
-
-pub static DEFAULT_RULE: NoQueryJoinOrTreeReshape = NoQueryJoinOrTreeReshape;
-
-impl Rule for NoQueryJoinOrTreeReshape {
-    fn name(&self) -> &'static str {
-        RULE_NAME
-    }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 #[derive(Clone, Copy)]
 enum Finding {
@@ -75,36 +63,28 @@ impl Finding {
     }
 }
 
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    let Some(body) = node.body() else {
+        return;
+    };
+    let mut findings = Vec::new();
+    if node.modifier_flags().contains(ModifierFlags::Async) {
+        findings.extend(
+            independent_await_runs(body)
+                .into_iter()
+                .map(|statement| (statement, Finding::SequentialAsyncWaterfall)),
+        );
     }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        let Some(body) = node.body() else {
-            return;
-        };
-        let mut findings = Vec::new();
-        if node.modifier_flags().contains(ModifierFlags::Async) {
-            findings.extend(
-                independent_await_runs(body)
-                    .into_iter()
-                    .map(|statement| (statement, Finding::SequentialAsyncWaterfall)),
-            );
+    if is_render_function(node) {
+        RenderScan::run(node, body, &mut findings);
+    }
+    for call in relational_key_join_calls(body) {
+        if !findings.iter().any(|(existing, _)| *existing == call) {
+            findings.push((call, Finding::MultiQueryRenderJoin));
         }
-        if is_render_function(node) {
-            RenderScan::run(node, body, &mut findings);
-        }
-        for call in relational_key_join_calls(body) {
-            if !findings.iter().any(|(existing, _)| *existing == call) {
-                findings.push((call, Finding::MultiQueryRenderJoin));
-            }
-        }
-        for (reported, finding) in findings {
-            ctx.report_node(reported, finding.message());
-        }
+    }
+    for (reported, finding) in findings {
+        ctx.report_node(reported, finding.message());
     }
 }
 

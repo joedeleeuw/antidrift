@@ -1,13 +1,17 @@
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use tsrs_ast::{Kind, Node};
 use tsrs_checker::{Checker, SignatureKind, Type, TypeFlags};
 use tsrs_core::P;
 
-pub struct NoExplicitTypeArgumentsOnOwnedApi;
+const LISTENERS: [Listener; 1] = [Listener::Enter(Kind::CallExpression)];
 
-pub static RULE: NoExplicitTypeArgumentsOnOwnedApi = NoExplicitTypeArgumentsOnOwnedApi {};
+pub static RULE: RuleSpec = RuleSpec::new(
+    "antidrift/no-explicit-type-arguments-on-owned-api",
+    &LISTENERS,
+    visit,
+);
 
 fn build_explicit_type_arguments_on_owned_api_message() -> RuleMessage {
     RuleMessage::new(
@@ -340,35 +344,15 @@ fn is_tanstack_registration_call(checker: &mut Checker, call_node: P<Node>) -> b
     resolves_to_registration(checker, arg0, 6)
 }
 
-impl Rule for NoExplicitTypeArgumentsOnOwnedApi {
-    fn name(&self) -> &'static str {
-        "antidrift/no-explicit-type-arguments-on-owned-api"
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    if node.kind() != Kind::CallExpression || node.type_arguments().is_empty() {
+        return;
     }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
-    }
-}
-
-struct Visitor;
-
-const LISTENERS: [Listener; 1] = [Listener::Enter(Kind::CallExpression)];
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        &LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        if node.kind() != Kind::CallExpression || node.type_arguments().is_empty() {
-            return;
-        }
-        if is_convex_hook_call(ctx.checker, node)
-            || is_trpc_procedure_hook_call(ctx.checker, node)
-            || is_swr_owned_fetcher_call(ctx.checker, node)
-            || is_tanstack_registration_call(ctx.checker, node)
-        {
-            ctx.report_node(node, build_explicit_type_arguments_on_owned_api_message());
-        }
+    if is_convex_hook_call(ctx.checker, node)
+        || is_trpc_procedure_hook_call(ctx.checker, node)
+        || is_swr_owned_fetcher_call(ctx.checker, node)
+        || is_tanstack_registration_call(ctx.checker, node)
+    {
+        ctx.report_node(node, build_explicit_type_arguments_on_owned_api_message());
     }
 }

@@ -1,6 +1,6 @@
 use super::syntax::{Span, member, unwrap_expression, unwrap_parentheses};
 use antidrift_kernel::directives::scan_source_comments;
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -19,67 +19,47 @@ struct BuilderChain {
     steps: Vec<ChainStep>,
 }
 
-pub struct NoAwaitedBuilderUnion;
-
-pub static DEFAULT_RULE: NoAwaitedBuilderUnion = NoAwaitedBuilderUnion;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::AwaitExpression)];
 
-impl Rule for NoAwaitedBuilderUnion {
-    fn name(&self) -> &'static str {
-        RULE_NAME
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    let argument = node.as_await_expression().expression();
+    if unwrap_expression(argument).kind() != Kind::ConditionalExpression {
+        return;
     }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor)
+    let mut branches = Vec::new();
+    collect_branches(argument, &mut branches);
+    let Some(chains) = branches
+        .iter()
+        .copied()
+        .map(describe_chain)
+        .collect::<Option<Vec<_>>>()
+    else {
+        return;
+    };
+    let Some(first) = chains.first() else {
+        return;
+    };
+    if chains.iter().any(|chain| chain.root != first.root) || !has_chain_union(&chains) {
+        return;
     }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
-    }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        let argument = node.as_await_expression().expression();
-        if unwrap_expression(argument).kind() != Kind::ConditionalExpression {
-            return;
-        }
-        let mut branches = Vec::new();
-        collect_branches(argument, &mut branches);
-        let Some(chains) = branches
-            .iter()
-            .copied()
-            .map(describe_chain)
-            .collect::<Option<Vec<_>>>()
-        else {
-            return;
-        };
-        let Some(first) = chains.first() else {
-            return;
-        };
-        if chains.iter().any(|chain| chain.root != first.root) || !has_chain_union(&chains) {
-            return;
-        }
-        let message = RuleMessage::new(
-            "awaitedBuilderUnion",
-            format!(
-                "Awaiting a ternary over two chain states of `{root}` makes TypeScript instantiate both builder types and their union before it can resolve `Awaited<>` over it, which is charged against the typecheck-cost baseline. Await inside each branch instead (`cond ? await {root}.chain() : await {root}`): the condition is evaluated first either way, so the rewrite preserves semantics and resolves one concrete type at a time.",
-                root = first.root
-            ),
-        );
-        if let Some(edits) = builder_fix(ctx, node, argument, &branches) {
-            ctx.report_node_with_fixes(node, message, |ctx| {
-                edits
-                    .into_iter()
-                    .map(|(start, end, text)| ctx.fix_replace_range(start, end, text))
-                    .collect()
-            });
-        } else {
-            ctx.report_node(node, message);
-        }
+    let message = RuleMessage::new(
+        "awaitedBuilderUnion",
+        format!(
+            "Awaiting a ternary over two chain states of `{root}` makes TypeScript instantiate both builder types and their union before it can resolve `Awaited<>` over it, which is charged against the typecheck-cost baseline. Await inside each branch instead (`cond ? await {root}.chain() : await {root}`): the condition is evaluated first either way, so the rewrite preserves semantics and resolves one concrete type at a time.",
+            root = first.root
+        ),
+    );
+    if let Some(edits) = builder_fix(ctx, node, argument, &branches) {
+        ctx.report_node_with_fixes(node, message, |ctx| {
+            edits
+                .into_iter()
+                .map(|(start, end, text)| ctx.fix_replace_range(start, end, text))
+                .collect()
+        });
+    } else {
+        ctx.report_node(node, message);
     }
 }
 

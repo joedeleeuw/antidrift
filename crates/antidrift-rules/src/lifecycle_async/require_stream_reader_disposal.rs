@@ -4,7 +4,7 @@ use super::syntax::{
     identifier_of, is_const_variable_declaration, is_function_like, is_write_reference, member,
     owner, parent_expression, resolve_lexical_binding,
 };
-use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 
@@ -16,81 +16,61 @@ pub(super) struct ReaderAnalysis {
     pub(super) root: P<Node>,
 }
 
-pub struct RequireStreamReaderDisposal;
-
-pub static DEFAULT_RULE: RequireStreamReaderDisposal = RequireStreamReaderDisposal;
+pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 
-impl Rule for RequireStreamReaderDisposal {
-    fn name(&self) -> &'static str {
-        RULE_NAME
+fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    let call = node.as_call_expression();
+    let Some((stream, "getReader")) = member(call.expression()) else {
+        return;
+    };
+    if !is_stream(stream) || directly_returned(node) {
+        return;
     }
-
-    fn create_visitor(&'static self, _ctx: &mut Ctx) -> Box<dyn RuleVisitor> {
-        Box::new(Visitor {})
+    let Some((binding, stable)) = acquisition_owner(node) else {
+        ctx.report_node(node, disposal_message("releaseInFinally"));
+        return;
+    };
+    let analysis = ReaderAnalysis {
+        sf: ctx.file,
+        binding,
+        root: owner(node),
+    };
+    if stable && analysis.transferred(node) {
+        return;
     }
-}
-
-struct Visitor;
-
-impl RuleVisitor for Visitor {
-    fn listeners(&self) -> &[Listener] {
-        LISTENERS
+    let Some(protecting) = analysis.protecting_try(node) else {
+        ctx.report_node(node, disposal_message("releaseInFinally"));
+        return;
+    };
+    let Some(finalizer) = protecting.as_try_statement().finally_block() else {
+        return;
+    };
+    let release_end = finalizer
+        .as_block()
+        .statements()
+        .nodes()
+        .first()
+        .map_or_else(
+            || Span::of(ctx.file, finalizer).end,
+            |&stmt| Span::of(ctx.file, stmt).end,
+        );
+    let call_end = Span::of(ctx.file, node).end;
+    let mutated = collect_binding_references(ctx.file.as_node(), binding)
+        .into_iter()
+        .any(|reference| {
+            let span = Span::of(ctx.file, reference);
+            is_write_reference(reference) && span.start > call_end && span.start < release_end
+        });
+    if mutated {
+        ctx.report_node(node, disposal_message("releaseInFinally"));
+        return;
     }
-
-    fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        let call = node.as_call_expression();
-        let Some((stream, "getReader")) = member(call.expression()) else {
-            return;
-        };
-        if !is_stream(stream) || directly_returned(node) {
-            return;
-        }
-        let Some((binding, stable)) = acquisition_owner(node) else {
-            ctx.report_node(node, disposal_message("releaseInFinally"));
-            return;
-        };
-        let analysis = ReaderAnalysis {
-            sf: ctx.file,
-            binding,
-            root: owner(node),
-        };
-        if stable && analysis.transferred(node) {
-            return;
-        }
-        let Some(protecting) = analysis.protecting_try(node) else {
-            ctx.report_node(node, disposal_message("releaseInFinally"));
-            return;
-        };
-        let Some(finalizer) = protecting.as_try_statement().finally_block() else {
-            return;
-        };
-        let release_end = finalizer
-            .as_block()
-            .statements()
-            .nodes()
-            .first()
-            .map_or_else(
-                || Span::of(ctx.file, finalizer).end,
-                |&stmt| Span::of(ctx.file, stmt).end,
-            );
-        let call_end = Span::of(ctx.file, node).end;
-        let mutated = collect_binding_references(ctx.file.as_node(), binding)
-            .into_iter()
-            .any(|reference| {
-                let span = Span::of(ctx.file, reference);
-                is_write_reference(reference) && span.start > call_end && span.start < release_end
-            });
-        if mutated {
-            ctx.report_node(node, disposal_message("releaseInFinally"));
-            return;
-        }
-        if !analysis.finalizer_cleanup(finalizer).cancels()
-            && analysis.read_paths_require_cancel(protecting)
-        {
-            ctx.report_node(node, disposal_message("cancelBeforeRelease"));
-        }
+    if !analysis.finalizer_cleanup(finalizer).cancels()
+        && analysis.read_paths_require_cancel(protecting)
+    {
+        ctx.report_node(node, disposal_message("cancelBeforeRelease"));
     }
 }
 

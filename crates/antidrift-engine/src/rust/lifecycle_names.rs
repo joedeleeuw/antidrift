@@ -1,5 +1,4 @@
-use antidrift_kernel::declared_names::name_key;
-use antidrift_rules::type_narrowing::no_compat_names::{is_compat_name, plain_sibling_key};
+use antidrift_kernel::declared_names::{is_compat_name, name_key, plain_sibling_key};
 use proc_macro2::Span;
 use rustc_hash::FxHashMap;
 use std::path::PathBuf;
@@ -121,10 +120,10 @@ impl<'a> NameLedger<'a> {
                     .and_then(|key| self.crate_names.sibling(key))
                 {
                     Some(sibling) => format!(
-                        "'{name}' keeps a compatibility path beside '{sibling}'; delete the old path instead of keeping or naming it."
+                        "'{name}' uses compatibility naming while '{sibling}' is also declared; delete the old path instead of keeping or naming it."
                     ),
                     None => format!(
-                        "'{name}' declares a compatibility path; delete the old path or name the item after its domain concept."
+                        "'{name}' uses compatibility naming; delete the old path or name the item after its domain concept."
                     ),
                 };
                 (span, message)
