@@ -2,7 +2,7 @@ use antidrift_kernel::jsx::{
     has_plain_attribute, jsx_children, jsx_opening_node, plain_element_name,
 };
 use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
-use antidrift_kernel::rule_options::require_non_empty;
+use antidrift_kernel::rule_options::{NonEmptyString, deserialize_optional_non_empty};
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -32,18 +32,19 @@ const NAME_PROPS: [&str; 17] = [
 const SELF_ISOLATING: [&str; 2] = ["BidiText", "UserText"];
 const RAW_ISOLATING: [&str; 2] = ["bdi", "bdo"];
 
+fn deserialize_owner<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<NonEmptyString>, D::Error> {
+    deserialize_optional_non_empty(deserializer, "owner")
+}
+
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub(crate) struct RenderedNameOptions {
     name_props: Option<Vec<String>>,
     isolating_components: Option<Vec<String>>,
-    owner: Option<String>,
-}
-
-impl RenderedNameOptions {
-    fn validate(&self, rule_name: &str) -> Result<(), String> {
-        require_non_empty(rule_name, "owner", self.owner.as_ref())
-    }
+    #[serde(deserialize_with = "deserialize_owner")]
+    owner: Option<NonEmptyString>,
 }
 
 impl RenderedNameOptions {
@@ -80,7 +81,6 @@ impl crate::ConfigurableRule for RequireDirOnRenderedName {
     type Options = RenderedNameOptions;
 
     fn from_options(parsed: Self::Options) -> Result<Self, String> {
-        parsed.validate(RULE_NAME)?;
         Ok(Self { options: parsed })
     }
 }

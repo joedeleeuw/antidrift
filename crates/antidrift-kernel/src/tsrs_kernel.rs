@@ -401,6 +401,15 @@ pub fn cooked_text_lossy(node: P<Node>) -> Cow<'static, str> {
 }
 
 #[must_use]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "cooked_bytes returns the exact WTF-8 byte slice tsrs stores for cooked literal text so equality comparisons distinguish lone-surrogate code units without UTF-8 char decoding"
+)]
+pub fn cooked_bytes(node: P<Node>) -> &'static [u8] {
+    node.text().as_bytes()
+}
+
+#[must_use]
 pub fn decodable_text(text: &str) -> Option<&str> {
     std::str::from_utf8(text.as_bytes()).is_ok().then_some(text)
 }

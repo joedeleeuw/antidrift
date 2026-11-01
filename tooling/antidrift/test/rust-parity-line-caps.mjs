@@ -153,15 +153,81 @@ function buildScriptCases(lineCaps, workspace) {
     );
 }
 
+const CLASSIFICATION_CASES = [
+  [
+    "default-export-fn-component",
+    "default-export.tsx",
+    "export default function () {",
+    "  return <div />;",
+    "}",
+    [],
+  ],
+  [
+    "default-export-memo-component",
+    "default-memo.tsx",
+    "export default memo(forwardRef((props: { items: string[] }, ref) => {",
+    "  return <ul>{props.items.map((item) => <li key={item}>{item}</li>)}</ul>;",
+    "}));",
+    [],
+  ],
+  [
+    "nested-helper-before-jsx-component",
+    "nested-helper.tsx",
+    "export function View() {\n  function small() { return 1; }",
+    "  return <div>{small()}</div>;",
+    "}",
+    [],
+  ],
+  [
+    "default-param-jsx-not-component",
+    "default-param-jsx.tsx",
+    "export function BuildReport(template = <div />) {",
+    "  return String(template);",
+    "}",
+    ["antidrift/max-function-lines:error"],
+  ],
+  [
+    "callback-param-jsx-not-component",
+    "callback-param-jsx.tsx",
+    "declare const values: unknown[];\nexport function BuildReport() {",
+    "  return values.map((template: unknown = <div />) => String(template));",
+    "}",
+    ["antidrift/max-function-lines:error"],
+  ],
+];
+
+function buildClassificationCases(workspace) {
+  const pad = Array.from(
+    { length: 55 },
+    (_, index) => `  const v${index} = ${index};`
+  );
+  const rules = {
+    "antidrift/max-function-lines": "error",
+    "antidrift/max-component-lines": "error",
+  };
+  return CLASSIFICATION_CASES.map(([id, file, head, ret, tail, expected]) => ({
+    id,
+    filename: join(workspace, file),
+    cwd: workspace,
+    sourceText: [head, ...pad, ret, tail].join("\n"),
+    rules,
+    expected,
+  }));
+}
+
 function verifyScriptLineCaps({ binaryPath, repoRoot, workspace, lineCaps }) {
   const scriptCases = buildScriptCases(lineCaps, workspace);
+  const classificationCases = buildClassificationCases(workspace);
   const batchOutput = execFileSync(binaryPath, ["--batch-json", "-"], {
     cwd: repoRoot,
-    input: JSON.stringify(
-      scriptCases.map(
+    input: JSON.stringify([
+      ...scriptCases.map(
         ({ cap: _cap, expected: _expected, ...request }) => request
-      )
-    ),
+      ),
+      ...classificationCases.map(
+        ({ expected: _expected, ...request }) => request
+      ),
+    ]),
     encoding: "utf8",
     maxBuffer: 32 * 1024 * 1024,
   });
@@ -175,6 +241,15 @@ function verifyScriptLineCaps({ binaryPath, repoRoot, workspace, lineCaps }) {
       (scriptResults.get(id) ?? [])
         .filter(({ ruleId }) => ruleId === cap.ruleId)
         .map(({ severity }) => severity),
+      expected,
+      `${id}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(scriptResults.get(id))}`
+    );
+  }
+  for (const { id, expected } of classificationCases) {
+    assert.deepEqual(
+      (scriptResults.get(id) ?? []).map(
+        ({ ruleId, severity }) => `${ruleId}:${severity}`
+      ),
       expected,
       `${id}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(scriptResults.get(id))}`
     );

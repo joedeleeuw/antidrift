@@ -3,7 +3,7 @@ use crate::tsrs_kernel::{
     unwrap_parentheses,
 };
 use rustc_hash::FxHashSet;
-use tsrs_ast::{self as ast, Kind, Node};
+use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_core::P;
 
 #[must_use]
@@ -198,8 +198,11 @@ pub fn expression_contains_jsx(node: P<Node>) -> bool {
     }
     let mut found = false;
     node.for_each_child(&mut |child| {
-        if found || is_function_like(child) {
+        if found {
             return true;
+        }
+        if is_function_like(child) {
+            return false;
         }
         if expression_contains_jsx(child) {
             found = true;
@@ -368,20 +371,37 @@ fn is_react_hoc_call(call: P<Node>) -> bool {
 
 #[must_use]
 pub fn react_function_name(node: P<Node>) -> Option<&'static str> {
+    let mut cursor = node.parent();
+    while let Some(parent) = cursor {
+        match parent.kind() {
+            Kind::ParenthesizedExpression
+            | Kind::AsExpression
+            | Kind::TypeAssertionExpression
+            | Kind::SatisfiesExpression => {
+                cursor = parent.parent();
+            }
+            Kind::CallExpression if is_react_hoc_call(parent) => {
+                cursor = parent.parent();
+            }
+            Kind::VariableDeclaration => {
+                if let Some(name_node) = parent.name()
+                    && let Some(text) = property_name_text(name_node)
+                {
+                    return Some(text);
+                }
+                break;
+            }
+            Kind::ExportAssignment => return Some("DefaultExportComponent"),
+            _ => break,
+        }
+    }
     if let Some(name) = function_name(node) {
         return Some(name);
     }
-    let parent = node.parent()?;
-    if parent.kind() == Kind::CallExpression
-        && is_react_hoc_call(parent)
-        && let Some(grand) = parent.parent()
-        && grand.kind() == Kind::VariableDeclaration
-        && let Some(name_node) = grand.name()
-        && let Some(text) = property_name_text(name_node)
+    if node.kind() == Kind::FunctionDeclaration
+        && node.modifier_flags().contains(ModifierFlags::Default)
+        && expression_contains_jsx(node)
     {
-        return Some(text);
-    }
-    if parent.kind() == Kind::ExportAssignment {
         return Some("DefaultExportComponent");
     }
     None

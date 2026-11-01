@@ -23,7 +23,7 @@ pub fn rules() -> Vec<CatalogRule> {
         CatalogRule::everywhere(&no_awaited_builder_union::DEFAULT_RULE),
         CatalogRule::configured(
             &runtime_primitives::NO_EAGER_SINGLETON,
-            ScopePolicy::InferredRole(runtime_primitives::singleton_inferred_role),
+            ScopePolicy::NonScriptEntry,
         ),
         CatalogRule::configured_everywhere(&no_sentinel_absence_fallback::DEFAULT_RULE),
         CatalogRule::everywhere(&no_spread_input_in_query_key::DEFAULT_RULE),

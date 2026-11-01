@@ -6,7 +6,7 @@ use antidrift_kernel::local_binding::Binding;
 use antidrift_kernel::registries::OwnedUnion;
 use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::rule_options::EmptyVisitor;
-use antidrift_kernel::tsrs_kernel::cooked_text;
+use antidrift_kernel::tsrs_kernel::{cooked_text, cooked_text_lossy};
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -183,9 +183,13 @@ fn status_report(
     if literal.kind() != Kind::StringLiteral {
         return None;
     }
-    let text = cooked_text(literal)?;
+    let text = cooked_text_lossy(literal);
     let (_, entry) = statuses.iter().find(|(name, entry)| {
-        entry.values.iter().any(|candidate| candidate == text) && status_context(node, name)
+        entry
+            .values
+            .iter()
+            .any(|candidate| candidate == text.as_ref())
+            && status_context(node, name)
     })?;
     if filename
         .replace('\\', "/")

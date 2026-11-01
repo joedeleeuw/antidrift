@@ -2,7 +2,9 @@ use std::collections::VecDeque;
 use std::path::Path;
 
 use antidrift_kernel::imports::extract_module_import;
-use antidrift_kernel::tsrs_kernel::{function_name, is_generator_function};
+use antidrift_kernel::tsrs_kernel::{
+    function_name, is_generator_function, property_name_text, unwrap_expression,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{Kind, ModifierFlags, Node, SourceFile};
 use tsrs_compiler::Program;
@@ -119,18 +121,56 @@ pub(crate) fn file_stem(relative: &str) -> &str {
 }
 
 pub(crate) fn check_shared_is_sync(sf: P<SourceFile>, relative: &str, report: &mut DeriveReport) {
-    for function in exported_functions(sf) {
-        if function.is_async || function.is_generator {
+    for (name, is_async, is_generator) in shared_exported_callables(sf) {
+        if is_async || is_generator {
             report.flag(
                 relative,
                 DeriveRule::SharedMustBeSync,
                 format!(
-                    "`{}` is async, but shared/ code runs on both sides as the client simulation and stays synchronous; move the awaiting into methods/ or pubs/.",
-                    function.name
+                    "`{name}` is async, but shared/ code runs on both sides as the client simulation and stays synchronous; move the awaiting into methods/ or pubs/."
                 ),
             );
         }
     }
+}
+
+fn shared_exported_callables(sf: P<SourceFile>) -> Vec<(&'static str, bool, bool)> {
+    let mut callables: Vec<(&'static str, bool, bool)> = exported_functions(sf)
+        .into_iter()
+        .map(|function| (function.name, function.is_async, function.is_generator))
+        .collect();
+    for &stmt in sf.statements().nodes() {
+        if stmt.kind() != Kind::VariableStatement
+            || !stmt.modifier_flags().contains(ModifierFlags::Export)
+        {
+            continue;
+        }
+        let decl_list = stmt.as_variable_statement().declaration_list();
+        for &decl in decl_list
+            .as_variable_declaration_list()
+            .declarations()
+            .nodes()
+        {
+            let Some(name) = decl.name().and_then(property_name_text) else {
+                continue;
+            };
+            let Some(init) = decl
+                .as_variable_declaration()
+                .initializer()
+                .map(unwrap_expression)
+            else {
+                continue;
+            };
+            if matches!(init.kind(), Kind::ArrowFunction | Kind::FunctionExpression) {
+                callables.push((
+                    name,
+                    init.modifier_flags().contains(ModifierFlags::Async),
+                    is_generator_function(init),
+                ));
+            }
+        }
+    }
+    callables
 }
 
 fn runtime_imports(program: &Program, sf: P<SourceFile>, layout: &SourceLayout) -> Vec<String> {

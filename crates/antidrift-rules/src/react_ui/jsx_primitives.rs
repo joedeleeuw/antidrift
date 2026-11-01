@@ -95,7 +95,7 @@ pub static REQUIRE_DETACHED_LABEL_SHAPE: RuleSpec = RuleSpec::new(
 
 fn visit_centered_scroll_column(ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
     for fragment in class_fragments(ctx.file) {
-        if is_centered_scroll_column(fragment.text) {
+        if is_centered_scroll_column(&fragment.text) {
             ctx.report_node(
                 fragment.node,
                 RuleMessage::new("centeredScrollColumn", CENTERED_SCROLL_MESSAGE),

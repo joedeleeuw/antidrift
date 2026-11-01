@@ -10,7 +10,7 @@ pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, &[], visit);
 
 fn visit(ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
     for fragment in class_fragments(ctx.file) {
-        if has_physical_property(&without_symmetric_insets(fragment.text)) {
+        if has_physical_property(&without_symmetric_insets(&fragment.text)) {
             ctx.report_node(fragment.node, RuleMessage::new("physicalProperty", MESSAGE));
         }
     }

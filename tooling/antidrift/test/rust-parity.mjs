@@ -17,6 +17,7 @@ import {
   proveDeriveSmoke,
   proveInferredTypesSmoke,
   proveProjectRootSmoke,
+  verifyHeaderAndOptionFailureProbes,
 } from "./rust-parity-derive.mjs";
 import { proveLineCapSmokes } from "./rust-parity-line-caps.mjs";
 import { runRustLinterSmokes } from "./rust-linter-smokes.mjs";
@@ -225,6 +226,7 @@ const loneSurrogateFile = resolve(
 const loneSurrogateSource = [
   'export const lone = "a\\uD83D";',
   "export const tail = 'b\\uDE00 c';",
+  'export const hostPath = "/home/joe/\\uD83D";',
   "export const plain = `x\\uD83D y`;",
   "export const spans = `h\\uD83D ${lone} m\\uDE00 ${tail} t\\uD800`;",
   'export const keyed = { "\\uD83D": 1, ["\\uDE00"]: 2 };',
@@ -247,12 +249,22 @@ const loneSurrogateDiags = runHeadlessProbe({
   ],
   source_overrides: { [loneSurrogateFile]: loneSurrogateSource },
 });
+assert.equal(
+  loneSurrogateDiags.filter(
+    (diag) => diag.rule === "antidrift/no-host-path-literal"
+  ).length,
+  1,
+  `Expected lone-surrogate host path literal to report, got ${JSON.stringify(loneSurrogateDiags)}`
+);
 assert.deepEqual(
   loneSurrogateDiags
     .filter((diag) => diag.rule === "antidrift/no-raw-foreground-opacity")
     .map((diag) => diag.range.pos),
-  [loneSurrogateSource.indexOf('"text-foreground/50">ok')],
-  `Lone-surrogate literals must lint without aborting and leave the valid className reported, got ${JSON.stringify(loneSurrogateDiags)}`
+  [
+    loneSurrogateSource.indexOf('"text-foreground/50 \\uD83D"'),
+    loneSurrogateSource.indexOf('"text-foreground/50">ok'),
+  ],
+  `Lone-surrogate literals must lint without aborting and report both raw foreground opacity classNames, got ${JSON.stringify(loneSurrogateDiags)}`
 );
 assert.equal(
   loneSurrogateDiags.filter(
@@ -350,50 +362,6 @@ assert.equal(
   `Expected files: [] to match 0 files, got ${JSON.stringify(emptyFilesScopeDiags)}`
 );
 
-assert.throws(
-  () =>
-    runHeadlessProbe({
-      version: 2,
-      configs: [
-        {
-          file_paths: [probeFileA],
-          rules: [
-            {
-              name: "antidrift/react-max-component-props",
-              options: [{ max: 0 }],
-            },
-          ],
-        },
-      ],
-      source_overrides: {
-        [probeFileA]: "export const x = 1;\n",
-      },
-    }),
-  /max must be >= 1/
-);
-
-assert.throws(
-  () =>
-    runHeadlessProbe({
-      version: 2,
-      configs: [
-        {
-          file_paths: [probeFileA],
-          rules: [
-            {
-              name: "antidrift/no-compat-names",
-              options: [{ files: ["["] }],
-            },
-          ],
-        },
-      ],
-      source_overrides: {
-        [probeFileA]: "export const x = 1;\n",
-      },
-    }),
-  /invalid glob/
-);
-
 const missingPathRun = spawnSync(
   binaryPath,
   ["nonexistent-smoke-target-file.ts"],
@@ -411,6 +379,7 @@ assert.notEqual(
 runRustLinterSmokes({ binaryPath, repoRoot });
 await proveLineCapSmokes({ binaryPath, repoRoot, runHeadlessProbe });
 proveProjectRootSmoke(binaryPath);
+verifyHeaderAndOptionFailureProbes(runHeadlessProbe, probeFileA);
 proveInferredTypesSmoke(binaryPath, repoRoot);
 proveDeriveSmoke(binaryPath, repoRoot);
 

@@ -1,8 +1,12 @@
 use antidrift_kernel::jsx::{opening_tag_name_node, plain_attribute_name, plain_element_name};
 use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
-use antidrift_kernel::rule_options::require_non_empty;
+use antidrift_kernel::rule_options::{
+    NonEmptyString, deserialize_non_empty, deserialize_optional_non_empty,
+};
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_parentheses};
 use serde::Deserialize;
+use serde::de::{self, Deserializer, MapAccess};
+use std::fmt;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
 
@@ -17,25 +21,88 @@ const BANNED_UTILITIES: [&str; 2] = ["spin", "pulse"];
 const DEFAULT_OWNER: &str = "the HTML progress element";
 const DEFAULT_SKELETON: &str = "accessible placeholder text";
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug)]
 struct DocumentedAllowedFile {
-    path: String,
-    reason: String,
+    path: NonEmptyString,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
+impl<'de> Deserialize<'de> for DocumentedAllowedFile {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Entry {
+            #[serde(deserialize_with = "deserialize_allowed_path")]
+            path: NonEmptyString,
+            #[serde(deserialize_with = "deserialize_allowed_reason")]
+            reason: NonEmptyString,
+        }
+        let Entry { path, reason } = Entry::deserialize(deserializer)?;
+        drop(reason);
+        Ok(Self { path })
+    }
+}
+
+fn deserialize_allowed_path<'de, D: Deserializer<'de>>(d: D) -> Result<NonEmptyString, D::Error> {
+    deserialize_non_empty(d, "allowedFiles[].path")
+}
+
+fn deserialize_allowed_reason<'de, D: Deserializer<'de>>(d: D) -> Result<NonEmptyString, D::Error> {
+    deserialize_non_empty(d, "allowedFiles[].reason")
+}
+
+fn deserialize_owner<'de, D: Deserializer<'de>>(d: D) -> Result<Option<NonEmptyString>, D::Error> {
+    deserialize_optional_non_empty(d, "owner")
+}
+
+fn deserialize_skeleton<'de, D: Deserializer<'de>>(
+    d: D,
+) -> Result<Option<NonEmptyString>, D::Error> {
+    deserialize_optional_non_empty(d, "skeleton")
+}
+
+#[derive(Clone, Debug)]
 enum AllowedFile {
     Suffix(String),
     Documented(DocumentedAllowedFile),
+}
+
+impl<'de> Deserialize<'de> for AllowedFile {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct AllowedFileVisitor;
+
+        impl<'de> de::Visitor<'de> for AllowedFileVisitor {
+            type Value = AllowedFile;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(
+                    formatter,
+                    "a path suffix string or a {{ path, reason }} object"
+                )
+            }
+
+            fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+                Ok(AllowedFile::Suffix(value.to_owned()))
+            }
+
+            fn visit_string<E: de::Error>(self, value: String) -> Result<Self::Value, E> {
+                Ok(AllowedFile::Suffix(value))
+            }
+
+            fn visit_map<M: MapAccess<'de>>(self, map: M) -> Result<Self::Value, M::Error> {
+                DocumentedAllowedFile::deserialize(de::value::MapAccessDeserializer::new(map))
+                    .map(AllowedFile::Documented)
+            }
+        }
+
+        deserializer.deserialize_any(AllowedFileVisitor)
+    }
 }
 
 impl AllowedFile {
     fn suffix(&self) -> &str {
         match self {
             Self::Suffix(path) => path,
-            Self::Documented(documented) => &documented.path,
+            Self::Documented(documented) => documented.path.as_str(),
         }
     }
 }
@@ -44,23 +111,11 @@ impl AllowedFile {
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub(crate) struct AdhocLoaderOptions {
     loader_icons: Option<Vec<String>>,
-    owner: Option<String>,
-    skeleton: Option<String>,
+    #[serde(deserialize_with = "deserialize_owner")]
+    owner: Option<NonEmptyString>,
+    #[serde(deserialize_with = "deserialize_skeleton")]
+    skeleton: Option<NonEmptyString>,
     allowed_files: Vec<AllowedFile>,
-}
-
-impl AdhocLoaderOptions {
-    fn validate(&self, rule_name: &str) -> Result<(), String> {
-        require_non_empty(rule_name, "owner", self.owner.as_ref())?;
-        require_non_empty(rule_name, "skeleton", self.skeleton.as_ref())?;
-        for allowed in &self.allowed_files {
-            if let AllowedFile::Documented(doc) = allowed {
-                require_non_empty(rule_name, "allowedFiles[].path", Some(&doc.path))?;
-                require_non_empty(rule_name, "allowedFiles[].reason", Some(&doc.reason))?;
-            }
-        }
-        Ok(())
-    }
 }
 
 impl AdhocLoaderOptions {
@@ -90,7 +145,6 @@ impl crate::ConfigurableRule for NoAdhocLoader {
     type Options = AdhocLoaderOptions;
 
     fn from_options(parsed: Self::Options) -> Result<Self, String> {
-        parsed.validate(RULE_NAME)?;
         Ok(Self { options: parsed })
     }
 }

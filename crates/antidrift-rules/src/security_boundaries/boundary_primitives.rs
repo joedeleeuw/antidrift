@@ -3,7 +3,6 @@ use super::web_provenance::{
     AliasStability, ImportedOwner, const_initializer, imported_owner, member_expression,
     member_object, resolve_lexical_binding, static_property_name, unwrap_expression,
 };
-use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::imports::extract_module_import;
 use antidrift_kernel::jsx::element_tag_name;
 use antidrift_kernel::local_binding::Binding;
@@ -38,11 +37,6 @@ pub static REQUIRE_SAFE_WINDOW_OPEN: RuleSpec = RuleSpec::new(
     CALL_LISTENERS,
     visit_safe_window_open,
 );
-
-#[must_use]
-pub fn bun_inferred_role(path: &ProjectPath) -> bool {
-    path.has_role(FileRole::Shared)
-}
 
 fn visit_bun_api_in_shared(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
     let violation = match node.kind() {

@@ -1,18 +1,20 @@
+use std::borrow::Cow;
+
 use crate::jsx::plain_attribute_name;
 use crate::local_binding::{
     Binding, binding_for_declarator, collect_binding_references, is_write_reference,
 };
-use crate::tsrs_kernel::{cooked_text, node_range};
+use crate::tsrs_kernel::{cooked_text, cooked_text_lossy, node_range};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 
 const CLASS_HELPERS: [&str; 4] = ["clsx", "cn", "cva", "twMerge"];
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct StringFragment {
     pub node: P<Node>,
-    pub text: &'static str,
+    pub text: Cow<'static, str>,
 }
 
 #[must_use]
@@ -26,16 +28,17 @@ fn collect_fragments(sf: P<SourceFile>, node: P<Node>, out: &mut Vec<StringFragm
     let src = sf.text();
     match node.kind() {
         Kind::StringLiteral => {
-            if let Some(text) = cooked_text(node) {
-                out.push(StringFragment { node, text });
-            }
+            out.push(StringFragment {
+                node,
+                text: cooked_text_lossy(node),
+            });
         }
         Kind::NoSubstitutionTemplateLiteral | Kind::TemplateTail => {
             let (start, end) = node_range(sf, node);
             if end >= start + 2 {
                 out.push(StringFragment {
                     node,
-                    text: &src[start + 1..end - 1],
+                    text: Cow::Borrowed(&src[start + 1..end - 1]),
                 });
             }
         }
@@ -44,7 +47,7 @@ fn collect_fragments(sf: P<SourceFile>, node: P<Node>, out: &mut Vec<StringFragm
             if end >= start + 3 {
                 out.push(StringFragment {
                     node,
-                    text: &src[start + 1..end - 2],
+                    text: Cow::Borrowed(&src[start + 1..end - 2]),
                 });
             }
         }

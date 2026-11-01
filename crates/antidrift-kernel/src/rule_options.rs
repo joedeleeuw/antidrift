@@ -1,6 +1,7 @@
 use crate::error::KernelError;
 use crate::rule::{Ctx, Listener, RuleVisitor};
-use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use serde::de::{DeserializeOwned, Error};
 use serde_json::Value;
 use tsrs_ast::Node;
 use tsrs_core::P;
@@ -15,17 +16,50 @@ impl RuleVisitor for EmptyVisitor {
     fn visit(&mut self, _ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {}
 }
 
-pub fn require_non_empty(
-    rule_name: &str,
-    field: &str,
-    text: Option<&String>,
-) -> Result<(), String> {
-    if text.is_some_and(String::is_empty) {
-        return Err(format!(
-            "invalid options for {rule_name}: '{field}' must be a non-empty string"
-        ));
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(transparent)]
+pub struct NonEmptyString(String);
+
+impl NonEmptyString {
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
-    Ok(())
+}
+
+impl std::ops::Deref for NonEmptyString {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+pub fn deserialize_non_empty<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+    field: &'static str,
+) -> Result<NonEmptyString, D::Error> {
+    let value = String::deserialize(deserializer)?;
+    if value.is_empty() {
+        return Err(D::Error::custom(format!(
+            "'{field}' must be a non-empty string"
+        )));
+    }
+    Ok(NonEmptyString(value))
+}
+
+pub fn deserialize_optional_non_empty<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+    field: &'static str,
+) -> Result<Option<NonEmptyString>, D::Error> {
+    let value = Option::<String>::deserialize(deserializer)?;
+    match value {
+        Some(text) if text.is_empty() => Err(D::Error::custom(format!(
+            "'{field}' must be a non-empty string"
+        ))),
+        Some(text) => Ok(Some(NonEmptyString(text))),
+        None => Ok(None),
+    }
 }
 
 fn first_option_object(options: Option<&Value>) -> Option<&Value> {

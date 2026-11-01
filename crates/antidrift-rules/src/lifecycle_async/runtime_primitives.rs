@@ -3,7 +3,6 @@ use super::syntax::{
     is_var_variable_declaration, member, resolve_lexical_binding, unwrap_expression,
     unwrap_parentheses,
 };
-use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleSpec, RuleVisitor};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
@@ -166,11 +165,6 @@ impl NoEagerSingleton {
             None => DEFAULT_FACTORIES.contains(&name),
         }
     }
-}
-
-#[must_use]
-pub fn singleton_inferred_role(path: &ProjectPath) -> bool {
-    !path.has_role(FileRole::ScriptEntry)
 }
 
 impl Rule for NoEagerSingleton {

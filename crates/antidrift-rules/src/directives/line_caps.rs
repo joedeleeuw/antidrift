@@ -1,9 +1,9 @@
 use antidrift_kernel::directives::effective_token_start;
 use antidrift_kernel::file_role;
-use antidrift_kernel::jsx::{expression_contains_jsx, is_pascal_case_name, react_function_name};
+use antidrift_kernel::jsx::{is_pascal_case_name, react_function_name};
 use antidrift_kernel::line_caps::{CappedUnit, LineCapFinding};
 use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
-use antidrift_kernel::tsrs_kernel::{property_name_text, unwrap_expression};
+use antidrift_kernel::tsrs_kernel::{is_function_like, property_name_text, unwrap_expression};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
 
@@ -75,8 +75,8 @@ impl RuleVisitor for Visitor {
             return;
         }
         let react_name = react_function_name(node);
-        let is_component =
-            react_name.is_some_and(is_pascal_case_name) && expression_contains_jsx(node);
+        let is_component = react_name.is_some_and(is_pascal_case_name)
+            && node.body().is_some_and(body_contains_jsx);
         if is_component != (self.unit == CappedUnit::Component) {
             return;
         }
@@ -98,6 +98,45 @@ impl RuleVisitor for Visitor {
             report_first_line(ctx, start, end, finding);
         }
     }
+}
+
+fn body_contains_jsx(node: P<Node>) -> bool {
+    if matches!(
+        node.kind(),
+        Kind::JsxElement | Kind::JsxSelfClosingElement | Kind::JsxFragment
+    ) {
+        return true;
+    }
+    let mut found = false;
+    node.for_each_child(&mut |child| {
+        if found {
+            return true;
+        }
+        if matches!(child.kind(), Kind::ClassDeclaration | Kind::ClassExpression) {
+            return false;
+        }
+        if is_function_like(child) {
+            if is_inline_render_callback(child) && child.body().is_some_and(body_contains_jsx) {
+                found = true;
+                return true;
+            }
+            return false;
+        }
+        if body_contains_jsx(child) {
+            found = true;
+            return true;
+        }
+        false
+    });
+    found
+}
+
+fn is_inline_render_callback(func: P<Node>) -> bool {
+    matches!(func.kind(), Kind::ArrowFunction | Kind::FunctionExpression)
+        && func.parent().is_some_and(|parent| {
+            parent.kind() == Kind::CallExpression
+                && parent.as_call_expression().expression() != func
+        })
 }
 
 fn is_immediately_invoked(node: P<Node>) -> bool {

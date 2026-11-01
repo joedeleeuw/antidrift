@@ -11,9 +11,13 @@ pub const RULE_NAME: &str = "antidrift/no-duplicated-conditional-classnames";
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub(crate) struct ClassnameOptions {
+    #[serde(deserialize_with = "deserialize_attributes")]
     attributes: Vec<String>,
+    #[serde(deserialize_with = "deserialize_helpers")]
     helpers: Vec<String>,
+    #[serde(deserialize_with = "deserialize_ratio")]
     min_shared_ratio: f64,
+    #[serde(deserialize_with = "deserialize_min_tokens")]
     min_shared_tokens: usize,
 }
 
@@ -28,38 +32,57 @@ impl Default for ClassnameOptions {
     }
 }
 
-fn require_unique_names(field: &str, names: &[String]) -> Result<(), String> {
+fn deserialize_attributes<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<String>, D::Error> {
+    deserialize_unique_names(deserializer, "attributes")
+}
+
+fn deserialize_helpers<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<String>, D::Error> {
+    deserialize_unique_names(deserializer, "helpers")
+}
+
+fn deserialize_unique_names<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+    field: &'static str,
+) -> Result<Vec<String>, D::Error> {
+    let names = Vec::<String>::deserialize(deserializer)?;
     if names.iter().any(String::is_empty) {
-        return Err(format!(
-            "invalid options for {RULE_NAME}: '{field}' must be an array of non-empty strings"
-        ));
+        return Err(serde::de::Error::custom(format!(
+            "'{field}' must be an array of non-empty strings"
+        )));
     }
     let unique: FxHashSet<&str> = names.iter().map(String::as_str).collect();
     if unique.len() != names.len() {
-        return Err(format!(
-            "invalid options for {RULE_NAME}: '{field}' must not contain duplicate entries"
-        ));
+        return Err(serde::de::Error::custom(format!(
+            "'{field}' must not contain duplicate entries"
+        )));
     }
-    Ok(())
+    Ok(names)
 }
 
-impl ClassnameOptions {
-    fn validate(self) -> Result<Self, String> {
-        let options = self;
-        require_unique_names("attributes", &options.attributes)?;
-        require_unique_names("helpers", &options.helpers)?;
-        if !(0.0..=1.0).contains(&options.min_shared_ratio) {
-            return Err(format!(
-                "invalid options for {RULE_NAME}: 'minSharedRatio' must be between 0 and 1"
-            ));
-        }
-        if options.min_shared_tokens < 1 {
-            return Err(format!(
-                "invalid options for {RULE_NAME}: 'minSharedTokens' must be an integer greater than or equal to 1"
-            ));
-        }
-        Ok(options)
+fn deserialize_ratio<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<f64, D::Error> {
+    let ratio = f64::deserialize(deserializer)?;
+    if !(0.0..=1.0).contains(&ratio) {
+        return Err(serde::de::Error::custom(
+            "'minSharedRatio' must be between 0 and 1",
+        ));
     }
+    Ok(ratio)
+}
+
+fn deserialize_min_tokens<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<usize, D::Error> {
+    let tokens = usize::deserialize(deserializer)?;
+    if tokens < 1 {
+        return Err(serde::de::Error::custom(
+            "'minSharedTokens' must be an integer greater than or equal to 1",
+        ));
+    }
+    Ok(tokens)
 }
 
 pub struct NoDuplicatedConditionalClassnames {
@@ -79,9 +102,7 @@ impl crate::ConfigurableRule for NoDuplicatedConditionalClassnames {
     type Options = ClassnameOptions;
 
     fn from_options(options: Self::Options) -> Result<Self, String> {
-        Ok(Self {
-            options: options.validate()?,
-        })
+        Ok(Self { options })
     }
 }
 

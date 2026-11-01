@@ -214,6 +214,39 @@ fn strip_source_ext(file_path: &str) -> Option<&str> {
         .then(|| tspath::remove_file_extension(file_path))
 }
 
+const PROLOGUE_DIRECTIVES: &[&str] = &["use client", "use server", "use strict"];
+
+fn strip_prologue_directive(rest: &str) -> Option<&str> {
+    let trimmed = rest.trim_start();
+    let quote = trimmed.as_bytes().first().copied()?;
+    if quote != b'"' && quote != b'\'' {
+        return None;
+    }
+    let (body, after_quote) = trimmed[1..].split_once(char::from(quote))?;
+    if !PROLOGUE_DIRECTIVES.contains(&body) {
+        return None;
+    }
+    let after = after_quote.trim_start_matches([' ', '\t']);
+    after
+        .strip_prefix(';')
+        .map(|tail| tail.trim_start_matches([' ', '\t']))
+        .or_else(|| {
+            (after.is_empty() || after.starts_with('\n') || after.starts_with("\r\n"))
+                .then_some(after)
+        })
+}
+
+fn has_blank_line(gap: &str) -> bool {
+    gap.split_once('\n').is_some_and(|(_, after_first)| {
+        after_first
+            .split('\n')
+            .take_while(|_| true)
+            .collect::<Vec<_>>()
+            .split_last()
+            .is_some_and(|(_, middle)| middle.iter().any(|line| line.trim().is_empty()))
+    })
+}
+
 fn leading_comment_text(source_text: &str) -> String {
     let mut rest = source_text.trim_start_matches('\u{feff}');
     if rest.starts_with("#!") {
@@ -221,14 +254,33 @@ fn leading_comment_text(source_text: &str) -> String {
     }
     let mut header = String::new();
     loop {
-        rest = rest.trim_start();
-        let (comment, tail) = if let Some(body) = rest.strip_prefix("//") {
-            body.split_once('\n').unwrap_or((body, ""))
-        } else if let Some(body) = rest.strip_prefix("/*") {
-            body.split_once("*/").unwrap_or((body, ""))
+        if let Some(after_directive) = strip_prologue_directive(rest) {
+            rest = after_directive;
+            continue;
+        }
+        let trimmed = rest.trim_start();
+        let (comment, is_jsdoc, tail) = if let Some(body) = trimmed.strip_prefix("//") {
+            let (line, after) = body.split_once('\n').unwrap_or((body, ""));
+            (line, false, after)
+        } else if let Some(body) = trimmed.strip_prefix("/*") {
+            let is_jsdoc = body.starts_with('*') && !body.starts_with("*/");
+            let (block, after) = body.split_once("*/").unwrap_or((body, ""));
+            (block, is_jsdoc, after)
         } else {
             return header.to_ascii_lowercase();
         };
+        let next = tail.trim_start();
+        let followed_by_code = !next.is_empty()
+            && !next.starts_with("//")
+            && !next.starts_with("/*")
+            && strip_prologue_directive(next).is_none();
+        if is_jsdoc
+            && followed_by_code
+            && !has_blank_line(&tail[..tail.len() - next.len()])
+            && !comment.to_ascii_lowercase().contains("@generated")
+        {
+            return header.to_ascii_lowercase();
+        }
         header.push_str(comment);
         header.push('\n');
         rest = tail;

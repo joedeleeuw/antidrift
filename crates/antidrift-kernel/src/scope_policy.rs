@@ -1,26 +1,27 @@
-use crate::file_role::{self, ProjectPath, TEST_ROLES};
+use crate::file_role::{self, FileRole, ProjectPath, TEST_ROLES};
+use serde::Serialize;
 
-#[derive(Clone, Copy)]
+const HOST_PATH_EXEMPT_ROLES: &[FileRole] = &[
+    FileRole::TestOrSpec,
+    FileRole::TestSupport,
+    FileRole::Example,
+    FileRole::EndToEnd,
+    FileRole::Story,
+];
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum ScopePolicy {
     Everywhere,
     ExceptGenerated,
     AuthoredSource,
-    InferredRole(fn(&ProjectPath) -> bool),
+    NonExampleSource,
+    NonScriptEntry,
+    SharedOnly,
     TestFilesOnly,
 }
 
 impl ScopePolicy {
-    #[must_use]
-    pub const fn label(self) -> &'static str {
-        match self {
-            Self::Everywhere => "everywhere",
-            Self::ExceptGenerated => "except-generated",
-            Self::AuthoredSource => "authored-source",
-            Self::InferredRole(_) => "inferred-role",
-            Self::TestFilesOnly => "test-files-only",
-        }
-    }
-
     #[must_use]
     pub fn admits(
         self,
@@ -42,11 +43,17 @@ impl ScopePolicy {
                 !path.has_any_role(TEST_ROLES)
                     && (explicit_files || !file_role::is_generated_file(&path, source_text))
             }
-            Self::InferredRole(predicate) => explicit_files || predicate(&project_path()),
+            Self::NonExampleSource => {
+                explicit_files || !project_path().has_any_role(HOST_PATH_EXEMPT_ROLES)
+            }
+            Self::NonScriptEntry => {
+                explicit_files || !project_path().has_role(FileRole::ScriptEntry)
+            }
+            Self::SharedOnly => explicit_files || project_path().has_role(FileRole::Shared),
             Self::TestFilesOnly => {
                 let path = project_path();
                 matches!(path.as_str(), "" | "<input>" | "<text>")
-                    || path.has_role(file_role::FileRole::TestOrSpec)
+                    || path.has_role(FileRole::TestOrSpec)
             }
         }
     }

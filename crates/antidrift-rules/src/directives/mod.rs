@@ -28,7 +28,7 @@ pub fn rules() -> Vec<CatalogRule> {
         CatalogRule::everywhere(&syntax_directives::NO_DEBUG_RESIDUE_FILENAMES),
         CatalogRule::new(
             &syntax_directives::NO_HOST_PATH_LITERAL,
-            ScopePolicy::InferredRole(syntax_directives::host_path_inferred_role),
+            ScopePolicy::NonExampleSource,
         ),
         CatalogRule::everywhere(&no_mutable_let_alias::DEFAULT_RULE),
         CatalogRule::everywhere(&syntax_directives::NO_PARTIAL_RECORD_SATISFIES),

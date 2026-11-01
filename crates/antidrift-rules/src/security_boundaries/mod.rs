@@ -31,7 +31,7 @@ pub fn script_default_rules() -> Vec<CatalogRule> {
         CatalogRule::everywhere(&no_auth_token_in_web_storage::DEFAULT_RULE),
         CatalogRule::new(
             &boundary_primitives::NO_BUN_API_IN_SHARED,
-            ScopePolicy::InferredRole(boundary_primitives::bun_inferred_role),
+            ScopePolicy::SharedOnly,
         ),
         CatalogRule::everywhere(&no_path_prefix_containment::DEFAULT_RULE),
         CatalogRule::everywhere(&no_raw_filename_write::DEFAULT_RULE),

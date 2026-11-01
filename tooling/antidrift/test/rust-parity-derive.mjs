@@ -27,7 +27,7 @@ const PLANTED_DERIVE_VIOLATIONS = {
   "src/routes/lists/route.ts":
     "export function GET(): Response {\n  return Response.json([]);\n}\n",
   "src/shared/asyncShared.ts":
-    "export async function asyncShared(): Promise<number> {\n  return Promise.resolve(1);\n}\n",
+    "export async function asyncShared(): Promise<number> {\n  return Promise.resolve(1);\n}\nexport const asyncSharedArrow = async (): Promise<number> => Promise.resolve(2);\n",
   "src/methods/surrogateKey.ts":
     'export async function surrogateKey(input: { "x\\uD83D": string }): Promise<string> {\n  return Promise.resolve(input["x\\uD83D"]);\n}\n',
   "src/methods/surrogateLiteral.ts":
@@ -36,6 +36,8 @@ const PLANTED_DERIVE_VIOLATIONS = {
     "export async function overlap(id: string): Promise<{ id: string } | { id: string; detail: number }> {\n  return Promise.resolve({ id, detail: 7 });\n}\n",
   "src/methods/arrayOverlap.ts":
     'export async function arrayOverlap(): Promise<{ id: string }[] | { id: string; detail: number }[]> {\n  return Promise.resolve([{ id: "x", detail: 7 }]);\n}\n',
+  "src/methods/primitiveArrayOverlap.ts":
+    "export async function primitiveArrayOverlap(): Promise<(1 | 2)[] | (2 | 3)[]> {\n  return Promise.resolve([2]);\n}\n",
   "src/methods/dateOrText.ts":
     "export async function dateOrText(): Promise<string | Date> {\n  return Promise.resolve(new Date(0));\n}\n",
   "src/client/leaky.ts":
@@ -57,12 +59,14 @@ const EXPECTED_PLANTED_DERIVE_DIAGNOSTICS = [
   "methods/dateOrText.ts method-result-not-wire",
   "methods/optionalArg.ts method-param-not-wire",
   "methods/overlap.ts method-result-not-wire",
+  "methods/primitiveArrayOverlap.ts method-result-not-wire",
   "methods/renamed.ts method-export-name",
   "methods/surrogateKey.ts method-param-not-wire",
   "methods/surrogateLiteral.ts method-result-not-wire",
   "methods/syncMethod.ts method-must-be-async",
   "methods/voidResult.ts method-result-not-wire",
   "routes/lists/route.ts route-must-be-async",
+  "shared/asyncShared.ts shared-must-be-sync",
   "shared/asyncShared.ts shared-must-be-sync",
 ];
 
@@ -154,6 +158,62 @@ function inferredFindings(binaryPath, cwd, target) {
   return JSON.parse(String(run.stdout ?? "[]")).flatMap((entry) =>
     entry.messages.map((message) => `${message.line} ${message.ruleId}`)
   );
+}
+
+const OPTION_FAILURE_PROBES = [
+  [
+    { name: "antidrift/react-max-component-props", options: [{ max: 0 }] },
+    /max must be >= 1/,
+  ],
+  [
+    { name: "antidrift/no-compat-names", options: [{ files: ["["] }] },
+    /invalid glob/,
+  ],
+  [
+    { name: "antidrift/no-adhoc-loader", options: [{ owner: "" }] },
+    /'owner' must be a non-empty string/,
+  ],
+  [
+    {
+      name: "antidrift/no-adhoc-loader",
+      options: [{ allowedFiles: [{ path: "x.tsx", reason: "" }] }],
+    },
+    /'allowedFiles\[\]\.reason' must be a non-empty string/,
+  ],
+];
+
+export function verifyHeaderAndOptionFailureProbes(
+  runHeadlessProbe,
+  probeFileA
+) {
+  for (const [source, expected] of [
+    [
+      '/** do not edit the retries default */\nexport { foo } from "./bar";\n',
+      1,
+    ],
+    ['/** @generated */\nexport { foo } from "./bar";\n', 0],
+    ['"use client";\n// @generated\nexport { foo } from "./bar";\n', 0],
+  ]) {
+    const diags = runHeadlessProbe({
+      version: 2,
+      configs: [
+        {
+          file_paths: [probeFileA],
+          rules: [{ name: "antidrift/no-reexport-only-module" }],
+        },
+      ],
+      source_overrides: { [probeFileA]: source },
+    });
+    assert.equal(diags.length, expected, JSON.stringify(diags));
+  }
+  for (const [rule, pattern] of OPTION_FAILURE_PROBES) {
+    const payload = {
+      version: 2,
+      configs: [{ file_paths: [probeFileA], rules: [rule] }],
+      source_overrides: { [probeFileA]: "export const x = 1;\n" },
+    };
+    assert.throws(() => runHeadlessProbe(payload), pattern);
+  }
 }
 
 export function proveInferredTypesSmoke(binaryPath, repoRoot) {

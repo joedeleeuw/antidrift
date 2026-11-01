@@ -52,8 +52,11 @@ export interface RustRule {
   kind: "general" | "house-style";
   scopePolicy:
     | "everywhere"
+    | "except-generated"
     | "authored-source"
-    | "inferred-role"
+    | "non-example-source"
+    | "non-script-entry"
+    | "shared-only"
     | "test-files-only";
   level: "error" | "warn" | "off";
   guidance: string;

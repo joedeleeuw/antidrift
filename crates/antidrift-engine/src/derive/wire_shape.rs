@@ -253,6 +253,22 @@ fn shared_value_reason(left: &WireShape, right: &WireShape) -> Option<String> {
         (WireShape::Date, text) | (text, WireShape::Date) if carries_text(text) => {
             Some("mixes string and Date, which share one wire form".to_owned())
         }
+        (WireShape::String, other) | (other, WireShape::String) if carries_text(other) => {
+            Some("has overlapping string variants".to_owned())
+        }
+        (WireShape::Number, other) | (other, WireShape::Number) if carries_number(other) => {
+            Some("has overlapping number variants".to_owned())
+        }
+        (WireShape::Boolean, other) | (other, WireShape::Boolean) if carries_boolean(other) => {
+            Some("has overlapping boolean variants".to_owned())
+        }
+        (WireShape::Null, WireShape::Null) => Some("has duplicate null variants".to_owned()),
+        (WireShape::Date, WireShape::Date) => Some("has duplicate Date variants".to_owned()),
+        (WireShape::Literal { value: left_val }, WireShape::Literal { value: right_val })
+            if left_val == right_val =>
+        {
+            Some("has duplicate literal variants".to_owned())
+        }
         _ => None,
     }
 }
@@ -263,6 +279,26 @@ const fn carries_text(shape: &WireShape) -> bool {
         WireShape::String
             | WireShape::Literal {
                 value: WireLiteral::Text(_)
+            }
+    )
+}
+
+const fn carries_number(shape: &WireShape) -> bool {
+    matches!(
+        shape,
+        WireShape::Number
+            | WireShape::Literal {
+                value: WireLiteral::Number(_)
+            }
+    )
+}
+
+const fn carries_boolean(shape: &WireShape) -> bool {
+    matches!(
+        shape,
+        WireShape::Boolean
+            | WireShape::Literal {
+                value: WireLiteral::Flag(_)
             }
     )
 }

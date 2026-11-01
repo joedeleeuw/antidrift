@@ -1,7 +1,7 @@
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::jsx::{has_plain_attribute, plain_attribute_name, plain_element_name};
 use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
-use antidrift_kernel::rule_options::require_non_empty;
+use antidrift_kernel::rule_options::{NonEmptyString, deserialize_optional_non_empty};
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -28,20 +28,21 @@ const NON_DISPLAY_ATTRIBUTES: [&str; 11] = [
     "dir",
 ];
 
+fn deserialize_formatter<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<NonEmptyString>, D::Error> {
+    deserialize_optional_non_empty(deserializer, "formatter")
+}
+
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub(crate) struct UnformattedNumberOptions {
-    formatter: Option<String>,
-}
-
-impl UnformattedNumberOptions {
-    fn validate(&self, rule_name: &str) -> Result<(), String> {
-        require_non_empty(rule_name, "formatter", self.formatter.as_ref())
-    }
+    #[serde(deserialize_with = "deserialize_formatter")]
+    formatter: Option<NonEmptyString>,
 }
 
 pub struct NoUnformattedNumber {
-    formatter: Option<String>,
+    formatter: Option<NonEmptyString>,
 }
 
 pub static DEFAULT_RULE: NoUnformattedNumber = NoUnformattedNumber { formatter: None };
@@ -50,7 +51,6 @@ impl crate::ConfigurableRule for NoUnformattedNumber {
     type Options = UnformattedNumberOptions;
 
     fn from_options(parsed: Self::Options) -> Result<Self, String> {
-        parsed.validate(RULE_NAME)?;
         Ok(Self {
             formatter: parsed.formatter,
         })

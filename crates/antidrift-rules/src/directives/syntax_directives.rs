@@ -1,8 +1,7 @@
-use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::provenance::relative_to_cwd;
 use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::tsrs_kernel::{
-    assertion_parts, cooked_text, is_const_assertion, unwrap_parentheses,
+    assertion_parts, cooked_text_lossy, is_const_assertion, unwrap_parentheses,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node};
@@ -18,14 +17,6 @@ const CAST_CHAIN_LISTENERS: &[Listener] = &[
 const HOST_PATH_LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::StringLiteral),
     Listener::Enter(Kind::NoSubstitutionTemplateLiteral),
-];
-
-const HOST_PATH_EXEMPT_ROLES: &[FileRole] = &[
-    FileRole::TestOrSpec,
-    FileRole::TestSupport,
-    FileRole::Example,
-    FileRole::EndToEnd,
-    FileRole::Story,
 ];
 
 const PARTIAL_RECORD_MESSAGE: &str = "Don't pin an object literal with `satisfies Partial<Record<...>>` — Partial cancels the totality check satisfies would otherwise give you, so a union member can silently fall through. Make the record total (explicit 'none'/false/null per member), narrow the key union, or add an eslint-disable naming what absence means for genuinely sparse data.";
@@ -58,11 +49,6 @@ pub static NO_UNSAFE_CAST_CHAIN: RuleSpec = RuleSpec::new(
     CAST_CHAIN_LISTENERS,
     visit_unsafe_cast_chain,
 );
-
-#[must_use]
-pub fn host_path_inferred_role(path: &ProjectPath) -> bool {
-    !path.has_any_role(HOST_PATH_EXEMPT_ROLES)
-}
 
 fn visit_as_never(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
     if node.kind() != Kind::AsExpression {
@@ -143,10 +129,8 @@ fn visit_host_path_literal(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
     ) {
         return;
     }
-    let Some(text) = cooked_text(node) else {
-        return;
-    };
-    if is_host_path_literal(text) {
+    let text = cooked_text_lossy(node);
+    if is_host_path_literal(&text) {
         ctx.report_node(
             node,
             RuleMessage::new(

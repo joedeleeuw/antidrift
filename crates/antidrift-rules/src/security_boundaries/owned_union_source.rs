@@ -1,7 +1,9 @@
 use antidrift_kernel::local_binding::{
     Binding, is_const_variable_declaration, lookup_scope_binding, resolve_lexical_binding,
 };
-use antidrift_kernel::tsrs_kernel::{cooked_text, is_const_assertion, numeric_literal_value};
+use antidrift_kernel::tsrs_kernel::{
+    cooked_bytes, cooked_text, is_const_assertion, numeric_literal_value,
+};
 use rustc_hash::FxHashSet;
 use std::collections::{BTreeMap, BTreeSet};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
@@ -9,7 +11,7 @@ use tsrs_core::P;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum OwnedLiteral {
-    Text(String),
+    Text(Vec<u8>),
     Number(u64),
 }
 
@@ -24,9 +26,7 @@ pub(super) struct ExportedArray {
 
 pub(super) fn literal_expression(expression: P<Node>) -> Option<OwnedLiteral> {
     match expression.kind() {
-        Kind::StringLiteral => {
-            cooked_text(expression).map(|text| OwnedLiteral::Text(text.to_owned()))
-        }
+        Kind::StringLiteral => Some(OwnedLiteral::Text(cooked_bytes(expression).to_vec())),
         Kind::NumericLiteral => numeric_literal_value(expression).map(number_literal),
         Kind::PrefixUnaryExpression => {
             let unary = expression.as_prefix_unary_expression();

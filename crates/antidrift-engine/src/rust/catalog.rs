@@ -38,7 +38,7 @@ pub(super) struct LineCapSetting {
 pub(super) struct ResolvedRule {
     pub(super) id: &'static str,
     pub(super) kind: RuleKind,
-    pub(super) scope_policy: &'static str,
+    pub(super) scope_policy: ScopePolicy,
     pub(super) level: Severity,
     pub(super) guidance: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -58,7 +58,7 @@ impl ResolvedRule {
         Self {
             id: row.id,
             kind: row.kind,
-            scope_policy: row.scope_policy.label(),
+            scope_policy: row.scope_policy,
             level,
             guidance: row.guidance,
             line_cap,
