@@ -13,7 +13,6 @@ use tsrslint::protocol::{Diagnostic, Message, Range};
 use tsrslint::tsconfig::{ExtendedConfigCache, ParseHost, TsConfigResolver};
 
 use crate::inferred_program::{inferred_compiler_options, inferred_type_roots};
-use crate::program_inputs::matches_inputs;
 
 pub(crate) type DeclarationCache = Mutex<FxHashMap<SourceFileParseOptions, P<SourceFile>>>;
 
@@ -379,7 +378,7 @@ impl ProgramBuilderEnv {
         let cached = self
             .configured
             .get(config_file_name)
-            .filter(|cached| matches_inputs(cached.program, None))?;
+            .filter(|cached| matches_disk(cached.program))?;
         PROGRAMS_REUSED.fetch_add(1, Ordering::Relaxed);
         Some(self.factory.report(
             cached,
@@ -393,6 +392,20 @@ impl ProgramBuilderEnv {
         let program = self.factory.inferred(unmatched);
         self.factory.bind(program, &self.factory.cwd, unmatched)
     }
+}
+
+fn matches_disk(program: &Program) -> bool {
+    let disk = osvfs::fs();
+    program
+        .source_files()
+        .iter()
+        .filter(|sf| {
+            !program.is_lib_file(**sf) && !program.is_source_file_from_external_library(**sf)
+        })
+        .all(|sf| {
+            disk.read_file(sf.file_name())
+                .is_some_and(|text| text == sf.text())
+        })
 }
 
 pub(crate) fn collect_missing_bound_files(

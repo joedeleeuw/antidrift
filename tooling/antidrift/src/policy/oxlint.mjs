@@ -1,6 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -136,28 +135,25 @@ export const NATIVE_ARTIFACTS = {
   linter: {
     env: "ANTIDRIFT_LINTER_BIN",
     builds: [
-      "target/debug/antidrift-linter",
       "target/release/antidrift-linter",
+      "target/debug/antidrift-linter",
     ],
     packageSubpath: "",
   },
   addon: {
     env: "ANTIDRIFT_NAPI_ADDON",
     builds: [
-      `target/debug/${ADDON_LIBRARY_NAMES[process.platform]}`,
       `target/release/${ADDON_LIBRARY_NAMES[process.platform]}`,
+      `target/debug/${ADDON_LIBRARY_NAMES[process.platform]}`,
     ],
     packageSubpath: `/${ADDON_PACKAGE_PATH}`,
   },
 };
 
 function localArtifactCandidates(artifact, cwd) {
-  const localCandidates = artifact.builds
+  return artifact.builds
     .flatMap((build) => [resolve(cwd, build), resolve(repoRoot, build)])
     .filter((candidate) => existsSync(candidate));
-  return localCandidates.sort(
-    (left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs
-  );
 }
 
 function platformArtifactPackage(artifact) {
@@ -180,7 +176,7 @@ function platformArtifactPackage(artifact) {
 
 export function resolveNativeArtifact(artifact, cwd) {
   if (process.env[artifact.env]) {
-    return process.env[artifact.env];
+    return resolve(cwd, process.env[artifact.env]);
   }
   const [localBuild] = localArtifactCandidates(artifact, cwd);
   return localBuild ?? platformArtifactPackage(artifact);
@@ -262,10 +258,39 @@ function registersAntidriftPlugin(resolvedConfig) {
   );
 }
 
+const CONFIG_PREFLIGHT_FLAGS = new Set(["-c", "--config", "--tsconfig"]);
+
+function configPreflightArgs(passthrough) {
+  const args = [];
+  for (let index = 0; index < passthrough.length; index += 1) {
+    const arg = passthrough[index];
+    if (CONFIG_PREFLIGHT_FLAGS.has(arg)) {
+      args.push(arg);
+      if (index + 1 < passthrough.length) {
+        args.push(passthrough[index + 1]);
+        index += 1;
+      }
+      continue;
+    }
+    if (
+      arg.startsWith("--config=") ||
+      arg.startsWith("-c=") ||
+      arg.startsWith("--tsconfig=")
+    ) {
+      args.push(arg);
+    }
+  }
+  return args;
+}
+
 function resolvedConfigRegistersPlugin({ passthrough, cwd, spawn }) {
   const printed = spawn(
     process.execPath,
-    [resolveOxlintBinary(), "--print-config", ...passthrough],
+    [
+      resolveOxlintBinary(),
+      "--print-config",
+      ...configPreflightArgs(passthrough),
+    ],
     { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
   );
   if (printed.error) throw printed.error;
@@ -285,6 +310,12 @@ function oxlintLaunch({ parsed, cwd, spawn }) {
         "Missing antidrift-linter native binary; build crates/antidrift-linter or run pnpm --filter @joedeleeuw/antidrift build.\n",
     };
   }
+  const addonBinary = resolveNativeArtifact(NATIVE_ARTIFACTS.addon, cwd);
+  if (addonBinary && dirname(tsgolintBinary) !== dirname(addonBinary)) {
+    return {
+      failure: `antidrift native artifacts come from different directories (linter=${tsgolintBinary}, addon=${addonBinary}); build both with the same cargo profile or set ANTIDRIFT_LINTER_BIN and ANTIDRIFT_NAPI_ADDON to matching artifacts.\n`,
+    };
+  }
   const registered = resolvedConfigRegistersPlugin({
     passthrough: parsed.passthrough,
     cwd,
@@ -301,7 +332,6 @@ function oxlintLaunch({ parsed, cwd, spawn }) {
     env: {
       ...process.env,
       OXLINT_TSGOLINT_PATH: tsgolintBinary,
-      ANTIDRIFT_LINT_RUN: randomUUID(),
     },
   };
 }

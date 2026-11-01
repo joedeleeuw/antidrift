@@ -7,7 +7,6 @@ mod format;
 mod headless;
 mod headless_host;
 mod inferred_program;
-mod program_inputs;
 mod relay;
 pub mod rule_catalog;
 mod rule_plan;

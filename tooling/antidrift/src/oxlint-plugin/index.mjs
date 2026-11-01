@@ -1,18 +1,14 @@
 import { loadNativeAddon } from "../policy/oxlint.mjs";
 
 const RULE_PREFIX = "antidrift/";
-const STALE_RULE = "stale-session";
-export const STALE_MESSAGE =
-  "antidrift findings for this file are stale: a buffer or a project file changed after antidrift built this project, and the in-process engine cannot rebuild without growing. Restart the Oxlint language server.";
 
 const addon = loadNativeAddon();
 process.env.ANTIDRIFT_ENGINE = addon.engineEndpoint();
 
 const enabledRules = new Map();
 const currentFile = {
+  cwd: "",
   filename: "",
-  sourceText: "",
-  stale: false,
   requested: new Map(),
   findings: new Map(),
 };
@@ -24,21 +20,20 @@ function optionsOf(context) {
     : undefined;
 }
 
-function resetFile(filename, sourceText) {
+function resetFile(cwd, filename) {
+  currentFile.cwd = cwd;
   currentFile.filename = filename;
-  currentFile.sourceText = sourceText;
-  currentFile.stale = false;
   currentFile.requested = new Map();
   currentFile.findings = new Map();
 }
 
-function enterFile(filename, sourceText, ruleId, options) {
+function enterFile(cwd, filename, ruleId, options) {
   if (
+    currentFile.cwd !== cwd ||
     currentFile.filename !== filename ||
-    currentFile.sourceText !== sourceText ||
     currentFile.requested.has(ruleId)
   ) {
-    resetFile(filename, sourceText);
+    resetFile(cwd, filename);
   }
   currentFile.requested.set(ruleId, options);
 }
@@ -48,56 +43,24 @@ function isLinted(ruleId, options) {
   return cached !== undefined && cached.options === options;
 }
 
-function lintRules(context, requests) {
+function lintRules(requests) {
   const unlinted = [...requests].filter(
     ([ruleId, options]) => !isLinted(ruleId, options)
   );
   if (unlinted.length === 0) {
     return;
   }
-  const outcome = addon.lintFile(
-    context.cwd,
-    context.filename,
-    currentFile.sourceText,
-    process.env.ANTIDRIFT_LINT_RUN ?? null,
+  const findings = addon.lintFile(
+    currentFile.cwd,
+    currentFile.filename,
     unlinted.map(([rule, options]) => ({ rule, options }))
   );
-  currentFile.stale = outcome.stale;
   for (const [ruleId, options] of unlinted) {
     currentFile.findings.set(ruleId, { options, findings: [] });
   }
-  for (const finding of outcome.findings) {
+  for (const finding of findings) {
     currentFile.findings.get(finding.rule).findings.push(finding);
   }
-}
-
-function reportStale(context) {
-  if (
-    currentFile.filename !== context.filename ||
-    currentFile.sourceText !== context.sourceCode.text
-  ) {
-    resetFile(context.filename, context.sourceCode.text);
-  }
-  lintRules(context, new Map([...enabledRules, ...currentFile.requested]));
-  if (currentFile.stale) {
-    context.report({
-      message: STALE_MESSAGE,
-      loc: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
-    });
-  }
-}
-
-function staleRule() {
-  return {
-    meta: { type: "problem", schema: false },
-    createOnce(context) {
-      return {
-        Program() {
-          reportStale(context);
-        },
-      };
-    },
-  };
 }
 
 function reportFindings(context, ruleId) {
@@ -115,29 +78,31 @@ function reportFindings(context, ruleId) {
 function bridgeRule(ruleId) {
   return {
     meta: { type: "problem", schema: false },
+    create(context) {
+      enterFile(context.cwd, context.filename, ruleId, optionsOf(context));
+      return {
+        Program() {
+          lintRules(currentFile.requested);
+          reportFindings(context, ruleId);
+        },
+      };
+    },
     createOnce(context) {
       return {
         before() {
           const options = optionsOf(context);
-          enterFile(context.filename, context.sourceCode.text, ruleId, options);
+          enterFile(context.cwd, context.filename, ruleId, options);
           if (!enabledRules.has(ruleId)) {
             enabledRules.set(ruleId, options);
             return true;
           }
           enabledRules.set(ruleId, options);
-          if (!isLinted(ruleId, options)) {
-            lintRules(
-              context,
-              new Map([...enabledRules, ...currentFile.requested])
-            );
-          }
+          lintRules(new Map([...enabledRules, ...currentFile.requested]));
           reportFindings(context, ruleId);
           return false;
         },
         Program() {
-          if (!isLinted(ruleId, currentFile.requested.get(ruleId))) {
-            lintRules(context, currentFile.requested);
-          }
+          lintRules(currentFile.requested);
           reportFindings(context, ruleId);
         },
       };
@@ -156,12 +121,9 @@ function localRuleName(ruleId) {
 
 export default {
   meta: { name: "antidrift" },
-  rules: {
-    ...Object.fromEntries(
-      addon
-        .antidriftRules()
-        .map(({ name }) => [localRuleName(name), bridgeRule(name)])
-    ),
-    [STALE_RULE]: staleRule(),
-  },
+  rules: Object.fromEntries(
+    addon
+      .antidriftRules()
+      .map(({ name }) => [localRuleName(name), bridgeRule(name)])
+  ),
 };

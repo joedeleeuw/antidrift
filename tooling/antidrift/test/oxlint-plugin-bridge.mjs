@@ -11,7 +11,12 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { loadNativeAddon } from "../src/policy/oxlint.mjs";
+import { ADDON_LIBRARY_NAMES } from "../src/policy/oxlint.mjs";
+import {
+  PLUGIN_TEST_SOURCES,
+  proveDirectAddonAndCreate,
+  proveTypeAwareRelay,
+} from "./oxlint-plugin-relay.mjs";
 
 const TSCONFIG = {
   compilerOptions: {
@@ -22,22 +27,6 @@ const TSCONFIG = {
     noEmit: true,
   },
   include: ["src"],
-};
-
-const SOURCES = {
-  "src/cast.ts":
-    "export function castAway(value: unknown) {\n  return value as never;\n}\n\n" +
-    "// oxlint-disable-next-line antidrift/no-as-never -- the bridge must count this directive as used\n" +
-    "export const suppressed = (1 as unknown) as never;\n",
-  "src/other.ts": 'export const other = ("x" as unknown) as never;\n',
-  "src/idle-directive.ts":
-    "// oxlint-disable-next-line antidrift/no-as-never -- nothing here to suppress\n" +
-    "export const clean = 1;\n",
-  "src/floating.ts": "export async function work() {}\n\nwork();\n",
-  "src/api.d.ts": "export declare function read(): void;\n",
-  "src/card.tsx":
-    "export function Card(props: { title: string; body: string; footer: string }) {\n  return <article>{props.title}{props.body}{props.footer}</article>;\n}\n",
-  "src/caller.ts": 'import { read } from "./api";\n\nread();\n',
 };
 
 function runOxlint({ repoRoot, project, level, files }) {
@@ -95,7 +84,7 @@ function writeProject() {
   );
   mkdirSync(join(project, "src"));
   writeFileSync(join(project, "tsconfig.json"), JSON.stringify(TSCONFIG));
-  for (const [file, text] of Object.entries(SOURCES)) {
+  for (const [file, text] of Object.entries(PLUGIN_TEST_SOURCES)) {
     writeFileSync(join(project, file), text);
   }
   return project;
@@ -194,215 +183,6 @@ function proveIdleDirective(repoRoot, project) {
   );
 }
 
-const RELAYED_FILES = [
-  "src/cast.ts",
-  "src/other.ts",
-  "src/floating.ts",
-  "src/caller.ts",
-];
-const STALE_ENGINE = "127.0.0.1:9/stale-token";
-
-function decodeHeadless(output) {
-  const messages = [];
-  let offset = 0;
-  while (offset + 5 <= output.length) {
-    const length = output.readUInt32LE(offset);
-    messages.push([
-      output.readUInt8(offset + 4),
-      output.subarray(offset + 5, offset + 5 + length).toString("utf8"),
-    ]);
-    offset += 5 + length;
-  }
-  return messages.map((message) => JSON.stringify(message)).sort();
-}
-
-function headlessPayload(project, sourceOverrides) {
-  return JSON.stringify({
-    version: 2,
-    configs: [
-      {
-        file_paths: RELAYED_FILES.map((file) => join(project, file)),
-        rules: [
-          { name: "antidrift/no-as-never" },
-          { name: "no-floating-promises" },
-        ],
-      },
-    ],
-    ...(sourceOverrides ? { source_overrides: sourceOverrides } : {}),
-  });
-}
-
-function runHeadless({ linter, cwd, payload, environment }) {
-  const run = spawnSync(linter, ["headless"], {
-    cwd,
-    env: environment,
-    input: payload,
-  });
-  assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
-  return decodeHeadless(run.stdout);
-}
-
-const EDITED_OTHER_SOURCE =
-  'export const other = ("x" as unknown) as never;\nexport const again = ("y" as unknown) as never;\n';
-
-const RELAY_CASES = [
-  {
-    name: "a fresh program",
-    cwd: (project) => project,
-    overrides: () => undefined,
-    edit: () => {},
-    reused: 1,
-  },
-  {
-    name: "a payload with source overrides",
-    cwd: (project) => project,
-    overrides: (project) => ({
-      [join(project, "src/other.ts")]: EDITED_OTHER_SOURCE,
-    }),
-    edit: () => {},
-    reused: 0,
-  },
-  {
-    name: "a directory with no plugin session",
-    cwd: (project) => join(project, "src"),
-    overrides: () => undefined,
-    edit: () => {},
-    reused: 0,
-  },
-  {
-    name: "a file changed on disk since the plugin pass",
-    cwd: (project) => project,
-    overrides: () => undefined,
-    edit: (project) =>
-      writeFileSync(join(project, "src/other.ts"), EDITED_OTHER_SOURCE),
-    reused: 0,
-  },
-  {
-    name: "a declaration file changed on disk since the plugin pass",
-    cwd: (project) => project,
-    overrides: () => undefined,
-    edit: (project) =>
-      writeFileSync(
-        join(project, "src/api.d.ts"),
-        "export declare function read(): Promise<void>;\n"
-      ),
-    reused: 0,
-  },
-];
-
-function restoreSources(project) {
-  for (const [file, text] of Object.entries(SOURCES)) {
-    writeFileSync(join(project, file), text);
-  }
-}
-
-function proveRelay(linter, project, addon) {
-  const { ANTIDRIFT_ENGINE: _inherited, ...environment } = process.env;
-  for (const relayCase of RELAY_CASES) {
-    relayCase.edit(project);
-    const request = {
-      linter,
-      cwd: relayCase.cwd(project),
-      payload: headlessPayload(project, relayCase.overrides(project)),
-    };
-    const alone = runHeadless({ ...request, environment });
-    const before = addon.engineStats();
-    const relayed = runHeadless({
-      ...request,
-      environment: { ...environment, ANTIDRIFT_ENGINE: addon.engineEndpoint() },
-    });
-    const after = addon.engineStats();
-    assert.ok(
-      alone.length >= 3,
-      `The headless helper must report the planted findings for ${relayCase.name}: ${alone}`
-    );
-    assert.deepEqual(
-      relayed,
-      alone,
-      `A relayed request for ${relayCase.name} must answer exactly as the helper does alone`
-    );
-    assert.deepEqual(
-      [
-        after.programsBuilt - before.programsBuilt,
-        after.programsReused - before.programsReused,
-        after.relayedRequests - before.relayedRequests,
-      ],
-      [0, relayCase.reused, 1],
-      `A relayed request for ${relayCase.name} must build nothing in the engine and reuse ${relayCase.reused} program`
-    );
-    restoreSources(project);
-  }
-}
-
-function runTypeAwareOxlint({ repoRoot, project, linter, plugin }) {
-  const configPath = join(project, `oxlintrc.type-aware.${plugin}.json`);
-  const pluginConfig = plugin
-    ? {
-        jsPlugins: [
-          resolve(repoRoot, "tooling/antidrift/src/oxlint-plugin/index.mjs"),
-        ],
-      }
-    : {};
-  writeFileSync(
-    configPath,
-    JSON.stringify({
-      ...pluginConfig,
-      categories: { correctness: "off" },
-      rules: {
-        "typescript/no-floating-promises": "error",
-        ...(plugin ? { "antidrift/no-as-never": "error" } : {}),
-      },
-    })
-  );
-  const run = spawnSync(
-    resolve(repoRoot, "node_modules/.bin/oxlint"),
-    ["-c", configPath, "--type-aware", "--format", "json", ...RELAYED_FILES],
-    {
-      cwd: project,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        OXLINT_TSGOLINT_PATH: linter,
-        ANTIDRIFT_ENGINE: STALE_ENGINE,
-      },
-    }
-  );
-  return { status: run.status, output: `${run.stdout}${run.stderr}` };
-}
-
-function proveTypeAwareRelay(repoRoot, project, linter) {
-  const withPlugin = runTypeAwareOxlint({
-    repoRoot,
-    project,
-    linter,
-    plugin: true,
-  });
-  assert.deepEqual(
-    [withPlugin.status, summarize(JSON.parse(withPlugin.output).diagnostics)],
-    [
-      1,
-      [
-        ["src/cast.ts", RULE_CODE, "error", 2],
-        ["src/floating.ts", "typescript(no-floating-promises)", "error", 3],
-        ["src/other.ts", RULE_CODE, "error", 1],
-      ],
-    ],
-    `Loading the plugin must point the type-aware helper at its own engine: ${withPlugin.output}`
-  );
-  const withoutPlugin = runTypeAwareOxlint({
-    repoRoot,
-    project,
-    linter,
-    plugin: false,
-  });
-  assert.notEqual(withoutPlugin.status, 0, withoutPlugin.output);
-  assert.match(
-    withoutPlugin.output,
-    /antidrift engine relay named by ANTIDRIFT_ENGINE \(127\.0\.0\.1:9\/stale-token\) failed/u,
-    "The type-aware helper must fail loudly on an engine it cannot reach"
-  );
-}
-
 const FIXABLE_FILE = "src/fixable.ts";
 
 function proveFixAfterRegularPass(repoRoot, project, linter) {
@@ -442,34 +222,7 @@ function proveFixAfterRegularPass(repoRoot, project, linter) {
   rmSync(join(project, FIXABLE_FILE));
 }
 
-function proveDirectAddon(project, linter) {
-  const addon = loadNativeAddon(project);
-  const sourceOf = (file) => readFileSync(join(project, file), "utf8");
-  assert.deepEqual(
-    addon.lintFile(
-      project,
-      join(project, CAST_FILES[0]),
-      sourceOf(CAST_FILES[0]),
-      null,
-      []
-    ),
-    { findings: [], stale: false },
-    "A lint request with no rules must report nothing"
-  );
-  for (const file of CAST_FILES) {
-    addon.lintFile(project, join(project, file), sourceOf(file), null, [
-      { rule: "antidrift/no-as-never" },
-    ]);
-  }
-  assert.equal(
-    addon.engineStats().programsBuilt,
-    1,
-    "Two files under one tsconfig must share one type program"
-  );
-  proveRelay(linter, project, addon);
-}
-
-export function proveOxlintPluginBridge(repoRoot, linter) {
+export async function proveOxlintPluginBridge(repoRoot, linter) {
   execFileSync(
     "cargo",
     ["build", "--locked", "-p", "antidrift-napi", "--quiet"],
@@ -478,6 +231,12 @@ export function proveOxlintPluginBridge(repoRoot, linter) {
       stdio: "inherit",
     }
   );
+  process.env.ANTIDRIFT_NAPI_ADDON = resolve(
+    repoRoot,
+    "target/debug",
+    ADDON_LIBRARY_NAMES[process.platform]
+  );
+  process.env.ANTIDRIFT_LINTER_BIN = linter;
   const project = writeProject();
   try {
     proveConfiguredLevels(repoRoot, project);
@@ -485,7 +244,7 @@ export function proveOxlintPluginBridge(repoRoot, linter) {
     proveIdleDirective(repoRoot, project);
     proveTypeAwareRelay(repoRoot, project, linter);
     proveFixAfterRegularPass(repoRoot, project, linter);
-    proveDirectAddon(project, linter);
+    await proveDirectAddonAndCreate(project, linter);
   } finally {
     rmSync(project, { recursive: true, force: true });
   }

@@ -12,16 +12,14 @@ use crate::headless_host::program_counts;
 use crate::relay;
 use crate::rule_catalog::RuleRequest;
 use crate::rule_plan::RulePlanCache;
-use crate::session::{LintOutcome, Session};
+use crate::session::{Finding, Session};
 
 enum EngineRequest {
     Lint {
         cwd: String,
         file_path: String,
-        source_text: String,
-        run_id: Option<String>,
         rules: Vec<RuleRequest>,
-        reply: Sender<Result<LintOutcome, String>>,
+        reply: Sender<Result<Vec<Finding>, String>>,
     },
     Headless {
         request: HeadlessRequest,
@@ -67,18 +65,11 @@ fn serve(receiver: &Receiver<EngineRequest>) {
             EngineRequest::Lint {
                 cwd,
                 file_path,
-                source_text,
-                run_id,
                 rules,
                 reply,
             } => reply
                 .send(guarded(|| {
-                    session_for(&mut sessions, &cwd)?.lint_file(
-                        &file_path,
-                        &source_text,
-                        run_id.as_deref(),
-                        &rules,
-                    )
+                    session_for(&mut sessions, &cwd)?.lint_file(&file_path, &rules)
                 }))
                 .is_ok(),
             EngineRequest::Headless { request, reply } => {
@@ -123,17 +114,13 @@ impl EngineService {
         &self,
         cwd: String,
         file_path: String,
-        source_text: String,
-        run_id: Option<String>,
         rules: Vec<RuleRequest>,
-    ) -> Result<LintOutcome, String> {
+    ) -> Result<Vec<Finding>, String> {
         let (reply, outcome) = channel();
         self.sender()?
             .send(EngineRequest::Lint {
                 cwd,
                 file_path,
-                source_text,
-                run_id,
                 rules,
                 reply,
             })

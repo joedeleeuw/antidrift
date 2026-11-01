@@ -15,12 +15,6 @@ pub struct EngineFinding {
 }
 
 #[napi(object)]
-pub struct EngineLintOutcome {
-    pub findings: Vec<EngineFinding>,
-    pub stale: bool,
-}
-
-#[napi(object)]
 pub struct EngineStats {
     pub programs_built: u32,
     pub programs_reused: u32,
@@ -47,10 +41,8 @@ pub struct EngineRuleRequest {
 pub fn lint_file(
     cwd: String,
     file_path: String,
-    source_text: String,
-    run_id: Option<String>,
     rules: Vec<EngineRuleRequest>,
-) -> napi::Result<EngineLintOutcome> {
+) -> napi::Result<Vec<EngineFinding>> {
     let requests = rules
         .into_iter()
         .map(|request| RuleRequest {
@@ -58,24 +50,20 @@ pub fn lint_file(
             options: request.options,
         })
         .collect();
-    let outcome = service()?
-        .lint_file(cwd, file_path, source_text, run_id, requests)
+    let findings = service()?
+        .lint_file(cwd, file_path, requests)
         .map_err(napi::Error::from_reason)?;
-    Ok(EngineLintOutcome {
-        findings: outcome
-            .findings
-            .into_iter()
-            .map(|finding| EngineFinding {
-                rule: finding.rule,
-                message: finding.message,
-                line: finding.location.line,
-                column: finding.location.column,
-                end_line: finding.location.end_line,
-                end_column: finding.location.end_column,
-            })
-            .collect(),
-        stale: outcome.stale,
-    })
+    Ok(findings
+        .into_iter()
+        .map(|finding| EngineFinding {
+            rule: finding.rule,
+            message: finding.message,
+            line: finding.location.line,
+            column: finding.location.column,
+            end_line: finding.location.end_line,
+            end_column: finding.location.end_column,
+        })
+        .collect())
 }
 
 #[napi]
