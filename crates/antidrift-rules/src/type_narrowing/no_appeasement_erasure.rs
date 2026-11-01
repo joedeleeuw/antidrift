@@ -1,8 +1,7 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::{shape, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 use super::erasure_analysis::{
     classify_widening_target, erased_unknown_source, has_laundered_unknown_use,
@@ -246,13 +245,6 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
 pub struct NoAppeasementErasure;
 
 pub static DEFAULT_INSTANCE: NoAppeasementErasure = NoAppeasementErasure;
-
-impl NoAppeasementErasure {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options("antidrift/no-appeasement-erasure", options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::VariableDeclaration),

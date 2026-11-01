@@ -1,8 +1,7 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-redacted-log-attribute-key";
 
@@ -29,13 +28,6 @@ const SENSITIVE_SUBSTRINGS: &[&str] = &[
 pub struct NoRedactedLogAttributeKey;
 
 pub static DEFAULT_RULE: NoRedactedLogAttributeKey = NoRedactedLogAttributeKey;
-
-impl NoRedactedLogAttributeKey {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 

@@ -3,26 +3,18 @@ use antidrift_kernel::jsx::{
     jsx_attributes_list, jsx_children, jsx_opening_node, plain_attribute_name,
 };
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{is_function_like, unwrap_expression};
 use antidrift_kernel::type_syntax::{LocalTypeAliases, property_key_name};
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-omitted-prop-respread";
 
 pub struct NoOmittedPropRespread;
 
 pub static DEFAULT_RULE: NoOmittedPropRespread = NoOmittedPropRespread;
-
-impl NoOmittedPropRespread {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxElement),

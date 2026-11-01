@@ -4,7 +4,7 @@ use super::render_scope::{
 use antidrift_kernel::file_role::{ProjectPath, TEST_ROLES};
 use antidrift_kernel::jsx::{is_component_or_hook_function, react_function_name};
 use antidrift_kernel::provenance::{symbol_at_node, symbol_declarations};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{
     Span, function_node_from_declaration, is_function_like, property_name_text, unwrap_expression,
 };
@@ -12,20 +12,12 @@ use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_checker::{Checker, SignatureKind};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-impure-render-call";
 
 pub struct NoImpureRenderCall;
 
 pub static DEFAULT_RULE: NoImpureRenderCall = NoImpureRenderCall;
-
-impl NoImpureRenderCall {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),

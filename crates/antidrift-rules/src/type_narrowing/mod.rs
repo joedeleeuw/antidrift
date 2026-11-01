@@ -16,7 +16,6 @@ mod vague_name_lexicon;
 
 use crate::CatalogRule;
 use antidrift_kernel::scope_policy::ScopePolicy;
-use tsrslint::rule::Rule;
 
 #[must_use]
 pub fn typescript_only_rules() -> Vec<CatalogRule> {
@@ -55,52 +54,4 @@ pub fn script_default_rules() -> Vec<CatalogRule> {
 #[must_use]
 pub fn default_off_rules() -> Vec<CatalogRule> {
     vec![CatalogRule::everywhere(&no_vague_names::DEFAULT_INSTANCE)]
-}
-
-pub fn create_rule(
-    name: &str,
-    options: Option<&serde_json::Value>,
-) -> Result<Option<Box<dyn Rule>>, String> {
-    match name {
-        "antidrift/no-appeasement-cast" | "no-appeasement-cast" => Ok(Some(Box::new(
-            no_appeasement_cast::NoAppeasementCast::from_options(options)?,
-        ))),
-        "antidrift/no-appeasement-erasure" | "no-appeasement-erasure" => Ok(Some(Box::new(
-            no_appeasement_erasure::NoAppeasementErasure::from_options(options)?,
-        ))),
-        "antidrift/no-redundant-type-predicate" | "no-redundant-type-predicate" => Ok(Some(
-            Box::new(no_redundant_type_predicate::NoRedundantTypePredicate::from_options(options)?),
-        )),
-        "antidrift/no-underchecked-type-predicate" | "no-underchecked-type-predicate" => {
-            Ok(Some(Box::new(
-                no_underchecked_type_predicate::NoUndercheckedTypePredicate::from_options(options)?,
-            )))
-        }
-        "antidrift/no-wrapping-functions" | "no-wrapping-functions" => {
-            Ok(Some(no_wrapping_functions::create(options)?))
-        }
-        "antidrift/no-pass-through-parameters" | "no-pass-through-parameters" => {
-            Ok(Some(no_pass_through_parameters::create(options)?))
-        }
-        "antidrift/no-unresolved-dependency-types" | "no-unresolved-dependency-types" => {
-            Ok(Some(Box::new(
-                no_unresolved_dependency_types::NoUnresolvedDependencyTypes::from_options(options)?,
-            )))
-        }
-        "antidrift/no-compat-names" | "no-compat-names" => {
-            Ok(Some(no_compat_names::create(options)?))
-        }
-        no_closed_string_parameter::RULE_NAME | "no-closed-string-parameter" => Ok(Some(Box::new(
-            no_closed_string_parameter::NoClosedStringParameter::from_options(options)?,
-        ))),
-        no_argument_mutation_side_effect::RULE_NAME | "no-argument-mutation-side-effect" => {
-            Ok(Some(Box::new(
-                no_argument_mutation_side_effect::NoArgumentMutationSideEffect::from_options(
-                    options,
-                )?,
-            )))
-        }
-        "antidrift/no-vague-names" | "no-vague-names" => Ok(Some(no_vague_names::create(options)?)),
-        _ => Ok(None),
-    }
 }

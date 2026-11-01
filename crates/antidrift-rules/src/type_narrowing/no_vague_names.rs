@@ -1,11 +1,10 @@
 use super::vague_name_lexicon::{duplicate_context_word, vague_reason};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::Type;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrslint::utils::{is_intersection_type, is_union_type};
 
 const RULE_NAME: &str = "antidrift/no-vague-names";
@@ -238,11 +237,6 @@ impl NoVagueNames {
 }
 
 pub static DEFAULT_INSTANCE: NoVagueNames = NoVagueNames::DEFAULT;
-
-pub fn create(options: Option<&serde_json::Value>) -> Result<Box<dyn Rule>, String> {
-    reject_unknown_options(RULE_NAME, options)?;
-    Ok(Box::new(NoVagueNames))
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::VariableDeclaration),

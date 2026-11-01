@@ -2,11 +2,10 @@ use antidrift_kernel::directives::effective_token_start;
 use antidrift_kernel::file_role;
 use antidrift_kernel::jsx::{expression_contains_jsx, is_pascal_case_name, react_function_name};
 use antidrift_kernel::line_caps::{CappedUnit, LineCapFinding};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{property_name_text, unwrap_expression};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub struct LineCapRule {
     unit: CappedUnit,
@@ -23,23 +22,6 @@ pub static FUNCTION_RULE: LineCapRule = LineCapRule {
 pub static COMPONENT_RULE: LineCapRule = LineCapRule {
     unit: CappedUnit::Component,
 };
-
-pub fn create_rule(
-    name: &str,
-    options: Option<&serde_json::Value>,
-) -> Result<Option<Box<dyn Rule>>, String> {
-    let Some(rule) = [&MODULE_RULE, &FUNCTION_RULE, &COMPONENT_RULE]
-        .into_iter()
-        .find(|rule| {
-            let rule_id = rule.unit.cap().rule_id;
-            rule_id == name || rule_id.strip_prefix("antidrift/") == Some(name)
-        })
-    else {
-        return Ok(None);
-    };
-    reject_unknown_options(rule.unit.cap().rule_id, options)?;
-    Ok(Some(Box::new(LineCapRule { unit: rule.unit })))
-}
 
 const MODULE_LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
 

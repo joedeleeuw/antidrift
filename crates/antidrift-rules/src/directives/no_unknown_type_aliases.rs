@@ -1,21 +1,13 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-unknown-type-aliases";
 
 pub struct NoUnknownTypeAliases;
 
 pub static DEFAULT_RULE: NoUnknownTypeAliases = NoUnknownTypeAliases;
-
-impl NoUnknownTypeAliases {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
 

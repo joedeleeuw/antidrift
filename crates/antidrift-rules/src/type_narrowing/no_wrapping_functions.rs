@@ -2,7 +2,7 @@ use super::call_forwarding::{BodyForwarding, is_literal_kind, parameters_match_i
 use antidrift_kernel::callgraph::{IdentifierRef, ProgramSymbolIndex};
 use antidrift_kernel::file_role;
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{callgraph, provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
@@ -10,7 +10,6 @@ use tsrs_ast::{self as ast, Kind, Node, SourceFile, Symbol};
 use tsrs_checker::Checker;
 use tsrs_compiler::Program;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrslint::utils::find_modifier;
 
 const RULE_NAME: &str = "antidrift/no-wrapping-functions";
@@ -278,11 +277,6 @@ impl NoWrappingFunctions {
 }
 
 pub static DEFAULT_INSTANCE: NoWrappingFunctions = NoWrappingFunctions::DEFAULT;
-
-pub fn create(options: Option<&serde_json::Value>) -> Result<Box<dyn Rule>, String> {
-    reject_unknown_options(RULE_NAME, options)?;
-    Ok(Box::new(NoWrappingFunctions))
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),

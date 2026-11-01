@@ -9,24 +9,66 @@ pub mod security_boundaries;
 pub mod test_oracle;
 pub mod type_narrowing;
 
+use antidrift_kernel::rule::Rule;
+use antidrift_kernel::rule_options::{decode_rule_options, reject_unknown_options};
 use antidrift_kernel::scope_policy::ScopePolicy;
+use serde::de::DeserializeOwned;
 use std::sync::LazyLock;
-use tsrslint::rule::Rule;
+
+pub(crate) trait ConfigurableRule: Rule + Sized + 'static {
+    type Options: DeserializeOwned + Default;
+
+    fn from_options(options: Self::Options) -> Result<Self, String>;
+}
+
+pub type OptionFactory =
+    fn(&'static str, Option<&serde_json::Value>) -> Result<Box<dyn Rule>, String>;
+
+fn decode_configured<R: ConfigurableRule>(
+    rule_name: &'static str,
+    options: Option<&serde_json::Value>,
+) -> Result<Box<dyn Rule>, String> {
+    let parsed =
+        decode_rule_options::<R::Options>(rule_name, options).map_err(|err| err.to_string())?;
+    Ok(Box::new(R::from_options(parsed)?))
+}
 
 pub struct CatalogRule {
     pub rule: &'static dyn Rule,
     pub scope_policy: ScopePolicy,
+    pub factory: Option<OptionFactory>,
 }
 
 impl CatalogRule {
     #[must_use]
     pub const fn new(rule: &'static dyn Rule, scope_policy: ScopePolicy) -> Self {
-        Self { rule, scope_policy }
+        Self {
+            rule,
+            scope_policy,
+            factory: None,
+        }
     }
 
     #[must_use]
     pub const fn everywhere(rule: &'static dyn Rule) -> Self {
         Self::new(rule, ScopePolicy::Everywhere)
+    }
+
+    #[must_use]
+    pub(crate) const fn configured<R: ConfigurableRule>(
+        rule: &'static R,
+        scope_policy: ScopePolicy,
+    ) -> Self {
+        Self {
+            rule,
+            scope_policy,
+            factory: Some(decode_configured::<R>),
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn configured_everywhere<R: ConfigurableRule>(rule: &'static R) -> Self {
+        Self::configured(rule, ScopePolicy::Everywhere)
     }
 }
 
@@ -35,20 +77,25 @@ pub struct RuleCatalogEntry {
     pub scope_policy: ScopePolicy,
     pub default_enabled: bool,
     pub typescript_only: bool,
+    pub factory: Option<OptionFactory>,
 }
 
-type FamilyFactory = fn(&str, Option<&serde_json::Value>) -> Result<Option<Box<dyn Rule>>, String>;
-
-const FAMILY_FACTORIES: &[FamilyFactory] = &[
-    boundary_schema::create_rule,
-    contracts_shape::create_rule,
-    type_narrowing::create_rule,
-    directives::create_rule,
-    lifecycle_async::create_rule,
-    react_ui::create_rule,
-    security_boundaries::create_rule,
-    test_oracle::create_rule,
-];
+impl RuleCatalogEntry {
+    pub fn instantiate(
+        &self,
+        options: Option<&serde_json::Value>,
+    ) -> Result<&'static dyn Rule, String> {
+        let rule_name = self.rule.name();
+        match (self.factory, options) {
+            (_, None) => Ok(self.rule),
+            (None, Some(_)) => {
+                reject_unknown_options(rule_name, options)?;
+                Ok(self.rule)
+            }
+            (Some(factory), Some(_)) => Ok(Box::leak(factory(rule_name, options)?)),
+        }
+    }
+}
 
 fn push_entries(
     out: &mut Vec<RuleCatalogEntry>,
@@ -56,18 +103,24 @@ fn push_entries(
     default_enabled: bool,
     typescript_only: bool,
 ) {
-    for CatalogRule { rule, scope_policy } in rules {
+    for CatalogRule {
+        rule,
+        scope_policy,
+        factory,
+    } in rules
+    {
         out.push(RuleCatalogEntry {
             rule,
             scope_policy,
             default_enabled,
             typescript_only,
+            factory,
         });
     }
 }
 
 static RULE_CATALOG: LazyLock<Vec<RuleCatalogEntry>> = LazyLock::new(|| {
-    let mut entries = Vec::with_capacity(88);
+    let mut entries = Vec::with_capacity(98);
     push_entries(
         &mut entries,
         boundary_schema::typescript_only_rules(),
@@ -150,16 +203,4 @@ pub fn lookup_entry(name: &str) -> Option<&'static RuleCatalogEntry> {
         let rule_name = entry.rule.name();
         rule_name == name || rule_name.strip_prefix("antidrift/") == Some(name)
     })
-}
-
-pub fn create_rule(
-    name: &str,
-    options: Option<&serde_json::Value>,
-) -> Result<Option<Box<dyn Rule>>, String> {
-    for factory in FAMILY_FACTORIES {
-        if let Some(rule) = factory(name, options)? {
-            return Ok(Some(rule));
-        }
-    }
-    Ok(None)
 }

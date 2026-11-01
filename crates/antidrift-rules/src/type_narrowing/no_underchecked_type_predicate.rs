@@ -1,10 +1,9 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel;
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, Symbol, SymbolFlags};
 use tsrs_checker::{Checker, Type, TypeFlags};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrslint::utils::{
     get_call_signatures, is_intersection_type, is_intrinsic_error_type, is_object_type,
     is_type_flag_set, is_union_type, union_type_parts,
@@ -195,13 +194,6 @@ fn check_function(ctx: &mut Ctx, fn_node: P<Node>) {
 pub struct NoUndercheckedTypePredicate;
 
 pub static DEFAULT_INSTANCE: NoUndercheckedTypePredicate = NoUndercheckedTypePredicate;
-
-impl NoUndercheckedTypePredicate {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options("antidrift/no-underchecked-type-predicate", options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),

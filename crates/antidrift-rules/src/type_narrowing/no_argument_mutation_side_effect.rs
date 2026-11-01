@@ -1,9 +1,9 @@
-use antidrift_kernel::rule_options::{EmptyVisitor, reject_unknown_options};
+use antidrift_kernel::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule_options::EmptyVisitor;
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, Symbol};
 use tsrs_checker::Checker;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-argument-mutation-side-effect";
 
@@ -21,13 +21,6 @@ const ACCUMULATOR_NAMES: &[&str] = &[
 pub struct NoArgumentMutationSideEffect;
 
 pub static DEFAULT_RULE: NoArgumentMutationSideEffect = NoArgumentMutationSideEffect;
-
-impl NoArgumentMutationSideEffect {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 impl Rule for NoArgumentMutationSideEffect {
     fn name(&self) -> &'static str {

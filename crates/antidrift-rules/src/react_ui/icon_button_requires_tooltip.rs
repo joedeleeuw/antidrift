@@ -2,12 +2,11 @@ use antidrift_kernel::jsx::{
     attribute_name, element_tag_name, find_attribute, is_jsx_element_like, jsx_attributes_list,
     jsx_children, render_prop_element, static_attribute_string,
 };
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_expression, unwrap_parentheses};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/icon-button-requires-tooltip";
 const INTERACTIVE_ELEMENTS: [&str; 10] = [
@@ -40,7 +39,7 @@ const NATIVE_TOOLTIP_ATTRIBUTES: [&str; 1] = ["title"];
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct IconTooltipOptions {
+pub(crate) struct IconTooltipOptions {
     icon_components: Vec<String>,
 }
 
@@ -52,9 +51,10 @@ pub static DEFAULT_RULE: IconButtonRequiresTooltip = IconButtonRequiresTooltip {
     icon_components: Vec::new(),
 };
 
-impl IconButtonRequiresTooltip {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<IconTooltipOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for IconButtonRequiresTooltip {
+    type Options = IconTooltipOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         Ok(Self {
             icon_components: parsed.icon_components,
         })

@@ -1,23 +1,13 @@
 use antidrift_kernel::file_role;
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{boundary, provenance};
 use tsrs_ast::{Kind, Node, SourceFile, Symbol};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
-
-const RULE_NAME: &str = "antidrift/no-service-constructor-imports";
 
 pub struct NoServiceConstructorImports;
 
 pub static RULE: NoServiceConstructorImports = NoServiceConstructorImports {};
-
-impl NoServiceConstructorImports {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 struct ImportBinding {
     report_target: P<Node>,

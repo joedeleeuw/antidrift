@@ -20,6 +20,7 @@ pub mod projection;
 pub mod provenance;
 pub mod registries;
 pub mod relational_scan;
+pub mod rule;
 pub mod rule_options;
 pub mod runtime_lifecycle;
 pub mod scope_policy;

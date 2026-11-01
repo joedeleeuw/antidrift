@@ -1,9 +1,8 @@
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-static-devtools-import";
 
@@ -16,7 +15,7 @@ const DEVTOOLS_PACKAGES: &[&str] = &[
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct NoStaticDevtoolsImportOptions {
+pub(crate) struct NoStaticDevtoolsImportOptions {
     modules: Vec<String>,
 }
 
@@ -28,9 +27,10 @@ pub static DEFAULT_RULE: NoStaticDevtoolsImport = NoStaticDevtoolsImport {
     modules: Vec::new(),
 };
 
-impl NoStaticDevtoolsImport {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<NoStaticDevtoolsImportOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoStaticDevtoolsImport {
+    type Options = NoStaticDevtoolsImportOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         Ok(Self {
             modules: parsed.modules,
         })

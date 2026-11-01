@@ -1,8 +1,7 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::string_fragments::class_fragments;
 use tsrs_ast::Node;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-physical-properties";
 const MESSAGE: &str = "Physical directional CSS property breaks RTL. Use logical equivalents: ml→ms, mr→me, pl→ps, pr→pe, left→start, right→end, text-left→text-start, text-right→text-end, border-l→border-s, border-r→border-e, rounded-l→rounded-s, rounded-r→rounded-e.";
@@ -10,13 +9,6 @@ const MESSAGE: &str = "Physical directional CSS property breaks RTL. Use logical
 pub struct NoPhysicalProperties;
 
 pub static DEFAULT_RULE: NoPhysicalProperties = NoPhysicalProperties;
-
-impl NoPhysicalProperties {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 struct NoopVisitor;
 

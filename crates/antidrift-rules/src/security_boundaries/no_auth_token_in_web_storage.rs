@@ -3,23 +3,15 @@ use super::web_provenance::{
     static_property_name, static_string, unwrap_expression,
 };
 use antidrift_kernel::local_binding::Binding;
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-auth-token-in-web-storage";
 
 pub struct NoAuthTokenInWebStorage;
 
 pub static DEFAULT_RULE: NoAuthTokenInWebStorage = NoAuthTokenInWebStorage;
-
-impl NoAuthTokenInWebStorage {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),

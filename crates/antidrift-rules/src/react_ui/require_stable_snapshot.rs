@@ -2,14 +2,13 @@ use super::render_body_primitives::{is_inside_render_body, reactive_primitive_na
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::jsx::is_hook_name;
 use antidrift_kernel::local_binding::{Binding, resolve_lexical_binding};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{
     collect_return_expressions, property_name_text, unwrap_expression,
 };
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/require-stable-snapshot";
 const HOOK_NAME: &str = "useSyncExternalStore";
@@ -37,13 +36,6 @@ const MESSAGE: &str = "getSnapshot/getServerSnapshot must return a cached refere
 pub struct RequireStableSnapshot;
 
 pub static DEFAULT_RULE: RequireStableSnapshot = RequireStableSnapshot;
-
-impl RequireStableSnapshot {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),

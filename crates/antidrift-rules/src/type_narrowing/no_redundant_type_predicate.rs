@@ -1,9 +1,8 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::{Checker, Signature, Type, TypeFlags};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrslint::utils::{
     find_modifier, get_construct_signatures, is_intrinsic_error_type, is_type_flag_set,
     is_union_type, union_type_parts,
@@ -393,13 +392,6 @@ fn check_callback(ctx: &mut Ctx, node: P<Node>) {
 pub struct NoRedundantTypePredicate;
 
 pub static DEFAULT_INSTANCE: NoRedundantTypePredicate = NoRedundantTypePredicate;
-
-impl NoRedundantTypePredicate {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options("antidrift/no-redundant-type-predicate", options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),

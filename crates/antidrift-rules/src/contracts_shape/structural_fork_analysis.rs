@@ -6,12 +6,12 @@ use antidrift_kernel::directives::split_identifier_words;
 use antidrift_kernel::file_role;
 use antidrift_kernel::program_fact::{ProgramFact, ProgramFactSlot};
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_source_file_origin};
+use antidrift_kernel::rule::{Ctx, RuleMessage};
 use antidrift_kernel::shape;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, SourceFile};
 use tsrs_checker::Checker;
 use tsrs_compiler::Program;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, RuleMessage};
 use tsrslint::utils::is_object_type;
 
 #[must_use]

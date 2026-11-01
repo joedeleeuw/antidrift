@@ -2,13 +2,13 @@ use super::no_impure_render_call::callee_simple_name;
 use antidrift_kernel::jsx::{
     is_component_or_hook_function, is_event_handler_name, plain_attribute_name, react_function_name,
 };
+use antidrift_kernel::rule::Ctx;
 use antidrift_kernel::tsrs_kernel::{
     Span, is_function_like, property_name_text, unwrap_expression,
 };
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_core::P;
-use tsrslint::rule::Ctx;
 
 const EXEMPT_HOOK_CALLBACKS: [&str; 5] = [
     "useEffect",

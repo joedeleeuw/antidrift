@@ -2,11 +2,10 @@ use super::syntax::{
     Binding, Span, binding_for_declarator, collect_binding_references, identifier_member,
     identifier_of, parent_expression, unwrap_parentheses,
 };
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use serde::Deserialize;
 use tsrs_ast::{Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-async-array-method";
 
@@ -19,7 +18,7 @@ enum AsyncBranch {
 
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct AsyncArrayOptions {
+pub(crate) struct AsyncArrayOptions {
     #[serde(deserialize_with = "decode_branches")]
     branches: Vec<AsyncBranch>,
 }
@@ -49,9 +48,10 @@ pub static DEFAULT_RULE: NoAsyncArrayMethod = NoAsyncArrayMethod {
     requires_collection: false,
 };
 
-impl NoAsyncArrayMethod {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let decoded = decode_rule_options::<AsyncArrayOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoAsyncArrayMethod {
+    type Options = AsyncArrayOptions;
+
+    fn from_options(decoded: Self::Options) -> Result<Self, String> {
         Ok(Self {
             requires_collection: decoded.branches.contains(&AsyncBranch::RequiresCollection),
         })

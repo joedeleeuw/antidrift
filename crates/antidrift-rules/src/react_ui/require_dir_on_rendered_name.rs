@@ -1,12 +1,12 @@
 use antidrift_kernel::jsx::{
     has_plain_attribute, jsx_children, jsx_opening_node, plain_element_name,
 };
-use antidrift_kernel::rule_options::{decode_rule_options, require_non_empty};
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule_options::require_non_empty;
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/require-dir-on-rendered-name";
 const DEFAULT_OWNER: &str = "Unicode FSI (\\u2068) and PDI (\\u2069), or an HTML bdi element";
@@ -34,7 +34,7 @@ const RAW_ISOLATING: [&str; 2] = ["bdi", "bdo"];
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct RenderedNameOptions {
+pub(crate) struct RenderedNameOptions {
     name_props: Option<Vec<String>>,
     isolating_components: Option<Vec<String>>,
     owner: Option<String>,
@@ -76,9 +76,10 @@ pub static DEFAULT_RULE: RequireDirOnRenderedName = RequireDirOnRenderedName {
     },
 };
 
-impl RequireDirOnRenderedName {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<RenderedNameOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for RequireDirOnRenderedName {
+    type Options = RenderedNameOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         parsed.validate(RULE_NAME)?;
         Ok(Self { options: parsed })
     }

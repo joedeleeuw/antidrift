@@ -1,10 +1,9 @@
 use antidrift_kernel::jsx::{
     element_tag_name, is_jsx_element_like, jsx_children, render_prop_element,
 };
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-dialog-trigger-menu-item";
 const TRIGGER_NAMES: [&str; 4] = [
@@ -24,13 +23,6 @@ const MESSAGE: &str = "Do not mount a dialog trigger inside a menu item; the men
 pub struct NoDialogTriggerMenuItem;
 
 pub static DEFAULT_RULE: NoDialogTriggerMenuItem = NoDialogTriggerMenuItem;
-
-impl NoDialogTriggerMenuItem {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxElement),

@@ -1,23 +1,16 @@
-use antidrift_kernel::rule_options::{EmptyVisitor, reject_unknown_options};
+use antidrift_kernel::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule_options::EmptyVisitor;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use antidrift_kernel::{provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-reexport-only-module";
 
 pub struct NoReexportOnlyModule;
 
 pub static DEFAULT_RULE: NoReexportOnlyModule = NoReexportOnlyModule;
-
-impl NoReexportOnlyModule {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 impl Rule for NoReexportOnlyModule {
     fn name(&self) -> &'static str {

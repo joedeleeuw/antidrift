@@ -6,12 +6,12 @@ use super::shadow_state_mirror::{
 };
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
-use antidrift_kernel::rule_options::{EmptyVisitor, reject_unknown_options};
+use antidrift_kernel::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule_options::EmptyVisitor;
 use antidrift_kernel::tsrs_kernel::{static_member_chain, unwrap_expression};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-handrolled-resource-lifecycle-cells";
 const MESSAGE: &str = "This async transition hand-rolls a resource lifecycle: a constant lifecycle cell is toggled around the request while sibling cells receive the resource value and caught error. Model one resource/reducer value instead of coupled setters.";
@@ -20,13 +20,6 @@ const GLOBAL_OBJECTS: [&str; 3] = ["globalThis", "window", "self"];
 pub struct NoHandrolledResourceLifecycleCells;
 
 pub static DEFAULT_RULE: NoHandrolledResourceLifecycleCells = NoHandrolledResourceLifecycleCells;
-
-impl NoHandrolledResourceLifecycleCells {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 impl Rule for NoHandrolledResourceLifecycleCells {
     fn name(&self) -> &'static str {

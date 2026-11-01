@@ -1,25 +1,18 @@
 use antidrift_kernel::imports::FileImports;
 use antidrift_kernel::local_binding::resolve_lexical_binding;
-use antidrift_kernel::rule_options::{EmptyVisitor, reject_unknown_options};
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule_options::EmptyVisitor;
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
 use tsrs_checker::Checker;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-external-decode-in-tsx";
 
 pub struct NoExternalDecodeInTsx;
 
 pub static DEFAULT_RULE: NoExternalDecodeInTsx = NoExternalDecodeInTsx;
-
-impl NoExternalDecodeInTsx {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 

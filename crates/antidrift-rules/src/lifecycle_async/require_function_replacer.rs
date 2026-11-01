@@ -2,23 +2,15 @@ use super::syntax::{
     enclosing_variable_declaration, global, identifier_member, is_var_variable_declaration, member,
     resolve_lexical_binding, unwrap_expression, unwrap_parentheses,
 };
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/require-function-replacer";
 
 pub struct RequireFunctionReplacer;
 
 pub static DEFAULT_RULE: RequireFunctionReplacer = RequireFunctionReplacer;
-
-impl RequireFunctionReplacer {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 

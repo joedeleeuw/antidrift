@@ -1,9 +1,8 @@
 use antidrift_kernel::declared_names::{DeclaredNameIndex, name_key};
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 const RULE_NAME: &str = "antidrift/no-compat-names";
 
@@ -61,11 +60,6 @@ impl NoCompatNames {
 }
 
 pub static DEFAULT_INSTANCE: NoCompatNames = NoCompatNames::DEFAULT;
-
-pub fn create(options: Option<&serde_json::Value>) -> Result<Box<dyn Rule>, String> {
-    reject_unknown_options(RULE_NAME, options)?;
-    Ok(Box::new(NoCompatNames))
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),

@@ -3,17 +3,16 @@ use super::web_provenance::{
     resolve_lexical_binding, unwrap_expression,
 };
 use antidrift_kernel::local_binding::Binding;
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-unsafe-inner-html";
 
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
-struct HtmlOptions {
+pub(crate) struct HtmlOptions {
     sanitizers: Option<Vec<ImportedOwner>>,
     trusted_sources: Vec<ImportedOwner>,
 }
@@ -28,9 +27,10 @@ pub static DEFAULT_RULE: NoUnsafeInnerHtml = NoUnsafeInnerHtml {
     trusted_sources: Vec::new(),
 };
 
-impl NoUnsafeInnerHtml {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<HtmlOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoUnsafeInnerHtml {
+    type Options = HtmlOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         let sanitizers = parsed.sanitizers.unwrap_or_else(|| {
             vec![ImportedOwner {
                 module: "dompurify".to_owned(),
@@ -43,7 +43,9 @@ impl NoUnsafeInnerHtml {
             trusted_sources: parsed.trusted_sources,
         })
     }
+}
 
+impl NoUnsafeInnerHtml {
     fn effective_sanitizers(&self) -> Vec<ImportedOwner> {
         if self.sanitizers.is_empty() {
             vec![ImportedOwner {

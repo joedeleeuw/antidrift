@@ -11,18 +11,16 @@ pub mod unknown_input_must_be_decoded;
 pub mod unknown_input_probe;
 
 use crate::CatalogRule;
-use antidrift_kernel::rule_options::decode_rule_options;
-use tsrslint::rule::Rule;
 
 #[must_use]
 pub fn typescript_only_rules() -> Vec<CatalogRule> {
     vec![
-        CatalogRule::everywhere(&unknown_input_must_be_decoded::DEFAULT_RULE),
+        CatalogRule::configured_everywhere(&unknown_input_must_be_decoded::DEFAULT_RULE),
         CatalogRule::everywhere(&no_external_decode_in_tsx::DEFAULT_RULE),
         CatalogRule::everywhere(&no_redundant_zod_parse::DEFAULT_RULE),
         CatalogRule::everywhere(&no_identity_schema_transform::DEFAULT_RULE),
         CatalogRule::everywhere(&no_schema_validator_transcoding::DEFAULT_RULE),
-        CatalogRule::everywhere(&require_convex_return_validator::DEFAULT_RULE),
+        CatalogRule::configured_everywhere(&require_convex_return_validator::DEFAULT_RULE),
     ]
 }
 
@@ -30,51 +28,6 @@ pub fn typescript_only_rules() -> Vec<CatalogRule> {
 pub fn script_default_rules() -> Vec<CatalogRule> {
     vec![
         CatalogRule::everywhere(&no_unsafe_deserialize::DEFAULT_RULE),
-        CatalogRule::everywhere(&no_sql_string_concat::DEFAULT_RULE),
+        CatalogRule::configured_everywhere(&no_sql_string_concat::DEFAULT_RULE),
     ]
-}
-
-pub fn create_rule(
-    name: &str,
-    options: Option<&serde_json::Value>,
-) -> Result<Option<Box<dyn Rule>>, String> {
-    match name {
-        unknown_input_must_be_decoded::RULE_NAME | "unknown-input-must-be-decoded" => {
-            Ok(Some(Box::new(
-                unknown_input_must_be_decoded::UnknownInputMustBeDecoded::from_options(options)?,
-            )))
-        }
-        no_external_decode_in_tsx::RULE_NAME | "no-external-decode-in-tsx" => Ok(Some(Box::new(
-            no_external_decode_in_tsx::NoExternalDecodeInTsx::from_options(options)?,
-        ))),
-        no_unsafe_deserialize::RULE_NAME | "no-unsafe-deserialize" => Ok(Some(Box::new(
-            no_unsafe_deserialize::NoUnsafeDeserialize::from_options(options)?,
-        ))),
-        no_redundant_zod_parse::RULE_NAME | "no-redundant-zod-parse" => Ok(Some(Box::new(
-            no_redundant_zod_parse::NoRedundantZodParse::from_options(options)?,
-        ))),
-        no_identity_schema_transform::RULE_NAME | "no-identity-schema-transform" => {
-            Ok(Some(Box::new(
-                no_identity_schema_transform::NoIdentitySchemaTransform::from_options(options)?,
-            )))
-        }
-        no_schema_validator_transcoding::RULE_NAME | "no-schema-validator-transcoding" => {
-            Ok(Some(Box::new(
-                no_schema_validator_transcoding::NoSchemaValidatorTranscoding::from_options(
-                    options,
-                )?,
-            )))
-        }
-        require_convex_return_validator::RULE_NAME | "require-convex-return-validator" => {
-            Ok(Some(Box::new(
-                require_convex_return_validator::RequireConvexReturnValidator::from_options(
-                    options,
-                )?,
-            )))
-        }
-        no_sql_string_concat::RULE_NAME | "no-sql-string-concat" => Ok(Some(Box::new(
-            no_sql_string_concat::NoSqlStringConcat::from_options(options)?,
-        ))),
-        _ => Ok(None),
-    }
 }

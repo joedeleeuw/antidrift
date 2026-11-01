@@ -1,18 +1,17 @@
 use antidrift_kernel::json_manifest::load_nearest_package_json_manifest;
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/docs-source-policy";
 const MAX_QUARANTINE_MS: i64 = 31 * 24 * 60 * 60 * 1000;
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct DocsSourcePolicyOptions {
+pub(crate) struct DocsSourcePolicyOptions {
     policy_file: Option<String>,
     dependencies: Option<Vec<String>>,
     sources: BTreeMap<String, DocSourceEntry>,
@@ -42,9 +41,10 @@ pub struct DocsSourcePolicy {
 
 pub static DEFAULT_RULE: DocsSourcePolicy = DocsSourcePolicy { options: None };
 
-impl DocsSourcePolicy {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<DocsSourcePolicyOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for DocsSourcePolicy {
+    type Options = DocsSourcePolicyOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         Ok(Self {
             options: Some(parsed),
         })

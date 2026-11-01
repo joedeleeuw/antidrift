@@ -4,20 +4,20 @@ use super::owned_union_source::{
 use super::union_owners::union_owners;
 use antidrift_kernel::local_binding::Binding;
 use antidrift_kernel::registries::OwnedUnion;
-use antidrift_kernel::rule_options::{EmptyVisitor, decode_rule_options};
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule_options::EmptyVisitor;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-redeclared-owned-union";
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct OwnedUnionOptions {
+pub(crate) struct OwnedUnionOptions {
     allows: BTreeSet<String>,
     statuses: BTreeMap<String, OwnedUnion>,
 }
@@ -40,9 +40,10 @@ pub static DEFAULT_RULE: NoRedeclaredOwnedUnion = NoRedeclaredOwnedUnion {
     },
 };
 
-impl NoRedeclaredOwnedUnion {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let options = decode_rule_options::<OwnedUnionOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoRedeclaredOwnedUnion {
+    type Options = OwnedUnionOptions;
+
+    fn from_options(options: Self::Options) -> Result<Self, String> {
         Ok(Self { options })
     }
 }

@@ -1,11 +1,10 @@
 use antidrift_kernel::callgraph::ProgramSymbolIndex;
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
 use tsrs_checker::Checker;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-closed-string-parameter";
 
@@ -20,13 +19,6 @@ const BOUNDARY_PROPERTIES: &[&str] = &["argv", "query", "headers"];
 pub struct NoClosedStringParameter;
 
 pub static DEFAULT_RULE: NoClosedStringParameter = NoClosedStringParameter;
-
-impl NoClosedStringParameter {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),

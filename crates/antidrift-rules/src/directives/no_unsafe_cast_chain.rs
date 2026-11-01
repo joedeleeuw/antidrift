@@ -1,8 +1,7 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{assertion_parts, is_const_assertion, unwrap_parentheses};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-unsafe-cast-chain";
 const MESSAGE: &str = "This assertion chain discards type evidence. Keep the original precise type, or parse untrusted input at its boundary before narrowing it.";
@@ -10,13 +9,6 @@ const MESSAGE: &str = "This assertion chain discards type evidence. Keep the ori
 pub struct NoUnsafeCastChain;
 
 pub static DEFAULT_RULE: NoUnsafeCastChain = NoUnsafeCastChain;
-
-impl NoUnsafeCastChain {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::AsExpression),

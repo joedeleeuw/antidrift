@@ -16,70 +16,23 @@ mod syntax;
 
 use crate::CatalogRule;
 use antidrift_kernel::scope_policy::ScopePolicy;
-use tsrslint::rule::Rule;
 
 #[must_use]
 pub fn rules() -> Vec<CatalogRule> {
     vec![
-        CatalogRule::everywhere(&no_async_array_method::DEFAULT_RULE),
+        CatalogRule::configured_everywhere(&no_async_array_method::DEFAULT_RULE),
         CatalogRule::everywhere(&no_async_context_enter_with::DEFAULT_RULE),
         CatalogRule::everywhere(&no_awaited_builder_union::DEFAULT_RULE),
-        CatalogRule::new(
+        CatalogRule::configured(
             &no_eager_singleton::DEFAULT_RULE,
             ScopePolicy::InferredRole(no_eager_singleton::inferred_role),
         ),
-        CatalogRule::everywhere(&no_sentinel_absence_fallback::DEFAULT_RULE),
+        CatalogRule::configured_everywhere(&no_sentinel_absence_fallback::DEFAULT_RULE),
         CatalogRule::everywhere(&no_spread_input_in_query_key::DEFAULT_RULE),
         CatalogRule::everywhere(&require_fetch_timeout::DEFAULT_RULE),
         CatalogRule::everywhere(&require_function_replacer::DEFAULT_RULE),
         CatalogRule::everywhere(&require_query_key_factory::DEFAULT_RULE),
-        CatalogRule::everywhere(&require_query_signal::DEFAULT_RULE),
+        CatalogRule::configured_everywhere(&require_query_signal::DEFAULT_RULE),
         CatalogRule::everywhere(&require_stream_reader_disposal::DEFAULT_RULE),
     ]
-}
-
-pub fn create_rule(
-    name: &str,
-    options: Option<&serde_json::Value>,
-) -> Result<Option<Box<dyn Rule>>, String> {
-    match name {
-        no_async_array_method::RULE_NAME | "no-async-array-method" => Ok(Some(Box::new(
-            no_async_array_method::NoAsyncArrayMethod::from_options(options)?,
-        ))),
-        no_async_context_enter_with::RULE_NAME | "no-async-context-enter-with" => Ok(Some(
-            Box::new(no_async_context_enter_with::NoAsyncContextEnterWith::from_options(options)?),
-        )),
-        no_awaited_builder_union::RULE_NAME | "no-awaited-builder-union" => Ok(Some(Box::new(
-            no_awaited_builder_union::NoAwaitedBuilderUnion::from_options(options)?,
-        ))),
-        no_eager_singleton::RULE_NAME | "no-eager-singleton" => Ok(Some(Box::new(
-            no_eager_singleton::NoEagerSingleton::from_options(options)?,
-        ))),
-        no_sentinel_absence_fallback::RULE_NAME | "no-sentinel-absence-fallback" => {
-            Ok(Some(Box::new(
-                no_sentinel_absence_fallback::NoSentinelAbsenceFallback::from_options(options)?,
-            )))
-        }
-        no_spread_input_in_query_key::RULE_NAME | "no-spread-input-in-query-key" => Ok(Some(
-            Box::new(no_spread_input_in_query_key::NoSpreadInputInQueryKey::from_options(options)?),
-        )),
-        require_fetch_timeout::RULE_NAME | "require-fetch-timeout" => Ok(Some(Box::new(
-            require_fetch_timeout::RequireFetchTimeout::from_options(options)?,
-        ))),
-        require_function_replacer::RULE_NAME | "require-function-replacer" => Ok(Some(Box::new(
-            require_function_replacer::RequireFunctionReplacer::from_options(options)?,
-        ))),
-        require_query_key_factory::RULE_NAME | "require-query-key-factory" => Ok(Some(Box::new(
-            require_query_key_factory::RequireQueryKeyFactory::from_options(options)?,
-        ))),
-        require_query_signal::RULE_NAME | "require-query-signal" => Ok(Some(Box::new(
-            require_query_signal::RequireQuerySignal::from_options(options)?,
-        ))),
-        require_stream_reader_disposal::RULE_NAME | "require-stream-reader-disposal" => {
-            Ok(Some(Box::new(
-                require_stream_reader_disposal::RequireStreamReaderDisposal::from_options(options)?,
-            )))
-        }
-        _ => Ok(None),
-    }
 }

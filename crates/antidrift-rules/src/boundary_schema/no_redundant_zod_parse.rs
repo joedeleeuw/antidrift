@@ -1,23 +1,15 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::{boundary, projection, provenance, tsrs_kernel};
 use rustc_hash::FxHashMap;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags, SourceFile, Symbol};
 use tsrs_checker::Checker;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-redundant-zod-parse";
 
 pub struct NoRedundantZodParse;
 
 pub static DEFAULT_RULE: NoRedundantZodParse = NoRedundantZodParse;
-
-impl NoRedundantZodParse {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::CallExpression)];
 

@@ -1,9 +1,8 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::{shape, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
 use tsrs_checker::{Checker, Type, TypeFlags};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrslint::utils::{
     get_call_signatures, get_construct_signatures, is_object_type, is_type_flag_set,
     union_type_parts,
@@ -263,13 +262,6 @@ fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
 pub struct NoAppeasementCast;
 
 pub static DEFAULT_INSTANCE: NoAppeasementCast = NoAppeasementCast;
-
-impl NoAppeasementCast {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options("antidrift/no-appeasement-cast", options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::AsExpression),

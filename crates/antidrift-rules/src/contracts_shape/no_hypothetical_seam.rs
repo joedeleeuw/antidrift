@@ -2,12 +2,12 @@ use super::test_only_seam::check_test_only_seams;
 use antidrift_kernel::callgraph::ProgramSymbolIndex;
 use antidrift_kernel::file_role;
 use antidrift_kernel::program_fact::ProgramFact;
-use antidrift_kernel::rule_options::{EmptyVisitor, reject_unknown_options};
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule_options::EmptyVisitor;
 use antidrift_kernel::{provenance, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_compiler::Program;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-hypothetical-seam";
 
@@ -36,13 +36,6 @@ const EFFECTFUL_MEMBERS: &[(&str, &str)] = &[
 pub struct NoHypotheticalSeam;
 
 pub static DEFAULT_RULE: NoHypotheticalSeam = NoHypotheticalSeam;
-
-impl NoHypotheticalSeam {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ClassDeclaration),

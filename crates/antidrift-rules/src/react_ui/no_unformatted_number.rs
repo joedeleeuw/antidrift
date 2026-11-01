@@ -1,12 +1,12 @@
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::jsx::{has_plain_attribute, plain_attribute_name, plain_element_name};
-use antidrift_kernel::rule_options::{decode_rule_options, require_non_empty};
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule_options::require_non_empty;
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::TypeFlags;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-unformatted-number";
 const DEFAULT_FORMATTER: &str = "Intl.NumberFormat(locale).format(value)";
@@ -30,7 +30,7 @@ const NON_DISPLAY_ATTRIBUTES: [&str; 11] = [
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct UnformattedNumberOptions {
+pub(crate) struct UnformattedNumberOptions {
     formatter: Option<String>,
 }
 
@@ -46,9 +46,10 @@ pub struct NoUnformattedNumber {
 
 pub static DEFAULT_RULE: NoUnformattedNumber = NoUnformattedNumber { formatter: None };
 
-impl NoUnformattedNumber {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<UnformattedNumberOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoUnformattedNumber {
+    type Options = UnformattedNumberOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         parsed.validate(RULE_NAME)?;
         Ok(Self {
             formatter: parsed.formatter,

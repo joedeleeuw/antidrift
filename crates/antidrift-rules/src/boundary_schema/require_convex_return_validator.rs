@@ -1,9 +1,9 @@
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::{boundary, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/require-convex-return-validator";
 
@@ -22,7 +22,7 @@ struct AllowedFunctionSpec {
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct ConvexValidatorOptions {
+pub(crate) struct ConvexValidatorOptions {
     allows: Vec<AllowedEntry>,
 }
 
@@ -34,9 +34,10 @@ pub static DEFAULT_RULE: RequireConvexReturnValidator = RequireConvexReturnValid
     allows: FxHashSet::with_hasher(rustc_hash::FxBuildHasher),
 };
 
-impl RequireConvexReturnValidator {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = super::decode_rule_options::<ConvexValidatorOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for RequireConvexReturnValidator {
+    type Options = ConvexValidatorOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         let mut allows = FxHashSet::default();
         for entry in parsed.allows {
             let name = match entry {

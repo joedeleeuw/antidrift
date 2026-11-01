@@ -1,11 +1,10 @@
 use super::repo_state_imports::collect_tainted_imports;
 use super::repo_state_taint::{literal_keyed_source_call, taint_root_name};
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-repo-state-mirror-assertion";
 
@@ -36,7 +35,7 @@ const CHAIN_MODIFIERS: &[&str] = &["not", "resolves", "rejects"];
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct RepoStateMirrorOptions {
+pub(crate) struct RepoStateMirrorOptions {
     sources: Vec<RepoStateSourceOption>,
 }
 
@@ -55,9 +54,10 @@ pub static DEFAULT_RULE: NoRepoStateMirrorAssertion = NoRepoStateMirrorAssertion
     sources: Vec::new(),
 };
 
-impl NoRepoStateMirrorAssertion {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<RepoStateMirrorOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoRepoStateMirrorAssertion {
+    type Options = RepoStateMirrorOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         Ok(Self {
             sources: parsed.sources,
         })

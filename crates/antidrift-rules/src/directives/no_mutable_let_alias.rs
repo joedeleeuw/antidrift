@@ -3,24 +3,16 @@ use super::alias_usage_scan::{
     has_loop_mutation, has_memo_cache_store, is_function_boundary, is_immediate_return,
     is_loop_node,
 };
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{enclosing_function, unwrap_expression};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-mutable-let-alias";
 
 pub struct NoMutableLetAlias;
 
 pub static DEFAULT_RULE: NoMutableLetAlias = NoMutableLetAlias;
-
-impl NoMutableLetAlias {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::Block)];
 

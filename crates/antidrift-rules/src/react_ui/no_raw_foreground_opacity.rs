@@ -1,8 +1,7 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::string_fragments::string_fragments;
 use tsrs_ast::Node;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-raw-foreground-opacity";
 const UTILITY_PREFIXES: [&str; 5] = ["text", "decoration", "bg", "border", "ring"];
@@ -12,13 +11,6 @@ const RAW_OPACITIES: [&str; 8] = ["40", "45", "50", "60", "64", "70", "72", "80"
 pub struct NoRawForegroundOpacity;
 
 pub static DEFAULT_RULE: NoRawForegroundOpacity = NoRawForegroundOpacity;
-
-impl NoRawForegroundOpacity {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 struct NoopVisitor;
 

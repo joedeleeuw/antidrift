@@ -1,7 +1,7 @@
 use antidrift_kernel::directives::split_identifier_words;
+use antidrift_kernel::rule::{Ctx, RuleMessage};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, RuleMessage};
 
 pub(super) fn check_redundant_owner_prefix(ctx: &mut Ctx, node: P<Node>) {
     let Some(name_node) = node.name().filter(|n| ast::is_identifier(*n)) else {

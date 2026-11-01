@@ -1,22 +1,12 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::{Checker, Type, TypeFlags};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
-
-const RULE_NAME: &str = "antidrift/no-nullable-positional-tuple";
 
 pub struct NoNullablePositionalTuple;
 
 pub static RULE: NoNullablePositionalTuple = NoNullablePositionalTuple {};
-
-impl NoNullablePositionalTuple {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 fn build_nullable_positional_tuple_message() -> RuleMessage {
     RuleMessage::new(

@@ -1,15 +1,14 @@
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/confine-owner";
 
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
-struct ConfineOptions {
+pub(crate) struct ConfineOptions {
     registry: Option<String>,
     entries: Vec<OwnerEntry>,
 }
@@ -89,9 +88,10 @@ pub static DEFAULT_RULE: ConfineOwner = ConfineOwner {
     entries: Vec::new(),
 };
 
-impl ConfineOwner {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<ConfineOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for ConfineOwner {
+    type Options = ConfineOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         if parsed.registry.as_ref().is_some_and(String::is_empty)
             || !parsed.entries.iter().all(OwnerEntry::valid)
         {

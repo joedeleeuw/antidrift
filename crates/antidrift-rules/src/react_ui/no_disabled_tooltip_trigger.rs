@@ -1,8 +1,7 @@
 use antidrift_kernel::jsx::{element_tag_name, find_attribute, render_prop_element};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-disabled-tooltip-trigger";
 const TOOLTIP_ELEMENTS: [&str; 3] = ["Tooltip", "TooltipRoot", "TooltipTrigger"];
@@ -12,13 +11,6 @@ const MESSAGE: &str = "A disabled Button receives no hover or focus, so this too
 pub struct NoDisabledTooltipTrigger;
 
 pub static DEFAULT_RULE: NoDisabledTooltipTrigger = NoDisabledTooltipTrigger;
-
-impl NoDisabledTooltipTrigger {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxElement),

@@ -1,11 +1,10 @@
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use tsrs_ast::{Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 use super::redundant_local_return::check_redundant_local_return;
 use super::redundant_owner_prefix::check_redundant_owner_prefix;
@@ -23,7 +22,7 @@ struct RawFieldBlockConfig {
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct StructuralTypeForkOptions {
+pub(crate) struct StructuralTypeForkOptions {
     field_blocks: RawFieldBlockConfig,
 }
 
@@ -71,9 +70,10 @@ fn validate_positive_threshold(
     Ok(resolved)
 }
 
-impl NoStructuralTypeFork {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<StructuralTypeForkOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoStructuralTypeFork {
+    type Options = StructuralTypeForkOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         let fb = parsed.field_blocks;
         Ok(Self {
             field_blocks: FieldBlockConfig {

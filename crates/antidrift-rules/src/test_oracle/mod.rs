@@ -21,25 +21,17 @@ mod validators;
 
 use crate::CatalogRule;
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::scope_policy::ScopePolicy;
 use rustc_hash::FxHashMap;
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-nonindependent-test-oracle";
 
 pub struct NoNonindependentTestOracle;
 
 pub static DEFAULT_RULE: NoNonindependentTestOracle = NoNonindependentTestOracle;
-
-impl NoNonindependentTestOracle {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),
@@ -108,40 +100,12 @@ pub fn rules() -> Vec<CatalogRule> {
             ScopePolicy::TestFilesOnly,
         ),
         CatalogRule::everywhere(&no_redacted_log_attribute_key::DEFAULT_RULE),
-        CatalogRule::new(
+        CatalogRule::configured(
             &no_repo_state_mirror_assertion::DEFAULT_RULE,
             ScopePolicy::TestFilesOnly,
         ),
-        CatalogRule::everywhere(&no_static_devtools_import::DEFAULT_RULE),
+        CatalogRule::configured_everywhere(&no_static_devtools_import::DEFAULT_RULE),
     ]
-}
-
-pub fn create_rule(
-    name: &str,
-    options: Option<&serde_json::Value>,
-) -> Result<Option<Box<dyn Rule>>, String> {
-    match name {
-        RULE_NAME | "no-nonindependent-test-oracle" => Ok(Some(Box::new(
-            NoNonindependentTestOracle::from_options(options)?,
-        ))),
-        no_placeholder_tests::RULE_NAME | "no-placeholder-tests" => Ok(Some(Box::new(
-            no_placeholder_tests::NoPlaceholderTests::from_options(options)?,
-        ))),
-        no_redacted_log_attribute_key::RULE_NAME | "no-redacted-log-attribute-key" => {
-            Ok(Some(Box::new(
-                no_redacted_log_attribute_key::NoRedactedLogAttributeKey::from_options(options)?,
-            )))
-        }
-        no_repo_state_mirror_assertion::RULE_NAME | "no-repo-state-mirror-assertion" => {
-            Ok(Some(Box::new(
-                no_repo_state_mirror_assertion::NoRepoStateMirrorAssertion::from_options(options)?,
-            )))
-        }
-        no_static_devtools_import::RULE_NAME | "no-static-devtools-import" => Ok(Some(Box::new(
-            no_static_devtools_import::NoStaticDevtoolsImport::from_options(options)?,
-        ))),
-        _ => Ok(None),
-    }
 }
 
 fn analyze_call(

@@ -30,16 +30,6 @@ layers.crates = [
 ]
 layers.modules.antidrift-kernel = ["provenance", "shape", "projection", "boundary", "callgraph"]
 
-[[workspace.metadata.antidrift.forbidden-calls]]
-callee = "Listener::Enter"
-argument = "Kind::SourceFile"
-reason = "Listener::Enter(Kind::SourceFile) never fires in tsrslint; attach listeners to statement/declaration kinds or use post-walk state."
-
-[[workspace.metadata.antidrift.forbidden-calls]]
-callee = "Listener::Exit"
-argument = "Kind::SourceFile"
-reason = "Listener::Exit(Kind::SourceFile) never fires in tsrslint; attach listeners to statement/declaration kinds or use post-walk state."
-
 [workspace.dependencies]
 antidrift-engine = { path = "crates/antidrift-engine" }
 antidrift-kernel = { path = "crates/antidrift-kernel" }

@@ -1,19 +1,18 @@
 use super::syntax::unwrap_expression;
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::runtime_lifecycle::{has_mtime_ordering_text, spans_multiple_artifact_tiers};
 use antidrift_kernel::tsrs_kernel::{cooked_text, is_function_like, node_text};
 use serde::Deserialize;
 use tsrs_ast::{Kind, Node};
 use tsrs_checker::{Checker, TypeFlags};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrslint::utils::{is_object_type, is_type_flag_set, is_union_type};
 
 pub const RULE_NAME: &str = "antidrift/no-sentinel-absence-fallback";
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct AbsenceOptions {
+pub(crate) struct AbsenceOptions {
     member_sentinels: bool,
 }
 
@@ -33,9 +32,10 @@ pub static DEFAULT_RULE: NoSentinelAbsenceFallback = NoSentinelAbsenceFallback {
     member_sentinels: true,
 };
 
-impl NoSentinelAbsenceFallback {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let decoded = decode_rule_options::<AbsenceOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoSentinelAbsenceFallback {
+    type Options = AbsenceOptions;
+
+    fn from_options(decoded: Self::Options) -> Result<Self, String> {
         Ok(Self {
             member_sentinels: decoded.member_sentinels,
         })

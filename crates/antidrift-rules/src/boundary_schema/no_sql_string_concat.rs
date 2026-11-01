@@ -3,13 +3,13 @@ use super::sql_text::{
     combined_template_text, is_sql_identifier_context, is_sql_interpolation_context,
     is_sql_statement, is_static_string, static_string_text,
 };
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel;
 use antidrift_kernel::tsrs_kernel::cooked_text_lossy;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::Checker;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-sql-string-concat";
 
@@ -23,7 +23,7 @@ const LISTENERS: &[Listener] = &[
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-pub struct SqlConcatOptions {
+pub(crate) struct SqlConcatOptions {
     pub safe_identifier_members: Vec<SafeIdentifierMemberSpec>,
     pub safe_template_tags: Vec<SafeTemplateTagSpec>,
 }
@@ -63,9 +63,10 @@ pub static DEFAULT_RULE: NoSqlStringConcat = NoSqlStringConcat {
     },
 };
 
-impl NoSqlStringConcat {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = super::decode_rule_options::<SqlConcatOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoSqlStringConcat {
+    type Options = SqlConcatOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         Ok(Self { options: parsed })
     }
 }

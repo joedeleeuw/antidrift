@@ -1,10 +1,10 @@
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::{boundary, provenance, tsrs_kernel};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags};
 use tsrs_checker::{Checker, ContextFlags, SignatureKind, TypeFlags};
 use tsrs_compiler::Program;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrslint::utils::{is_type_flag_set, type_to_string};
 
 pub const RULE_NAME: &str = "antidrift/unknown-input-must-be-decoded";
@@ -23,7 +23,7 @@ const LISTENERS: &[Listener] = &[
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-pub struct UnknownInputOptions {
+pub(crate) struct UnknownInputOptions {
     pub defensive_shape_probe_threshold: Option<usize>,
 }
 
@@ -50,9 +50,10 @@ pub static DEFAULT_RULE: UnknownInputMustBeDecoded = UnknownInputMustBeDecoded {
     probe_threshold: DEFAULT_PROBE_THRESHOLD,
 };
 
-impl UnknownInputMustBeDecoded {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = super::decode_rule_options::<UnknownInputOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for UnknownInputMustBeDecoded {
+    type Options = UnknownInputOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         let threshold = match parsed.defensive_shape_probe_threshold {
             Some(0) => {
                 return Err(format!(

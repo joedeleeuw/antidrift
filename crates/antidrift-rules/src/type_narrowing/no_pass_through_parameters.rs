@@ -1,8 +1,7 @@
 use antidrift_kernel::callgraph;
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 const RULE_NAME: &str = "antidrift/no-pass-through-parameters";
 
@@ -23,11 +22,6 @@ impl NoPassThroughParameters {
 }
 
 pub static DEFAULT_INSTANCE: NoPassThroughParameters = NoPassThroughParameters::DEFAULT;
-
-pub fn create(options: Option<&serde_json::Value>) -> Result<Box<dyn Rule>, String> {
-    reject_unknown_options(RULE_NAME, options)?;
-    Ok(Box::new(NoPassThroughParameters))
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),

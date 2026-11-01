@@ -6,7 +6,7 @@ use antidrift_kernel::local_binding::resolve_lexical_binding;
 use antidrift_kernel::provenance::{
     resolve_aliased_symbol, symbol_at_node, symbol_declarations, type_symbol,
 };
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{
     collect_return_expressions, enclosing_function, function_node_from_declaration,
     is_function_like, normalize_path, property_name_text, unwrap_expression,
@@ -15,7 +15,6 @@ use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, Symbol};
 use tsrs_checker::{Checker, SignatureKind, Type, TypeFlags};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrslint::utils::{is_type_flag_set, is_union_type};
 
 pub const RULE_NAME: &str = "antidrift/no-query-envelope-leak";
@@ -54,13 +53,6 @@ const QUERY_HOOK_CALL_NAMES: [&str; 5] = [
 pub struct NoQueryEnvelopeLeak;
 
 pub static DEFAULT_RULE: NoQueryEnvelopeLeak = NoQueryEnvelopeLeak;
-
-impl NoQueryEnvelopeLeak {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CallExpression),

@@ -1,9 +1,9 @@
 use crate::error::KernelError;
+use crate::rule::{Ctx, Listener, RuleVisitor};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tsrs_ast::Node;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, RuleVisitor};
 
 pub struct EmptyVisitor;
 

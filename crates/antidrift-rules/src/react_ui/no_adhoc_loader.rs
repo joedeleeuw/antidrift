@@ -1,10 +1,10 @@
 use antidrift_kernel::jsx::{opening_tag_name_node, plain_attribute_name, plain_element_name};
-use antidrift_kernel::rule_options::{decode_rule_options, require_non_empty};
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::rule_options::require_non_empty;
 use antidrift_kernel::tsrs_kernel::{cooked_text, unwrap_parentheses};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-adhoc-loader";
 const LOADER_ICON_NAMES: [&str; 4] = [
@@ -42,7 +42,7 @@ impl AllowedFile {
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct AdhocLoaderOptions {
+pub(crate) struct AdhocLoaderOptions {
     loader_icons: Option<Vec<String>>,
     owner: Option<String>,
     skeleton: Option<String>,
@@ -86,9 +86,10 @@ pub static DEFAULT_RULE: NoAdhocLoader = NoAdhocLoader {
     },
 };
 
-impl NoAdhocLoader {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<AdhocLoaderOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoAdhocLoader {
+    type Options = AdhocLoaderOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         parsed.validate(RULE_NAME)?;
         Ok(Self { options: parsed })
     }

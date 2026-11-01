@@ -1,4 +1,5 @@
 use antidrift_kernel::imports::FileImports;
+use antidrift_kernel::rule::{Ctx, RuleMessage};
 use antidrift_kernel::runtime_lifecycle::is_inline_hold_open_script;
 use antidrift_kernel::tsrs_kernel::{
     callee_name, cooked_text, is_function_like, property_name_text, unwrap_expression,
@@ -6,7 +7,6 @@ use antidrift_kernel::tsrs_kernel::{
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags, SourceFile};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, RuleMessage};
 
 const RAW_PROCESS_MODULES: &[&str] = &["node:child_process", "child_process"];
 const RAW_PROCESS_PRIMITIVES: &[&str] = &["spawn", "exec", "execFile", "fork", "spawnSync"];

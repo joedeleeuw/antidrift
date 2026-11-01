@@ -6,14 +6,13 @@ use antidrift_kernel::local_binding::{
     Binding, binding_pattern_identifiers, for_each_resolved_reference, resolve_lexical_binding,
 };
 use antidrift_kernel::relational_scan::{is_inner_linear_scan_method, is_outer_traversal_method};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{
     callee_name, is_function_like, numeric_literal_value, property_name_text, unwrap_expression,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-query-join-or-tree-reshape";
 
@@ -39,13 +38,6 @@ const LISTENERS: &[Listener] = &[
 pub struct NoQueryJoinOrTreeReshape;
 
 pub static DEFAULT_RULE: NoQueryJoinOrTreeReshape = NoQueryJoinOrTreeReshape;
-
-impl NoQueryJoinOrTreeReshape {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 impl Rule for NoQueryJoinOrTreeReshape {
     fn name(&self) -> &'static str {

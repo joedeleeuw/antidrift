@@ -1,17 +1,16 @@
 use super::web_provenance::property_name;
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use serde::Deserialize;
 use std::collections::BTreeSet;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/require-secure-document-response";
 
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
-struct DocumentResponseOptions {
+pub(crate) struct DocumentResponseOptions {
     all_responses: bool,
     headers_module: Option<String>,
     owner: Option<String>,
@@ -29,11 +28,11 @@ pub static DEFAULT_RULE: RequireSecureDocumentResponse = RequireSecureDocumentRe
     },
 };
 
-impl RequireSecureDocumentResponse {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        Ok(Self {
-            options: decode_rule_options::<DocumentResponseOptions>(RULE_NAME, options)?,
-        })
+impl crate::ConfigurableRule for RequireSecureDocumentResponse {
+    type Options = DocumentResponseOptions;
+
+    fn from_options(options: Self::Options) -> Result<Self, String> {
+        Ok(Self { options })
     }
 }
 

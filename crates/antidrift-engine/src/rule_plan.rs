@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 
 use antidrift_kernel::directives::is_inline_disabled;
 use antidrift_kernel::registries::PolicyRegistries;
-use antidrift_rules::{RuleCatalogEntry, all_entries, create_rule, lookup_entry};
+use antidrift_rules::{RuleCatalogEntry, all_entries, lookup_entry};
 use rustc_hash::FxHashMap;
 use serde_json::json;
 use tsrs_ast::SourceFile;
@@ -62,17 +62,7 @@ pub(crate) fn instantiate_rule(
     let rule_name = entry.rule.name();
     let split = split_scope_envelope(rule_name, options)?;
     let scope = RuleScope::from_scope_options(rule_name, &split.scope)?;
-    let rule: &'static dyn Rule = match split.rule_options {
-        None => entry.rule,
-        Some(rule_options) => {
-            let Some(custom) = create_rule(name, Some(&rule_options))? else {
-                return Err(format!(
-                    "rule '{rule_name}' is cataloged but no family factory builds it"
-                ));
-            };
-            Box::leak(custom)
-        }
-    };
+    let rule = entry.instantiate(split.rule_options.as_ref())?;
     Ok(Some(Box::leak(Box::new(Scoped::new(
         scope,
         entry.scope_policy,

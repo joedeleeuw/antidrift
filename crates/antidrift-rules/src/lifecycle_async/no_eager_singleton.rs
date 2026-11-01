@@ -1,10 +1,9 @@
 use super::syntax::is_function_like;
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-eager-singleton";
 
@@ -13,7 +12,7 @@ const DEFAULT_FACTORIES: &[&str] = &["createRedisClient", "postgres"];
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct SingletonOptions {
+pub(crate) struct SingletonOptions {
     constructors: Vec<String>,
     factories: Vec<String>,
 }
@@ -40,15 +39,18 @@ pub static DEFAULT_RULE: NoEagerSingleton = NoEagerSingleton {
     factories: None,
 };
 
-impl NoEagerSingleton {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let decoded = decode_rule_options::<SingletonOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoEagerSingleton {
+    type Options = SingletonOptions;
+
+    fn from_options(decoded: Self::Options) -> Result<Self, String> {
         Ok(Self {
             constructors: Some(decoded.constructors),
             factories: Some(decoded.factories),
         })
     }
+}
 
+impl NoEagerSingleton {
     fn has_constructor(&self, name: &str) -> bool {
         match &self.constructors {
             Some(list) => list.iter().any(|entry| entry == name),

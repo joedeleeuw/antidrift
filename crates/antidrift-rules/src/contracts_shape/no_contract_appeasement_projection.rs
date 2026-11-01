@@ -1,25 +1,15 @@
 use antidrift_kernel::file_role;
 use antidrift_kernel::outcome_shape::find_sum_to_product_pair;
 use antidrift_kernel::provenance::{DeclarationOrigin, classify_symbol_origin, symbol_at_node};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::{projection, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
-
-const RULE_NAME: &str = "antidrift/no-contract-appeasement-projection";
 
 pub struct NoContractAppeasementProjection;
 
 pub static RULE: NoContractAppeasementProjection = NoContractAppeasementProjection {};
-
-impl NoContractAppeasementProjection {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 fn build_contract_appeasement_projection_message() -> RuleMessage {
     RuleMessage::new(

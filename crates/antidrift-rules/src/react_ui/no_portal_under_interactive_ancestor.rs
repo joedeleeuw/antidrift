@@ -2,11 +2,10 @@ use antidrift_kernel::jsx::{
     attribute_initializer_expression, is_jsx_element_like, jsx_attributes_list,
     plain_attribute_name, plain_element_name,
 };
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-portal-under-interactive-ancestor";
 const WATCHED_HANDLERS: [&str; 9] = [
@@ -36,13 +35,6 @@ const HELPER_NAMES: [&str; 2] = ["containedEventHandler", "containedHandler"];
 pub struct NoPortalUnderInteractiveAncestor;
 
 pub static DEFAULT_RULE: NoPortalUnderInteractiveAncestor = NoPortalUnderInteractiveAncestor;
-
-impl NoPortalUnderInteractiveAncestor {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::JsxOpeningElement),

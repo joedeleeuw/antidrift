@@ -1,8 +1,8 @@
 use super::structural_fork_analysis::has_modifier;
+use antidrift_kernel::rule::{Ctx, RuleMessage};
 use antidrift_kernel::tsrs_kernel;
 use tsrs_ast::{Kind, ModifierFlags, Node, NodeFlags, SourceFile};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, RuleMessage};
 
 fn build_redundant_return_message(fn_name: &str, type_name: &str) -> RuleMessage {
     RuleMessage::new(

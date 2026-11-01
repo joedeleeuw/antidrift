@@ -6,6 +6,7 @@ use antidrift_kernel::local_binding::{
     collect_identifier_references_in_subtree, resolve_binding_source_expression,
 };
 use antidrift_kernel::projection::is_nullish_expression;
+use antidrift_kernel::rule::{Ctx, RuleMessage};
 use antidrift_kernel::tsrs_kernel::{
     collect_return_expressions, function_name, is_function_like, member_chain_root_identifier,
     member_chain_root_node, terminal_member_name, unwrap_awaited_expression, unwrap_expression,
@@ -13,7 +14,6 @@ use antidrift_kernel::tsrs_kernel::{
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_checker::Checker;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, RuleMessage};
 
 const FALLBACK_MESSAGE: &str = "Failure path drops the error and returns an empty collection, which makes bad data look valid. Let the error propagate or return a typed failure.";
 

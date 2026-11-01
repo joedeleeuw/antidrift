@@ -1,8 +1,7 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::string_fragments::class_fragments;
 use tsrs_ast::Node;
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-centered-scroll-column";
 const MESSAGE: &str = "Centered, width-capped column owns the vertical scroll (mx-auto + max-w-* + overflow-y-auto/scroll), so the scrollbar floats at the column edge instead of the pane edge next to the inspector rail. Move overflow to a full-width parent (e.g. flex-1 overflow-y-auto) and keep mx-auto/max-w-* on an inner content wrapper. (absolute/fixed/max-h-* boxes are exempt.)";
@@ -10,13 +9,6 @@ const MESSAGE: &str = "Centered, width-capped column owns the vertical scroll (m
 pub struct NoCenteredScrollColumn;
 
 pub static DEFAULT_RULE: NoCenteredScrollColumn = NoCenteredScrollColumn;
-
-impl NoCenteredScrollColumn {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 struct NoopVisitor;
 

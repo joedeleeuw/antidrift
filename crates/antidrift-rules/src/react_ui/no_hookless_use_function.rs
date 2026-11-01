@@ -1,13 +1,12 @@
 use std::path::Path;
 
 use antidrift_kernel::jsx::is_hook_name;
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{
     is_undefined_or_void_expression, normalize_path, property_name_text, unwrap_expression,
 };
 use tsrs_ast::{self as ast, Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-hookless-use-function";
 const PLATFORM_INFIXES: [&str; 4] = ["web", "native", "ios", "android"];
@@ -16,13 +15,6 @@ const CODE_EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mts", "mjs"];
 pub struct NoHooklessUseFunction;
 
 pub static DEFAULT_RULE: NoHooklessUseFunction = NoHooklessUseFunction;
-
-impl NoHooklessUseFunction {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::FunctionDeclaration),

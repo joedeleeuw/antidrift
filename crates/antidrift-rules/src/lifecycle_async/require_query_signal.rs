@@ -4,19 +4,18 @@ use super::syntax::{
     unwrap_expression,
 };
 use antidrift_kernel::local_binding::is_identifier_reference_position;
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/require-query-signal";
 
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct QuerySignalOptions {
+pub(crate) struct QuerySignalOptions {
     api_module: Option<String>,
 }
 
@@ -32,9 +31,10 @@ pub struct RequireQuerySignal {
 
 pub static DEFAULT_RULE: RequireQuerySignal = RequireQuerySignal { api_module: None };
 
-impl RequireQuerySignal {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let decoded = decode_rule_options::<QuerySignalOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for RequireQuerySignal {
+    type Options = QuerySignalOptions;
+
+    fn from_options(decoded: Self::Options) -> Result<Self, String> {
         Ok(Self {
             api_module: decoded.api_module,
         })

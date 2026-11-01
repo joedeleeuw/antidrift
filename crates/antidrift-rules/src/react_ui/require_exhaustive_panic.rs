@@ -1,16 +1,15 @@
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::unwrap_parentheses;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/require-exhaustive-panic";
 const MESSAGE: &str = "Terminate this unreachable branch with a throw or the configured exhaustive-failure owner; a never annotation has no runtime effect.";
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct ExhaustivePanicOptions {
+pub(crate) struct ExhaustivePanicOptions {
     failure_functions: Vec<String>,
 }
 
@@ -22,9 +21,10 @@ pub static DEFAULT_RULE: RequireExhaustivePanic = RequireExhaustivePanic {
     failure_functions: Vec::new(),
 };
 
-impl RequireExhaustivePanic {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<ExhaustivePanicOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for RequireExhaustivePanic {
+    type Options = ExhaustivePanicOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         Ok(Self {
             failure_functions: parsed.failure_functions,
         })

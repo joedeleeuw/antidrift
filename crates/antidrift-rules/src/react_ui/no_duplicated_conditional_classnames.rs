@@ -1,17 +1,16 @@
 use antidrift_kernel::jsx::attribute_name;
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{cooked_text, is_function_like, unwrap_expression};
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-duplicated-conditional-classnames";
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct ClassnameOptions {
+pub(crate) struct ClassnameOptions {
     attributes: Vec<String>,
     helpers: Vec<String>,
     min_shared_ratio: f64,
@@ -45,8 +44,8 @@ fn require_unique_names(field: &str, names: &[String]) -> Result<(), String> {
 }
 
 impl ClassnameOptions {
-    fn decode(raw: Option<&serde_json::Value>) -> Result<Self, String> {
-        let options = decode_rule_options::<Self>(RULE_NAME, raw)?;
+    fn validate(self) -> Result<Self, String> {
+        let options = self;
         require_unique_names("attributes", &options.attributes)?;
         require_unique_names("helpers", &options.helpers)?;
         if !(0.0..=1.0).contains(&options.min_shared_ratio) {
@@ -76,12 +75,17 @@ pub static DEFAULT_RULE: NoDuplicatedConditionalClassnames = NoDuplicatedConditi
     },
 };
 
-impl NoDuplicatedConditionalClassnames {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let decoded = ClassnameOptions::decode(options)?;
-        Ok(Self { options: decoded })
-    }
+impl crate::ConfigurableRule for NoDuplicatedConditionalClassnames {
+    type Options = ClassnameOptions;
 
+    fn from_options(options: Self::Options) -> Result<Self, String> {
+        Ok(Self {
+            options: options.validate()?,
+        })
+    }
+}
+
+impl NoDuplicatedConditionalClassnames {
     fn matches_attribute(&self, name: &str) -> bool {
         if self.options.attributes.is_empty() {
             matches!(name, "class" | "className")

@@ -3,7 +3,7 @@ use super::package_resolution::{
     resolution_config, resolve_dependency, resolver_with_mode, unresolved_module,
 };
 use antidrift_kernel::imports::{ModuleImport, extract_module_import};
-use antidrift_kernel::rule_options::decode_rule_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::ts_resolver::ResolutionMode;
 use oxc_resolver::{ResolveError, Resolver};
 use serde::Deserialize;
@@ -11,13 +11,12 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-unlisted-external-imports";
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
-struct DependencyOptions {
+pub(crate) struct DependencyOptions {
     internal_prefixes: Vec<String>,
     ancestor_dev_dependencies: bool,
 }
@@ -41,9 +40,10 @@ pub static DEFAULT_RULE: NoUnlistedExternalImports = NoUnlistedExternalImports {
     ancestor_dev_dependencies: true,
 };
 
-impl NoUnlistedExternalImports {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        let parsed = decode_rule_options::<DependencyOptions>(RULE_NAME, options)?;
+impl crate::ConfigurableRule for NoUnlistedExternalImports {
+    type Options = DependencyOptions;
+
+    fn from_options(parsed: Self::Options) -> Result<Self, String> {
         let internal_prefixes = parsed
             .internal_prefixes
             .into_iter()
@@ -54,7 +54,9 @@ impl NoUnlistedExternalImports {
             ancestor_dev_dependencies: parsed.ancestor_dev_dependencies,
         })
     }
+}
 
+impl NoUnlistedExternalImports {
     fn prefixes(&self) -> &[&str] {
         if self.internal_prefixes.is_empty() {
             &["@/", "~/"]

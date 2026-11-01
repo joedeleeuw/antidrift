@@ -4,13 +4,12 @@ use super::anemic_error_fallback::{
     is_error_member_read,
 };
 use antidrift_kernel::file_role::{FileRole, ProjectPath};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::tsrs_kernel::{
     cooked_text, property_name_text, unwrap_awaited_expression, unwrap_expression,
 };
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-anemic-errors";
 
@@ -43,13 +42,6 @@ const LOGGER_METHODS: &[&str] = &["debug", "error", "fatal", "info", "log", "tra
 pub struct NoAnemicErrors;
 
 pub static DEFAULT_RULE: NoAnemicErrors = NoAnemicErrors;
-
-impl NoAnemicErrors {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::CatchClause),

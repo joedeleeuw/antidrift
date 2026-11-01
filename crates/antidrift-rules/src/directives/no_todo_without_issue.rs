@@ -1,8 +1,7 @@
 use antidrift_kernel::directives::{scan_source_comments, split_identifier_words};
-use antidrift_kernel::rule_options::reject_unknown_options;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 pub const RULE_NAME: &str = "antidrift/no-todo-without-issue";
 
@@ -22,13 +21,6 @@ const AI_TOKENS: &[&str] = &[
 pub struct NoTodoWithoutIssue;
 
 pub static DEFAULT_RULE: NoTodoWithoutIssue = NoTodoWithoutIssue;
-
-impl NoTodoWithoutIssue {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options(RULE_NAME, options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[Listener::Enter(Kind::EndOfFile)];
 

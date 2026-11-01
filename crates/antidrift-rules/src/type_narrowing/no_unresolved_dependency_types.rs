@@ -1,13 +1,12 @@
-use antidrift_kernel::rule_options::reject_unknown_options;
 use antidrift_kernel::tsrs_kernel::cooked_text;
 use std::path::{Path, PathBuf};
 
 use antidrift_kernel::json_manifest::parse_package_json_manifest;
+use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::ts_resolver;
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{self as ast, Kind, Node};
 use tsrs_core::P;
-use tsrslint::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 
 struct DependencyResolution {
     missing_by_name: FxHashMap<String, String>,
@@ -179,13 +178,6 @@ fn module_resolves(
 pub struct NoUnresolvedDependencyTypes;
 
 pub static DEFAULT_INSTANCE: NoUnresolvedDependencyTypes = NoUnresolvedDependencyTypes;
-
-impl NoUnresolvedDependencyTypes {
-    pub fn from_options(options: Option<&serde_json::Value>) -> Result<Self, String> {
-        reject_unknown_options("antidrift/no-unresolved-dependency-types", options)?;
-        Ok(Self)
-    }
-}
 
 const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ImportDeclaration),
