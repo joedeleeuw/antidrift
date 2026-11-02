@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { collectTouchedModuleGraph } from "../src/change-scope/module-graph.mjs";
+import { checkRegistries } from "../src/policy/check-registries.mjs";
 import { dataFlowProbes } from "./headless-data-flow-probes.mjs";
 import { typeContractProbes } from "./headless-type-contract-probes.mjs";
 
@@ -84,26 +85,18 @@ const abstractionProbes = [
     source: `
       const MODES = ["fast", "slow"] as const;
       export function pickMode(mode: string) {
-        if (!MODES.includes(mode as (typeof MODES)[number])) {
-          throw new Error(\`unknown mode \${mode}\`);
-        }
+        if (!MODES.includes(mode as (typeof MODES)[number])) throw new Error(\`unknown mode \${mode}\`);
         return mode;
       }
       export function pickLevel(level: string) {
-        if (level !== "info" && level !== "warn") {
-          throw new Error("unknown level");
-        }
+        if (level !== "info" && level !== "warn") throw new Error("unknown level");
         return level;
       }
       export function render(text: string, verbose: boolean) {
-        if (verbose) {
-          return text.toUpperCase();
-        }
+        if (verbose) return text.toUpperCase();
         return text;
       }
-      export function main() {
-        return render(pickMode("fast") + pickLevel("info"), true);
-      }
+      export function main() { return render(pickMode("fast") + pickLevel("info"), true); }
     `,
     expectedCount: 3,
   },
@@ -113,35 +106,20 @@ const abstractionProbes = [
     file: "tooling/antidrift/src/__probe_closed_string_clean.ts",
     source: `
       export function decodeMode(mode: string, raw: unknown) {
-        if (mode !== "a" && mode !== "b") {
-          throw new Error("bad mode");
-        }
+        if (mode !== "a" && mode !== "b") throw new Error("bad mode");
         return raw;
       }
       export function requireA(mode: string) {
-        if (mode !== "a") {
-          throw new Error("bad mode");
-        }
+        if (mode !== "a") throw new Error("bad mode");
         return mode;
       }
-      export function setEnabled(on: boolean) {
-        return on ? 1 : 0;
-      }
-      export function stored(label: string, verbose: boolean) {
-        const keep = verbose;
-        return keep ? label : "";
-      }
+      export function setEnabled(on: boolean) { return on ? 1 : 0; }
+      export function stored(label: string, verbose: boolean) { const keep = verbose; return keep ? label : ""; }
       export function quiet(text: string, verbose: boolean) {
-        if (verbose) {
-          return text;
-        }
+        if (verbose) return text;
         return "";
       }
-      export function callers(flag: boolean) {
-        setEnabled(true);
-        stored("x", false);
-        return quiet("x", flag);
-      }
+      export function callers(flag: boolean) { setEnabled(true); stored("x", false); return quiet("x", flag); }
     `,
     expectedCount: 0,
   },
@@ -347,6 +325,57 @@ function verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace) {
   assert.equal(graph.touchedFiles[0]?.withinRadius, true);
 }
 
+function verifyRegistryAndRoleSmokes(binaryPath, repoRoot, workspace) {
+  const regDir = join(workspace, "reg-smoke/policy/registries");
+  mkdirSync(regDir, { recursive: true });
+  writeFileSync(join(regDir, "mcp.yaml"), "allowedServers: {}\n");
+  writeFileSync(
+    join(workspace, "reg-smoke/policy/agent-guardrails.yaml"),
+    "clusters:\n  - id: c\n    owner: o\n    rules:\n      - id: r\n        detector: fictionalDetector\n      - id: cross\n        detector: oxlint:boundaries/element-types\n"
+  );
+  const regErrors = [];
+  const ok = checkRegistries({
+    repoRoot,
+    policyDir: join(workspace, "reg-smoke/policy"),
+    report: (msg) => regErrors.push(msg),
+  });
+  assert.equal(ok, false);
+  assert.deepEqual(regErrors, [
+    "policy/registries/mcp.yaml has no registered reader (allowed: architecture, boundaries, domain, gateways, generated, react-native).",
+    "policy/agent-guardrails.yaml rule 'r' detector 'fictionalDetector' is not registered.",
+    "policy/agent-guardrails.yaml rule 'cross' detector 'oxlint:boundaries/element-types' is not registered.",
+  ]);
+  const roleRepo = join(workspace, "role-smoke");
+  for (const sub of ["policy/registries", "core/models", "build"])
+    mkdirSync(join(roleRepo, sub), { recursive: true });
+  writeFileSync(
+    join(roleRepo, "policy/registries/architecture.yaml"),
+    "layers:\n  models:\n    role: domain\n    roots:\n      - core/models/**\n    mayImport: []\n"
+  );
+  writeFileSync(
+    join(roleRepo, "tsconfig.json"),
+    '{ "compilerOptions": { "strict": true, "target": "es2022", "module": "esnext", "moduleResolution": "bundler" }, "include": ["core", "build"] }\n'
+  );
+  const shape =
+    "{ id: string; orgId: string; status: string; createdAt: number; updatedAt: number }";
+  writeFileSync(
+    join(roleRepo, "core/models/account.ts"),
+    `export type Account = ${shape};\n`
+  );
+  writeFileSync(
+    join(roleRepo, "build/reexport.ts"),
+    'export { type Account } from "../core/models/account.js";\n'
+  );
+  writeFileSync(
+    join(roleRepo, "build/fork.ts"),
+    `export type DupAccount = ${shape};\n`
+  );
+  assert.deepEqual(inferredFindings(binaryPath, roleRepo, "build"), [
+    "1 antidrift/no-structural-type-fork",
+    "1 antidrift/no-reexport-only-module",
+  ]);
+}
+
 export function proveInferredTypesSmoke(binaryPath, repoRoot) {
   const workspace = mkdtempSync(join(tmpdir(), "antidrift-inferred-types-"));
   try {
@@ -380,6 +409,7 @@ export function proveInferredTypesSmoke(binaryPath, repoRoot) {
       ["3 antidrift/no-unsafe-deserialize"]
     );
     verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace);
+    verifyRegistryAndRoleSmokes(binaryPath, repoRoot, workspace);
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }

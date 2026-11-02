@@ -59,6 +59,7 @@ const EXPECTED_CONFIGURED_RULES = {
   "apps/client/src/tw/index.tsx": [],
   "apps/client/src/screen.tsx": ["eslint(no-restricted-imports) error"],
   "domain/entity.ts": ["import(no-default-export) error"],
+  "domain/cross-layer.ts": ["boundaries(element-types) error"],
   "domain/migrations/001_init.ts": [],
 };
 

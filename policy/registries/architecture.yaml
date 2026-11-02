@@ -6,26 +6,21 @@ layers:
     roots: ["packages/ui/src/**"] # UI components should remain presentational and token-driven.
     mayImport: ["domain"]
   domain:
+    role: domain
     roots: ["packages/domain/src/**"] # Domain code must not depend on infrastructure.
     mayImport: []
   contracts:
+    role: domain
     roots: ["packages/contracts/src/**"] # Contracts may reference domain primitives only.
     mayImport: ["domain"]
   api:
+    role: boundary
     roots: ["packages/api/src/**"] # Server boundaries may compose domain, contracts, and gateways.
     mayImport: ["domain", "contracts", "gateways"]
   gateways:
+    role: boundary
     roots: ["packages/gateways/src/**"] # Gateways own direct external SDK/client integrations.
     mayImport: ["domain", "contracts"]
-
-publicEntrypoints:
-  - index.ts # Consumers should import module public APIs, not internal files.
-  - public.ts # Optional explicit public API file for larger modules.
-
-forbiddenImports:
-  - from: "apps/*/src/**" # Browser app code cannot import server internals.
-    to: "packages/api/src/**"
-  - from: "packages/ui/src/**" # UI must not reach infrastructure.
-    to: "packages/gateways/src/**"
-  - from: "packages/domain/src/**" # Domain must not depend on platform details.
-    to: "packages/api/src/**"
+  tooling:
+    roots: ["tooling/**"] # Tooling packages remain self-contained.
+    mayImport: ["tooling"]

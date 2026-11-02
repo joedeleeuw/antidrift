@@ -434,6 +434,9 @@ importers:
 
   tooling/antidrift:
     dependencies:
+      eslint-plugin-boundaries:
+        specifier: ^5.0.1
+        version: 5.4.0(@typescript-eslint/parser@8.72.0(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3))(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)
       oxlint:
         specifier: 1.89.0
         version: 1.89.0(oxlint-tsgolint@7.0.2005)

@@ -18,13 +18,22 @@ export interface AgentGuardrailsPolicy {
   clusters: PolicyCluster[];
 }
 
+export interface ArchitectureLayer {
+  role?: "domain" | "boundary";
+  roots: string[];
+  mayImport: string[];
+}
+
+export interface ArchitectureRegistry {
+  layers?: Record<string, ArchitectureLayer>;
+}
+
 export interface AntidriftRegistries {
   domain: unknown;
   gateways: unknown;
-  architecture: unknown;
+  architecture: ArchitectureRegistry;
   boundaries: unknown;
   generated: unknown;
-  ownership: unknown;
   reactNative: unknown;
 }
 

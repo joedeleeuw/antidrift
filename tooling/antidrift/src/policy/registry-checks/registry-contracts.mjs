@@ -42,15 +42,27 @@ export function stringArray(value, label, errors, { allowEmpty = false } = {}) {
 }
 
 function safeRepoPath(root, relativePath) {
+  if (typeof relativePath !== "string" || relativePath.length === 0) {
+    return null;
+  }
+  const normalized = relativePath
+    .replaceAll("\\", "/")
+    .replace(/^\.\//u, "")
+    .replace(/\/+$/u, "");
   if (
-    typeof relativePath !== "string" ||
-    relativePath.length === 0 ||
-    isAbsolute(relativePath) ||
-    /^[A-Za-z]:[\\/]/u.test(relativePath)
+    normalized.length === 0 ||
+    isAbsolute(normalized) ||
+    /^[A-Za-z]:\//u.test(normalized) ||
+    /[!*?{}()[\]]/u.test(normalized) ||
+    normalized
+      .split("/")
+      .some(
+        (segment) => segment.length === 0 || segment === "." || segment === ".."
+      )
   ) {
     return null;
   }
-  const target = resolve(root, relativePath);
+  const target = resolve(root, normalized);
   return target.startsWith(root + sep) ? target : null;
 }
 

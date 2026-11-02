@@ -69,6 +69,18 @@ const workspaceFiles = {
     "  ignorePatterns: [...new Set([...governance.ignorePatterns, ...tooling.ignorePatterns])],\n" +
     "  overrides: [...(tooling.overrides ?? []), ...governance.overrides],\n" +
     "};\n",
+  "react-native-policy/registries/architecture.yaml":
+    "layers:\n" +
+    "  domain:\n" +
+    "    role: domain\n" +
+    "    roots:\n" +
+    "      - domain/**\n" +
+    "    mayImport: []\n" +
+    "  configured:\n" +
+    "    roots:\n" +
+    "      - configured/**\n" +
+    "    mayImport:\n" +
+    "      - domain\n",
   "react-native-policy/registries/react-native.yaml":
     'replacementImport: "@/tw"\n' +
     "allowedFiles:\n" +
@@ -161,6 +173,8 @@ const workspaceFiles = {
   "configured/exempt-card.tsx":
     "export function ExemptCard(props: { title: string; body: string; footer: string }) {\n  return <article>{props.title}{props.body}{props.footer}</article>;\n}\n",
   "domain/entity.ts": "export default class Entity {}\n",
+  "domain/cross-layer.ts":
+    'import { top } from "../configured/cast.ts";\nexport const leak = top;\n',
   "domain/migrations/001_init.ts": "export default function up() {}\n",
   "oxlint.precedence.config.mjs":
     'import config from "./oxlint.config.mjs";\n' +

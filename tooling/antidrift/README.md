@@ -76,6 +76,7 @@ const tooling = createConfig({ repoRoot: import.meta.dirname });
 export default {
   ...tooling,
   jsPlugins: [...(tooling.jsPlugins ?? []), ...governance.jsPlugins],
+  settings: { ...tooling.settings, ...governance.settings },
   rules: {
     ...tooling.rules,
     ...governance.rules,

@@ -18,14 +18,20 @@ function loadOne(policyDir, name) {
   return YAML.parse(text) ?? {};
 }
 
+export const REGISTRY_FILES = {
+  architecture: "architecture",
+  boundaries: "boundaries",
+  domain: "domain",
+  gateways: "gateways",
+  generated: "generated",
+  reactNative: "react-native",
+};
+
 export function loadRegistriesSync(policyDir = "policy") {
-  return {
-    domain: loadOne(policyDir, "domain"),
-    gateways: loadOne(policyDir, "gateways"),
-    architecture: loadOne(policyDir, "architecture"),
-    boundaries: loadOne(policyDir, "boundaries"),
-    generated: loadOne(policyDir, "generated"),
-    ownership: loadOne(policyDir, "ownership"),
-    reactNative: loadOne(policyDir, "react-native"),
-  };
+  return Object.fromEntries(
+    Object.entries(REGISTRY_FILES).map(([key, file]) => [
+      key,
+      loadOne(policyDir, file),
+    ])
+  );
 }

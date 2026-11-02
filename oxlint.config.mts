@@ -1,5 +1,3 @@
-import { createRequire } from "node:module";
-
 import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";
 import {
   createConfig as createToolingConfig,
@@ -9,7 +7,6 @@ import {
 import { defineConfig } from "oxlint";
 import type { DummyRuleMap } from "oxlint";
 
-const packageRequire = createRequire(import.meta.url);
 const governance = createGovernanceOxlintConfig({
   repoRoot: import.meta.dirname,
 });
@@ -43,29 +40,15 @@ export default defineConfig({
       ...(tooling.ignorePatterns ?? []),
     ]),
   ],
-  jsPlugins: [
-    ...(tooling.jsPlugins ?? []),
-    ...(governance.jsPlugins ?? []),
-    {
-      name: "boundaries",
-      specifier: packageRequire.resolve("eslint-plugin-boundaries"),
-    },
-  ],
+  jsPlugins: [...(tooling.jsPlugins ?? []), ...(governance.jsPlugins ?? [])],
   options: {
     ...tooling.options,
     typeAware: true,
   },
   plugins: [...nativePlugins],
   settings: {
-    "boundaries/elements": [
-      { type: "app", pattern: "apps/*/src/**" },
-      { type: "ui", pattern: "packages/ui/src/**" },
-      { type: "domain", pattern: "packages/domain/src/**" },
-      { type: "contracts", pattern: "packages/contracts/src/**" },
-      { type: "api", pattern: "packages/api/src/**" },
-      { type: "gateways", pattern: "packages/gateways/src/**" },
-      { type: "tooling", pattern: "tooling/**" },
-    ],
+    ...tooling.settings,
+    ...governance.settings,
   },
   rules: {
     ...toolingBaseRules,
@@ -116,22 +99,6 @@ export default defineConfig({
     "unicorn/prefer-node-protocol": "error",
     "unicorn/require-post-message-target-origin": "error",
     curly: ["error", "multi-line"],
-    "boundaries/element-types": [
-      "error",
-      {
-        default: "disallow",
-        rules: [
-          { from: "app", allow: ["ui", "domain", "contracts"] },
-          { from: "ui", allow: ["domain"] },
-          { from: "domain", allow: [] },
-          { from: "contracts", allow: ["domain"] },
-          { from: "api", allow: ["domain", "contracts", "gateways"] },
-          { from: "gateways", allow: ["domain", "contracts"] },
-          { from: "tooling", allow: ["tooling"] },
-        ],
-      },
-    ],
-    "boundaries/no-private": "error",
     "import/no-cycle": ["error", { ignoreExternal: true }],
     "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
     "import/first": "error",

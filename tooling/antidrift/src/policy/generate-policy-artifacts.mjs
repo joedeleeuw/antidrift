@@ -19,7 +19,7 @@ async function write(path, content) {
 const POLICY_HEADER =
   "This file is generated from `policy/agent-guardrails.yaml` and the Rust rule levels in `Cargo.toml`. Do not edit it directly.";
 
-const AGENT_HOOKS = {
+export const AGENT_HOOKS = {
   PreToolUse: [
     {
       matcher: "Edit|Write|MultiEdit",

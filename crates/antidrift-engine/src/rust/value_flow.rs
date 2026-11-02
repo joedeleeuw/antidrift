@@ -4,7 +4,6 @@ use super::value_origin::{
     Bindings, Origin, Representation, UNTYPED_VALUE_METHODS, has_value_evidence,
     is_string_key_probe, is_value_path, is_value_type, peel_expr, serde_representation,
 };
-use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -18,10 +17,8 @@ pub(super) fn check_value_flow(
     ast: &syn::File,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
-    let boundary = ProjectPath::from_relative(rel_path).has_role(FileRole::Boundary);
     ValueFlow {
         rel_path,
-        boundary,
         index,
         scope: file_scope(path),
         bindings: Bindings::default(),
@@ -35,7 +32,6 @@ pub(super) fn check_value_flow(
 
 struct ValueFlow<'a, 'ast> {
     rel_path: &'a str,
-    boundary: bool,
     index: Option<&'a StructIndex<'ast>>,
     scope: Vec<String>,
     bindings: Bindings,
@@ -360,7 +356,7 @@ impl<'ast> Visit<'ast> for ValueFlow<'_, 'ast> {
         let string_probe = (node.method == "and_then" || node.method == "as_str")
             && is_string_key_probe(&node.receiver)
             && (self.probe_is_untyped(&node.receiver) || node.args.iter().any(has_value_evidence));
-        if !self.boundary && (specific || string_probe) {
+        if specific || string_probe {
             self.diagnostics.push(RustDiagnostic::error(
                 self.rel_path.to_owned(),
                 node.method.span().start().line.max(1),

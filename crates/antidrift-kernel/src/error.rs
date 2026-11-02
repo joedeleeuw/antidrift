@@ -28,6 +28,22 @@ pub enum KernelError {
         #[source]
         source: yaml_serde::Error,
     },
+    #[error(
+        "unknown registry '{stem}' in {path}; valid registries: architecture, boundaries, domain, gateways, generated, react-native",
+        path = .path.display()
+    )]
+    UnknownRegistry { stem: String, path: PathBuf },
+    #[error(
+        "invalid glob '{pattern}' in {key} registry ({path}): {source}",
+        path = .path.display()
+    )]
+    InvalidRegistryGlob {
+        key: &'static str,
+        pattern: String,
+        path: PathBuf,
+        #[source]
+        source: globset::Error,
+    },
 }
 
 impl From<KernelError> for String {

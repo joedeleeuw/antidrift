@@ -47,6 +47,7 @@ dependencies = [
 name = "antidrift-kernel"
 version = "0.21.1"
 dependencies = [
+ "globset",
  "oxc_resolver",
  "rustc-hash",
  "serde",

@@ -1,7 +1,3 @@
-canonicalEntities:
-  User: packages/domain/src/user.ts # User shape ownership belongs in the domain package.
-  Project: packages/domain/src/project.ts # Project shape ownership belongs in the domain package.
-
 statuses:
   UserStatus:
     owner: packages/domain/src/user.ts # Status strings must be imported from the canonical type.

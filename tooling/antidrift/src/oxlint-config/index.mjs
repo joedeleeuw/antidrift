@@ -1,4 +1,5 @@
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { createRequire } from "node:module";
+import { isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "oxlint";
@@ -8,6 +9,9 @@ import { loadNativeAddon } from "../policy/oxlint.mjs";
 
 const ANTIDRIFT_PLUGIN = fileURLToPath(
   new URL("../oxlint-plugin/index.mjs", import.meta.url)
+);
+const BOUNDARIES_PLUGIN = createRequire(import.meta.url).resolve(
+  "eslint-plugin-boundaries"
 );
 
 function antidriftRuleLevels(repoRoot) {
@@ -76,39 +80,36 @@ function generatedImportPatterns(registries) {
   );
 }
 
-function generatedRegistryPath(repoRoot, name, generated) {
+function generatedRegistryPath(name, generated) {
   const label = `policy/registries/generated.yaml generatedSources.${name}.generated`;
   if (typeof generated !== "string" || generated.length === 0) {
     throw new TypeError(`${label} must be a non-empty string.`);
   }
-  const normalized = generated.replaceAll("\\", "/");
+  const normalized = generated
+    .replaceAll("\\", "/")
+    .replace(/^\.\//u, "")
+    .replace(/\/+$/u, "");
   if (/[!*?{}()[\]]/u.test(normalized)) {
     throw new TypeError(
       `${label} must be an exact repo path without glob metacharacters.`
     );
   }
-  if (isAbsolute(normalized) || /^[A-Za-z]:\//u.test(normalized)) {
-    throw new TypeError(
-      `${label} must be a relative repo path below the repository root.`
-    );
-  }
-  const root = resolve(repoRoot);
-  const target = resolve(root, normalized);
-  const repoRelative = relative(root, target);
   if (
-    repoRelative.length === 0 ||
-    repoRelative === ".." ||
-    repoRelative.startsWith(`..${sep}`) ||
-    isAbsolute(repoRelative)
+    normalized.length === 0 ||
+    isAbsolute(normalized) ||
+    /^[A-Za-z]:\//u.test(normalized) ||
+    normalized
+      .split("/")
+      .some((seg) => seg.length === 0 || seg === "." || seg === "..")
   ) {
     throw new TypeError(
       `${label} must be a relative repo path below the repository root.`
     );
   }
-  return repoRelative.split(sep).join("/");
+  return normalized;
 }
 
-function generatedIgnorePatterns(registries, repoRoot) {
+function generatedIgnorePatterns(registries) {
   const patterns = new Set();
 
   for (const [name, entry] of Object.entries(
@@ -119,7 +120,7 @@ function generatedIgnorePatterns(registries, repoRoot) {
         `policy/registries/generated.yaml generatedSources.${name} must be a mapping.`
       );
     }
-    const pattern = generatedRegistryPath(repoRoot, name, entry.generated);
+    const pattern = generatedRegistryPath(name, entry.generated);
     patterns.add(pattern);
     patterns.add(`${pattern}/**`);
   }
@@ -233,12 +234,17 @@ function applicationExclusionOverrides(otherPatterns) {
   ];
 }
 
-const domainFiles = [
-  "domain/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
-  "**/domain/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
-  "model/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
-  "**/model/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
-];
+function domainLayerFiles(registries) {
+  return Object.values(registries.architecture?.layers ?? {})
+    .filter((layer) => layer?.role === "domain")
+    .flatMap((layer) => layer.roots ?? [])
+    .filter((root) => typeof root === "string" && root.length > 0)
+    .map((root) =>
+      root.endsWith("/**")
+        ? `${root.slice(0, -3)}/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}`
+        : root
+    );
+}
 
 const domainDefaultExportExclusions = [
   "**/__tests__/**",
@@ -252,10 +258,14 @@ const domainDefaultExportExclusions = [
   ]),
 ];
 
-function domainDefaultExportOverrides() {
+function domainDefaultExportOverrides(registries) {
+  const files = domainLayerFiles(registries);
+  if (files.length === 0) {
+    return [];
+  }
   return [
     {
-      files: domainFiles,
+      files,
       plugins: ["import"],
       rules: {
         "import/no-default-export": "error",
@@ -273,7 +283,6 @@ function domainDefaultExportOverrides() {
 
 const governanceIgnorePatterns = [
   "**/node_modules/**",
-  "**/dist/**",
   "**/coverage/**",
   "reports/**",
 ];
@@ -285,12 +294,56 @@ const declarationIgnorePatterns = [
   "**/*.tsbuildinfo",
 ];
 
-function governanceRules(restrictedImportPatterns) {
-  if (restrictedImportPatterns.length === 0) {
+function architectureLayers(registries) {
+  return Object.entries(registries.architecture?.layers ?? {}).filter(
+    ([, layer]) =>
+      layer &&
+      typeof layer === "object" &&
+      !Array.isArray(layer) &&
+      Array.isArray(layer.roots) &&
+      layer.roots.length > 0
+  );
+}
+
+function architectureBoundaryRules(layers) {
+  if (layers.length === 0) {
     return {};
   }
   return {
-    "no-restricted-imports": restrictedImportsRule(restrictedImportPatterns),
+    "boundaries/element-types": [
+      "error",
+      {
+        default: "disallow",
+        rules: layers.map(([from, layer]) => ({
+          from,
+          allow: Array.isArray(layer.mayImport) ? layer.mayImport : [],
+        })),
+      },
+    ],
+  };
+}
+
+function architectureBoundarySettings(layers) {
+  if (layers.length === 0) {
+    return undefined;
+  }
+  return {
+    "boundaries/elements": layers.flatMap(([type, layer]) =>
+      layer.roots.map((pattern) => ({ type, pattern }))
+    ),
+  };
+}
+
+function governanceRules(restrictedImportPatterns, layers) {
+  return {
+    ...(restrictedImportPatterns.length > 0
+      ? {
+          "no-restricted-imports": restrictedImportsRule(
+            restrictedImportPatterns
+          ),
+        }
+      : {}),
+    ...architectureBoundaryRules(layers),
   };
 }
 
@@ -299,32 +352,41 @@ export function createGovernanceOxlintConfig({
   policyDir = "policy",
 } = {}) {
   const registries = loadRegistriesSync(resolve(repoRoot, policyDir));
+  const layers = architectureLayers(registries);
   const generatedPatterns = generatedImportPatterns(registries);
   const reactNativePolicy = reactNativePolicyFor(registries.reactNative);
   const otherPatterns = [
     ...generatedPatterns,
     ...gatewayImportPatterns(registries),
   ];
+  const settings = architectureBoundarySettings(layers);
+  const allPatterns = [
+    ...otherPatterns,
+    ...touchableImportPatterns(reactNativePolicy),
+  ];
 
   return defineConfig({
-    jsPlugins: [ANTIDRIFT_PLUGIN],
+    jsPlugins: [
+      ANTIDRIFT_PLUGIN,
+      ...(layers.length > 0
+        ? [{ name: "boundaries", specifier: BOUNDARIES_PLUGIN }]
+        : []),
+    ],
+    ...(settings ? { settings } : {}),
     ignorePatterns: [
       ...governanceIgnorePatterns,
-      ...generatedIgnorePatterns(registries, repoRoot),
+      ...generatedIgnorePatterns(registries),
       ...declarationIgnorePatterns,
     ],
     rules: {
       ...antidriftRuleLevels(repoRoot),
-      ...governanceRules([
-        ...otherPatterns,
-        ...touchableImportPatterns(reactNativePolicy),
-      ]),
+      ...governanceRules(allPatterns, layers),
     },
     overrides: [
       ...gatewayWrapperOverrides(registries, generatedPatterns),
       ...touchableOwnerOverrides(reactNativePolicy, otherPatterns),
       ...applicationExclusionOverrides(otherPatterns),
-      ...domainDefaultExportOverrides(),
+      ...domainDefaultExportOverrides(registries),
     ],
   });
 }
