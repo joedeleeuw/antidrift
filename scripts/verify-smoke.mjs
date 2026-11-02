@@ -37,6 +37,14 @@ for (const [name, rule] of Object.entries(rules)) {
     "error",
     `Preset must enable antidrift/${name}`
   );
+  assert.ok(
+    rule.meta?.schema?.[0]?.properties?.files,
+    `Rule ${name} must accept 'files' in meta.schema`
+  );
+  assert.ok(
+    rule.meta?.schema?.[0]?.properties?.excludeFiles,
+    `Rule ${name} must accept 'excludeFiles' in meta.schema`
+  );
 }
 
 assert.deepEqual(oxlintPreset.jsPlugins, ["@joedeleeuw/antidrift"]);
@@ -49,6 +57,8 @@ import { Text as WidgetText } from "@expo/ui/swift-ui";
 import { z } from "zod";
 
 type HiddenUnknown = unknown;
+export const ORDER_MODES = ["fast", "slow"] as const;
+export type OrderMode = "fast" | "slow";
 
 interface FirstContract {
   id: string;
@@ -204,6 +214,7 @@ export function parseTwoStage(raw: unknown) {
 
 const expectedRules = [
   "antidrift/no-unknown-type-aliases",
+  "antidrift/no-redeclared-owned-union",
   "antidrift/no-structural-type-fork",
   "antidrift/no-compat-names",
   "antidrift/no-closed-string-parameter",

@@ -12,8 +12,12 @@ const FILLER_PREFIX = /^(?:my|the|some|temp|tmp)[A-Z_]/;
 const ABBREVIATION = /^([a-z]+)\d*$/;
 const SINGLE_LETTER = /^[a-hl-mo-wzA-HL-MO-WZ]$/;
 const EXEMPT_NAME =
-  /^(?:te?mp_?(?:dir|directory|file|path|root|base|home)s?|formData|imageData)$/i;
-const CONTEXT_TYPE_NAME = /(?:Ctx|Context)$/;
+  /^(?:te?mp_?(?:dir|directory|file|path|root|base|home)s?|formData|imageData|loaderData|actionData|routeData|staticData|metaData)$/i;
+const QUERY_BUILDER_METHODS = new Set([
+  "withIndex",
+  "withSearchIndex",
+  "filter",
+]);
 const FUNCTION_TYPES = new Set([
   "ArrowFunctionExpression",
   "FunctionDeclaration",
@@ -70,36 +74,6 @@ function duplicateContextWord(name) {
   return null;
 }
 
-function* typeReferenceNames(typeNode) {
-  if (!typeNode) return;
-  switch (typeNode.type) {
-    case "TSTypeAnnotation":
-      yield* typeReferenceNames(typeNode.typeAnnotation);
-      return;
-    case "TSTypeReference": {
-      const { typeName } = typeNode;
-      yield typeName.type === "TSQualifiedName"
-        ? typeName.right.name
-        : typeName.name;
-      return;
-    }
-    case "TSUnionType":
-    case "TSIntersectionType":
-      for (const member of typeNode.types) yield* typeReferenceNames(member);
-      return;
-    default:
-  }
-}
-
-function* typeSymbolNames(type) {
-  if (!type) return;
-  if (type.isUnionOrIntersection()) {
-    for (const member of type.types) yield* typeSymbolNames(member);
-  }
-  if (type.aliasSymbol) yield type.aliasSymbol.name;
-  if (type.symbol) yield type.symbol.name;
-}
-
 function* patternIdentifiers(node) {
   if (!node) return;
   switch (node.type) {
@@ -117,9 +91,22 @@ function* patternIdentifiers(node) {
       return;
     case "ObjectPattern":
       for (const property of node.properties) {
-        yield* patternIdentifiers(
-          property.type === "RestElement" ? property : property.value
-        );
+        if (property.type === "RestElement") {
+          yield* patternIdentifiers(property);
+          continue;
+        }
+        if (
+          !property.computed &&
+          property.key?.type === "Identifier" &&
+          ((property.value?.type === "Identifier" &&
+            property.value.name === property.key.name) ||
+            (property.value?.type === "AssignmentPattern" &&
+              property.value.left?.type === "Identifier" &&
+              property.value.left.name === property.key.name))
+        ) {
+          continue;
+        }
+        yield* patternIdentifiers(property.value);
       }
       return;
     case "TSParameterProperty":
@@ -152,30 +139,86 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const services =
-      context.sourceCode?.parserServices ?? context.parserServices;
-    const checker = services?.program?.getTypeChecker?.();
 
-    // `ctx` is a framework's own vocabulary when the binding's type says so:
-    // a declared `QueryCtx | MutationCtx`, a local alias such as `DatabaseCtx`,
-    // or, with type services, the context type a handler slot infers.
-    function isFrameworkContext(identifier) {
-      if (identifier.name !== "ctx") return false;
-      if (identifier.typeAnnotation) {
-        return [...typeReferenceNames(identifier.typeAnnotation)].some((name) =>
-          CONTEXT_TYPE_NAME.test(name)
-        );
+    function isParameterIdentifier(identifier) {
+      let cur = identifier;
+      while (cur?.parent) {
+        const parent = cur.parent;
+        if (FUNCTION_TYPES.has(parent.type)) {
+          return parent.params.includes(cur);
+        }
+        if (
+          parent.type === "AssignmentPattern" ||
+          parent.type === "RestElement" ||
+          parent.type === "ArrayPattern" ||
+          parent.type === "ObjectPattern" ||
+          parent.type === "Property" ||
+          parent.type === "TSParameterProperty"
+        ) {
+          cur = parent;
+          continue;
+        }
+        return false;
       }
-      const tsNode = services?.esTreeNodeToTSNodeMap?.get(identifier);
-      if (!checker || !tsNode) return false;
-      return [...typeSymbolNames(checker.getTypeAtLocation(tsNode))].some(
-        (name) => CONTEXT_TYPE_NAME.test(name)
+      return false;
+    }
+
+    function isQueryBuilderParam(identifier) {
+      if (identifier.name !== "q") return false;
+      const fnNode = identifier.parent;
+      if (
+        !FUNCTION_TYPES.has(fnNode?.type) ||
+        fnNode.params[0] !== identifier
+      ) {
+        return false;
+      }
+      const callNode = fnNode.parent;
+      return (
+        callNode?.type === "CallExpression" &&
+        callNode.callee?.type === "MemberExpression" &&
+        !callNode.callee.computed &&
+        callNode.callee.property?.type === "Identifier" &&
+        QUERY_BUILDER_METHODS.has(callNode.callee.property.name)
+      );
+    }
+
+    function isUnknownCandidateParam(identifier) {
+      if (identifier.name !== "value") return false;
+      if (
+        identifier.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword"
+      ) {
+        return true;
+      }
+      const fnNode = identifier.parent;
+      return (
+        FUNCTION_TYPES.has(fnNode?.type) &&
+        fnNode.returnType?.typeAnnotation?.type === "TSTypePredicate"
+      );
+    }
+
+    function isTestHarnessVariable(identifier) {
+      if (identifier.name !== "t") return false;
+      const decl = identifier.parent;
+      if (decl?.type !== "VariableDeclarator" || decl.id !== identifier) {
+        return false;
+      }
+      const init = decl.init;
+      return (
+        init?.type === "CallExpression" &&
+        init.callee?.type === "Identifier" &&
+        (init.callee.name === "convexTest" ||
+          init.callee.name === "useTranslation")
       );
     }
 
     function check(identifier) {
       if (identifier?.type !== "Identifier") return;
-      if (isFrameworkContext(identifier)) return;
+      if (identifier.name === "ctx" && isParameterIdentifier(identifier)) {
+        return;
+      }
+      if (isQueryBuilderParam(identifier)) return;
+      if (isUnknownCandidateParam(identifier)) return;
+      if (isTestHarnessVariable(identifier)) return;
       const reason = vagueReason(identifier.name);
       if (reason) {
         context.report({

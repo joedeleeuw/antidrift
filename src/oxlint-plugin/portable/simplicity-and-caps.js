@@ -13,20 +13,31 @@ function nonBlankLineCount(text) {
   return count;
 }
 
-function createLineCapRule({ unitLabel, warnAbove, max, filterNode }) {
+function createLineCapRule({
+  unitLabel,
+  warnAbove: defaultWarnAbove,
+  max: defaultMax,
+  filterNode,
+}) {
+  const capSchema = [
+    {
+      type: "object",
+      properties: {
+        ...scopeProperties,
+        max: { type: "number" },
+        warnAbove: { type: "number" },
+      },
+      additionalProperties: false,
+    },
+  ];
   const baseRule = {
     meta: {
       type: "problem",
-      schema: [
-        {
-          type: "object",
-          properties: scopeProperties,
-          additionalProperties: false,
-        },
-      ],
+      schema: capSchema,
     },
     create(context) {
       if (!isRuleFile(context)) return {};
+      const max = context.options[0]?.max ?? defaultMax;
       const sourceCode = context.sourceCode;
       if (!filterNode) {
         return {
@@ -61,16 +72,12 @@ function createLineCapRule({ unitLabel, warnAbove, max, filterNode }) {
   const nearRule = {
     meta: {
       type: "suggestion",
-      schema: [
-        {
-          type: "object",
-          properties: scopeProperties,
-          additionalProperties: false,
-        },
-      ],
+      schema: capSchema,
     },
     create(context) {
       if (!isRuleFile(context)) return {};
+      const max = context.options[0]?.max ?? defaultMax;
+      const warnAbove = context.options[0]?.warnAbove ?? defaultWarnAbove;
       const sourceCode = context.sourceCode;
       if (!filterNode) {
         return {
@@ -112,11 +119,30 @@ export const moduleLineCaps = createLineCapRule({
   filterNode: null,
 });
 
+const TEST_SUITE_CALLEES = new Set(["describe", "suite", "context"]);
+
+function isTestSuiteCallback(node) {
+  const parent = node.parent;
+  if (parent?.type !== "CallExpression" || !parent.arguments.includes(node)) {
+    return false;
+  }
+  const callee = parent.callee;
+  if (callee?.type === "Identifier") {
+    return TEST_SUITE_CALLEES.has(callee.name);
+  }
+  return (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object?.type === "Identifier" &&
+    TEST_SUITE_CALLEES.has(callee.object.name)
+  );
+}
+
 export const functionLineCaps = createLineCapRule({
   unitLabel: "Function",
   warnAbove: 40,
   max: 50,
-  filterNode: (node) => !functionReturnsJsx(node),
+  filterNode: (node) => !functionReturnsJsx(node) && !isTestSuiteCallback(node),
 });
 
 export const componentLineCaps = createLineCapRule({

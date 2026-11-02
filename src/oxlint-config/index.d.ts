@@ -1,3 +1,5 @@
+export declare const defaultIgnorePatterns: readonly string[];
+
 export declare const recommendedRules: Readonly<Record<string, "error">>;
 
 export interface CreateOxlintConfigOptions {
@@ -7,9 +9,9 @@ export interface CreateOxlintConfigOptions {
 }
 
 export interface AntidriftOxlintConfig {
-  readonly jsPlugins: readonly string[];
-  readonly rules: Readonly<Record<string, unknown>>;
-  readonly ignorePatterns?: readonly string[];
+  readonly jsPlugins: string[];
+  readonly rules: Record<string, unknown>;
+  readonly ignorePatterns: string[];
 }
 
 export declare function createOxlintConfig(

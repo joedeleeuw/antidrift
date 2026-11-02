@@ -116,8 +116,47 @@ import ruleNoRedeclaredOwnedUnion from "./rules/no-redeclared-owned-union.js";
 import ruleNoRepoStateMirrorAssertion from "./rules/no-repo-state-mirror-assertion.js";
 import ruleNoSentinelAbsenceFallback from "./rules/no-sentinel-absence-fallback.js";
 import requireEffectDepsRule from "./rules/require-effect-deps.js";
+import { isRuleFile, scopeProperties } from "./shared/rule-scope.js";
 
-export const rules = {
+function withRuleScope(rule) {
+  const existingSchema = Array.isArray(rule.meta?.schema)
+    ? rule.meta.schema
+    : [];
+  const firstSchema = existingSchema[0];
+  const mergedSchema =
+    firstSchema && typeof firstSchema === "object"
+      ? [
+          {
+            ...firstSchema,
+            properties: {
+              ...scopeProperties,
+              ...firstSchema.properties,
+            },
+          },
+          ...existingSchema.slice(1),
+        ]
+      : [
+          {
+            type: "object",
+            properties: scopeProperties,
+            additionalProperties: false,
+          },
+        ];
+
+  return {
+    ...rule,
+    meta: {
+      ...rule.meta,
+      schema: mergedSchema,
+    },
+    create(context) {
+      if (!isRuleFile(context)) return {};
+      return rule.create(context);
+    },
+  };
+}
+
+const rawRules = {
   "confine-owner": confineOwnerRule,
   "docs-source-policy": docsSourcePolicyRule,
   "icon-button-requires-tooltip": iconButtonRequiresTooltipRule,
@@ -226,6 +265,10 @@ export const rules = {
   "require-stream-reader-disposal": requireStreamReaderDisposalRule,
   "unknown-input-must-be-decoded": unknownInputMustBeDecodedRule,
 };
+
+export const rules = Object.fromEntries(
+  Object.entries(rawRules).map(([name, rule]) => [name, withRuleScope(rule)])
+);
 
 export const antidriftPlugin = {
   meta: {

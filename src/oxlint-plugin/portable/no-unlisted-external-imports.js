@@ -22,6 +22,7 @@ export default {
           ...scopeProperties,
           internalPrefixes: { type: "array", items: { type: "string" } },
           ancestorDevDependencies: { type: "boolean" },
+          allowDevDependencies: { type: "boolean" },
         },
         additionalProperties: false,
       },
@@ -36,18 +37,19 @@ export default {
   create(context) {
     if (!isRuleFile(context)) return {};
 
+    const allowDevDeps = context.options[0]?.allowDevDependencies !== false;
     const owner = packageOwner(context.filename ?? context.getFilename());
     const manifest = owner?.manifest ?? {};
     const dependencies = new Set([
       manifest.name,
       ...[
         manifest.dependencies,
-        manifest.devDependencies,
+        ...(allowDevDeps ? [manifest.devDependencies] : []),
         manifest.peerDependencies,
         manifest.optionalDependencies,
       ].flatMap((group) => Object.keys(group ?? {})),
     ]);
-    if (context.options[0]?.ancestorDevDependencies !== false) {
+    if (allowDevDeps && context.options[0]?.ancestorDevDependencies !== false) {
       let current = owner;
       while (current && dirname(current.directory) !== current.directory) {
         current = packageOwner(

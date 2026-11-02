@@ -1,30 +1,14 @@
 import {
-  exportedArrays,
+  astLiteralValue,
+  exportedArraysFromProgram,
   importedArrays,
   memberSet,
 } from "../owned-union-source.js";
+import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import { canonicalStatusLiteralOwner, findVariable } from "../shared/scope.js";
 
 function fileMatchesPath(filename, filePath) {
   return filename.replace(/\\/gu, "/").endsWith(filePath.replace(/\\/gu, "/"));
-}
-
-function literalValue(node) {
-  if (node?.type === "TSLiteralType") return literalValue(node.literal);
-  if (
-    node?.type === "Literal" &&
-    ["string", "number"].includes(typeof node.value)
-  ) {
-    return node.value;
-  }
-  if (
-    node?.type === "UnaryExpression" &&
-    node.operator === "-" &&
-    typeof node.argument.value === "number"
-  ) {
-    return -node.argument.value;
-  }
-  return null;
 }
 
 function convexMethod(node, method, sourceCode) {
@@ -67,7 +51,7 @@ function validatorMembers(node, sourceCode) {
       ) {
         return null;
       }
-      return literalValue(argument.arguments[0]);
+      return astLiteralValue(argument.arguments[0]);
     })
   );
 }
@@ -168,6 +152,7 @@ export default function ruleNoRedeclaredOwnedUnion() {
         {
           type: "object",
           properties: {
+            ...scopeProperties,
             allows: {
               type: "array",
               items: { type: "string" },
@@ -184,6 +169,7 @@ export default function ruleNoRedeclaredOwnedUnion() {
       },
     },
     create(context) {
+      if (!isRuleFile(context)) return {};
       const sourceCode = context.sourceCode;
       const allows = new Set(context.options[0]?.allows ?? []);
       const statuses = context.options[0]?.statuses ?? {};
@@ -208,14 +194,12 @@ export default function ruleNoRedeclaredOwnedUnion() {
       return {
         Program(node) {
           const cache = new Map();
-          owners = exportedArrays(context.filename, sourceCode.text).map(
-            (array) => ({
-              ...array,
-              name: array.local,
-              binding: array.local,
-              variable: localOwnerVariable(node, sourceCode, array.local),
-            })
-          );
+          owners = exportedArraysFromProgram(node).map((array) => ({
+            ...array,
+            name: array.local,
+            binding: array.local,
+            variable: localOwnerVariable(node, sourceCode, array.local),
+          }));
           for (const statement of node.body) {
             if (statement.type === "ImportDeclaration") {
               owners.push(...importOwners(statement, context, cache));
@@ -226,7 +210,7 @@ export default function ruleNoRedeclaredOwnedUnion() {
           if (node.typeAnnotation.type !== "TSUnionType") return;
           report(
             node.typeAnnotation,
-            memberSet(node.typeAnnotation.types.map(literalValue)),
+            memberSet(node.typeAnnotation.types.map(astLiteralValue)),
             node.id.name
           );
         },

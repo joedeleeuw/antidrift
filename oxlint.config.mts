@@ -108,6 +108,10 @@ export default defineConfig({
         "antidrift/max-module-lines": "off",
         "antidrift/no-pass-through-parameters": "off",
         "antidrift/no-query-join-or-tree-reshape": "off",
+        "antidrift/no-unlisted-external-imports": [
+          "error",
+          { allowDevDependencies: false },
+        ],
         "antidrift/no-vague-names": "off",
       },
     },

@@ -16,10 +16,14 @@ function scopePatterns(options, field) {
   return patterns.filter((pattern) => typeof pattern === "string");
 }
 
+const IGNORED_PATH_RE =
+  /(?:^|\/)(?:node_modules|dist|build|coverage|\.output|\.nitro|\.tanstack|\.sst|\.vinxi|\.next|\.expo|\.wrangler|_generated|\.agents|\.claude|\.sudocode|\.scratch|\.agent-sources|\.repos|src-tauri\/target|src-tauri\/gen)\/|\.(?:gen|min|umd|bundle)\.[cm]?[jt]sx?$|\.d\.[cm]?ts$/u;
+
 export function isRuleFile(context, inferredScope) {
   const [options] = context.options ?? [];
   const rawFilename = context.filename ?? context.getFilename?.() ?? "";
   const filename = rawFilename.replaceAll("\\", "/");
+  if (IGNORED_PATH_RE.test(filename)) return false;
   const cwd = context.cwd ?? context.getCwd?.() ?? process.cwd();
   const local = isAbsolute(filename)
     ? relative(cwd, filename).replaceAll("\\", "/")

@@ -1,3 +1,5 @@
+import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+
 const defaultAttributes = ["class", "className"];
 const defaultHelpers = [];
 const defaultOptions = {
@@ -11,6 +13,8 @@ const optionKeys = new Set([
   "helpers",
   "minSharedRatio",
   "minSharedTokens",
+  "files",
+  "excludeFiles",
 ]);
 
 function unwrapExpression(node) {
@@ -141,7 +145,8 @@ function normalizeOptionShape(options) {
 function normalizedOptions(rawOptions) {
   if (rawOptions === undefined) return normalizeOptionShape(defaultOptions);
   if (!isRecord(rawOptions)) invalidOptions("must be an object.");
-  return normalizeOptionShape(rawOptions);
+  requireKnownKeys(rawOptions);
+  return normalizeOptionShape({ ...defaultOptions, ...rawOptions });
 }
 
 function isFunctionBoundary(node) {
@@ -240,13 +245,8 @@ export default function ruleNoDuplicatedConditionalClassnames() {
         {
           type: "object",
           additionalProperties: false,
-          required: [
-            "attributes",
-            "helpers",
-            "minSharedRatio",
-            "minSharedTokens",
-          ],
           properties: {
+            ...scopeProperties,
             attributes: {
               type: "array",
               items: { type: "string", minLength: 1 },
@@ -275,6 +275,7 @@ export default function ruleNoDuplicatedConditionalClassnames() {
       },
     },
     create(context) {
+      if (!isRuleFile(context)) return {};
       const options = normalizedOptions(context.options?.[0]);
       return {
         ConditionalExpression(node) {

@@ -1,14 +1,17 @@
-import { recommendedRules } from "../oxlint-config/index.js";
+import {
+  defaultIgnorePatterns,
+  recommendedRules,
+} from "../oxlint-config/index.js";
 import { antidriftPlugin } from "../oxlint-plugin/index.js";
 
-export { recommendedRules };
+export { defaultIgnorePatterns, recommendedRules };
 
 export function createEslintConfig(options = {}) {
-  const { files, ignores, rules: ruleOverrides = {} } = options;
+  const { files, ignores = [], rules: ruleOverrides = {} } = options;
   return {
     name: "antidrift/recommended",
     ...(Array.isArray(files) && files.length > 0 ? { files } : {}),
-    ...(Array.isArray(ignores) && ignores.length > 0 ? { ignores } : {}),
+    ignores: [...new Set([...defaultIgnorePatterns, ...ignores])],
     plugins: {
       antidrift: antidriftPlugin,
     },

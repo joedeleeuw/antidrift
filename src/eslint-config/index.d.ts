@@ -1,5 +1,7 @@
 import type { antidriftPlugin } from "../oxlint-plugin/index.js";
 
+export declare const defaultIgnorePatterns: readonly string[];
+
 export declare const recommendedRules: Readonly<Record<string, "error">>;
 
 export interface CreateEslintConfigOptions {
@@ -11,11 +13,11 @@ export interface CreateEslintConfigOptions {
 export interface AntidriftEslintConfig {
   readonly name: "antidrift/recommended";
   readonly files?: readonly string[];
-  readonly ignores?: readonly string[];
+  readonly ignores: string[];
   readonly plugins: {
     readonly antidrift: typeof antidriftPlugin;
   };
-  readonly rules: Readonly<Record<string, unknown>>;
+  readonly rules: Record<string, unknown>;
 }
 
 export declare function createEslintConfig(
