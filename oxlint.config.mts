@@ -1,4 +1,3 @@
-import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";
 import {
   createConfig as createToolingConfig,
   typescriptSyntaxRules,
@@ -7,8 +6,10 @@ import {
 import { defineConfig } from "oxlint";
 import type { DummyRuleMap } from "oxlint";
 
-const governance = createGovernanceOxlintConfig({
-  repoRoot: import.meta.dirname,
+import { createOxlintConfig } from "./src/oxlint-config/index.js";
+
+const antidrift = createOxlintConfig({
+  pluginSpecifier: "./src/oxlint-plugin/index.js",
 });
 const tooling = createToolingConfig({
   repoRoot: import.meta.dirname,
@@ -35,12 +36,10 @@ export default defineConfig({
     node: true,
   },
   ignorePatterns: [
-    ...new Set([
-      ...(governance.ignorePatterns ?? []),
-      ...(tooling.ignorePatterns ?? []),
-    ]),
+    ...new Set(tooling.ignorePatterns ?? []),
+    "src/oxlint-plugin/anti-slop/**",
   ],
-  jsPlugins: [...(tooling.jsPlugins ?? []), ...(governance.jsPlugins ?? [])],
+  jsPlugins: [...(tooling.jsPlugins ?? []), ...antidrift.jsPlugins],
   options: {
     ...tooling.options,
     typeAware: true,
@@ -48,30 +47,12 @@ export default defineConfig({
   plugins: [...nativePlugins],
   settings: {
     ...tooling.settings,
-    ...governance.settings,
   },
   rules: {
     ...toolingBaseRules,
-    ...governance.rules,
+    ...antidrift.rules,
     "max-lines": "off",
     "max-lines-per-function": "off",
-    "react/rules-of-hooks": "error",
-    "react/exhaustive-deps": "error",
-    "react/no-deriving-state-in-effects": "error",
-    "react/purity": "error",
-    "react/button-has-type": "error",
-    "react/checked-requires-onchange-or-readonly": "error",
-    "react/iframe-missing-sandbox": "error",
-    "react/jsx-key": "error",
-    "react/jsx-no-target-blank": "error",
-    "react/jsx-no-duplicate-props": "error",
-    "react/jsx-no-script-url": "error",
-    "react/jsx-no-constructed-context-values": "error",
-    "react/no-danger-with-children": "error",
-    "react/no-unknown-property": "error",
-    "react/no-children-prop": "error",
-    "react/jsx-no-undef": "error",
-    "react/jsx-no-comment-textnodes": "error",
     "preserve-caught-error": "error",
     "no-console": "error",
     "no-debugger": "error",
@@ -115,26 +96,26 @@ export default defineConfig({
   },
   overrides: [
     ...(tooling.overrides ?? []),
-    ...(governance.overrides ?? []),
     {
       files: ["**/*.{ts,tsx,mts,cts}"],
       plugins: [...nativePlugins, "typescript"],
       rules: typescriptRules,
     },
     {
-      files: ["tooling/**/*.{ts,tsx,mts,cts}"],
+      files: ["src/oxlint-plugin/**"],
       rules: {
-        "typescript/no-unsafe-assignment": "off",
-        "typescript/no-unsafe-member-access": "off",
-        "typescript/no-unsafe-return": "off",
-        "typescript/no-unsafe-call": "off",
-        "typescript/no-unsafe-argument": "off",
-        "typescript/restrict-template-expressions": "off",
+        "antidrift/max-function-lines": "off",
+        "antidrift/max-module-lines": "off",
+        "antidrift/no-pass-through-parameters": "off",
+        "antidrift/no-query-join-or-tree-reshape": "off",
+        "antidrift/no-vague-names": "off",
       },
     },
     {
-      files: ["tooling/**"],
+      files: ["scripts/**"],
       rules: {
+        "antidrift/max-function-lines": "off",
+        "antidrift/no-vague-names": "off",
         "no-console": "off",
       },
     },

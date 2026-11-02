@@ -1,50 +1,96 @@
 {
-  "name": "antidrift-monorepo",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@joedeleeuw/antidrift",
+  "version": "0.22.0",
   "type": "module",
+  "license": "MIT",
+  "description": "Host-agnostic Oxlint and ESLint rules for TypeScript, React, boundary decoding, and AI-agent drift prevention.",
+  "keywords": [
+    "oxlint",
+    "eslint",
+    "lint",
+    "guardrails",
+    "ai",
+    "agents",
+    "typescript",
+    "react"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joedeleeuw/antidrift.git"
+  },
+  "homepage": "https://github.com/joedeleeuw/antidrift#readme",
+  "bugs": "https://github.com/joedeleeuw/antidrift/issues",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "packageManager": "pnpm@12.16.1",
   "engines": {
     "node": ">=26"
   },
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./oxlint-plugin": {
+      "types": "./src/oxlint-plugin/index.d.ts",
+      "import": "./src/oxlint-plugin/index.js"
+    },
+    "./eslint-plugin": {
+      "types": "./src/oxlint-plugin/index.d.ts",
+      "import": "./src/oxlint-plugin/index.js"
+    },
+    "./oxlint-config": {
+      "types": "./src/oxlint-config/index.d.ts",
+      "import": "./src/oxlint-config/index.js"
+    },
+    "./eslint-config": {
+      "types": "./src/eslint-config/index.d.ts",
+      "import": "./src/eslint-config/index.js"
+    },
+    "./preset": {
+      "types": "./src/oxlint-config/index.d.ts",
+      "import": "./src/oxlint-config/index.js"
+    },
+    "./brand": {
+      "types": "./src/brand/index.d.mts",
+      "import": "./src/brand/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "src"
+  ],
   "scripts": {
-    "build": "pnpm -r --if-present build",
-    "typecheck": "tsc -p tsconfig.json --pretty false && tsc -p tooling/antidrift --pretty false && tsc -p apps/shape-sample --pretty false",
-    "lint": "pnpm lint:rust && pnpm lint:oxlint",
-    "lint:rust": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo run --quiet -p antidrift-linter -- rust . --deny-warnings",
-    "parity:rust": "node tooling/antidrift/test/rust-parity.mjs",
-    "lint:oxlint": "antidrift oxlint",
-    "lint:sarif": "mkdir -p reports && antidrift oxlint -- --format sarif > reports/oxlint.sarif || true",
-    "test:integration": "pnpm package:verify",
-    "package:verify": "node tooling/antidrift/test/consumer-monorepo.mjs",
-    "check": "pnpm verify:release",
-    "check:ci": "pnpm verify:release",
-    "verify:release": "pnpm policy:check-generated && pnpm policy:check-registries && pnpm parity:rust && pnpm typecheck && pnpm lint && pnpm package:verify",
-    "policy:generate": "antidrift generate",
-    "policy:check-generated": "antidrift check-generated",
-    "policy:check-registries": "antidrift check-registries",
-    "policy:check:changed": "antidrift check-changed",
-    "policy:verify-session": "antidrift verify-session",
-    "policy:reports": "pnpm lint:sarif",
+    "typecheck": "tsc -p tsconfig.json --pretty false",
+    "lint": "oxlint -c oxlint.config.mts src scripts oxlint.config.mts",
+    "smoke": "node scripts/verify-smoke.mjs",
+    "check": "pnpm typecheck && pnpm lint && pnpm smoke",
+    "check:ci": "pnpm check",
+    "verify:release": "pnpm check",
+    "policy:verify-session": "pnpm check",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
-    "@joedeleeuw/antidrift": "workspace:*",
     "@joedeleeuw/typescript-tooling": "github:joedeleeuw/typescript-tooling#0f9ce5d52ca962471ae1774620f9f77389669bc1",
-    "@types/node": "catalog:core",
-    "eslint": "catalog:lint",
-    "eslint-plugin-boundaries": "^5.0.1",
-    "lint-staged": "catalog:git",
-    "oxlint": "catalog:lint",
-    "oxlint-tsgolint": "catalog:lint",
-    "prettier": "catalog:lint",
-    "simple-git-hooks": "catalog:git",
-    "tsx": "catalog:core",
-    "typescript": "catalog:core"
+    "@types/node": "^26.6.6",
+    "@typescript-eslint/parser": "^8.72.0",
+    "eslint": "^10.13.0",
+    "lint-staged": "^15.3.0",
+    "oxlint": "^1.89.0",
+    "oxlint-tsgolint": "^7.0.2005",
+    "prettier": "^3.4.2",
+    "simple-git-hooks": "^2.11.1",
+    "typescript": "6.0.3"
   },
   "lint-staged": {
-    "*.{js,cjs,mjs,ts,tsx}": [
-      "antidrift oxlint --fix",
+    "*.{js,cjs,mjs,ts,tsx,mts}": [
+      "oxlint -c oxlint.config.mts --fix",
       "prettier --write"
     ],
     "*.{json,jsonc,md,yml,yaml}": [

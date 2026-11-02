@@ -1,5 +1,0 @@
-statuses:
-  TodoStatus:
-    owner: apps/shape-sample/src/shared/todo.ts
-    valuesExport: todoStatuses
-    values: [open, done]

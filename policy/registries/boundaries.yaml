@@ -1,6 +1,0 @@
-serverBoundaryGlobs:
-  - apps/shape-sample/src/routes/**/*.ts
-
-requiredCalls:
-  authorization:
-    - requireOwner

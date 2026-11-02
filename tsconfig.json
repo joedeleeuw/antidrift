@@ -1,8 +1,12 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "target": "ES2024",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
     "noEmit": true,
+    "skipLibCheck": true,
     "types": ["node"]
   },
-  "files": ["oxlint.config.mts"]
+  "include": ["oxlint.config.mts", "src/**/*.d.ts", "src/**/*.d.mts"]
 }

@@ -1,4 +1,0 @@
-approvedGateways:
-  ai:
-    wrapper: apps/shape-sample/src/runtime/client.ts
-    bannedDirectImports: [openai, "@anthropic-ai/sdk"]

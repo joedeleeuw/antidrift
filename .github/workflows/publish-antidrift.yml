@@ -9,248 +9,32 @@ permissions:
   contents: read
 
 jobs:
-  platform-packages:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'antidrift-v')
-    runs-on: ${{ matrix.runner }}
-    env:
-      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-      CARGO_BUILD_TARGET: ${{ matrix.target }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-22.04
-            package: linux-x64-gnu
-            target: x86_64-unknown-linux-gnu
-          - runner: ubuntu-22.04-arm
-            package: linux-arm64-gnu
-            target: aarch64-unknown-linux-gnu
-          - runner: ubuntu-22.04
-            package: linux-x64-musl
-            target: x86_64-unknown-linux-musl
-          - runner: ubuntu-22.04-arm
-            package: linux-arm64-musl
-            target: aarch64-unknown-linux-musl
-          - runner: macos-15
-            package: darwin-arm64
-            target: aarch64-apple-darwin
-          - runner: windows-latest
-            package: win32-x64-msvc
-            target: x86_64-pc-windows-msvc
-          - runner: windows-11-arm
-            package: win32-arm64-msvc
-            target: aarch64-pc-windows-msvc
-    steps:
-      - name: Allow long paths in git checkouts
-        if: runner.os == 'Windows'
-        run: git config --system core.longpaths true
-
-      - uses: actions/checkout@v6
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 26
-          package-manager-cache: false
-
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
-        with:
-          build-warnings: warn
-
-      - run: rustup target add "${{ matrix.target }}"
-
-      - uses: mlugg/setup-zig@v2
-        if: endsWith(matrix.package, '-musl')
-        with:
-          version: 0.15.2
-
-      - uses: taiki-e/install-action@v2
-        if: endsWith(matrix.package, '-musl')
-        with:
-          tool: cargo-zigbuild@0.24.0
-
-      - name: Verify release tag matches package version
-        if: github.event_name == 'release'
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        shell: bash
-        run: |
-          VERSION="$(node -p "require('./tooling/antidrift/package.json').version")"
-          EXPECTED_TAG="antidrift-v${VERSION}"
-          if [ "${RELEASE_TAG}" != "${EXPECTED_TAG}" ]; then
-            echo "release tag ${RELEASE_TAG} must match ${EXPECTED_TAG}" >&2
-            exit 1
-          fi
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Build antidrift-linter and the Oxlint addon
-        if: "!endsWith(matrix.package, '-musl')"
-        run: cargo build --release --locked --target "${{ matrix.target }}" -p antidrift-linter -p antidrift-napi
-
-      - name: Build antidrift-linter and the Oxlint addon against musl
-        if: endsWith(matrix.package, '-musl')
-        env:
-          RUSTFLAGS: -C target-feature=-crt-static
-        run: cargo zigbuild --release --locked --target "${{ matrix.target }}" -p antidrift-linter -p antidrift-napi
-
-      - name: Pack platform package
-        shell: bash
-        run: |
-          node tooling/antidrift/scripts/stage-platform-package.mjs "${{ matrix.package }}" "$RUNNER_TEMP/platform-package"
-          mkdir -p "$RUNNER_TEMP/platform-pack"
-          npm pack "$RUNNER_TEMP/platform-package" --pack-destination "$RUNNER_TEMP/platform-pack"
-          echo "ANTIDRIFT_PLATFORM_TARBALL=$RUNNER_TEMP/platform-pack/$(ls -- "$RUNNER_TEMP/platform-pack")" >> "$GITHUB_ENV"
-
-      - name: Smoke the packed platform package on this runner
-        if: "!endsWith(matrix.package, '-musl')"
-        run: pnpm package:verify
-
-      - name: Smoke the packed platform package in node:26-alpine
-        if: endsWith(matrix.package, '-musl')
-        run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --env HOME=/tmp/home \
-            --env NPM_CONFIG_PREFIX=/tmp/npm-global \
-            --env ANTIDRIFT_PLATFORM_TARBALL \
-            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
-            --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
-            --workdir "$GITHUB_WORKSPACE" \
-            node:26-alpine \
-            sh -euc 'export PATH="/tmp/npm-global/bin:$PATH"; npm install --global "$(node -p "require(\"./package.json\").packageManager")" && pnpm package:verify'
-
-      - name: Archive antidrift-linter for the GitHub release
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p "$RUNNER_TEMP/release-archive"
-          tar -czf "$RUNNER_TEMP/release-archive/antidrift-linter-${{ matrix.target }}.tar.gz" -C "target/${{ matrix.target }}/release" antidrift-linter
-
-      - name: Archive antidrift-linter for the GitHub release
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/release-archive" | Out-Null
-          Compress-Archive -Path "target/${{ matrix.target }}/release/antidrift-linter.exe" -DestinationPath "$env:RUNNER_TEMP/release-archive/antidrift-linter-${{ matrix.target }}.zip"
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: platform-${{ matrix.package }}
-          path: ${{ runner.temp }}/platform-pack/*.tgz
-          if-no-files-found: error
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: release-${{ matrix.package }}
-          path: ${{ runner.temp }}/release-archive/*
-          if-no-files-found: error
-
-  release-set:
-    needs: platform-packages
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 26
-          package-manager-cache: false
-
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: platform-*
-          path: ${{ runner.temp }}/platform-packs
-          merge-multiple: true
-
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: release-*
-          path: ${{ runner.temp }}/release-archives
-          merge-multiple: true
-
-      - run: node tooling/antidrift/scripts/verify-release-set.mjs "$RUNNER_TEMP/platform-packs" "$RUNNER_TEMP/release-archives"
-
   publish:
     if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'antidrift-v')
-    needs: release-set
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
-      contents: write
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v6
-
       - uses: pnpm/action-setup@v6
-
       - uses: actions/setup-node@v6
         with:
           node-version: 26
-          package-manager-cache: false
-
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
-        with:
-          build-warnings: warn
-
-      - run: node --version && npm --version && pnpm --version && cargo --version
+          registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
-      - run: cargo build --release --locked -p antidrift-linter -p antidrift-napi
-
       - name: Verify release tag matches package version
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          VERSION="$(node -p "require('./tooling/antidrift/package.json').version")"
+          VERSION="$(node -p "require('./package.json').version")"
           EXPECTED_TAG="antidrift-v${VERSION}"
           if [ "${RELEASE_TAG}" != "${EXPECTED_TAG}" ]; then
             echo "release tag ${RELEASE_TAG} must match ${EXPECTED_TAG}" >&2
             exit 1
           fi
-
       - run: pnpm verify:release
-
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: platform-*
-          path: ${{ runner.temp }}/platform-packs
-          merge-multiple: true
-
-      - name: Publish platform packages
-        run: node tooling/antidrift/scripts/publish-tarball.mjs "$RUNNER_TEMP"/platform-packs/*.tgz
-
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: release-*
-          path: ${{ runner.temp }}/release-archives
-          merge-multiple: true
-
-      - name: Attach antidrift-linter archives to the release
+      - run: npm publish --provenance --access public
         env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          existing="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
-          mkdir -p "$RUNNER_TEMP/published-archives"
-          for archive in "$RUNNER_TEMP"/release-archives/*; do
-            name="$(basename "$archive")"
-            if ! grep -qxF "$name" <<<"$existing"; then
-              gh release upload "$RELEASE_TAG" "$archive" --repo "$GITHUB_REPOSITORY"
-              echo "uploaded $name"
-              continue
-            fi
-            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$name" --dir "$RUNNER_TEMP/published-archives" --clobber
-            local_digest="$(sha256sum "$archive" | cut -d' ' -f1)"
-            published_digest="$(sha256sum "$RUNNER_TEMP/published-archives/$name" | cut -d' ' -f1)"
-            if [ "$local_digest" != "$published_digest" ]; then
-              echo "release asset $name already exists with digest $published_digest, this build produced $local_digest; delete the asset by hand if this build should replace it" >&2
-              exit 1
-            fi
-            echo "kept $name (same digest)"
-          done
-
-      - name: Pack package
-        run: pnpm --dir tooling/antidrift pack --pack-destination "$RUNNER_TEMP/antidrift-pack"
-
-      - name: Publish package
-        run: node tooling/antidrift/scripts/publish-tarball.mjs "$RUNNER_TEMP"/antidrift-pack/*.tgz
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

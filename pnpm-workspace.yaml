@@ -1,43 +1,6 @@
-engineStrict: true
-strictPeerDependencies: true
-autoInstallPeers: false
-resolutionMode: highest
-
-packages:
-  - apps/*
-  - tooling/*
-  - tooling/antidrift/npm/*
-
-linkWorkspacePackages: true
-
 allowBuilds:
   "@firebase/util": true
   esbuild: true
   protobufjs: true
   simple-git-hooks: true
   unrs-resolver: true
-
-catalogs:
-  core:
-    "@types/node": ^26.6.6
-    tsx: ^4.19.2
-    typescript: 6.0.3
-    yaml: ^2.6.1
-    zod: ^3.24.1
-
-  lint:
-    "@typescript-eslint/parser": ^8.72.0
-    eslint: ^10.13.0
-    eslint-plugin-boundaries: ^5.0.1
-    "@eslint-community/eslint-plugin-eslint-comments": ^4.7.2
-    oxlint: ^1.89.0
-    oxlint-tsgolint: ^7.0.2005
-    prettier: ^3.4.2
-    typescript-eslint: ^8.72.0
-
-  git:
-    lint-staged: ^15.3.0
-    simple-git-hooks: ^2.11.1
-
-minimumReleaseAgeExclude:
-  - eslint-plugin-unicorn@79.0.0
