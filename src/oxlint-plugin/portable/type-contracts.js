@@ -1,7 +1,5 @@
-import { noKnownValueWideningRule } from "../anti-slop/rules/no-known-value-widening.js";
-import { noWidenThenAssertRule } from "../anti-slop/rules/no-widen-then-assert.js";
-import { mergeVisitors } from "../shared/merge-visitors.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { findVariable, unwrapExpression } from "../shared/scope.js";
 
 export const noAppeasementCastRule = {
   meta: {
@@ -65,12 +63,59 @@ export const noAppeasementCastRule = {
   },
 };
 
+function erasedUnknownInitializer(node) {
+  if (node.id?.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword") {
+    return node.init?.type === "TSAsExpression"
+      ? node.init.expression
+      : node.init;
+  }
+  if (
+    node.init?.type === "TSAsExpression" &&
+    node.init.typeAnnotation?.type === "TSUnknownKeyword"
+  ) {
+    return node.init.expression;
+  }
+  return null;
+}
+
+function isContractFreeLiteral(expr) {
+  const unwrapped = unwrapExpression(expr);
+  return (
+    (unwrapped?.type === "ObjectExpression" &&
+      unwrapped.properties.length === 0) ||
+    (unwrapped?.type === "ArrayExpression" && unwrapped.elements.length === 0)
+  );
+}
+
+function isReestablishingRef(ident) {
+  const parent = ident.parent;
+  if (
+    parent?.type === "TSAsExpression" &&
+    parent.expression === ident &&
+    parent.typeAnnotation?.type === "TSTypeReference"
+  ) {
+    return true;
+  }
+  if (
+    parent?.type === "CallExpression" &&
+    parent.arguments[0] === ident &&
+    parent.callee?.type === "MemberExpression" &&
+    parent.callee.property?.type === "Identifier" &&
+    /^(?:parse|safeParse|parseAsync|decodeUnknownSync|decodeUnknownEither)$/u.test(
+      parent.callee.property.name
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export const noAppeasementErasureRule = {
   meta: {
     type: "problem",
     docs: {
       description:
-        "Disallow widening known values to `unknown` or open dictionaries to erase type evidence.",
+        "Disallow widening known values to `unknown` only to re-assert or re-parse a narrower contract.",
     },
     schema: [
       {
@@ -79,20 +124,32 @@ export const noAppeasementErasureRule = {
         additionalProperties: false,
       },
     ],
-    messages: {
-      ...noKnownValueWideningRule.meta?.messages,
-      ...noWidenThenAssertRule.meta?.messages,
-    },
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const v1 = noKnownValueWideningRule.create
-      ? noKnownValueWideningRule.create(context)
-      : {};
-    const v2 = noWidenThenAssertRule.create
-      ? noWidenThenAssertRule.create(context)
-      : {};
-    return mergeVisitors(v1, v2);
+    const sourceCode = context.sourceCode;
+    return {
+      VariableDeclarator(node) {
+        if (node.id?.type !== "Identifier" || node.parent?.kind !== "const") {
+          return;
+        }
+        const init = erasedUnknownInitializer(node);
+        if (!init || isContractFreeLiteral(init)) return;
+        const variable = findVariable(sourceCode, node.id);
+        if (!variable) return;
+        if (
+          variable.references.some(
+            (ref) => ref.isRead() && isReestablishingRef(ref.identifier)
+          )
+        ) {
+          context.report({
+            node: node.id,
+            message:
+              "Appeasement erasure: widening a known value to `unknown` only makes the parse or cast below look earned. Keep the precise type and validate at the real boundary.",
+          });
+        }
+      },
+    };
   },
 };
 

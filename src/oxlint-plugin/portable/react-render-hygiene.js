@@ -66,15 +66,24 @@ export const noHooklessUseFunctionRule = {
     function enter(node) {
       stack.push({ node, name: functionNameOf(node), calledHook: false });
     }
+    function isPlatformHookStub(node) {
+      if (node.body?.type !== "BlockStatement") return false;
+      const stmts = node.body.body;
+      if (stmts.length === 0) return true;
+      if (stmts.length !== 1 || stmts[0].type !== "ReturnStatement") {
+        return false;
+      }
+      const arg = stmts[0].argument;
+      return (
+        !arg ||
+        arg.type === "Literal" ||
+        (arg.type === "Identifier" && arg.name === "undefined")
+      );
+    }
     function exit() {
       const frame = stack.pop();
       if (!frame?.name || !HOOK_NAME.test(frame.name)) return;
-      if (
-        frame.node.body?.type === "BlockStatement" &&
-        frame.node.body.body.length === 0
-      ) {
-        return;
-      }
+      if (isPlatformHookStub(frame.node)) return;
       if (!frame.calledHook) {
         context.report({
           node: frame.node.id ?? frame.node,
@@ -396,6 +405,12 @@ export const noExternalDecodeInTsxRule = {
         return true;
       }
       if (method === "parse") {
+        if (
+          callee.object?.type === "Identifier" &&
+          /^(?:Date|URL|path)$/u.test(callee.object.name)
+        ) {
+          return false;
+        }
         const arg = unwrapExpression(node.arguments[0]);
         return (
           arg?.type === "MemberExpression" ||

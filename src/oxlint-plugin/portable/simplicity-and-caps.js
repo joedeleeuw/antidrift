@@ -389,6 +389,7 @@ export const noReexportOnlyModuleRule = {
     ).replaceAll("\\", "/");
     if (
       /\/index\.[cm]?[jt]sx?$/u.test(filename) ||
+      /(?:^|\/)[^/]+\.config\.[cm]?[jt]sx?$/u.test(filename) ||
       /\.(?:ios|android|native|web|electron)\.[cm]?[jt]sx?$/u.test(filename) ||
       /(?:^|\/)app\/.*\.[cm]?[jt]sx?$/u.test(filename)
     ) {
