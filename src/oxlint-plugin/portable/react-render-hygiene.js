@@ -485,10 +485,20 @@ export const noQueryJoinOrTreeReshapeRule = {
         if (innerParam?.type !== "Identifier") return;
 
         for (let cur = node.parent; cur; cur = cur.parent) {
-          if (isMethodCall(cur, OUTER_METHODS)) {
-            const outerCb = unwrapExpression(cur.arguments[0]);
-            const outerParam = outerCb?.params?.[0];
-            if (outerParam?.type === "Identifier") {
+          if (!isFunctionLike(cur)) continue;
+          const outerCall =
+            cur.parent?.type === "CallExpression"
+              ? cur.parent
+              : cur.parent?.parent;
+          if (
+            isMethodCall(outerCall, OUTER_METHODS) &&
+            unwrapExpression(outerCall.arguments[0]) === cur
+          ) {
+            const outerParam = cur.params?.[0];
+            if (
+              outerParam?.type === "Identifier" &&
+              outerParam.name !== innerParam.name
+            ) {
               const text = context.sourceCode.getText(innerCb.body);
               if (
                 text.includes(`${innerParam.name}.`) &&
